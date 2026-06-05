@@ -2,7 +2,7 @@
 mod_fin/__init__.py — interface pública do módulo financeiro
 
 Uso:
-    from mod_fin import calcular_aymore, calcular_cartao, calcular_financeira_loja
+    from mod_fin import calcular_aymore, calcular_cartao
     from mod_fin import carregar_faixas, carregar_tabela
 """
 import os, json
@@ -39,12 +39,6 @@ def carregar_faixas(codigo: str) -> list:
     if tipo == "avista":
         return [{"parcelas": 1, "custo_pct": 0.0, "label": "À Vista"}]
 
-    if tipo == "parcelado_proprio":
-        return [{"parcelas": int(f["parcelas"]),
-                 "custo_pct": float(f.get("acrescimo_pct", 0)),
-                 "label": f.get("obs", f"{f['parcelas']}x")}
-                for f in tab.get("faixas", [])]
-
     if tipo == "financiamento_externo":
         if "faixas" in tab:   # cartao_credito
             return [{"parcelas": max(1, int(f["parcelas"])),
@@ -77,25 +71,21 @@ def carregar_faixas(codigo: str) -> list:
 
 def listar_modalidades() -> list:
     """Retorna lista de modalidades disponíveis para o dropdown da interface."""
-    import os
-    codigos = ['a_vista', 'aymore', 'cartao_credito',
-               'financeira_loja', 'venda_programada', 'total_flex']
+    codigos = ['a_vista', 'aymore', 'cartao_credito', 'venda_programada', 'total_flex']
     resultado = []
     for codigo in codigos:
         tab = _carregar(codigo)
         if tab:
             resultado.append({
-                'codigo':   tab.get('codigo', codigo),
+                'codigo':    tab.get('codigo', codigo),
                 'descricao': tab.get('descricao', codigo),
-                'tipo':     tab.get('tipo', ''),
+                'tipo':      tab.get('tipo', ''),
             })
         else:
-            # Fallback para modalidades sem JSON
             nomes = {
                 'a_vista':          ('A Vista',          'avista'),
                 'aymore':           ('Aymoré',            'financiamento_externo'),
                 'cartao_credito':   ('Cartão de Crédito', 'financiamento_externo'),
-                'financeira_loja':  ('Financeira Loja',   'parcelado_proprio'),
                 'venda_programada': ('Venda Programada',  'programado'),
                 'total_flex':       ('Total Flex',        'flex'),
             }
@@ -104,6 +94,5 @@ def listar_modalidades() -> list:
     return resultado
 
 # Imports diretos das funções de cálculo
-from .aymore          import calcular as calcular_aymore
-from .cartao          import calcular as calcular_cartao
-from .financeira_loja import calcular as calcular_financeira_loja
+from .aymore import calcular as calcular_aymore
+from .cartao  import calcular as calcular_cartao
