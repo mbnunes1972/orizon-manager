@@ -1,0 +1,11 @@
+{
+  "codigo": "total_flex",
+  "descricao": "Total Flex",
+  "tipo": "flex",
+  "recebimento": "parcelado",
+  "gerar_boleto": true,
+  "parcelas_max": 6,
+  "prazo_maximo_dias": 365,
+  "taxa_juros_mensal_pct": 2.0,
+  "observacao": "Datas e valores livres. Juros compostos mensais sobre saldo devedor. Ultima parcela fecha o saldo automaticamente."
+}

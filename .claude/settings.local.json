@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(netstat *)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(Get-ChildItem -Path \"E:\\\\2026\\\\ESTUDO_DE_IA\\\\Omie_V2\" -Recurse -File | Where-Object { $_.Extension -in '.py','.json','.html','.js','.css' } | Sort-Object LastWriteTime -Descending | Select-Object Name, LastWriteTime, FullName | Select-Object -First 20 | Format-Table -AutoSize)",
+      "PowerShell(try { $resp = Invoke-WebRequest -Uri \"http://127.0.0.1:8765/pagamentos/aymore/faixas\" -UseBasicParsing -TimeoutSec 3; $resp.Content } catch { \"Servidor não está rodando ou erro: $_\" })",
+      "PowerShell(cd \"E:\\\\2026\\\\ESTUDO_DE_IA\\\\Omie_V2\"; Start-Process python -ArgumentList \"main.py\" -WindowStyle Hidden; Start-Sleep -Seconds 2; try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8765/pagamentos/aymore/faixas\" -UseBasicParsing -TimeoutSec 5; \"Status: $\\($r.StatusCode\\)\"; $r.Content } catch { \"Erro: $_\" })",
+      "PowerShell($body = '{\"valor_venda\": 75000, \"entrada\": 0, \"n_parcelas\": 8, \"carencia_dias\": 30, \"data_contrato\": \"2026-06-04\"}'; try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8765/calcular_aymore\" -Method POST -Body $body -ContentType \"application/json\" -UseBasicParsing -TimeoutSec 5; \"Status: $\\($r.StatusCode\\)\"; $data = $r.Content | ConvertFrom-Json; \"ok: $\\($data.ok\\), n_parcelas: $\\($data.n_parcelas\\), parcelas_count: $\\($data.parcelas.Count\\)\" } catch { \"Erro: $_\" })",
+      "PowerShell($file = \"E:\\\\2026\\\\ESTUDO_DE_IA\\\\Omie_V2\\\\static\\\\index.html\"; $lines = \\(Get-Content $file\\).Count; $size = \\(Get-Item $file\\).Length; \"Linhas: $lines, Bytes: $size\"; $bytes = [System.IO.File]::ReadAllBytes\\($file\\); \"Primeiros 3 bytes \\(BOM?\\): $\\($bytes[0]\\) $\\($bytes[1]\\) $\\($bytes[2]\\)\")",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8765/projetos\" -UseBasicParsing -TimeoutSec 5; \\($r.Content | ConvertFrom-Json\\).projetos | Select-Object -First 3 nome_safe, nome_projeto } catch { \"Erro: $_\" })",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8765/projetos/Projeto_Marcelo_13\" -UseBasicParsing -TimeoutSec 5; $proj = \\($r.Content | ConvertFrom-Json\\).projeto; \"Nome: $\\($proj.nome_projeto\\)\"; \"Ambientes: $\\($proj.ambientes.Count\\)\"; $proj.ambientes | ForEach-Object { \"  - $\\($_.arquivo\\): selecionado=$\\($_.selecionado\\), total=$\\($_.total\\)\" } } catch { \"Erro: $_\" })",
+      "PowerShell($body = '{\"valor_venda\": 129328.4, \"entrada\": 0, \"n_parcelas\": 8, \"carencia_dias\": 30, \"data_contrato\": \"2026-06-04\"}'; try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8765/calcular_aymore\" -Method POST -Body $body -ContentType \"application/json\" -UseBasicParsing -TimeoutSec 5; $data = $r.Content | ConvertFrom-Json; \"ok=$\\($data.ok\\), taxa_ret=$\\($data.taxa_retencao_pct\\)%, liberado=R$$\\($data.valor_liberado\\), parcelas=$\\($data.parcelas.Count\\)\"; $data.parcelas | ForEach-Object { \"  $\\($_.tipo\\) $\\($_.num\\): $\\($_.data\\) = R$$\\($_.valor\\)\" } } catch { \"Erro: $_\" })",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Start-Sleep -Seconds 2; try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8765/\" -UseBasicParsing -TimeoutSec 3; \"OK — HTTP $\\($r.StatusCode\\)\" } catch { \"Falha: $_\" })",
+      "PowerShell(cd \"E:\\\\2026\\\\ESTUDO_DE_IA\\\\Omie_V2\"; $proc = Start-Process python -ArgumentList \"main.py\" -PassThru -RedirectStandardOutput \".\\\\server_out.txt\" -RedirectStandardError \".\\\\server_err.txt\"; Start-Sleep -Seconds 3; Get-Content \".\\\\server_out.txt\" -ErrorAction SilentlyContinue; Get-Content \".\\\\server_err.txt\" -ErrorAction SilentlyContinue; try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8765/\" -UseBasicParsing -TimeoutSec 3; \"Servidor OK: $\\($r.StatusCode\\)\" } catch { \"Servidor não respondeu\" })",
+      "PowerShell(Copy-Item *)"
+    ]
+  }
+}

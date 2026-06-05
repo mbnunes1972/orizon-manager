@@ -1,0 +1,9 @@
+﻿__pycache__/
+*.pyc
+*.pyo
+omie_config.json
+omie_grupos_cache.json
+PROJETOS/
+*.xlsx
+.env
+.pytest_cache/

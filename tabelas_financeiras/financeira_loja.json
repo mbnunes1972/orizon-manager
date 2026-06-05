@@ -1,0 +1,16 @@
+{
+  "codigo": "financeira_loja",
+  "descricao": "Financeira Loja",
+  "tipo": "parcelado_proprio",
+  "recebimento": "parcelado",
+  "gerar_boleto": true,
+  "parcelas_max": 4,
+  "observacao": "Ate 4x: entrada + ate 3x com juros compostos de 2% ao mes",
+  "taxa_juros_mensal": 0.02,
+  "faixas": [
+    {"parcelas": 1, "acrescimo_pct": 0.0,  "carencia_dias": 30, "obs": "A vista"},
+    {"parcelas": 2, "acrescimo_pct": 2.0,  "carencia_dias": 30, "obs": "Entrada + 1x"},
+    {"parcelas": 3, "acrescimo_pct": 4.04, "carencia_dias": 30, "obs": "Entrada + 2x"},
+    {"parcelas": 4, "acrescimo_pct": 6.12, "carencia_dias": 30, "obs": "Entrada + 3x"}
+  ]
+}

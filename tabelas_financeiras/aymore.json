@@ -1,0 +1,111 @@
+{
+  "codigo": "aymore",
+  "descricao": "Aymoré",
+  "tipo": "financiamento_externo",
+  "recebimento": "avista_instituicao",
+  "gerar_boleto": false,
+  "parcelas_max": 24,
+  "carencia_min_dias": 15,
+  "carencia_max_dias": 120,
+  "carencia_step_dias": 5,
+  "formula_retencao": "((1/n)/PMT(taxa_mensal, n, -1) * (1+taxa_mensal)^((carencia-30)/30)) - 1",
+  "observacao": "Taxa de retencao calculada em tempo real via formula com carencia. Atualizada conforme tabela Santander/Aymore.",
+  "taxas_mensais": [
+    {
+      "parcelas": 1,
+      "taxa_mensal_pct": 4.3891
+    },
+    {
+      "parcelas": 2,
+      "taxa_mensal_pct": 3.1261
+    },
+    {
+      "parcelas": 3,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 4,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 5,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 6,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 7,
+      "taxa_mensal_pct": 2.4
+    },
+    {
+      "parcelas": 8,
+      "taxa_mensal_pct": 2.4
+    },
+    {
+      "parcelas": 9,
+      "taxa_mensal_pct": 2.4
+    },
+    {
+      "parcelas": 10,
+      "taxa_mensal_pct": 2.4
+    },
+    {
+      "parcelas": 11,
+      "taxa_mensal_pct": 2.4
+    },
+    {
+      "parcelas": 12,
+      "taxa_mensal_pct": 2.4
+    },
+    {
+      "parcelas": 13,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 14,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 15,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 16,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 17,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 18,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 19,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 20,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 21,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 22,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 23,
+      "taxa_mensal_pct": 2.45
+    },
+    {
+      "parcelas": 24,
+      "taxa_mensal_pct": 2.5157
+    }
+  ]
+}

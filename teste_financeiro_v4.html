@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Painel de Testes — Módulo Financeiro v4</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0b0c0f;color:#dde1ec;font-family:'Courier New',monospace;padding:24px;font-size:13px}
+h1{color:#e8611a;font-size:18px;margin-bottom:4px}
+.sub{color:#5a6178;font-size:11px;margin-bottom:20px}
+.tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+.tab{padding:7px 14px;border-radius:6px;border:1px solid #1f2330;cursor:pointer;font-size:12px;color:#5a6178;background:#111318;transition:.15s}
+.tab:hover{border-color:#e8611a;color:#e8611a}
+.tab.active{background:#e8611a;color:#fff;border-color:#e8611a}
+.panel{display:none}.panel.active{display:block}
+.grid2{display:grid;grid-template-columns:300px 1fr;gap:16px}
+.sep{height:1px;background:#1f2330;margin:12px 0}
+
+/* Cards */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.card{border-radius:8px;padding:12px;border:1px solid}
+.card-green {background:rgba(25,201,160,.06);border-color:rgba(25,201,160,.3)}
+.card-green .lbl{color:rgba(25,201,160,.7)} .card-green .val{color:#19c9a0}
+.card-orange{background:rgba(232,97,26,.06);border-color:rgba(232,97,26,.3)}
+.card-orange .lbl{color:rgba(232,97,26,.7)} .card-orange .val{color:#e8611a}
+.card-amber {background:rgba(240,165,0,.06);border-color:rgba(240,165,0,.3)}
+.card-amber .lbl{color:rgba(240,165,0,.7)}  .card-amber .val{color:#f0a500}
+.card-blue  {background:rgba(99,179,237,.06);border-color:rgba(99,179,237,.3)}
+.card-blue .lbl{color:rgba(99,179,237,.7)}  .card-blue .val{color:#63b3ed}
+.card-neutral{background:#161921;border-color:#1f2330}
+.card-neutral .lbl{color:#5a6178} .card-neutral .val{color:#dde1ec}
+.lbl{font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
+.val{font-size:14px;font-weight:bold}
+
+/* Contrato box — destaque principal */
+.contrato-box{border-radius:10px;overflow:hidden;margin-bottom:14px;border:1px solid #1f2330}
+.contrato-avista{background:rgba(25,201,160,.06);border-bottom:1px solid #1f2330;padding:14px 16px}
+.contrato-parcelado{background:rgba(232,97,26,.06);padding:14px 16px}
+.contrato-label{font-size:9px;color:#5a6178;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.contrato-val{font-family:'Epilogue',sans-serif;font-weight:900;font-size:22px}
+.contrato-val.green{color:#19c9a0}
+.contrato-val.orange{color:#e8611a}
+.contrato-sub{font-size:11px;color:#5a6178;margin-top:4px}
+.toggle-btn{font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #1f2330;
+  background:transparent;color:#5a6178;cursor:pointer}
+.toggle-btn:hover{border-color:#19c9a0;color:#19c9a0}
+
+/* Campos */
+.field{margin-bottom:8px}
+.field label{display:block;font-size:11px;color:#5a6178;margin-bottom:3px}
+.field input,.field select{width:100%;background:#111318;border:1px solid #1f2330;
+  border-radius:6px;padding:6px 10px;color:#dde1ec;font-family:'Courier New',monospace;
+  font-size:12px;outline:none;transition:.15s}
+.field input:focus,.field select:focus{border-color:#e8611a}
+.field input[readonly]{color:#5a6178;cursor:default;border-style:dashed}
+
+/* Botões */
+.btn{padding:7px 14px;border-radius:6px;border:none;cursor:pointer;font-family:'Courier New',monospace;font-size:12px;font-weight:bold;transition:.15s}
+.btn-p{background:#e8611a;color:#fff}.btn-p:hover{opacity:.85}
+.btn-g{background:transparent;border:1px solid #1f2330;color:#5a6178}.btn-g:hover{border-color:#e8611a;color:#e8611a}
+
+/* Tabela de parcelas */
+.pt{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+.pt th{color:#5a6178;text-align:left;padding:5px 8px;border-bottom:1px solid #1f2330;font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.pt td{padding:5px 8px;border-bottom:1px solid #1f2330}
+.pt tbody tr:hover td{background:rgba(255,255,255,.02)}
+.badge{font-size:10px;padding:1px 7px;border-radius:3px;display:inline-block}
+.bc{background:rgba(90,97,120,.15);color:#5a6178}
+.be{background:rgba(232,97,26,.15);color:#e8611a}
+.b1{background:rgba(240,165,0,.12);color:#f0a500}
+.bp{background:rgba(25,201,160,.1);color:#19c9a0}
+
+/* Log */
+.log{background:#111318;border:1px solid #1f2330;border-radius:6px;padding:10px;
+  font-size:11px;line-height:1.7;max-height:140px;overflow-y:auto;white-space:pre-wrap;margin-top:8px}
+.log .ok{color:#19c9a0}.log .err{color:#e05555}.log .info{color:#f0a500}
+
+/* Testes automáticos */
+.progress{height:3px;background:#1f2330;border-radius:2px;margin-bottom:14px;overflow:hidden}
+.progress-bar{height:100%;background:#19c9a0;transition:width .2s}
+.suite-wrap{margin-bottom:10px;background:#161921;border:1px solid #1f2330;border-radius:8px;overflow:hidden}
+.suite-hdr{padding:9px 14px;background:#111318;font-size:12px;font-weight:bold;border-bottom:1px solid #1f2330;display:flex;justify-content:space-between;align-items:center}
+.case-row{padding:7px 14px;border-bottom:1px solid #1f2330;font-size:11px;display:flex;justify-content:space-between;align-items:flex-start}
+.case-row:last-child{border:none}
+.case-detail{font-size:10px;color:#e05555;margin-top:3px;padding-left:8px;border-left:2px solid rgba(224,85,85,.3)}
+.sum-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+
+/* Tabela de taxas */
+.taxa-table{width:100%;border-collapse:collapse;font-size:11px}
+.taxa-table th{color:#5a6178;padding:5px 8px;border-bottom:1px solid #1f2330;text-align:right;font-size:10px;text-transform:uppercase}
+.taxa-table th:first-child{text-align:left}
+.taxa-table td{padding:4px 8px;border-bottom:1px solid #1f2330;text-align:right}
+.taxa-table td:first-child{text-align:left;color:#5a6178}
+.taxa-table tr:hover td{background:rgba(255,255,255,.02)}
+
+/* Histórico */
+.hist-table{width:100%;border-collapse:collapse;font-size:11px}
+.hist-table th{color:#5a6178;padding:5px 8px;border-bottom:1px solid #1f2330;text-align:left;font-size:10px;text-transform:uppercase}
+.hist-table td{padding:6px 8px;border-bottom:1px solid #1f2330;vertical-align:top}
+.hist-table tr:hover td{background:rgba(255,255,255,.02)}
+</style>
+</head>
+<body>
+
+<h1>🧪 Painel de Testes — Módulo Financeiro v4</h1>
+<div class="sub">
+  Servidor: <span id="srv-url" style="color:#e8611a"></span>
+  &nbsp;|&nbsp; <span id="srv-status" style="color:#f0a500">verificando...</span>
+  &nbsp;|&nbsp; Última execução: <span id="last-run" style="color:#5a6178">—</span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('auto')">▶ Testes Automáticos</div>
+  <div class="tab" onclick="showTab('aymore')">Aymoré</div>
+  <div class="tab" onclick="showTab('cartao')">Cartão</div>
+  <div class="tab" onclick="showTab('financeira')">Financeira Loja</div>
+  <div class="tab" onclick="showTab('taxas')">📊 Taxas</div>
+  <div class="tab" onclick="showTab('hist')">📋 Histórico</div>
+</div>
+
+<!-- ═══ TESTES AUTOMÁTICOS ═══ -->
+<div id="tab-auto" class="panel active">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <button class="btn btn-p" onclick="runAll()">▶ Executar Todos</button>
+    <button class="btn btn-g" onclick="clearAuto()">Limpar</button>
+    <span id="run-badge"></span>
+  </div>
+  <div class="progress"><div class="progress-bar" id="prog" style="width:0"></div></div>
+  <div class="sum-cards">
+    <div class="card card-neutral"><div class="lbl">Total</div><div class="val" id="s-tot">—</div></div>
+    <div class="card card-green"><div class="lbl">Passou</div><div class="val" id="s-pass">—</div></div>
+    <div class="card card-amber"><div class="lbl">Falhou</div><div class="val" id="s-fail" style="color:#e05555">—</div></div>
+  </div>
+  <div id="suite-out"></div>
+</div>
+
+<!-- ═══ AYMORÉ ═══ -->
+<div id="tab-aymore" class="panel">
+  <div class="grid2">
+    <div>
+      <div class="field">
+        <label>Valor Bruto (R$) — do XML / base de negociação</label>
+        <input type="number" id="ay-bruto" value="129328.40" oninput="ayCalcAvista()">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 80px;gap:8px">
+        <div class="field">
+          <label>Desconto (%)</label>
+          <input type="number" id="ay-desconto" value="10" min="0" max="100" step="0.5" oninput="ayCalcAvista()">
+        </div>
+        <div class="field">
+          <label style="color:#5a6178">Desc. R$</label>
+          <input type="number" id="ay-desc-rs" value="0" readonly>
+        </div>
+      </div>
+      <div class="field">
+        <label>Valor à Vista (R$) — loja recebe — calculado automaticamente</label>
+        <input type="number" id="ay-avista" value="0" readonly style="color:#19c9a0;border-color:rgba(25,201,160,.3)">
+      </div>
+      <div class="field">
+        <label>Valor ao Cliente (R$) — com gross-up — calculado automaticamente</label>
+        <input type="number" id="ay-venda" value="0" readonly>
+      </div>
+      <div class="field"><label>Entrada (R$)</label>
+        <input type="number" id="ay-entrada" value="0"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div class="field"><label>Parcelas</label>
+          <select id="ay-n" onchange="ayCalcAvista()">
+            <option value="1">1x</option><option value="2">2x</option><option value="3">3x</option>
+            <option value="4">4x</option><option value="5">5x</option><option value="6">6x</option>
+            <option value="7">7x</option><option value="8" selected>8x</option><option value="9">9x</option>
+            <option value="10">10x</option><option value="11">11x</option><option value="12">12x</option>
+            <option value="13">13x</option><option value="14">14x</option><option value="15">15x</option>
+            <option value="16">16x</option><option value="17">17x</option><option value="18">18x</option>
+            <option value="19">19x</option><option value="20">20x</option><option value="21">21x</option>
+            <option value="22">22x</option><option value="23">23x</option><option value="24">24x</option>
+          </select></div>
+        <div class="field"><label>Carência (dias)</label>
+          <select id="ay-car" onchange="ayCalcAvista()">
+            <option value="15">15d</option><option value="20">20d</option><option value="25">25d</option>
+            <option value="30" selected>30d</option><option value="35">35d</option><option value="40">40d</option>
+            <option value="45">45d</option><option value="60">60d</option>
+            <option value="75">75d</option><option value="90">90d</option><option value="120">120d</option>
+          </select></div>
+      </div>
+      <div class="field"><label>Data do Contrato</label>
+        <input type="date" id="ay-data"></div>
+      <button class="btn btn-p" style="width:100%;margin-top:4px" onclick="calcAy()">Calcular →</button>
+      <div class="sep"></div>
+      <div id="ay-checks"></div>
+    </div>
+    <div>
+      <!-- Box principal de contrato -->
+      <div class="contrato-box" id="ay-contrato-box" style="display:none">
+        <div class="contrato-avista">
+          <div class="contrato-label">
+            <span>Contrato à Vista — Loja Recebe</span>
+            <button class="toggle-btn" onclick="toggleAvista('ay')">ocultar</button>
+          </div>
+          <div class="contrato-val green" id="ay-c-avista">—</div>
+          <div class="contrato-sub" id="ay-c-avista-sub"></div>
+        </div>
+        <div class="contrato-parcelado">
+          <div class="contrato-label">Contrato Parcelado — Cliente Paga</div>
+          <div class="contrato-val orange" id="ay-c-parcelado">—</div>
+          <div class="contrato-sub" id="ay-c-parcelado-sub"></div>
+        </div>
+      </div>
+      <!-- Cards de detalhe -->
+      <div class="cards" id="ay-cards">
+        <div class="card card-neutral"><div class="lbl">Aguardando</div><div class="val">—</div></div>
+      </div>
+      <table class="pt">
+        <thead><tr><th>#</th><th>Tipo</th><th>Vencimento</th><th style="text-align:right">Valor</th></tr></thead>
+        <tbody id="ay-tb"></tbody>
+      </table>
+      <div class="log" id="ay-log">Clique em Calcular...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CARTÃO ═══ -->
+<div id="tab-cartao" class="panel">
+  <div class="grid2">
+    <div>
+      <div class="field">
+        <label>Valor Bruto (R$) — do XML / base de negociação</label>
+        <input type="number" id="cc-bruto" value="10000" oninput="ccCalcAvista()">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 80px;gap:8px">
+        <div class="field">
+          <label>Desconto (%)</label>
+          <input type="number" id="cc-desconto" value="0" min="0" max="100" step="0.5" oninput="ccCalcAvista()">
+        </div>
+        <div class="field">
+          <label style="color:#5a6178">Desc. R$</label>
+          <input type="number" id="cc-desc-rs" value="0" readonly>
+        </div>
+      </div>
+      <div class="field">
+        <label>Valor à Vista (R$) — loja recebe — calculado automaticamente</label>
+        <input type="number" id="cc-avista" value="0" readonly style="color:#19c9a0;border-color:rgba(25,201,160,.3)">
+      </div>
+      <div class="field">
+        <label>Valor ao Cliente (R$) — com gross-up — calculado automaticamente</label>
+        <input type="number" id="cc-venda" value="0" readonly>
+      </div>
+      <div class="field"><label>Entrada (R$)</label>
+        <input type="number" id="cc-entrada" value="0"></div>
+      <div class="field"><label>Parcelas</label>
+        <select id="cc-n" onchange="ccCalcAvista()">
+          <option value="1">1x (à vista)</option><option value="2">2x</option><option value="3">3x</option>
+          <option value="4">4x</option><option value="5">5x</option><option value="6" selected>6x</option>
+          <option value="7">7x</option><option value="8">8x</option><option value="9">9x</option>
+          <option value="10">10x</option><option value="11">11x</option><option value="12">12x</option>
+          <option value="13">13x</option><option value="14">14x</option><option value="15">15x</option>
+          <option value="16">16x</option><option value="17">17x</option><option value="18">18x</option>
+          <option value="19">19x</option><option value="20">20x</option><option value="21">21x</option>
+        </select></div>
+      <div class="field"><label>Data do Contrato</label>
+        <input type="date" id="cc-data"></div>
+      <button class="btn btn-p" style="width:100%;margin-top:4px" onclick="calcCC()">Calcular →</button>
+      <div class="sep"></div>
+      <div id="cc-checks"></div>
+    </div>
+    <div>
+      <div class="contrato-box" id="cc-contrato-box" style="display:none">
+        <div class="contrato-avista">
+          <div class="contrato-label">
+            <span>Contrato à Vista — Loja Recebe</span>
+            <button class="toggle-btn" onclick="toggleAvista('cc')">ocultar</button>
+          </div>
+          <div class="contrato-val green" id="cc-c-avista">—</div>
+          <div class="contrato-sub" id="cc-c-avista-sub"></div>
+        </div>
+        <div class="contrato-parcelado">
+          <div class="contrato-label">Contrato Parcelado — Cliente Paga</div>
+          <div class="contrato-val orange" id="cc-c-parcelado">—</div>
+          <div class="contrato-sub" id="cc-c-parcelado-sub"></div>
+        </div>
+      </div>
+      <div class="cards" id="cc-cards">
+        <div class="card card-neutral"><div class="lbl">Aguardando</div><div class="val">—</div></div>
+      </div>
+      <table class="pt">
+        <thead><tr><th>#</th><th>Tipo</th><th>Vencimento</th><th style="text-align:right">Valor</th></tr></thead>
+        <tbody id="cc-tb"></tbody>
+      </table>
+      <div class="log" id="cc-log">Clique em Calcular...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ FINANCEIRA LOJA ═══ -->
+<div id="tab-financeira" class="panel">
+  <div class="grid2">
+    <div>
+      <div class="field"><label>Valor à Vista (R$) — o que a loja quer receber</label>
+        <input type="number" id="fl-avista" value="10000"></div>
+      <div class="field"><label>Entrada (R$)</label>
+        <input type="number" id="fl-entrada" value="0"></div>
+      <div class="field"><label>Parcelas (1–4)</label>
+        <select id="fl-n">
+          <option value="1">1x</option><option value="2">2x</option>
+          <option value="3">3x</option><option value="4" selected>4x</option>
+        </select></div>
+      <div class="field"><label>Data do Contrato</label>
+        <input type="date" id="fl-data"></div>
+      <div class="field"><label>Parcela 1 — editável (0 = base)</label>
+        <input type="number" id="fl-p1" value="0"></div>
+      <div class="field"><label>Parcela 2 — editável (0 = base)</label>
+        <input type="number" id="fl-p2" value="0"></div>
+      <div class="field"><label>Parcela 3 — editável (0 = base)</label>
+        <input type="number" id="fl-p3" value="0"></div>
+      <button class="btn btn-p" style="width:100%;margin-top:4px" onclick="calcFL()">Calcular →</button>
+    </div>
+    <div>
+      <div class="contrato-box" id="fl-contrato-box" style="display:none">
+        <div class="contrato-avista">
+          <div class="contrato-label">
+            <span>Contrato à Vista — Loja Recebe</span>
+            <button class="toggle-btn" onclick="toggleAvista('fl')">ocultar</button>
+          </div>
+          <div class="contrato-val green" id="fl-c-avista">—</div>
+          <div class="contrato-sub" id="fl-c-avista-sub"></div>
+        </div>
+        <div class="contrato-parcelado">
+          <div class="contrato-label">Contrato Parcelado — Cliente Paga</div>
+          <div class="contrato-val orange" id="fl-c-parcelado">—</div>
+          <div class="contrato-sub" id="fl-c-parcelado-sub"></div>
+        </div>
+      </div>
+      <div class="cards" id="fl-cards">
+        <div class="card card-neutral"><div class="lbl">Aguardando</div><div class="val">—</div></div>
+      </div>
+      <table class="pt">
+        <thead><tr><th>#</th><th>Tipo</th><th>Vencimento</th><th style="text-align:right">Valor</th></tr></thead>
+        <tbody id="fl-tb"></tbody>
+      </table>
+      <div class="log" id="fl-log">Clique em Calcular...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TABELA DE TAXAS ═══ -->
+<div id="tab-taxas" class="panel">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <div>
+      <h2 style="color:#19c9a0;font-size:13px;margin-bottom:10px">Aymoré — Carência 30d / Base R$100k à vista</h2>
+      <table class="taxa-table">
+        <thead><tr><th>Prazo</th><th>Taxa Mens.</th><th>Retenção</th><th style="color:#19c9a0">Loja Recebe</th><th style="color:#e8611a">Cliente Paga</th><th style="color:#e8611a">Parcela</th></tr></thead>
+        <tbody id="taxa-ay-tb"></tbody>
+      </table>
+    </div>
+    <div>
+      <h2 style="color:#19c9a0;font-size:13px;margin-bottom:10px">Cartão de Crédito — Base R$10k à vista</h2>
+      <table class="taxa-table">
+        <thead><tr><th>Prazo</th><th>Retenção</th><th style="color:#19c9a0">Loja Recebe</th><th style="color:#e8611a">Cliente Paga</th><th style="color:#e8611a">Parcela</th></tr></thead>
+        <tbody id="taxa-cc-tb"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HISTÓRICO ═══ -->
+<div id="tab-hist" class="panel">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <h2 style="color:#19c9a0;font-size:13px">Histórico</h2>
+    <button class="btn btn-g" onclick="clearHist()">Limpar</button>
+  </div>
+  <table class="hist-table">
+    <thead><tr><th>Horário</th><th>Resultado</th><th>✓</th><th>✗</th><th>Falhas</th></tr></thead>
+    <tbody id="hist-tb"></tbody>
+  </table>
+</div>
+
+<script>
+const BASE = 'http://127.0.0.1:8765';
+const fmt  = v => 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtP = v => Number(v).toLocaleString('pt-BR',{minimumFractionDigits:4,maximumFractionDigits:4})+'%';
+const hoje = new Date().toISOString().split('T')[0];
+let _hist  = JSON.parse(localStorage.getItem('fin_hist_v4')||'[]');
+let _avistas = {ay: true, cc: true, fl: true};
+
+['ay-data','cc-data','fl-data'].forEach(id=>document.getElementById(id).value=hoje);
+document.getElementById('srv-url').textContent=BASE;
+
+fetch(BASE+'/config').then(r=>{
+  document.getElementById('srv-status').textContent = r.ok?'✓ Servidor online':'✗ Erro';
+  document.getElementById('srv-status').style.color = r.ok?'#19c9a0':'#e05555';
+}).catch(()=>{
+  document.getElementById('srv-status').textContent='✗ Servidor offline';
+  document.getElementById('srv-status').style.color='#e05555';
+});
+
+// Inicializar campos de valor ao cliente
+setTimeout(()=>{ayCalcAvista();ccCalcAvista();},100);
+
+function showTab(n){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const ns=['auto','aymore','cartao','financeira','taxas','hist'];
+    t.className='tab'+(ns[i]===n?' active':'');
+  });
+  document.querySelectorAll('.panel').forEach(p=>p.className='panel');
+  document.getElementById('tab-'+n).className='panel active';
+  if(n==='taxas') buildTaxas();
+  if(n==='hist')  renderHist();
+}
+
+// ── Cálculo local da taxa de retenção Aymoré (para preview) ──────────────
+const TAXAS_AY={1:0.043891,2:0.031261,3:0.0245,4:0.0245,5:0.0245,6:0.0245,
+  7:0.024,8:0.024,9:0.024,10:0.024,11:0.024,12:0.024,
+  13:0.0245,14:0.0245,15:0.0245,16:0.0245,17:0.0245,18:0.0245,
+  19:0.0245,20:0.0245,21:0.0245,22:0.0245,23:0.0245,24:0.025157};
+const TAXAS_CC={1:2.85,2:3.65,3:4.15,4:4.65,5:5.15,6:5.65,7:6.16,8:6.66,
+  9:7.16,10:7.66,11:8.16,12:8.66,13:9.16,14:9.66,15:10.16,
+  16:10.66,17:11.16,18:11.66,19:12.16,20:12.66,21:13.16};
+
+function pmtJs(taxa,n){return taxa*(1+taxa)**n/((1+taxa)**n-1);}
+
+function calcRetencaoAy(n,car){
+  const taxa=TAXAS_AY[n]||0.024;
+  const coef=pmtJs(taxa,n)*(1+taxa)**((car-30)/30);
+  return 1-(1.0/n)/coef;
+}
+
+function ayCalcAvista(){
+  const bruto=+document.getElementById('ay-bruto').value||0;
+  const desc=+document.getElementById('ay-desconto').value||0;
+  const descRs=Math.round(bruto*desc/100*100)/100;
+  const avista=Math.round((bruto-descRs)*100)/100;
+  document.getElementById('ay-desc-rs').value=descRs.toFixed(2);
+  document.getElementById('ay-avista').value=avista.toFixed(2);
+  // Recalcular valor ao cliente
+  const n=+document.getElementById('ay-n').value||8;
+  const car=+document.getElementById('ay-car').value||30;
+  const ret=calcRetencaoAy(n,car);
+  const cliente=avista>0?Math.round(avista/(1-ret)*100)/100:0;
+  document.getElementById('ay-venda').value=cliente.toFixed(2);
+}
+
+function ccCalcAvista(){
+  const bruto=+document.getElementById('cc-bruto').value||0;
+  const desc=+document.getElementById('cc-desconto').value||0;
+  const descRs=Math.round(bruto*desc/100*100)/100;
+  const avista=Math.round((bruto-descRs)*100)/100;
+  document.getElementById('cc-desc-rs').value=descRs.toFixed(2);
+  document.getElementById('cc-avista').value=avista.toFixed(2);
+  const n=+document.getElementById('cc-n').value||6;
+  const taxa=(TAXAS_CC[n]||5.65)/100;
+  const cliente=avista>0?Math.round(avista/(1-taxa)*100)/100:0;
+  document.getElementById('cc-venda').value=cliente.toFixed(2);
+}
+
+// Alias para compatibilidade
+function ayCalcCliente(){ ayCalcAvista(); }
+function ccCalcCliente(){ ccCalcAvista(); }
+
+// ── Toggle à vista ────────────────────────────────────────────────────────
+function toggleAvista(prefix){
+  _avistas[prefix] = !_avistas[prefix];
+  const avDiv=document.getElementById(prefix+'-contrato-box').querySelector('.contrato-avista');
+  const btn=document.getElementById(prefix+'-contrato-box').querySelector('.toggle-btn');
+  avDiv.style.display=_avistas[prefix]?'block':'none';
+  btn.textContent=_avistas[prefix]?'ocultar':'mostrar';
+}
+
+// ── Contrato box ──────────────────────────────────────────────────────────
+function showContrato(prefix, avista, parcelado, sub_av, sub_par){
+  document.getElementById(prefix+'-contrato-box').style.display='block';
+  document.getElementById(prefix+'-c-avista').textContent=fmt(avista);
+  document.getElementById(prefix+'-c-avista-sub').textContent=sub_av||'';
+  document.getElementById(prefix+'-c-parcelado').textContent=fmt(parcelado);
+  document.getElementById(prefix+'-c-parcelado-sub').textContent=sub_par||'';
+}
+
+// ── Cards ─────────────────────────────────────────────────────────────────
+function makeCards(id,items){
+  document.getElementById(id).innerHTML=items.map(([l,v,c])=>
+    `<div class="card card-${c||'neutral'}"><div class="lbl">${l}</div><div class="val">${v}</div></div>`
+  ).join('');
+}
+
+// ── Parcelas ──────────────────────────────────────────────────────────────
+function makeParcelas(tbId, lista, totalPago){
+  const B={contrato:['bc','Assinatura'],entrada:['be','Entrada'],primeira:['b1','1ª Parc.'],parcela:['bp','Parcela']};
+  const rows=lista.map(p=>{
+    const[cls,lbl]=B[p.tipo]||B.parcela;
+    return `<tr>
+      <td style="color:#5a6178">${p.num>0?p.num:'—'}</td>
+      <td><span class="badge ${cls}">${lbl}</span></td>
+      <td style="color:#5a6178">${p.data}</td>
+      <td style="text-align:right;color:${p.tipo==='entrada'?'#e8611a':p.tipo==='contrato'?'#5a6178':'#19c9a0'}">
+        ${p.valor!==null?fmt(p.valor):'—'}</td></tr>`;
+  }).join('');
+  document.getElementById(tbId).innerHTML=rows+
+    `<tr><td colspan="3" style="color:#5a6178;font-size:11px;padding-top:8px">Total pago pelo cliente</td>
+      <td style="text-align:right;color:#19c9a0;font-weight:bold;padding-top:8px">${fmt(totalPago)}</td></tr>`;
+}
+
+function addLog(id,msg,cls=''){
+  const el=document.getElementById(id);
+  const s=document.createElement('span');
+  s.className=cls;s.textContent=msg+'\n';
+  el.appendChild(s);el.scrollTop=el.scrollHeight;
+}
+
+function buildChecks(items){
+  return items.map(([lbl,got,exp,tol])=>{
+    const ok=Math.abs(Number(got)-Number(exp))<=tol;
+    return `<div style="padding:5px 0;border-bottom:1px solid #1f2330;font-size:11px">
+      <div style="display:flex;justify-content:space-between">
+        <span style="color:#5a6178">${lbl}</span>
+        <span style="color:${ok?'#19c9a0':'#e05555'}">${ok?'✓ '+Number(got).toFixed(4):'✗'}</span>
+      </div>${!ok?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:3px;font-size:10px">
+        <div style="background:rgba(25,201,160,.08);border:1px solid rgba(25,201,160,.2);border-radius:3px;padding:2px 6px">
+          <div style="color:#5a6178">esperado</div><div style="color:#19c9a0">${exp}</div></div>
+        <div style="background:rgba(224,85,85,.08);border:1px solid rgba(224,85,85,.2);border-radius:3px;padding:2px 6px">
+          <div style="color:#5a6178">recebido</div><div style="color:#e05555">${Number(got).toFixed(4)}</div>
+        </div></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+// ── AYMORÉ ────────────────────────────────────────────────────────────────
+async function calcAy(){
+  const avista =+document.getElementById('ay-avista').value||0;
+  const venda  =+document.getElementById('ay-venda').value||0;
+  const ent    =+document.getElementById('ay-entrada').value||0;
+  const n      =+document.getElementById('ay-n').value||8;
+  const car    =+document.getElementById('ay-car').value||30;
+  const dc     =document.getElementById('ay-data').value;
+  document.getElementById('ay-log').innerHTML='';
+  addLog('ay-log',`POST /calcular_aymore  venda=${venda} ent=${ent} n=${n} car=${car}`,'info');
+  try{
+    const r=await fetch(BASE+'/calcular_aymore',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({valor_avista:avista,entrada:ent,n_parcelas:n,carencia_dias:car,data_contrato:dc})});
+    const d=await r.json();
+    if(!d.ok){addLog('ay-log','ERRO: '+d.erro,'err');return;}
+    addLog('ay-log',`✓ ret=${d.taxa_retencao_pct}%  loja=${d.valor_liberado}  custo=${d.retencao_rs}  parcela=${d.valor_parcela}`,'ok');
+
+    // Box contrato
+    showContrato('ay',
+      d.valor_liberado,
+      d.total_cliente,
+      `Loja recebe: ${fmt(d.valor_liberado)} (após retenção de ${fmtP(d.taxa_retencao_pct)})`,
+      `${n}x ${fmt(d.valor_parcela)}${ent>0?' | entrada '+fmt(ent):''}`
+    );
+
+    makeCards('ay-cards',[
+      ['Loja Recebe',      fmt(d.valor_liberado),     'green'],
+      ['Cliente Paga',     fmt(d.total_cliente),      'orange'],
+      ['Custo Financeiro', fmt(d.retencao_rs),        'amber'],
+      ['Taxa Retenção',    fmtP(d.taxa_retencao_pct), 'amber'],
+      ['Entrada',          fmt(d.entrada),            d.entrada>0?'blue':'neutral'],
+      ['Financiado',       fmt(d.financiado),         'orange'],
+      ['Valor / Parcela',  fmt(d.valor_parcela),      'orange'],
+      ['Taxa Mensal',      fmtP(d.taxa_mensal_pct),   'neutral'],
+      ['Carência',         car+'d',                   'neutral'],
+    ]);
+    makeParcelas('ay-tb',d.parcelas,d.total_cliente);
+
+    // Checks para caso padrão
+    if(Math.abs(venda-110223.82)<1&&ent===0&&n===8&&car===20){
+      document.getElementById('ay-checks').innerHTML=buildChecks([
+        ['Loja Recebe (valor_liberado)', d.valor_liberado, 100000, 1],
+        ['Taxa Retenção %',              d.taxa_retencao_pct, 9.2755, 0.001],
+        ['Valor Parcela',                d.valor_parcela, 13777.98, 0.1],
+      ]);
+    } else {
+      document.getElementById('ay-checks').innerHTML=
+        '<div style="color:#5a6178;font-size:11px;padding:8px 0">Defina à vista=R$100k, 8x, 20d para verificação automática</div>';
+    }
+  }catch(e){addLog('ay-log','EXCEÇÃO: '+e.message,'err');}
+}
+
+// ── CARTÃO ────────────────────────────────────────────────────────────────
+async function calcCC(){
+  const avista=+document.getElementById('cc-avista').value||0;
+  const venda =+document.getElementById('cc-venda').value||0;
+  const ent   =+document.getElementById('cc-entrada').value||0;
+  const n     =+document.getElementById('cc-n').value||6;
+  const dc    =document.getElementById('cc-data').value;
+  document.getElementById('cc-log').innerHTML='';
+  addLog('cc-log',`POST /calcular_cartao  venda=${venda} ent=${ent} n=${n}`,'info');
+  try{
+    const r=await fetch(BASE+'/calcular_cartao',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({valor_avista:avista,entrada:ent,n_parcelas:n,data_contrato:dc})});
+    const d=await r.json();
+    if(!d.ok){addLog('cc-log','ERRO: '+d.erro,'err');return;}
+    addLog('cc-log',`✓ ret=${d.taxa_retencao_pct}%  loja=${d.valor_liberado}  parcela=${d.valor_parcela}`,'ok');
+
+    showContrato('cc',
+      d.valor_liberado,
+      d.total_cliente,
+      `Loja recebe: ${fmt(d.valor_liberado)} (retenção ${fmtP(d.taxa_retencao_pct)})`,
+      `${n}x ${fmt(d.valor_parcela)}${ent>0?' | entrada '+fmt(ent):''}`
+    );
+
+    makeCards('cc-cards',[
+      ['Loja Recebe',      fmt(d.valor_liberado),     'green'],
+      ['Cliente Paga',     fmt(d.total_cliente),      'orange'],
+      ['Custo Financeiro', fmt(d.retencao_rs),        'amber'],
+      ['Taxa Retenção',    fmtP(d.taxa_retencao_pct), 'amber'],
+      ['Entrada',          fmt(d.entrada),            d.entrada>0?'blue':'neutral'],
+      ['Financiado',       fmt(d.financiado),         'orange'],
+      ['Valor / Parcela',  fmt(d.valor_parcela),      'orange'],
+      ['Liquidação',       d.liquidacao,              'neutral'],
+    ]);
+    makeParcelas('cc-tb',d.parcelas,d.total_cliente);
+  }catch(e){addLog('cc-log','EXCEÇÃO: '+e.message,'err');}
+}
+
+// ── FINANCEIRA LOJA ───────────────────────────────────────────────────────
+async function calcFL(){
+  const venda=+document.getElementById('fl-avista').value||0;
+  const ent  =+document.getElementById('fl-entrada').value||0;
+  const n    =+document.getElementById('fl-n').value||4;
+  const dc   =document.getElementById('fl-data').value;
+  const vals =[+document.getElementById('fl-p1').value,
+               +document.getElementById('fl-p2').value,
+               +document.getElementById('fl-p3').value].slice(0,n-1);
+  document.getElementById('fl-log').innerHTML='';
+  addLog('fl-log',`POST /calcular_financeira_loja  venda=${venda} ent=${ent} n=${n}`,'info');
+  try{
+    const r=await fetch(BASE+'/calcular_financeira_loja',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({valor_venda:venda,entrada:ent,n_parcelas:n,data_contrato:dc,valores_parcelas:vals})});
+    const d=await r.json();
+    if(!d.ok){addLog('fl-log','ERRO: '+d.erro,'err');return;}
+
+    showContrato('fl',
+      d.financiado,
+      d.total_cliente,
+      `Loja recebe: ${fmt(d.financiado)} (financiado sem juros)`,
+      `${n}x base ${fmt(d.parcela_base)} | última ${fmt(d.ultima_parcela)}`
+    );
+
+    makeCards('fl-cards',[
+      ['Loja Recebe',    fmt(d.financiado),      'green'],
+      ['Cliente Paga',  fmt(d.total_cliente),    'orange'],
+      ['Juros (R$)',     fmt(d.acrescimo_rs),    'amber'],
+      ['Acréscimo %',   d.acrescimo_pct+'%',    'amber'],
+      ['Entrada',        fmt(d.entrada),         d.entrada>0?'blue':'neutral'],
+      ['Parcela Base',   fmt(d.parcela_base),    'orange'],
+      ['Última Parcela', fmt(d.ultima_parcela),  d.equilibrado?'green':'amber'],
+      ['Taxa Mensal',    d.taxa_juros_pct+'% a.m.','neutral'],
+      ['Equilibrado',    d.equilibrado?'✓ Sim':'⚠ Não', d.equilibrado?'green':'amber'],
+    ]);
+    makeParcelas('fl-tb',d.parcelas,d.total_cliente);
+    addLog('fl-log',d.equilibrado?'✓ Parcelas equilibradas':'⚠ Saldo: R$ '+d.saldo_remanescente,
+      d.equilibrado?'ok':'err');
+  }catch(e){addLog('fl-log','EXCEÇÃO: '+e.message,'err');}
+}
+
+// ── Tabela de taxas ───────────────────────────────────────────────────────
+function buildTaxas(){
+  // Aymoré
+  const ayRows=Object.entries(TAXAS_AY).map(([n,taxa])=>{
+    n=+n;
+    const coef=pmtJs(taxa,n)*1;
+    const ret=1-(1.0/n)/coef;
+    const avista=100000;
+    const cliente=Math.round(avista/(1-ret)*100)/100;
+    const parc=Math.round(cliente/n*100)/100;
+    return `<tr>
+      <td>${n}x</td>
+      <td>${(taxa*100).toFixed(4)}%</td>
+      <td style="color:#f0a500">${(ret*100).toFixed(4)}%</td>
+      <td style="color:#19c9a0">${fmt(avista)}</td>
+      <td style="color:#e8611a">${fmt(cliente)}</td>
+      <td style="color:#e8611a">${fmt(parc)}</td></tr>`;
+  }).join('');
+  document.getElementById('taxa-ay-tb').innerHTML=ayRows;
+
+  // Cartão
+  const ccRows=Object.entries(TAXAS_CC).map(([n,taxa_pct])=>{
+    n=+n;
+    const taxa=taxa_pct/100;
+    const avista=10000;
+    const cliente=Math.round(avista/(1-taxa)*100)/100;
+    const parc=Math.round(cliente/n*100)/100;
+    return `<tr>
+      <td>${n}x</td>
+      <td style="color:#f0a500">${taxa_pct.toFixed(2)}%</td>
+      <td style="color:#19c9a0">${fmt(avista)}</td>
+      <td style="color:#e8611a">${fmt(cliente)}</td>
+      <td style="color:#e8611a">${fmt(parc)}</td></tr>`;
+  }).join('');
+  document.getElementById('taxa-cc-tb').innerHTML=ccRows;
+}
+
+// ── Testes automáticos ────────────────────────────────────────────────────
+// NOTA: os testes enviam valor_venda = valor ao cliente (gross-up já aplicado)
+// pois os backends recebem o total que o cliente paga
+const SUITES=[
+  {nome:'Aymoré', ep:'/calcular_aymore', casos:[
+    {lbl:'8x/20d/avista=100k → loja recebe R$100k',
+     pay:{valor_avista:100000,entrada:0,n_parcelas:8,carencia_dias:20,data_contrato:hoje},
+     chk:[['taxa_retencao_pct',9.2755,0.001],['valor_liberado',100000,1],['valor_parcela',13777.98,0.1],['total_cliente',110223.82,1]]},
+    {lbl:'12x/30d/avista=100k',
+     pay:{valor_avista:100000,entrada:0,n_parcelas:12,carencia_dias:30,data_contrato:hoje},
+     chk:[['taxa_retencao_pct',13.9987,0.001],['valor_liberado',100000,1],['total_cliente',116277.37,1]]},
+    {lbl:'8x/20d/avista=100k + entrada 20k → total menor',
+     pay:{valor_avista:100000,entrada:20000,n_parcelas:8,carencia_dias:20,data_contrato:hoje},
+     chk:[['valor_liberado',100000,1],['financiado',88179.05,0.5],['total_cliente',108179.05,1]]},
+    {lbl:'8x/20d/avista=100k + entrada 50k → total ainda menor',
+     pay:{valor_avista:100000,entrada:50000,n_parcelas:8,carencia_dias:20,data_contrato:hoje},
+     chk:[['valor_liberado',100000,1],['total_cliente',105111.91,1]]},
+    {lbl:'8x/60d — carência maior = mais retenção',
+     pay:{valor_avista:100000,entrada:0,n_parcelas:8,carencia_dias:60,data_contrato:hoje},
+     chk:[['taxa_retencao_pct',12.0995,0.001],['valor_liberado',100000,1]]},
+    {lbl:'8x/15d — carência menor = menos retenção',
+     pay:{valor_avista:100000,entrada:0,n_parcelas:8,carencia_dias:15,data_contrato:hoje},
+     chk:[['taxa_retencao_pct',8.9162,0.001],['valor_liberado',100000,1]]},
+    {lbl:'1x/30d — prazo mínimo',
+     pay:{valor_avista:100000,entrada:0,n_parcelas:1,carencia_dias:30,data_contrato:hoje},
+     chk:[['taxa_retencao_pct',4.2046,0.001],['valor_liberado',100000,1]]},
+    {lbl:'24x/30d — prazo máximo',
+     pay:{valor_avista:100000,entrada:0,n_parcelas:24,carencia_dias:30,data_contrato:hoje},
+     chk:[['valor_liberado',100000,1],['valor_parcela',5600.98,0.1]]},
+  ]},
+  {nome:'Cartão de Crédito', ep:'/calcular_cartao', casos:[
+    {lbl:'1x/avista=10k (à vista)',
+     pay:{valor_avista:10000,entrada:0,n_parcelas:1,data_contrato:hoje},
+     chk:[['taxa_retencao_pct',2.85,0.001],['valor_liberado',10000,1],['total_cliente',10293.59,1]]},
+    {lbl:'6x/avista=10k — sem entrada',
+     pay:{valor_avista:10000,entrada:0,n_parcelas:6,data_contrato:hoje},
+     chk:[['taxa_retencao_pct',5.65,0.001],['valor_liberado',10000,1],['valor_parcela',1766.47,0.1],['total_cliente',10598.83,1]]},
+    {lbl:'6x/avista=10k + entrada 2k → total menor',
+     pay:{valor_avista:10000,entrada:2000,n_parcelas:6,data_contrato:hoje},
+     chk:[['valor_liberado',10000,1],['total_cliente',10479.07,1],['valor_parcela',1413.18,0.1]]},
+    {lbl:'12x/avista=10k',
+     pay:{valor_avista:10000,entrada:0,n_parcelas:12,data_contrato:hoje},
+     chk:[['taxa_retencao_pct',8.66,0.001],['valor_liberado',10000,1],['total_cliente',10948.11,1]]},
+    {lbl:'21x/avista=10k — prazo máximo',
+     pay:{valor_avista:10000,entrada:0,n_parcelas:21,data_contrato:hoje},
+     chk:[['taxa_retencao_pct',13.16,0.001],['valor_liberado',10000,1]]},
+  ]},
+  {nome:'Financeira Loja', ep:'/calcular_financeira_loja', casos:[
+    {lbl:'4x/R$10k — parcelas iguais',
+     pay:{valor_venda:10000,entrada:0,n_parcelas:4,data_contrato:hoje,valores_parcelas:[]},
+     chk:[['taxa_juros_pct',2,0.01],['financiado',10000,0.01],['valor_total',10824.32,0.1],['parcela_base',2706.08,0.1]]},
+    {lbl:'4x/R$10k — entrada R$2k',
+     pay:{valor_venda:10000,entrada:2000,n_parcelas:4,data_contrato:hoje,valores_parcelas:[]},
+     chk:[['financiado',8000,0.01],['total_cliente',10659.46,0.1]]},
+    {lbl:'2x/R$10k',
+     pay:{valor_venda:10000,entrada:0,n_parcelas:2,data_contrato:hoje,valores_parcelas:[]},
+     chk:[['financiado',10000,0.01],['taxa_juros_pct',2,0.01]]},
+  ]},];
+
+async function runAll(){
+  document.getElementById('suite-out').innerHTML='';
+  document.getElementById('prog').style.width='0';
+  document.getElementById('run-badge').innerHTML='<span style="color:#f0a500;font-size:11px">executando...</span>';
+  let total=0,pass=0,fail=0,results=[];
+  const totalCases=SUITES.reduce((s,x)=>s+x.casos.length,0);
+  let done=0;
+
+  for(const suite of SUITES){
+    const sid=suite.nome.replace(/[ /]/g,'_');
+    const wrap=document.createElement('div');
+    wrap.className='suite-wrap';
+    wrap.innerHTML=`<div class="suite-hdr">
+      <span style="color:#dde1ec">${suite.nome}</span>
+      <span id="sh-${sid}" style="color:#5a6178">...</span></div>
+      <div id="sc-${sid}"></div>`;
+    document.getElementById('suite-out').appendChild(wrap);
+    const casesEl=document.getElementById(`sc-${sid}`);
+    let sp=0,sf=0;
+
+    for(const caso of suite.casos){
+      total++;
+      const row=document.createElement('div');
+      row.className='case-row';
+      casesEl.appendChild(row);
+      try{
+        const r=await fetch(BASE+suite.ep,{method:'POST',
+          headers:{'Content-Type':'application/json'},body:JSON.stringify(caso.pay)});
+        const d=await r.json();
+        if(!d.ok){
+          row.innerHTML=`<span>${caso.lbl}</span><span style="color:#e05555">✗ ${d.erro}</span>`;
+          sf++;fail++;results.push({s:suite.nome,l:caso.lbl,ok:false,d:'API: '+d.erro});
+        } else {
+          const erros=[];
+          for(const[field,exp,tol=0.01] of caso.chk){
+            const got=Number(d[field]);
+            if(Math.abs(got-Number(exp))>tol)
+              erros.push(`${field}: esperado=${exp}, recebido=${got.toFixed(4)}`);
+          }
+          if(erros.length===0){
+            row.innerHTML=`<span style="color:#dde1ec">${caso.lbl}</span><span style="color:#19c9a0">✓</span>`;
+            sp++;pass++;results.push({s:suite.nome,l:caso.lbl,ok:true});
+          } else {
+            row.innerHTML=`<div style="flex:1"><div style="display:flex;justify-content:space-between">
+              <span style="color:#dde1ec">${caso.lbl}</span><span style="color:#e05555">✗</span></div>
+              <div class="case-detail">${erros.map(e=>'• '+e).join('<br>')}</div></div>`;
+            sf++;fail++;results.push({s:suite.nome,l:caso.lbl,ok:false,d:erros.join(' | ')});
+          }
+        }
+      }catch(e){
+        row.innerHTML=`<span style="color:#e05555">${caso.lbl} — ${e.message}</span>`;
+        sf++;fail++;
+      }
+      done++;
+      document.getElementById('prog').style.width=Math.round(done/totalCases*100)+'%';
+    }
+    document.getElementById(`sh-${sid}`).innerHTML=
+      `<span style="color:${sf===0?'#19c9a0':'#e05555'}">${sp}✓ ${sf}✗</span>`;
+  }
+
+  document.getElementById('s-tot').textContent=total;
+  document.getElementById('s-pass').textContent=pass;
+  document.getElementById('s-fail').textContent=fail;
+  document.getElementById('run-badge').innerHTML=
+    `<span style="background:${fail===0?'rgba(25,201,160,.15)':'rgba(224,85,85,.15)'};
+      color:${fail===0?'#19c9a0':'#e05555'};padding:2px 10px;border-radius:4px;font-size:11px">
+      ${fail===0?'✓ TODOS PASSARAM':'✗ '+fail+' FALHA'+(fail>1?'S':'')}</span>`;
+  document.getElementById('last-run').textContent=new Date().toLocaleTimeString('pt-BR');
+
+  const entry={ts:new Date().toLocaleString('pt-BR'),total,pass,fail,
+    details:results.filter(r=>!r.ok).map(r=>r.s+': '+r.l)};
+  _hist.unshift(entry);
+  if(_hist.length>30)_hist=_hist.slice(0,30);
+  localStorage.setItem('fin_hist_v4',JSON.stringify(_hist));
+}
+
+function clearAuto(){
+  document.getElementById('suite-out').innerHTML='';
+  document.getElementById('prog').style.width='0';
+  ['s-tot','s-pass','s-fail'].forEach(id=>document.getElementById(id).textContent='—');
+  document.getElementById('run-badge').innerHTML='';
+}
+
+function renderHist(){
+  const tb=document.getElementById('hist-tb');
+  if(!_hist.length){
+    tb.innerHTML='<tr><td colspan="5" style="color:#5a6178;text-align:center;padding:20px">Nenhuma execução ainda</td></tr>';
+    return;
+  }
+  tb.innerHTML=_hist.map(h=>`<tr>
+    <td style="color:#5a6178;font-size:10px;white-space:nowrap">${h.ts}</td>
+    <td style="font-weight:bold;color:${h.fail===0?'#19c9a0':'#e05555'}">${h.fail===0?'✓ OK':'✗ FALHA'}</td>
+    <td style="color:#19c9a0">${h.pass}</td>
+    <td style="color:${h.fail>0?'#e05555':'#5a6178'}">${h.fail}</td>
+    <td style="color:#5a6178;font-size:10px">${h.details.length?h.details.join('<br>'):'—'}</td>
+  </tr>`).join('');
+}
+
+function clearHist(){
+  _hist=[];localStorage.setItem('fin_hist_v4','[]');renderHist();
+}
+</script>
+</body>
+</html>

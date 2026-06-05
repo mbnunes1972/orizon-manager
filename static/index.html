@@ -1,0 +1,2410 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Promob &#x2192; Omie</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Epilogue:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#111d11; --surface:#0e180e; --card:#162016;
+  --border:#1e2e1e; --border2:#2a3a2a;
+  --accent:#5DCAA5; --ok:#5DCAA5; --warn:#EF9F27;
+  --create:#a78bfa; --section:#60a5fa; --err:#F0997B;
+  --text:#9FE1CB; --muted:#4d7a4d;
+  /* Cartão teal */
+  --teal-bg:#04342C; --teal-brd:#0F6E56; --teal-text:#9FE1CB; --teal-lbl:#5DCAA5;
+  /* Cartão amber */
+  --amber-bg:#412402; --amber-brd:#854F0B; --amber-text:#FAC775; --amber-lbl:#EF9F27;
+  /* Cartão coral */
+  --coral-bg:#4A1B0C; --coral-brd:#993C1D; --coral-text:#F5C4B3; --coral-lbl:#F0997B;
+  /* Sidebar */
+  --sb-bg:#0d160d;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;height:100vh;display:flex;overflow:hidden}
+.sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.sb-logo{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
+.sb-logo-mark{width:36px;height:36px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Epilogue',sans-serif;font-weight:900;font-size:14px;color:#fff;margin-bottom:12px}
+.sb-app-name{font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px;letter-spacing:-.3px}
+.sb-app-name span{color:var(--accent)}
+.sb-version{font-size:9px;color:var(--muted);letter-spacing:1px;margin-top:2px}
+.sb-creds{padding:16px 20px;border-bottom:1px solid var(--border)}
+.sb-creds-title{font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-family:'Epilogue',sans-serif;margin-bottom:10px}
+.sb-creds label{font-size:9px;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:4px;margin-top:8px}
+.sb-creds input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;outline:none}
+.sb-creds input:focus{border-color:var(--accent)}
+.sb-save-btn{width:100%;margin-top:12px;padding:7px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-family:'Epilogue',sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:.15s}
+.sb-save-btn:hover{border-color:var(--accent);color:var(--accent)}
+.sb-save-hint{font-size:10px;color:var(--ok);text-align:center;height:14px;margin-top:4px}
+.sb-nav{padding:16px 12px;flex:1}
+.sb-nav-title{font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-family:'Epilogue',sans-serif;padding:0 8px;margin-bottom:8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:.15s;position:relative;margin-bottom:2px;font-family:'Epilogue',sans-serif;font-size:12px;font-weight:600;color:var(--muted)}
+.nav-item::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0}
+.nav-item:hover{background:rgba(232,97,26,.06);color:var(--text)}
+.nav-item.active{background:rgba(232,97,26,.1);color:var(--accent);border-left:2px solid var(--accent);padding-left:8px}
+.nav-item.active::before{background:var(--accent)}
+.nav-item.done::before{background:var(--ok)}
+.nav-item.done{color:var(--text)}
+.nav-item.locked{opacity:.35;cursor:not-allowed}
+.nav-num{font-size:9px;opacity:.6;letter-spacing:.5px}
+.content{flex:1;overflow-y:auto;padding:28px 32px}
+.page{display:none}
+.page.active{display:block}
+.page-title{font-family:'Epilogue',sans-serif;font-weight:900;font-size:22px;letter-spacing:-.5px;margin-bottom:4px}
+.page-sub{font-size:11px;color:var(--muted);margin-bottom:24px;letter-spacing:.3px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px}
+.card-title{font-family:'Epilogue',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+label.field-label{font-size:10px;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:5px}
+input[type=text],input[type=password],input[type=number]{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;transition:.15s}
+input:focus{border-color:var(--accent)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:8px;font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;cursor:pointer;border:none;transition:.15s;letter-spacing:.2px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{opacity:.88}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--muted)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-sm{padding:6px 13px;font-size:11px}
+.btn-danger{background:transparent;border:1px solid var(--err);color:var(--err)}
+.btn-danger:hover{background:rgba(248,113,113,.1)}
+.actions{display:flex;gap:10px;align-items:center;margin-top:18px;flex-wrap:wrap}
+.hint{font-size:10px;color:var(--muted)}
+/* Projetos page */
+.proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.proj-card-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;cursor:pointer;transition:.15s;margin-bottom:8px}
+.proj-card-item:hover{border-color:var(--accent);background:rgba(232,97,26,.04)}
+.proj-card-nome{font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px}
+.proj-card-cli{font-size:11px;color:var(--muted);margin-bottom:6px}
+.proj-card-meta{display:flex;gap:12px;font-size:10px;color:var(--muted)}
+.proj-card-meta span{color:var(--section)}
+.search-wrap{position:relative;margin-bottom:12px}
+.search-wrap input{padding-right:36px}
+.search-spinner{display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%)}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.15);border-top-color:#fff;border-radius:50%;animation:spin .55s linear infinite;flex-shrink:0;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.search-hint{font-size:10px;color:var(--muted);margin-bottom:10px;height:16px}
+.form-field{margin-bottom:14px}
+/* Badge de origem */
+.badge-origem { font-size:9px; padding:2px 7px; border-radius:10px; font-weight:700; letter-spacing:.5px; }
+.badge-origem.local { background:rgba(25,201,160,.15); color:var(--ok); }
+.badge-origem.omie  { background:rgba(96,165,250,.15); color:var(--section); }
+/* Ambientes page */
+.proj-header{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.proj-header-nome{font-family:'Epilogue',sans-serif;font-weight:900;font-size:20px}
+.proj-header-cli{font-size:12px;color:var(--muted)}
+.banner{display:flex;align-items:center;gap:20px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 22px;margin-bottom:20px;flex-wrap:wrap}
+.banner-val{font-family:'Epilogue',sans-serif;font-weight:900;font-size:22px;color:var(--ok)}
+.banner-label{font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px}
+.banner-sep{width:1px;height:40px;background:var(--border);margin:0 4px}
+/* Drop zone */
+.drop-zone{border:2px dashed var(--border2);border-radius:10px;padding:28px;text-align:center;transition:.15s;cursor:pointer;position:relative;margin-bottom:16px}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:rgba(232,97,26,.03)}
+.drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.drop-icon{font-size:28px;margin-bottom:8px}
+.drop-text{font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;margin-bottom:3px}
+.drop-sub{font-size:11px;color:var(--muted)}
+/* Ambiente cards */
+.amb-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;transition:.15s}
+.amb-card.selected{border-color:rgba(25,201,160,.35)}
+.amb-card-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer}
+.amb-check{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
+.amb-info{flex:1;min-width:0}
+.amb-nome{font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px;color:var(--text)}
+.amb-file{font-size:10px;color:var(--muted);margin-top:2px}
+.amb-total{font-family:'Epilogue',sans-serif;font-weight:700;font-size:15px;color:var(--ok);white-space:nowrap}
+.amb-grupos-count{font-size:10px;color:var(--muted);text-align:right;margin-top:2px;white-space:nowrap}
+.amb-actions{display:flex;gap:6px;flex-shrink:0}
+.amb-expand-btn{background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:11px;padding:5px 10px;cursor:pointer;transition:.15s;font-family:'Epilogue',sans-serif;font-weight:700}
+.amb-expand-btn:hover{border-color:var(--accent);color:var(--accent)}
+.amb-body{display:none;border-top:1px solid var(--border);padding:0}
+.amb-body.open{display:block}
+.amb-table-wrap{overflow-x:auto}
+.amb-table{width:100%;border-collapse:collapse;font-size:11px}
+.amb-table th{text-align:left;padding:8px 14px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'Epilogue',sans-serif;background:var(--card);border-bottom:1px solid var(--border)}
+.amb-table td{padding:8px 14px;border-bottom:1px solid var(--border)}
+.amb-table tr:last-child td{border-bottom:none}
+.amb-table .td-val{text-align:right;color:var(--ok);white-space:nowrap}
+.amb-update-wrap{position:relative;display:inline-block}
+.amb-update-wrap input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.fb-row{display:flex;align-items:center;gap:10px;padding:10px 18px;background:rgba(232,97,26,.04);border-top:1px solid var(--border);flex-wrap:wrap}
+/* Feedback toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 20px;font-size:12px;color:var(--ok);z-index:200;display:none;font-family:'Epilogue',sans-serif;font-weight:700;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+.toast.err{color:var(--err)}
+/* Coming soon */
+.coming-soon{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px;opacity:.5}
+.coming-soon-icon{font-size:40px}
+.coming-soon-text{font-family:'Epilogue',sans-serif;font-weight:700;font-size:18px;color:var(--muted)}
+.coming-soon-sub{font-size:12px;color:var(--muted)}
+/* == Pagina 02 - Negociacao == */
+.neg-section{margin-bottom:20px}
+.neg-section-title{font-family:'Epilogue',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.neg-section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.toggle-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{flex:1;font-size:12px;color:var(--text)}
+.toggle-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.toggle-input{width:90px!important;max-width:90px!important;text-align:right;padding:6px 10px;font-size:12px}
+.toggle-unit{font-size:11px;color:var(--muted);width:22px;text-align:left}
+.sw{position:relative;display:inline-block;width:36px;height:20px;flex-shrink:0}
+.sw input{opacity:0;width:0;height:0}
+.sw-slider{position:absolute;cursor:pointer;inset:0;background:var(--border2);border-radius:20px;transition:.2s}
+.sw-slider::before{content:'';position:absolute;width:14px;height:14px;left:3px;bottom:3px;background:var(--muted);border-radius:50%;transition:.2s}
+.sw input:checked+.sw-slider{background:var(--accent)}
+.sw input:checked+.sw-slider::before{transform:translateX(16px);background:#fff}
+.sim-table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
+.sim-table{width:100%;border-collapse:collapse;font-size:11px;min-width:720px}
+.sim-table th{padding:9px 12px;background:var(--surface);color:var(--muted);font-size:9px;letter-spacing:.8px;text-transform:uppercase;text-align:right;border-bottom:1px solid var(--border);font-family:'Epilogue',sans-serif}
+.sim-table th:first-child{text-align:left}
+.sim-table td{padding:9px 12px;border-bottom:1px solid var(--border);text-align:right;color:var(--text)}
+.sim-table td:first-child{text-align:left;font-weight:600}
+.sim-table .td-bruto{color:var(--muted)}
+.sim-table .td-final{color:var(--ok);font-weight:700}
+.sim-table tfoot td{font-family:'Epilogue',sans-serif;font-weight:700;font-size:12px;background:var(--surface);border-top:2px solid var(--border2);border-bottom:none}
+.sim-table tfoot td.td-final{color:var(--ok)}
+.resumo-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:16px}
+.resumo-row{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+.resumo-row:last-child{border:none;padding-top:14px}
+.resumo-label{color:var(--muted)}
+.resumo-val{font-weight:600;color:var(--text);font-family:'Epilogue',sans-serif}
+.resumo-val.ok{color:var(--ok);font-size:18px}
+.resumo-val.warn{color:var(--warn)}
+.placeholder-note{font-size:11px;color:var(--muted);font-style:italic;padding:10px 14px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;margin-top:10px}
+select.neg-select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;cursor:pointer}
+/* Tabela limpa do cliente */
+.cli-table{width:100%;border-collapse:collapse;font-size:13px}
+.cli-table th{text-align:left;padding:10px 14px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'Epilogue',sans-serif;border-bottom:2px solid var(--border)}
+.cli-table th:last-child{text-align:right}
+.cli-table td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)}
+.cli-table td:last-child{text-align:right;font-weight:700;color:var(--ok)}
+.cli-table tfoot td{font-family:'Epilogue',sans-serif;font-weight:900;font-size:14px;border-top:2px solid var(--border2);border-bottom:none;background:var(--surface)}
+.cli-table tfoot td:last-child{color:var(--ok);text-align:right}
+/* Remove setas dos inputs numéricos em todos os navegadores */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+/* === V3 NOVO LAYOUT === */
+body{overflow:hidden}
+.sidebar{width:180px;min-width:180px;background:var(--sb-bg);border-right:1px solid var(--border)}
+.content{flex:1;overflow-y:auto;padding:24px 28px}
+/* Sidebar params */
+.sb-params{padding:12px 0;border-top:1px solid var(--border);margin-top:8px}
+.sb-param-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-family:'Epilogue',sans-serif}
+.sb-label{display:block;font-size:9px;letter-spacing:.5px;color:var(--muted);margin-bottom:3px}
+.sb-select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;outline:none;cursor:pointer;margin-bottom:8px}
+.sb-input-sm{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;margin-bottom:8px}
+.sb-input-sm:focus{border-color:var(--accent)}
+/* Cards teal/amber para contrato */
+.contrato-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
+.card-teal{background:var(--teal-bg);border:1px solid var(--teal-brd);border-radius:10px;padding:16px}
+.card-amber{background:var(--amber-bg);border:1px solid var(--amber-brd);border-radius:10px;padding:16px}
+.c-label{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--teal-lbl);margin-bottom:8px}
+.card-amber .c-label{color:var(--amber-lbl)}
+.c-value{font-size:20px;font-weight:900;color:var(--teal-text);font-family:'Epilogue',sans-serif}
+.card-amber .c-value{color:var(--amber-text)}
+.c-sub{font-size:10px;color:var(--teal-lbl);margin-top:4px}
+.card-amber .c-sub{color:var(--amber-lbl)}
+/* Cards 3x2 */
+.cards-3x2{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+.c-card{background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:12px}
+.c-card-lbl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.c-card-val{font-size:15px;font-weight:900;font-family:'Epilogue',sans-serif;color:var(--text)}
+.c-card-val.ok{color:var(--ok)} .c-card-val.warn{color:var(--warn)}
+/* Header negociação */
+.neg-hdr{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;margin-bottom:16px;flex-wrap:wrap}
+.neg-hdr-arrow{color:var(--muted);font-size:16px}
+.neg-hdr-lbl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.neg-hdr-val{font-size:18px;font-weight:900;font-family:'Epilogue',sans-serif}
+.neg-hdr-val.ok{color:var(--ok)} .neg-hdr-val.warn{color:var(--warn)}
+/* Painel modalidade */
+.mod-panel{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:18px;margin-bottom:14px}
+.mod-panel-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.mod-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.mod-grid label{display:block;font-size:10px;color:var(--muted);margin-bottom:4px}
+.mod-grid input,.mod-grid select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none}
+.mod-grid input:focus{border-color:var(--accent)}
+/* Plano de pagamento */
+.plano-wrap{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin:12px 0}
+.plano-hdr{padding:8px 14px;background:var(--surface);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border)}
+.plano-tbl{width:100%;border-collapse:collapse}
+.plano-tbl th{padding:7px 12px;font-size:9px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;letter-spacing:1px}
+.plano-tbl td{border-bottom:1px solid var(--border)}
+/* Total contrato */
+.total-contract{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;margin:14px 0 8px}
+.total-contract span{font-size:11px;color:var(--muted)}
+.total-contract input{background:transparent;border:none;color:var(--ok);font-size:22px;font-weight:900;font-family:'Epilogue',sans-serif;text-align:right;outline:none;width:200px;cursor:pointer}
+/* Botões de ação */
+.action-row{display:flex;gap:10px;margin-top:16px;padding-bottom:40px;flex-wrap:wrap}
+.btn-ok{background:var(--teal-bg);color:var(--ok);border:1px solid var(--teal-brd)}
+.btn-ok:hover{background:var(--teal-brd);color:#0d160d}
+.btn-amber{background:var(--amber-bg);color:var(--warn);border:1px solid var(--amber-brd)}
+.btn-amber:hover{background:var(--amber-brd);color:#0d160d}
+/* Page-00 simplificada */
+.p00-btns{display:flex;gap:10px;margin-bottom:20px}
+.p00-form{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:20px;margin-bottom:20px}
+.p00-form label{display:block;font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;margin-top:12px}
+.p00-form label:first-of-type{margin-top:0}
+.p00-form input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none}
+.p00-form input:focus{border-color:var(--accent)}
+/* Modal novo ambiente */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:center;justify-content:center}
+.modal-box{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:500px;width:92%}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.modal-title{font-weight:700;font-size:15px;font-family:'Epilogue',sans-serif}
+.modal-close{cursor:pointer;color:var(--muted);font-size:18px;line-height:1}
+.modal-close:hover{color:var(--text)}
+@keyframes mIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <!-- Projeto ativo -->
+  <div class="sb-logo" style="padding:16px 14px 12px">
+    <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-family:'Epilogue',sans-serif">Projeto</div>
+    <div id="sb-proj-nome" style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+    <div id="sb-proj-cli" style="font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+  </div>
+
+  <!-- Credenciais -->
+  <div class="sb-creds" id="sb-creds-block">
+    <div class="sb-creds-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Credenciais Omie</span>
+      <span id="sb-creds-lock" style="font-size:10px;color:var(--muted);cursor:default" title="Visivel apenas para Diretoria">&#x1F512;</span>
+    </div>
+    <div id="sb-creds-fields" style="display:none">
+      <label>APP KEY</label>
+      <input type="text" id="app_key" placeholder="App Key">
+      <label>APP SECRET</label>
+      <input type="password" id="app_secret" placeholder="App Secret">
+      <label>INTERVALO (s)</label>
+      <input type="number" id="intervalo" min="0.3" max="10" step="0.1" value="0.5">
+      <button class="sb-save-btn" onclick="saveConfig()">Salvar credenciais</button>
+    </div>
+    <div id="sb-creds-oculto" style="font-size:10px;color:var(--muted);padding:4px 0">&#x1F512; Acesso restrito</div>
+    <div class="sb-save-hint" id="save-hint"></div>
+  </div>
+
+  <!-- Navegação -->
+  <nav class="sb-nav">
+    <div class="sb-nav-title">Menu</div>
+    <div class="nav-item active" id="nav-00" onclick="goPage(0)">&#x25C8; Projetos</div>
+    <div class="nav-item locked" id="nav-new-amb" onclick="abrirModalNovoAmbiente()" style="color:var(--muted)">+ Novo ambiente</div>
+    <div class="nav-item locked" id="nav-02" onclick="goPage(2)">&#x25C6; Negociacao</div>
+    <div class="nav-item locked" id="nav-03" onclick="goPage(3)">&#x2191; Exportar</div>
+  </nav>
+
+  <!-- Parâmetros de negociação (visível apenas na page-02) -->
+  <div class="sb-params" id="sb-params" style="display:none;padding:12px 14px 0">
+    <div class="sb-param-title">Parâmetros</div>
+
+    <label class="sb-label">Desconto (%)</label>
+    <div style="display:flex;align-items:center;gap:4px;margin-bottom:8px">
+      <input type="number" id="neg-desconto" min="0" max="100" step="0.5" value="0"
+             oninput="negValidarLimiteDesconto(this.value); agendarCalculo(); agendarSalvarDesconto()"
+             onblur="salvarDescontoAutomatico()"
+             class="sb-input-sm" style="width:60px;text-align:right">
+      <span style="color:var(--muted);font-size:12px">%</span>
+    </div>
+    <div id="neg-limite-hint" style="display:none;font-size:10px;color:var(--err);margin-bottom:8px"></div>
+
+    <label class="sb-label">Modalidade</label>
+    <select id="neg-pagamento" onchange="onPagamentoChange()" class="sb-select">
+      <option value="a_vista">A Vista</option>
+    </select>
+
+    <label class="sb-label">Parcelas</label>
+    <select id="neg-parcelas" onchange="onParcelasChange()" class="sb-select">
+      <option value="1">1x</option>
+    </select>
+  </div>
+
+  <!-- Espaçador + Config -->
+  <div style="flex:1"></div>
+  <div style="padding:12px 14px;border-top:1px solid var(--border)">
+    <div class="nav-item" id="nav-cfg" onclick="goPage(9)" style="opacity:.6;padding:6px 8px">&#x2699; Config</div>
+  </div>
+</aside>
+
+<main class="content">
+
+  <!-- PAGE 00: Projetos (simplificada) -->
+  <div class="page active" id="page-00">
+    <div class="page-title" style="margin-bottom:16px">Projetos</div>
+    <div class="p00-btns">
+      <button class="btn btn-primary" onclick="mostrarFormNovoProjeto()">+ Novo projeto</button>
+      <button class="btn btn-ghost" onclick="focarBuscaProjeto()">&#x1F50D; Buscar</button>
+    </div>
+    <div id="form-novo-projeto" class="p00-form" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px">Novo Projeto</div>
+        <span onclick="esconderFormNovoProjeto()" style="cursor:pointer;color:var(--muted);font-size:18px">&#x2715;</span>
+      </div>
+      <label>NOME DO PROJETO *</label><input type="text" id="novo-proj-nome" placeholder="Ex: Cozinha Planejada Silva">
+      <label>CLIENTE *</label><input type="text" id="novo-proj-cli" placeholder="Nome completo do cliente">
+      <label>CPF DO CLIENTE (opcional)</label><input type="text" id="novo-proj-cpf" placeholder="000.000.000-00">
+      <label>E-MAIL</label><input type="text" id="np-email" placeholder="opcional">
+      <label>TELEFONE</label><input type="text" id="np-tel" placeholder="opcional">
+      <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+        <button class="btn btn-primary" onclick="criarProjeto()">Criar Projeto</button>
+        <span id="novo-proj-status" style="font-size:11px;color:var(--muted)"></span>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <input type="text" id="proj-search" placeholder="Buscar projeto..." oninput="debounceProjBusca(this.value)">
+      <div class="search-spinner" id="proj-spinner"><div class="spinner"></div></div>
+    </div>
+    <div class="search-hint" id="proj-search-hint">Digite para buscar projetos</div>
+    <div id="proj-resultados"></div>
+  </div>
+
+  <!-- PAGE 02: Negociacao (novo layout) -->
+  <div class="page" id="page-02">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <div class="page-title">Negociacao</div>
+        <div class="page-sub">Valores finais apresentados ao cliente</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
+    </div>
+
+    <!-- Linha Bruto → Desconto → Líquido -->
+    <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:8px;align-items:center;margin-bottom:16px">
+      <div style="background:#162016;border:0.5px solid #2a3a2a;border-radius:8px;padding:12px 14px">
+        <div style="font-size:9px;color:#4d7a4d;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Valor Bruto</div>
+        <div style="font-size:19px;font-weight:500;color:#9FE1CB" id="neg-subtotal">R$ 0,00</div>
+      </div>
+      <div style="text-align:center;color:#4d7a4d;font-size:16px">&#x2192;</div>
+      <div style="background:#162016;border:0.5px solid #2a3a2a;border-radius:8px;padding:12px 14px">
+        <div style="font-size:9px;color:#4d7a4d;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Desconto</div>
+        <div style="font-size:19px;font-weight:500;color:#F0997B" id="neg-desc-val">- R$ 0,00</div>
+      </div>
+      <div style="text-align:center;color:#4d7a4d;font-size:16px">&#x2192;</div>
+      <div style="background:#04342C;border:0.5px solid #0F6E56;border-radius:8px;padding:12px 14px">
+        <div style="font-size:9px;color:#5DCAA5;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Valor à Vista</div>
+        <div style="font-size:19px;font-weight:500;color:#9FE1CB" id="neg-avista">R$ 0,00</div>
+      </div>
+    </div>
+    <span id="neg-desc-pct-lbl" style="display:none">0</span>
+
+    <!-- Tabela de ambientes -->
+    <div class="card" style="padding:0;overflow:hidden;margin-bottom:14px">
+      <table class="cli-table">
+        <thead><tr>
+          <th style="width:40px;text-align:center;padding:10px 8px">
+            <input type="checkbox" id="neg-sel-all" checked title="Marcar/desmarcar todos"
+                   onchange="negToggleAll(this.checked)"
+                   style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;display:block;margin:0 auto">
+          </th>
+          <th>Ambiente</th>
+          <th style="text-align:center;width:80px;font-size:9px;letter-spacing:.5px">Desc. %</th>
+          <th style="text-align:right;width:160px">Valor</th>
+        </tr></thead>
+        <tbody id="neg-tbody">
+          <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:28px 14px">Nenhum ambiente selecionado.</td></tr>
+        </tbody>
+        <tfoot>
+          <tr style="border-top:2px solid var(--border2)">
+            <td colspan="3" style="padding:12px 14px;font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px">Total</td>
+            <td id="neg-total" style="padding:12px 14px;text-align:right;font-family:'Epilogue',sans-serif;font-weight:900;font-size:18px;color:var(--ok);white-space:nowrap">—</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Painel Aymoré -->
+    <div class="mod-panel" id="painel-aymore" style="display:none">
+      <div class="mod-panel-title">&#x1F3E6; Aymore — Parametros</div>
+      <div class="mod-grid">
+        <div>
+          <label>Entrada (R$) <span id="ay-entrada-pct" style="color:var(--accent);font-size:10px"></span></label>
+          <input type="number" id="ay-entrada" value="0" min="0" step="100" oninput="ayEntradaChange()">
+          <div id="ay-hint-financiado" style="font-size:10px;color:var(--ok);margin-top:4px"></div>
+        </div>
+        <div>
+          <label>Data do Contrato</label>
+          <input type="date" id="ay-data-contrato" oninput="ayAtualizarCarencia()">
+        </div>
+        <div>
+          <label>Data 1a Parcela <span id="ay-carencia-badge" style="background:rgba(239,159,39,.15);color:var(--warn);border-radius:4px;padding:1px 7px;font-size:10px;margin-left:4px">30d</span></label>
+          <input type="date" id="ay-data-primeira" oninput="ayAtualizarCarencia()">
+        </div>
+        <div>
+          <label>Carencia (dias)</label>
+          <input type="number" id="ay-carencia" value="30" min="15" max="120" step="5" oninput="ayCarenciaChange()">
+        </div>
+      </div>
+      <div id="ay-aviso" style="display:none;font-size:10px;color:var(--warn);margin-bottom:10px;padding:7px 12px;background:rgba(239,159,39,.08);border-radius:6px;border-left:3px solid var(--warn)"></div>
+      <div id="ay-resumo" style="display:none">
+        <div class="contrato-grid">
+          <div class="card-teal">
+            <div class="c-label">Contrato a Vista — Loja Recebe</div>
+            <div id="ay-c-avista" class="c-value">R$ —</div>
+            <div id="ay-c-avista-sub" class="c-sub">Apos retencao do banco</div>
+          </div>
+          <div class="card-amber">
+            <div class="c-label">Contrato Parcelado — Cliente Paga</div>
+            <div id="ay-c-parcelado" class="c-value">R$ —</div>
+            <div id="ay-c-parcelado-sub" class="c-sub">Total pago pelo cliente</div>
+          </div>
+        </div>
+        <div class="cards-3x2">
+          <div class="c-card"><div class="c-card-lbl">Loja Recebe</div><div id="ay-r-liberado" class="c-card-val ok">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Cliente Paga</div><div id="ay-r-total-cliente" class="c-card-val">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Valor / Parcela</div><div id="ay-r-parcela" class="c-card-val ok">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Custo Financeiro</div><div id="ay-r-retencao-rs" class="c-card-val warn">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Taxa Retencao</div><div id="ay-r-retencao" class="c-card-val warn">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Taxa Mensal</div><div id="ay-r-taxa" class="c-card-val">—</div></div>
+        </div>
+        <div class="plano-wrap">
+          <div class="plano-hdr">Plano de Pagamento</div>
+          <table class="plano-tbl">
+            <thead><tr><th style="width:40px">#</th><th>Tipo</th><th>Vencimento</th><th style="text-align:right">Valor</th></tr></thead>
+            <tbody id="ay-parc-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Painel Cartão -->
+    <div class="mod-panel" id="painel-cartao" style="display:none">
+      <div class="mod-panel-title">&#x1F4B3; Cartao de Credito</div>
+      <div class="mod-grid">
+        <div>
+          <label>Entrada (R$) <span id="cc-entrada-pct" style="color:var(--accent);font-size:10px"></span></label>
+          <input type="number" id="cc-entrada" value="0" min="0" step="100" oninput="atualizarCartao()">
+          <div id="cc-hint-financiado" style="font-size:10px;color:var(--ok);margin-top:4px"></div>
+        </div>
+        <div>
+          <label>Bandeira</label>
+          <select id="cc-bandeira" onchange="atualizarCartao()">
+            <option value="Visa">Visa</option>
+            <option value="Mastercard">Mastercard</option>
+          </select>
+        </div>
+        <div>
+          <label>Data do Contrato</label>
+          <input type="date" id="cc-data-contrato" oninput="atualizarCartao()">
+        </div>
+      </div>
+      <div id="cc-resumo" style="display:none">
+        <div class="contrato-grid">
+          <div class="card-teal">
+            <div class="c-label">Contrato a Vista — Loja Recebe</div>
+            <div id="cc-c-avista" class="c-value">R$ —</div>
+            <div id="cc-c-avista-sub" class="c-sub">Apos retencao do banco</div>
+          </div>
+          <div class="card-amber">
+            <div class="c-label">Contrato Parcelado — Cliente Paga</div>
+            <div id="cc-c-parcelado" class="c-value">R$ —</div>
+            <div id="cc-c-parcelado-sub" class="c-sub">Total pago pelo cliente</div>
+          </div>
+        </div>
+        <div class="cards-3x2">
+          <div class="c-card"><div class="c-card-lbl">Loja Recebe</div><div id="cc-r-liberado" class="c-card-val ok">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Cliente Paga</div><div id="cc-r-total-cliente" class="c-card-val">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Valor / Parcela</div><div id="cc-r-parcela" class="c-card-val ok">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Custo Financeiro</div><div id="cc-r-retencao-rs" class="c-card-val warn">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Taxa Retencao</div><div id="cc-r-retencao" class="c-card-val warn">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Liquidacao</div><div id="cc-r-liquidacao" class="c-card-val">1 dia util</div></div>
+        </div>
+        <div class="plano-wrap">
+          <div class="plano-hdr">Plano de Pagamento</div>
+          <table class="plano-tbl">
+            <thead><tr><th style="width:40px">#</th><th>Tipo</th><th>Vencimento</th><th style="text-align:right">Valor</th></tr></thead>
+            <tbody id="cc-parc-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAINEL FINANCEIRA LOJA -->
+    <div class="card" id="painel-financeira-loja" style="display:none;margin-bottom:14px">
+      <div style="font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:10px">&#x1F3E2; Parametros Financeira Loja</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:5px">Entrada (R$) <span id="fl-entrada-pct" style="color:var(--accent);font-size:10px;margin-left:6px">0,00%</span></div>
+          <input type="number" id="fl-entrada" value="0" min="0" step="100" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" oninput="flEntradaChange()">
+          <div id="fl-hint-financiado" style="font-size:10px;color:var(--ok);margin-top:4px"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:5px">Data do Contrato</div>
+          <input type="date" id="fl-data-contrato" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none" oninput="atualizarFinanceiraLoja()">
+        </div>
+      </div>
+      <div id="fl-resumo" style="display:none">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px"><div style="font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:5px">Financiado</div><div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px;color:var(--accent)" id="fl-r-financiado">—</div></div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px"><div style="font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:5px">Total c/ Juros</div><div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px;color:var(--ok)" id="fl-r-total">—</div></div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px"><div style="font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:5px">Acrescimo R$</div><div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px;color:var(--warn)" id="fl-r-acrescimo">—</div></div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px"><div style="font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:5px">Taxa Mensal</div><div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px" id="fl-r-taxa">—</div></div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px"><div style="font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:5px">Parcela Base</div><div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px;color:var(--ok)" id="fl-r-parcela">—</div></div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px"><div style="font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:5px">N Parcelas</div><div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px" id="fl-r-n">—</div></div>
+        </div>
+        <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px">
+          <div style="padding:10px 14px;background:var(--surface);font-size:9px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border)">Plano de Pagamento — Parcelas 1 a N-1 editaveis</div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr>
+              <th style="padding:8px 12px;font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;width:40px">#</th>
+              <th style="padding:8px 12px;font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left">Tipo</th>
+              <th style="padding:8px 12px;font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left">Vencimento</th>
+              <th style="padding:8px 12px;font-size:9px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);text-align:right">Valor</th>
+            </tr></thead>
+            <tbody id="fl-parc-body"></tbody>
+          </table>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:12px">
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted)">Total com juros</span><span id="fl-conf-total" style="font-weight:600">—</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--muted)">Soma parcelas 1..N-1</span><span id="fl-conf-soma" style="font-weight:600">—</span></div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:2px solid var(--border2)"><span style="color:var(--muted)">Ultima parcela</span><span id="fl-conf-ultima" style="font-weight:600">—</span></div>
+          <div id="fl-conf-status" style="display:flex;justify-content:space-between;padding:6px 0;font-family:'Epilogue',sans-serif;font-weight:700"><span>Diferenca</span><span id="fl-conf-dif">—</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resumo e total -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="total-contract">
+        <span style="font-family:'Epilogue',sans-serif;font-weight:700">Total do Contrato</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:13px;font-weight:700;color:var(--muted)">R$</span>
+          <input id="neg-total-final" type="text" value="—" readonly
+                 title="Clique para editar"
+                 onclick="negTotalIniciarEdicao(this)"
+                 onblur="negTotalConfirmar(this.value)"
+                 onkeydown="if(event.key==='Enter')this.blur()">
+        </div>
+      </div>
+      <div id="neg-resumo-parcelas" style="display:none;text-align:right;font-family:'Epilogue',sans-serif;font-weight:700;font-size:15px;color:var(--muted);margin-top:8px;padding-right:2px"></div>
+    </div>
+
+    <!-- Acoes -->
+    <div class="action-row">
+      <button class="btn btn-ok" onclick="showToast('Orcamento salvo!')">&#x1F4BE; Salvar orcamento</button>
+      <button class="btn btn-amber" onclick="goPage(3)">&#x2713; Exportar para Omie &#x2192;</button>
+      <button class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
+    </div>
+
+  </div>
+
+  <!-- PAGE 01 DUMMY (mantido para não quebrar unlockNav) -->
+  <div id="page-01" style="display:none"></div>
+
+
+    <!-- PAGE 03: Exportar (em breve) -->
+  <div class="page" id="page-03">
+    <div class="coming-soon">
+      <div class="coming-soon-icon">&#x1F4E4;</div>
+      <div class="coming-soon-text">Exportar</div>
+      <div class="coming-soon-sub">Disponivel em breve</div>
+      <button class="btn btn-ghost btn-sm" onclick="goPage(0)" style="margin-top:8px">&#x2190; Voltar para Projetos</button>
+    </div>
+  </div>
+
+  <!-- PAGE 09: Configurações / Limites de Perfil -->
+  <div class="page" id="page-09">
+    <div class="page-title">Configuracoes</div>
+    <div class="page-sub">Limites de desconto por perfil de acesso</div>
+
+    <!-- Card: Perfil Ativo -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Perfil Ativo (sessao local)</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px">
+        Em producao na nuvem, o perfil sera definido por autenticacao de usuario.
+        Localmente, selecione o perfil para testar os limites.
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap" id="cfg-perfil-btns">
+        <button class="btn btn-ghost btn-sm" id="cfg-btn-consultor" onclick="cfgSetPerfil('consultor')">
+          Consultor de Vendas
+        </button>
+        <button class="btn btn-ghost btn-sm" id="cfg-btn-gerente" onclick="cfgSetPerfil('gerente')">
+          Gerente de Vendas
+        </button>
+        <button class="btn btn-ghost btn-sm" id="cfg-btn-diretoria" onclick="cfgSetPerfil('diretoria')">
+          Diretoria
+        </button>
+      </div>
+      <div style="margin-top:12px;font-size:12px;color:var(--ok)" id="cfg-perfil-ativo-label"></div>
+    </div>
+
+    <!-- Card: Limites por perfil -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Limites de Desconto por Perfil</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:16px">
+        O desconto total (global + individuais) nao pode ultrapassar o limite do perfil ativo.
+        Ao tentar exceder o limite, o sistema bloqueia e exibe aviso.
+      </div>
+
+      <div id="cfg-perfis-lista"></div>
+
+      <div style="margin-top:16px">
+        <button class="btn btn-primary btn-sm" onclick="cfgSalvarLimites()">Salvar limites</button>
+        <span id="cfg-save-hint" style="font-size:11px;color:var(--ok);margin-left:10px"></span>
+      </div>
+    </div>
+
+    <!-- Card: Nota sobre nuvem -->
+    <div class="card" style="background:rgba(232,97,26,.04);border-color:rgba(232,97,26,.2)">
+      <div class="card-title" style="color:var(--accent)">&#x2601; Preparacao para Nuvem</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">
+        <div>&#x2022; Os perfis aqui configurados serao migrados para um banco de dados de usuarios.</div>
+        <div>&#x2022; Cada usuario tera um perfil associado via autenticacao (JWT/OAuth).</div>
+        <div>&#x2022; O arquivo <code style="color:var(--ok)">perfis_config.json</code> e a fonte local — equivalente ao banco em nuvem.</div>
+        <div>&#x2022; A funcao <code style="color:var(--ok)">perfil_ativo_get()</code> sera substituida por leitura do token do usuario.</div>
+        <div>&#x2022; O limite e verificado no backend (Python) — nao apenas no frontend.</div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Modal: Novo Ambiente -->
+<div id="modal-novo-ambiente" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="animation:mIn .18s ease">
+    <div class="modal-hdr">
+      <div class="modal-title">Adicionar Ambiente</div>
+      <span class="modal-close" onclick="fecharModalNovoAmbiente()">&#x2715;</span>
+    </div>
+    <div class="drop-zone" id="drop-zone-amb">
+      <input type="file" id="xml-input-amb" multiple accept=".xml" onchange="uploadXmls(this.files)">
+      <div class="drop-icon">&#x1F4C2;</div>
+      <div class="drop-text">Arraste XMLs do Promob aqui</div>
+      <div class="drop-sub">ou clique para selecionar — cada XML = um ambiente</div>
+    </div>
+    <div id="upload-status" style="font-size:11px;color:var(--muted);min-height:16px;margin-top:8px"></div>
+  </div>
+</div>
+
+<!-- Modal: Parametros da negociacao -->
+<div id="modal-params" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+  <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:598px;width:92%;animation:mIn .18s ease">
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;gap:12px">
+      <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:16px">Parametros da negociacao</div>
+      <div id="mp-total-ambientes" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ok);background:rgba(25,201,160,.08);border:1px solid rgba(25,201,160,.2);border-radius:6px;padding:3px 10px;white-space:nowrap">—</div>
+    </div>
+
+    <div class="toggle-row">
+      <span class="toggle-label" style="flex:1">Desconto de venda</span>
+      <input type="number" class="toggle-input" id="mp-desconto" min="0" max="100" step="0.5" value="0" oninput="agendarDiscriminacao()">
+      <span class="toggle-unit">%</span>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label" style="flex:1">Comissao do arquiteto</span>
+      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-arq-ativa" onchange="mpToggleArq();agendarDiscriminacao()"><span class="sw-slider"></span></label>
+      <input type="number" class="toggle-input" id="mp-arq-pct" min="0" max="30" step="0.5" value="0" disabled style="opacity:.35" oninput="agendarDiscriminacao()">
+      <span class="toggle-unit">%</span>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label" style="flex:1">Programa de fidelidade</span>
+      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-fid-ativa" onchange="mpToggleFid();agendarDiscriminacao()"><span class="sw-slider"></span></label>
+      <input type="number" class="toggle-input" id="mp-fid-pct" min="0" max="10" step="0.5" value="0" disabled style="opacity:.35" oninput="agendarDiscriminacao()">
+      <span class="toggle-unit">%</span>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label" style="flex:1">Custo Viagem</span>
+      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-fora-sede" onchange="mpToggleViagem();agendarDiscriminacao()"><span class="sw-slider"></span></label>
+      <input type="number" class="toggle-input" id="mp-viagem" min="0" step="50" value="0" disabled style="opacity:.35" oninput="agendarDiscriminacao()">
+      <span class="toggle-unit" style="font-size:9px">R$</span>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label" style="flex:1">Brinde</span>
+      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-brinde-ativo" onchange="mpToggleBrinde();agendarDiscriminacao()"><span class="sw-slider"></span></label>
+      <input type="number" class="toggle-input" id="mp-brinde" min="0" step="10" value="0" disabled style="opacity:.35" oninput="agendarDiscriminacao()">
+      <span class="toggle-unit" style="font-size:9px">R$</span>
+    </div>
+
+    <!-- Painel de discriminacao interno (uso do consultor) -->
+    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="toggleDiscriminacao()" id="btn-discr">&#x1F4CA; Ver discriminacao por ambiente</button>
+      <div id="discriminacao-panel" style="display:none;margin-top:12px;max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+        <table class="sim-table" style="font-size:11px;width:100%">
+          <thead>
+            <tr>
+              <th>Ambiente</th><th>Bruto</th><th>&#x2212; Desc</th><th>+ Fin.</th>
+              <th>&#x2212; Viagem</th><th>&#x2212; Brinde</th><th>&#x2212; Arq</th><th>&#x2212; Fid</th><th>Valor Final</th>
+            </tr>
+          </thead>
+          <tbody id="discriminacao-tbody"><tr><td colspan="9" style="text-align:center;padding:12px;color:var(--muted)">Calcule para ver...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Painel de apoio à negociação -->
+    <div id="mp-apoio" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;display:none">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Apoio à negociação</div>
+      <div style="font-size:12px;line-height:2">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Valor bruto total</span><span id="mp-a-bruto" style="font-family:'IBM Plex Mono',monospace">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Desconto (<span id="mp-a-desc-pct">0</span>%)</span><span id="mp-a-desc" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px"><span style="color:var(--muted)">Valor à vista</span><span id="mp-a-avista" style="font-family:'IBM Plex Mono',monospace">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Comissão arquiteto</span><span id="mp-a-arq" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Programa de fidelidade</span><span id="mp-a-fid" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Custo de viagem</span><span id="mp-a-viagem" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px"><span style="color:var(--muted)">− Brinde</span><span id="mp-a-brinde" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="font-weight:700">Valor líquido final</span><span id="mp-a-liq" style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--ok)">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Desconto total s/ bruto</span><span id="mp-a-margem" style="font-family:'IBM Plex Mono',monospace;color:var(--warn);font-weight:700">—</span></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:20px">
+      <button class="btn btn-ghost btn-sm" onclick="fecharModalParams(false)" style="flex:1;justify-content:center">Voltar</button>
+      <button class="btn btn-primary btn-sm" onclick="fecharModalParams(true)" style="flex:1;justify-content:center">Salvar e continuar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmt = n => Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+let projetoAtivo    = null;
+let _projBuscaTimer = null;
+let _negBaseValues  = [];   // { arquivo, nome, val_bruto, estrutural } para todos os ambs fase01
+let _negSelLocal    = {};   // { arquivo: bool } seletor de negociacao
+let _descIndividual = {};   // { arquivo: pct } desconto individual por ambiente
+let _descAdicional  = {};   // legado — mantido por compat
+let _selLocal = {};           // { arquivo: bool } estado local dos checkboxes
+
+// ---- Config ------------------------------------------------------------------
+async function loadConfig(){
+  try{
+    const r = await fetch('/config');
+    const d = await r.json();
+    document.getElementById('app_key').value    = d.app_key||'';
+    document.getElementById('app_secret').value = d.app_secret||'';
+    document.getElementById('intervalo').value  = d.intervalo||0.5;
+  }catch(e){}
+}
+async function saveConfig(){
+  const cfg = {
+    app_key: document.getElementById('app_key').value,
+    app_secret: document.getElementById('app_secret').value,
+    intervalo: parseFloat(document.getElementById('intervalo').value)||0.5
+  };
+  await fetch('/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});
+  const h = document.getElementById('save-hint');
+  h.textContent='Salvo'; h.style.color='var(--ok)';
+  setTimeout(()=>h.textContent='',2000);
+}
+
+// ---- Navegacao ---------------------------------------------------------------
+// =====================================================================
+// PERFIS DE ACESSO
+// =====================================================================
+let _perfilAtivo = {
+  perfil_ativo: 'consultor',
+  config: { nome:'Consultor de Vendas', desconto_max_pct:10,
+            pode_editar_total:true, pode_ver_margens:false }
+};
+let _perfisConfig = null;
+
+async function carregarPerfil(){
+  try {
+    const r = await fetch('/perfis/ativo');
+    const d = await r.json();
+    _perfilAtivo = d;
+    const rp = await fetch('/perfis');
+    _perfisConfig = await rp.json();
+    aplicarRestricoesPerfil();
+  } catch(e){ console.warn('[PERFIL] Erro ao carregar:', e); }
+}
+
+function aplicarRestricoesPerfil(){
+  const cfg = _perfilAtivo.config || {};
+  const nomePerfil = (_perfilAtivo.perfil_ativo || 'consultor').toLowerCase();
+  const isDiretoria = nomePerfil === 'diretoria';
+
+  // Indicador na página de configurações
+  const label = document.getElementById('cfg-perfil-ativo-label');
+  if(label) label.textContent = '✓ Perfil ativo: ' + (cfg.nome || nomePerfil);
+
+  // Credenciais: visíveis apenas para diretoria
+  const credsFields = document.getElementById('sb-creds-fields');
+  const credsOculto = document.getElementById('sb-creds-oculto');
+  const credsLock   = document.getElementById('sb-creds-lock');
+  if(credsFields) credsFields.style.display = isDiretoria ? 'block' : 'none';
+  if(credsOculto) credsOculto.style.display = isDiretoria ? 'none'  : 'block';
+  if(credsLock)   credsLock.textContent     = isDiretoria ? '🔓' : '🔒';
+
+  // Botão de editar total
+  const elTot = document.getElementById('neg-total-final');
+  if(elTot){
+    if(!cfg.pode_editar_total){
+      elTot.title = 'Seu perfil não permite editar o total diretamente';
+      elTot.style.cursor = 'default';
+      elTot.onfocus = () => {};
+    } else {
+      elTot.title = 'Clique para editar — o desconto % será recalculado';
+      elTot.style.cursor = 'pointer';
+    }
+  }
+}
+
+function cfgGetDescontoMax(){
+  return parseFloat((_perfilAtivo.config && _perfilAtivo.config.desconto_max_pct) || 100);
+}
+
+function cfgValidarDesconto(discPct){
+  const max = cfgGetDescontoMax();
+  if(discPct > max){
+    return { ok:false, max,
+      msg: `Desconto de ${discPct.toFixed(2)}% excede o limite do perfil `+
+           `${(_perfilAtivo.config||{}).nome||''} (máx: ${max}%)` };
+  }
+  return { ok:true };
+}
+
+async function cfgSetPerfil(nomePerfil){
+  const r = await fetch('/perfis/ativo',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({perfil:nomePerfil})});
+  const d = await r.json();
+  if(d.ok){
+    await carregarPerfil();
+    cfgRenderizarPerfis();
+    const hint = document.getElementById('cfg-save-hint');
+    if(hint){ hint.textContent='✓ Perfil alterado';
+              setTimeout(()=>hint.textContent='',2500); }
+  }
+}
+
+async function cfgSalvarLimites(){
+  if(!_perfisConfig) return;
+  ['consultor','gerente','diretoria'].forEach(p => {
+    const el = document.getElementById('cfg-limit-'+p);
+    if(el && _perfisConfig.perfis[p])
+      _perfisConfig.perfis[p].desconto_max_pct = parseFloat(el.value)||0;
+  });
+  const r = await fetch('/perfis',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(_perfisConfig)});
+  const d = await r.json();
+  if(d.ok){
+    await carregarPerfil();
+    const hint = document.getElementById('cfg-save-hint');
+    if(hint){ hint.textContent='✓ Limites salvos';
+              setTimeout(()=>hint.textContent='',2500); }
+  }
+}
+
+function cfgRenderizarPerfis(){
+  if(!_perfisConfig) return;
+  const lista = document.getElementById('cfg-perfis-lista');
+  if(!lista) return;
+  const ativo = _perfilAtivo.perfil_ativo || 'consultor';
+  lista.innerHTML = Object.entries(_perfisConfig.perfis||{}).map(([key,cfg])=>`
+    <div style="display:grid;grid-template-columns:200px 120px 1fr;gap:12px;
+      align-items:center;padding:12px 14px;margin-bottom:8px;border-radius:8px;
+      border:1px solid ${key===ativo?'var(--accent)':'var(--border)'};
+      background:${key===ativo?'rgba(232,97,26,.06)':'var(--surface)'}">
+      <div>
+        <div style="font-weight:700;font-size:13px;color:${key===ativo?'var(--accent)':'var(--text)'}">
+          ${cfg.nome||key}</div>
+        <div style="font-size:10px;color:var(--muted)">${key===ativo?'● Perfil ativo':''}</div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;
+          letter-spacing:1px;margin-bottom:4px">Desc. máx. %</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="number" id="cfg-limit-${key}"
+            value="${cfg.desconto_max_pct||0}" min="0" max="100" step="0.5"
+            style="width:70px;text-align:right;padding:5px 8px;font-size:13px;
+              background:var(--bg);border:1px solid var(--border);border-radius:6px;
+              color:var(--text);font-family:'IBM Plex Mono',monospace;outline:none">
+          <span style="color:var(--muted);font-size:12px">%</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.7">
+        ${cfg.pode_ver_margens?'✓ Vê margens internas':'✗ Não vê margens'}
+        <br>${cfg.pode_editar_total?'✓ Pode editar total':'✗ Não edita total'}
+        <br>${key==='diretoria'?'✓ Vê credenciais Omie':'✗ Credenciais ocultas'}
+      </div>
+    </div>`).join('');
+
+  // Destacar botão do perfil ativo
+  ['consultor','gerente','diretoria'].forEach(p=>{
+    const btn = document.getElementById('cfg-btn-'+p);
+    if(btn) btn.className = p===ativo
+      ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+  });
+}
+
+function goPage(n){
+  const navId  = n === 9 ? 'nav-cfg' : 'nav-0'+n;
+  const pageId = n === 9 ? 'page-09' : 'page-0'+n;
+  const navEl  = document.getElementById(navId);
+  if(!navEl) return;
+  if(navEl.classList.contains('locked')) return;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const pageEl = document.getElementById(pageId);
+  if(pageEl) pageEl.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+  navEl.classList.add('active');
+  // Mostrar/ocultar parâmetros na sidebar
+  const sbParams = document.getElementById('sb-params');
+  if(sbParams) sbParams.style.display = n===2 ? 'block' : 'none';
+  if(n===2 && projetoAtivo) carregarMargensSalvas();
+  if(n===9) cfgRenderizarPerfis();
+}
+function unlockNav(n){
+  const el = document.getElementById('nav-0'+n);
+  if(el) el.classList.remove('locked');
+  // Desbloquear também o botão novo ambiente
+  const nb = document.getElementById('nav-new-amb');
+  if(nb && n===2) nb.classList.remove('locked');
+}
+// Funções modal novo ambiente
+function abrirModalNovoAmbiente(){
+  if(!projetoAtivo){ showToast('Abra um projeto primeiro', true); return; }
+  document.getElementById('modal-novo-ambiente').style.display = 'flex';
+}
+function fecharModalNovoAmbiente(){
+  document.getElementById('modal-novo-ambiente').style.display = 'none';
+  const us = document.getElementById('upload-status');
+  if(us) us.textContent = '';
+}
+// Funções page-00
+function mostrarFormNovoProjeto(){
+  document.getElementById('form-novo-projeto').style.display = 'block';
+  document.getElementById('novo-proj-nome').focus();
+}
+function esconderFormNovoProjeto(){
+  document.getElementById('form-novo-projeto').style.display = 'none';
+}
+function focarBuscaProjeto(){
+  document.getElementById('proj-search').focus();
+}
+
+// ---- Toast -------------------------------------------------------------------
+function showToast(msg, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isErr?' err':'');
+  t.style.display='block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.style.display='none', 3000);
+}
+
+// ---- Page 00: Projetos -------------------------------------------------------
+function debounceProjBusca(val){
+  clearTimeout(_projBuscaTimer);
+  const q = val.trim();
+  const hint = document.getElementById('proj-search-hint');
+  if(q.length < 2){
+    document.getElementById('proj-resultados').innerHTML='';
+    hint.textContent = 'Digite ao menos 2 caracteres para buscar';
+    document.getElementById('proj-spinner').style.display='none';
+    return;
+  }
+  hint.textContent='';
+  document.getElementById('proj-spinner').style.display='block';
+  _projBuscaTimer = setTimeout(()=>executarBuscaProjeto(q), 400);
+}
+
+async function executarBuscaProjeto(q){
+  try{
+    const r = await fetch('/projetos/buscar?q='+encodeURIComponent(q));
+    const d = await r.json();
+    document.getElementById('proj-spinner').style.display='none';
+    const hint = document.getElementById('proj-search-hint');
+    if(!d.ok){ hint.textContent='Erro: '+(d.erro||'falha'); return; }
+    if(!d.projetos.length){
+      hint.textContent='Nenhum projeto encontrado';
+      document.getElementById('proj-resultados').innerHTML='';
+      return;
+    }
+    hint.textContent = d.projetos.length+' projeto(s) encontrado(s)';
+    renderProjResultados(d.projetos);
+  }catch(e){
+    document.getElementById('proj-spinner').style.display='none';
+    document.getElementById('proj-search-hint').textContent='Erro: '+e;
+  }
+}
+
+function renderProjResultados(lista){
+  document.getElementById('proj-resultados').innerHTML = lista.map(p=>`
+    <div class="proj-card-item" onclick="abrirProjeto('${esc(p.nome_safe)}')">
+      <div class="proj-card-nome">${esc(p.nome_projeto)} <span class="badge-origem ${esc(p.origem||'local')}">${esc((p.origem||'local').toUpperCase())}</span></div>
+      <div class="proj-card-cli">${esc(p.cliente_nome)}</div>
+      <div class="proj-card-meta">
+        <span>${p.n_ambientes} ambiente(s)</span>
+        <span style="color:var(--ok)">${p.n_selecionados} selecionado(s)</span>
+        ${p.atualizado_em?'<span style="color:var(--muted)">'+esc(p.atualizado_em.substring(0,10))+'</span>':''}
+      </div>
+    </div>`).join('');
+}
+
+async function abrirProjeto(nome_safe){
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(nome_safe));
+    const d = await r.json();
+    if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+    projetoAtivo = d.projeto;
+    // Atualizar sidebar com nome do projeto e cliente
+    const elNome = document.getElementById('sb-proj-nome');
+    const elCli  = document.getElementById('sb-proj-cli');
+    if(elNome) elNome.textContent = projetoAtivo.nome_projeto || '—';
+    if(elCli)  elCli.textContent  = (projetoAtivo.cliente||{}).nome || '—';
+    unlockNav(1); unlockNav(2);
+    goPage(2);  // vai direto para negociação
+  }catch(e){ showToast('Erro: '+e, true); }
+}
+
+async function criarProjeto(){
+  const nome  = document.getElementById('novo-proj-nome').value.trim();
+  const cli   = document.getElementById('novo-proj-cli').value.trim();
+  const cpf   = document.getElementById('novo-proj-cpf').value.trim();
+  const email = document.getElementById('np-email').value.trim();
+  const tel   = document.getElementById('np-tel').value.trim();
+  const st    = document.getElementById('novo-proj-status');
+  if(!nome){ st.textContent='Nome do projeto obrigatorio'; st.style.color='var(--err)'; return; }
+  if(!cli){  st.textContent='Nome do cliente obrigatorio'; st.style.color='var(--err)'; return; }
+  st.textContent='Criando...'; st.style.color='var(--muted)';
+  try{
+    const r = await fetch('/projetos/novo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome_projeto:nome,cliente:{nome:cli,cpf:cpf,email:email,telefone:tel}})});
+    const d = await r.json();
+    if(!d.ok){ st.textContent='Erro: '+(d.erro||'falha'); st.style.color='var(--err)'; return; }
+    projetoAtivo = d.projeto;
+    st.textContent='Projeto criado!'; st.style.color='var(--ok)';
+    document.getElementById('novo-proj-nome').value='';
+    document.getElementById('novo-proj-cli').value='';
+    document.getElementById('novo-proj-cpf').value='';
+    document.getElementById('np-email').value='';
+    document.getElementById('np-tel').value='';
+    setTimeout(()=>st.textContent='',3000);
+    // Atualizar sidebar
+    const elNome = document.getElementById('sb-proj-nome');
+    const elCli  = document.getElementById('sb-proj-cli');
+    if(elNome) elNome.textContent = projetoAtivo.nome_projeto || '—';
+    if(elCli)  elCli.textContent  = (projetoAtivo.cliente||{}).nome || '—';
+    esconderFormNovoProjeto();
+    unlockNav(1); unlockNav(2);
+    goPage(2);  // vai direto para negociação
+  }catch(e){ st.textContent='Erro: '+e; st.style.color='var(--err)'; }
+}
+
+// ---- Page 01: Ambientes ------------------------------------------------------
+function carregarPaginaAmbientes(){
+  if(!projetoAtivo) return;
+  const elNome = document.getElementById('amb-proj-nome');
+  const elCli  = document.getElementById('amb-proj-cli');
+  if(elNome) elNome.textContent = projetoAtivo.nome_projeto || '—';
+  if(elCli){ const cli = projetoAtivo.cliente||{}; elCli.textContent = cli.nome + (cli.cpf?' | '+cli.cpf:''); }
+  // Inicializa selLocal com estado salvo
+  _selLocal = {};
+  (projetoAtivo.ambientes||[]).forEach(a=>{ _selLocal[a.arquivo] = a.selecionado!==false; });
+  renderAmbientes();
+  atualizarBanner();
+}
+
+function renderAmbientes(){
+  const lista = document.getElementById('amb-lista');
+  const ambs = projetoAtivo ? projetoAtivo.ambientes || [] : [];
+  if(!lista) return;  // page-01 foi removida — só manter o estado
+  if(!ambs.length){
+    lista.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted);font-size:12px">Nenhum ambiente carregado. Adicione XMLs acima.</div>';
+    return;
+  }
+  lista.innerHTML = ambs.map((amb,idx)=>{
+    const sel = _selLocal[amb.arquivo] !== false;
+    const grupos = amb.grupos || [];
+    const nomeAmb = esc(amb.ambiente || amb.projeto || amb.arquivo);
+    const nomeArq = esc(amb.arquivo);
+    return `
+    <div class="amb-card ${sel?'selected':''}" id="amb-card-${idx}">
+      <div class="amb-card-header">
+        <input type="checkbox" class="amb-check" ${sel?'checked':''} onclick="toggleAmbSel(event,'${esc(amb.arquivo)}',${idx})" title="Selecionar ambiente">
+        <div class="amb-info">
+          <div class="amb-nome">${nomeAmb}</div>
+          <div class="amb-file">${nomeArq}</div>
+        </div>
+        <div style="text-align:right;min-width:90px">
+          <div class="amb-total">R$ ${fmt(amb.total||0)}</div>
+          <div class="amb-grupos-count">${grupos.length} grupo(s)</div>
+        </div>
+        <div class="amb-actions">
+          <button class="amb-expand-btn" onclick="toggleAmbBody(event,${idx})" id="expand-btn-${idx}">&#x25BC; Ver</button>
+          <div class="amb-update-wrap">
+            <button class="btn btn-ghost btn-sm">Atualizar XML</button>
+            <input type="file" accept=".xml" onchange="atualizarXml(this.files,'${esc(amb.arquivo)}',${idx})">
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="removerAmbiente(event,'${esc(amb.arquivo)}',${idx})">Remover</button>
+        </div>
+      </div>
+      <div class="amb-body" id="amb-body-${idx}">
+        ${grupos.length?`
+        <div class="amb-table-wrap">
+          <table class="amb-table">
+            <thead><tr><th>Grupo</th><th>Descricao</th><th style="text-align:right">Subtotal (R$)</th></tr></thead>
+            <tbody>
+              ${grupos.map(g=>`<tr><td>GRUPO-${esc(g.grupo_id)}</td><td>${esc(g.grupo_nome)}</td><td class="td-val">R$ ${fmt(g.subtotal)}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`:'<div style="padding:14px 18px;font-size:11px;color:var(--muted)">Sem grupos neste ambiente.</div>'}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleAmbBody(evt, idx){
+  evt.stopPropagation();
+  const body = document.getElementById('amb-body-'+idx);
+  const btn  = document.getElementById('expand-btn-'+idx);
+  const open = body.classList.toggle('open');
+  btn.innerHTML = open ? '&#x25B2; Fechar' : '&#x25BC; Ver';
+}
+
+function toggleAmbSel(evt, arquivo, idx){
+  evt.stopPropagation();
+  const cb = evt.target;
+  _selLocal[arquivo] = cb.checked;
+  const card = document.getElementById('amb-card-'+idx);
+  if(cb.checked) card.classList.add('selected');
+  else card.classList.remove('selected');
+  atualizarBanner();
+}
+
+function atualizarBanner(){
+  const ambs = projetoAtivo ? projetoAtivo.ambientes || [] : [];
+  const selecionados = ambs.filter(a=>_selLocal[a.arquivo]!==false);
+  const total = selecionados.reduce((s,a)=>s+(a.total||0),0);
+  // Elementos da page-01 (pode não existir mais — usar null-guard)
+  const elT = document.getElementById('banner-total');
+  const elN = document.getElementById('banner-total-count');
+  const elS = document.getElementById('banner-sel-count');
+  if(elT) elT.textContent = 'R$ '+fmt(total);
+  if(elN) elN.textContent = ambs.length;
+  if(elS) elS.textContent = selecionados.length;
+  const btnNeg = document.getElementById('btn-ir-neg');
+  if(btnNeg){
+    const temSel = selecionados.length > 0;
+    btnNeg.disabled = !temSel;
+    btnNeg.style.opacity = temSel ? '1' : '.35';
+    btnNeg.style.cursor  = temSel ? 'pointer' : 'not-allowed';
+  }
+}
+
+// Drop zone
+const dz = document.getElementById('drop-zone-amb');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');uploadXmls(e.dataTransfer.files)});
+
+async function uploadXmls(fileList){
+  if(!projetoAtivo){ showToast('Nenhum projeto ativo', true); return; }
+  if(!fileList||!fileList.length) return;
+  const st = document.getElementById('upload-status');
+  st.textContent='Enviando...';
+  const fd = new FormData();
+  for(const f of fileList) fd.append('xmls', f);
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/ambientes/adicionar',{method:'POST',body:fd});
+    const d = await r.json();
+    if(!d.ok){ st.textContent='Erro: '+(d.erro||'falha'); showToast('Erro ao enviar XMLs', true); return; }
+    projetoAtivo = d.projeto;
+    (projetoAtivo.ambientes||[]).forEach(a=>{
+      if(_selLocal[a.arquivo]===undefined) _selLocal[a.arquivo]=a.selecionado!==false;
+    });
+    renderAmbientes();
+    atualizarBanner();
+    st.textContent = fileList.length+' XML(s) adicionado(s)';
+    document.getElementById('xml-input-amb').value='';
+    showToast(fileList.length+' ambiente(s) adicionado(s)!');
+    // Fechar modal e atualizar negociação
+    fecharModalNovoAmbiente();
+    if(document.getElementById('page-02').classList.contains('active')){
+      carregarMargensSalvas();
+    }
+  }catch(e){ st.textContent='Erro: '+e; showToast('Erro: '+e, true); }
+}
+
+async function removerAmbiente(evt, arquivo, idx){
+  evt.stopPropagation();
+  if(!confirm('Remover ambiente "'+arquivo+'" do projeto?')) return;
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/ambientes/remover',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({arquivo:arquivo})
+    });
+    const d = await r.json();
+    if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+    projetoAtivo = d.projeto;
+    delete _selLocal[arquivo];
+    renderAmbientes();
+    atualizarBanner();
+    showToast('Ambiente removido');
+  }catch(e){ showToast('Erro: '+e, true); }
+}
+
+async function atualizarXml(fileList, arquivoAntigo, idx){
+  if(!fileList||!fileList.length) return;
+  const fd = new FormData();
+  fd.append('xmls', fileList[0]);
+  fd.append('arquivo_substituir', arquivoAntigo);
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/ambientes/atualizar',{method:'POST',body:fd});
+    const d = await r.json();
+    if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+    projetoAtivo = d.projeto;
+    (projetoAtivo.ambientes||[]).forEach(a=>{
+      if(_selLocal[a.arquivo]===undefined) _selLocal[a.arquivo]=a.selecionado!==false;
+    });
+    renderAmbientes();
+    atualizarBanner();
+    showToast('Ambiente atualizado!');
+  }catch(e){ showToast('Erro: '+e, true); }
+}
+
+async function salvarSelecao(){
+  if(!projetoAtivo){ showToast('Nenhum projeto ativo', true); return; }
+  const st = document.getElementById('sel-status');
+  st.textContent='Salvando...'; st.style.color='var(--muted)';
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/ambientes/selecao',{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({selecoes:_selLocal})
+    });
+    const d = await r.json();
+    if(!d.ok){ st.textContent='Erro: '+(d.erro||'falha'); st.style.color='var(--err)'; return; }
+    st.textContent='Selecao salva!'; st.style.color='var(--ok)';
+    showToast('Selecao salva!');
+    setTimeout(()=>st.textContent='',3000);
+  }catch(e){ st.textContent='Erro: '+e; st.style.color='var(--err)'; }
+}
+
+// ---- Pagina 02: Negociacao ---------------------------------------------------
+let _calculoTimer = null;
+
+function agendarCalculo(){
+  clearTimeout(_calculoTimer);
+  _calculoTimer = setTimeout(executarCalculo, 400);
+}
+
+// ---- Pagamento: estado e carregamento das tabelas ----------------------------
+let _faixasAtivas    = [];
+let _tipoAtivo       = 'avista';
+let _codigoPagAtivo  = 'a_vista';  // código da modalidade selecionada (ex: 'cartao_credito')
+let _descontoAvista  = 0.0;
+let _acrescimoFin    = 0.0;
+let _descricaoPag    = 'A Vista';
+let _nParcelasSel    = 1;
+
+async function carregarModalidades(){
+  try {
+    const r = await fetch('/pagamentos');
+    const d = await r.json();
+    if(d.ok && d.modalidades.length){
+      const sel = document.getElementById('neg-pagamento');
+      const cur = sel.value;
+      sel.innerHTML = d.modalidades.map(m=>
+        `<option value="${esc(m.codigo)}">${esc(m.descricao)}</option>`).join('');
+      if(d.modalidades.find(m=>m.codigo===cur)) sel.value = cur;
+    }
+  } catch(e){}
+  await onPagamentoChange();
+}
+
+function atualizarResumoParcelas(entrada, n_parcelas, valor_parcela, total_cliente) {
+  const el = document.getElementById('neg-resumo-parcelas');
+  if (!el) return;
+  // Usar valor_parcela calculado a partir do total do contrato (negociado)
+  // em vez do valor_parcela do endpoint (que é financiado/n sem refletir o total negociado)
+  const totalContrato = parseFloat(
+    (document.getElementById('neg-total-final').value||'0')
+      .replace(/\./g,'').replace(',','.').replace(/[^0-9.]/g,'')
+  ) || total_cliente || 0;
+  const parcelaReal = n_parcelas > 0
+    ? Math.round((totalContrato - (entrada||0)) / n_parcelas * 100) / 100
+    : valor_parcela;
+  const parcelaFmt = n_parcelas + 'x R$ ' + fmt(parcelaReal);
+  el.textContent = entrada > 0
+    ? 'R$ ' + fmt(entrada) + ' de entrada + ' + parcelaFmt
+    : parcelaFmt;
+  el.style.display = 'block';
+}
+
+async function onPagamentoChange(){
+  // Oculta resumo de parcelas ao trocar modalidade
+  const elRP = document.getElementById('neg-resumo-parcelas');
+  if (elRP) elRP.style.display = 'none';
+  const codigo = document.getElementById('neg-pagamento').value;
+  _codigoPagAtivo = codigo;  // persiste para uso em renderTabelaNeg e nos painéis
+  const parcel = document.getElementById('neg-parcelas');
+  try {
+    const r = await fetch('/pagamentos/'+encodeURIComponent(codigo)+'/faixas');
+    const d = await r.json();
+    _faixasAtivas   = d.faixas  || [];
+    _tipoAtivo      = d.tipo    || 'avista';
+    _descontoAvista = d.desconto_avista || 0;
+
+    if(_tipoAtivo === 'avista'){
+      parcel.innerHTML = '<option value="1">A Vista</option>';
+      parcel.disabled  = true;
+      _acrescimoFin    = -_descontoAvista;
+      _descricaoPag    = 'A Vista';
+      _nParcelasSel    = 1;
+    } else if(_faixasAtivas.length){
+      parcel.innerHTML = _faixasAtivas.map(f=>
+        `<option value="${f.parcelas}">${esc(f.label||f.parcelas+'x')}</option>`).join('');
+      parcel.disabled = false;
+      onParcelasChange();
+    }
+    // Mostrar/ocultar painéis de modalidade
+    ayMostrarPainel(codigo === 'aymore');
+    cartaoMostrarPainel(codigo === 'cartao_credito');
+    flMostrarPainel(codigo === 'financeira_loja');
+  } catch(e){
+    console.error('[PAG] Erro ao carregar faixas:', e);
+    _faixasAtivas=[]; _tipoAtivo='avista'; _descontoAvista=0; _acrescimoFin=0;
+    parcel.innerHTML='<option value="1">A Vista</option>'; parcel.disabled=true;
+    ayMostrarPainel(false);
+    cartaoMostrarPainel(false);
+    flMostrarPainel(false);
+  }
+  agendarCalculo();
+}
+
+function onParcelasChange(){
+  const n = parseInt(document.getElementById('neg-parcelas').value) || 1;
+  _nParcelasSel = n;
+  const faixa = _faixasAtivas.find(f=>f.parcelas===n);
+  _acrescimoFin = faixa ? (faixa.custo_pct || 0) : 0;  // usa custo_pct normalizado
+  const modalDesc = document.getElementById('neg-pagamento').selectedOptions[0]?.text || '';
+  _descricaoPag = modalDesc + (n > 1 ? ' '+n+'x' : '');
+  console.log('[PAG] parcelas='+n+' custo_pct='+_acrescimoFin);
+  agendarCalculo();
+}
+
+// ---- Painel Aymoré -----------------------------------------------------------
+let _ayTimer = null;
+
+function _ayAddDias(dataStr, dias) {
+  const d = new Date(dataStr + 'T12:00:00');
+  d.setDate(d.getDate() + dias);
+  return d.toISOString().split('T')[0];
+}
+
+function _ayFormatDate(isoStr) {
+  if (!isoStr) return '';
+  const [y,m,d] = isoStr.split('-');
+  return d+'/'+m+'/'+y;
+}
+
+function _ayDiffDias(d1str, d2str) {
+  const d1 = new Date(d1str + 'T12:00:00');
+  const d2 = new Date(d2str + 'T12:00:00');
+  return Math.round((d2 - d1) / (1000*60*60*24));
+}
+
+function ayMostrarPainel(mostrar) {
+  document.getElementById('painel-aymore').style.display = mostrar ? 'block' : 'none';
+  if (mostrar) {
+    const hoje = new Date().toISOString().split('T')[0];
+    const dc = document.getElementById('ay-data-contrato');
+    const dp = document.getElementById('ay-data-primeira');
+    if (!dc.value) dc.value = hoje;
+    if (!dp.value) dp.value = _ayAddDias(dc.value || hoje, 30);
+    ayAtualizarCarencia();
+    // Atualizar hint de entrada
+    ayEntradaChange();
+  }
+}
+
+function ayAtualizarCarencia() {
+  const dc = document.getElementById('ay-data-contrato').value;
+  const dp = document.getElementById('ay-data-primeira').value;
+  if (!dc || !dp) return;
+  const dias = _ayDiffDias(dc, dp);
+  document.getElementById('ay-carencia').value = dias;
+  document.getElementById('ay-carencia-badge').textContent = 'carência: ' + dias + 'd';
+  const aviso = document.getElementById('ay-aviso');
+  if (dias < 15) {
+    aviso.textContent = '⚠ Carência mínima Aymoré: 15 dias'; aviso.style.display='block';
+  } else if (dias > 120) {
+    aviso.textContent = '⚠ Carência máxima Aymoré: 120 dias'; aviso.style.display='block';
+  } else if (dias % 5 !== 0) {
+    aviso.textContent = '⚠ A Aymoré aceita carências de 5 em 5 dias (15, 20, 25... 120). Mais próximo: '+(Math.round(dias/5)*5)+'d';
+    aviso.style.display='block';
+  } else {
+    aviso.style.display='none';
+  }
+  clearTimeout(_ayTimer);
+  _ayTimer = setTimeout(atualizarAymore, 300);
+}
+
+// Carencia editada pelo usuario → atualiza data da 1ª parcela
+function ayCarenciaChange() {
+  const dc   = document.getElementById('ay-data-contrato').value;
+  const dias = parseInt(document.getElementById('ay-carencia').value) || 30;
+  if (!dc) return;
+  document.getElementById('ay-data-primeira').value = _ayAddDias(dc, dias);
+  document.getElementById('ay-carencia-badge').textContent = 'carência: ' + dias + 'd';
+  const aviso = document.getElementById('ay-aviso');
+  if (dias < 15)        { aviso.textContent = '⚠ Carência mínima Aymoré: 15 dias'; aviso.style.display='block'; }
+  else if (dias > 120)  { aviso.textContent = '⚠ Carência máxima Aymoré: 120 dias'; aviso.style.display='block'; }
+  else if (dias % 5 !== 0) {
+    aviso.textContent = '⚠ Aymoré aceita de 5 em 5 dias. Mais próximo: '+(Math.round(dias/5)*5)+'d';
+    aviso.style.display='block';
+  } else { aviso.style.display='none'; }
+  clearTimeout(_ayTimer);
+  _ayTimer = setTimeout(atualizarAymore, 300);
+}
+
+function ayEntradaChange() {
+  const valorVenda = _ayGetValorVenda();
+  const entrada    = parseFloat(document.getElementById('ay-entrada').value) || 0;
+  const pct = valorVenda > 0 ? (entrada / valorVenda * 100) : 0;
+  document.getElementById('ay-entrada-pct').textContent = pct.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  const financiado = Math.max(0, valorVenda - entrada);
+  const hint = document.getElementById('ay-hint-financiado');
+  hint.textContent = financiado > 0 ? 'Financiado: R$ ' + fmt(financiado) : '';
+  hint.style.color = entrada >= valorVenda && valorVenda > 0 ? 'var(--err)' : 'var(--ok)';
+  clearTimeout(_ayTimer);
+  _ayTimer = setTimeout(atualizarAymore, 300);
+}
+
+function _ayGetValorVenda() {
+  // Retorna o valor a vista — após desconto e margens, SEM gross-up financeiro.
+  // neg-avista é atualizado por renderTabelaNeg() e negAtualizarDescontoEfetivo().
+  const el = document.getElementById('neg-avista');
+  if (el) {
+    const txt = el.textContent || '';
+    const v = parseFloat(txt.replace(/[^\d,]/g,'').replace(',','.')) || 0;
+    if (v > 0) return v;
+  }
+  // Fallback: calcular a partir dos ambientes selecionados (sem divisor financeiro)
+  if (_negBaseValues && _negBaseValues.length) {
+    const mg   = lerMargensNegociacao();
+    const disc_g = mg.desconto_pct;
+    return Math.round(_negBaseValues
+      .filter(b => _negSelLocal[b.arquivo] !== false)
+      .reduce((s,b) => {
+        const disc_i = parseFloat(_descIndividual[b.arquivo]) || 0;
+        return s + Math.round((b.estrutural||0)*(1-disc_g/100)*(1-disc_i/100)*100)/100;
+      }, 0) * 100) / 100;
+  }
+  return 0;
+}
+
+async function atualizarAymore() {
+  const valorAvista = _ayGetValorVenda();
+  const entrada  = parseFloat(document.getElementById('ay-entrada').value) || 0;
+  const n        = parseInt(document.getElementById('neg-parcelas').value) || 8;
+  const carencia = parseInt(document.getElementById('ay-carencia').value) || 30;
+  const dc       = document.getElementById('ay-data-contrato').value;
+  if (!dc || !valorAvista) {
+    const resumo = document.getElementById('ay-resumo');
+    if (resumo) resumo.style.display = 'none';
+    return;
+  }
+  let d;
+  try {
+    const r = await fetch('/calcular_aymore', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({valor_avista: valorAvista, entrada, n_parcelas: n,
+                            carencia_dias: carencia, data_contrato: dc})
+    });
+    d = await r.json();
+  } catch(e) { console.error('[AYMORE]', e); return; }
+  if (!d.ok) { console.warn('[AYMORE]', d.erro); return; }
+
+  document.getElementById('ay-resumo').style.display = 'block';
+  document.getElementById('ay-r-liberado').textContent    = 'R$ '+fmt(d.valor_liberado);
+  document.getElementById('ay-r-total-cliente').textContent = 'R$ '+fmt(d.total_cliente);
+  document.getElementById('ay-r-retencao').textContent    = d.taxa_retencao_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%';
+  document.getElementById('ay-r-retencao-rs').textContent = 'R$ '+fmt(d.retencao_rs);
+  document.getElementById('ay-r-parcela').textContent     = 'R$ '+fmt(d.valor_parcela);
+  document.getElementById('ay-r-taxa').textContent        = d.taxa_mensal_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%';
+
+  const elCAv = document.getElementById('ay-c-avista');
+  const elCAvSub = document.getElementById('ay-c-avista-sub');
+  const elCPar = document.getElementById('ay-c-parcelado');
+  const elCParSub = document.getElementById('ay-c-parcelado-sub');
+  if (elCAv) elCAv.textContent = 'R$ '+fmt(d.valor_liberado);
+  if (elCAvSub) elCAvSub.textContent = 'Loja recebe (retencao '+d.taxa_retencao_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%)';
+  if (elCPar) elCPar.textContent = 'R$ '+fmt(d.total_cliente);
+  if (elCParSub) elCParSub.textContent = n+'x R$ '+fmt(d.valor_parcela)+(entrada>0?' | entrada R$ '+fmt(entrada):'');
+
+  const elTot = document.getElementById('neg-total-final');
+  if (elTot && !elTot._editando) elTot.value = fmt(d.total_cliente);
+
+  const tbody = document.getElementById('ay-parc-body');
+  const BADGE = {
+    contrato: ['#0d1e0d','var(--muted)','Assinatura'],
+    entrada:  ['rgba(239,159,39,.12)','var(--warn)','Entrada'],
+    primeira: ['rgba(93,202,165,.12)','var(--ok)','1a Parcela'],
+    parcela:  ['rgba(93,202,165,.08)','var(--ok)','Parcela'],
+  };
+  tbody.innerHTML = d.parcelas.map(p => {
+    const [bg,color,label] = BADGE[p.tipo] || BADGE.parcela;
+    const numCell = p.num > 0 ? p.num : '—';
+    const valorReal = p.tipo === 'contrato' ? null : p.tipo === 'entrada' ? p.valor : d.valor_parcela;
+    const valCell = valorReal !== null
+      ? `<span style="color:${color};font-weight:700">R$ ${fmt(valorReal)}</span>`
+      : `<span style="color:var(--muted)">—</span>`;
+    return `<tr style="background:${bg}">
+      <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
+      <td style="padding:8px 12px"><span style="background:${bg};color:${color};border-radius:4px;padding:2px 8px;font-size:10px;border:1px solid ${color}40">${label}</span></td>
+      <td style="padding:8px 12px;color:var(--muted);font-size:11px">${p.data}</td>
+      <td style="padding:8px 12px;text-align:right">${valCell}</td>
+    </tr>`;
+  }).join('');
+  tbody.innerHTML += `<tr style="border-top:1px solid var(--border2)">
+    <td colspan="3" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
+    <td style="padding:10px 12px;text-align:right;font-weight:900;color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
+  </tr>`;
+  atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
+}
+
+// ---- Painel Cartão de Crédito ------------------------------------------------
+let _ccTimer = null;
+
+function cartaoMostrarPainel(mostrar) {
+  document.getElementById('painel-cartao').style.display = mostrar ? 'block' : 'none';
+  if (mostrar) {
+    const dc = document.getElementById('cc-data-contrato');
+    if (!dc.value) dc.value = new Date().toISOString().split('T')[0];
+    ccEntradaChange();
+    atualizarCartao();
+  }
+}
+
+function ccEntradaChange() {
+  const valorVenda = _ayGetValorVenda();
+  const entrada    = parseFloat(document.getElementById('cc-entrada').value) || 0;
+  const pct = valorVenda > 0 ? (entrada / valorVenda * 100) : 0;
+  document.getElementById('cc-entrada-pct').textContent =
+    pct.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  const financiado = Math.max(0, valorVenda - entrada);
+  const hint = document.getElementById('cc-hint-financiado');
+  hint.textContent = financiado > 0 ? 'Financiado: R$ ' + fmt(financiado) : '';
+  hint.style.color = (entrada >= valorVenda && valorVenda > 0) ? 'var(--err)' : 'var(--ok)';
+  clearTimeout(_ccTimer);
+  _ccTimer = setTimeout(atualizarCartao, 300);
+}
+
+async function atualizarCartao() {
+  const valorAvista = _ayGetValorVenda();
+  const entrada  = parseFloat(document.getElementById('cc-entrada').value) || 0;
+  const n        = parseInt(document.getElementById('neg-parcelas').value) || 1;
+  const bandeira = document.getElementById('cc-bandeira').value;
+  const dc       = document.getElementById('cc-data-contrato').value;
+  if (!dc || !valorAvista) {
+    document.getElementById('cc-resumo').style.display = 'none';
+    return;
+  }
+  let d;
+  try {
+    const r = await fetch('/calcular_cartao', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({valor_avista: valorAvista, entrada, n_parcelas: n,
+                            bandeira, data_contrato: dc})
+    });
+    d = await r.json();
+  } catch(e) { console.error('[CARTAO]', e); return; }
+  if (!d.ok) return;
+
+  document.getElementById('cc-resumo').style.display = 'block';
+  document.getElementById('cc-r-liberado').textContent    = 'R$ '+fmt(d.valor_liberado);
+  document.getElementById('cc-r-total-cliente').textContent = 'R$ '+fmt(d.total_cliente);
+  document.getElementById('cc-r-retencao').textContent    = d.taxa_retencao_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%';
+  document.getElementById('cc-r-retencao-rs').textContent = 'R$ '+fmt(d.retencao_rs);
+  document.getElementById('cc-r-parcela').textContent     = 'R$ '+fmt(d.valor_parcela);
+  const elLiq = document.getElementById('cc-r-liquidacao');
+  if (elLiq) elLiq.textContent = d.liquidacao || '1 dia util';
+
+  const elCAv = document.getElementById('cc-c-avista');
+  const elCAvSub = document.getElementById('cc-c-avista-sub');
+  const elCPar = document.getElementById('cc-c-parcelado');
+  const elCParSub = document.getElementById('cc-c-parcelado-sub');
+  if (elCAv) elCAv.textContent = 'R$ '+fmt(d.valor_liberado);
+  if (elCAvSub) elCAvSub.textContent = 'Loja recebe (retencao '+d.taxa_retencao_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%)';
+  if (elCPar) elCPar.textContent = 'R$ '+fmt(d.total_cliente);
+  if (elCParSub) elCParSub.textContent = n+'x R$ '+fmt(d.valor_parcela)+(entrada>0?' | entrada R$ '+fmt(entrada):'');
+
+  const elTot = document.getElementById('neg-total-final');
+  if (elTot && !elTot._editando) elTot.value = fmt(d.total_cliente);
+
+  const tbody = document.getElementById('cc-parc-body');
+  tbody.innerHTML = d.parcelas.map(p => {
+    const bg    = p.tipo==='contrato'?'#0d1e0d':p.tipo==='entrada'?'rgba(239,159,39,.12)':p.num===1?'rgba(93,202,165,.15)':'rgba(93,202,165,.08)';
+    const color = p.tipo==='contrato'?'var(--muted)':p.tipo==='entrada'?'var(--warn)':'var(--ok)';
+    const label = p.tipo==='contrato'?'Assinatura':p.tipo==='entrada'?'Entrada':p.num===1?'1a Parcela':'Parcela '+p.num;
+    const valorReal = p.tipo==='contrato'?null:p.tipo==='entrada'?p.valor:d.valor_parcela;
+    const numCell = p.num > 0 ? p.num : '—';
+    return `<tr style="background:${bg}">
+      <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
+      <td style="padding:8px 12px"><span style="background:${bg};color:${color};border-radius:4px;padding:2px 8px;font-size:10px;border:1px solid ${color}40">${label}</span></td>
+      <td style="padding:8px 12px;color:var(--muted);font-size:11px">${esc(p.data)}</td>
+      <td style="padding:8px 12px;text-align:right;font-weight:700;color:${valorReal?color:'var(--muted)'}">
+        ${valorReal !== null ? 'R$ '+fmt(valorReal) : '—'}
+      </td>
+    </tr>`;
+  }).join('');
+  tbody.innerHTML += `<tr style="border-top:1px solid var(--border2)">
+    <td colspan="3" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
+    <td style="padding:10px 12px;text-align:right;font-weight:900;color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
+  </tr>`;
+  atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
+}
+
+// ---- Painel Financeira Loja --------------------------------------------------
+let _flTimer     = null;
+let _flValTotal  = 0;      // valor_total com juros (para calculo local da ultima)
+let _flParcelas  = {};     // { num: valor } parcelas editadas pelo usuario
+
+function flMostrarPainel(mostrar) {
+  const el = document.getElementById('painel-financeira-loja');
+  if (!el) return;
+  el.style.display = mostrar ? 'block' : 'none';
+  if (mostrar) {
+    const dc = document.getElementById('fl-data-contrato');
+    if (!dc.value) dc.value = new Date().toISOString().split('T')[0];
+    flEntradaChange();
+    atualizarFinanceiraLoja();
+  }
+}
+
+function flEntradaChange() {
+  const valorVenda = _ayGetValorVenda();
+  const entrada    = parseFloat(document.getElementById('fl-entrada').value) || 0;
+  const pct = valorVenda > 0 ? (entrada / valorVenda * 100) : 0;
+  document.getElementById('fl-entrada-pct').textContent =
+    pct.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  const financiado = Math.max(0, valorVenda - entrada);
+  const hint = document.getElementById('fl-hint-financiado');
+  hint.textContent = financiado > 0 ? 'Financiado: R$ ' + fmt(financiado) : '';
+  hint.style.color = (entrada >= valorVenda && valorVenda > 0) ? 'var(--err)' : 'var(--ok)';
+  clearTimeout(_flTimer);
+  _flTimer = setTimeout(atualizarFinanceiraLoja, 300);
+}
+
+function flParcelaChange(num, val) {
+  _flParcelas[num] = parseFloat(val) || 0;
+  flAtualizarUltima();
+}
+
+function flAtualizarUltima() {
+  const n   = _nParcelasSel;
+  let soma  = 0;
+  for (let i = 1; i < n; i++) soma += _flParcelas[i] || 0;
+  soma = Math.round(soma * 100) / 100;
+  const ultima = Math.round((_flValTotal - soma) * 100) / 100;
+
+  const elUlt = document.getElementById('fl-ultima-val');
+  const elConfUlt = document.getElementById('fl-conf-ultima');
+  const elConfSoma = document.getElementById('fl-conf-soma');
+  const elConfDif  = document.getElementById('fl-conf-dif');
+  const elStatus   = document.getElementById('fl-conf-status');
+
+  const cor = ultima < 0 ? 'var(--err)' : (ultima === 0 ? 'var(--ok)' : 'var(--text)');
+  if (elUlt) { elUlt.textContent = 'R$ ' + fmt(ultima); elUlt.style.color = cor; }
+  if (elConfUlt) elConfUlt.textContent = 'R$ ' + fmt(ultima);
+  if (elConfSoma) elConfSoma.textContent = 'R$ ' + fmt(soma);
+
+  const totalPago = Math.round((soma + Math.max(0, ultima)) * 100) / 100;
+  const dif = Math.round((_flValTotal - totalPago) * 100) / 100;
+  if (elConfDif) {
+    elConfDif.textContent = 'R$ ' + fmt(Math.abs(dif)) + (dif === 0 ? '  ✓ equilibrado' : '  ⚠ ajuste necessário');
+    elConfDif.style.color = dif === 0 ? 'var(--ok)' : 'var(--warn)';
+  }
+
+  // Linha total da tabela
+  const elTotPago = document.getElementById('fl-total-pago');
+  if (elTotPago) elTotPago.textContent = 'R$ ' + fmt(totalPago);
+}
+
+function atualizarFinanceiraLoja() {
+  const valorVenda = _ayGetValorVenda();
+  const entrada    = parseFloat(document.getElementById('fl-entrada').value) || 0;
+  const n          = parseInt(document.getElementById('neg-parcelas').value) || 1;
+  const dc         = document.getElementById('fl-data-contrato').value;
+  if (!dc) return;
+  if (!valorVenda) { document.getElementById('fl-resumo').style.display = 'none'; return; }
+
+  // Monta lista de valores editados pelo usuario
+  const valsEdit = [];
+  for (let i = 1; i < n; i++) valsEdit.push(_flParcelas[i] || 0);
+
+  fetch('/calcular_financeira_loja', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({valor_venda: valorVenda, entrada, n_parcelas: n,
+                          data_contrato: dc, valores_parcelas: valsEdit})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (!d.ok) return;
+    document.getElementById('fl-resumo').style.display = 'block';
+
+    _flValTotal = d.valor_total;
+
+    document.getElementById('fl-r-financiado').textContent = 'R$ ' + fmt(d.financiado);
+    document.getElementById('fl-r-total').textContent      = 'R$ ' + fmt(d.valor_total);
+    document.getElementById('fl-r-acrescimo').textContent  = 'R$ ' + fmt(d.acrescimo_rs) +
+      ' (' + d.acrescimo_pct.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '%)';
+    document.getElementById('fl-r-taxa').textContent       =
+      d.taxa_juros_mensal_pct.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '% a.m.';
+    document.getElementById('fl-r-parcela').textContent    = 'R$ ' + fmt(d.parcela_base);
+    document.getElementById('fl-r-n').textContent          = d.n_parcelas + 'x';
+    document.getElementById('fl-conf-total').textContent   = 'R$ ' + fmt(d.valor_total);
+
+    // Inicializa _flParcelas com parcela_base se nao editadas ainda
+    for (let i = 1; i < n; i++) {
+      if (!_flParcelas[i]) _flParcelas[i] = d.parcela_base;
+    }
+
+    // Renderiza tabela de parcelas
+    const tbody = document.getElementById('fl-parc-body');
+    tbody.innerHTML = d.parcelas.map((p, idx) => {
+      const isUltima = p.editavel === false && typeof p.num === 'number';
+      const valDisp  = p.valor !== null ? fmt(p.valor) : '—';
+      const cellVal  = p.editavel
+        ? `<input type="number" value="${p.valor||0}" step="0.01"
+               style="width:110px;text-align:right;padding:4px 8px;font-size:12px;background:var(--surface);border:1px solid var(--accent);border-radius:6px;color:var(--text);outline:none;font-family:'IBM Plex Mono',monospace"
+               oninput="flParcelaChange(${p.num}, this.value)">`
+        : (isUltima
+            ? `<span id="fl-ultima-val" style="font-weight:700;color:${p.valor >= 0?'var(--ok)':'var(--err)'}">R$ ${fmt(p.valor)}</span>`
+            : (p.valor !== null ? 'R$ '+fmt(p.valor) : '—'));
+      return `<tr>
+        <td style="padding:8px 12px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${p.num}</td>
+        <td style="padding:8px 12px;font-size:12px;border-bottom:1px solid var(--border)">${esc(p.tipo)}</td>
+        <td style="padding:8px 12px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border)">${esc(p.data)}</td>
+        <td style="padding:8px 12px;font-size:12px;text-align:right;border-bottom:1px solid var(--border)">${cellVal}</td>
+      </tr>`;
+    }).join('') + `<tr>
+      <td colspan="3" style="padding:12px;font-family:'Epilogue',sans-serif;font-weight:700;font-size:12px;color:var(--muted)">Total pago</td>
+      <td id="fl-total-pago" style="padding:12px;text-align:right;font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px;color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
+    </tr>`;
+
+    flAtualizarUltima();
+  })
+  .catch(e => console.error('[FL]', e));
+}
+
+// Os parametros estruturais (arq, fidelidade, viagem) vem de projetoAtivo.margens.
+function lerMargensNegociacao(){
+  const m = (projetoAtivo && projetoAtivo.margens) || {};
+  return {
+    desconto_pct:             parseFloat(document.getElementById('neg-desconto').value) || 0,
+    fora_da_sede:             !!m.fora_da_sede,
+    custo_viagem:             parseFloat(m.custo_viagem) || 0,
+    comissao_arq_pct:         parseFloat(m.comissao_arq_pct) || 0,
+    comissao_arq_ativa:       !!m.comissao_arq_ativa,
+    fidelidade_pct:           parseFloat(m.fidelidade_pct) || 0,
+    fidelidade_ativa:         !!m.fidelidade_ativa,
+    custo_financeiro_pct: _acrescimoFin,  // taxa de retencao da forma de pagamento selecionada
+    brinde:               parseFloat(m.brinde) || 0,
+    brinde_ativo:         !!m.brinde_ativo,
+  };
+}
+
+// Rateio proporcional: custo_viagem_total * (total_amb / total_selecionados)
+// Residuo de arredondamento e adicionado ao ambiente de maior peso.
+function ratearViagem(custo_total, ambSel){
+  if(!custo_total || !ambSel.length) return ambSel.map(()=>0);
+  const totalBruto = ambSel.reduce((s,a)=>s+(a.total||0),0);
+  if(!totalBruto) return ambSel.map(()=> custo_total / ambSel.length);
+  let somaRateada = 0;
+  const rateado = ambSel.map(a=>{
+    const v = Math.round(custo_total * (a.total / totalBruto) * 100) / 100;
+    somaRateada += v;
+    return v;
+  });
+  // Adiciona residuo ao ambiente de maior peso
+  const residuo = Math.round((custo_total - somaRateada) * 100) / 100;
+  if(residuo !== 0){
+    const idxMaior = ambSel.reduce((mi,a,i,arr)=>a.total > arr[mi].total ? i : mi, 0);
+    rateado[idxMaior] = Math.round((rateado[idxMaior] + residuo) * 100) / 100;
+  }
+  return rateado;
+}
+
+async function executarCalculo(){
+  if(!projetoAtivo) return;
+  // Todos os ambientes selecionados na Fase 01 (independente do seletor de negociacao)
+  const allAmbs = (projetoAtivo.ambientes||[]).filter(a => a.selecionado);
+  const tbody   = document.getElementById('neg-tbody');
+  const vazio   = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">Sem ambientes selecionados na Fase 01.</td></tr>';
+  if(!allAmbs.length){ tbody.innerHTML=vazio; document.getElementById('neg-total').value='—'; _limparResumo(); return; }
+
+  const mg           = lerMargensNegociacao();
+  const desconto_pct = mg.desconto_pct;
+  const custoFin     = mg.custo_financeiro_pct;
+  const divisorFin   = custoFin < 100 ? (1 - custoFin / 100) : 1;
+  const viagemRateada= mg.fora_da_sede ? ratearViagem(mg.custo_viagem, allAmbs) : allAmbs.map(()=>0);
+  const n_total_proj = (projetoAtivo.ambientes||[]).length;
+  const brinde_por_amb = (mg.brinde_ativo && n_total_proj > 0) ? (mg.brinde||0) / n_total_proj : 0;
+
+  // Base estrutural para TODOS os ambientes (sem desconto e sem custo financeiro)
+  const baseResults = await Promise.all(allAmbs.map(async (amb, i) => {
+    const r = await fetch('/calcular_margens',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({...mg, desconto_pct:0, custo_financeiro_pct:0,
+                           brinde: brinde_por_amb, brinde_ativo: brinde_por_amb > 0,
+                           valor_bruto:amb.total, custo_viagem:viagemRateada[i]})});
+    return (await r.json()).resultado;
+  }));
+
+  const rnd = v => Math.round(v * 100) / 100;
+
+  // Popula _negBaseValues com TODOS os ambientes + base estrutural
+  window._negBaseValues = _negBaseValues = baseResults.map((res, i) => ({
+    arquivo:    allAmbs[i].arquivo,
+    nome:       allAmbs[i].ambiente||allAmbs[i].projeto||allAmbs[i].arquivo,
+    val_bruto:  allAmbs[i].total,
+    estrutural: rnd(res.valor_liquido_avista),  // base sem desconto e sem financeiro
+  }));
+
+  // renderTabelaNeg chamado APÓS o resumo para sobrescrever com valores efetivos
+  // (inclui descontos individuais por ambiente)
+  renderTabelaNeg();
+
+  // Atualiza cards do resumo
+  const subtotal_r = Math.round(_negBaseValues
+    .filter(b => _negSelLocal[b.arquivo] !== false)
+    .reduce((s,b) => s + (b.estrutural||0), 0) * 100) / 100;
+  const elSub = document.getElementById('neg-subtotal');
+  if (elSub) elSub.textContent = 'R$ '+fmt(subtotal_r);
+
+  if (document.getElementById('painel-aymore').style.display !== 'none') {
+    clearTimeout(_ayTimer); _ayTimer = setTimeout(atualizarAymore, 200);
+  }
+  if (document.getElementById('painel-cartao').style.display !== 'none') {
+    clearTimeout(_ccTimer); _ccTimer = setTimeout(atualizarCartao, 200);
+  }
+  if (document.getElementById('painel-financeira-loja') &&
+      document.getElementById('painel-financeira-loja').style.display !== 'none') {
+    clearTimeout(_flTimer); _flTimer = setTimeout(atualizarFinanceiraLoja, 200);
+  }
+}
+function totalComDescontoAmb(){
+  // Legado — mantido por seguranca, usa estrutural
+  const mg = lerMargensNegociacao();
+  const disc_g = mg.desconto_pct;
+  const custoFin = mg.custo_financeiro_pct;
+  const divisorFin = custoFin < 100 ? (1 - custoFin / 100) : 1;
+  return Math.round(_negBaseValues
+    .filter(b => _negSelLocal[b.arquivo] !== false)
+    .reduce((s,b) => {
+      const disc_i = parseFloat(_descIndividual[b.arquivo]) || 0;
+      const est = b.estrutural || b.valBase || 0;
+      return s + Math.round(est * (1-disc_g/100) * (1-disc_i/100) / divisorFin * 100) / 100;
+    }, 0) * 100) / 100;
+}
+function negToggleAll(checked){
+  _negBaseValues.forEach(({arquivo})=>{ _negSelLocal[arquivo] = checked; });
+  _salvarSelecaoNeg();
+  agendarCalculo();
+}
+function negTotalIniciarEdicao(el){
+  el._editando = true;
+  el.removeAttribute('readonly');
+  el.style.background   = 'var(--surface)';
+  el.style.border       = '1px solid var(--accent)';
+  el.style.borderRadius = '8px';
+  el.style.padding      = '4px 10px';
+  el.style.cursor       = 'text';
+  // Exibe valor numérico limpo para edição
+  const v = parseFloat(el.value.replace(/\./g,'').replace(',','.')) || 0;
+  el.value = v > 0 ? v.toFixed(2).replace('.',',') : '';
+  el.select();
+}
+function negTotalConfirmar(valStr){
+  const el = document.getElementById('neg-total-final');
+  el._editando = false;
+  el.setAttribute('readonly','');
+  el.style.background   = 'transparent';
+  el.style.border       = 'none';
+  el.style.borderRadius = '0';
+  el.style.padding      = '0';
+  el.style.cursor       = 'pointer';
+  el.style.color        = 'var(--ok)';
+
+  // Parse: aceita tanto ponto quanto vírgula como decimal
+  // Remove pontos de milhar e troca vírgula por ponto
+  const valLimpo = (valStr||'').trim()
+    .replace(/[^0-9.,]/g,'')   // remove letras e símbolos
+    .replace(/\./g,'')         // remove pontos de milhar
+    .replace(',','.');          // vírgula → ponto decimal
+  const total = parseFloat(valLimpo) || 0;
+  if(total <= 0){ renderTabelaNeg(); return; }
+
+  // Base de referência: soma estrutural dos ambientes selecionados
+  // estrutural já inclui arq/fid/viagem/brinde — sem desconto e sem financeiro
+  const negSel = _negBaseValues.filter(b => _negSelLocal[b.arquivo] !== false);
+  const mg = lerMargensNegociacao();
+  const custoFin = mg.custo_financeiro_pct;
+  const divisorFin = custoFin < 100 ? (1 - custoFin / 100) : 1;
+  const estTotal = negSel.reduce((s,b) => s + (b.estrutural||0), 0);
+
+  if(estTotal <= 0){ renderTabelaNeg(); return; }
+
+  // Verificar se o valor digitado é possível
+  // Valor máximo possível = estTotal / divisorFin (sem nenhum desconto)
+  const maxPossivel = estTotal / divisorFin;
+  if(total > maxPossivel){
+    el.style.color = 'var(--err)';
+    el.value = fmt(total) + ' ⚠ maior que base';
+    setTimeout(() => { el.style.color='var(--ok)'; renderTabelaNeg(); }, 2500);
+    return;
+  }
+
+  // Zerar todos os descontos individuais
+  _negBaseValues.forEach(({arquivo}) => { _descIndividual[arquivo] = 0; });
+
+  // Fórmula exata sem arredondamento intermediário:
+  // total_digitado = estTotal × (1 - disc%) / divisorFin
+  // (1 - disc%) = total_digitado × divisorFin / estTotal
+  // disc% = (1 - total × divisorFin / estTotal) × 100
+  const fator = total * divisorFin / estTotal;
+  const discPct = Math.max(0, parseFloat(((1 - fator) * 100).toFixed(4)));
+  const discEl  = document.getElementById('neg-desconto');
+  if(discEl){
+    discEl.value = discPct;
+    // Forçar renderização imediata com o valor exato
+    // (sem agendar para evitar drift de arredondamento)
+    renderTabelaNeg();
+    // Verificar se o total calculado bate com o digitado
+    const elTot = document.getElementById('neg-total-final');
+    if(elTot) elTot.value = fmt(total);  // garantir valor exato
+    agendarSalvarDesconto();
+  }
+}
+let _salvarSelTimer = null;
+function _salvarSelecaoNeg(){
+  if(!projetoAtivo) return;
+  clearTimeout(_salvarSelTimer);
+  _salvarSelTimer = setTimeout(()=>{
+    fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/ambientes/selecao',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({selecoes: _negSelLocal}),
+    }).catch(()=>{});
+  }, 600);
+}
+function renderTabelaNeg(){
+  const tbody = document.getElementById('neg-tbody');
+  if(!_negBaseValues.length) return;
+
+  const mg         = lerMargensNegociacao();
+  const disc_g     = mg.desconto_pct;
+  const custoFin   = mg.custo_financeiro_pct;
+  const divisorFin = custoFin < 100 ? (1 - custoFin / 100) : 1;
+
+  let total = 0;
+  let nSel  = 0;
+
+  tbody.innerHTML = _negBaseValues.map(({arquivo, nome, val_bruto, estrutural}) => {
+    const sel   = _negSelLocal[arquivo] !== false;
+    const disc_i = parseFloat(_descIndividual[arquivo]) || 0;
+    // valor_amb = estrutural × (1-disc_g%) × (1-disc_i%) / (1-custo_fin%)
+    const valFinal = sel
+      ? Math.round(estrutural * (1-disc_g/100) * (1-disc_i/100) / divisorFin * 100) / 100
+      : 0;
+    if(sel){ total += valFinal; nSel++; }
+    const arqEsc = esc(arquivo);
+    const arqId  = arquivo.replace(/[^a-z0-9]/gi,'_');
+
+    return `<tr>
+      <td style="width:40px;padding:10px 8px;text-align:center;border-bottom:1px solid var(--border)">
+        <input type="checkbox" ${sel?'checked':''} title="Incluir na negociacao"
+               style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;display:block;margin:0 auto"
+               onchange="_negSelLocal['${arqEsc}']=this.checked; _salvarSelecaoNeg(); agendarCalculo(); renderTabelaNeg()">
+      </td>
+      <td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;color:${sel?'var(--text)':'var(--muted)'}">
+        ${esc(nome)}
+      </td>
+      <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;width:80px">
+        <input type="number" id="di-${arqId}" value="${disc_i}" min="0" max="100" step="0.5" ${sel?'':'disabled'}
+               style="width:60px;text-align:right;padding:3px 6px;font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;opacity:${sel?'1':'0.35'}"
+               oninput="_descIndividual['${arqEsc}']=parseFloat(this.value)||0; renderTabelaNeg(); mpAtualizarApoio(); negAtualizarDescontoEfetivo()">
+      </td>
+      <td style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:${sel?'var(--ok)':'var(--muted)'};text-decoration:${sel?'none':'line-through'}">
+        ${sel ? 'R$ '+fmt(valFinal) : 'R$ '+fmt(Math.round(estrutural*(1-disc_g/100)/divisorFin*100)/100)}
+
+      </td>
+    </tr>`;
+  }).join('');
+
+  total = Math.round(total * 100) / 100;
+  document.getElementById('neg-total').textContent = 'R$ '+fmt(total);
+
+  const cbAll = document.getElementById('neg-sel-all');
+  if(cbAll) cbAll.checked = nSel === _negBaseValues.length;
+
+  // Total do contrato editável
+  const elTot = document.getElementById('neg-total-final');
+  if(elTot && !elTot._editando) elTot.value = fmt(total);
+
+  // Atualiza cards do resumo com valores reais (inclui descontos individuais)
+  // valor_avista_real = total × (1 - custo_fin%) → remove o gross-up financeiro
+  const subtotal_real = Math.round(_negBaseValues
+    .filter(b => _negSelLocal[b.arquivo] !== false)
+    .reduce((s,b) => s + b.estrutural, 0) * 100) / 100;
+  const valorAvista_real = Math.round(total * divisorFin * 100) / 100;
+  const descontoReal     = Math.round((subtotal_real - valorAvista_real) * 100) / 100;
+
+  const elSub  = document.getElementById('neg-subtotal');
+  const elDesc = document.getElementById('neg-desc-val');
+  const elAv   = document.getElementById('neg-avista');
+  if(elSub)  elSub.textContent  = 'R$ '+fmt(subtotal_real);
+  if(elDesc) elDesc.textContent = '− R$ '+fmt(descontoReal);
+  if(elAv)   elAv.textContent   = 'R$ '+fmt(valorAvista_real);
+
+  // Atualiza % do desconto mostrado no label
+  const pctLabel = document.getElementById('neg-desc-pct-lbl');
+  if(pctLabel && subtotal_real > 0){
+    const pctReal = Math.round(descontoReal / subtotal_real * 10000) / 100;
+    pctLabel.textContent = pctReal.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  }
+}
+function negValidarLimiteDesconto(val){
+  const disc = parseFloat(val) || 0;
+  const v = cfgValidarDesconto(disc);
+  const el = document.getElementById('neg-desconto');
+  const hint = document.getElementById('neg-limite-hint');
+  if(!v.ok){
+    if(el){ el.style.borderColor='var(--err)'; el.style.color='var(--err)'; }
+    if(hint){ hint.textContent='⚠ Limite do perfil: '+v.max+'%'; hint.style.display='block'; }
+  } else {
+    if(el){ el.style.borderColor=''; el.style.color=''; }
+    if(hint){ hint.style.display='none'; }
+  }
+}
+
+function negAtualizarDescontoEfetivo(){
+  // Recalcula o desconto % efetivo médio ponderado considerando os descontos individuais
+  // e atualiza o label do box Desconto para informar ao consultor
+  const mg = lerMargensNegociacao();
+  const disc_g = mg.desconto_pct;
+  const custoFin = mg.custo_financeiro_pct;
+  const divisorFin = custoFin < 100 ? (1 - custoFin / 100) : 1;
+  const negSel = _negBaseValues.filter(b => _negSelLocal[b.arquivo] !== false);
+  if (!negSel.length) return;
+
+  const estTotal  = negSel.reduce((s,b) => s + (b.estrutural||0), 0);
+  const finalTotal = negSel.reduce((s,b) => {
+    const disc_i = parseFloat(_descIndividual[b.arquivo]) || 0;
+    return s + Math.round((b.estrutural||0) * (1-disc_g/100) * (1-disc_i/100) / divisorFin * 100) / 100;
+  }, 0);
+
+  // Atualizar Total do contrato
+  const total = Math.round(finalTotal * 100) / 100;
+  const elTot = document.getElementById('neg-total-final');
+  if (elTot && !elTot._editando) elTot.value = fmt(total);
+  document.getElementById('neg-total').textContent = 'R$ ' + fmt(total);
+
+  // Calcular desconto efetivo global equivalente para exibição
+  const valorAvista = Math.round(total * divisorFin * 100) / 100;
+  const descEfetivo = estTotal > 0
+    ? Math.round((1 - valorAvista / estTotal) * 10000) / 100
+    : disc_g;
+
+  // Atualizar label de desconto
+  const pctLabel = document.getElementById('neg-desc-pct-lbl');
+  if (pctLabel) pctLabel.textContent =
+    descEfetivo.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const elDesc = document.getElementById('neg-desc-val');
+  if (elDesc) elDesc.textContent = '− R$ ' + fmt(Math.round((estTotal - valorAvista)*100)/100);
+  const elAv = document.getElementById('neg-avista');
+  if (elAv) elAv.textContent = 'R$ ' + fmt(valorAvista);
+  const elSub = document.getElementById('neg-subtotal');
+  if (elSub) elSub.textContent = 'R$ ' + fmt(Math.round(estTotal*100)/100);
+}
+
+function _limparResumo(){
+  ['neg-subtotal','neg-desc-val','neg-avista']
+    .forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='R$ —'; });
+  const elTot=document.getElementById('neg-total-final');
+  if(elTot && !elTot._editando) elTot.value='—';
+  const lbl=document.getElementById('neg-desc-pct-lbl'); if(lbl) lbl.textContent='0';
+}
+
+let _salvarDescTimer = null;
+function agendarSalvarDesconto(){
+  clearTimeout(_salvarDescTimer);
+  _salvarDescTimer = setTimeout(salvarDescontoAutomatico, 800);
+}
+
+async function salvarDescontoAutomatico(){
+  if(!projetoAtivo) return;
+  const desconto = parseFloat(document.getElementById('neg-desconto').value)||0;
+  const mg = Object.assign({}, projetoAtivo.margens||{}, {desconto_pct: desconto});
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/margens',{
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(mg),
+    });
+    const d = await r.json();
+    if(d.ok) projetoAtivo.margens = d.margens;
+  }catch(e){}
+}
+
+// Painel de discriminacao detalhada (uso interno do consultor, dentro do modal)
+async function toggleDiscriminacao(){
+  const panel  = document.getElementById('discriminacao-panel');
+  const modal  = document.getElementById('modal-params').querySelector('div');
+  const open   = panel.style.display === 'block';
+  panel.style.display  = open ? 'none' : 'block';
+  modal.style.maxWidth = open ? '598px' : '900px';
+  document.getElementById('btn-discr').innerHTML =
+    open ? '&#x1F4CA; Ver discriminacao por ambiente' : '&#x1F4CA; Ocultar discriminacao';
+  if(!open) await atualizarDiscriminacao();
+}
+async function atualizarDiscriminacao(){
+  if(!projetoAtivo) return;
+  const ambSel = (projetoAtivo.ambientes||[]).filter(a=>a.selecionado);
+  if(!ambSel.length) return;
+  // Usa valores atuais do modal (nao os salvos) para recalculo em tempo real
+  const mg = lerMargensModal();
+  const viagemRateada = mg.fora_da_sede ? ratearViagem(mg.custo_viagem, ambSel) : ambSel.map(()=>0);
+  const resultados = await Promise.all(ambSel.map(async (amb,i)=>{
+    const r = await fetch('/calcular_margens',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({...mg, valor_bruto:amb.total, custo_viagem:viagemRateada[i]})});
+    return (await r.json()).resultado;
+  }));
+  document.getElementById('discriminacao-tbody').innerHTML = resultados.map((res,i)=>{
+    const nome     = esc(ambSel[i].ambiente||ambSel[i].projeto||ambSel[i].arquivo);
+    const op_desc   = fmt(res.valor_bruto - res.saldo_apos_desconto);
+    const op_fin    = fmt(res.saldo_apos_financeiro - res.saldo_apos_desconto);
+    const op_viagem = fmt(res.saldo_apos_financeiro - res.saldo_apos_viagem);
+    const op_brinde = fmt(res.saldo_apos_viagem - res.saldo_apos_brinde);
+    const op_arq    = fmt(res.saldo_apos_brinde - res.saldo_apos_arq);
+    const op_fid    = fmt(res.saldo_apos_arq - res.saldo_apos_fidelidade);
+    const fin_pos   = res.custo_financeiro > 0;
+    const finC      = fin_pos ? 'var(--ok)' : 'var(--muted)';
+    const warn      = 'var(--warn)';
+    return `
+    <tr style="font-size:11px">
+      <td rowspan="2" style="font-weight:700;border-right:1px solid var(--border);padding:6px 10px;vertical-align:middle">${nome}</td>
+      <td class="td-bruto">${fmt(res.valor_bruto)}</td>
+      <td style="color:${warn}">&#x2212; ${op_desc}</td>
+      <td style="color:${finC}">${fin_pos?'+ ':''}${op_fin}</td>
+      <td style="color:${warn}">&#x2212; ${op_viagem}</td>
+      <td style="color:${warn}">&#x2212; ${op_brinde}</td>
+      <td style="color:${warn}">&#x2212; ${op_arq}</td>
+      <td style="color:${warn}">&#x2212; ${op_fid}</td>
+      <td class="td-final">${fmt(res.valor_final)}</td>
+    </tr>
+    <tr style="font-size:10px;color:var(--muted);border-bottom:2px solid var(--border2)">
+      <td>${fmt(res.valor_bruto)}</td>
+      <td>${fmt(res.saldo_apos_desconto)}</td>
+      <td style="color:${finC}">${fmt(res.saldo_apos_financeiro)}</td>
+      <td>${fmt(res.saldo_apos_viagem)}</td>
+      <td>${fmt(res.saldo_apos_brinde)}</td>
+      <td>${fmt(res.saldo_apos_arq)}</td>
+      <td>${fmt(res.saldo_apos_fidelidade)}</td>
+      <td class="td-final">${fmt(res.valor_final)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Sincroniza campo de desconto ao entrar na Pagina 02 e carrega modalidades
+async function carregarMargensSalvas(){
+  if(!projetoAtivo) return;
+  _descAdicional  = {};
+  _descIndividual = {};
+  _negBaseValues  = [];
+  _negSelLocal    = {};
+  (projetoAtivo.ambientes||[]).filter(a=>a.selecionado).forEach(a=>{ _negSelLocal[a.arquivo] = true; });
+  const el = document.getElementById('neg-desconto');
+  if(el) el.value = (projetoAtivo.margens||{}).desconto_pct || 0;
+  await carregarModalidades();  // popula dropdowns e dispara calculo
+  await carregarPerfil();
+}
+
+// ---- Modal de Parametros da Negociacao ---------------------------------------
+function mpToggleArq(){
+  const cb=document.getElementById('mp-arq-ativa'), inp=document.getElementById('mp-arq-pct');
+  inp.disabled=!cb.checked; inp.style.opacity=cb.checked?'1':'0.35';
+}
+function mpToggleFid(){
+  const cb=document.getElementById('mp-fid-ativa'), inp=document.getElementById('mp-fid-pct');
+  inp.disabled=!cb.checked; inp.style.opacity=cb.checked?'1':'0.35';
+}
+function mpToggleViagem(){
+  const cb  = document.getElementById('mp-fora-sede');
+  const inp = document.getElementById('mp-viagem');
+  inp.disabled = !cb.checked;
+  inp.style.opacity = cb.checked ? '1' : '0.35';
+}
+// Lê os valores actuais dos campos do modal (não os salvos em projetoAtivo.margens)
+function lerMargensModal(){
+  const id    = s => document.getElementById(s);
+  const n_tot = (projetoAtivo && projetoAtivo.ambientes||[]).length;
+  const brinde_total = id('mp-brinde-ativo').checked ? (parseFloat(id('mp-brinde').value)||0) : 0;
+  const brinde_por_amb = n_tot > 0 ? brinde_total / n_tot : 0;
+  return {
+    desconto_pct:         parseFloat(id('mp-desconto').value)||0,
+    fora_da_sede:         id('mp-fora-sede').checked,
+    custo_viagem:         parseFloat(id('mp-viagem').value)||0,
+    brinde:               brinde_por_amb,
+    brinde_ativo:         brinde_por_amb > 0,
+    comissao_arq_ativa:   id('mp-arq-ativa').checked,
+    comissao_arq_pct:     parseFloat(id('mp-arq-pct').value)||0,
+    fidelidade_ativa:     id('mp-fid-ativa').checked,
+    fidelidade_pct:       parseFloat(id('mp-fid-pct').value)||0,
+  };
+}
+let _discrTimer = null;
+function agendarDiscriminacao(){
+  clearTimeout(_discrTimer);
+  _discrTimer = setTimeout(atualizarDiscriminacao, 400);
+  mpAtualizarApoio();  // atualiza painel de apoio em tempo real
+}
+function mpToggleBrinde(){
+  const cb  = document.getElementById('mp-brinde-ativo');
+  const inp = document.getElementById('mp-brinde');
+  inp.disabled = !cb.checked;
+  inp.style.opacity = cb.checked ? '1' : '0.35';
+}
+
+function mpAtualizarApoio(){
+  const rnd = v => Math.round(v*100)/100;
+  const ambs = (projetoAtivo && projetoAtivo.ambientes) || [];
+  const ambsNeg = ambs.filter(a => a.selecionado && _negSelLocal[a.arquivo] !== false);
+  const bruto = rnd(ambsNeg.reduce((s,a)=>s+(a.total||0),0));
+  if(!bruto){ document.getElementById('mp-apoio').style.display='none'; return; }
+  document.getElementById('mp-apoio').style.display='block';
+
+  const id = s => document.getElementById(s);
+  const desc_pct = parseFloat(id('mp-desconto').value)||0;
+
+  // Usa estrutural de _negBaseValues (já com margens de arq/fid/viagem/brinde)
+  // para cálculo por ambiente considerando desconto individual
+  let avista_base = 0;
+  if(_negBaseValues && _negBaseValues.length){
+    _negBaseValues.filter(b => _negSelLocal[b.arquivo] !== false).forEach(b => {
+      const disc_i = parseFloat(_descIndividual[b.arquivo]) || 0;
+      avista_base += rnd(b.estrutural * (1-disc_pct_to_dec_g(desc_pct)) * (1-disc_i/100));
+    });
+    avista_base = rnd(avista_base);
+  } else {
+    avista_base = rnd(bruto*(1-desc_pct/100));
+  }
+  function disc_pct_to_dec_g(p){ return p/100; }
+  const avista   = avista_base;
+  const desc_val = rnd(bruto-avista);
+
+  // Margens estruturais (sobre valor à vista)
+  const arq_ativa = id('mp-arq-ativa').checked;
+  const arq_pct   = arq_ativa ? (parseFloat(id('mp-arq-pct').value)||0) : 0;
+  const fid_ativa = id('mp-fid-ativa').checked;
+  const fid_pct   = fid_ativa ? (parseFloat(id('mp-fid-pct').value)||0) : 0;
+  const viagemAtiva = id('mp-fora-sede').checked;
+  const viagem_val  = viagemAtiva ? (parseFloat(id('mp-viagem').value)||0) : 0;
+  const brinde_ativo= id('mp-brinde-ativo').checked;
+  const brinde_val  = brinde_ativo ? (parseFloat(id('mp-brinde').value)||0) : 0;
+  const n_ambs      = ambsNeg.length || 1;
+
+  let saldo = avista;
+  const v_viagem = rnd(viagem_val);
+  saldo = rnd(saldo - v_viagem);
+  const v_brinde = rnd(brinde_val);
+  saldo = rnd(saldo - v_brinde);
+  const s_apos_viagem_brinde = saldo;
+  const v_arq = rnd(s_apos_viagem_brinde * arq_pct / 100);
+  saldo = rnd(saldo - v_arq);
+  const v_fid = rnd(saldo * fid_pct / 100);
+  saldo = rnd(saldo - v_fid);
+  const liquido = saldo;
+
+  // Desconto Total% = (bruto - liquido) / bruto * 100
+  // Representa quanto o negócio foi descontado em relação ao valor bruto original
+  const margem = bruto > 0 ? rnd((bruto - liquido) / bruto * 100) : 0;
+
+  id('mp-a-bruto').textContent     = 'R$ '+fmt(bruto);
+  id('mp-a-desc-pct').textContent  = desc_pct.toLocaleString('pt-BR');
+  id('mp-a-desc').textContent      = '− R$ '+fmt(desc_val);
+  id('mp-a-avista').textContent    = 'R$ '+fmt(avista);
+  id('mp-a-arq').textContent       = arq_ativa ? '− R$ '+fmt(v_arq) : 'R$ 0,00';
+  id('mp-a-fid').textContent       = fid_ativa ? '− R$ '+fmt(v_fid) : 'R$ 0,00';
+  id('mp-a-viagem').textContent    = viagemAtiva ? '− R$ '+fmt(v_viagem) : 'R$ 0,00';
+  id('mp-a-brinde').textContent    = brinde_ativo ? '− R$ '+fmt(v_brinde) : 'R$ 0,00';
+  id('mp-a-liq').textContent       = 'R$ '+fmt(liquido);
+  id('mp-a-margem').textContent    = margem.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
+}
+
+function abrirModalParams(){
+  const m  = (projetoAtivo && projetoAtivo.margens) || {};
+  // Total dos ambientes incluidos na negociacao
+  const ambs = (projetoAtivo && projetoAtivo.ambientes) || [];
+  const ambsNeg = ambs.filter(a => a.selecionado && _negSelLocal[a.arquivo] !== false);
+  const totalNeg = ambsNeg.reduce((s,a)=>s+(a.total||0),0);
+  const elTot = document.getElementById('mp-total-ambientes');
+  if(elTot) elTot.textContent = 'R$ '+fmt(totalNeg)+' · '+ambsNeg.length+'/'+(ambs.filter(a=>a.selecionado).length)+' amb.';
+  const id = s => document.getElementById(s);
+  const pag02Ativa = document.getElementById('page-02').classList.contains('active');
+  const descontoAtual = pag02Ativa
+    ? (parseFloat(document.getElementById('neg-desconto').value) || 0)
+    : (m.desconto_pct || 0);
+  id('mp-desconto').value      = descontoAtual;
+  id('mp-arq-ativa').checked   = !!m.comissao_arq_ativa;
+  id('mp-arq-pct').value     = m.comissao_arq_pct || 0;
+  id('mp-fid-ativa').checked = !!m.fidelidade_ativa;
+  id('mp-fid-pct').value     = m.fidelidade_pct || 0;
+  id('mp-fora-sede').checked  = !!m.fora_da_sede;
+  id('mp-viagem').value       = m.custo_viagem   || 0;
+  id('mp-brinde-ativo').checked = !!m.brinde_ativo;
+  id('mp-brinde').value       = m.brinde || 0;
+  mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
+  document.getElementById('modal-params').style.display = 'flex';
+  mpAtualizarApoio();
+}
+
+async function fecharModalParams(salvar){
+  document.getElementById('modal-params').style.display = 'none';
+  if(salvar && projetoAtivo){
+    const id = s => document.getElementById(s);
+    const mg = {
+      desconto_pct:          parseFloat(id('mp-desconto').value)||0,
+      comissao_arq_ativa:    id('mp-arq-ativa').checked,
+      comissao_arq_pct:   parseFloat(id('mp-arq-pct').value)||0,
+      fidelidade_ativa:   id('mp-fid-ativa').checked,
+      fidelidade_pct:     parseFloat(id('mp-fid-pct').value)||0,
+      fora_da_sede:       id('mp-fora-sede').checked,
+      custo_viagem:       parseFloat(id('mp-viagem').value)||0,
+      brinde_ativo:       id('mp-brinde-ativo').checked,
+      brinde:             parseFloat(id('mp-brinde').value)||0,
+    };
+    try{
+      const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/margens',{
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(mg),
+      });
+      const d = await r.json();
+      if(d.ok){
+        projetoAtivo.margens = d.margens;
+        showToast('Parametros salvos!');
+        // Sincroniza desconto e recalcula sempre (a funcao trata o caso de pagina inativa)
+        const elDesc = document.getElementById('neg-desconto');
+        if(elDesc) elDesc.value = d.margens.desconto_pct || 0;
+        executarCalculo();
+      }
+    }catch(e){ showToast('Erro ao salvar parametros', true); }
+  }
+  // Prossegue para page-02 se veio do fluxo de criacao
+  if(document.getElementById('page-00') && document.getElementById('page-00').classList.contains('active')){
+    unlockNav(1); unlockNav(2);
+    goPage(2);
+  }
+}
+
+// ---- Init --------------------------------------------------------------------
+function salvarOrcamento(){
+  if(!projetoAtivo){ showToast('Nenhum projeto ativo', true); return; }
+  showToast('Orcamento salvo em ' + projetoAtivo.nome_projeto);
+}
+
+// Event listeners drag-drop para o modal de novo ambiente
+document.addEventListener('DOMContentLoaded', function(){
+  const dz2 = document.getElementById('drop-zone-amb');
+  if(dz2 && !dz2._hasDrop){
+    dz2._hasDrop = true;
+    dz2.addEventListener('dragover',  e => { e.preventDefault(); dz2.classList.add('drag'); });
+    dz2.addEventListener('dragleave', () => dz2.classList.remove('drag'));
+    dz2.addEventListener('drop',      e => { e.preventDefault(); dz2.classList.remove('drag'); uploadXmls(e.dataTransfer.files); });
+  }
+});
+
+loadConfig();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "codigo": "a_vista",
+  "descricao": "A Vista",
+  "tipo": "avista",
+  "recebimento": "imediato",
+  "gerar_boleto": false,
+  "desconto_pct": 0.0,
+  "observacao": "Desconto negociavel. Valor configurado nos parametros da negociacao."
+}
