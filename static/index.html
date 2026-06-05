@@ -1654,6 +1654,8 @@ let _flTimer     = null;
 let _flValTotal  = 0;      // valor_total com juros (para calculo local da ultima)
 let _flParcelas  = {};     // { num: valor } parcelas editadas pelo usuario
 
+const FL_ENTRADA_MIN_PCT = 0.10;  // 10% mínimo — espelha backend
+
 function flMostrarPainel(mostrar) {
   const el = document.getElementById('painel-financeira-loja');
   if (!el) return;
@@ -1661,6 +1663,13 @@ function flMostrarPainel(mostrar) {
   if (mostrar) {
     const dc = document.getElementById('fl-data-contrato');
     if (!dc.value) dc.value = new Date().toISOString().split('T')[0];
+    // Pré-preencher entrada com 10% do valor à vista
+    const valorVenda = _ayGetValorVenda();
+    const elEnt = document.getElementById('fl-entrada');
+    if (valorVenda > 0 && (!elEnt.value || parseFloat(elEnt.value) === 0)) {
+      elEnt.value = Math.round(valorVenda * FL_ENTRADA_MIN_PCT * 100) / 100;
+    }
+    _flParcelas = {};  // limpar edições anteriores ao abrir
     flEntradaChange();
     atualizarFinanceiraLoja();
   }
@@ -1670,12 +1679,20 @@ function flEntradaChange() {
   const valorVenda = _ayGetValorVenda();
   const entrada    = parseFloat(document.getElementById('fl-entrada').value) || 0;
   const pct = valorVenda > 0 ? (entrada / valorVenda * 100) : 0;
+  const entradaMin = Math.round(valorVenda * FL_ENTRADA_MIN_PCT * 100) / 100;
+
   document.getElementById('fl-entrada-pct').textContent =
     pct.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
-  const financiado = Math.max(0, valorVenda - entrada);
+
   const hint = document.getElementById('fl-hint-financiado');
-  hint.textContent = financiado > 0 ? 'Financiado: R$ ' + fmt(financiado) : '';
-  hint.style.color = (entrada >= valorVenda && valorVenda > 0) ? 'var(--err)' : 'var(--ok)';
+  if (valorVenda > 0 && entrada < entradaMin) {
+    hint.textContent = '⚠ Entrada mínima: R$ ' + fmt(entradaMin) + ' (10%)';
+    hint.style.color = 'var(--err)';
+  } else {
+    const financiado = Math.max(0, valorVenda - entrada);
+    hint.textContent = financiado > 0 ? 'Financiado: R$ ' + fmt(financiado) : '';
+    hint.style.color = (entrada >= valorVenda && valorVenda > 0) ? 'var(--err)' : 'var(--ok)';
+  }
   clearTimeout(_flTimer);
   _flTimer = setTimeout(atualizarFinanceiraLoja, 300);
 }
@@ -1744,7 +1761,7 @@ function atualizarFinanceiraLoja() {
     document.getElementById('fl-r-acrescimo').textContent  = 'R$ ' + fmt(d.acrescimo_rs) +
       ' (' + d.acrescimo_pct.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '%)';
     document.getElementById('fl-r-taxa').textContent       =
-      d.taxa_juros_mensal_pct.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '% a.m.';
+      d.taxa_juros_pct.toLocaleString('pt-BR',{minimumFractionDigits:2}) + '% a.m.';
     document.getElementById('fl-r-parcela').textContent    = 'R$ ' + fmt(d.parcela_base);
     document.getElementById('fl-r-n').textContent          = d.n_parcelas + 'x';
     document.getElementById('fl-conf-total').textContent   = 'R$ ' + fmt(d.valor_total);
