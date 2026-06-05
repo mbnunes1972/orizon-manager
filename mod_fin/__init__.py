@@ -71,7 +71,7 @@ def carregar_faixas(codigo: str) -> list:
 
 def listar_modalidades() -> list:
     """Retorna lista de modalidades disponíveis para o dropdown da interface."""
-    codigos = ['a_vista', 'aymore', 'cartao_credito', 'venda_programada', 'total_flex']
+    codigos = ['a_vista', 'aymore', 'cartao_credito', 'cartao_credito_x', 'venda_programada', 'total_flex']
     resultado = []
     for codigo in codigos:
         tab = _carregar(codigo)
@@ -85,7 +85,8 @@ def listar_modalidades() -> list:
             nomes = {
                 'a_vista':          ('A Vista',          'avista'),
                 'aymore':           ('Aymoré',            'financiamento_externo'),
-                'cartao_credito':   ('Cartão de Crédito', 'financiamento_externo'),
+                'cartao_credito':   ('Cartão de Crédito',   'financiamento_externo'),
+                'cartao_credito_x': ('Cartão de Crédito X', 'financiamento_externo'),
                 'venda_programada': ('Venda Programada',  'programado'),
                 'total_flex':       ('Total Flex',        'flex'),
             }
@@ -94,5 +95,6 @@ def listar_modalidades() -> list:
     return resultado
 
 # Imports diretos das funções de cálculo
-from .aymore import calcular as calcular_aymore
-from .cartao  import calcular as calcular_cartao
+from .aymore           import calcular as calcular_aymore
+from .cartao           import calcular as calcular_cartao
+from .venda_programada import calcular as calcular_venda_programada

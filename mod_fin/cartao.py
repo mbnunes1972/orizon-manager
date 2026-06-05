@@ -30,16 +30,17 @@ _FAIXAS_FALLBACK = {
 }
 
 
-def _faixas() -> dict:
-    tab = carregar_json("cartao_credito")
+def _faixas(codigo: str = "cartao_credito") -> dict:
+    tab = carregar_json(codigo)
     if not tab or "faixas" not in tab:
-        return _FAIXAS_FALLBACK
+        return _FAIXAS_FALLBACK if codigo == "cartao_credito" else {}
     return {int(f["parcelas"]): float(f["taxa_retencao_pct"])
             for f in tab["faixas"]}
 
 
 def calcular(valor_avista: float, entrada: float,
-             n_parcelas: int, data_contrato: str) -> dict:
+             n_parcelas: int, data_contrato: str,
+             codigo: str = "cartao_credito") -> dict:
     """
     Calcula parcelamento Cartão de Crédito.
 
@@ -60,7 +61,7 @@ def calcular(valor_avista: float, entrada: float,
     if ent >= avista:
         return {"ok": False, "erro": "Entrada deve ser menor que o valor à vista"}
 
-    faixas = _faixas()
+    faixas = _faixas(codigo)
     if n not in faixas:
         return {"ok": False, "erro": f"Sem taxa cadastrada para {n} parcelas"}
 

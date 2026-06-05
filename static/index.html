@@ -468,7 +468,7 @@ body{overflow:hidden}
 
     <!-- Painel Cartão -->
     <div class="mod-panel" id="painel-cartao" style="display:none">
-      <div class="mod-panel-title">&#x1F4B3; Cartao de Credito</div>
+      <div class="mod-panel-title" id="painel-cartao-titulo">&#x1F4B3; Cartao de Credito</div>
       <div class="mod-grid">
         <div>
           <label>Entrada (R$) <span id="cc-entrada-pct" style="color:var(--accent);font-size:10px"></span></label>
@@ -513,6 +513,60 @@ body{overflow:hidden}
           <table class="plano-tbl">
             <thead><tr><th style="width:40px">#</th><th>Tipo</th><th>Vencimento</th><th style="text-align:right">Valor</th></tr></thead>
             <tbody id="cc-parc-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Painel Venda Programada -->
+    <div class="mod-panel" id="painel-vp" style="display:none">
+      <div class="mod-panel-title">&#x1F4C5; Venda Programada</div>
+      <div class="mod-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div>
+          <label>Entrada (R$) <span id="vp-entrada-pct" style="color:var(--accent);font-size:10px"></span></label>
+          <input type="number" id="vp-entrada" value="0" min="0" step="100" oninput="vpEntradaChange()">
+          <div id="vp-hint-financiado" style="font-size:10px;color:var(--ok);margin-top:4px"></div>
+        </div>
+        <div>
+          <label>Data do Contrato</label>
+          <input type="date" id="vp-data-contrato" oninput="vpDataContratoChange()">
+        </div>
+        <div>
+          <label>Prazo limite <span style="font-size:9px;color:var(--muted)">(395 dias)</span></label>
+          <div id="vp-data-limite" style="padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace">—</div>
+        </div>
+      </div>
+      <div id="vp-aviso" style="display:none;font-size:10px;color:var(--err);margin-bottom:10px;padding:7px 12px;background:rgba(220,53,69,.08);border-radius:6px;border-left:3px solid var(--err)"></div>
+      <div id="vp-resumo" style="display:none">
+        <div class="contrato-grid">
+          <div class="card-teal">
+            <div class="c-label">Contrato — Loja Recebe</div>
+            <div id="vp-c-avista" class="c-value">R$ —</div>
+            <div id="vp-c-avista-sub" class="c-sub">Sem retencao — parcelado direto</div>
+          </div>
+          <div class="card-amber">
+            <div class="c-label">Parcelado — Cliente Paga</div>
+            <div id="vp-c-parcelado" class="c-value">R$ —</div>
+            <div id="vp-c-parcelado-sub" class="c-sub">Total pago pelo cliente</div>
+          </div>
+        </div>
+        <div class="cards-3x2">
+          <div class="c-card"><div class="c-card-lbl">Loja Recebe</div><div id="vp-r-avista" class="c-card-val ok">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Cliente Paga</div><div id="vp-r-total" class="c-card-val">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Valor / Parcela</div><div id="vp-r-parcela" class="c-card-val ok">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Acrescimo</div><div id="vp-r-custo" class="c-card-val ok">0,00%</div></div>
+          <div class="c-card"><div class="c-card-lbl">Ultima Parcela</div><div id="vp-r-ultima" class="c-card-val">—</div></div>
+          <div class="c-card"><div class="c-card-lbl">Status Prazo</div><div id="vp-r-status" class="c-card-val ok">—</div></div>
+        </div>
+        <div class="plano-wrap">
+          <div class="plano-hdr">Plano de Pagamento <span style="font-size:10px;font-weight:400;color:var(--muted)">— edite as datas das parcelas</span></div>
+          <table class="plano-tbl">
+            <thead><tr>
+              <th style="width:40px">#</th><th>Tipo</th>
+              <th>Vencimento</th>
+              <th style="text-align:right">Valor</th>
+            </tr></thead>
+            <tbody id="vp-parc-body"></tbody>
           </table>
         </div>
       </div>
@@ -1306,14 +1360,15 @@ async function onPagamentoChange(){
     }
     // Mostrar/ocultar painéis de modalidade
     ayMostrarPainel(codigo === 'aymore');
-    cartaoMostrarPainel(codigo === 'cartao_credito');
+    cartaoMostrarPainel(codigo === 'cartao_credito' || codigo === 'cartao_credito_x');
+    vpMostrarPainel(codigo === 'venda_programada');
   } catch(e){
     console.error('[PAG] Erro ao carregar faixas:', e);
     _faixasAtivas=[]; _tipoAtivo='avista'; _descontoAvista=0; _acrescimoFin=0;
     parcel.innerHTML='<option value="1">A Vista</option>'; parcel.disabled=true;
     ayMostrarPainel(false);
     cartaoMostrarPainel(false);
-    flMostrarPainel(false);
+    vpMostrarPainel(false);
   }
   agendarCalculo();
 }
@@ -1326,6 +1381,7 @@ function onParcelasChange(){
   const modalDesc = document.getElementById('neg-pagamento').selectedOptions[0]?.text || '';
   _descricaoPag = modalDesc + (n > 1 ? ' '+n+'x' : '');
   console.log('[PAG] parcelas='+n+' custo_pct='+_acrescimoFin);
+  if (_codigoPagAtivo === 'venda_programada') _vpDatas = [];
   agendarCalculo();
 }
 
@@ -1517,6 +1573,9 @@ let _ccTimer = null;
 function cartaoMostrarPainel(mostrar) {
   document.getElementById('painel-cartao').style.display = mostrar ? 'block' : 'none';
   if (mostrar) {
+    const sel = document.getElementById('neg-pagamento');
+    const desc = sel.selectedOptions[0]?.text || 'Cartão de Crédito';
+    document.getElementById('painel-cartao-titulo').textContent = '💳 ' + desc;
     const dc = document.getElementById('cc-data-contrato');
     if (!dc.value) dc.value = new Date().toISOString().split('T')[0];
     ccEntradaChange();
@@ -1554,7 +1613,7 @@ async function atualizarCartao() {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({valor_avista: valorAvista, entrada, n_parcelas: n,
-                            bandeira, data_contrato: dc})
+                            bandeira, data_contrato: dc, codigo: _codigoPagAtivo})
     });
     d = await r.json();
   } catch(e) { console.error('[CARTAO]', e); return; }
@@ -1604,6 +1663,200 @@ async function atualizarCartao() {
   atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
 }
 
+
+// ---- Painel Venda Programada -------------------------------------------------
+let _vpTimer = null;
+let _vpDatas  = [];   // datas editadas pelo usuário (strings ISO por parcela)
+
+function vpMostrarPainel(mostrar) {
+  document.getElementById('painel-vp').style.display = mostrar ? 'block' : 'none';
+  if (mostrar) {
+    const hoje = new Date().toISOString().split('T')[0];
+    const dc = document.getElementById('vp-data-contrato');
+    if (!dc.value) dc.value = hoje;
+    _vpDatas = [];
+    vpAtualizarLimite();
+    vpEntradaChange();
+    atualizarVP();
+  }
+}
+
+function vpDataContratoChange() {
+  _vpDatas = [];
+  vpAtualizarLimite();
+  clearTimeout(_vpTimer);
+  _vpTimer = setTimeout(atualizarVP, 300);
+}
+
+function vpAtualizarLimite() {
+  const dc = document.getElementById('vp-data-contrato').value;
+  if (!dc) return;
+  const d = new Date(dc + 'T12:00:00');
+  d.setDate(d.getDate() + 395);
+  const limIso = d.toISOString().split('T')[0];
+  const [y, m, dd] = limIso.split('-');
+  const el = document.getElementById('vp-data-limite');
+  el.textContent  = dd + '/' + m + '/' + y;
+  el.dataset.iso  = limIso;
+}
+
+function vpEntradaChange() {
+  const valorVenda = _ayGetValorVenda();
+  const entrada    = parseFloat(document.getElementById('vp-entrada').value) || 0;
+  const pct = valorVenda > 0 ? (entrada / valorVenda * 100) : 0;
+  document.getElementById('vp-entrada-pct').textContent =
+    pct.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) + '%';
+  const financiado = Math.max(0, valorVenda - entrada);
+  const hint = document.getElementById('vp-hint-financiado');
+  hint.textContent  = financiado > 0 ? 'Parcelado: R$ ' + fmt(financiado) : '';
+  hint.style.color  = (entrada >= valorVenda && valorVenda > 0) ? 'var(--err)' : 'var(--ok)';
+  clearTimeout(_vpTimer);
+  _vpTimer = setTimeout(atualizarVP, 300);
+}
+
+function vpDataChange(input, idx) {
+  _vpDatas[idx] = input.value;
+  clearTimeout(_vpTimer);
+  _vpTimer = setTimeout(atualizarVP, 300);
+}
+
+async function atualizarVP() {
+  const valorAvista = _ayGetValorVenda();
+  const entrada  = parseFloat(document.getElementById('vp-entrada').value) || 0;
+  const n        = parseInt(document.getElementById('neg-parcelas').value) || 1;
+  const dc       = document.getElementById('vp-data-contrato').value;
+  if (!dc || !valorAvista) {
+    document.getElementById('vp-resumo').style.display = 'none';
+    return;
+  }
+  let d;
+  try {
+    const r = await fetch('/calcular_venda_programada', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        valor_avista:   valorAvista,
+        entrada,
+        n_parcelas:     n,
+        data_contrato:  dc,
+        datas_parcelas: _vpDatas.length >= n ? _vpDatas.slice(0, n) : [],
+      })
+    });
+    d = await r.json();
+  } catch(e) { console.error('[VP]', e); return; }
+  if (!d.ok) { console.warn('[VP]', d.erro); return; }
+
+  // Popula _vpDatas com datas do backend na primeira chamada (sem edições do user)
+  if (_vpDatas.length < n) {
+    _vpDatas = d.parcelas
+      .filter(p => p.tipo !== 'contrato' && p.tipo !== 'entrada')
+      .map(p => p.data_iso);
+  }
+
+  document.getElementById('vp-resumo').style.display = 'block';
+
+  // Cards
+  document.getElementById('vp-r-avista').textContent  = 'R$ ' + fmt(d.valor_liberado);
+  document.getElementById('vp-r-total').textContent   = 'R$ ' + fmt(d.total_cliente);
+  document.getElementById('vp-r-parcela').textContent = 'R$ ' + fmt(d.valor_parcela);
+  document.getElementById('vp-r-custo').textContent   = '0,0000%';
+
+  const parcInstals = d.parcelas.filter(p => p.tipo !== 'contrato' && p.tipo !== 'entrada');
+  const ultima = parcInstals[parcInstals.length - 1];
+  document.getElementById('vp-r-ultima').textContent = ultima ? ultima.data : '—';
+
+  const statusEl = document.getElementById('vp-r-status');
+  if (d.excede_prazo) {
+    statusEl.textContent = '⚠ Excede 395d';
+    statusEl.style.color = 'var(--err)';
+  } else {
+    statusEl.textContent = '✓ Dentro do prazo';
+    statusEl.style.color = 'var(--ok)';
+  }
+
+  // Banner de avisos
+  const aviso = document.getElementById('vp-aviso');
+  if (d.avisos && d.avisos.length) {
+    aviso.innerHTML    = '⚠ ' + d.avisos.join('<br>⚠ ');
+    aviso.style.display = 'block';
+  } else {
+    aviso.style.display = 'none';
+  }
+
+  // Contratos grandes
+  document.getElementById('vp-c-avista').textContent      = 'R$ ' + fmt(d.valor_liberado);
+  document.getElementById('vp-c-avista-sub').textContent  = 'Sem retencao — parcelado direto';
+  document.getElementById('vp-c-parcelado').textContent   = 'R$ ' + fmt(d.total_cliente);
+  document.getElementById('vp-c-parcelado-sub').textContent =
+    n + 'x R$ ' + fmt(d.valor_parcela) + (entrada > 0 ? ' | entrada R$ ' + fmt(entrada) : '');
+
+  // Total final
+  const elTot = document.getElementById('neg-total-final');
+  if (elTot && !elTot._editando) elTot.value = fmt(d.total_cliente);
+
+  vpRenderTabela(d);
+  atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
+}
+
+function vpRenderTabela(d) {
+  const limIso = document.getElementById('vp-data-limite').dataset.iso || '';
+  const BADGE  = {
+    contrato: ['#0d1e0d',               'var(--muted)', 'Assinatura'],
+    entrada:  ['rgba(239,159,39,.12)',   'var(--warn)',  'Entrada'],
+    primeira: ['rgba(93,202,165,.12)',   'var(--ok)',    '1a Parcela'],
+    parcela:  ['rgba(93,202,165,.08)',   'var(--ok)',    'Parcela'],
+  };
+  const tbody = document.getElementById('vp-parc-body');
+
+  tbody.innerHTML = d.parcelas.map(p => {
+    const [bg, color] = BADGE[p.tipo] || BADGE.parcela;
+    const numCell = p.num > 0 ? p.num : '—';
+    const label   = p.tipo === 'contrato' ? 'Assinatura'
+                  : p.tipo === 'entrada'  ? 'Entrada'
+                  : p.num  === 1          ? '1a Parcela'
+                  : 'Parcela ' + p.num;
+    const badge = `<span style="background:${bg};color:${color};border-radius:4px;padding:2px 8px;font-size:10px;border:1px solid ${color}40">${label}</span>`;
+
+    if (p.tipo === 'contrato') {
+      return `<tr style="background:${bg}">
+        <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
+        <td style="padding:8px 12px">${badge}</td>
+        <td style="padding:8px 12px;color:var(--muted);font-size:11px">${esc(p.data)}</td>
+        <td style="padding:8px 12px;text-align:right;color:var(--muted)">—</td>
+      </tr>`;
+    }
+    if (p.tipo === 'entrada') {
+      return `<tr style="background:${bg}">
+        <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
+        <td style="padding:8px 12px">${badge}</td>
+        <td style="padding:8px 12px;color:var(--muted);font-size:11px">${esc(p.data)}</td>
+        <td style="padding:8px 12px;text-align:right;font-weight:700;color:var(--warn)">R$ ${fmt(p.valor)}</td>
+      </tr>`;
+    }
+
+    // Parcela com data editável
+    const idx    = p.num - 1;
+    const excede = limIso && p.data_iso > limIso;
+    const bColor = excede ? 'var(--err)' : 'var(--border)';
+    const tColor = excede ? 'var(--err)' : 'var(--text)';
+    return `<tr style="background:${bg}">
+      <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
+      <td style="padding:8px 12px">${badge}</td>
+      <td style="padding:4px 8px">
+        <input type="date" value="${esc(p.data_iso)}" max="${esc(limIso)}"
+               style="background:var(--surface);border:1px solid ${bColor};border-radius:6px;padding:5px 8px;color:${tColor};font-family:inherit;font-size:12px;width:140px;outline:none"
+               oninput="vpDataChange(this,${idx})">
+        ${excede ? `<span style="color:var(--err);font-size:10px;margin-left:4px">⚠ excede limite</span>` : ''}
+      </td>
+      <td style="padding:8px 12px;text-align:right;font-weight:700;color:${color}">R$ ${fmt(p.valor)}</td>
+    </tr>`;
+  }).join('');
+
+  tbody.innerHTML += `<tr style="border-top:1px solid var(--border2)">
+    <td colspan="3" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
+    <td style="padding:10px 12px;text-align:right;font-weight:900;color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
+  </tr>`;
+}
 
 // Os parametros estruturais (arq, fidelidade, viagem) vem de projetoAtivo.margens.
 function lerMargensNegociacao(){
@@ -1695,9 +1948,8 @@ async function executarCalculo(){
   if (document.getElementById('painel-cartao').style.display !== 'none') {
     clearTimeout(_ccTimer); _ccTimer = setTimeout(atualizarCartao, 200);
   }
-  if (document.getElementById('painel-financeira-loja') &&
-      document.getElementById('painel-financeira-loja').style.display !== 'none') {
-    clearTimeout(_flTimer); _flTimer = setTimeout(atualizarFinanceiraLoja, 200);
+  if (document.getElementById('painel-vp').style.display !== 'none') {
+    clearTimeout(_vpTimer); _vpTimer = setTimeout(atualizarVP, 200);
   }
 }
 function totalComDescontoAmb(){

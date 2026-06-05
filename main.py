@@ -32,7 +32,7 @@ from mod_omie import (
     _buscar_projetos_omie, _projeto_path, carregar_xmls
 )
 from mod_margens import calcular_margens, _normalizar_faixas
-from mod_fin import calcular_aymore, calcular_cartao
+from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada
 
 # HTML servido como arquivo estático
 _STATIC_DIR = os.path.join(_BASE_DIR, "static")
@@ -364,6 +364,19 @@ class Handler(BaseHTTPRequestHandler):
                 entrada       = float(req.get("entrada", 0)),
                 n_parcelas    = int(req.get("n_parcelas", 1)),
                 data_contrato = req.get("data_contrato", ""),
+                codigo        = req.get("codigo", "cartao_credito"),
+            )
+            self.send_json(resultado)
+
+        elif path == "/calcular_venda_programada":
+            req = json.loads(body)
+            from mod_fin import calcular_venda_programada as _calc_vp
+            resultado = _calc_vp(
+                valor_avista   = float(req.get("valor_avista", 0)),
+                entrada        = float(req.get("entrada", 0)),
+                n_parcelas     = int(req.get("n_parcelas", 1)),
+                data_contrato  = req.get("data_contrato", ""),
+                datas_parcelas = req.get("datas_parcelas", []),
             )
             self.send_json(resultado)
 

@@ -5,8 +5,9 @@
   "recebimento": "parcelado",
   "gerar_boleto": true,
   "parcelas_max": 12,
+  "prazo_limite_dias": 395,
   "juros_pct": 0.0,
   "pct_minimo_para_entrega": 80.0,
   "exige_termo_assinado": true,
-  "observacao": "Sem juros ate data de entrega. Maximo 12x. Exige 80% liquidado antes da entrega."
+  "observacao": "Sem juros. Maximo 12x. Ultima parcela ate 395 dias apos a assinatura. Datas configuradas individualmente para emissao de boleto."
 }
