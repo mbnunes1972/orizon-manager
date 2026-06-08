@@ -151,7 +151,39 @@ Baseado no documento `1_FLUXO_DE_PROCESSOS.docx`. O sistema deve suportar e even
 - Se já existir: perguntar se é novo projeto ou continuação
 - Sincronização bidirecional Omie_V3 ↔ Omie via API
 
-### 5.4 Documentos
+### 5.4 Negociação — Regras de cálculo e persistência
+
+**Valor bruto é intocável para o cliente:**
+- Arquiteto, fidelidade, viagem e brinde são custos internos da loja
+- Nunca alteram o valor que o cliente vê
+- O cliente vê apenas: Valor bruto → menos Desconto de venda → mais Juros de financiamento = Valor final
+- Os parâmetros internos reduzem a margem da loja e são exibidos apenas no painel de apoio interno
+
+**Isolamento entre projetos:**
+- Parâmetros de um projeto nunca contaminam outro
+- Cada projeto tem seu próprio estado de negociação isolado
+- Ao criar novo projeto, todos os parâmetros começam zerados e desligados
+
+**Persistência da negociação:**
+- Sem salvar, a negociação volta ao último estado salvo (botão "Salvar orçamento")
+- Ao salvar parâmetros do modal, ficam guardados junto com o estado da negociação
+- O modal de parâmetros é um subconjunto da negociação — salvar parâmetros = salvar negociação
+- A última tela salva é sempre o ponto de partida de uma nova fase de negociação
+
+**Limites de desconto autorizados:**
+- Limites autorizados por gerente/diretor são persistidos no projeto
+- O limite autorizado é o desconto específico aprovado, não o limite do perfil do autorizador
+- Exemplo: Gerente autoriza 15% → novo limite para aquela negociação é 15% (não 20%)
+- Se diretor autorizar depois 30% → novo limite passa a ser 30% (não 50%)
+- O limite autorizado persiste enquanto o projeto estiver aberto
+- Reseta ao trocar de projeto
+
+**Separação de campos:**
+- Campos do cliente: `desconto_pct`, `forma_pagamento`, `custo_financeiro_pct`
+- Campos internos da loja: `comissao_arq_pct`, `comissao_arq_ativa`, `fidelidade_pct`, `fidelidade_ativa`, `custo_viagem`, `fora_da_sede`, `brinde`, `brinde_ativo`
+- Campos internos nunca devem ser incluídos no valor exibido ao cliente
+
+### 5.5 Documentos
 - Sistema deve cobrar confirmação de documentos conforme fase avança
 - Documentos mais importantes devem ser anexados obrigatoriamente
 - Repositório de modelos de documentos (templates)

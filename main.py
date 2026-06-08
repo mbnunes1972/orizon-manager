@@ -579,6 +579,7 @@ class Handler(BaseHTTPRequestHandler):
                     "comissao_arq_ativa": bool( req.get("comissao_arq_ativa",  m_atual.get("comissao_arq_ativa", False))),
                     "fidelidade_pct":     float(req.get("fidelidade_pct",     m_atual.get("fidelidade_pct", 0))),
                     "fidelidade_ativa":   bool( req.get("fidelidade_ativa",    m_atual.get("fidelidade_ativa", False))),
+                    "incluir_custos":     bool( req.get("incluir_custos",      m_atual.get("incluir_custos", False))),
                 })
                 proj["margens"] = m_atual
                 _salvar_projeto(proj)

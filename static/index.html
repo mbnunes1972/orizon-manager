@@ -313,9 +313,8 @@ body{overflow:hidden}
 
     <label class="sb-label" style="display:flex;align-items:center;justify-content:space-between">
       <span>Desconto (%)</span>
-      <span id="sb-desc-lock" class="lock-btn" onclick="tfAbrirModalSenha('desconto')" title="Liberar desconto sem limite (gerente)">&#x1F512;</span>
     </label>
-    <div style="display:flex;align-items:center;gap:4px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
       <input type="number" id="neg-desconto" min="0" max="100" step="0.5" value="0"
              onfocus="this._prev=this.value"
              oninput="negValidarLimiteDesconto(this.value); negSyncModal(this.value); agendarCalculo(); agendarSalvarDesconto()"
@@ -323,12 +322,19 @@ body{overflow:hidden}
              onblur="salvarDescontoAutomatico()"
              class="sb-input-sm" style="width:60px;text-align:right">
       <span style="color:var(--muted);font-size:12px">%</span>
+      <button id="neg-desc-confirmar" onclick="negConfirmarDesconto()"
+              style="display:none;padding:3px 7px;background:var(--err);color:#fff;border:none;
+                     border-radius:5px;font-family:'Epilogue',sans-serif;font-weight:700;
+                     font-size:9px;cursor:pointer;letter-spacing:.3px;transition:.15s;white-space:nowrap"
+              title="Solicitar autorização para este desconto">
+        ✓ OK
+      </button>
     </div>
     <div id="neg-limite-hint" style="display:none;font-size:10px;color:var(--err);margin-bottom:8px"></div>
 
     <label class="sb-label">Modalidade</label>
     <select id="neg-pagamento" onchange="onPagamentoChange()" class="sb-select">
-      <option value="a_vista">A Vista</option>
+      <option value="a_vista">1x</option>
     </select>
 
     <label class="sb-label">Parcelas</label>
@@ -963,6 +969,17 @@ body{overflow:hidden}
       <div id="mp-total-ambientes" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ok);background:rgba(25,201,160,.08);border:1px solid rgba(25,201,160,.2);border-radius:6px;padding:3px 10px;white-space:nowrap">—</div>
     </div>
 
+    <!-- Toggle: Incluir custos adicionais ao valor bruto -->
+    <div class="toggle-row" style="background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.2);border-radius:8px;padding:10px 12px;margin-bottom:4px">
+      <span class="toggle-label" style="flex:1;color:var(--warn)">Incluir custos adicionais?</span>
+      <label class="sw" style="margin-right:8px">
+        <input type="checkbox" id="mp-incluir-custos" onchange="mpToggleIncluirCustos()">
+        <span class="sw-slider"></span>
+      </label>
+      <span style="font-size:10px;color:var(--muted);max-width:140px;line-height:1.3">
+        Acrescenta custos ao valor bruto do cliente
+      </span>
+    </div>
     <div class="toggle-row">
       <span class="toggle-label" style="flex:1">Desconto de venda</span>
       <input type="number" class="toggle-input" id="mp-desconto" min="0" max="100" step="0.5" value="0"
@@ -992,7 +1009,7 @@ body{overflow:hidden}
     </div>
     <div class="toggle-row">
       <span class="toggle-label" style="flex:1">Brinde</span>
-      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-brinde-ativo" onchange="mpToggleBrinde();agendarDiscriminacao()"><span class="sw-slider"></span></label>
+      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-brinde-ativo" onchange="mpToggleBrinde();mpToggleBrindeRecalc();agendarDiscriminacao()"><span class="sw-slider"></span></label>
       <input type="number" class="toggle-input" id="mp-brinde" min="0" step="10" value="0" disabled style="opacity:.35" oninput="agendarDiscriminacao()">
       <span class="toggle-unit" style="font-size:9px">R$</span>
     </div>
@@ -1025,7 +1042,7 @@ body{overflow:hidden}
         <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Custo de viagem</span><span id="mp-a-viagem" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
         <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px"><span style="color:var(--muted)">− Brinde</span><span id="mp-a-brinde" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
         <div style="display:flex;justify-content:space-between"><span style="font-weight:700">Valor líquido final</span><span id="mp-a-liq" style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--ok)">—</span></div>
-        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Desconto total s/ bruto</span><span id="mp-a-margem" style="font-family:'IBM Plex Mono',monospace;color:var(--warn);font-weight:700">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Desconto Total</span><span id="mp-a-margem" style="font-family:'IBM Plex Mono',monospace;color:var(--warn);font-weight:700">—</span></div>
       </div>
     </div>
 
@@ -1268,7 +1285,10 @@ function aplicarRestricoesPerfil(){
   }
 }
 
+let _limiteAutorizado = null; // limite temporário após autorização delegada
+
 function cfgGetDescontoMax(){
+  if(_limiteAutorizado !== null) return _limiteAutorizado;
   if(_usuarioAtual && _usuarioAtual.nivel){
     return _LIMITES_NIVEL[_usuarioAtual.nivel] || 10;
   }
@@ -1768,7 +1788,7 @@ async function onPagamentoChange(){
     _descontoAvista = d.desconto_avista || 0;
 
     if(_tipoAtivo === 'avista'){
-      parcel.innerHTML = '<option value="1">A Vista</option>';
+      parcel.innerHTML = '<option value="1">1x</option>';
       parcel.disabled  = true;
       _acrescimoFin    = -_descontoAvista;
       _descricaoPag    = 'A Vista';
@@ -1787,7 +1807,7 @@ async function onPagamentoChange(){
   } catch(e){
     console.error('[PAG] Erro ao carregar faixas:', e);
     _faixasAtivas=[]; _tipoAtivo='avista'; _descontoAvista=0; _acrescimoFin=0;
-    parcel.innerHTML='<option value="1">A Vista</option>'; parcel.disabled=true;
+    parcel.innerHTML='<option value="1">1x</option>'; parcel.disabled=true;
     ayMostrarPainel(false);
     cartaoMostrarPainel(false);
     vpMostrarPainel(false);
@@ -2742,6 +2762,11 @@ function tfRenderTabela(d, valorAvista, entrada) {
 // Os parametros estruturais (arq, fidelidade, viagem) vem de projetoAtivo.margens.
 function lerMargensNegociacao(){
   const m = (projetoAtivo && projetoAtivo.margens) || {};
+  // Se o modal de parâmetros está aberto, lê o toggle diretamente
+  const modalAberto = document.getElementById('modal-params')?.style.display === 'flex';
+  const incluirCustos = modalAberto
+    ? (document.getElementById('mp-incluir-custos')?.checked || false)
+    : !!m.incluir_custos;
   return {
     desconto_pct:             parseFloat(document.getElementById('neg-desconto').value) || 0,
     fora_da_sede:             !!m.fora_da_sede,
@@ -2750,9 +2775,10 @@ function lerMargensNegociacao(){
     comissao_arq_ativa:       !!m.comissao_arq_ativa,
     fidelidade_pct:           parseFloat(m.fidelidade_pct) || 0,
     fidelidade_ativa:         !!m.fidelidade_ativa,
-    custo_financeiro_pct: _acrescimoFin,  // taxa de retencao da forma de pagamento selecionada
+    custo_financeiro_pct: _acrescimoFin,
     brinde:               parseFloat(m.brinde) || 0,
     brinde_ativo:         !!m.brinde_ativo,
+    incluir_custos:       incluirCustos,
   };
 }
 
@@ -2805,11 +2831,14 @@ async function executarCalculo(){
   const rnd = v => Math.round(v * 100) / 100;
 
   // Popula _negBaseValues com TODOS os ambientes + base estrutural
+  // Calcula valor bruto do cliente (com ou sem custos adicionais)
+  const brutosCliente = calcularValorBrutoCliente(mg);
   window._negBaseValues = _negBaseValues = baseResults.map((res, i) => ({
     arquivo:    allAmbs[i].arquivo,
     nome:       allAmbs[i].ambiente||allAmbs[i].projeto||allAmbs[i].arquivo,
     val_bruto:  allAmbs[i].total,
-    estrutural: rnd(res.valor_liquido_avista),  // base sem desconto e sem financeiro
+    estrutural: brutosCliente[allAmbs[i].arquivo] || allAmbs[i].total,
+    margem_interna: rnd(res.valor_liquido_avista),  // valor líquido da loja (uso interno)
   }));
 
   // renderTabelaNeg chamado APÓS o resumo para sobrescrever com valores efetivos
@@ -3021,16 +3050,70 @@ function renderTabelaNeg(){
 }
 function negValidarLimiteDesconto(val){
   const disc = parseFloat(val) || 0;
-  const v = cfgValidarDesconto(disc);
-  const el = document.getElementById('neg-desconto');
+  const max  = cfgGetDescontoMax(); // respeita _limiteAutorizado se existir
+  const el   = document.getElementById('neg-desconto');
   const hint = document.getElementById('neg-limite-hint');
-  if(!v.ok){
+  const btn  = document.getElementById('neg-desc-confirmar');
+  if(disc > max){
     if(el){ el.style.borderColor='var(--err)'; el.style.color='var(--err)'; }
-    if(hint){ hint.textContent='⚠ Limite do perfil: '+v.max+'%'; hint.style.display='block'; }
+    if(hint){
+      const limiteBase = _usuarioAtual ? (_LIMITES_NIVEL[_usuarioAtual.nivel] || 10) : 10;
+      const limiteVigente = _limiteAutorizado !== null ? _limiteAutorizado : limiteBase;
+      hint.textContent = '⚠ Limite: ' + limiteVigente + '% — clique OK para autorizar';
+      hint.style.display = 'block';
+    }
+    if(btn){ btn.style.display = 'block'; }
   } else {
     if(el){ el.style.borderColor=''; el.style.color=''; }
     if(hint){ hint.style.display='none'; }
+    if(btn){ btn.style.display = 'none'; }
   }
+}
+
+async function negConfirmarDesconto(){
+  const disc = parseFloat(document.getElementById('neg-desconto').value) || 0;
+  const max  = cfgGetDescontoMax();
+  if(disc <= max) return;
+  const ok = await abrirModalAutorizacaoSidebar(disc, max);
+  const el   = document.getElementById('neg-desconto');
+  const hint = document.getElementById('neg-limite-hint');
+  const btn  = document.getElementById('neg-desc-confirmar');
+  if(ok){
+    // Autorizado — aceita o novo desconto
+    if(el){ el.style.borderColor=''; el.style.color=''; el._prev = disc; }
+    if(hint){ hint.style.display='none'; }
+    if(btn){ btn.style.display='none'; }
+    agendarCalculo();
+    agendarSalvarDesconto();
+  } else {
+    // Cancelado — volta ao valor anterior
+    const prev = (el && el._prev != null) ? parseFloat(el._prev) : max;
+    if(el){ el.value = prev; el.style.borderColor=''; el.style.color=''; }
+    if(hint){ hint.style.display='none'; }
+    if(btn){ btn.style.display='none'; }
+    negSyncModal(prev);
+    agendarCalculo();
+  }
+}
+
+// Modal de autorização exclusivo para a sidebar (não mexe em mp-desconto)
+let _resolveAutorizacaoSidebar = null;
+function abrirModalAutorizacaoSidebar(desconto, limite){
+  return new Promise(resolve => {
+    _resolveAutorizacaoSidebar = resolve;
+    const nivel = _usuarioAtual?.nivel || 'consultor';
+    const nivelLabel = { consultor: 'Consultor', gerente: 'Gerente', diretor: 'Diretor' }[nivel] || nivel;
+    document.getElementById('auth-modal-msg').textContent =
+      `Seu limite como ${nivelLabel} é ${limite}%. O desconto solicitado é ${desconto}%.`;
+    document.getElementById('auth-modal-login').value = '';
+    document.getElementById('auth-modal-senha').value = '';
+    document.getElementById('auth-modal-erro').textContent = '';
+    // Marca contexto como sidebar
+    document.getElementById('modal-autorizacao').dataset.contexto = 'sidebar';
+    document.getElementById('modal-autorizacao').dataset.desconto = desconto;
+    document.getElementById('modal-autorizacao').style.display = 'flex';
+    setTimeout(() => document.getElementById('auth-modal-login').focus(), 80);
+  });
 }
 
 function negAtualizarDescontoEfetivo(){
@@ -3223,6 +3306,11 @@ async function atualizarDiscriminacao(){
 // Sincroniza campo de desconto ao entrar na Pagina 02 e carrega modalidades
 async function carregarMargensSalvas(){
   if(!projetoAtivo) return;
+  // Ao carregar projeto, o desconto salvo passa a ser o limite autorizado
+  // (foi aprovado em algum momento anterior)
+  const descontoSalvo = parseFloat((projetoAtivo.margens||{}).desconto_pct) || 0;
+  const limiteBase = _usuarioAtual ? (_LIMITES_NIVEL[_usuarioAtual.nivel] || 10) : 10;
+  _limiteAutorizado = descontoSalvo > limiteBase ? descontoSalvo : null;
   _descAdicional  = {};
   _descIndividual = {};
   _negBaseValues  = [];
@@ -3235,13 +3323,51 @@ async function carregarMargensSalvas(){
 }
 
 // ---- Modal de Parametros da Negociacao ---------------------------------------
+function mpToggleIncluirCustos(){
+  mpRecalcularEstruturalModal();
+  agendarDiscriminacao();
+}
+
+function calcularValorBrutoCliente(mg){
+  // Calcula o valor bruto que o cliente vê, com ou sem custos adicionais
+  // Retorna um map arquivo -> valor_bruto_cliente
+  const ambs = (projetoAtivo && projetoAtivo.ambientes) || [];
+  const resultado = {};
+  ambs.forEach(amb => {
+    let bruto = amb.total || 0;
+    if(mg.incluir_custos){
+      // Gross-up: acrescenta custos ao valor bruto
+      if(mg.comissao_arq_ativa && mg.comissao_arq_pct > 0)
+        bruto = bruto / (1 - mg.comissao_arq_pct / 100);
+      if(mg.fidelidade_ativa && mg.fidelidade_pct > 0)
+        bruto = bruto / (1 - mg.fidelidade_pct / 100);
+      const n_ambs = ambs.length || 1;
+      if(mg.fora_da_sede && mg.custo_viagem > 0)
+        bruto = bruto + (mg.custo_viagem / n_ambs);
+      if(mg.brinde_ativo && mg.brinde > 0)
+        bruto = bruto + (mg.brinde / n_ambs);
+    }
+    resultado[amb.arquivo] = Math.round(bruto * 100) / 100;
+  });
+  return resultado;
+}
+
 function mpDescontoValidar(el){
   const val  = parseFloat(el.value) || 0;
-  const max  = cfgGetDescontoMax();
+  const max  = cfgGetDescontoMax(); // retorna _limiteAutorizado se existir, senão limite do perfil
   const hint = document.getElementById('mp-desc-hint');
   if(val > max){
     el.style.borderColor = 'var(--err)';
-    if(hint){ hint.textContent = `Limite do seu perfil: ${max}%. Salvar solicitará autorização.`; hint.style.display = 'block'; }
+    if(hint){
+      if(_limiteAutorizado !== null){
+        // Já foi autorizado — informa que precisa de nova autorização para esse valor maior
+        hint.textContent = `Desconto acima do limite autorizado (${_limiteAutorizado}%). Salvar solicitará nova autorização.`;
+      } else {
+        const limiteBase = _usuarioAtual ? (_LIMITES_NIVEL[_usuarioAtual.nivel] || 10) : 10;
+        hint.textContent = `Limite do seu perfil: ${limiteBase}%. Salvar solicitará autorização.`;
+      }
+      hint.style.display = 'block';
+    }
   } else {
     el.style.borderColor = '';
     if(hint){ hint.style.display = 'none'; }
@@ -3251,16 +3377,43 @@ function mpDescontoValidar(el){
 function mpToggleArq(){
   const cb=document.getElementById('mp-arq-ativa'), inp=document.getElementById('mp-arq-pct');
   inp.disabled=!cb.checked; inp.style.opacity=cb.checked?'1':'0.35';
+  mpRecalcularEstruturalModal();
 }
 function mpToggleFid(){
   const cb=document.getElementById('mp-fid-ativa'), inp=document.getElementById('mp-fid-pct');
   inp.disabled=!cb.checked; inp.style.opacity=cb.checked?'1':'0.35';
+  mpRecalcularEstruturalModal();
 }
 function mpToggleViagem(){
   const cb  = document.getElementById('mp-fora-sede');
   const inp = document.getElementById('mp-viagem');
   inp.disabled = !cb.checked;
   inp.style.opacity = cb.checked ? '1' : '0.35';
+  mpRecalcularEstruturalModal();
+}
+
+// Recalcula estrutural em _negBaseValues com base no estado atual dos toggles do modal
+function mpRecalcularEstruturalModal(){
+  if(!projetoAtivo || !_negBaseValues || !_negBaseValues.length) return;
+  const id = s => document.getElementById(s);
+  const mg = {
+    incluir_custos:     id('mp-incluir-custos')?.checked || false,
+    comissao_arq_ativa: id('mp-arq-ativa')?.checked || false,
+    comissao_arq_pct:   parseFloat(id('mp-arq-pct')?.value) || 0,
+    fidelidade_ativa:   id('mp-fid-ativa')?.checked || false,
+    fidelidade_pct:     parseFloat(id('mp-fid-pct')?.value) || 0,
+    fora_da_sede:       id('mp-fora-sede')?.checked || false,
+    custo_viagem:       parseFloat(id('mp-viagem')?.value) || 0,
+    brinde_ativo:       id('mp-brinde-ativo')?.checked || false,
+    brinde:             parseFloat(id('mp-brinde')?.value) || 0,
+  };
+  const ambs = projetoAtivo.ambientes || [];
+  const brutosCliente = calcularValorBrutoCliente(mg);
+  _negBaseValues = _negBaseValues.map(b => {
+    const amb = ambs.find(a => a.arquivo === b.arquivo);
+    return { ...b, estrutural: brutosCliente[b.arquivo] || (amb?.total || b.estrutural) };
+  });
+  mpAtualizarApoio();
 }
 // Lê os valores actuais dos campos do modal (não os salvos em projetoAtivo.margens)
 function lerMargensModal(){
@@ -3300,6 +3453,10 @@ let _resolveAutorizacao = null;
 function abrirModalAutorizacao(desconto, limite){
   return new Promise(resolve => {
     _resolveAutorizacao = resolve;
+    _resolveAutorizacaoSidebar = null; // garante que não resolve a promise errada
+    const modal = document.getElementById('modal-autorizacao');
+    modal.dataset.contexto = 'modal_params'; // contexto explícito
+    modal.dataset.desconto = desconto;
     const nivel = _usuarioAtual?.nivel || 'consultor';
     const nivelLabel = { consultor: 'Consultor', gerente: 'Gerente', diretor: 'Diretor' }[nivel] || nivel;
     document.getElementById('auth-modal-msg').textContent =
@@ -3312,13 +3469,21 @@ function abrirModalAutorizacao(desconto, limite){
   });
 }
 function fecharModalAutorizacao(resultado){
-  document.getElementById('modal-autorizacao').style.display = 'none';
+  const modal = document.getElementById('modal-autorizacao');
+  modal.style.display = 'none';
+  modal.dataset.contexto = '';
+  modal.dataset.desconto = '';
+  if(_resolveAutorizacaoSidebar){ _resolveAutorizacaoSidebar(resultado); _resolveAutorizacaoSidebar = null; return; }
   if(_resolveAutorizacao){ _resolveAutorizacao(resultado); _resolveAutorizacao = null; }
 }
 async function confirmarAutorizacao(){
-  const login = document.getElementById('auth-modal-login').value.trim();
-  const senha = document.getElementById('auth-modal-senha').value;
-  const desc  = parseFloat(document.getElementById('mp-desconto').value) || 0;
+  const login    = document.getElementById('auth-modal-login').value.trim();
+  const senha    = document.getElementById('auth-modal-senha').value;
+  const modal    = document.getElementById('modal-autorizacao');
+  const contexto = modal.dataset.contexto || 'modal_params';
+  const desc     = contexto === 'sidebar'
+    ? parseFloat(modal.dataset.desconto || 0)
+    : parseFloat(document.getElementById('mp-desconto').value) || 0;
   const erro  = document.getElementById('auth-modal-erro');
   erro.textContent = '';
   if(!login || !senha){ erro.textContent = 'Preencha usuário e senha do autorizador.'; return; }
@@ -3326,14 +3491,41 @@ async function confirmarAutorizacao(){
     const r = await fetch('/api/auth/autorizar_desconto', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ login_autorizador:login, senha_autorizador:senha,
-                             desconto_pct:desc, contexto:{origem:'modal_params'} })
+                             desconto_pct:desc, contexto:{origem: contexto} })
     });
     const d = await r.json();
-    if(d.ok){ showToast(`Desconto autorizado por ${d.autorizador.nome}`); fecharModalAutorizacao(true); }
+    if(d.ok){
+      // Salva o desconto específico aprovado como novo limite (não o limite do perfil)
+      const descontoAprovado = parseFloat(document.getElementById('mp-desconto').value) || 0;
+      _limiteAutorizado = descontoAprovado;
+      // Limpa hint e borda vermelha do campo
+      const el = document.getElementById('mp-desconto');
+      const hint = document.getElementById('mp-desc-hint');
+      if(el) el.style.borderColor = '';
+      if(hint) hint.style.display = 'none';
+      showToast(`Desconto de ${descontoAprovado}% autorizado por ${d.autorizador.nome}`);
+      fecharModalAutorizacao(true);
+      // Se veio do modal de parâmetros, sincroniza sidebar
+      if(contexto !== 'sidebar'){
+        const _desc = descontoAprovado;
+        setTimeout(() => {
+          const negEl = document.getElementById('neg-desconto');
+          if(negEl){
+            negEl.blur();
+            negEl.value = _desc;
+            negEl._prev = _desc;
+            negValidarLimiteDesconto(_desc);
+            agendarCalculo();
+            agendarSalvarDesconto();
+          }
+        }, 300);
+      }
+    }
     else { erro.textContent = d.erro || 'Autorização negada.'; }
   } catch(e){ erro.textContent = 'Erro de conexão.'; }
 }
 
+function mpToggleBrindeRecalc(){ mpRecalcularEstruturalModal(); }
 function mpToggleBrinde(){
   const cb  = document.getElementById('mp-brinde-ativo');
   const inp = document.getElementById('mp-brinde');
@@ -3345,7 +3537,10 @@ function mpAtualizarApoio(){
   const rnd = v => Math.round(v*100)/100;
   const ambs = (projetoAtivo && projetoAtivo.ambientes) || [];
   const ambsNeg = ambs.filter(a => a.selecionado && _negSelLocal[a.arquivo] !== false);
-  const bruto = rnd(ambsNeg.reduce((s,a)=>s+(a.total||0),0));
+  // Usa estrutural de _negBaseValues que já considera incluir_custos
+  const bruto = (_negBaseValues && _negBaseValues.length)
+    ? rnd(_negBaseValues.filter(b => _negSelLocal[b.arquivo] !== false).reduce((s,b)=>s+(b.estrutural||0),0))
+    : rnd(ambsNeg.reduce((s,a)=>s+(a.total||0),0));
   if(!bruto){ document.getElementById('mp-apoio').style.display='none'; return; }
   document.getElementById('mp-apoio').style.display='block';
 
@@ -3393,7 +3588,9 @@ function mpAtualizarApoio(){
 
   // Desconto Total% = (bruto - liquido) / bruto * 100
   // Representa quanto o negócio foi descontado em relação ao valor bruto original
-  const margem = bruto > 0 ? rnd((bruto - liquido) / bruto * 100) : 0;
+  // Desconto Total usa sempre o bruto original dos XMLs (sem gross-up)
+  const bruto_original = rnd(ambsNeg.reduce((s,a)=>s+(a.total||0),0));
+  const margem = bruto_original > 0 ? rnd((bruto_original - liquido) / bruto_original * 100) : 0;
 
   id('mp-a-bruto').textContent     = 'R$ '+fmt(bruto);
   id('mp-a-desc-pct').textContent  = desc_pct.toLocaleString('pt-BR');
@@ -3430,6 +3627,10 @@ function abrirModalParams(){
   id('mp-brinde-ativo').checked = !!m.brinde_ativo;
   id('mp-brinde').value       = m.brinde || 0;
   mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
+  // Carrega toggle incluir_custos
+  const incEl = document.getElementById('mp-incluir-custos');
+  if(incEl) incEl.checked = !!m.incluir_custos;
+
   _mpSnapshot = {
     desconto_pct:       descontoAtual,
     comissao_arq_ativa: !!m.comissao_arq_ativa,
@@ -3440,6 +3641,7 @@ function abrirModalParams(){
     custo_viagem:       m.custo_viagem || 0,
     brinde_ativo:       !!m.brinde_ativo,
     brinde:             m.brinde || 0,
+    incluir_custos:     !!m.incluir_custos,
   };
   document.getElementById('modal-params').style.display = 'flex';
   mpAtualizarApoio();
@@ -3448,6 +3650,7 @@ let _mpSnapshot = null;
 
 async function fecharModalParams(salvar){
   document.getElementById('modal-params').style.display = 'none';
+  // _limiteAutorizado NÃO é resetado — persiste durante toda a negociação
   if(!salvar && _mpSnapshot){
     const id = s => document.getElementById(s);
     const s = _mpSnapshot;
@@ -3460,13 +3663,17 @@ async function fecharModalParams(salvar){
     id('mp-viagem').value         = s.custo_viagem;
     id('mp-brinde-ativo').checked = s.brinde_ativo;
     id('mp-brinde').value         = s.brinde;
+    const incEl2 = document.getElementById('mp-incluir-custos');
+    if(incEl2) incEl2.checked = !!s.incluir_custos;
     mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
+    mpRecalcularEstruturalModal();
     negSyncSidebar(s.desconto_pct);
     _mpSnapshot = null;
     return;
   }
   if(salvar && projetoAtivo){
     const id = s => document.getElementById(s);
+    const novoIncluirCustos = document.getElementById('mp-incluir-custos')?.checked || false;
     const mg = {
       desconto_pct:          parseFloat(id('mp-desconto').value)||0,
       comissao_arq_ativa:    id('mp-arq-ativa').checked,
@@ -3477,6 +3684,7 @@ async function fecharModalParams(salvar){
       custo_viagem:       parseFloat(id('mp-viagem').value)||0,
       brinde_ativo:       id('mp-brinde-ativo').checked,
       brinde:             parseFloat(id('mp-brinde').value)||0,
+      incluir_custos:     novoIncluirCustos,
     };
     try{
       const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/margens',{
@@ -3484,12 +3692,15 @@ async function fecharModalParams(salvar){
       });
       const d = await r.json();
       if(d.ok){
+        // Garante que incluir_custos foi salvo corretamente
+        if(novoIncluirCustos !== undefined) d.margens.incluir_custos = novoIncluirCustos;
         projetoAtivo.margens = d.margens;
         showToast('Parametros salvos!');
-        // Sincroniza desconto e recalcula sempre (a funcao trata o caso de pagina inativa)
+        // Sincroniza desconto
         const elDesc = document.getElementById('neg-desconto');
         if(elDesc) elDesc.value = d.margens.desconto_pct || 0;
-        executarCalculo();
+        // Recarrega negociação para recalcular valor bruto (incluir_custos pode ter mudado)
+        await carregarMargensSalvas();
       }
     }catch(e){ showToast('Erro ao salvar parametros', true); }
   }
