@@ -365,8 +365,124 @@ body{overflow:hidden}
   <div style="flex:1"></div>
   <div style="padding:12px 14px;border-top:1px solid var(--border)">
     <div class="nav-item" id="nav-cfg" onclick="goPage(9)" style="opacity:.6;padding:6px 8px">&#x2699; Config</div>
+    <!-- Botão de perfil do usuário -->
+    <div id="sb-user-btn" onclick="abrirModalPerfil()"
+         style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;
+                cursor:pointer;margin-top:4px;transition:.15s;border:1px solid var(--border)"
+         onmouseover="this.style.borderColor='var(--accent)'"
+         onmouseout="this.style.borderColor='var(--border)'">
+      <div id="sb-user-avatar"
+           style="width:30px;height:30px;border-radius:50%;background:var(--accent);
+                  display:flex;align-items:center;justify-content:center;
+                  font-family:'Epilogue',sans-serif;font-weight:700;font-size:12px;
+                  color:#0d160d;flex-shrink:0;overflow:hidden">
+        <span id="sb-user-inicial">?</span>
+        <img id="sb-user-foto" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%">
+      </div>
+      <div style="flex:1;min-width:0">
+        <div id="sb-user-nome" style="font-family:'Epilogue',sans-serif;font-size:11px;font-weight:700;
+                                       color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+        <div id="sb-user-nivel" style="font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">—</div>
+      </div>
+    </div>
   </div>
 </aside>
+
+<!-- MODAL PERFIL ─────────────────────────────────────────────── -->
+<div id="modal-perfil" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
+     z-index:9000;display:none;align-items:center;justify-content:center">
+  <div style="background:#111d11;border:1px solid #1e2e1e;border-radius:16px;
+              padding:32px;width:100%;max-width:420px;position:relative">
+    <!-- Fechar -->
+    <button onclick="fecharModalPerfil()"
+            style="position:absolute;top:16px;right:16px;background:transparent;border:none;
+                   color:var(--muted);font-size:18px;cursor:pointer;line-height:1">✕</button>
+    <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:16px;margin-bottom:24px">
+      Meu Perfil
+    </div>
+    <!-- Avatar -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
+      <div style="position:relative;width:64px;height:64px;flex-shrink:0">
+        <div id="mp-avatar-circle"
+             style="width:64px;height:64px;border-radius:50%;background:var(--accent);
+                    display:flex;align-items:center;justify-content:center;
+                    font-family:'Epilogue',sans-serif;font-weight:700;font-size:22px;
+                    color:#0d160d;overflow:hidden">
+          <span id="mp-avatar-inicial">?</span>
+          <img id="mp-avatar-foto" src="" alt=""
+               style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%">
+        </div>
+        <label for="mp-foto-input"
+               style="position:absolute;bottom:0;right:0;width:22px;height:22px;
+                      background:var(--border2);border-radius:50%;display:flex;
+                      align-items:center;justify-content:center;cursor:pointer;
+                      font-size:11px;border:2px solid #111d11" title="Trocar foto">📷</label>
+        <input type="file" id="mp-foto-input" accept="image/*" style="display:none"
+               onchange="mpTrocarFoto(event)">
+      </div>
+      <div>
+        <div id="mp-nome-display" style="font-family:'Epilogue',sans-serif;font-weight:700;
+                                          font-size:15px;color:var(--text)">—</div>
+        <div id="mp-nivel-display" style="font-size:10px;color:var(--muted);
+                                           text-transform:uppercase;letter-spacing:.8px;margin-top:2px">—</div>
+        <div id="mp-limite-display" style="font-size:10px;color:var(--accent);margin-top:4px">—</div>
+      </div>
+    </div>
+    <!-- Campos editáveis -->
+    <div style="display:grid;gap:14px">
+      <div>
+        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
+                       display:block;margin-bottom:5px">Telefone</label>
+        <input type="tel" id="mp-telefone" placeholder="(11) 99999-9999"
+               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;
+                      padding:10px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;
+                      font-size:13px;outline:none"
+               onfocus="this.style.borderColor='var(--accent)'"
+               onblur="this.style.borderColor='var(--border)'">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
+                       display:block;margin-bottom:5px">WhatsApp</label>
+        <input type="tel" id="mp-whatsapp" placeholder="(11) 99999-9999"
+               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;
+                      padding:10px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;
+                      font-size:13px;outline:none"
+               onfocus="this.style.borderColor='var(--accent)'"
+               onblur="this.style.borderColor='var(--border)'">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
+                       display:block;margin-bottom:5px">E-mail</label>
+        <input type="email" id="mp-email" placeholder="seu@email.com"
+               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;
+                      padding:10px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;
+                      font-size:13px;outline:none"
+               onfocus="this.style.borderColor='var(--accent)'"
+               onblur="this.style.borderColor='var(--border)'">
+      </div>
+    </div>
+    <!-- Botões -->
+    <div style="display:flex;gap:10px;margin-top:24px">
+      <button onclick="mpSalvarPerfil()"
+              style="flex:1;padding:11px;background:var(--accent);color:#0d160d;border:none;
+                     border-radius:9px;font-family:'Epilogue',sans-serif;font-weight:700;
+                     font-size:13px;cursor:pointer;transition:.15s"
+              onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+        Salvar
+      </button>
+      <button onclick="mpLogout()"
+              style="padding:11px 18px;background:transparent;border:1px solid var(--border);
+                     border-radius:9px;color:var(--muted);font-family:'Epilogue',sans-serif;
+                     font-weight:700;font-size:13px;cursor:pointer;transition:.15s"
+              onmouseover="this.style.borderColor='var(--err)';this.style.color='var(--err)'"
+              onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
+        Sair
+      </button>
+    </div>
+    <div id="mp-save-hint" style="font-size:11px;color:var(--ok);text-align:center;
+                                   height:16px;margin-top:10px"></div>
+  </div>
+</div>
 
 <main class="content">
 
@@ -851,8 +967,9 @@ body{overflow:hidden}
       <span class="toggle-label" style="flex:1">Desconto de venda</span>
       <input type="number" class="toggle-input" id="mp-desconto" min="0" max="100" step="0.5" value="0"
              onfocus="this._prev=this.value"
-             oninput="negSyncSidebar(this.value); agendarDiscriminacao()"
+             oninput="mpDescontoValidar(this); negSyncSidebar(this.value); agendarDiscriminacao()"
              onkeydown="mpDescontoKeydown(event,this)">
+      <div id="mp-desc-hint" style="display:none;font-size:10px;color:var(--err);margin-top:4px;grid-column:1/-1"></div>
       <span class="toggle-unit">%</span>
     </div>
     <div class="toggle-row">
@@ -914,11 +1031,39 @@ body{overflow:hidden}
 
     <div style="display:flex;gap:10px;margin-top:20px">
       <button class="btn btn-ghost btn-sm" onclick="fecharModalParams(false)" style="flex:1;justify-content:center">Voltar</button>
-      <button class="btn btn-primary btn-sm" onclick="fecharModalParams(true)" style="flex:1;justify-content:center">Salvar e continuar</button>
+      <button class="btn btn-primary btn-sm" onclick="mpSalvarComValidacao()" style="flex:1;justify-content:center">Salvar e continuar</button>
     </div>
   </div>
 </div>
 
+<div id="modal-autorizacao" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9500;align-items:center;justify-content:center">
+  <div style="background:#111d11;border:1px solid #1e2e1e;border-radius:14px;padding:28px;width:100%;max-width:380px">
+    <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Autorização Necessária</div>
+    <div id="auth-modal-msg" style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6"></div>
+    <div style="font-size:11px;color:var(--text);margin-bottom:14px">Informe as credenciais de um Gerente ou Diretor:</div>
+    <div style="display:grid;gap:12px;margin-bottom:16px">
+      <div>
+        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Usuário autorizador</label>
+        <input type="text" id="auth-modal-login" placeholder="login.autorizador"
+               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none"
+               onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
+               onkeydown="if(event.key==='Enter') document.getElementById('auth-modal-senha').focus()">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Senha</label>
+        <input type="password" id="auth-modal-senha" placeholder="••••••••"
+               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none"
+               onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
+               onkeydown="if(event.key==='Enter') confirmarAutorizacao()">
+      </div>
+    </div>
+    <div id="auth-modal-erro" style="font-size:12px;color:var(--err);min-height:18px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="fecharModalAutorizacao(false)" style="flex:1;padding:11px;background:transparent;border:1px solid var(--border);border-radius:9px;color:var(--muted);font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;cursor:pointer">Cancelar</button>
+      <button onclick="confirmarAutorizacao()" style="flex:1;padding:11px;background:var(--accent);color:#0d160d;border:none;border-radius:9px;font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;cursor:pointer">Autorizar</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -966,6 +1111,121 @@ let _perfilAtivo = {
 };
 let _perfisConfig = null;
 
+// ── Usuário autenticado ───────────────────────────────────────
+let _usuarioAtual = null;
+
+const _LIMITES_NIVEL = { consultor: 10, gerente: 20, diretor: 50 };
+
+async function carregarUsuarioAutenticado(){
+  try {
+    const r = await fetch('/api/auth/me');
+    if(!r.ok){ window.location.href = '/login'; return; }
+    const d = await r.json();
+    if(!d.ok){ window.location.href = '/login'; return; }
+    _usuarioAtual = d.usuario;
+    _atualizarUIUsuario();
+    _carregarDadosExtrasUsuario();
+  } catch(e){ console.warn('[AUTH] Erro ao carregar usuário:', e); }
+}
+
+function _atualizarUIUsuario(){
+  if(!_usuarioAtual) return;
+  const u = _usuarioAtual;
+  const inicial = u.nome ? u.nome.charAt(0).toUpperCase() : '?';
+  const nivel   = u.nivel || 'consultor';
+
+  // Sidebar
+  const elNome   = document.getElementById('sb-user-nome');
+  const elNivel  = document.getElementById('sb-user-nivel');
+  const elInicial= document.getElementById('sb-user-inicial');
+  if(elNome)    elNome.textContent    = u.nome;
+  if(elNivel)   elNivel.textContent   = nivel;
+  if(elInicial) elInicial.textContent = inicial;
+
+  // Modal perfil
+  const mpNome  = document.getElementById('mp-nome-display');
+  const mpNivel = document.getElementById('mp-nivel-display');
+  const mpLim   = document.getElementById('mp-limite-display');
+  const mpIni   = document.getElementById('mp-avatar-inicial');
+  if(mpNome)  mpNome.textContent  = u.nome;
+  if(mpNivel) mpNivel.textContent = nivel;
+  if(mpLim)   mpLim.textContent   = `Limite de desconto: ${_LIMITES_NIVEL[nivel] || 10}%`;
+  if(mpIni)   mpIni.textContent   = inicial;
+}
+
+function _carregarDadosExtrasUsuario(){
+  const saved = localStorage.getItem('omie_user_extras_' + (_usuarioAtual?.id || ''));
+  if(!saved) return;
+  try {
+    const extras = JSON.parse(saved);
+    const tel = document.getElementById('mp-telefone');
+    const wpp = document.getElementById('mp-whatsapp');
+    const eml = document.getElementById('mp-email');
+    if(tel) tel.value = extras.telefone || '';
+    if(wpp) wpp.value = extras.whatsapp || '';
+    if(eml) eml.value = extras.email    || '';
+    // Foto
+    if(extras.foto){
+      _aplicarFotoUsuario(extras.foto);
+    }
+  } catch(e){}
+}
+
+function _aplicarFotoUsuario(dataUrl){
+  ['sb-user-foto','mp-avatar-foto'].forEach(id => {
+    const img = document.getElementById(id);
+    const ini = document.getElementById(id === 'sb-user-foto' ? 'sb-user-inicial' : 'mp-avatar-inicial');
+    if(img){ img.src = dataUrl; img.style.display = 'block'; }
+    if(ini){ ini.style.display = 'none'; }
+  });
+}
+
+// ── Modal perfil ──────────────────────────────────────────────
+function abrirModalPerfil(){
+  _carregarDadosExtrasUsuario();
+  const m = document.getElementById('modal-perfil');
+  if(m){ m.style.display = 'flex'; }
+}
+
+function fecharModalPerfil(){
+  const m = document.getElementById('modal-perfil');
+  if(m){ m.style.display = 'none'; }
+}
+
+function mpTrocarFoto(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    _aplicarFotoUsuario(e.target.result);
+    const key = 'omie_user_extras_' + (_usuarioAtual?.id || '');
+    const saved = JSON.parse(localStorage.getItem(key) || '{}');
+    saved.foto = e.target.result;
+    localStorage.setItem(key, JSON.stringify(saved));
+  };
+  reader.readAsDataURL(file);
+}
+
+function mpSalvarPerfil(){
+  const tel = document.getElementById('mp-telefone')?.value || '';
+  const wpp = document.getElementById('mp-whatsapp')?.value || '';
+  const eml = document.getElementById('mp-email')?.value    || '';
+  const key = 'omie_user_extras_' + (_usuarioAtual?.id || '');
+  const saved = JSON.parse(localStorage.getItem(key) || '{}');
+  saved.telefone = tel;
+  saved.whatsapp = wpp;
+  saved.email    = eml;
+  localStorage.setItem(key, JSON.stringify(saved));
+  const hint = document.getElementById('mp-save-hint');
+  if(hint){ hint.textContent = '✓ Salvo'; setTimeout(() => hint.textContent = '', 2000); }
+}
+
+function mpLogout(){
+  fetch('/api/auth/logout', {method:'POST'}).finally(() => {
+    window.location.href = '/login';
+  });
+}
+
 async function carregarPerfil(){
   try {
     const r = await fetch('/perfis/ativo');
@@ -1009,6 +1269,9 @@ function aplicarRestricoesPerfil(){
 }
 
 function cfgGetDescontoMax(){
+  if(_usuarioAtual && _usuarioAtual.nivel){
+    return _LIMITES_NIVEL[_usuarioAtual.nivel] || 10;
+  }
   return parseFloat((_perfilAtivo.config && _perfilAtivo.config.desconto_max_pct) || 100);
 }
 
@@ -2972,6 +3235,19 @@ async function carregarMargensSalvas(){
 }
 
 // ---- Modal de Parametros da Negociacao ---------------------------------------
+function mpDescontoValidar(el){
+  const val  = parseFloat(el.value) || 0;
+  const max  = cfgGetDescontoMax();
+  const hint = document.getElementById('mp-desc-hint');
+  if(val > max){
+    el.style.borderColor = 'var(--err)';
+    if(hint){ hint.textContent = `Limite do seu perfil: ${max}%. Salvar solicitará autorização.`; hint.style.display = 'block'; }
+  } else {
+    el.style.borderColor = '';
+    if(hint){ hint.style.display = 'none'; }
+  }
+}
+
 function mpToggleArq(){
   const cb=document.getElementById('mp-arq-ativa'), inp=document.getElementById('mp-arq-pct');
   inp.disabled=!cb.checked; inp.style.opacity=cb.checked?'1':'0.35';
@@ -3010,6 +3286,54 @@ function agendarDiscriminacao(){
   _discrTimer = setTimeout(atualizarDiscriminacao, 400);
   mpAtualizarApoio();  // atualiza painel de apoio em tempo real
 }
+async function mpSalvarComValidacao(){
+  const desc = parseFloat(document.getElementById('mp-desconto').value) || 0;
+  const max  = cfgGetDescontoMax();
+  if(desc > max){
+    const ok = await abrirModalAutorizacao(desc, max);
+    if(!ok) return;
+  }
+  fecharModalParams(true);
+}
+
+let _resolveAutorizacao = null;
+function abrirModalAutorizacao(desconto, limite){
+  return new Promise(resolve => {
+    _resolveAutorizacao = resolve;
+    const nivel = _usuarioAtual?.nivel || 'consultor';
+    const nivelLabel = { consultor: 'Consultor', gerente: 'Gerente', diretor: 'Diretor' }[nivel] || nivel;
+    document.getElementById('auth-modal-msg').textContent =
+      `Seu limite como ${nivelLabel} é ${limite}%. O desconto solicitado é ${desconto}%.`;
+    document.getElementById('auth-modal-login').value = '';
+    document.getElementById('auth-modal-senha').value = '';
+    document.getElementById('auth-modal-erro').textContent = '';
+    document.getElementById('modal-autorizacao').style.display = 'flex';
+    setTimeout(() => document.getElementById('auth-modal-login').focus(), 80);
+  });
+}
+function fecharModalAutorizacao(resultado){
+  document.getElementById('modal-autorizacao').style.display = 'none';
+  if(_resolveAutorizacao){ _resolveAutorizacao(resultado); _resolveAutorizacao = null; }
+}
+async function confirmarAutorizacao(){
+  const login = document.getElementById('auth-modal-login').value.trim();
+  const senha = document.getElementById('auth-modal-senha').value;
+  const desc  = parseFloat(document.getElementById('mp-desconto').value) || 0;
+  const erro  = document.getElementById('auth-modal-erro');
+  erro.textContent = '';
+  if(!login || !senha){ erro.textContent = 'Preencha usuário e senha do autorizador.'; return; }
+  try {
+    const r = await fetch('/api/auth/autorizar_desconto', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ login_autorizador:login, senha_autorizador:senha,
+                             desconto_pct:desc, contexto:{origem:'modal_params'} })
+    });
+    const d = await r.json();
+    if(d.ok){ showToast(`Desconto autorizado por ${d.autorizador.nome}`); fecharModalAutorizacao(true); }
+    else { erro.textContent = d.erro || 'Autorização negada.'; }
+  } catch(e){ erro.textContent = 'Erro de conexão.'; }
+}
+
 function mpToggleBrinde(){
   const cb  = document.getElementById('mp-brinde-ativo');
   const inp = document.getElementById('mp-brinde');
@@ -3106,12 +3430,41 @@ function abrirModalParams(){
   id('mp-brinde-ativo').checked = !!m.brinde_ativo;
   id('mp-brinde').value       = m.brinde || 0;
   mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
+  _mpSnapshot = {
+    desconto_pct:       descontoAtual,
+    comissao_arq_ativa: !!m.comissao_arq_ativa,
+    comissao_arq_pct:   m.comissao_arq_pct || 0,
+    fidelidade_ativa:   !!m.fidelidade_ativa,
+    fidelidade_pct:     m.fidelidade_pct || 0,
+    fora_da_sede:       !!m.fora_da_sede,
+    custo_viagem:       m.custo_viagem || 0,
+    brinde_ativo:       !!m.brinde_ativo,
+    brinde:             m.brinde || 0,
+  };
   document.getElementById('modal-params').style.display = 'flex';
   mpAtualizarApoio();
 }
+let _mpSnapshot = null;
 
 async function fecharModalParams(salvar){
   document.getElementById('modal-params').style.display = 'none';
+  if(!salvar && _mpSnapshot){
+    const id = s => document.getElementById(s);
+    const s = _mpSnapshot;
+    id('mp-desconto').value       = s.desconto_pct;
+    id('mp-arq-ativa').checked    = s.comissao_arq_ativa;
+    id('mp-arq-pct').value        = s.comissao_arq_pct;
+    id('mp-fid-ativa').checked    = s.fidelidade_ativa;
+    id('mp-fid-pct').value        = s.fidelidade_pct;
+    id('mp-fora-sede').checked    = s.fora_da_sede;
+    id('mp-viagem').value         = s.custo_viagem;
+    id('mp-brinde-ativo').checked = s.brinde_ativo;
+    id('mp-brinde').value         = s.brinde;
+    mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
+    negSyncSidebar(s.desconto_pct);
+    _mpSnapshot = null;
+    return;
+  }
   if(salvar && projetoAtivo){
     const id = s => document.getElementById(s);
     const mg = {
@@ -3288,6 +3641,7 @@ function fecharModalExportar() {
   document.getElementById('modal-exportar').style.display = 'none';
 }
 
+carregarUsuarioAutenticado();
 loadConfig();
 </script>
 
