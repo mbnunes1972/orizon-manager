@@ -1089,6 +1089,9 @@ const fmt = n => Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maxim
 
 let projetoAtivo    = null;
 let _projBuscaTimer = null;
+// Fonte de verdade para o toggle "Incluir custos adicionais?" — sobrevive a qualquer
+// sobrescrita de projetoAtivo.margens (race condition com salvarDescontoAutomatico).
+let _incluirCustos = false;
 let _negBaseValues  = [];   // { arquivo, nome, val_bruto, estrutural } para todos os ambs fase01
 let _negSelLocal    = {};   // { arquivo: bool } seletor de negociacao
 let _descIndividual = {};   // { arquivo: pct } desconto individual por ambiente
@@ -2766,7 +2769,7 @@ function lerMargensNegociacao(){
   const modalAberto = document.getElementById('modal-params')?.style.display === 'flex';
   const incluirCustos = modalAberto
     ? (document.getElementById('mp-incluir-custos')?.checked || false)
-    : !!m.incluir_custos;
+    : _incluirCustos;  // usa fonte de verdade em vez de projetoAtivo.margens (evita race condition)
   return {
     desconto_pct:             parseFloat(document.getElementById('neg-desconto').value) || 0,
     fora_da_sede:             !!m.fora_da_sede,
@@ -3240,7 +3243,11 @@ async function salvarDescontoAutomatico(){
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(mg),
     });
     const d = await r.json();
-    if(d.ok) projetoAtivo.margens = d.margens;
+    if(d.ok){
+      projetoAtivo.margens = d.margens;
+      // Restaura _incluirCustos: o servidor pode retornar valor desatualizado em race conditions
+      projetoAtivo.margens.incluir_custos = _incluirCustos;
+    }
   }catch(e){}
 }
 
@@ -3308,6 +3315,7 @@ async function carregarMargensSalvas(){
   if(!projetoAtivo) return;
   // Ao carregar projeto, o desconto salvo passa a ser o limite autorizado
   // (foi aprovado em algum momento anterior)
+  _incluirCustos = !!(projetoAtivo.margens||{}).incluir_custos;  // sincroniza fonte de verdade
   const descontoSalvo = parseFloat((projetoAtivo.margens||{}).desconto_pct) || 0;
   const limiteBase = _usuarioAtual ? (_LIMITES_NIVEL[_usuarioAtual.nivel] || 10) : 10;
   _limiteAutorizado = descontoSalvo > limiteBase ? descontoSalvo : null;
@@ -3627,9 +3635,10 @@ function abrirModalParams(){
   id('mp-brinde-ativo').checked = !!m.brinde_ativo;
   id('mp-brinde').value       = m.brinde || 0;
   mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
-  // Carrega toggle incluir_custos
+  // Carrega toggle incluir_custos — sincroniza _incluirCustos com o valor salvo
+  _incluirCustos = !!m.incluir_custos;
   const incEl = document.getElementById('mp-incluir-custos');
-  if(incEl) incEl.checked = !!m.incluir_custos;
+  if(incEl) incEl.checked = _incluirCustos;
 
   _mpSnapshot = {
     desconto_pct:       descontoAtual,
@@ -3663,8 +3672,9 @@ async function fecharModalParams(salvar){
     id('mp-viagem').value         = s.custo_viagem;
     id('mp-brinde-ativo').checked = s.brinde_ativo;
     id('mp-brinde').value         = s.brinde;
+    _incluirCustos = !!s.incluir_custos;  // restaura fonte de verdade com o snapshot
     const incEl2 = document.getElementById('mp-incluir-custos');
-    if(incEl2) incEl2.checked = !!s.incluir_custos;
+    if(incEl2) incEl2.checked = _incluirCustos;
     mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
     mpRecalcularEstruturalModal();
     negSyncSidebar(s.desconto_pct);
@@ -3674,6 +3684,7 @@ async function fecharModalParams(salvar){
   if(salvar && projetoAtivo){
     const id = s => document.getElementById(s);
     const novoIncluirCustos = document.getElementById('mp-incluir-custos')?.checked || false;
+    _incluirCustos = novoIncluirCustos;  // atualiza fonte de verdade ao salvar
     const mg = {
       desconto_pct:          parseFloat(id('mp-desconto').value)||0,
       comissao_arq_ativa:    id('mp-arq-ativa').checked,
