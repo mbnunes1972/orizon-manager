@@ -31,25 +31,74 @@
 
 ### [PENDENTE]
 - **ALTA** — Bug: toggle "Incluir custos adicionais?" não persiste corretamente entre aberturas do modal. Fluxo do bug: (1) marcar toggle → salvar → ok. (2) entrar/sair sem salvar → ok. (3) entrar novamente → toggle aparece desmarcado mesmo sem ação do usuário. Causa: `carregarMargensSalvas` recarrega do servidor após fechar o modal sem salvar, e o servidor retorna o JSON desatualizado. O `projetoAtivo.margens.incluir_custos` fica desatualizado. Arquivos relevantes: `static/index.html` funções `fecharModalParams`, `carregarMargensSalvas`, `abrirModalParams`; `main.py` rota `/projetos/<nome>/margens`.
+- **ALTA** — Implementar cadastro de Clientes (próxima tarefa — ver [PRÓXIMA TAREFA])
+- **MÉDIA** — Implementar cadastro de Parceiros (após Clientes)
 - **MÉDIA** — Servidor DEV ainda sem domínio — acessível só por IP
-- **BAIXA** — Atualizar servidor DEV com git pull após testes locais validados
+- **BAIXA** — Criar script `deploy.sh` no servidor para automatizar git pull + sed + restart
+
+### [PRÓXIMA TAREFA] Cadastro de Clientes
+**Modelo de dados (adicionar em database.py):**
+```python
+class Cliente(Base):
+    __tablename__ = "clientes"
+    id           = Column(Integer, primary_key=True)
+    nome         = Column(String(150), nullable=False)
+    cpf          = Column(String(14), unique=True, nullable=False)
+    email        = Column(String(120))
+    telefone     = Column(String(20))
+    whatsapp     = Column(String(20))
+    cidade       = Column(String(80))
+    estado       = Column(String(2))
+    observacoes  = Column(Text)
+    omie_codigo  = Column(String(40))  # código do cliente no Omie
+    criado_em    = Column(DateTime, default=datetime.utcnow)
+    atualizado_em= Column(DateTime, onupdate=datetime.utcnow)
+```
+
+**Funcionalidades a implementar:**
+- Página própria no menu ("Clientes") — nova entrada na nav da sidebar
+- Lista de clientes com busca por nome ou CPF
+- Formulário de cadastro/edição com todos os campos
+- Verificação de CPF contra Omie ao cadastrar (se já existe, importa dados)
+- Ao criar novo projeto, buscar cliente por nome ou CPF — se não existir, criar na hora
+- Projeto (`projeto.json`) ganha campo `cliente_id`
+
+**Após Clientes — Parceiros:**
+```python
+class Parceiro(Base):
+    __tablename__ = "parceiros"
+    id                  = Column(Integer, primary_key=True)
+    nome                = Column(String(150), nullable=False)
+    cpf_cnpj            = Column(String(18))
+    tipo                = Column(String(30))  # arquiteto/designer/decorador/corretor/engenheiro/indicador
+    email               = Column(String(120))
+    telefone            = Column(String(20))
+    whatsapp            = Column(String(20))
+    comissao_padrao_pct = Column(Float, default=0.0)
+    criado_em           = Column(DateTime, default=datetime.utcnow)
+```
+- Um parceiro por projeto
+- Busca por nome ou CPF
+- Comissão padrão preenche automaticamente o modal de parâmetros
 
 ### [DECIDIDO]
 - Banco: SQLite + SQLAlchemy (migração futura para MySQL)
 - Limites: Consultor 10%, Gerente 20%, Diretor 50%
-- Servidor DEV: `167.88.33.121:8765`
+- Servidor DEV: `167.88.33.121:8765` (main.py usa 0.0.0.0 no servidor via sed -i após git pull)
 - GitHub: `https://github.com/mbnunes1972/omie_v3`
 - Parâmetros internos (arquiteto, fidelidade, viagem, brinde) nunca alteram valor do cliente
 - Toggle "Incluir custos adicionais?" permite gross-up no valor bruto quando ativo
 - Desconto Total sempre calculado sobre bruto original dos XMLs
 - Foto e dados extras do perfil em localStorage (não no banco por ora)
 - Autorização delegada registrada no banco mesmo quando negada
-- Patches aplicados via scripts Python (patch_*.py) na raiz do projeto
+- Clientes e Parceiros são cadastros separados
+- Um parceiro por projeto (pode expandir no futuro)
+- Busca de cliente e parceiro por nome ou CPF
 
 ### [CONTEXTO] Arquivos e variáveis chave
 **Arquivos principais:**
 - `main.py` — servidor HTTP, rotas (incluindo `/projetos/<nome>/margens` que salva `incluir_custos`)
-- `database.py` — SQLAlchemy: `Usuario`, `Sessao`, `LogAutorizacao`
+- `database.py` — SQLAlchemy: `Usuario`, `Sessao`, `LogAutorizacao` (adicionar `Cliente`, `Parceiro`)
 - `auth.py` — login, logout, validação, autorização delegada
 - `auth_routes.py` — rotas HTTP de autenticação
 - `seed.py` — cria usuários iniciais
@@ -95,6 +144,7 @@
 - "1x" em vez de "A Vista" no select de parcelas
 - DEV_RULES.md, DEV_LOG.md, REQUIREMENTS.md criados
 - Bug pendente: toggle incluir_custos não persiste entre aberturas do modal
+- Decisão: Clientes e Parceiros como cadastros separados
 
 **Arquivos modificados:**
 - `main.py` — autenticação integrada, bind 0.0.0.0, salva incluir_custos
