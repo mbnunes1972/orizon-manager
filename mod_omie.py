@@ -97,12 +97,14 @@ def _salvar_projeto(dados_projeto):
     dados_projeto['atualizado_em'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
     storage_salvar_json(os.path.join(pasta, 'projeto.json'), dados_projeto)
 
-def _criar_projeto(nome_projeto, cliente_nome, cliente_cpf='', cliente_email='', cliente_telefone=''):
+def _criar_projeto(nome_projeto, cliente_nome, cliente_cpf='', cliente_email='', cliente_telefone='', cliente_id=None, parceiro_id=None):
     """Cria pasta + projeto.json inicial. Retorna o projeto criado."""
     nome_safe = _nome_safe(nome_projeto)
     proj = {
         'nome_safe': nome_safe,
         'nome_projeto': nome_projeto,
+        'cliente_id': cliente_id,
+        'parceiro_id': parceiro_id,
         'cliente': {'nome': cliente_nome, 'cpf': cliente_cpf,
                     'email': cliente_email, 'telefone': cliente_telefone},
         'criado_em': datetime.now().strftime('%Y-%m-%dT%H:%M:%S'),
@@ -144,6 +146,8 @@ def _listar_projetos():
             'nome_safe':      nome_safe,
             'nome_projeto':   proj.get('nome_projeto', proj.get('cliente', '')),
             'cliente_nome':   cliente_nome,
+            'cliente_id':     proj.get('cliente_id'),
+            'parceiro_id':    proj.get('parceiro_id'),
             'atualizado_em':  proj.get('atualizado_em', ''),
             'n_ambientes':    len(proj.get('ambientes', [])),
             'n_selecionados': sum(1 for a in proj.get('ambientes', []) if a.get('selecionado')),

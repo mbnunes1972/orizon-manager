@@ -9,7 +9,7 @@ from email import policy as _email_policy
 from datetime import datetime, date, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
-from database import init_db
+from database import init_db, get_session, Cliente, Parceiro
 from urllib.parse import urlparse
 
 from storage import (
@@ -150,6 +150,42 @@ class Handler(BaseHTTPRequestHandler):
             omie_unicos = [p for p in omie_res if p['nome_projeto'].lower() not in nomes_locais]
             self.send_json({'ok': True, 'projetos': locais + omie_unicos})
 
+        elif path == "/api/clientes":
+            from urllib.parse import parse_qs
+            q  = (parse_qs(urlparse(self.path).query).get('q') or [''])[0].strip().lower()
+            db = get_session()
+            try:
+                query = db.query(Cliente).order_by(Cliente.nome)
+                if q:
+                    query = query.filter(
+                        (Cliente.nome.ilike(f"%{q}%")) |
+                        (Cliente.cpf.ilike(f"%{q}%"))
+                    )
+                clientes = [_cliente_dict(c) for c in query.all()]
+                self.send_json({"ok": True, "clientes": clientes})
+            except Exception as e:
+                self.send_json({"ok": False, "erro": str(e), "clientes": []})
+            finally:
+                db.close()
+
+        elif path == "/api/parceiros":
+            from urllib.parse import parse_qs
+            q  = (parse_qs(urlparse(self.path).query).get('q') or [''])[0].strip().lower()
+            db = get_session()
+            try:
+                query = db.query(Parceiro).order_by(Parceiro.nome)
+                if q:
+                    query = query.filter(
+                        (Parceiro.nome.ilike(f"%{q}%")) |
+                        (Parceiro.cpf_cnpj.ilike(f"%{q}%"))
+                    )
+                parceiros = [_parceiro_dict(p) for p in query.all()]
+                self.send_json({"ok": True, "parceiros": parceiros})
+            except Exception as e:
+                self.send_json({"ok": False, "erro": str(e), "parceiros": []})
+            finally:
+                db.close()
+
         elif path.endswith(".html") and path != "/":
             nome    = path.lstrip("/")
             caminho = os.path.join(_BASE_DIR, nome)
@@ -195,9 +231,61 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": True, "projeto": proj})
                 else:
                     self.send_json({"ok": False, "erro": "Projeto nao encontrado"}, code=404)
-            else:
-                self.send_response(404)
-                self.end_headers()
+                return
+
+            m = _re.match(r"^/api/clientes/(\d+)$", path)
+            if m:
+                db = get_session()
+                try:
+                    c = db.get(Cliente, int(m.group(1)))
+                    if c:
+                        self.send_json({"ok": True, "cliente": _cliente_dict(c)})
+                    else:
+                        self.send_json({"ok": False, "erro": "Cliente não encontrado"}, code=404)
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r"^/api/parceiros/(\d+)$", path)
+            if m:
+                db = get_session()
+                try:
+                    p = db.get(Parceiro, int(m.group(1)))
+                    if p:
+                        self.send_json({"ok": True, "parceiro": _parceiro_dict(p)})
+                    else:
+                        self.send_json({"ok": False, "erro": "Parceiro não encontrado"}, code=404)
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r"^/api/clientes/(\d+)/projetos$", path)
+            if m:
+                db = get_session()
+                try:
+                    c = db.get(Cliente, int(m.group(1)))
+                    if not c:
+                        self.send_json({"ok": False, "erro": "Cliente não encontrado"}, code=404)
+                        return
+                    nome_lower = c.nome.lower()
+                    projetos = [
+                        p for p in _listar_projetos()
+                        if p.get("cliente_id") == c.id
+                        or p.get("cliente_nome", "").lower() == nome_lower
+                    ]
+                    self.send_json({"ok": True, "projetos": projetos, "cliente": _cliente_dict(c)})
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)})
+                finally:
+                    db.close()
+                return
+
+            self.send_response(404)
+            self.end_headers()
 
     def do_POST(self):
         path   = urlparse(self.path).path
@@ -503,16 +591,35 @@ class Handler(BaseHTTPRequestHandler):
 
         elif path == "/projetos/novo":
             req = json.loads(body)
-            nome_proj    = req.get('nome_projeto', '').strip()
-            cli_nome     = req.get('cliente', {}).get('nome', '').strip()
-            cli_cpf      = req.get('cliente', {}).get('cpf', '').strip()
-            cli_email    = req.get('cliente', {}).get('email', '').strip()
-            cli_telefone = req.get('cliente', {}).get('telefone', '').strip()
-            if not nome_proj or not cli_nome:
-                self.send_json({'ok': False, 'erro': 'nome_projeto e cliente.nome são obrigatórios'})
+            nome_proj   = req.get('nome_projeto', '').strip()
+            cliente_id  = req.get('cliente_id')
+            parceiro_id = req.get('parceiro_id')
+            if not nome_proj:
+                self.send_json({'ok': False, 'erro': 'nome_projeto é obrigatório'})
                 return
+            if not cliente_id:
+                self.send_json({'ok': False, 'erro': 'cliente_id é obrigatório — selecione ou cadastre um cliente'})
+                return
+            # Carrega dados do cliente do banco para garantir consistência
+            db = get_session()
             try:
-                proj = _criar_projeto(nome_proj, cli_nome, cli_cpf, cli_email, cli_telefone)
+                c = db.get(Cliente, int(cliente_id))
+                if not c:
+                    self.send_json({'ok': False, 'erro': 'Cliente não encontrado'})
+                    return
+                cli_nome     = c.nome
+                cli_cpf      = c.cpf      or ''
+                cli_email    = c.email    or ''
+                cli_telefone = c.telefone or ''
+            except Exception as e:
+                self.send_json({'ok': False, 'erro': str(e)})
+                return
+            finally:
+                db.close()
+            try:
+                proj = _criar_projeto(nome_proj, cli_nome, cli_cpf, cli_email, cli_telefone,
+                                      cliente_id=int(cliente_id),
+                                      parceiro_id=int(parceiro_id) if parceiro_id else None)
 
                 # Garante credenciais carregadas (main() já carrega, mas reforça)
                 if not get_omie_key():
@@ -551,6 +658,128 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({'ok': True, 'projeto': proj})
             except Exception as e:
                 self.send_json({'ok': False, 'erro': str(e)})
+
+        elif path == "/api/clientes":
+            req  = json.loads(body) if body else {}
+            nome = (req.get("nome") or "").strip()
+            if not nome:
+                self.send_json({"ok": False, "erro": "Nome é obrigatório"})
+                return
+            cpf = (req.get("cpf") or "").strip() or None
+            db  = get_session()
+            try:
+                if cpf:
+                    existente = db.query(Cliente).filter_by(cpf=cpf).first()
+                    if existente:
+                        self.send_json({"ok": False, "erro": "CPF já cadastrado",
+                                        "cliente": _cliente_dict(existente)})
+                        return
+                c = Cliente(
+                    nome       =nome, cpf=cpf,
+                    email      =(req.get("email")       or "").strip() or None,
+                    telefone   =(req.get("telefone")    or "").strip() or None,
+                    whatsapp   =(req.get("whatsapp")    or "").strip() or None,
+                    cep        =(req.get("cep")         or "").strip() or None,
+                    logradouro =(req.get("logradouro")  or "").strip() or None,
+                    numero     =(req.get("numero")      or "").strip() or None,
+                    complemento=(req.get("complemento") or "").strip() or None,
+                    bairro     =(req.get("bairro")      or "").strip() or None,
+                    cidade     =(req.get("cidade")      or "").strip() or None,
+                    estado     =(req.get("estado")      or "").strip() or None,
+                    observacoes=(req.get("observacoes") or "").strip() or None,
+                )
+                db.add(c)
+                db.commit()
+                db.refresh(c)
+                self.send_json({"ok": True, "cliente": _cliente_dict(c)})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)})
+            finally:
+                db.close()
+
+        elif re.match(r"^/api/clientes/(\d+)/editar$", path):
+            m_cli = re.match(r"^/api/clientes/(\d+)/editar$", path)
+            req   = json.loads(body) if body else {}
+            db    = get_session()
+            try:
+                c = db.get(Cliente, int(m_cli.group(1)))
+                if not c:
+                    self.send_json({"ok": False, "erro": "Cliente não encontrado"})
+                    return
+                campos = ["nome","cpf","email","telefone","whatsapp",
+                          "cep","logradouro","numero","complemento",
+                          "bairro","cidade","estado","observacoes"]
+                for f in campos:
+                    if f in req:
+                        setattr(c, f, (req[f] or "").strip() or None)
+                if "nome" in req and not c.nome:
+                    self.send_json({"ok": False, "erro": "Nome é obrigatório"})
+                    return
+                from datetime import datetime as _dt
+                c.atualizado_em = _dt.utcnow()
+                db.commit()
+                db.refresh(c)
+                self.send_json({"ok": True, "cliente": _cliente_dict(c)})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)})
+            finally:
+                db.close()
+
+        elif path == "/api/parceiros":
+            req  = json.loads(body) if body else {}
+            nome = (req.get("nome") or "").strip()
+            if not nome:
+                self.send_json({"ok": False, "erro": "Nome é obrigatório"})
+                return
+            db = get_session()
+            try:
+                p = Parceiro(
+                    nome                =nome,
+                    cpf_cnpj            =(req.get("cpf_cnpj")            or "").strip() or None,
+                    tipo                =(req.get("tipo")                 or "").strip() or None,
+                    email               =(req.get("email")                or "").strip() or None,
+                    telefone            =(req.get("telefone")             or "").strip() or None,
+                    whatsapp            =(req.get("whatsapp")             or "").strip() or None,
+                    comissao_padrao_pct =float(req.get("comissao_padrao_pct") or 0),
+                    observacoes         =(req.get("observacoes")          or "").strip() or None,
+                )
+                db.add(p)
+                db.commit()
+                db.refresh(p)
+                self.send_json({"ok": True, "parceiro": _parceiro_dict(p)})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)})
+            finally:
+                db.close()
+
+        elif re.match(r"^/api/parceiros/(\d+)/editar$", path):
+            m_par = re.match(r"^/api/parceiros/(\d+)/editar$", path)
+            req   = json.loads(body) if body else {}
+            db    = get_session()
+            try:
+                p = db.get(Parceiro, int(m_par.group(1)))
+                if not p:
+                    self.send_json({"ok": False, "erro": "Parceiro não encontrado"})
+                    return
+                for f in ["nome","cpf_cnpj","tipo","email","telefone","whatsapp","observacoes"]:
+                    if f in req:
+                        setattr(p, f, (req[f] or "").strip() or None)
+                if "comissao_padrao_pct" in req:
+                    p.comissao_padrao_pct = float(req["comissao_padrao_pct"] or 0)
+                if "nome" in req and not p.nome:
+                    self.send_json({"ok": False, "erro": "Nome é obrigatório"})
+                    return
+                db.commit()
+                db.refresh(p)
+                self.send_json({"ok": True, "parceiro": _parceiro_dict(p)})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)})
+            finally:
+                db.close()
 
         else:
             import re as _re
@@ -670,6 +899,43 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.send_response(404)
                 self.end_headers()
+
+
+# ── Helper ────────────────────────────────────────────────────────────────────
+def _cliente_dict(c) -> dict:
+    return {
+        "id":          c.id,
+        "nome":        c.nome,
+        "cpf":         c.cpf         or "",
+        "email":       c.email       or "",
+        "telefone":    c.telefone    or "",
+        "whatsapp":    c.whatsapp    or "",
+        "cep":         c.cep         or "",
+        "logradouro":  c.logradouro  or "",
+        "numero":      c.numero      or "",
+        "complemento": c.complemento or "",
+        "bairro":      c.bairro      or "",
+        "cidade":      c.cidade      or "",
+        "estado":      c.estado      or "",
+        "observacoes": c.observacoes or "",
+        "omie_codigo": c.omie_codigo or "",
+        "criado_em":   c.criado_em.strftime("%Y-%m-%d") if c.criado_em else "",
+    }
+
+
+def _parceiro_dict(p) -> dict:
+    return {
+        "id":                  p.id,
+        "nome":                p.nome,
+        "cpf_cnpj":            p.cpf_cnpj            or "",
+        "tipo":                p.tipo                 or "",
+        "email":               p.email                or "",
+        "telefone":            p.telefone             or "",
+        "whatsapp":            p.whatsapp             or "",
+        "comissao_padrao_pct": p.comissao_padrao_pct  if p.comissao_padrao_pct is not None else 0.0,
+        "observacoes":         p.observacoes          or "",
+        "criado_em":           p.criado_em.strftime("%Y-%m-%d") if p.criado_em else "",
+    }
 
 
 # == MAIN ==

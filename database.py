@@ -79,9 +79,71 @@ class LogAutorizacao(Base):
     autorizador  = relationship("Usuario", back_populates="autorizacoes", foreign_keys=[autorizador_id])
 
 
+class Cliente(Base):
+    __tablename__ = "clientes"
+
+    id            = Column(Integer,     primary_key=True, autoincrement=True)
+    nome          = Column(String(150), nullable=False)
+    cpf           = Column(String(14),  nullable=True, unique=True)
+    email         = Column(String(120), nullable=True)
+    telefone      = Column(String(20),  nullable=True)
+    whatsapp      = Column(String(20),  nullable=True)
+    cep           = Column(String(9),   nullable=True)
+    logradouro    = Column(String(200), nullable=True)
+    numero        = Column(String(20),  nullable=True)
+    complemento   = Column(String(100), nullable=True)
+    bairro        = Column(String(100), nullable=True)
+    cidade        = Column(String(80),  nullable=True)
+    estado        = Column(String(2),   nullable=True)
+    observacoes   = Column(Text,        nullable=True)
+    omie_codigo   = Column(String(40),  nullable=True)
+    criado_em     = Column(DateTime,    default=datetime.utcnow)
+    atualizado_em = Column(DateTime,    onupdate=datetime.utcnow)
+
+
+class Parceiro(Base):
+    __tablename__ = "parceiros"
+
+    id                  = Column(Integer,     primary_key=True, autoincrement=True)
+    nome                = Column(String(150), nullable=False)
+    cpf_cnpj            = Column(String(18),  nullable=True)
+    tipo                = Column(String(30),   nullable=True)   # arquiteto/designer/decorador/corretor/engenheiro/indicador
+    email               = Column(String(120),  nullable=True)
+    telefone            = Column(String(20),   nullable=True)
+    whatsapp            = Column(String(20),   nullable=True)
+    comissao_padrao_pct = Column(Float,        default=0.0)
+    observacoes         = Column(Text,         nullable=True)
+    criado_em           = Column(DateTime,     default=datetime.utcnow)
+
+
 # ── Inicialização ─────────────────────────────────────────────────────────────
 def init_db():
     Base.metadata.create_all(ENGINE)
+    _migrar_colunas()
+
+def _migrar_colunas():
+    """Adiciona colunas novas em tabelas existentes sem perder dados."""
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(clientes)")
+        existing = {row[1] for row in cur.fetchall()}
+        novas = [
+            ("cep",         "VARCHAR(9)"),
+            ("logradouro",  "VARCHAR(200)"),
+            ("numero",      "VARCHAR(20)"),
+            ("complemento", "VARCHAR(100)"),
+            ("bairro",      "VARCHAR(100)"),
+        ]
+        for col, tipo in novas:
+            if col not in existing:
+                cur.execute(f"ALTER TABLE clientes ADD COLUMN {col} {tipo}")
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
 
 def get_session():
     return Session()

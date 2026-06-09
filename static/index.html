@@ -302,6 +302,8 @@ body{overflow:hidden}
   <nav class="sb-nav">
     <div class="sb-nav-title">Menu</div>
     <div class="nav-item active" id="nav-00" onclick="goPage(0)">&#x25C8; Projetos</div>
+    <div class="nav-item" id="nav-05" onclick="goPage(5)">&#x1F465; Clientes</div>
+    <div class="nav-item" id="nav-06" onclick="goPage(6)">&#x1F91D; Parceiros</div>
     <div class="nav-item locked" id="nav-new-amb" onclick="abrirModalNovoAmbiente()" style="color:var(--muted)">+ Novo ambiente</div>
     <div class="nav-item locked" id="nav-02" onclick="goPage(2)">&#x25C6; Negociacao</div>
     <div class="nav-item locked" id="nav-03" onclick="goPage(3)">&#x2191; Exportar</div>
@@ -492,33 +494,78 @@ body{overflow:hidden}
 
 <main class="content">
 
-  <!-- PAGE 00: Projetos (simplificada) -->
+  <!-- PAGE 00: Projetos -->
   <div class="page active" id="page-00">
-    <div class="page-title" style="margin-bottom:16px">Projetos</div>
-    <div class="p00-btns">
-      <button class="btn btn-primary" onclick="mostrarFormNovoProjeto()">+ Novo projeto</button>
-      <button class="btn btn-ghost" onclick="focarBuscaProjeto()">&#x1F50D; Buscar</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+      <div class="page-title">Projetos</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="projToggleOrdem()" id="btn-proj-ordem"
+                title="Inverter ordem" style="font-size:13px;padding:5px 10px">&#x21C5;</button>
+        <button class="btn btn-primary btn-sm" onclick="mostrarFormNovoProjeto()">+ Novo projeto</button>
+      </div>
     </div>
     <div id="form-novo-projeto" class="p00-form" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px">Novo Projeto</div>
         <span onclick="esconderFormNovoProjeto()" style="cursor:pointer;color:var(--muted);font-size:18px">&#x2715;</span>
       </div>
-      <label>NOME DO PROJETO *</label><input type="text" id="novo-proj-nome" placeholder="Ex: Cozinha Planejada Silva">
-      <label>CLIENTE *</label><input type="text" id="novo-proj-cli" placeholder="Nome completo do cliente">
-      <label>CPF DO CLIENTE (opcional)</label><input type="text" id="novo-proj-cpf" placeholder="000.000.000-00">
-      <label>E-MAIL</label><input type="text" id="np-email" placeholder="opcional">
-      <label>TELEFONE</label><input type="text" id="np-tel" placeholder="opcional">
+      <label>NOME DO PROJETO *</label>
+      <input type="text" id="novo-proj-nome" placeholder="Ex: Cozinha Planejada Silva">
+      <input type="hidden" id="novo-proj-cliente-id">
+      <label>CLIENTE *</label>
+      <!-- Chip: cliente selecionado -->
+      <div id="np-cli-chip" style="display:none;align-items:center;justify-content:space-between;background:rgba(93,202,165,.08);border:1px solid rgba(93,202,165,.25);border-radius:8px;padding:9px 13px;margin-bottom:6px">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text)" id="np-cli-chip-nome"></div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px" id="np-cli-chip-cpf"></div>
+        </div>
+        <span onclick="npDeselecionarCliente()" title="Trocar cliente"
+              style="cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px">&#x2715;</span>
+      </div>
+      <!-- Busca: visível quando sem cliente selecionado -->
+      <div id="np-cli-busca-wrap">
+        <div style="position:relative">
+          <input type="text" id="novo-proj-cli" placeholder="Buscar por nome ou CPF..."
+                 oninput="npBuscarCliente(this.value)" autocomplete="off">
+          <div id="np-cli-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border2);border-radius:8px;z-index:200;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.4)"></div>
+        </div>
+        <div style="margin-top:6px;text-align:right">
+          <button class="btn btn-ghost btn-sm" onclick="npAbrirCadastroCliente()"
+                  style="font-size:11px;padding:4px 10px">+ Cadastrar novo cliente</button>
+        </div>
+      </div>
+      <!-- Campo de parceiro (opcional) -->
+      <input type="hidden" id="novo-proj-parceiro-id">
+      <label>PARCEIRO (opcional)</label>
+      <div id="np-par-chip" style="display:none;align-items:center;justify-content:space-between;background:rgba(160,130,240,.08);border:1px solid rgba(160,130,240,.25);border-radius:8px;padding:9px 13px;margin-bottom:6px">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text)" id="np-par-chip-nome"></div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px" id="np-par-chip-tipo"></div>
+        </div>
+        <span onclick="npDeselecionarParceiro()" title="Remover parceiro"
+              style="cursor:pointer;color:var(--muted);font-size:16px;padding:2px 6px">&#x2715;</span>
+      </div>
+      <div id="np-par-busca-wrap">
+        <div style="position:relative">
+          <input type="text" id="novo-proj-par" placeholder="Buscar parceiro por nome ou CPF/CNPJ..."
+                 oninput="npBuscarParceiro(this.value)" autocomplete="off">
+          <div id="np-par-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border2);border-radius:8px;z-index:200;max-height:180px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.4)"></div>
+        </div>
+        <div style="margin-top:6px;text-align:right">
+          <button class="btn btn-ghost btn-sm" onclick="npAbrirCadastroParceiro()"
+                  style="font-size:11px;padding:4px 10px">+ Cadastrar novo parceiro</button>
+        </div>
+      </div>
       <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
         <button class="btn btn-primary" onclick="criarProjeto()">Criar Projeto</button>
         <span id="novo-proj-status" style="font-size:11px;color:var(--muted)"></span>
       </div>
     </div>
     <div class="search-wrap">
-      <input type="text" id="proj-search" placeholder="Buscar projeto..." oninput="debounceProjBusca(this.value)">
+      <input type="text" id="proj-search" placeholder="Filtrar projetos..." oninput="projFiltrar(this.value)">
       <div class="search-spinner" id="proj-spinner"><div class="spinner"></div></div>
     </div>
-    <div class="search-hint" id="proj-search-hint">Digite para buscar projetos</div>
+    <div id="proj-search-hint" style="font-size:11px;color:var(--muted);height:16px;margin-bottom:8px"></div>
     <div id="proj-resultados"></div>
   </div>
 
@@ -876,6 +923,260 @@ body{overflow:hidden}
   <!-- PAGE 01 DUMMY (mantido para não quebrar unlockNav) -->
   <div id="page-01" style="display:none"></div>
 
+
+  <!-- PAGE 05: Clientes -->
+  <div class="page" id="page-05">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="page-title">Clientes</div>
+        <div class="page-sub">Cadastro de clientes vinculados a projetos</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="cliAbrirModal()">+ Novo Cliente</button>
+    </div>
+
+    <!-- Busca -->
+    <div class="search-wrap" style="max-width:420px;margin-bottom:16px">
+      <input type="text" id="cli-busca" placeholder="Buscar por nome ou CPF..."
+             oninput="cliAgendarBusca()" class="sb-input-sm"
+             style="width:100%;padding:9px 36px 9px 12px;font-size:12px">
+      <div class="search-spinner" id="cli-spinner"><div class="spinner"></div></div>
+    </div>
+
+    <!-- Lista -->
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="cli-table">
+        <thead>
+          <tr>
+            <th>Nome</th><th>CPF</th><th>Telefone</th><th>Cidade/UF</th><th style="width:80px"></th>
+          </tr>
+        </thead>
+        <tbody id="cli-tbody">
+          <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="cli-hint" style="font-size:11px;color:var(--muted);margin-top:8px;height:16px"></div>
+  </div>
+
+  <!-- PAGE 06: Parceiros -->
+  <div class="page" id="page-06">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="page-title">Parceiros</div>
+        <div class="page-sub">Arquitetos, designers, corretores e outros parceiros</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="parAbrirModal()">+ Novo Parceiro</button>
+    </div>
+    <div class="search-wrap" style="max-width:420px;margin-bottom:16px">
+      <input type="text" id="par-busca" placeholder="Buscar por nome ou CPF/CNPJ..."
+             oninput="parAgendarBusca()" class="sb-input-sm"
+             style="width:100%;padding:9px 36px 9px 12px;font-size:12px">
+      <div class="search-spinner" id="par-spinner"><div class="spinner"></div></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="cli-table">
+        <thead>
+          <tr>
+            <th>Nome</th><th>Tipo</th><th>CPF/CNPJ</th><th>Comissão</th><th style="width:80px"></th>
+          </tr>
+        </thead>
+        <tbody id="par-tbody">
+          <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="par-hint" style="font-size:11px;color:var(--muted);margin-top:8px;height:16px"></div>
+  </div>
+
+  <!-- Modal: Cadastro / Edição de Parceiro -->
+  <div id="modal-parceiro" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:520px;width:92%;animation:mIn .18s ease;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:16px" id="par-modal-titulo">Novo Parceiro</div>
+        <span onclick="parFecharModal()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
+      </div>
+      <input type="hidden" id="par-edit-id">
+      <div class="grid2" style="gap:14px;margin-bottom:14px">
+        <div style="grid-column:1/-1">
+          <label class="field-label">Nome completo *</label>
+          <input type="text" id="par-nome" placeholder="Nome do parceiro"
+                 oninput="_parHomonimoConfirmado=false;document.getElementById('par-aviso-nome').style.display='none'">
+        </div>
+        <!-- Aviso: nome duplicado -->
+        <div id="par-aviso-nome" style="display:none;grid-column:1/-1;background:rgba(240,153,123,.07);border:1px solid rgba(240,153,123,.3);border-radius:8px;padding:11px 13px">
+          <div style="font-size:11px;color:var(--err);font-weight:600;margin-bottom:4px">&#x26A0; Já existe um parceiro com este nome:</div>
+          <div style="font-size:11px;color:var(--text);margin-bottom:10px" id="par-aviso-nome-info"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="parHomonimoSim()" style="font-size:11px">É um homônimo — continuar</button>
+            <button class="btn btn-primary btn-sm" onclick="parHomonimoNao()" style="font-size:11px">Ver parceiro existente</button>
+          </div>
+        </div>
+        <div>
+          <label class="field-label">Tipo</label>
+          <select id="par-tipo" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px;outline:none">
+            <option value="">— selecione —</option>
+            <option value="arquiteto">Arquiteto</option>
+            <option value="designer">Designer de Interiores</option>
+            <option value="decorador">Decorador</option>
+            <option value="corretor">Corretor</option>
+            <option value="engenheiro">Engenheiro</option>
+            <option value="indicador">Indicador</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">CPF / CNPJ</label>
+          <input type="text" id="par-cpf" placeholder="000.000.000-00 ou 00.000.000/0001-00"
+                 oninput="parFormatarCPFCNPJ(this)">
+        </div>
+        <div>
+          <label class="field-label">E-mail</label>
+          <input type="text" id="par-email" placeholder="email@exemplo.com">
+        </div>
+        <div>
+          <label class="field-label">Telefone</label>
+          <input type="text" id="par-tel" placeholder="(00) 00000-0000" oninput="cliMascaraTel(this)">
+        </div>
+        <div>
+          <label class="field-label">WhatsApp</label>
+          <input type="text" id="par-wpp" placeholder="(00) 00000-0000" oninput="cliMascaraTel(this)">
+        </div>
+        <div>
+          <label class="field-label">Comissão padrão (%)</label>
+          <input type="number" id="par-comissao" min="0" max="30" step="0.5" value="0"
+                 style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px;outline:none">
+        </div>
+        <div style="grid-column:1/-1">
+          <label class="field-label">Observações</label>
+          <textarea id="par-obs" rows="2" placeholder="Observações opcionais"
+                    style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;resize:vertical"></textarea>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--err);min-height:16px;margin-bottom:12px" id="par-modal-erro"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-sm" onclick="parFecharModal()" style="flex:1;justify-content:center">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="parSalvar()" style="flex:1;justify-content:center">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cadastro / Edição de Cliente -->
+  <div id="modal-cliente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:520px;width:92%;animation:mIn .18s ease;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:16px" id="cli-modal-titulo">Novo Cliente</div>
+        <span onclick="cliFecharModal()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
+      </div>
+      <input type="hidden" id="cli-edit-id">
+      <div class="grid2" style="gap:14px;margin-bottom:14px">
+        <div style="grid-column:1/-1">
+          <label class="field-label">Nome completo *</label>
+          <input type="text" id="cli-nome" placeholder="Nome do cliente"
+                 oninput="_cliHomonimoConfirmado=false;document.getElementById('cli-aviso-nome').style.display='none'">
+        </div>
+        <!-- Aviso: nome duplicado -->
+        <div id="cli-aviso-nome" style="display:none;grid-column:1/-1;background:rgba(240,153,123,.07);border:1px solid rgba(240,153,123,.3);border-radius:8px;padding:11px 13px">
+          <div style="font-size:11px;color:var(--err);font-weight:600;margin-bottom:4px">&#x26A0; Já existe um cliente com este nome:</div>
+          <div style="font-size:11px;color:var(--text);margin-bottom:10px" id="cli-aviso-nome-info"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="cliHomonimoSim()" style="font-size:11px">É um homônimo — continuar</button>
+            <button class="btn btn-primary btn-sm" onclick="cliHomonimoNao()" style="font-size:11px">Ver cliente existente</button>
+          </div>
+        </div>
+        <div>
+          <label class="field-label">CPF</label>
+          <input type="text" id="cli-cpf" placeholder="000.000.000-00"
+                 oninput="cliFormatarCPF(this)" onblur="cliChecarCPF(this.value)">
+          <div id="cli-aviso-cpf" style="display:none;font-size:10px;color:var(--err);margin-top:4px"></div>
+        </div>
+        <div>
+          <label class="field-label">E-mail</label>
+          <input type="text" id="cli-email" placeholder="email@exemplo.com">
+        </div>
+        <div>
+          <label class="field-label">Telefone</label>
+          <input type="text" id="cli-tel" placeholder="(00) 00000-0000" oninput="cliMascaraTel(this)">
+        </div>
+        <div>
+          <label class="field-label">WhatsApp</label>
+          <input type="text" id="cli-wpp" placeholder="(00) 00000-0000" oninput="cliMascaraTel(this)">
+        </div>
+        <!-- Endereço -->
+        <div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:12px;margin-top:2px">
+          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px;font-family:'Epilogue',sans-serif">Endereço</div>
+          <div class="grid2" style="gap:12px">
+            <div>
+              <label class="field-label" style="display:flex;align-items:center;gap:6px">
+                CEP
+                <span id="cli-cep-spinner" style="display:none;line-height:0"><div class="spinner" style="width:10px;height:10px;border-width:1.5px;display:inline-block"></div></span>
+              </label>
+              <input type="text" id="cli-cep" placeholder="00000-000" maxlength="9" oninput="cliFormatarCEP(this)">
+              <div id="cli-cep-erro" style="font-size:10px;color:var(--err);margin-top:3px;display:none">CEP não encontrado.</div>
+            </div>
+            <div><!-- espaço --></div>
+            <div style="grid-column:1/-1">
+              <label class="field-label">Logradouro</label>
+              <input type="text" id="cli-logradouro" placeholder="Preenchido automaticamente pelo CEP">
+            </div>
+            <div>
+              <label class="field-label">Número *</label>
+              <input type="text" id="cli-numero" placeholder="123">
+            </div>
+            <div>
+              <label class="field-label">Complemento</label>
+              <input type="text" id="cli-complemento" placeholder="Apto, Sala...">
+            </div>
+            <div>
+              <label class="field-label">Bairro</label>
+              <input type="text" id="cli-bairro" placeholder="Preenchido pelo CEP">
+            </div>
+            <div>
+              <label class="field-label">Cidade</label>
+              <input type="text" id="cli-cidade" placeholder="Preenchido pelo CEP">
+            </div>
+            <div>
+              <label class="field-label">Estado (UF)</label>
+              <input type="text" id="cli-estado" placeholder="SP" maxlength="2" style="text-transform:uppercase">
+            </div>
+          </div>
+        </div>
+        <div style="grid-column:1/-1">
+          <label class="field-label">Observações</label>
+          <textarea id="cli-obs" rows="2" placeholder="Observações opcionais"
+                    style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;resize:vertical"></textarea>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--err);min-height:16px;margin-bottom:12px" id="cli-modal-erro"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-sm" onclick="cliFecharModal()" style="flex:1;justify-content:center">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="cliSalvar()" style="flex:1;justify-content:center">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cliente encontrado (duplicata por nome ou CPF) -->
+  <div id="modal-cli-encontrado" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:480px;width:92%;max-height:90vh;overflow-y:auto;animation:mIn .18s ease">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px">Cliente encontrado</div>
+        <span onclick="mceFechar()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
+      </div>
+      <!-- Info do cliente -->
+      <div style="background:rgba(93,202,165,.07);border:1px solid rgba(93,202,165,.2);border-radius:8px;padding:12px 14px;margin-bottom:18px">
+        <div style="font-weight:700;font-size:14px;margin-bottom:3px" id="mce-nome"></div>
+        <div style="font-size:11px;color:var(--muted)" id="mce-detalhe"></div>
+      </div>
+      <!-- Projetos -->
+      <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-family:'Epilogue',sans-serif">Projetos deste cliente</div>
+      <div id="mce-projetos" style="margin-bottom:18px;max-height:240px;overflow-y:auto">
+        <div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Carregando...</div>
+      </div>
+      <!-- Ações -->
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-sm" onclick="mceFechar()" style="flex:1;justify-content:center">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="mceCriarProjeto()" style="flex:1;justify-content:center">+ Novo projeto</button>
+      </div>
+    </div>
+  </div>
 
     <!-- PAGE 03: Exportar (em breve) -->
   <div class="page" id="page-03">
@@ -1394,18 +1695,29 @@ function goPage(n){
   if(pageEl) pageEl.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
   navEl.classList.add('active');
-  // Mostrar/ocultar parâmetros na sidebar
   const sbParams = document.getElementById('sb-params');
   if(sbParams) sbParams.style.display = n===2 ? 'block' : 'none';
   if(n===2 && projetoAtivo) carregarMargensSalvas();
+  if(n===0) projCarregar();
+  if(n===5) cliCarregar();
+  if(n===6) parCarregar();
   if(n===9) cfgRenderizarPerfis();
+  // "Novo ambiente" só fica habilitado na negociação com projeto aberto
+  const nb = document.getElementById('nav-new-amb');
+  if(nb){
+    if(n === 2 && projetoAtivo) nb.classList.remove('locked');
+    else nb.classList.add('locked');
+  }
 }
 function unlockNav(n){
   const el = document.getElementById('nav-0'+n);
   if(el) el.classList.remove('locked');
-  // Desbloquear também o botão novo ambiente
+  // Novo ambiente desbloqueado apenas quando estamos na negociação
   const nb = document.getElementById('nav-new-amb');
-  if(nb && n===2) nb.classList.remove('locked');
+  if(nb && n===2){
+    const page02 = document.getElementById('page-02');
+    if(page02 && page02.classList.contains('active')) nb.classList.remove('locked');
+  }
 }
 // Funções modal novo ambiente
 function abrirModalNovoAmbiente(){
@@ -1419,8 +1731,21 @@ function fecharModalNovoAmbiente(){
 }
 // Funções page-00
 function mostrarFormNovoProjeto(){
+  document.getElementById('novo-proj-nome').value = '';
+  document.getElementById('novo-proj-cliente-id').value = '';
+  document.getElementById('novo-proj-cli').value = '';
+  document.getElementById('novo-proj-status').textContent = '';
+  document.getElementById('np-cli-dropdown').style.display = 'none';
+  document.getElementById('np-cli-chip').style.display = 'none';
+  document.getElementById('np-cli-busca-wrap').style.display = '';
+  // Reset parceiro
+  document.getElementById('novo-proj-parceiro-id').value = '';
+  document.getElementById('novo-proj-par').value = '';
+  document.getElementById('np-par-dropdown').style.display = 'none';
+  document.getElementById('np-par-chip').style.display = 'none';
+  document.getElementById('np-par-busca-wrap').style.display = '';
   document.getElementById('form-novo-projeto').style.display = 'block';
-  document.getElementById('novo-proj-nome').focus();
+  setTimeout(() => document.getElementById('novo-proj-nome').focus(), 50);
 }
 function esconderFormNovoProjeto(){
   document.getElementById('form-novo-projeto').style.display = 'none';
@@ -1428,6 +1753,9 @@ function esconderFormNovoProjeto(){
 function focarBuscaProjeto(){
   document.getElementById('proj-search').focus();
 }
+
+// Parceiro ativo do projeto aberto (carregado ao abrir projeto)
+let _parceiroAtivoProjeto = null;
 
 // ---- Toast -------------------------------------------------------------------
 function showToast(msg, isErr){
@@ -1476,13 +1804,18 @@ async function executarBuscaProjeto(q){
 }
 
 function renderProjResultados(lista){
+  if(!lista.length){
+    document.getElementById('proj-resultados').innerHTML =
+      '<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Nenhum projeto encontrado.</div>';
+    return;
+  }
   document.getElementById('proj-resultados').innerHTML = lista.map(p=>`
     <div class="proj-card-item" onclick="abrirProjeto('${esc(p.nome_safe)}')">
       <div class="proj-card-nome">${esc(p.nome_projeto)} <span class="badge-origem ${esc(p.origem||'local')}">${esc((p.origem||'local').toUpperCase())}</span></div>
-      <div class="proj-card-cli">${esc(p.cliente_nome)}</div>
+      <div class="proj-card-cli">${esc(p.cliente_nome||'—')}</div>
       <div class="proj-card-meta">
-        <span>${p.n_ambientes} ambiente(s)</span>
-        <span style="color:var(--ok)">${p.n_selecionados} selecionado(s)</span>
+        <span>${p.n_ambientes||0} ambiente(s)</span>
+        <span style="color:var(--ok)">${p.n_selecionados||0} selecionado(s)</span>
         ${p.atualizado_em?'<span style="color:var(--muted)">'+esc(p.atualizado_em.substring(0,10))+'</span>':''}
       </div>
     </div>`).join('');
@@ -1499,43 +1832,124 @@ async function abrirProjeto(nome_safe){
     const elCli  = document.getElementById('sb-proj-cli');
     if(elNome) elNome.textContent = projetoAtivo.nome_projeto || '—';
     if(elCli)  elCli.textContent  = (projetoAtivo.cliente||{}).nome || '—';
+    // Carregar parceiro do projeto (para auto-fill de comissão)
+    _parceiroAtivoProjeto = null;
+    if(projetoAtivo.parceiro_id){
+      try {
+        const rp = await fetch('/api/parceiros/'+projetoAtivo.parceiro_id);
+        const dp = await rp.json();
+        if(dp.ok) _parceiroAtivoProjeto = dp.parceiro;
+      } catch(e){}
+    }
     unlockNav(1); unlockNav(2);
     atualizarUIBloqueio();
     goPage(2);  // vai direto para negociação
   }catch(e){ showToast('Erro: '+e, true); }
 }
 
+let _npBuscaTimer = null;
+let _npCadastrandoCliente = false;
+
+async function npBuscarCliente(q){
+  document.getElementById('novo-proj-cliente-id').value = '';
+  clearTimeout(_npBuscaTimer);
+  const dd = document.getElementById('np-cli-dropdown');
+  if(!q || q.length < 2){ dd.style.display='none'; return; }
+  _npBuscaTimer = setTimeout(async () => {
+    try {
+      const r = await fetch('/api/clientes?q='+encodeURIComponent(q));
+      const d = await r.json();
+      const lista = d.clientes || [];
+      if(!lista.length){
+        dd.innerHTML = `<div style="padding:10px 14px;font-size:11px;color:var(--muted)">
+          Nenhum cliente encontrado.
+          <span onclick="npAbrirCadastroCliente()"
+                style="color:var(--accent);cursor:pointer;margin-left:6px;font-weight:600">+ Cadastrar</span>
+        </div>`;
+        dd.style.display = 'block';
+        return;
+      }
+      dd.innerHTML = lista.map(c =>
+        `<div onclick="npSelecionarCliente(${c.id},'${esc(c.nome)}','${esc(c.cpf||'')}','${esc(c.email||'')}','${esc(c.telefone||c.whatsapp||'')}')"
+              style="padding:10px 14px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
+              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+          <span style="font-weight:600">${esc(c.nome)}</span>
+          ${c.cpf?`<span style="color:var(--muted);margin-left:8px">${esc(c.cpf)}</span>`:''}
+          ${c.cidade?`<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(c.cidade)}</span>`:''}
+        </div>`).join('');
+      dd.style.display = 'block';
+    } catch(e){}
+  }, 300);
+}
+
+function npSelecionarCliente(id, nome, cpf, email, tel){
+  document.getElementById('novo-proj-cliente-id').value = id;
+  document.getElementById('novo-proj-cli').value        = nome;
+  document.getElementById('np-cli-dropdown').style.display = 'none';
+  // Mostra chip com nome e CPF, esconde campo de busca
+  const chip = document.getElementById('np-cli-chip');
+  document.getElementById('np-cli-chip-nome').textContent = nome;
+  document.getElementById('np-cli-chip-cpf').textContent  = cpf || '';
+  chip.style.display = 'flex';
+  document.getElementById('np-cli-busca-wrap').style.display = 'none';
+}
+
+function npDeselecionarCliente(){
+  document.getElementById('novo-proj-cliente-id').value = '';
+  document.getElementById('novo-proj-cli').value = '';
+  document.getElementById('np-cli-chip').style.display = 'none';
+  document.getElementById('np-cli-busca-wrap').style.display = '';
+  setTimeout(() => document.getElementById('novo-proj-cli').focus(), 50);
+}
+
+function npAbrirCadastroCliente(){
+  _npCadastrandoCliente = true;
+  const nomeBusca = (document.getElementById('novo-proj-cli')?.value || '').trim();
+  document.getElementById('np-cli-dropdown').style.display = 'none';
+  cliAbrirModal();
+  if(nomeBusca){
+    setTimeout(() => {
+      const el = document.getElementById('cli-nome');
+      if(el) el.value = nomeBusca;
+    }, 120);
+  }
+}
+
 async function criarProjeto(){
-  const nome  = document.getElementById('novo-proj-nome').value.trim();
-  const cli   = document.getElementById('novo-proj-cli').value.trim();
-  const cpf   = document.getElementById('novo-proj-cpf').value.trim();
-  const email = document.getElementById('np-email').value.trim();
-  const tel   = document.getElementById('np-tel').value.trim();
-  const st    = document.getElementById('novo-proj-status');
-  if(!nome){ st.textContent='Nome do projeto obrigatorio'; st.style.color='var(--err)'; return; }
-  if(!cli){  st.textContent='Nome do cliente obrigatorio'; st.style.color='var(--err)'; return; }
-  st.textContent='Criando...'; st.style.color='var(--muted)';
+  const nome      = document.getElementById('novo-proj-nome').value.trim();
+  const clienteId = document.getElementById('novo-proj-cliente-id').value.trim();
+  const st        = document.getElementById('novo-proj-status');
+  if(!nome){
+    st.textContent = 'Nome do projeto obrigatório'; st.style.color = 'var(--err)'; return;
+  }
+  if(!clienteId){
+    st.textContent = 'Selecione um cliente ou clique em "+ Cadastrar novo cliente"';
+    st.style.color = 'var(--err)'; return;
+  }
+  st.textContent = 'Criando...'; st.style.color = 'var(--muted)';
   try{
-    const r = await fetch('/projetos/novo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome_projeto:nome,cliente:{nome:cli,cpf:cpf,email:email,telefone:tel}})});
+    const parceiroId = document.getElementById('novo-proj-parceiro-id').value.trim();
+    const r = await fetch('/projetos/novo', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        nome_projeto: nome,
+        cliente_id:   parseInt(clienteId),
+        parceiro_id:  parceiroId ? parseInt(parceiroId) : null
+      })
+    });
     const d = await r.json();
-    if(!d.ok){ st.textContent='Erro: '+(d.erro||'falha'); st.style.color='var(--err)'; return; }
+    if(!d.ok){ st.textContent = 'Erro: '+(d.erro||'falha'); st.style.color = 'var(--err)'; return; }
     projetoAtivo = d.projeto;
-    st.textContent='Projeto criado!'; st.style.color='var(--ok)';
-    document.getElementById('novo-proj-nome').value='';
-    document.getElementById('novo-proj-cli').value='';
-    document.getElementById('novo-proj-cpf').value='';
-    document.getElementById('np-email').value='';
-    document.getElementById('np-tel').value='';
-    setTimeout(()=>st.textContent='',3000);
-    // Atualizar sidebar
+    st.textContent = 'Projeto criado!'; st.style.color = 'var(--ok)';
+    setTimeout(() => st.textContent = '', 3000);
     const elNome = document.getElementById('sb-proj-nome');
     const elCli  = document.getElementById('sb-proj-cli');
     if(elNome) elNome.textContent = projetoAtivo.nome_projeto || '—';
     if(elCli)  elCli.textContent  = (projetoAtivo.cliente||{}).nome || '—';
     esconderFormNovoProjeto();
     unlockNav(1); unlockNav(2);
-    goPage(2);  // vai direto para negociação
-  }catch(e){ st.textContent='Erro: '+e; st.style.color='var(--err)'; }
+    goPage(2);
+  }catch(e){ st.textContent = 'Erro: '+e; st.style.color = 'var(--err)'; }
 }
 
 // ---- Page 01: Ambientes ------------------------------------------------------
@@ -3626,8 +4040,12 @@ function abrirModalParams(){
     ? (parseFloat(document.getElementById('neg-desconto').value) || 0)
     : (m.desconto_pct || 0);
   id('mp-desconto').value      = descontoAtual;
-  id('mp-arq-ativa').checked   = !!m.comissao_arq_ativa;
-  id('mp-arq-pct').value     = m.comissao_arq_pct || 0;
+  // Auto-preenche comissão do parceiro se não estiver configurada
+  const comissaoArq = (m.comissao_arq_pct || 0) > 0
+    ? m.comissao_arq_pct
+    : (_parceiroAtivoProjeto?.comissao_padrao_pct || 0);
+  id('mp-arq-ativa').checked = !!(m.comissao_arq_ativa || (comissaoArq > 0 && !m.comissao_arq_pct));
+  id('mp-arq-pct').value     = comissaoArq || 0;
   id('mp-fid-ativa').checked = !!m.fidelidade_ativa;
   id('mp-fid-pct').value     = m.fidelidade_pct || 0;
   id('mp-fora-sede').checked  = !!m.fora_da_sede;
@@ -3720,6 +4138,656 @@ async function fecharModalParams(salvar){
     unlockNav(1); unlockNav(2);
     goPage(2);
   }
+}
+
+// ── Módulo Clientes ────────────────────────────────────────────────────────────
+let _cliBuscaTimer       = null;
+let _cliEncontrado       = null;   // cliente encontrado por nome/CPF duplicado
+let _cliHomonimoConfirmado = false; // usuário confirmou que é homônimo
+let _mceFromNovoProjeto  = false;  // modal encontrado foi aberto no contexto de novo projeto
+
+function cliAgendarBusca(){
+  clearTimeout(_cliBuscaTimer);
+  document.getElementById('cli-spinner').style.display = 'block';
+  _cliBuscaTimer = setTimeout(cliCarregar, 400);
+}
+
+async function cliCarregar(){
+  const q = (document.getElementById('cli-busca')?.value || '').trim();
+  try {
+    const r = await fetch('/api/clientes' + (q ? '?q='+encodeURIComponent(q) : ''));
+    const d = await r.json();
+    cliRenderizar(d.clientes || []);
+    const hint = document.getElementById('cli-hint');
+    if(hint) hint.textContent = d.clientes?.length ? `${d.clientes.length} cliente(s) encontrado(s)` : 'Nenhum cliente encontrado.';
+  } catch(e) {
+    document.getElementById('cli-tbody').innerHTML =
+      '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--err)">Erro ao carregar clientes.</td></tr>';
+  } finally {
+    document.getElementById('cli-spinner').style.display = 'none';
+  }
+}
+
+function cliRenderizar(lista){
+  const tbody = document.getElementById('cli-tbody');
+  if(!lista.length){
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Nenhum cliente cadastrado.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map(c => `
+    <tr class="proj-card-item" style="cursor:pointer"
+        title="Duplo clique para ver projetos"
+        ondblclick="cliMostrarEncontrado(${JSON.stringify(c).replace(/"/g,'&quot;')})">
+      <td style="padding:10px 14px;font-weight:600">${esc(c.nome)}</td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--muted)">${esc(c.cpf||'—')}</td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--muted)">${esc(c.telefone||c.whatsapp||'—')}</td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--muted)">${c.cidade ? esc(c.cidade)+(c.estado?'/'+esc(c.estado):'') : '—'}</td>
+      <td style="padding:10px 14px;text-align:right">
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();cliAbrirModal(${c.id})" style="padding:4px 10px;font-size:10px">Editar</button>
+      </td>
+    </tr>`).join('');
+}
+
+function cliFormatarCPF(el){
+  let v = el.value.replace(/\D/g,'').slice(0,11);
+  if(v.length > 9)      v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');
+  else if(v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3');
+  else if(v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/,'$1.$2');
+  el.value = v;
+}
+
+function cliMascaraTel(el){
+  let v = el.value.replace(/\D/g,'').slice(0,11);
+  if(v.length === 0){ el.value=''; return; }
+  // Detecta celular (9 dígitos no número) ou fixo (8 dígitos)
+  if(v.length <= 2)       v = '(' + v;
+  else if(v.length <= 6)  v = '(' + v.slice(0,2) + ') ' + v.slice(2);
+  else if(v.length <= 10) v = '(' + v.slice(0,2) + ') ' + v.slice(2,6) + '-' + v.slice(6);
+  else                    v = '(' + v.slice(0,2) + ') ' + v.slice(2,7) + '-' + v.slice(7);
+  el.value = v;
+}
+
+let _cepTimer = null;
+function cliFormatarCEP(el){
+  let v = el.value.replace(/\D/g,'').slice(0,8);
+  el.value = v.length > 5 ? v.slice(0,5) + '-' + v.slice(5) : v;
+  document.getElementById('cli-cep-erro').style.display = 'none';
+  clearTimeout(_cepTimer);
+  if(v.length === 8) _cepTimer = setTimeout(() => cliBuscarCEP(v), 400);
+}
+
+async function cliBuscarCEP(cep){
+  const spinner = document.getElementById('cli-cep-spinner');
+  const erroEl  = document.getElementById('cli-cep-erro');
+  spinner.style.display = 'inline-block';
+  erroEl.style.display  = 'none';
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const d = await r.json();
+    if(d.erro){
+      erroEl.style.display = 'block';
+    } else {
+      document.getElementById('cli-logradouro').value = d.logradouro || '';
+      document.getElementById('cli-bairro').value     = d.bairro     || '';
+      document.getElementById('cli-cidade').value     = d.localidade || '';
+      document.getElementById('cli-estado').value     = d.uf         || '';
+    }
+  } catch(e){
+    erroEl.style.display = 'block';
+  } finally {
+    spinner.style.display = 'none';
+  }
+}
+
+async function cliAbrirModal(id){
+  document.getElementById('cli-modal-titulo').textContent = id ? 'Editar Cliente' : 'Novo Cliente';
+  document.getElementById('cli-edit-id').value   = id || '';
+  document.getElementById('cli-modal-erro').textContent = '';
+  document.getElementById('cli-cep-erro').style.display = 'none';
+  document.getElementById('cli-aviso-nome').style.display = 'none';
+  document.getElementById('cli-aviso-cpf').style.display  = 'none';
+  _cliHomonimoConfirmado = false;
+  ['nome','cpf','email','tel','wpp','cep','logradouro','numero','complemento','bairro','cidade','estado','obs'].forEach(f => {
+    const el = document.getElementById('cli-'+f);
+    if(el) el.value = '';
+  });
+  if(id){
+    try {
+      const r = await fetch('/api/clientes/'+id);
+      const d = await r.json();
+      if(d.ok){
+        const c = d.cliente;
+        document.getElementById('cli-nome').value        = c.nome        || '';
+        document.getElementById('cli-cpf').value         = c.cpf         || '';
+        document.getElementById('cli-email').value       = c.email       || '';
+        const telEl = document.getElementById('cli-tel');
+        const wppEl = document.getElementById('cli-wpp');
+        telEl.value = c.telefone || '';
+        wppEl.value = c.whatsapp || '';
+        cliMascaraTel(telEl);
+        cliMascaraTel(wppEl);
+        document.getElementById('cli-cep').value         = c.cep         || '';
+        document.getElementById('cli-logradouro').value  = c.logradouro  || '';
+        document.getElementById('cli-numero').value      = c.numero      || '';
+        document.getElementById('cli-complemento').value = c.complemento || '';
+        document.getElementById('cli-bairro').value      = c.bairro      || '';
+        document.getElementById('cli-cidade').value      = c.cidade      || '';
+        document.getElementById('cli-estado').value      = c.estado      || '';
+        document.getElementById('cli-obs').value         = c.observacoes || '';
+      }
+    } catch(e){ showToast('Erro ao carregar cliente', true); return; }
+  }
+  document.getElementById('modal-cliente').style.display = 'flex';
+  setTimeout(()=>document.getElementById('cli-nome').focus(), 80);
+}
+
+function cliFecharModal(){
+  document.getElementById('modal-cliente').style.display = 'none';
+  document.getElementById('cli-aviso-nome').style.display = 'none';
+  document.getElementById('cli-aviso-cpf').style.display  = 'none';
+  _cliHomonimoConfirmado = false;
+  _npCadastrandoCliente  = false;
+}
+
+// ── Verificação de duplicatas ────────────────────────────────────────────────
+
+async function cliVerificarNomeDuplicado(nome){
+  try {
+    const r = await fetch('/api/clientes?q=' + encodeURIComponent(nome));
+    const d = await r.json();
+    const nl = nome.toLowerCase().trim();
+    return (d.clientes || []).find(c => c.nome.toLowerCase().trim() === nl) || null;
+  } catch(e){ return null; }
+}
+
+async function cliChecarCPF(val){
+  const editId = document.getElementById('cli-edit-id').value;
+  const aviso  = document.getElementById('cli-aviso-cpf');
+  aviso.style.display = 'none';
+  const digitos = val.replace(/\D/g, '');
+  if(digitos.length !== 11) return;
+  try {
+    const r = await fetch('/api/clientes?q=' + encodeURIComponent(val.trim()));
+    const d = await r.json();
+    const encontrado = (d.clientes || []).find(c =>
+      c.cpf && c.cpf.replace(/\D/g,'') === digitos && (!editId || c.id !== parseInt(editId))
+    );
+    if(encontrado){
+      _cliEncontrado = encontrado;
+      aviso.innerHTML = `⚠️ CPF já cadastrado — <strong>${esc(encontrado.nome)}</strong>
+        <span onclick="cliCPFverEncontrado()"
+              style="color:var(--accent);cursor:pointer;margin-left:8px">Ver cliente →</span>`;
+      aviso.style.display = 'block';
+    }
+  } catch(e){}
+}
+
+function cliCPFverEncontrado(){
+  const wasNp = _npCadastrandoCliente;
+  cliFecharModal();
+  _mceFromNovoProjeto = wasNp;
+  if(_cliEncontrado) cliMostrarEncontrado(_cliEncontrado);
+}
+
+function cliAvisoHomonimoMostrar(cliente){
+  const el   = document.getElementById('cli-aviso-nome');
+  const info = document.getElementById('cli-aviso-nome-info');
+  let txt = cliente.nome;
+  if(cliente.cpf)    txt += ` — CPF: ${cliente.cpf}`;
+  if(cliente.cidade) txt += ` — ${cliente.cidade}${cliente.estado ? '/' + cliente.estado : ''}`;
+  info.textContent = txt;
+  el.style.display = 'block';
+  el.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+
+function cliHomonimoSim(){
+  _cliHomonimoConfirmado = true;
+  document.getElementById('cli-aviso-nome').style.display = 'none';
+  const erro = document.getElementById('cli-modal-erro');
+  erro.textContent = 'Homônimo confirmado — preencha CPF e e-mail para diferenciar.';
+  erro.style.color = 'var(--muted)';
+  setTimeout(() => document.getElementById('cli-cpf').focus(), 50);
+}
+
+function cliHomonimoNao(){
+  document.getElementById('cli-aviso-nome').style.display = 'none';
+  const wasNp = _npCadastrandoCliente;
+  cliFecharModal();
+  _mceFromNovoProjeto = wasNp;
+  if(_cliEncontrado) cliMostrarEncontrado(_cliEncontrado);
+}
+
+// ── Modal: Cliente encontrado ────────────────────────────────────────────────
+
+async function cliMostrarEncontrado(cliente){
+  _cliEncontrado = cliente;
+  document.getElementById('mce-nome').textContent = cliente.nome;
+  const partes = [];
+  if(cliente.cpf)     partes.push('CPF: ' + cliente.cpf);
+  if(cliente.cidade)  partes.push(cliente.cidade + (cliente.estado ? '/' + cliente.estado : ''));
+  if(cliente.telefone) partes.push(cliente.telefone);
+  document.getElementById('mce-detalhe').textContent = partes.join(' · ');
+  document.getElementById('mce-projetos').innerHTML =
+    '<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Carregando projetos...</div>';
+  document.getElementById('modal-cli-encontrado').style.display = 'flex';
+  try {
+    const r = await fetch('/api/clientes/' + cliente.id + '/projetos');
+    const d = await r.json();
+    const lista = d.projetos || [];
+    if(!lista.length){
+      document.getElementById('mce-projetos').innerHTML =
+        '<div style="font-size:12px;color:var(--muted);padding:6px 0">Nenhum projeto ainda.</div>';
+    } else {
+      document.getElementById('mce-projetos').innerHTML = lista.map(p => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">
+          <div>
+            <div style="font-size:12px;font-weight:600">${esc(p.nome_projeto)}</div>
+            <div style="font-size:10px;color:var(--muted)">${p.n_ambientes} ambiente(s)${p.atualizado_em?' · '+p.atualizado_em.substring(0,10):''}</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="mceAbrirProjeto('${esc(p.nome_safe)}')"
+                  style="font-size:11px;padding:4px 10px">Abrir</button>
+        </div>`).join('');
+    }
+  } catch(e){
+    document.getElementById('mce-projetos').innerHTML =
+      '<div style="font-size:12px;color:var(--err)">Erro ao carregar projetos.</div>';
+  }
+}
+
+function mceFechar(){
+  document.getElementById('modal-cli-encontrado').style.display = 'none';
+  _cliEncontrado      = null;
+  _mceFromNovoProjeto = false;
+}
+
+async function mceAbrirProjeto(nomeSafe){
+  mceFechar();
+  await abrirProjeto(nomeSafe);
+}
+
+function mceCriarProjeto(){
+  if(!_cliEncontrado) return;
+  const c    = _cliEncontrado;
+  const fromNP = _mceFromNovoProjeto;
+  mceFechar();
+  if(fromNP){
+    // Contexto de novo projeto: apenas selecionar o cliente no formulário
+    npSelecionarCliente(c.id, c.nome, c.cpf||'', c.email||'', c.telefone||c.whatsapp||'');
+  } else {
+    // Da página Clientes: abrir formulário de novo projeto com cliente pré-selecionado
+    goPage(0);
+    mostrarFormNovoProjeto();
+    npSelecionarCliente(c.id, c.nome, c.cpf||'', c.email||'', c.telefone||c.whatsapp||'');
+  }
+}
+
+async function cliSalvar(){
+  const id   = document.getElementById('cli-edit-id').value;
+  const nome = document.getElementById('cli-nome').value.trim();
+  const erro = document.getElementById('cli-modal-erro');
+  erro.textContent = '';
+  if(!nome){ erro.textContent = 'Nome é obrigatório.'; return; }
+
+  // Verificação de nome duplicado (somente novo cadastro, somente se ainda não confirmado homônimo)
+  if(!id && !_cliHomonimoConfirmado){
+    const dup = await cliVerificarNomeDuplicado(nome);
+    if(dup){
+      _cliEncontrado = dup;
+      cliAvisoHomonimoMostrar(dup);
+      return;
+    }
+  }
+
+  // Homônimo confirmado: CPF e e-mail são obrigatórios
+  if(_cliHomonimoConfirmado){
+    const cpf   = document.getElementById('cli-cpf').value.trim();
+    const email = document.getElementById('cli-email').value.trim();
+    if(!cpf || !email){
+      erro.textContent = 'Para homônimo, CPF e e-mail são obrigatórios para diferenciar.';
+      return;
+    }
+  }
+
+  const payload = {
+    nome,
+    cpf:         document.getElementById('cli-cpf').value.trim(),
+    email:       document.getElementById('cli-email').value.trim(),
+    telefone:    document.getElementById('cli-tel').value.trim(),
+    whatsapp:    document.getElementById('cli-wpp').value.trim(),
+    cep:         document.getElementById('cli-cep').value.trim(),
+    logradouro:  document.getElementById('cli-logradouro').value.trim(),
+    numero:      document.getElementById('cli-numero').value.trim(),
+    complemento: document.getElementById('cli-complemento').value.trim(),
+    bairro:      document.getElementById('cli-bairro').value.trim(),
+    cidade:      document.getElementById('cli-cidade').value.trim(),
+    estado:      document.getElementById('cli-estado').value.trim().toUpperCase(),
+    observacoes: document.getElementById('cli-obs').value.trim(),
+  };
+
+  const url = id ? `/api/clientes/${id}/editar` : '/api/clientes';
+  try {
+    const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'},
+                                  body: JSON.stringify(payload) });
+    const d = await r.json();
+    if(d.ok){
+      const wasNpCadastro = _npCadastrandoCliente && !id;
+      showToast(id ? 'Cliente atualizado!' : 'Cliente cadastrado!');
+      cliFecharModal();
+      cliCarregar();
+      if(wasNpCadastro){
+        const c = d.cliente;
+        npSelecionarCliente(c.id, c.nome, c.cpf || '', c.email || '', c.telefone || c.whatsapp || '');
+      }
+    } else if(d.cliente){
+      // CPF já cadastrado — mostrar fluxo "cliente encontrado"
+      const wasNp = _npCadastrandoCliente;
+      cliFecharModal();
+      _mceFromNovoProjeto = wasNp;
+      cliMostrarEncontrado(d.cliente);
+    } else {
+      erro.textContent = d.erro || 'Erro ao salvar.';
+    }
+  } catch(e){ erro.textContent = 'Erro de conexão.'; }
+}
+
+// ── Módulo Projetos — carregamento e ordenação ────────────────────────────────
+let _projOrdemAsc   = false;  // false = mais recente primeiro
+let _projListaBase  = [];     // cache dos projetos carregados
+
+async function projCarregar(){
+  try {
+    const r = await fetch('/projetos');
+    const d = await r.json();
+    if(!d.ok) return;
+    _projListaBase = d.projetos || [];
+    projRenderOrdenado();
+  } catch(e){}
+}
+
+function projRenderOrdenado(){
+  const lista = [..._projListaBase].sort((a, b) => {
+    const da = a.atualizado_em || a.criado_em || '';
+    const db2 = b.atualizado_em || b.criado_em || '';
+    return _projOrdemAsc ? da.localeCompare(db2) : db2.localeCompare(da);
+  });
+  const hint = document.getElementById('proj-search-hint');
+  if(hint) hint.textContent = lista.length
+    ? `${lista.length} projeto(s) — ${_projOrdemAsc ? '↑ mais antigo primeiro' : '↓ mais recente primeiro'}`
+    : '';
+  renderProjResultados(lista);
+}
+
+function projToggleOrdem(){
+  _projOrdemAsc = !_projOrdemAsc;
+  projRenderOrdenado();
+}
+
+function projFiltrar(q){
+  const s = (q || '').trim().toLowerCase();
+  document.getElementById('proj-spinner').style.display = 'block';
+  clearTimeout(window._projFiltrarTimer);
+  window._projFiltrarTimer = setTimeout(async () => {
+    document.getElementById('proj-spinner').style.display = 'none';
+    if(s.length < 2){
+      projRenderOrdenado();
+      return;
+    }
+    // Para busca com texto, usa endpoint de busca (inclui Omie)
+    try {
+      const r = await fetch('/projetos/buscar?q='+encodeURIComponent(s));
+      const d = await r.json();
+      const hint = document.getElementById('proj-search-hint');
+      if(hint) hint.textContent = d.projetos?.length ? d.projetos.length+' encontrado(s)' : 'Nenhum resultado';
+      renderProjResultados(d.projetos || []);
+    } catch(e){}
+  }, 350);
+}
+
+// ── Parceiro no formulário de novo projeto ────────────────────────────────────
+let _npParBuscaTimer = null;
+let _npCadastrandoParceiro = false;
+
+async function npBuscarParceiro(q){
+  document.getElementById('novo-proj-parceiro-id').value = '';
+  clearTimeout(_npParBuscaTimer);
+  const dd = document.getElementById('np-par-dropdown');
+  if(!q || q.length < 2){ dd.style.display='none'; return; }
+  _npParBuscaTimer = setTimeout(async () => {
+    try {
+      const r = await fetch('/api/parceiros?q='+encodeURIComponent(q));
+      const d = await r.json();
+      const lista = d.parceiros || [];
+      if(!lista.length){
+        dd.innerHTML = `<div style="padding:10px 14px;font-size:11px;color:var(--muted)">
+          Nenhum parceiro encontrado.
+          <span onclick="npAbrirCadastroParceiro()" style="color:var(--accent);cursor:pointer;margin-left:8px">+ Cadastrar</span>
+        </div>`;
+        dd.style.display = 'block'; return;
+      }
+      dd.innerHTML = lista.map(p =>
+        `<div onclick="npSelecionarParceiro(${p.id},'${esc(p.nome)}','${esc(p.tipo||'')}',${p.comissao_padrao_pct||0})"
+              style="padding:10px 14px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
+              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+          <span style="font-weight:600">${esc(p.nome)}</span>
+          ${p.tipo?`<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(p.tipo)}</span>`:''}
+          ${p.comissao_padrao_pct?`<span style="color:var(--ok);margin-left:8px;font-size:10px">${p.comissao_padrao_pct}%</span>`:''}
+        </div>`).join('');
+      dd.style.display = 'block';
+    } catch(e){}
+  }, 300);
+}
+
+function npSelecionarParceiro(id, nome, tipo, comissao){
+  document.getElementById('novo-proj-parceiro-id').value = id;
+  document.getElementById('novo-proj-par').value = nome;
+  document.getElementById('np-par-dropdown').style.display = 'none';
+  document.getElementById('np-par-chip-nome').textContent = nome;
+  document.getElementById('np-par-chip-tipo').textContent = tipo ? `${tipo} — ${comissao}% comissão` : `${comissao}% comissão`;
+  document.getElementById('np-par-chip').style.display = 'flex';
+  document.getElementById('np-par-busca-wrap').style.display = 'none';
+}
+
+function npDeselecionarParceiro(){
+  document.getElementById('novo-proj-parceiro-id').value = '';
+  document.getElementById('novo-proj-par').value = '';
+  document.getElementById('np-par-chip').style.display = 'none';
+  document.getElementById('np-par-busca-wrap').style.display = '';
+  setTimeout(() => document.getElementById('novo-proj-par').focus(), 50);
+}
+
+function npAbrirCadastroParceiro(){
+  _npCadastrandoParceiro = true;
+  const nomeBusca = (document.getElementById('novo-proj-par')?.value || '').trim();
+  document.getElementById('np-par-dropdown').style.display = 'none';
+  parAbrirModal();
+  if(nomeBusca){
+    setTimeout(() => {
+      const el = document.getElementById('par-nome');
+      if(el) el.value = nomeBusca;
+    }, 120);
+  }
+}
+
+// ── Módulo Parceiros ──────────────────────────────────────────────────────────
+let _parBuscaTimer         = null;
+let _parHomonimoConfirmado = false;
+
+function parAgendarBusca(){
+  clearTimeout(_parBuscaTimer);
+  document.getElementById('par-spinner').style.display = 'block';
+  _parBuscaTimer = setTimeout(parCarregar, 400);
+}
+
+async function parCarregar(){
+  const q = (document.getElementById('par-busca')?.value || '').trim();
+  try {
+    const r = await fetch('/api/parceiros' + (q ? '?q='+encodeURIComponent(q) : ''));
+    const d = await r.json();
+    parRenderizar(d.parceiros || []);
+    const hint = document.getElementById('par-hint');
+    if(hint) hint.textContent = d.parceiros?.length ? `${d.parceiros.length} parceiro(s)` : 'Nenhum parceiro cadastrado.';
+  } catch(e){
+    document.getElementById('par-tbody').innerHTML =
+      '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--err)">Erro ao carregar parceiros.</td></tr>';
+  } finally {
+    document.getElementById('par-spinner').style.display = 'none';
+  }
+}
+
+function parRenderizar(lista){
+  const tbody = document.getElementById('par-tbody');
+  if(!lista.length){
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Nenhum parceiro cadastrado.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = lista.map(p => `
+    <tr class="proj-card-item" style="cursor:default">
+      <td style="padding:10px 14px;font-weight:600">${esc(p.nome)}</td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--muted)">${esc(p.tipo||'—')}</td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--muted)">${esc(p.cpf_cnpj||'—')}</td>
+      <td style="padding:10px 14px;font-size:12px;color:var(--ok)">${p.comissao_padrao_pct||0}%</td>
+      <td style="padding:10px 14px;text-align:right">
+        <button class="btn btn-ghost btn-sm" onclick="parAbrirModal(${p.id})" style="padding:4px 10px;font-size:10px">Editar</button>
+      </td>
+    </tr>`).join('');
+}
+
+function parFormatarCPFCNPJ(el){
+  let v = el.value.replace(/\D/g,'').slice(0,14);
+  if(v.length <= 11){
+    if(v.length > 9)      v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/,'$1.$2.$3-$4');
+    else if(v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{0,3})/,'$1.$2.$3');
+    else if(v.length > 3) v = v.replace(/(\d{3})(\d{0,3})/,'$1.$2');
+  } else {
+    v = v.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})/,'$1.$2.$3/$4-$5');
+  }
+  el.value = v;
+}
+
+async function parAbrirModal(id){
+  document.getElementById('par-modal-titulo').textContent = id ? 'Editar Parceiro' : 'Novo Parceiro';
+  document.getElementById('par-edit-id').value   = id || '';
+  document.getElementById('par-modal-erro').textContent = '';
+  document.getElementById('par-aviso-nome').style.display = 'none';
+  _parHomonimoConfirmado = false;
+  ['nome','cpf','email','tel','wpp','obs'].forEach(f => {
+    const el = document.getElementById('par-'+f);
+    if(el) el.value = '';
+  });
+  const tipoEl = document.getElementById('par-tipo');
+  if(tipoEl) tipoEl.value = '';
+  const comEl = document.getElementById('par-comissao');
+  if(comEl) comEl.value = 0;
+  if(id){
+    try {
+      const r = await fetch('/api/parceiros/'+id);
+      const d = await r.json();
+      if(d.ok){
+        const p = d.parceiro;
+        document.getElementById('par-nome').value    = p.nome           || '';
+        document.getElementById('par-tipo').value    = p.tipo           || '';
+        document.getElementById('par-cpf').value     = p.cpf_cnpj       || '';
+        document.getElementById('par-email').value   = p.email          || '';
+        const telEl = document.getElementById('par-tel');
+        const wppEl = document.getElementById('par-wpp');
+        telEl.value = p.telefone || ''; cliMascaraTel(telEl);
+        wppEl.value = p.whatsapp || ''; cliMascaraTel(wppEl);
+        document.getElementById('par-comissao').value = p.comissao_padrao_pct || 0;
+        document.getElementById('par-obs').value      = p.observacoes || '';
+      }
+    } catch(e){ showToast('Erro ao carregar parceiro', true); return; }
+  }
+  document.getElementById('modal-parceiro').style.display = 'flex';
+  setTimeout(() => document.getElementById('par-nome').focus(), 80);
+}
+
+function parFecharModal(){
+  document.getElementById('modal-parceiro').style.display = 'none';
+  document.getElementById('par-aviso-nome').style.display = 'none';
+  _parHomonimoConfirmado = false;
+  _npCadastrandoParceiro = false;
+}
+
+async function parVerificarNomeDuplicado(nome){
+  try {
+    const r = await fetch('/api/parceiros?q='+encodeURIComponent(nome));
+    const d = await r.json();
+    const nl = nome.toLowerCase().trim();
+    return (d.parceiros || []).find(p => p.nome.toLowerCase().trim() === nl) || null;
+  } catch(e){ return null; }
+}
+
+function parAvisoHomonimoMostrar(parceiro){
+  const el   = document.getElementById('par-aviso-nome');
+  const info = document.getElementById('par-aviso-nome-info');
+  let txt = parceiro.nome;
+  if(parceiro.tipo)     txt += ` — ${parceiro.tipo}`;
+  if(parceiro.cpf_cnpj) txt += ` — ${parceiro.cpf_cnpj}`;
+  info.textContent = txt;
+  el.style.display = 'block';
+  el.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+function parHomonimoSim(){
+  _parHomonimoConfirmado = true;
+  document.getElementById('par-aviso-nome').style.display = 'none';
+  const erro = document.getElementById('par-modal-erro');
+  erro.textContent = 'Homônimo confirmado — prossiga com o cadastro.';
+  erro.style.color = 'var(--muted)';
+}
+
+function parHomonimoNao(){
+  document.getElementById('par-aviso-nome').style.display = 'none';
+  const wasNp = _npCadastrandoParceiro;
+  parFecharModal();
+  // Se tinha parceiro encontrado, selecioná-lo no formulário
+  if(wasNp && window._parEncontrado){
+    const p = window._parEncontrado;
+    npSelecionarParceiro(p.id, p.nome, p.tipo||'', p.comissao_padrao_pct||0);
+  }
+}
+
+async function parSalvar(){
+  const id   = document.getElementById('par-edit-id').value;
+  const nome = document.getElementById('par-nome').value.trim();
+  const erro = document.getElementById('par-modal-erro');
+  erro.textContent = ''; erro.style.color = 'var(--err)';
+  if(!nome){ erro.textContent = 'Nome é obrigatório.'; return; }
+
+  if(!id && !_parHomonimoConfirmado){
+    const dup = await parVerificarNomeDuplicado(nome);
+    if(dup){ window._parEncontrado = dup; parAvisoHomonimoMostrar(dup); return; }
+  }
+
+  const payload = {
+    nome,
+    tipo:                 document.getElementById('par-tipo').value,
+    cpf_cnpj:             document.getElementById('par-cpf').value.trim(),
+    email:                document.getElementById('par-email').value.trim(),
+    telefone:             document.getElementById('par-tel').value.trim(),
+    whatsapp:             document.getElementById('par-wpp').value.trim(),
+    comissao_padrao_pct:  parseFloat(document.getElementById('par-comissao').value) || 0,
+    observacoes:          document.getElementById('par-obs').value.trim(),
+  };
+
+  const url = id ? `/api/parceiros/${id}/editar` : '/api/parceiros';
+  try {
+    const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'},
+                                  body: JSON.stringify(payload) });
+    const d = await r.json();
+    if(d.ok){
+      const wasNpCadastro = _npCadastrandoParceiro && !id;
+      showToast(id ? 'Parceiro atualizado!' : 'Parceiro cadastrado!');
+      parFecharModal();
+      parCarregar();
+      if(wasNpCadastro){
+        const p = d.parceiro;
+        npSelecionarParceiro(p.id, p.nome, p.tipo||'', p.comissao_padrao_pct||0);
+      }
+    } else {
+      erro.textContent = d.erro || 'Erro ao salvar.';
+    }
+  } catch(e){ erro.textContent = 'Erro de conexão.'; }
 }
 
 // ---- Init --------------------------------------------------------------------

@@ -25,7 +25,15 @@
       "Bash(git commit -m ' *)",
       "Bash(git tag *)",
       "Bash(git checkout *)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(curl -s http://127.0.0.1:8765/api/clientes)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8765/api/clientes\" -UseBasicParsing -TimeoutSec 5; Write-Output \"Status: $\\($r.StatusCode\\)\"; Write-Output \"Body: $\\($r.Content\\)\" } catch { Write-Output \"ERRO: $\\($_.Exception.Message\\)\" })",
+      "PowerShell(Get-WmiObject *)",
+      "Bash(powershell -c \"netstat -ano | findstr ':8765'\")",
+      "Bash(node -e \"const { chromium } = require\\('playwright'\\); console.log\\('ok'\\)\")",
+      "PowerShell(Get-Command *)",
+      "Bash(curl -s -X POST http://127.0.0.1:8765/api/clientes -H 'Content-Type: application/json' -d '{\"nome\":\"Ana Lima\",\"cpf\":\"111.222.333-44\",\"telefone\":\"\\(12\\) 98765-4321\",\"whatsapp\":\"\\(12\\) 98765-4321\",\"cep\":\"12242-800\",\"logradouro\":\"Av Barão do Rio Branco\",\"numero\":\"200\",\"complemento\":\"Sala 5\",\"bairro\":\"Jardim Esplanada\",\"cidade\":\"São José dos Campos\",\"estado\":\"SP\",\"observacoes\":\"cliente verify test\"}')",
+      "Bash(grep -n \"projetos\\\\$\" \"E:/2026/estudo_de_ia/omie_v3/main.py\")"
     ]
   }
 }

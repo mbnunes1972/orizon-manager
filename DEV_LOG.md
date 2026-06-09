@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-08
+> Atualizado em: 2026-06-09 (sessão 2)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -27,43 +27,25 @@
 - Label "Desconto Total" (renomeado de "Desconto total s/ bruto")
 - "A Vista" substituído por "1x" no select de parcelas
 - Backend (`main.py`) salva `incluir_custos` no projeto.json
+- **Módulo Clientes completo**: tabela `clientes` com endereço completo (CEP, logradouro, número, complemento, bairro, cidade, estado), busca por nome/CPF, busca automática de CEP via ViaCEP, máscara de telefone/WhatsApp, CRUD via modal
+- **Duplo clique em cliente** abre modal "Cliente encontrado" com lista de projetos vinculados
+- **Regras de unicidade**: nome duplicado mostra aviso "É homônimo?" com opção de ver cliente existente; CPF duplicado detectado no blur; modal "Cliente encontrado" mostra projetos e permite criar novo ou abrir existente
+- **Projeto vinculado a cliente obrigatório**: `projeto.json` salva `cliente_id`; formulário exige seleção ou cadastro de cliente; botão "+ Cadastrar novo cliente" abre modal com nome pré-preenchido e auto-seleciona ao salvar
+- **Módulo Parceiros completo**: tabela `parceiros` (nome, tipo, CPF/CNPJ, email, tel, wpp, comissão padrão, obs), busca por nome/CPF, CRUD via modal, verificação de homônimos, página própria no menu
+- **Parceiro no projeto**: campo opcional no formulário de novo projeto (busca + chip + "+ Cadastrar novo parceiro"); `projeto.json` salva `parceiro_id`; ao abrir projeto, parceiro é carregado; ao abrir modal de parâmetros, comissão padrão do parceiro preenche automaticamente "Comissão arquiteto" se ainda não configurada
+- **Lista de projetos ordenada**: projetos carregam automaticamente ao entrar na página (mais recente primeiro); botão ↑↓ inverte a ordem; campo de busca filtra/pesquisa; data de alteração exibida em cada card
+- **"+ Novo ambiente" bloqueado**: botão só fica habilitado quando o usuário está na página de Negociação com um projeto aberto; ao navegar para Clientes/Parceiros/Projetos, o botão volta a ficar locked
 - Documentos: DEV_RULES.md, DEV_LOG.md, REQUIREMENTS.md criados
 
 ### [PENDENTE]
 - **ALTA** — Bug: toggle "Incluir custos adicionais?" não persiste corretamente entre aberturas do modal. Fluxo do bug: (1) marcar toggle → salvar → ok. (2) entrar/sair sem salvar → ok. (3) entrar novamente → toggle aparece desmarcado mesmo sem ação do usuário. Causa: `carregarMargensSalvas` recarrega do servidor após fechar o modal sem salvar, e o servidor retorna o JSON desatualizado. O `projetoAtivo.margens.incluir_custos` fica desatualizado. Arquivos relevantes: `static/index.html` funções `fecharModalParams`, `carregarMargensSalvas`, `abrirModalParams`; `main.py` rota `/projetos/<nome>/margens`.
-- **ALTA** — Implementar cadastro de Clientes (próxima tarefa — ver [PRÓXIMA TAREFA])
-- **MÉDIA** — Implementar cadastro de Parceiros (após Clientes)
+- ~~**MÉDIA** — Implementar cadastro de Parceiros~~ **CONCLUÍDO**
 - **MÉDIA** — Servidor DEV ainda sem domínio — acessível só por IP
 - **BAIXA** — Criar script `deploy.sh` no servidor para automatizar git pull + sed + restart
+- **BAIXA** — Projetos antigos (sem `cliente_id`) mostram cliente vazio no chip quando abertos — sem impacto funcional pois o nome ainda está em `projeto.cliente.nome`
 
-### [PRÓXIMA TAREFA] Cadastro de Clientes
+### [PRÓXIMA TAREFA] Bug toggle incluir_custos + melhorias
 **Modelo de dados (adicionar em database.py):**
-```python
-class Cliente(Base):
-    __tablename__ = "clientes"
-    id           = Column(Integer, primary_key=True)
-    nome         = Column(String(150), nullable=False)
-    cpf          = Column(String(14), unique=True, nullable=False)
-    email        = Column(String(120))
-    telefone     = Column(String(20))
-    whatsapp     = Column(String(20))
-    cidade       = Column(String(80))
-    estado       = Column(String(2))
-    observacoes  = Column(Text)
-    omie_codigo  = Column(String(40))  # código do cliente no Omie
-    criado_em    = Column(DateTime, default=datetime.utcnow)
-    atualizado_em= Column(DateTime, onupdate=datetime.utcnow)
-```
-
-**Funcionalidades a implementar:**
-- Página própria no menu ("Clientes") — nova entrada na nav da sidebar
-- Lista de clientes com busca por nome ou CPF
-- Formulário de cadastro/edição com todos os campos
-- Verificação de CPF contra Omie ao cadastrar (se já existe, importa dados)
-- Ao criar novo projeto, buscar cliente por nome ou CPF — se não existir, criar na hora
-- Projeto (`projeto.json`) ganha campo `cliente_id`
-
-**Após Clientes — Parceiros:**
 ```python
 class Parceiro(Base):
     __tablename__ = "parceiros"
@@ -77,9 +59,14 @@ class Parceiro(Base):
     comissao_padrao_pct = Column(Float, default=0.0)
     criado_em           = Column(DateTime, default=datetime.utcnow)
 ```
-- Um parceiro por projeto
-- Busca por nome ou CPF
-- Comissão padrão preenche automaticamente o modal de parâmetros
+
+**Funcionalidades a implementar:**
+- Página própria no menu ("Parceiros") — nova entrada na nav da sidebar
+- Lista de parceiros com busca por nome ou CPF/CNPJ
+- Formulário de cadastro/edição com todos os campos
+- Ao criar/abrir projeto, vincular parceiro por nome ou CPF — se não existir, criar na hora
+- `projeto.json` ganha campo `parceiro_id`
+- Comissão padrão do parceiro preenche automaticamente o campo de comissão no modal de parâmetros
 
 ### [DECIDIDO]
 - Banco: SQLite + SQLAlchemy (migração futura para MySQL)
@@ -126,6 +113,30 @@ class Parceiro(Base):
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-09
+**Objetivo:** Corrigir e completar módulo de Clientes; vincular projeto a cliente obrigatório
+
+**Realizado:**
+- Diagnóstico: 34 processos Python acumulados na porta 8765 (SO_REUSEADDR) causavam 404 nas rotas de clientes — resolvido com kill de todos e reinício de instância única
+- Migração do banco: tabela `clientes` não tinha colunas `cep`, `logradouro`, `numero`, `complemento`, `bairro` — `_migrar_colunas()` executada com sucesso
+- Correção frontend: `numero` e `complemento` faltavam no payload de save (`cliSalvar`), na limpeza e preenchimento do modal de edição (`cliAbrirModal`)
+- Máscara de telefone aplicada ao abrir modal de edição (dados já salvos no banco)
+- `except Exception` adicionado à rota GET `/api/clientes/<id>` (era só `try/finally`)
+- `db.query(Cliente).get()` substituído por `db.get(Cliente, ...)` (API SQLAlchemy 2.0)
+- Formulário de novo projeto reformulado: chip de cliente selecionado, botão "+ Cadastrar novo cliente" que abre modal com nome pré-preenchido e auto-seleciona após salvar
+- `criarProjeto()` agora exige `cliente_id` — não é mais possível criar projeto sem cliente
+- Backend `/projetos/novo`: busca dados do cliente no banco pelo `cliente_id`, rejeita sem ele
+- `_criar_projeto()` recebe e salva `cliente_id` no `projeto.json`
+- `_listar_projetos()` expõe `cliente_id` nos resultados de busca
+- DEV_LOG atualizado: próxima tarefa alterada de Clientes para Parceiros
+
+**Arquivos modificados:**
+- `main.py` — `/projetos/novo` exige `cliente_id`, busca cliente no DB
+- `mod_omie.py` — `_criar_projeto` e `_listar_projetos` com `cliente_id`
+- `static/index.html` — form novo projeto reformulado; funções `npBuscarCliente`, `npSelecionarCliente`, `npDeselecionarCliente`, `npAbrirCadastroCliente`, `criarProjeto`, `mostrarFormNovoProjeto`; correção `cliSalvar`, `cliAbrirModal` com `numero`/`complemento`
+- `database.py` — já tinha o modelo completo (sessão anterior); `omie.db` migrado
+- `DEV_LOG.md` — atualizado
 
 ### Sessão 2026-06-07 (continuação — 2026-06-08)
 **Objetivo:** Implementar sistema de autenticação, perfis e controle de descontos
