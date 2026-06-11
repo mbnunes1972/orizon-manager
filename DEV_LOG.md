@@ -77,22 +77,24 @@ Nenhum bug crítico conhecido. Próximos passos do EP-07 a definir (Passo 12+).
 
 ## HISTÓRICO
 
-### Sessão 2026-06-10 (sessão 4 — EP-07 interface)
-**Objetivo:** Implementar interface do EP-07 (Passos 10 e 11)
+### Sessão 2026-06-10 (sessão 4 — EP-07 completo)
+**Commit:** `79cec86` — feat: EP-07 versionamento de orcamentos completo (passos 1-12)
 
 **Realizado:**
-- Passos 1-9 validados via curl (backend completo)
-- Passo 10: barra de orçamentos, troca de abas, painel de ambientes implementados
-- Refatoração de renderTabelaNeg para aceitar ambientes direto do banco
-- Bug FileList corrigido
-- Painel "Ambientes ▾" implementado com checkboxes
-- Remoção de ambiente com modal de confirmação funcionando
-- Banco limpo de dados de teste (reset_ep07.py criado)
-- Identificados BUG-EP07-01 e BUG-EP07-02 no upload de XML
+- EP-07 Versionamento de Orçamentos completo — todos os 12 passos implementados sem bugs
+- Passos 1-8: backend (tabelas, rotas, pool, orçamentos, recálculo)
+- Passos 9-12: interface (barra de orçamentos, painel Ambientes, novo orçamento, renomear)
+- Modal de parâmetros corrigido para calcular sobre ambientes do orçamento ativo
+- Upload de XML vincula automaticamente ao orçamento ativo quando ambiente já existe no pool
+- Servidor DEV atualizado: `167.88.33.121:8765` rodando com screen
+
+**Documento criado:**
+- `docs/modulos/financeiro/FUTURO_CALCULO_FINANCEIRO.md`
 
 **Pendente:**
-- BUG-EP07-01 e BUG-EP07-02 (upload não vincula quando ambiente já no pool)
-- Passo 11: renomear orçamento inline
+- Bug toggle "incluir custos adicionais" (da sessão 2) — ainda em aberto
+- Total Flex (US-14) — planejado para v0.2.0
+- Módulo Clientes e Parceiros vinculados a orçamentos — planejado
 
 ### Sessão 2026-06-09 (sessão 3 — documentação)
 - BACKLOG.md com 26 histórias (EP-01 a EP-07)
