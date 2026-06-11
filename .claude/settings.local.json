@@ -33,7 +33,23 @@
       "Bash(node -e \"const { chromium } = require\\('playwright'\\); console.log\\('ok'\\)\")",
       "PowerShell(Get-Command *)",
       "Bash(curl -s -X POST http://127.0.0.1:8765/api/clientes -H 'Content-Type: application/json' -d '{\"nome\":\"Ana Lima\",\"cpf\":\"111.222.333-44\",\"telefone\":\"\\(12\\) 98765-4321\",\"whatsapp\":\"\\(12\\) 98765-4321\",\"cep\":\"12242-800\",\"logradouro\":\"Av Barão do Rio Branco\",\"numero\":\"200\",\"complemento\":\"Sala 5\",\"bairro\":\"Jardim Esplanada\",\"cidade\":\"São José dos Campos\",\"estado\":\"SP\",\"observacoes\":\"cliente verify test\"}')",
-      "Bash(grep -n \"projetos\\\\$\" \"E:/2026/estudo_de_ia/omie_v3/main.py\")"
+      "Bash(grep -n \"projetos\\\\$\" \"E:/2026/estudo_de_ia/omie_v3/main.py\")",
+      "Bash(findstr :8765)",
+      "Bash(tasklist *)",
+      "Bash(curl -s http://127.0.0.1:8765/config)",
+      "Bash(curl -s -c /tmp/cookie.txt -X POST http://127.0.0.1:8765/api/auth/login -H 'Content-Type: application/json' -d '{\"login\":\"pdm2026\",\"senha\":\"teste123\"}')",
+      "Bash(curl -s -b /tmp/cookie.txt -X POST http://127.0.0.1:8765/projetos/novo -H 'Content-Type: application/json' -d '{\"nome_projeto\":\"Teste_ORC_EP07\",\"cliente_id\":1}')",
+      "Bash(curl -s -b /tmp/cookie.txt http://127.0.0.1:8765/projetos/Teste_ORC_EP07/orcamentos)",
+      "Bash(curl -v -b /tmp/cookie.txt -X POST http://127.0.0.1:8765/projetos/Teste_ORC_EP07/orcamentos -H 'Content-Type: application/json' -d '{\"nome\":\"Teste Novo\"}')",
+      "Bash(curl -s -b /tmp/cookie.txt -X POST http://127.0.0.1:8765/projetos/Teste_ORC_EP07/orcamentos -H 'Content-Type: application/json' -d '{\"nome\":\"Validacao\"}')",
+      "Bash(curl -v -b /tmp/cookie.txt -X POST http://127.0.0.1:8765/projetos/Teste_ORC_EP07/orcamentos -H 'Content-Type: application/json' -d '{\"nome\":\"Orcamento Entrada\"}')",
+      "Bash(curl -s -b /tmp/cookie.txt http://127.0.0.1:8765/projetos/Projeto_2/orcamentos)",
+      "Read(//mnt/e/2026/ESTUDO_DE_IA/**)",
+      "Bash(curl -s http://127.0.0.1:8765/ -o /dev/null -w \"%{http_code}\")",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://127.0.0.1:8765/\" -TimeoutSec 3 -UseBasicParsing; $r.StatusCode } catch { \"not running: $_\" })",
+      "PowerShell(Start-Process python -ArgumentList \"main.py\" -WorkingDirectory \"E:\\\\2026\\\\ESTUDO_DE_IA\\\\Omie_V3\" -WindowStyle Hidden)",
+      "Bash(sed -n '4414,4422p' \"E:/2026/ESTUDO_DE_IA/Omie_V3/static/index.html\")",
+      "Bash(sed -n '4355,4378p' \"E:/2026/ESTUDO_DE_IA/Omie_V3/static/index.html\")"
     ]
   }
 }

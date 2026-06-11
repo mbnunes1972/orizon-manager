@@ -344,14 +344,6 @@ body{overflow:hidden}
       <option value="1">1x</option>
     </select>
 
-    <label class="sb-label">Carga Tributaria (%)</label>
-    <div style="display:flex;align-items:center;gap:4px;margin-bottom:8px">
-      <input type="number" id="neg-carga-trib" value="8.00" min="0" max="100" step="0.5"
-             class="sb-input-sm" style="width:60px;text-align:right"
-             oninput="agendarCalculo()">
-      <span style="color:var(--muted);font-size:12px">%</span>
-    </div>
-
     <!-- Params exclusivos do Total Flex (visivel so quando TF ativo) -->
     <div id="sb-tf-extras" style="display:none;border-top:1px solid var(--border);margin-top:6px;padding-top:8px">
       <label class="sb-label" style="display:flex;align-items:center;justify-content:space-between">
@@ -583,9 +575,22 @@ body{overflow:hidden}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div>
         <div class="page-title">Negociacao</div>
-        <div class="page-sub">Valores finais apresentados ao cliente</div>
+        <div class="page-sub" id="neg-orc-nome-hdr">Valores finais apresentados ao cliente</div>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
+    </div>
+
+    <!-- Barra de orçamentos (EP-07) — oculta por padrão, exibida só se projeto tem orcamentos no banco -->
+    <div id="neg-orc-bar" style="display:none;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:6px;
+                                  padding:8px 12px;background:var(--surface);border:1px solid var(--border);
+                                  border-radius:8px">
+      <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;
+                   margin-right:4px;white-space:nowrap">Orçamento:</span>
+      <span id="neg-orc-tabs" style="display:flex;gap:4px;flex-wrap:wrap;flex:1"></span>
+      <button class="btn btn-ghost btn-sm" onclick="abrirPainelPool()"
+              style="font-size:11px;padding:4px 10px">Ambientes &#9660;</button>
+      <button class="btn btn-ghost btn-sm" onclick="abrirModalNovoOrc()"
+              style="font-size:11px;padding:4px 10px;margin-left:4px">+ Novo</button>
     </div>
 
     <!-- Linha Bruto → Desconto → Líquido -->
@@ -915,7 +920,6 @@ body{overflow:hidden}
     <div class="action-row">
       <button class="btn btn-ok" onclick="showToast('Orcamento salvo!')">&#x1F4BE; Salvar orcamento</button>
       <button class="btn btn-amber" onclick="aprovarOrcamento()">&#x2713; Aprovar Orcamento &#x2192;</button>
-      <button class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
     </div>
 
   </div>
@@ -1245,6 +1249,80 @@ body{overflow:hidden}
 
 </main>
 
+<!-- Modal: Novo Orçamento (EP-07) -->
+<div id="modal-novo-orc" class="modal-overlay" style="display:none"
+     onclick="if(event.target===this)fecharModalNovoOrc()">
+  <div class="modal-box" style="max-width:360px">
+    <div class="modal-title">Novo orçamento</div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px">Nome</label>
+      <input id="novo-orc-nome-input" class="inp" placeholder="Ex: Orçamento Entrada"
+             onkeydown="if(event.key==='Enter')confirmarNovoOrc()"
+             style="width:100%;box-sizing:border-box">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="fecharModalNovoOrc()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmarNovoOrc()">Criar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Painel de ambientes do pool (EP-07) -->
+<div id="modal-pool-ambientes" class="modal-overlay" style="display:none"
+     onclick="if(event.target===this)fecharPainelPool()">
+  <div class="modal-box" style="max-width:480px;max-height:80vh;display:flex;flex-direction:column;padding:0">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)">
+      <div>
+        <div class="modal-title" style="margin:0">Ambientes do projeto</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Marque para incluir no orçamento ativo</div>
+      </div>
+      <span class="modal-close" onclick="fecharPainelPool()">&#x2715;</span>
+    </div>
+    <div id="pool-lista" style="overflow-y:auto;flex:1;min-height:80px"></div>
+  </div>
+</div>
+
+<!-- Modal: Confirmar remoção de ambiente do orçamento (EP-07) -->
+<div id="modal-remover-amb-orc" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:360px">
+    <div class="modal-title">Retirar ambiente?</div>
+    <div id="modal-remover-amb-corpo" style="margin-bottom:16px;font-size:13px;line-height:1.5"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="cancelarRemoverAmbOrc()">Não</button>
+      <button class="btn btn-sm" style="background:var(--err,#c0392b);color:#fff"
+              onclick="confirmarRemoverAmbOrc()">Sim, retirar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Sobrescrever ambiente (Caso B — mesmo nome, conteúdo diferente) -->
+<div id="modal-pool-sobrescrever" class="modal-overlay" style="display:none"
+     onclick="if(event.target===this)cancelarPoolSobrescrever()">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-title">Arquivo já existe</div>
+    <div id="modal-pool-sobr-corpo" style="margin-bottom:16px;font-size:13px;line-height:1.6"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="cancelarPoolSobrescrever()">Cancelar</button>
+      <button class="btn btn-sm" style="background:var(--warn,#e67e22);color:#0a1a0a"
+              onclick="confirmarPoolSobrescrever()">Sobrescrever</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Renomear ambiente existente (Caso C — conteúdo igual, nome diferente) -->
+<div id="modal-pool-renomear" class="modal-overlay" style="display:none"
+     onclick="if(event.target===this)cancelarPoolRenomear()">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-title">Arquivo com mesmo conteúdo</div>
+    <div id="modal-pool-ren-corpo" style="margin-bottom:16px;font-size:13px;line-height:1.6"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="cancelarPoolRenomear()">Cancelar</button>
+      <button class="btn btn-ghost btn-sm" onclick="confirmarPoolCarregarAssim()">Carregar assim mesmo</button>
+      <button class="btn btn-sm btn-primary" onclick="confirmarPoolRenomear()">Alterar nome</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Novo Ambiente -->
 <div id="modal-novo-ambiente" class="modal-overlay" style="display:none">
   <div class="modal-box" style="animation:mIn .18s ease">
@@ -1313,6 +1391,12 @@ body{overflow:hidden}
       <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-brinde-ativo" onchange="mpToggleBrinde();mpToggleBrindeRecalc();agendarDiscriminacao()"><span class="sw-slider"></span></label>
       <input type="number" class="toggle-input" id="mp-brinde" min="0" step="10" value="0" disabled style="opacity:.35" oninput="agendarDiscriminacao()">
       <span class="toggle-unit" style="font-size:9px">R$</span>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label" style="flex:1">Carga Tributaria</span>
+      <input type="number" class="toggle-input" id="mp-carga-trib" min="0" max="100" step="0.5" value="8.00"
+             oninput="agendarCalculo()">
+      <span class="toggle-unit">%</span>
     </div>
 
     <!-- Painel de discriminacao interno (uso do consultor) -->
@@ -1398,6 +1482,12 @@ let _negSelLocal    = {};   // { arquivo: bool } seletor de negociacao
 let _descIndividual = {};   // { arquivo: pct } desconto individual por ambiente
 let _descAdicional  = {};   // legado — mantido por compat
 let _selLocal = {};           // { arquivo: bool } estado local dos checkboxes
+
+// EP-07: Versionamento de Orçamentos
+let _orcamentos        = [];   // lista de orçamentos do projeto ativo
+let _orcamentoAtivoId  = null; // id do orçamento selecionado
+let _orcAmbientesAtivos = null; // pool_ambientes do orçamento ativo — null = modo legado (comportamento original)
+let _removerAmbPending  = null; // { pid } aguardando confirmação
 
 // ---- Config ------------------------------------------------------------------
 async function loadConfig(){
@@ -1827,6 +1917,8 @@ async function abrirProjeto(nome_safe){
     const d = await r.json();
     if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
     projetoAtivo = d.projeto;
+    // Reset orçamento ao trocar de projeto
+    _orcamentos = []; _orcamentoAtivoId = null; _orcAmbientesAtivos = null;
     // Atualizar sidebar com nome do projeto e cliente
     const elNome = document.getElementById('sb-proj-nome');
     const elCli  = document.getElementById('sb-proj-cli');
@@ -1843,9 +1935,242 @@ async function abrirProjeto(nome_safe){
     }
     unlockNav(1); unlockNav(2);
     atualizarUIBloqueio();
+    await carregarOrcamentos();  // EP-07: carrega lista de orçamentos
     goPage(2);  // vai direto para negociação
   }catch(e){ showToast('Erro: '+e, true); }
 }
+
+// ── EP-07: Orçamentos ─────────────────────────────────────────────────────────
+
+async function carregarOrcamentos(){
+  if(!projetoAtivo) return;
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/orcamentos');
+    const d = await r.json();
+    if(!d.ok) return;
+    _orcamentos = d.orcamentos || [];
+    if(!_orcamentoAtivoId && _orcamentos.length > 0)
+      _orcamentoAtivoId = projetoAtivo.orcamento_ativo_id || _orcamentos[0].id;
+    if(_orcamentoAtivoId) await ativarOrcamento(_orcamentoAtivoId);
+    else renderOrcamentosBar();
+  }catch(e){}
+}
+
+function renderOrcamentosBar(){
+  const bar  = document.getElementById('neg-orc-bar');
+  const tabs = document.getElementById('neg-orc-tabs');
+  if(!tabs) return;
+  // Só exibe a barra se o projeto tem orçamentos EP-07 no banco
+  if(!_orcamentos.length){
+    if(bar) bar.style.display = 'none';
+    return;
+  }
+  if(bar) bar.style.display = 'flex';
+  // Detecta nomes duplicados para exibir id como disambiguação
+  const nCount = {};
+  _orcamentos.forEach(o => { nCount[o.nome] = (nCount[o.nome]||0)+1; });
+  tabs.innerHTML = _orcamentos.map(o => {
+    const lbl = nCount[o.nome] > 1 ? `${esc(o.nome)} (${o.id})` : esc(o.nome);
+    const ativo = o.id===_orcamentoAtivoId;
+    const inner = ativo
+      ? `<span onclick="iniciarRenomearOrc(event,${o.id})" title="Clique para renomear">${lbl}</span>`
+      : lbl;
+    return `<button class="btn btn-sm ${ativo?'btn-primary':'btn-ghost'}"
+              onclick="ativarOrcamento(${o.id})"
+              style="font-size:11px;padding:4px 10px;${ativo?'font-weight:700;color:#0a1a0a;box-shadow:0 2px 0 var(--accent);':''}"
+              title="R$ ${fmt(o.valor_total||0)} — ordem ${o.ordem}">${inner}</button>`;
+  }).join('');
+  const orc = _orcamentos.find(o => o.id === _orcamentoAtivoId);
+  const hdr = document.getElementById('neg-orc-nome-hdr');
+  if(hdr) hdr.textContent = orc ? orc.nome : 'Valores finais apresentados ao cliente';
+}
+
+function iniciarRenomearOrc(evt, id){
+  evt.stopPropagation();
+  const orc = _orcamentos.find(o => o.id === id);
+  if(!orc) return;
+  const span = evt.currentTarget;
+  const input = document.createElement('input');
+  input.value = orc.nome;
+  input.style.cssText = 'background:transparent;border:none;border-bottom:1px solid var(--accent);outline:none;color:inherit;font:inherit;min-width:60px;max-width:160px;padding:0';
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+  let saved = false;
+  const onBlur = async () => {
+    if(saved) return;
+    saved = true;
+    const novo = input.value.trim();
+    if(novo && novo !== orc.nome) await salvarRenomearOrc(id, novo);
+    else renderOrcamentosBar();
+  };
+  input.addEventListener('blur', onBlur);
+  input.addEventListener('keydown', e => {
+    if(e.key === 'Enter'){ e.preventDefault(); input.blur(); }
+    if(e.key === 'Escape'){ saved = true; input.removeEventListener('blur', onBlur); renderOrcamentosBar(); }
+  });
+}
+
+async function salvarRenomearOrc(id, novoNome){
+  if(!projetoAtivo) return;
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/orcamentos/'+id,
+      {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nome:novoNome})});
+    const d = await r.json();
+    if(d.ok){
+      const orc = _orcamentos.find(o => o.id === id);
+      if(orc) orc.nome = d.orcamento.nome;
+      renderOrcamentosBar();
+    } else {
+      showToast('Erro ao renomear: '+(d.erro||''), true);
+      renderOrcamentosBar();
+    }
+  }catch(e){ showToast('Erro: '+e, true); renderOrcamentosBar(); }
+}
+
+// Change 4: busca ambientes do orçamento e seta _orcAmbientesAtivos diretamente
+async function _aplicarFiltroOrcamento(id){
+  if(!id || !projetoAtivo) return;
+  try{
+    const r = await fetch('/orcamentos/'+id+'/ambientes');
+    const d = await r.json();
+    if(!d.ok) return;
+    _orcAmbientesAtivos = d.ambientes || [];  // null → legado; array → EP-07
+    renderTabelaNeg(_orcAmbientesAtivos);
+    _atualizarPaineisAbertos();
+  }catch(e){}
+}
+
+// Change 5: remove agendarCalculo() — renderTabelaNeg já é chamado por _aplicarFiltroOrcamento
+async function ativarOrcamento(id){
+  _orcamentoAtivoId = id;
+  renderOrcamentosBar();
+  await _aplicarFiltroOrcamento(id);
+}
+
+function abrirModalNovoOrc(){
+  const el = document.getElementById('novo-orc-nome-input');
+  if(el) el.value='';
+  document.getElementById('modal-novo-orc').style.display='flex';
+  setTimeout(()=>{ const i=document.getElementById('novo-orc-nome-input'); if(i)i.focus(); },50);
+}
+
+function fecharModalNovoOrc(){
+  document.getElementById('modal-novo-orc').style.display='none';
+}
+
+async function confirmarNovoOrc(){
+  const nome = (document.getElementById('novo-orc-nome-input').value||'').trim();
+  if(!nome) return;
+  fecharModalNovoOrc();
+  if(!projetoAtivo) return;
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/orcamentos',{
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nome})
+    });
+    const d = await r.json();
+    if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+    _orcamentos.push(d.orcamento);
+    await ativarOrcamento(d.orcamento.id);  // já renderiza barra e aplica filtro vazio
+    showToast('Orçamento criado: '+d.orcamento.nome);
+  }catch(e){ showToast('Erro: '+e, true); }
+}
+
+// ── Painel de ambientes do pool ───────────────────────────────────────────────
+
+async function abrirPainelPool(){
+  if(!projetoAtivo || !_orcamentoAtivoId){ showToast('Selecione um orçamento primeiro.', true); return; }
+  document.getElementById('modal-pool-ambientes').style.display='flex';
+  await renderPainelPool();
+}
+
+function fecharPainelPool(){
+  document.getElementById('modal-pool-ambientes').style.display='none';
+}
+
+async function renderPainelPool(){
+  const lista = document.getElementById('pool-lista');
+  if(!lista) return;
+  lista.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center">Carregando...</div>';
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/pool?orcamento_id='+_orcamentoAtivoId);
+    const d = await r.json();
+    if(!d.ok || !d.pool.length){
+      lista.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center">Nenhum ambiente no pool.<br>Faça upload de um XML via "Novo Ambiente".</div>';
+      return;
+    }
+    lista.innerHTML = d.pool.map(pa=>`
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid var(--border)">
+        <input type="checkbox" ${pa.incluido?'checked':''} id="pool-cb-${pa.id}"
+               style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0"
+               onchange="poolToggleAmbiente(${pa.id},'${esc(pa.nome_exibicao)}',this)">
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:13px;color:${pa.incluido?'var(--text)':'var(--muted)'}">${esc(pa.nome_exibicao)}</div>
+          <div style="font-size:11px;color:var(--muted)">R$ ${fmt(pa.budget_total||0)}</div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);white-space:nowrap">${pa.incluido?'&#x2705; incluído':'disponível'}</div>
+      </div>`).join('');
+  }catch(e){
+    lista.innerHTML='<div style="padding:20px;color:var(--err);text-align:center">Erro ao carregar ambientes.</div>';
+  }
+}
+
+async function poolToggleAmbiente(pid, nome, el){
+  if(el.checked){
+    try{
+      const r = await fetch('/orcamentos/'+_orcamentoAtivoId+'/ambientes/'+pid, {method:'POST'});
+      const d = await r.json();
+      if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); el.checked=false; return; }
+      const orc = _orcamentos.find(o=>o.id===_orcamentoAtivoId);
+      if(orc) Object.assign(orc, d.orcamento);
+      await ativarOrcamento(_orcamentoAtivoId);
+      await renderPainelPool();
+      showToast('"'+nome+'" adicionado!');
+    }catch(e){ el.checked=false; }
+  } else {
+    el.checked=true;  // mantém marcado enquanto pergunta
+    _orcConfirmarRemoverPool(pid, nome, el);
+  }
+}
+
+// Alias chamado pelo painel do pool (re-renderiza painel após remover)
+function _orcConfirmarRemoverPool(pid, nomeAmb, el){
+  _removerAmbPending = Object.assign({}, { pid, _doPainel: true });
+  _orcConfirmarRemover(pid, nomeAmb, el);
+}
+
+// Change 6: remoção de ambiente — modal de confirmação direto via pool_ambiente_id
+function _orcConfirmarRemover(pid, nomeAmb, el){
+  el.checked = true;  // mantém marcado enquanto pergunta
+  const orc = _orcamentos.find(o => o.id===_orcamentoAtivoId);
+  _removerAmbPending = { pid };
+  document.getElementById('modal-remover-amb-corpo').innerHTML =
+    `Retirar <strong>${esc(nomeAmb)}</strong> do orçamento <strong>${esc(orc?orc.nome:'este orçamento')}</strong>?`;
+  document.getElementById('modal-remover-amb-orc').style.display='flex';
+}
+
+function cancelarRemoverAmbOrc(){
+  document.getElementById('modal-remover-amb-orc').style.display='none';
+  _removerAmbPending = null;
+}
+
+async function confirmarRemoverAmbOrc(){
+  document.getElementById('modal-remover-amb-orc').style.display='none';
+  if(!_removerAmbPending || !_orcamentoAtivoId){ _removerAmbPending=null; return; }
+  const { pid } = _removerAmbPending;
+  _removerAmbPending = null;
+  try{
+    const r = await fetch('/orcamentos/'+_orcamentoAtivoId+'/ambientes/'+pid+'/remover',{method:'POST'});
+    const d = await r.json();
+    if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+    const orc = _orcamentos.find(o => o.id===_orcamentoAtivoId);
+    if(orc) Object.assign(orc, d.orcamento);
+    await ativarOrcamento(_orcamentoAtivoId);
+    if(_removerAmbPending && _removerAmbPending._doPainel) await renderPainelPool();
+  }catch(e){ showToast('Erro: '+e, true); }
+}
+
+// ── fim EP-07 ─────────────────────────────────────────────────────────────────
 
 let _npBuscaTimer = null;
 let _npCadastrandoCliente = false;
@@ -1946,8 +2271,11 @@ async function criarProjeto(){
     const elCli  = document.getElementById('sb-proj-cli');
     if(elNome) elNome.textContent = projetoAtivo.nome_projeto || '—';
     if(elCli)  elCli.textContent  = (projetoAtivo.cliente||{}).nome || '—';
+    // Reset e carga de orçamentos (igual a abrirProjeto)
+    _orcamentos = []; _orcamentoAtivoId = null; _orcAmbientesAtivos = null;
     esconderFormNovoProjeto();
     unlockNav(1); unlockNav(2);
+    await carregarOrcamentos();
     goPage(2);
   }catch(e){ st.textContent = 'Erro: '+e; st.style.color = 'var(--err)'; }
 }
@@ -2062,10 +2390,12 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');up
 async function uploadXmls(fileList){
   if(!projetoAtivo){ showToast('Nenhum projeto ativo', true); return; }
   if(!fileList||!fileList.length) return;
+  // Snapshot imediato — limpar o input mais tarde esvaziaria o FileList original
+  const files = Array.from(fileList);
   const st = document.getElementById('upload-status');
   st.textContent='Enviando...';
   const fd = new FormData();
-  for(const f of fileList) fd.append('xmls', f);
+  for(const f of files) fd.append('xmls', f);
   try{
     const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/ambientes/adicionar',{method:'POST',body:fd});
     const d = await r.json();
@@ -2076,15 +2406,141 @@ async function uploadXmls(fileList){
     });
     renderAmbientes();
     atualizarBanner();
-    st.textContent = fileList.length+' XML(s) adicionado(s)';
+    st.textContent = files.length+' XML(s) adicionado(s)';
     document.getElementById('xml-input-amb').value='';
-    showToast(fileList.length+' ambiente(s) adicionado(s)!');
+    showToast(files.length+' ambiente(s) adicionado(s)!');
+    // EP-07: registra cada XML no pool com detecção inteligente de duplicatas
+    if(_orcamentoAtivoId && projetoAtivo){
+      for(const f of files){
+        const fdPool = new FormData();
+        fdPool.append('xmls', f);
+        try{
+          const rPool = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/pool',
+                                    {method:'POST', body:fdPool});
+          const dPool = await rPool.json();
+          if(!dPool.ok){ showToast('Erro no pool: '+(dPool.erro||''), true); continue; }
+
+          if(dPool.acao === 'criado'){
+            // Novo → vincula ao orçamento
+            await _poolVincular(dPool.ambiente.id);
+
+          } else if(dPool.acao === 'ja_existe'){
+            // Caso A: mesmo nome + mesmo conteúdo → vincula silenciosamente
+            const r2 = await _poolVincular(dPool.ambiente_existente.id);
+            if(r2 && r2.ok)
+              showToast('"'+dPool.ambiente_existente.nome_exibicao+'" adicionado ao orçamento.');
+            else if(r2 && r2.erro === 'Ambiente já está neste orçamento')
+              showToast('"'+dPool.ambiente_existente.nome_exibicao+'" já está neste orçamento.', true);
+
+          } else if(dPool.acao === 'perguntar_sobrescrever'){
+            // Caso B: mesmo nome, conteúdo diferente → modal
+            _poolDuplicataPendente = {
+              acao: 'sobrescrever',
+              pid:  dPool.ambiente_existente.id,
+              nome_exibicao: dPool.ambiente_existente.nome_exibicao,
+              orcamentos_afetados: dPool.ambiente_existente.orcamentos_afetados,
+            };
+            const n = dPool.ambiente_existente.orcamentos_afetados;
+            fecharModalNovoAmbiente();
+            document.getElementById('modal-pool-sobr-corpo').innerHTML =
+              'O arquivo <strong>'+esc(dPool.ambiente_existente.nome_exibicao)+'</strong> já existe com conteúdo diferente.'
+              +(n > 0 ? ' Isso atualizará <strong>'+n+'</strong> orçamento(s).' : '');
+            document.getElementById('modal-pool-sobrescrever').style.display='flex';
+            return; // aguarda confirmação do usuário
+
+          } else if(dPool.acao === 'perguntar_renomear'){
+            // Caso C: conteúdo igual, nome diferente → modal
+            _poolDuplicataPendente = {
+              acao: 'renomear',
+              pid:  dPool.ambiente_existente.id,
+              nome_exibicao: dPool.ambiente_existente.nome_exibicao,
+              nome_novo: dPool.nome_novo,
+            };
+            fecharModalNovoAmbiente();
+            document.getElementById('modal-pool-ren-corpo').innerHTML =
+              'Já existe um arquivo com o mesmo conteúdo: <strong>'+esc(dPool.ambiente_existente.nome_exibicao)+'</strong>.'
+              +'<br>O arquivo carregado tem nome <strong>'+esc(dPool.nome_novo)+'</strong>.'
+              +'<br><span style="color:var(--muted);font-size:11px">Alterar nome substitui o nome do arquivo existente. "Carregar assim mesmo" cria uma entrada separada.</span>';
+            document.getElementById('modal-pool-renomear').style.display='flex';
+            return; // aguarda confirmação do usuário
+          }
+        }catch(e){}
+      }
+    }
     // Fechar modal e atualizar negociação
     fecharModalNovoAmbiente();
-    if(document.getElementById('page-02').classList.contains('active')){
+    if(_orcamentoAtivoId){
+      await ativarOrcamento(_orcamentoAtivoId);  // EP-07: recarrega ambientes do orçamento
+    } else if(document.getElementById('page-02').classList.contains('active')){
       carregarMargensSalvas();
     }
   }catch(e){ st.textContent='Erro: '+e; showToast('Erro: '+e, true); }
+}
+
+// ── EP-07: helpers para modais de duplicata no pool ──────────────────────────
+let _poolDuplicataPendente = null;  // estado aguardando confirmação do usuário
+
+async function _poolVincular(pid){
+  if(!_orcamentoAtivoId) return null;
+  const r = await fetch('/orcamentos/'+_orcamentoAtivoId+'/ambientes/'+pid, {method:'POST'});
+  return await r.json();
+}
+
+function cancelarPoolSobrescrever(){
+  document.getElementById('modal-pool-sobrescrever').style.display='none';
+  _poolDuplicataPendente = null;
+}
+function cancelarPoolRenomear(){
+  document.getElementById('modal-pool-renomear').style.display='none';
+  _poolDuplicataPendente = null;
+}
+
+async function confirmarPoolSobrescrever(){
+  if(!_poolDuplicataPendente || !projetoAtivo) return;
+  cancelarPoolSobrescrever();
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/pool/'+_poolDuplicataPendente.pid+'/sobrescrever',
+                          {method:'POST'});
+    const d = await r.json();
+    if(!d.ok){ showToast('Erro: '+(d.erro||''), true); return; }
+    const rLink = await _poolVincular(d.ambiente.id);
+    const n = d.orcamentos_afetados || 0;
+    showToast('"'+d.ambiente.nome_exibicao+'" atualizado'+(n?' em '+n+' orçamento(s)':'')+' e adicionado.');
+    fecharModalNovoAmbiente();
+    if(_orcamentoAtivoId) await ativarOrcamento(_orcamentoAtivoId);
+  }catch(e){ showToast('Erro: '+e, true); }
+}
+
+async function confirmarPoolRenomear(){
+  if(!_poolDuplicataPendente || !projetoAtivo) return;
+  const p = _poolDuplicataPendente;
+  cancelarPoolRenomear();
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/pool/'+p.pid+'/renomear',
+                          {method:'POST', headers:{'Content-Type':'application/json'},
+                           body: JSON.stringify({novo_nome: p.nome_novo})});
+    const d = await r.json();
+    if(!d.ok){ showToast('Erro: '+(d.erro||''), true); return; }
+    const rLink = await _poolVincular(d.ambiente.id);
+    showToast('"'+p.nome_exibicao+'" renomeado para "'+p.nome_novo+'" e adicionado.');
+    fecharModalNovoAmbiente();
+    if(_orcamentoAtivoId) await ativarOrcamento(_orcamentoAtivoId);
+  }catch(e){ showToast('Erro: '+e, true); }
+}
+
+async function confirmarPoolCarregarAssim(){
+  if(!_poolDuplicataPendente || !projetoAtivo) return;
+  cancelarPoolRenomear();
+  try{
+    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/pool/criar_forcado',
+                          {method:'POST'});
+    const d = await r.json();
+    if(!d.ok){ showToast('Erro: '+(d.erro||''), true); return; }
+    await _poolVincular(d.ambiente.id);
+    showToast('"'+d.ambiente.nome_exibicao+'" adicionado ao orçamento.');
+    fecharModalNovoAmbiente();
+    if(_orcamentoAtivoId) await ativarOrcamento(_orcamentoAtivoId);
+  }catch(e){ showToast('Erro: '+e, true); }
 }
 
 async function removerAmbiente(evt, arquivo, idx){
@@ -2215,6 +2671,9 @@ async function onPagamentoChange(){
         `<option value="${f.parcelas}">${esc(f.label||f.parcelas+'x')}</option>`).join('');
       parcel.disabled = false;
       onParcelasChange();
+    } else {
+      // Aymoré, TF e outros com taxa própria: sem custo_pct no gross-up da tabela
+      _acrescimoFin = 0;
     }
     // Mostrar/ocultar painéis de modalidade
     ayMostrarPainel(codigo === 'aymore');
@@ -2435,6 +2894,7 @@ async function atualizarAymore() {
   </tr>`;
   _atualizarImpostos('ay', d.total_cliente);
   atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
+  _ep07DistribuirFinanciado(d.total_cliente, valorAvista);
 }
 
 // ---- Painel Cartão de Crédito ------------------------------------------------
@@ -2776,7 +3236,7 @@ function atualizarUIBloqueio() {
 
 // ---- Provisao de Impostos (todas as modalidades) -----------------------------
 function _atualizarImpostos(prefixo, valorBase) {
-  const cargaPct = parseFloat(document.getElementById('neg-carga-trib')?.value) || 0;
+  const cargaPct = parseFloat(document.getElementById('mp-carga-trib')?.value) || 0;
   const impostos = Math.round(valorBase * cargaPct / 100 * 100) / 100;
   const elBase = document.getElementById(prefixo + '-r-base-trib');
   const elImp  = document.getElementById(prefixo + '-r-impostos');
@@ -3093,6 +3553,7 @@ async function atualizarTF() {
 
   tfRenderTabela(d, valorAvista, entrada);
   atualizarResumoParcelas(entrada, n_parc, ultima.valor_efetivo, totalCliente);
+  _ep07DistribuirFinanciado(totalCliente, valorAvista);
 }
 
 function tfRenderTabela(d, valorAvista, entrada) {
@@ -3222,7 +3683,9 @@ function ratearViagem(custo_total, ambSel){
 
 async function executarCalculo(){
   if(!projetoAtivo) return;
-  // Todos os ambientes selecionados na Fase 01 (independente do seletor de negociacao)
+  // EP-07: base de cálculo = ambientes do orçamento ativo (parâmetros do projeto)
+  if(_orcAmbientesAtivos !== null){ renderTabelaNeg(_orcAmbientesAtivos); _atualizarPaineisAbertos(); return; }
+  // Legacy: ambientes selecionados na Fase 01
   const allAmbs = (projetoAtivo.ambientes||[]).filter(a => a.selecionado);
   const tbody   = document.getElementById('neg-tbody');
   const vazio   = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">Sem ambientes selecionados na Fase 01.</td></tr>';
@@ -3258,17 +3721,30 @@ async function executarCalculo(){
     margem_interna: rnd(res.valor_liquido_avista),  // valor líquido da loja (uso interno)
   }));
 
-  // renderTabelaNeg chamado APÓS o resumo para sobrescrever com valores efetivos
-  // (inclui descontos individuais por ambiente)
-  renderTabelaNeg();
-
-  // Atualiza cards do resumo
+  renderTabelaNeg();  // legacy: renderiza com _negBaseValues
+  // Atualiza cards do resumo (path legado — intocado)
   const subtotal_r = Math.round(_negBaseValues
     .filter(b => _negSelLocal[b.arquivo] !== false)
     .reduce((s,b) => s + (b.estrutural||0), 0) * 100) / 100;
   const elSub = document.getElementById('neg-subtotal');
   if (elSub) elSub.textContent = 'R$ '+fmt(subtotal_r);
 
+  _atualizarPaineisAbertos();
+}
+// EP-07: distribui o total financiado proporcionalmente entre os ambientes da tabela
+function _ep07DistribuirFinanciado(totalCliente, totalAvista){
+  if(_orcamentoAtivoId === null || !totalAvista) return;
+  const factor = totalCliente / totalAvista;
+  document.querySelectorAll('#neg-tbody td[data-ep07-avista]').forEach(td => {
+    const av = parseFloat(td.dataset.ep07Avista) || 0;
+    td.textContent = 'R$ ' + fmt(Math.round(av * factor * 100) / 100);
+  });
+  const elTot = document.getElementById('neg-total');
+  if(elTot) elTot.textContent = 'R$ ' + fmt(Math.round(totalCliente * 100) / 100);
+  const elFin = document.getElementById('neg-total-final');
+  if(elFin && !elFin._editando) elFin.value = fmt(Math.round(totalCliente * 100) / 100);
+}
+function _atualizarPaineisAbertos(){
   if (document.getElementById('painel-aymore').style.display !== 'none') {
     clearTimeout(_ayTimer); _ayTimer = setTimeout(atualizarAymore, 200);
   }
@@ -3386,7 +3862,67 @@ function _salvarSelecaoNeg(){
     }).catch(()=>{});
   }, 600);
 }
-function renderTabelaNeg(){
+function renderTabelaNeg(ambientes = null){
+  // ── CHANGE 8: FLAG DE COMPATIBILIDADE ────────────────────────────────────
+  // _orcAmbientesAtivos === null (ambientes === null) → path legado INALTERADO
+  // _orcAmbientesAtivos !== null (ambientes === array) → path EP-07
+  if(ambientes !== null){
+    const tbody = document.getElementById('neg-tbody');
+    if(!tbody) return;
+    if(!ambientes.length){
+      tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:28px 14px">Nenhum ambiente neste orçamento. Adicione pelo painel Ambientes.</td></tr>';
+      ['neg-total','neg-subtotal','neg-avista','neg-desc-val'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='R$ 0,00';});
+      const elF=document.getElementById('neg-total-final'); if(elF&&!elF._editando) elF.value='0,00';
+      const cbAll=document.getElementById('neg-sel-all'); if(cbAll) cbAll.checked=false;
+      return;
+    }
+    const mg=lerMargensNegociacao();
+    const descPct=mg.desconto_pct||0, custoFin=mg.custo_financeiro_pct||0;
+    const divisorFin=custoFin<100?(1-custoFin/100):1;
+    const n_ambs=ambientes.length||1;
+    const brinde_por=(mg.brinde_ativo&&mg.brinde>0)?mg.brinde/n_ambs:0;
+    const viagem_por=(mg.fora_da_sede&&mg.custo_viagem>0)?mg.custo_viagem/n_ambs:0;
+    let totalBruto=0, totalAvista=0, totalFinal=0;
+    tbody.innerHTML=ambientes.map(pa=>{
+      let bruto=pa.budget_total||0;
+      if(mg.incluir_custos){
+        if(mg.comissao_arq_ativa&&mg.comissao_arq_pct>0) bruto=bruto/(1-mg.comissao_arq_pct/100);
+        if(mg.fidelidade_ativa&&mg.fidelidade_pct>0)     bruto=bruto/(1-mg.fidelidade_pct/100);
+        bruto+=viagem_por+brinde_por;
+      }
+      bruto=Math.round(bruto*100)/100;
+      // avista = preço à vista (desconto aplicado, sem taxa financeira)
+      // final  = preço ao cliente com financiamento (avista ÷ divisorFin)
+      const avista=Math.round(bruto*(1-descPct/100)*100)/100;
+      const final_=Math.round(avista/divisorFin*100)/100;
+      totalBruto+=bruto; totalAvista+=avista; totalFinal+=final_;
+      return `<tr>
+        <td style="width:40px;padding:10px 8px;text-align:center;border-bottom:1px solid var(--border)">
+          <input type="checkbox" checked title="Retirar deste orçamento"
+                 style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;display:block;margin:0 auto"
+                 onchange="if(!this.checked)_orcConfirmarRemover(${pa.id},'${esc(pa.nome_exibicao)}',this)">
+        </td>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600">${esc(pa.nome_exibicao)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;width:80px">
+          <span style="font-size:11px;color:var(--muted)">—</span>
+        </td>
+        <td data-ep07-avista="${avista}" style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:var(--ok)">
+          R$ ${fmt(final_)}
+        </td>
+      </tr>`;
+    }).join('');
+    totalBruto =Math.round(totalBruto*100)/100;
+    totalAvista=Math.round(totalAvista*100)/100;
+    totalFinal =Math.round(totalFinal*100)/100;
+    const descVal=Math.round((totalBruto-totalAvista)*100)/100;
+    const upd={'neg-total':'R$ '+fmt(totalFinal),'neg-subtotal':'R$ '+fmt(totalBruto),
+               'neg-desc-val':'- R$ '+fmt(descVal),'neg-avista':'R$ '+fmt(totalAvista)};
+    Object.entries(upd).forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=v;});
+    const elF=document.getElementById('neg-total-final'); if(elF&&!elF._editando) elF.value=fmt(totalFinal);
+    const cbAll=document.getElementById('neg-sel-all'); if(cbAll) cbAll.checked=!!ambientes.length;
+    return;
+  }
+  // ── PATH LEGADO — comportamento EXATAMENTE igual ao anterior ─────────────
   const tbody = document.getElementById('neg-tbody');
   if(!_negBaseValues.length) return;
 
@@ -3742,6 +4278,8 @@ async function carregarMargensSalvas(){
   if(el) el.value = (projetoAtivo.margens||{}).desconto_pct || 0;
   await carregarModalidades();  // popula dropdowns e dispara calculo
   await carregarPerfil();
+  // EP-07: _orcAmbientesAtivos já foi setado por ativarOrcamento (em carregarOrcamentos)
+  // executarCalculo usará _orcAmbientesAtivos automaticamente — sem hook necessário aqui
 }
 
 // ---- Modal de Parametros da Negociacao ---------------------------------------
@@ -3957,6 +4495,54 @@ function mpToggleBrinde(){
 
 function mpAtualizarApoio(){
   const rnd = v => Math.round(v*100)/100;
+  // EP-07: base de cálculo = ambientes do orçamento ativo
+  if(_orcamentoAtivoId !== null){
+    const orcAmbs = _orcAmbientesAtivos || [];
+    const id = s => document.getElementById(s);
+    const incluirCustos = id('mp-incluir-custos')?.checked || false;
+    const arqAtiva  = id('mp-arq-ativa').checked;
+    const arqPct    = arqAtiva  ? (parseFloat(id('mp-arq-pct').value)||0)  : 0;
+    const fidAtiva  = id('mp-fid-ativa').checked;
+    const fidPct    = fidAtiva  ? (parseFloat(id('mp-fid-pct').value)||0)  : 0;
+    const viagAtiva = id('mp-fora-sede').checked;
+    const viagVal   = viagAtiva ? (parseFloat(id('mp-viagem').value)||0)   : 0;
+    const brdAtivo  = id('mp-brinde-ativo').checked;
+    const brdVal    = brdAtivo  ? (parseFloat(id('mp-brinde').value)||0)   : 0;
+    const descPct   = parseFloat(id('mp-desconto').value)||0;
+    // Gross-up: base bruta para o cliente (igual a renderTabelaNeg EP-07)
+    let bruto = orcAmbs.reduce((s,pa)=>s+(pa.budget_total||0), 0);
+    if(incluirCustos){
+      if(arqAtiva && arqPct > 0) bruto = bruto / (1 - arqPct/100);
+      if(fidAtiva && fidPct > 0) bruto = bruto / (1 - fidPct/100);
+      bruto += viagVal + brdVal;
+    }
+    bruto = rnd(bruto);
+    if(!bruto){ document.getElementById('mp-apoio').style.display='none'; return; }
+    document.getElementById('mp-apoio').style.display='block';
+    const avista   = rnd(bruto*(1-descPct/100));
+    const descVal  = rnd(bruto-avista);
+    let saldo = avista;
+    const vViag = rnd(viagVal); saldo = rnd(saldo-vViag);
+    const vBrd  = rnd(brdVal);  saldo = rnd(saldo-vBrd);
+    const vArq  = rnd(saldo*arqPct/100); saldo = rnd(saldo-vArq);
+    const vFid  = rnd(saldo*fidPct/100);
+    const liquido = rnd(saldo-vFid);
+    const bruto0  = orcAmbs.reduce((s,pa)=>s+(pa.budget_total||0), 0);
+    const margem  = bruto0 > 0 ? rnd((bruto0-liquido)/bruto0*100) : 0;
+    id('mp-a-bruto').textContent    = 'R$ '+fmt(bruto);
+    id('mp-a-desc-pct').textContent = descPct.toLocaleString('pt-BR');
+    id('mp-a-desc').textContent     = '− R$ '+fmt(descVal);
+    id('mp-a-avista').textContent   = 'R$ '+fmt(avista);
+    id('mp-a-arq').textContent      = arqAtiva  ? '− R$ '+fmt(vArq)  : 'R$ 0,00';
+    id('mp-a-fid').textContent      = fidAtiva  ? '− R$ '+fmt(vFid)  : 'R$ 0,00';
+    id('mp-a-viagem').textContent   = viagAtiva ? '− R$ '+fmt(vViag) : 'R$ 0,00';
+    id('mp-a-brinde').textContent   = brdAtivo  ? '− R$ '+fmt(vBrd)  : 'R$ 0,00';
+    id('mp-a-liq').textContent      = 'R$ '+fmt(liquido);
+    id('mp-a-margem').textContent   = margem.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
+    _atualizarImpostos('ay',avista); _atualizarImpostos('cc',avista);
+    _atualizarImpostos('vp',avista); _atualizarImpostos('tf',avista);
+    return;
+  }
   const ambs = (projetoAtivo && projetoAtivo.ambientes) || [];
   const ambsNeg = ambs.filter(a => a.selecionado && _negSelLocal[a.arquivo] !== false);
   // Usa estrutural de _negBaseValues que já considera incluir_custos
@@ -4029,11 +4615,12 @@ function mpAtualizarApoio(){
 function abrirModalParams(){
   const m  = (projetoAtivo && projetoAtivo.margens) || {};
   // Total dos ambientes incluidos na negociacao
-  const ambs = (projetoAtivo && projetoAtivo.ambientes) || [];
-  const ambsNeg = ambs.filter(a => a.selecionado && _negSelLocal[a.arquivo] !== false);
-  const totalNeg = ambsNeg.reduce((s,a)=>s+(a.total||0),0);
+  const isEP07  = _orcamentoAtivoId !== null;
+  const ambs    = isEP07 ? (_orcAmbientesAtivos || []) : ((projetoAtivo && projetoAtivo.ambientes) || []);
+  const ambsNeg = isEP07 ? ambs : ambs.filter(a => a.selecionado && _negSelLocal[a.arquivo] !== false);
+  const totalNeg = ambsNeg.reduce((s,a)=>s+(isEP07?(a.budget_total||0):(a.total||0)),0);
   const elTot = document.getElementById('mp-total-ambientes');
-  if(elTot) elTot.textContent = 'R$ '+fmt(totalNeg)+' · '+ambsNeg.length+'/'+(ambs.filter(a=>a.selecionado).length)+' amb.';
+  if(elTot) elTot.textContent = 'R$ '+fmt(totalNeg)+' · '+ambsNeg.length+'/'+(isEP07?ambs.length:ambs.filter(a=>a.selecionado).length)+' amb.';
   const id = s => document.getElementById(s);
   const pag02Ativa = document.getElementById('page-02').classList.contains('active');
   const descontoAtual = pag02Ativa
@@ -4052,6 +4639,7 @@ function abrirModalParams(){
   id('mp-viagem').value       = m.custo_viagem   || 0;
   id('mp-brinde-ativo').checked = !!m.brinde_ativo;
   id('mp-brinde').value       = m.brinde || 0;
+  id('mp-carga-trib').value   = m.carga_trib !== undefined ? m.carga_trib : 8.00;
   mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
   // Carrega toggle incluir_custos — sincroniza _incluirCustos com o valor salvo
   _incluirCustos = !!m.incluir_custos;
@@ -4069,6 +4657,7 @@ function abrirModalParams(){
     brinde_ativo:       !!m.brinde_ativo,
     brinde:             m.brinde || 0,
     incluir_custos:     !!m.incluir_custos,
+    carga_trib:         m.carga_trib !== undefined ? m.carga_trib : 8.00,
   };
   document.getElementById('modal-params').style.display = 'flex';
   mpAtualizarApoio();
@@ -4090,6 +4679,7 @@ async function fecharModalParams(salvar){
     id('mp-viagem').value         = s.custo_viagem;
     id('mp-brinde-ativo').checked = s.brinde_ativo;
     id('mp-brinde').value         = s.brinde;
+    id('mp-carga-trib').value     = s.carga_trib !== undefined ? s.carga_trib : 8.00;
     _incluirCustos = !!s.incluir_custos;  // restaura fonte de verdade com o snapshot
     const incEl2 = document.getElementById('mp-incluir-custos');
     if(incEl2) incEl2.checked = _incluirCustos;
@@ -4114,6 +4704,7 @@ async function fecharModalParams(salvar){
       brinde_ativo:       id('mp-brinde-ativo').checked,
       brinde:             parseFloat(id('mp-brinde').value)||0,
       incluir_custos:     novoIncluirCustos,
+      carga_trib:         parseFloat(id('mp-carga-trib').value)||0,
     };
     try{
       const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/margens',{

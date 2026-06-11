@@ -116,6 +116,64 @@ class Parceiro(Base):
     criado_em           = Column(DateTime,     default=datetime.utcnow)
 
 
+# ── EP-07: Versionamento de Orçamentos ───────────────────────────────────────
+
+class PoolAmbiente(Base):
+    """Pool permanente de XMLs por projeto. Registros nunca são deletados."""
+    __tablename__ = "pool_ambientes"
+
+    id             = Column(Integer,  primary_key=True, autoincrement=True)
+    projeto_id     = Column(String,   nullable=False)          # nome da pasta do projeto
+    nome           = Column(String,   nullable=False)          # nome base sem extensão
+    versao         = Column(Integer,  default=1)
+    nome_exibicao  = Column(String,   nullable=False)          # "Cozinha", "Cozinha_v1" etc.
+    xml_path       = Column(String,   nullable=False)
+    ambientes_json = Column(Text,     nullable=False)
+    budget_total   = Column(Float,    nullable=False, default=0.0)
+    order_total    = Column(Float,    nullable=False, default=0.0)
+    created_by     = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    created_at     = Column(DateTime, default=datetime.utcnow)
+
+    criador           = relationship("Usuario", foreign_keys=[created_by])
+    orcamento_links   = relationship("OrcamentoAmbiente", back_populates="pool_ambiente",
+                                     cascade="all, delete-orphan")
+
+
+class Orcamento(Base):
+    """Versão de negociação dentro de um projeto. Nunca deletado."""
+    __tablename__ = "orcamentos"
+
+    id              = Column(Integer,  primary_key=True, autoincrement=True)
+    projeto_id      = Column(String,   nullable=False)
+    nome            = Column(String,   nullable=False, default="Orçamento 1")
+    ordem           = Column(Integer,  nullable=False, default=1)
+    margens         = Column(Text,     nullable=True)   # JSON
+    desconto_pct    = Column(Float,    default=0.0)
+    forma_pagamento = Column(String,   nullable=True)
+    valor_total     = Column(Float,    default=0.0)
+    valor_liquido   = Column(Float,    default=0.0)
+    created_by      = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+    updated_at      = Column(DateTime, nullable=True)
+
+    criador   = relationship("Usuario", foreign_keys=[created_by])
+    ambientes = relationship("OrcamentoAmbiente", back_populates="orcamento",
+                             cascade="all, delete-orphan")
+
+
+class OrcamentoAmbiente(Base):
+    """Relação N:N entre orçamento e ambiente do pool."""
+    __tablename__ = "orcamento_ambientes"
+
+    orcamento_id     = Column(Integer, ForeignKey("orcamentos.id"),     primary_key=True)
+    pool_ambiente_id = Column(Integer, ForeignKey("pool_ambientes.id"), primary_key=True)
+    ordem            = Column(Integer, default=1)
+    added_at         = Column(DateTime, default=datetime.utcnow)
+
+    orcamento     = relationship("Orcamento",     back_populates="ambientes")
+    pool_ambiente = relationship("PoolAmbiente",  back_populates="orcamento_links")
+
+
 # ── Inicialização ─────────────────────────────────────────────────────────────
 def init_db():
     Base.metadata.create_all(ENGINE)

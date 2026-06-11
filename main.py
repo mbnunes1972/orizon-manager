@@ -2,14 +2,14 @@
 main.py — Servidor HTTP, rotas e inicialização.
 Ponto de entrada da aplicação: python main.py
 """
-import os, io, json, time, re, threading, webbrowser
+import os, io, json, time, re, threading, webbrowser, hashlib
 import sys
 import email
 from email import policy as _email_policy
 from datetime import datetime, date, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
-from database import init_db, get_session, Cliente, Parceiro
+from database import init_db, get_session, Cliente, Parceiro, Orcamento, PoolAmbiente, OrcamentoAmbiente
 from urllib.parse import urlparse
 
 from storage import (
@@ -77,7 +77,7 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def send_json(self, data, code=200):
-        body = json.dumps(data, ensure_ascii=False).encode()
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", len(body))
@@ -220,6 +220,80 @@ class Handler(BaseHTTPRequestHandler):
                     tipo = "avista"; desconto_avista = 0.0
                 self.send_json({"ok": True, "faixas": faixas, "tipo": tipo,
                                 "desconto_avista": desconto_avista})
+                return
+
+            # ── GET /projetos/<nome>/pool?orcamento_id=<id> ───────────────────────────
+            m = _re.match(r"^/projetos/([^/]+)/pool$", path)
+            if m:
+                from urllib.parse import parse_qs
+                nome_safe    = m.group(1)
+                qs           = parse_qs(urlparse(self.path).query)
+                orcamento_id = qs.get("orcamento_id", [None])[0]
+                orcamento_id = int(orcamento_id) if orcamento_id else None
+                db = get_session()
+                try:
+                    ambientes = (db.query(PoolAmbiente)
+                                   .filter_by(projeto_id=nome_safe)
+                                   .order_by(PoolAmbiente.nome, PoolAmbiente.versao)
+                                   .all())
+                    incluidos = set()
+                    if orcamento_id:
+                        links = (db.query(OrcamentoAmbiente)
+                                   .filter_by(orcamento_id=orcamento_id)
+                                   .all())
+                        incluidos = {lk.pool_ambiente_id for lk in links}
+                    pool = []
+                    for pa in ambientes:
+                        d = _pool_ambiente_dict(pa)
+                        d["incluido"] = pa.id in incluidos
+                        pool.append(d)
+                    self.send_json({"ok": True, "pool": pool})
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # ── GET /orcamentos/<oid>/ambientes — listar ambientes do orçamento ─────
+            m = _re.match(r"^/orcamentos/(\d+)/ambientes$", path)
+            if m:
+                oid = int(m.group(1))
+                db  = get_session()
+                try:
+                    links = (db.query(OrcamentoAmbiente)
+                               .filter_by(orcamento_id=oid)
+                               .order_by(OrcamentoAmbiente.ordem)
+                               .all())
+                    ambientes = []
+                    for lk in links:
+                        pa = db.get(PoolAmbiente, lk.pool_ambiente_id)
+                        if pa:
+                            d = _pool_ambiente_dict(pa)
+                            d["ordem"] = lk.ordem
+                            ambientes.append(d)
+                    self.send_json({"ok": True, "orcamento_id": oid, "ambientes": ambientes})
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r"^/projetos/([^/]+)/orcamentos$", path)
+            if m:
+                nome_safe = m.group(1)
+                print("[ORC] GET orcamentos para projeto_id=%r" % nome_safe)
+                db = get_session()
+                try:
+                    orcs = (db.query(Orcamento)
+                              .filter_by(projeto_id=nome_safe)
+                              .order_by(Orcamento.ordem)
+                              .all())
+                    print("[ORC] encontrados %d orcamento(s)" % len(orcs))
+                    self.send_json({"ok": True, "orcamentos": [_orcamento_dict(o) for o in orcs]})
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
                 return
 
             m = _re.match(r"^/projetos/([^/]+)$", path)
@@ -621,6 +695,30 @@ class Handler(BaseHTTPRequestHandler):
                                       cliente_id=int(cliente_id),
                                       parceiro_id=int(parceiro_id) if parceiro_id else None)
 
+                # Cria Orçamento 1 automaticamente
+                _usuario = get_usuario_sessao(self)
+                _db_orc = get_session()
+                try:
+                    _pid = proj['nome_safe']
+                    print("[ORC] criando Orcamento 1 para projeto_id=%r" % _pid)
+                    _orc = Orcamento(
+                        projeto_id=_pid,
+                        nome="Orçamento 1",
+                        ordem=1,
+                        created_by=_usuario['id'] if _usuario else None,
+                    )
+                    _db_orc.add(_orc)
+                    _db_orc.commit()
+                    _db_orc.refresh(_orc)
+                    proj['orcamento_ativo_id'] = _orc.id
+                    print("[ORC] commit OK — id=%d projeto_id=%r" % (_orc.id, _orc.projeto_id))
+                    _salvar_projeto(proj)
+                except Exception as _e_orc:
+                    print("[ORC] ERRO ao criar orcamento: %s" % _e_orc)
+                    raise
+                finally:
+                    _db_orc.close()
+
                 # Garante credenciais carregadas (main() já carrega, mas reforça)
                 if not get_omie_key():
                     cfg = config_carregar()
@@ -783,6 +881,446 @@ class Handler(BaseHTTPRequestHandler):
 
         else:
             import re as _re
+
+            # ── POST /projetos/<nome_safe>/orcamentos — criar novo orçamento ─────────
+            m_novo_orc = _re.match(r"^/projetos/([^/]+)/orcamentos$", path)
+            if m_novo_orc:
+                nome_safe = m_novo_orc.group(1)
+                db = get_session()
+                _orc_dict = None
+                try:
+                    req      = json.loads(body.decode("utf-8", "replace")) if body else {}
+                    nome_orc = (req.get("nome") or "").strip()
+                    if not nome_orc:
+                        self.send_json({"ok": False, "erro": "nome é obrigatório"})
+                        return
+                    ultimo = (db.query(Orcamento)
+                                .filter_by(projeto_id=nome_safe)
+                                .order_by(Orcamento.ordem.desc())
+                                .first())
+                    proxima_ordem = (ultimo.ordem + 1) if ultimo else 1
+                    _usuario = get_usuario_sessao(self)
+                    orc = Orcamento(
+                        projeto_id=nome_safe,
+                        nome=      nome_orc,
+                        ordem=     proxima_ordem,
+                        created_by=_usuario['id'] if _usuario else None,
+                    )
+                    db.add(orc)
+                    db.commit()
+                    db.refresh(orc)
+                    _orc_dict = _orcamento_dict(orc)
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)})
+                    return
+                finally:
+                    db.close()
+                # print fora do try para não capturar erros de encoding do terminal
+                print("[ORC] novo orcamento: id=%d ordem=%d projeto=%r"
+                      % (_orc_dict["id"], _orc_dict["ordem"], nome_safe))
+                self.send_json({"ok": True, "orcamento": _orc_dict})
+                return
+
+            # ── POST /projetos/<nome_safe>/pool — carregar XML com detecção de duplicata ──
+            m_pool = _re.match(r"^/projetos/([^/]+)/pool$", path)
+            if m_pool:
+                nome_safe = m_pool.group(1)
+                ct = self.headers.get("Content-Type", "")
+                arquivos, _ = _parse_multipart(body, ct)
+                if not arquivos:
+                    self.send_json({"ok": False, "erro": "Nenhum XML recebido"})
+                    return
+                arq_nome, arq_conteudo = arquivos[0]
+                nome_base = re.sub(r"\.xml$", "", arq_nome, flags=re.IGNORECASE).strip()
+
+                from promob_grupos import ler_xml_str
+                try:
+                    amb = ler_xml_str(arq_nome, arq_conteudo)
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": "XML inválido: %s" % e})
+                    return
+
+                budget_total = amb.get("total", 0.0)
+                order_total  = sum(
+                    item.get("order_total", 0.0)
+                    for grupo in amb.get("grupos", [])
+                    for item in grupo.get("itens", [])
+                )
+
+                # Hash do conteúdo (ignora campos derivados do nome do arquivo)
+                def _content_hash(a):
+                    c = {"total": a.get("total"), "grupos": a.get("grupos", [])}
+                    return hashlib.sha256(
+                        json.dumps(c, sort_keys=True, ensure_ascii=False).encode("utf-8")
+                    ).hexdigest()
+                hash_novo = _content_hash(amb)
+
+                db = get_session()
+                try:
+                    # Busca por nome
+                    por_nome = db.query(PoolAmbiente).filter_by(
+                        projeto_id=nome_safe, nome=nome_base
+                    ).first()
+
+                    # Busca por conteúdo (compara hash contra todos do projeto)
+                    por_hash = None
+                    for pa_c in db.query(PoolAmbiente).filter_by(projeto_id=nome_safe).all():
+                        try:
+                            h = _content_hash(json.loads(pa_c.ambientes_json))
+                            if h == hash_novo:
+                                por_hash = pa_c
+                                break
+                        except Exception:
+                            continue
+
+                    temp_base = {
+                        "nome_safe":    nome_safe,
+                        "nome_base":    nome_base,
+                        "arq_nome":     arq_nome,
+                        "arq_conteudo": arq_conteudo,
+                        "amb":          amb,
+                        "budget_total": budget_total,
+                        "order_total":  order_total,
+                    }
+
+                    if por_nome and por_hash and por_nome.id == por_hash.id:
+                        # Caso A: nome igual + conteúdo igual → já está no projeto
+                        print("[POOL] ja_existe: id=%d nome=%r projeto=%r"
+                              % (por_nome.id, por_nome.nome_exibicao, nome_safe))
+                        self.send_json({
+                            "ok":  True,
+                            "acao": "ja_existe",
+                            "ambiente_existente": {
+                                "id":           por_nome.id,
+                                "nome_exibicao": por_nome.nome_exibicao,
+                            },
+                        })
+
+                    elif por_nome and (not por_hash or por_hash.id != por_nome.id):
+                        # Caso B: nome igual + conteúdo diferente → perguntar sobrescrever
+                        n_afetados = db.query(OrcamentoAmbiente).filter_by(
+                            pool_ambiente_id=por_nome.id
+                        ).count()
+                        session_set("pool_xml_temp", temp_base)
+                        print("[POOL] perguntar_sobrescrever: nome=%r orcamentos=%d"
+                              % (nome_base, n_afetados))
+                        self.send_json({
+                            "ok":  True,
+                            "acao": "perguntar_sobrescrever",
+                            "ambiente_existente": {
+                                "id":                  por_nome.id,
+                                "nome_exibicao":       por_nome.nome_exibicao,
+                                "orcamentos_afetados": n_afetados,
+                            },
+                        })
+
+                    elif not por_nome and por_hash:
+                        # Caso C: nome diferente + conteúdo igual → perguntar renomear
+                        session_set("pool_xml_temp", temp_base)
+                        print("[POOL] perguntar_renomear: nome_existente=%r nome_novo=%r"
+                              % (por_hash.nome_exibicao, nome_base))
+                        self.send_json({
+                            "ok":  True,
+                            "acao": "perguntar_renomear",
+                            "ambiente_existente": {
+                                "id":           por_hash.id,
+                                "nome_exibicao": por_hash.nome_exibicao,
+                            },
+                            "nome_novo": nome_base,
+                        })
+
+                    else:
+                        # Novo ambiente
+                        pasta_xmls = os.path.join(_projeto_path(nome_safe), "xmls")
+                        os.makedirs(pasta_xmls, exist_ok=True)
+                        storage_salvar_texto(os.path.join(pasta_xmls, arq_nome), arq_conteudo)
+                        _usuario = get_usuario_sessao(self)
+                        pa = PoolAmbiente(
+                            projeto_id=    nome_safe,
+                            nome=          nome_base,
+                            versao=        1,
+                            nome_exibicao= nome_base,
+                            xml_path=      os.path.join("xmls", arq_nome),
+                            ambientes_json=json.dumps(amb),
+                            budget_total=  budget_total,
+                            order_total=   order_total,
+                            created_by=    _usuario['id'] if _usuario else None,
+                        )
+                        db.add(pa)
+                        db.commit()
+                        db.refresh(pa)
+                        print("[POOL] criado: id=%d nome_exibicao=%r projeto=%r budget=%.2f"
+                              % (pa.id, pa.nome_exibicao, pa.projeto_id, pa.budget_total))
+                        self.send_json({"ok": True, "acao": "criado",
+                                        "ambiente": _pool_ambiente_dict(pa)})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)})
+                finally:
+                    db.close()
+                return
+
+            # ── POST /projetos/<nome_safe>/pool/<pid>/sobrescrever ────────────────────
+            m_sobr = _re.match(r"^/projetos/([^/]+)/pool/(\d+)/sobrescrever$", path)
+            if m_sobr:
+                nome_safe = m_sobr.group(1)
+                pid       = int(m_sobr.group(2))
+                temp      = session_get("pool_xml_temp")
+                if not temp or temp.get("nome_safe") != nome_safe:
+                    self.send_json({"ok": False, "erro": "Nenhum XML pendente para sobrescrita"})
+                    return
+                db = get_session()
+                try:
+                    pa = db.get(PoolAmbiente, pid)
+                    if not pa or pa.projeto_id != nome_safe:
+                        self.send_json({"ok": False, "erro": "Ambiente não encontrado"})
+                        return
+                    # Salva novo XML sobrescrevendo o arquivo anterior
+                    pasta_xmls = os.path.join(_projeto_path(nome_safe), "xmls")
+                    os.makedirs(pasta_xmls, exist_ok=True)
+                    storage_salvar_texto(os.path.join(pasta_xmls, temp["arq_nome"]), temp["arq_conteudo"])
+                    # Atualiza o registro no pool
+                    pa.xml_path      = os.path.join("xmls", temp["arq_nome"])
+                    pa.ambientes_json = json.dumps(temp["amb"])
+                    pa.budget_total  = temp["budget_total"]
+                    pa.order_total   = temp["order_total"]
+                    # Passo 12: recalcula todos os orçamentos que referenciam este ambiente
+                    links_afetados = db.query(OrcamentoAmbiente).filter_by(pool_ambiente_id=pid).all()
+                    recalculados = []
+                    for lk in links_afetados:
+                        orc = db.get(Orcamento, lk.orcamento_id)
+                        if orc:
+                            todos = db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all()
+                            orc.valor_total = round(
+                                sum(db.get(PoolAmbiente, t.pool_ambiente_id).budget_total
+                                    for t in todos), 2
+                            )
+                            orc.updated_at = datetime.now()
+                            recalculados.append(orc.id)
+                    db.commit()
+                    session_set("pool_xml_temp", None)
+                    print("[POOL] sobrescrito: id=%d nome=%r budget=%.2f orcamentos_recalc=%s"
+                          % (pa.id, pa.nome_exibicao, pa.budget_total, recalculados))
+                    self.send_json({
+                        "ok": True, "acao": "sobrescrito",
+                        "ambiente": _pool_ambiente_dict(pa),
+                        "orcamentos_recalculados": recalculados,
+                        "orcamentos_afetados": len(recalculados),
+                    })
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)})
+                finally:
+                    db.close()
+                return
+
+            # ── POST /projetos/<nome_safe>/pool/<pid>/nova-versao ─────────────────────
+            m_nova = _re.match(r"^/projetos/([^/]+)/pool/(\d+)/nova-versao$", path)
+            if m_nova:
+                nome_safe = m_nova.group(1)
+                pid       = int(m_nova.group(2))
+                temp      = session_get("pool_xml_temp")
+                if not temp or temp.get("nome_safe") != nome_safe:
+                    self.send_json({"ok": False, "erro": "Nenhum XML pendente para nova versão"})
+                    return
+                db = get_session()
+                try:
+                    pa_orig = db.get(PoolAmbiente, pid)
+                    if not pa_orig or pa_orig.projeto_id != nome_safe:
+                        self.send_json({"ok": False, "erro": "Ambiente não encontrado"})
+                        return
+                    nova_versao      = pa_orig.versao + 1
+                    # versao=2 → "_v1", versao=3 → "_v2" ...
+                    nome_exib_novo   = "%s_v%d" % (pa_orig.nome, nova_versao - 1)
+                    arq_nome_novo    = "%s.xml" % nome_exib_novo
+                    # Salva XML com nome da nova versão para coexistir com a anterior
+                    pasta_xmls = os.path.join(_projeto_path(nome_safe), "xmls")
+                    os.makedirs(pasta_xmls, exist_ok=True)
+                    storage_salvar_texto(os.path.join(pasta_xmls, arq_nome_novo), temp["arq_conteudo"])
+                    _usuario = get_usuario_sessao(self)
+                    pa_novo = PoolAmbiente(
+                        projeto_id=    nome_safe,
+                        nome=          pa_orig.nome,
+                        versao=        nova_versao,
+                        nome_exibicao= nome_exib_novo,
+                        xml_path=      os.path.join("xmls", arq_nome_novo),
+                        ambientes_json=json.dumps(temp["amb"]),
+                        budget_total=  temp["budget_total"],
+                        order_total=   temp["order_total"],
+                        created_by=    _usuario['id'] if _usuario else None,
+                    )
+                    db.add(pa_novo)
+                    db.commit()
+                    db.refresh(pa_novo)
+                    session_set("pool_xml_temp", None)
+                    print("[POOL] nova versao: id=%d nome_exibicao=%r versao=%d budget=%.2f"
+                          % (pa_novo.id, pa_novo.nome_exibicao, pa_novo.versao, pa_novo.budget_total))
+                    self.send_json({"ok": True, "acao": "nova_versao",
+                                    "ambiente": _pool_ambiente_dict(pa_novo)})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)})
+                finally:
+                    db.close()
+                return
+
+            # ── POST /projetos/<nome_safe>/pool/<pid>/renomear ────────────────────────
+            m_ren = _re.match(r"^/projetos/([^/]+)/pool/(\d+)/renomear$", path)
+            if m_ren:
+                nome_safe = m_ren.group(1)
+                pid       = int(m_ren.group(2))
+                try:
+                    req = json.loads(body)
+                except Exception:
+                    self.send_json({"ok": False, "erro": "JSON inválido"})
+                    return
+                novo_nome = (req.get("novo_nome") or "").strip()
+                if not novo_nome:
+                    self.send_json({"ok": False, "erro": "Nome não pode ser vazio"})
+                    return
+                db = get_session()
+                try:
+                    pa = db.get(PoolAmbiente, pid)
+                    if not pa or pa.projeto_id != nome_safe:
+                        self.send_json({"ok": False, "erro": "Ambiente não encontrado"})
+                        return
+                    pa.nome          = novo_nome
+                    pa.nome_exibicao = novo_nome
+                    db.commit()
+                    db.refresh(pa)
+                    session_set("pool_xml_temp", None)
+                    print("[POOL] renomeado: id=%d novo_nome=%r" % (pa.id, novo_nome))
+                    self.send_json({"ok": True, "acao": "renomeado",
+                                    "ambiente": _pool_ambiente_dict(pa)})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)})
+                finally:
+                    db.close()
+                return
+
+            # ── POST /projetos/<nome_safe>/pool/criar_forcado — mesmo conteúdo, nome novo ─
+            m_forc = _re.match(r"^/projetos/([^/]+)/pool/criar_forcado$", path)
+            if m_forc:
+                nome_safe = m_forc.group(1)
+                temp      = session_get("pool_xml_temp")
+                if not temp or temp.get("nome_safe") != nome_safe:
+                    self.send_json({"ok": False, "erro": "Nenhum XML pendente"})
+                    return
+                db = get_session()
+                try:
+                    pasta_xmls = os.path.join(_projeto_path(nome_safe), "xmls")
+                    os.makedirs(pasta_xmls, exist_ok=True)
+                    storage_salvar_texto(os.path.join(pasta_xmls, temp["arq_nome"]), temp["arq_conteudo"])
+                    _usuario = get_usuario_sessao(self)
+                    pa = PoolAmbiente(
+                        projeto_id=    nome_safe,
+                        nome=          temp["nome_base"],
+                        versao=        1,
+                        nome_exibicao= temp["nome_base"],
+                        xml_path=      os.path.join("xmls", temp["arq_nome"]),
+                        ambientes_json=json.dumps(temp["amb"]),
+                        budget_total=  temp["budget_total"],
+                        order_total=   temp["order_total"],
+                        created_by=    _usuario['id'] if _usuario else None,
+                    )
+                    db.add(pa)
+                    db.commit()
+                    db.refresh(pa)
+                    session_set("pool_xml_temp", None)
+                    print("[POOL] criado_forcado: id=%d nome=%r" % (pa.id, pa.nome_exibicao))
+                    self.send_json({"ok": True, "acao": "criado",
+                                    "ambiente": _pool_ambiente_dict(pa)})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)})
+                finally:
+                    db.close()
+                return
+
+            # ── POST /orcamentos/<oid>/ambientes/<pid>/remover — remover ambiente ─────
+            m_rem = _re.match(r"^/orcamentos/(\d+)/ambientes/(\d+)/remover$", path)
+            if m_rem:
+                oid = int(m_rem.group(1))
+                pid = int(m_rem.group(2))
+                db  = get_session()
+                try:
+                    orc = db.get(Orcamento, oid)
+                    if not orc:
+                        self.send_json({"ok": False, "erro": "Orçamento não encontrado"})
+                        return
+                    pa = db.get(PoolAmbiente, pid)
+                    link = db.query(OrcamentoAmbiente).filter_by(
+                        orcamento_id=oid, pool_ambiente_id=pid
+                    ).first()
+                    if not link:
+                        self.send_json({"ok": False, "erro": "Ambiente não está neste orçamento"})
+                        return
+                    db.delete(link)
+                    db.flush()
+                    # Recálculo simples — Passo 8 implementa versão completa com margens
+                    links = db.query(OrcamentoAmbiente).filter_by(orcamento_id=oid).all()
+                    orc.valor_total = round(
+                        sum(db.get(PoolAmbiente, lk.pool_ambiente_id).budget_total for lk in links), 2
+                    )
+                    orc.updated_at = datetime.now()
+                    db.commit()
+                    print("[ORC-AMB] removido: orcamento_id=%d pool_ambiente_id=%d valor_total=%.2f"
+                          % (oid, pid, orc.valor_total))
+                    self.send_json({"ok": True,
+                                    "orcamento":        _orcamento_dict(orc),
+                                    "ambiente_removido": _pool_ambiente_dict(pa) if pa else {"id": pid}})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)})
+                finally:
+                    db.close()
+                return
+
+            # ── POST /orcamentos/<oid>/ambientes/<pid> — adicionar ambiente ──────────
+            m_add = _re.match(r"^/orcamentos/(\d+)/ambientes/(\d+)$", path)
+            if m_add:
+                oid = int(m_add.group(1))
+                pid = int(m_add.group(2))
+                db  = get_session()
+                try:
+                    orc = db.get(Orcamento, oid)
+                    if not orc:
+                        self.send_json({"ok": False, "erro": "Orçamento não encontrado"})
+                        return
+                    pa = db.get(PoolAmbiente, pid)
+                    if not pa or pa.projeto_id != orc.projeto_id:
+                        self.send_json({"ok": False, "erro": "Ambiente não encontrado neste projeto"})
+                        return
+                    ja_existe = db.query(OrcamentoAmbiente).filter_by(
+                        orcamento_id=oid, pool_ambiente_id=pid
+                    ).first()
+                    if ja_existe:
+                        self.send_json({"ok": False, "erro": "Ambiente já está neste orçamento"})
+                        return
+                    ordem = db.query(OrcamentoAmbiente).filter_by(orcamento_id=oid).count() + 1
+                    db.add(OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pid, ordem=ordem))
+                    db.flush()
+                    # Recálculo simples — Passo 8 implementa versão completa com margens
+                    links = db.query(OrcamentoAmbiente).filter_by(orcamento_id=oid).all()
+                    orc.valor_total = round(
+                        sum(db.get(PoolAmbiente, lk.pool_ambiente_id).budget_total for lk in links), 2
+                    )
+                    orc.updated_at = datetime.now()
+                    db.commit()
+                    print("[ORC-AMB] adicionado: orcamento_id=%d pool_ambiente_id=%d valor_total=%.2f"
+                          % (oid, pid, orc.valor_total))
+                    self.send_json({"ok": True,
+                                    "orcamento": _orcamento_dict(orc),
+                                    "ambiente":  _pool_ambiente_dict(pa)})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)})
+                finally:
+                    db.close()
+                return
+
             # Rota: POST /projetos/<nome_safe>/margens
             m_mar = _re.match(r"^/projetos/([^/]+)/margens$", path)
             if m_mar:
@@ -809,6 +1347,7 @@ class Handler(BaseHTTPRequestHandler):
                     "fidelidade_pct":     float(req.get("fidelidade_pct",     m_atual.get("fidelidade_pct", 0))),
                     "fidelidade_ativa":   bool( req.get("fidelidade_ativa",    m_atual.get("fidelidade_ativa", False))),
                     "incluir_custos":     bool( req.get("incluir_custos",      m_atual.get("incluir_custos", False))),
+                    "carga_trib":         float(req.get("carga_trib",          m_atual.get("carga_trib", 8.0))),
                 })
                 proj["margens"] = m_atual
                 _salvar_projeto(proj)
@@ -900,6 +1439,46 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(404)
                 self.end_headers()
 
+    def do_PUT(self):
+        path   = urlparse(self.path).path
+        length = int(self.headers.get("Content-Length", 0))
+        body   = self.rfile.read(length)
+
+        # ── PUT /projetos/<nome_safe>/orcamentos/<oid> — renomear orçamento ───
+        m = re.match(r"^/projetos/([^/]+)/orcamentos/(\d+)$", path)
+        if m:
+            nome_safe = m.group(1)
+            oid       = int(m.group(2))
+            try:
+                req = json.loads(body)
+            except Exception:
+                self.send_json({"ok": False, "erro": "JSON inválido"})
+                return
+            novo_nome = (req.get("nome") or "").strip()
+            if not novo_nome:
+                self.send_json({"ok": False, "erro": "Nome não pode ser vazio"})
+                return
+            db = get_session()
+            try:
+                orc = db.get(Orcamento, oid)
+                if not orc or orc.projeto_id != nome_safe:
+                    self.send_json({"ok": False, "erro": "Orçamento não encontrado"})
+                    return
+                orc.nome       = novo_nome
+                orc.updated_at = datetime.now()
+                db.commit()
+                db.refresh(orc)
+                self.send_json({"ok": True, "orcamento": _orcamento_dict(orc)})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)})
+            finally:
+                db.close()
+            return
+
+        self.send_response(404)
+        self.end_headers()
+
 
 # ── Helper ────────────────────────────────────────────────────────────────────
 def _cliente_dict(c) -> dict:
@@ -920,6 +1499,36 @@ def _cliente_dict(c) -> dict:
         "observacoes": c.observacoes or "",
         "omie_codigo": c.omie_codigo or "",
         "criado_em":   c.criado_em.strftime("%Y-%m-%d") if c.criado_em else "",
+    }
+
+
+def _pool_ambiente_dict(pa) -> dict:
+    return {
+        "id":            pa.id,
+        "projeto_id":    pa.projeto_id,
+        "nome":          pa.nome,
+        "versao":        pa.versao,
+        "nome_exibicao": pa.nome_exibicao,
+        "xml_path":      pa.xml_path,
+        "budget_total":  pa.budget_total,
+        "order_total":   pa.order_total,
+        "created_at":    pa.created_at.strftime("%Y-%m-%d %H:%M") if pa.created_at else "",
+    }
+
+
+def _orcamento_dict(o) -> dict:
+    return {
+        "id":              o.id,
+        "projeto_id":      o.projeto_id,
+        "nome":            o.nome,
+        "ordem":           o.ordem,
+        "desconto_pct":    o.desconto_pct    or 0.0,
+        "forma_pagamento": o.forma_pagamento or "",
+        "valor_total":     o.valor_total     or 0.0,
+        "valor_liquido":   o.valor_liquido   or 0.0,
+        "created_at":      o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else "",
+        "updated_at":      o.updated_at.strftime("%Y-%m-%d %H:%M") if o.updated_at else "",
+        "ambientes":       [],  # preenchido por rotas específicas
     }
 
 

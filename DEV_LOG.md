@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-10 (sessão 4)
+> Atualizado em: 2026-06-10 (sessão 6)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -15,79 +15,38 @@
 - Módulo Parceiros completo com tipos, comissão padrão, CRUD
 - Projeto vinculado a cliente obrigatório
 - Lista de projetos ordenada com busca
-- EP-07 Passos 1-10 implementados (backend completo + interface parcial)
+- EP-07 completo: Passos 1-11 + cálculos de negociação 100% funcionando
 
 ### [EP-07] Estado atual do versionamento de orçamentos
 
-**Backend — 100% funcionando (validado via curl):**
-- Tabelas criadas: `pool_ambientes`, `orcamentos`, `orcamento_ambientes`
+**Backend — 100% funcionando:**
+- Tabelas: `pool_ambientes`, `orcamentos`, `orcamento_ambientes`
 - Criar projeto → Orçamento 1 criado automaticamente ✓
-- Upload XML → ambiente vai para o pool ✓
+- Upload XML → pool ✓ | Duplicata → vincula ao orçamento ativo ✓
 - Detecção de duplicata (Sobrescrever / Nova versão) ✓
-- Painel GET pool com status `incluido: true/false` ✓
-- Adicionar ambiente ao orçamento ✓
-- Remover ambiente com recálculo automático ✓
-- Criar novo orçamento ✓
-- Navegação entre orçamentos (barra de tabs) ✓
+- Painel pool com status `incluido: true/false` ✓
+- Adicionar/remover ambiente com recálculo ✓
+- Criar novo orçamento ✓ | Renomear: `PUT /projetos/<nome>/orcamentos/<oid>` ✓
 
-**Interface — parcialmente funcionando:**
-- Barra de orçamentos com abas aparece ✓
-- Barra oculta para projetos sem EP-07 ✓
-- Trocar de aba carrega ambientes do orçamento ✓
-- Botão "Ambientes ▾" abre painel do pool ✓
-- Painel mostra ambientes com checkbox incluído/disponível ✓
-- Remoção de ambiente com modal de confirmação ✓
+**Interface — 100% funcionando:**
+- Barra de orçamentos com abas, troca de aba, renomear inline ✓
+- Painel "Ambientes ▾" com checkbox incluído/disponível ✓
+- Upload XML: duplicata vincula com toast / remoção re-vincula ✓
 
-### [PENDENTE — ALTA PRIORIDADE]
+**Cálculo de negociação EP-07 — 100% funcionando:**
+- Parâmetros (margens, desconto, custos, impostos): compartilhados por projeto ✓
+- Base de cálculo: sempre os ambientes do orçamento ativo ✓
+- Sequência: `bruto` (gross-up) → `avista` (−desc%) → `final` (÷(1−fin%))
+- `neg-subtotal` = bruto gross-up | `neg-avista` = à vista | `neg-total` = com financiamento ✓
+- Modal de parâmetros: total e custos adicionais do orçamento ativo ✓
+- Cartão/VP: gross-up via `_acrescimoFin` na tabela ✓
+- Aymoré/TF: `_acrescimoFin = 0` + distribuição proporcional pós-cálculo ✓
+  - `_ep07DistribuirFinanciado(totalCliente, totalAvista)` atualiza células + `neg-total` + `neg-total-final`
+- Painéis de pagamento atualizam ao trocar aba ou alterar parâmetros ✓
 
-**BUG-EP07-01 — Upload de XML não vincula ao orçamento quando ambiente já existe no pool**
+### [PENDENTE]
 
-Fluxo com problema:
-1. Cozinha.xml carregada no Orçamento 1 → OK
-2. No Orçamento 2, tentar carregar Cozinha.xml novamente → sistema detecta duplicata mas NÃO vincula ao Orçamento 2
-
-Comportamento correto:
-- Se XML já está no pool → vincular automaticamente ao orçamento ativo (sem perguntar)
-- A pergunta Sobrescrever/Nova versão só aparece quando o usuário quer ATUALIZAR o arquivo
-- Upload de XML já existente no pool = "adicionar este ambiente ao orçamento atual"
-
-**BUG-EP07-02 — Ambiente removido não pode ser re-adicionado via upload**
-
-Fluxo com problema:
-1. Carregar Cozinha.xml → vincula ao orçamento ✓
-2. Remover Cozinha do orçamento ✓
-3. Tentar carregar Cozinha.xml novamente → não vincula de volta
-
-Causa provável: `uploadXmls` checa duplicata e para, sem tentar vincular ao orçamento atual.
-
-**Correção necessária em `uploadXmls` (static/index.html):**
-```javascript
-if (dPool.ok && dPool.acao === 'criado') {
-  // Novo ambiente → vincular ao orçamento ativo
-  await fetch('/orcamentos/' + _orcamentoAtivoId + '/ambientes/' + dPool.ambiente.id, {method:'POST'});
-} else if (dPool.ok && dPool.acao === 'duplicata') {
-  // Já existe no pool → vincular ao orçamento ativo diretamente (sem modal)
-  const rLink = await fetch('/orcamentos/' + _orcamentoAtivoId + '/ambientes/' + dPool.ambiente_existente.id, {method:'POST'});
-  const dLink = await rLink.json();
-  if (dLink.ok) {
-    showToast('"' + dPool.ambiente_existente.nome_exibicao + '" adicionado ao orçamento.');
-  } else if (dLink.erro === 'Ambiente já está neste orçamento') {
-    showToast('"' + dPool.ambiente_existente.nome_exibicao + '" já está neste orçamento.', true);
-  }
-}
-```
-
-**BUG-EP07-03 (menor) — Passo 11 ainda não implementado**
-Renomear orçamento inline (clique no nome → campo de texto → salvo ao perder foco)
-Rota necessária: `PUT /projetos/<nome>/orcamentos/<oid>` com body `{"nome": "novo nome"}`
-
-### [PRÓXIMA TAREFA] Corrigir BUG-EP07-01 e BUG-EP07-02, depois implementar Passo 11
-
-**Sequência:**
-1. Corrigir `uploadXmls` conforme correção acima
-2. Testar: carregar XML já no pool → deve vincular ao orçamento ativo
-3. Testar: remover ambiente → carregar XML novamente → deve vincular de volta
-4. Implementar Passo 11: renomear orçamento inline
+Nenhum bug crítico conhecido. Próximos passos do EP-07 a definir (Passo 12+).
 
 ### [DECIDIDO]
 - Pool de ambientes permanente por projeto (XMLs nunca deletados)
