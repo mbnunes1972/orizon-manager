@@ -3897,9 +3897,10 @@ function renderTabelaNeg(ambientes = null){
         bruto+=viagem_por+brinde_por;
       }
       bruto=Math.round(bruto*100)/100;
-      // avista = preço à vista (desconto aplicado, sem taxa financeira)
-      // final  = preço ao cliente com financiamento (avista ÷ divisorFin)
-      const avista=Math.round(bruto*(1-descPct/100)*100)/100;
+      const diKey='ep07_'+pa.id;
+      const disc_i=parseFloat(_descIndividual[diKey])||0;
+      // avista = bruto × (1-desc_global%) × (1-desc_individual%)
+      const avista=Math.round(bruto*(1-descPct/100)*(1-disc_i/100)*100)/100;
       const final_=Math.round(avista/divisorFin*100)/100;
       totalBruto+=bruto; totalAvista+=avista; totalFinal+=final_;
       return `<tr>
@@ -3910,7 +3911,12 @@ function renderTabelaNeg(ambientes = null){
         </td>
         <td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600">${esc(pa.nome_exibicao)}</td>
         <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;width:80px">
-          <span style="font-size:11px;color:var(--muted)">—</span>
+          <input type="number" value="${disc_i}" min="0" max="100" step="0.5"
+                 style="width:60px;text-align:right;padding:3px 6px;font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none"
+                 onfocus="this._prev=this.value;this._esc=false"
+                 oninput="_descIndividual['ep07_${pa.id}']=parseFloat(this.value)||0"
+                 onkeydown="diDescKeydown(event,this,'ep07_${pa.id}')"
+                 onblur="if(!this._esc){renderTabelaNeg(_orcAmbientesAtivos);mpAtualizarApoio();}">
         </td>
         <td data-ep07-avista="${avista}" style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:var(--ok)">
           R$ ${fmt(final_)}
