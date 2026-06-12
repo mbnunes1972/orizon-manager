@@ -5595,6 +5595,38 @@ function fecharModalExportar() {
 
 carregarUsuarioAutenticado();
 loadConfig();
+
+// ── Esc fecha o modal visível mais ao topo (sem salvar) ───────────────────────
+document.addEventListener('keydown', function(e){
+  if(e.key !== 'Escape') return;
+  // Mapa ordenado do z-index mais alto para o mais baixo.
+  // Cada entrada: [id, fn_cancelar]
+  const ESC_MAP = [
+    ['modal-autorizacao',      () => fecharModalAutorizacao(false)],
+    ['modal-perfil',           fecharModalPerfil],
+    ['modal-exportar',         fecharModalExportar],
+    ['modal-gerente-senha',    tfFecharModalSenha],
+    ['modal-tf-aviso',         tfFecharAviso],
+    ['modal-cli-encontrado',   mceFechar],
+    ['modal-parceiro',         parFecharModal],
+    ['modal-cliente',          cliFecharModal],
+    ['modal-pool-sobrescrever',cancelarPoolSobrescrever],
+    ['modal-pool-renomear',    cancelarPoolRenomear],
+    ['modal-remover-amb-orc',  cancelarRemoverAmbOrc],
+    ['modal-pool-ambientes',   fecharPainelPool],
+    ['modal-novo-orc',         fecharModalNovoOrc],
+    ['modal-novo-ambiente',    fecharModalNovoAmbiente],
+    ['modal-params',           () => fecharModalParams(false)],
+  ];
+  for(const [id, fn] of ESC_MAP){
+    const el = document.getElementById(id);
+    if(el && el.style.display !== 'none' && el.style.display !== ''){
+      e.preventDefault();
+      fn();
+      return;
+    }
+  }
+});
 </script>
 
 <!-- Modal: Aprovacao / Exportacao para Omie -->
