@@ -1,6 +1,6 @@
 # Histórias de Usuário — Omie_V3
 
-> Versão de referência: **v0.2.0** | Junho 2026  
+> Versão de referência: **v0.2.0** | Junho 2026 — atualizado 2026-06-12
 > Repositório: [github.com/mbnunes1972/omie_v3](https://github.com/mbnunes1972/omie_v3)
 
 **Convenções de status:**
@@ -153,6 +153,10 @@
 - Visual de terminal escuro (`bg #111d11`, `sidebar #0d160d`)
 - Três rampas de cor: teal (valor líquido loja), âmbar (valor contratual cliente), coral (custos/taxas)
 - Campo de desconto global aplicável a todos os ambientes
+- Desconto individual por ambiente (coluna "Desc.%" editável na tabela) — EP-07 e legado
+- Fórmula: `à vista = bruto × (1 − desc_global%) × (1 − desc_individual%)`
+- Limite de desconto total de **35%** sobre o valor bruto original dos XMLs
+  - Bloqueio no save de parâmetros; reversão automática no desconto individual
 
 ---
 
@@ -358,7 +362,7 @@
 
 ---
 
-### US-21 — Carregar XML com detecção de duplicata `[PLANEJADO]`
+### US-21 — Carregar XML com detecção de duplicata `[IMPLEMENTADO]`
 
 **Como** consultor de vendas,  
 **quero** que ao carregar um XML com nome já existente o sistema me pergunte se quero sobrescrever ou criar nova versão,  
@@ -370,6 +374,8 @@
 - Sobrescrever → atualiza pool e recalcula automaticamente todos os orçamentos que usam esse ambiente
 - Nova versão → cria `Ambiente_v1` no pool; orçamentos existentes não são alterados
 - Novo ambiente disponível no painel de Ambientes para adição manual
+- **Upload EP-07 usa exclusivamente `/pool`** — arquivo salvo em disco somente após confirmação e commit no banco
+- Se conteúdo igual com nome diferente → modal "Alterar nome" ou "Carregar assim mesmo"
 
 ---
 

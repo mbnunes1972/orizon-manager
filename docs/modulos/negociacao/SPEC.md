@@ -1,6 +1,7 @@
 # Módulo de Negociação — SPEC
 
-**Status:** `[IMPLEMENTADO]` (com bug pendente — ver [PENDENTE])
+**Status:** `[IMPLEMENTADO]` — atualizado 2026-06-12  
+> Bug toggle "Incluir custos adicionais?" ainda pendente — ver [PENDENTE]
 
 ---
 
@@ -31,9 +32,12 @@ Projeto carregado
 - Valor à vista
 
 ### Tabela de ambientes
-- Lista de ambientes com checkbox de seleção
-- Desconto individual por ambiente (opcional)
-- Valor por ambiente após desconto
+- Lista de ambientes com checkbox de seleção (legado) ou listagem fixa do orçamento (EP-07)
+- **Desconto individual por ambiente** — coluna "Desc.%" com input numérico editável
+  - Fórmula: `à vista = bruto × (1 − desc_global%) × (1 − desc_individual%)`
+  - Chave EP-07: `'ep07_' + pool_ambiente_id`; legado: nome do arquivo
+  - Revertido automaticamente se ultrapassar o limite total de 35%
+- Valor por ambiente após desconto (e financiamento distribuído proporcionalmente para Aymoré/TF)
 
 ### Sidebar — Parâmetros visíveis
 - Campo de desconto (%) com validação de limite
@@ -109,6 +113,19 @@ O "Desconto Total" no painel de apoio é calculado **sempre** sobre o valor brut
 Desconto Total % = (bruto_original − valor_liquido_final) / bruto_original × 100
 ```
 
+onde `bruto_original = Σ budget_total` dos XMLs (nunca o valor majorado pelo gross-up).
+
+---
+
+## Limite de Desconto Total
+
+O sistema impõe um **teto absoluto de 35%** no desconto total, independente do nível do usuário.
+
+- **Salvar parâmetros:** bloqueado se `desconto_total > 35%` com mensagem: *"Desconto total excede o limite máximo de descontos."*
+- **Desconto individual:** revertido automaticamente para o valor anterior se ultrapassar o limite
+- `_margemAtual` é atualizado em tempo real por `mpAtualizarApoio()` a cada mudança nos parâmetros
+- O limite de nível do usuário (10/20/50%) e o teto de 35% são validações independentes e cumulativas
+
 ---
 
 ## Salvar vs Aprovar
@@ -135,9 +152,18 @@ Desconto Total % = (bruto_original − valor_liquido_final) / bruto_original × 
 
 ---
 
+## Comportamento de Modais
+
+Todos os modais do sistema respondem à tecla **Esc** como equivalente ao botão "Cancelar" / "Voltar" (sem salvar). Um listener global `keydown` percorre os modais do z-index mais alto ao mais baixo e fecha o primeiro visível.
+
+Modais cobertos: `modal-autorizacao`, `modal-perfil`, `modal-exportar`, `modal-gerente-senha`, `modal-tf-aviso`, `modal-cli-encontrado`, `modal-parceiro`, `modal-cliente`, `modal-pool-sobrescrever`, `modal-pool-renomear`, `modal-remover-amb-orc`, `modal-pool-ambientes`, `modal-novo-orc`, `modal-novo-ambiente`, `modal-params`.
+
+---
+
 ## Arquivos relevantes
 
 - `static/index.html` — todo o frontend da negociação
 - `mod_margens.py` — função `calcular_margens()`
 - `mod_fin/` — módulos financeiros
 - `storage.py` — persistência de margens
+- `main.py` — `_enriquecer_projetos_com_pool()` corrige contadores de ambientes em listagens
