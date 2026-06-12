@@ -2390,10 +2390,77 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');up
 async function uploadXmls(fileList){
   if(!projetoAtivo){ showToast('Nenhum projeto ativo', true); return; }
   if(!fileList||!fileList.length) return;
-  // Snapshot imediato — limpar o input mais tarde esvaziaria o FileList original
   const files = Array.from(fileList);
   const st = document.getElementById('upload-status');
   st.textContent='Enviando...';
+
+  // EP-07: quando há orçamento ativo usa exclusivamente o sistema pool.
+  // Não chama /ambientes/adicionar antes — evita salvar arquivo no disco
+  // antes da confirmação do usuário (BUG-EP07-03).
+  if(_orcamentoAtivoId){
+    try{
+      let adicionados = 0;
+      for(const f of files){
+        const fdPool = new FormData();
+        fdPool.append('xmls', f, f.name);
+        const rPool = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/pool',
+                                  {method:'POST', body:fdPool});
+        const dPool = await rPool.json();
+        if(!dPool.ok){ showToast('Erro no pool: '+(dPool.erro||''), true); continue; }
+
+        if(dPool.acao === 'criado'){
+          await _poolVincular(dPool.ambiente.id);
+          adicionados++;
+
+        } else if(dPool.acao === 'ja_existe'){
+          const r2 = await _poolVincular(dPool.ambiente_existente.id);
+          if(r2 && r2.ok){
+            showToast('"'+dPool.ambiente_existente.nome_exibicao+'" adicionado ao orçamento.');
+            adicionados++;
+          } else if(r2 && r2.erro === 'Ambiente já está neste orçamento'){
+            showToast('"'+dPool.ambiente_existente.nome_exibicao+'" já está neste orçamento.', true);
+          }
+
+        } else if(dPool.acao === 'perguntar_sobrescrever'){
+          _poolDuplicataPendente = {
+            acao: 'sobrescrever',
+            pid:  dPool.ambiente_existente.id,
+            nome_exibicao: dPool.ambiente_existente.nome_exibicao,
+            orcamentos_afetados: dPool.ambiente_existente.orcamentos_afetados,
+          };
+          const n = dPool.ambiente_existente.orcamentos_afetados;
+          fecharModalNovoAmbiente();
+          document.getElementById('modal-pool-sobr-corpo').innerHTML =
+            'O arquivo <strong>'+esc(dPool.ambiente_existente.nome_exibicao)+'</strong> já existe com conteúdo diferente.'
+            +(n > 0 ? ' Isso atualizará <strong>'+n+'</strong> orçamento(s).' : '');
+          document.getElementById('modal-pool-sobrescrever').style.display='flex';
+          return;
+
+        } else if(dPool.acao === 'perguntar_renomear'){
+          _poolDuplicataPendente = {
+            acao: 'renomear',
+            pid:  dPool.ambiente_existente.id,
+            nome_exibicao: dPool.ambiente_existente.nome_exibicao,
+            nome_novo: dPool.nome_novo,
+          };
+          fecharModalNovoAmbiente();
+          document.getElementById('modal-pool-ren-corpo').innerHTML =
+            'Já existe um arquivo com o mesmo conteúdo: <strong>'+esc(dPool.ambiente_existente.nome_exibicao)+'</strong>.'
+            +'<br>O arquivo carregado tem nome <strong>'+esc(dPool.nome_novo)+'</strong>.'
+            +'<br><span style="color:var(--muted);font-size:11px">Alterar nome substitui o nome do arquivo existente. "Carregar assim mesmo" cria uma entrada separada.</span>';
+          document.getElementById('modal-pool-renomear').style.display='flex';
+          return;
+        }
+      }
+      if(adicionados > 0) st.textContent = adicionados+' XML(s) adicionado(s)';
+      document.getElementById('xml-input-amb').value='';
+      fecharModalNovoAmbiente();
+      await ativarOrcamento(_orcamentoAtivoId);
+    }catch(e){ st.textContent='Erro: '+e; showToast('Erro: '+e, true); }
+    return;
+  }
+
+  // Modo legado: sem orçamento ativo (projetos anteriores ao EP-07)
   const fd = new FormData();
   for(const f of files) fd.append('xmls', f);
   try{
@@ -2409,69 +2476,8 @@ async function uploadXmls(fileList){
     st.textContent = files.length+' XML(s) adicionado(s)';
     document.getElementById('xml-input-amb').value='';
     showToast(files.length+' ambiente(s) adicionado(s)!');
-    // EP-07: registra cada XML no pool com detecção inteligente de duplicatas
-    if(_orcamentoAtivoId && projetoAtivo){
-      for(const f of files){
-        const fdPool = new FormData();
-        fdPool.append('xmls', f);
-        try{
-          const rPool = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/pool',
-                                    {method:'POST', body:fdPool});
-          const dPool = await rPool.json();
-          if(!dPool.ok){ showToast('Erro no pool: '+(dPool.erro||''), true); continue; }
-
-          if(dPool.acao === 'criado'){
-            // Novo → vincula ao orçamento
-            await _poolVincular(dPool.ambiente.id);
-
-          } else if(dPool.acao === 'ja_existe'){
-            // Caso A: mesmo nome + mesmo conteúdo → vincula silenciosamente
-            const r2 = await _poolVincular(dPool.ambiente_existente.id);
-            if(r2 && r2.ok)
-              showToast('"'+dPool.ambiente_existente.nome_exibicao+'" adicionado ao orçamento.');
-            else if(r2 && r2.erro === 'Ambiente já está neste orçamento')
-              showToast('"'+dPool.ambiente_existente.nome_exibicao+'" já está neste orçamento.', true);
-
-          } else if(dPool.acao === 'perguntar_sobrescrever'){
-            // Caso B: mesmo nome, conteúdo diferente → modal
-            _poolDuplicataPendente = {
-              acao: 'sobrescrever',
-              pid:  dPool.ambiente_existente.id,
-              nome_exibicao: dPool.ambiente_existente.nome_exibicao,
-              orcamentos_afetados: dPool.ambiente_existente.orcamentos_afetados,
-            };
-            const n = dPool.ambiente_existente.orcamentos_afetados;
-            fecharModalNovoAmbiente();
-            document.getElementById('modal-pool-sobr-corpo').innerHTML =
-              'O arquivo <strong>'+esc(dPool.ambiente_existente.nome_exibicao)+'</strong> já existe com conteúdo diferente.'
-              +(n > 0 ? ' Isso atualizará <strong>'+n+'</strong> orçamento(s).' : '');
-            document.getElementById('modal-pool-sobrescrever').style.display='flex';
-            return; // aguarda confirmação do usuário
-
-          } else if(dPool.acao === 'perguntar_renomear'){
-            // Caso C: conteúdo igual, nome diferente → modal
-            _poolDuplicataPendente = {
-              acao: 'renomear',
-              pid:  dPool.ambiente_existente.id,
-              nome_exibicao: dPool.ambiente_existente.nome_exibicao,
-              nome_novo: dPool.nome_novo,
-            };
-            fecharModalNovoAmbiente();
-            document.getElementById('modal-pool-ren-corpo').innerHTML =
-              'Já existe um arquivo com o mesmo conteúdo: <strong>'+esc(dPool.ambiente_existente.nome_exibicao)+'</strong>.'
-              +'<br>O arquivo carregado tem nome <strong>'+esc(dPool.nome_novo)+'</strong>.'
-              +'<br><span style="color:var(--muted);font-size:11px">Alterar nome substitui o nome do arquivo existente. "Carregar assim mesmo" cria uma entrada separada.</span>';
-            document.getElementById('modal-pool-renomear').style.display='flex';
-            return; // aguarda confirmação do usuário
-          }
-        }catch(e){}
-      }
-    }
-    // Fechar modal e atualizar negociação
     fecharModalNovoAmbiente();
-    if(_orcamentoAtivoId){
-      await ativarOrcamento(_orcamentoAtivoId);  // EP-07: recarrega ambientes do orçamento
-    } else if(document.getElementById('page-02').classList.contains('active')){
+    if(document.getElementById('page-02').classList.contains('active')){
       carregarMargensSalvas();
     }
   }catch(e){ st.textContent='Erro: '+e; showToast('Erro: '+e, true); }

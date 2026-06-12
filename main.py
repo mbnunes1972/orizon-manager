@@ -1034,7 +1034,6 @@ class Handler(BaseHTTPRequestHandler):
                         # Novo ambiente
                         pasta_xmls = os.path.join(_projeto_path(nome_safe), "xmls")
                         os.makedirs(pasta_xmls, exist_ok=True)
-                        storage_salvar_texto(os.path.join(pasta_xmls, arq_nome), arq_conteudo)
                         _usuario = get_usuario_sessao(self)
                         pa = PoolAmbiente(
                             projeto_id=    nome_safe,
@@ -1050,6 +1049,7 @@ class Handler(BaseHTTPRequestHandler):
                         db.add(pa)
                         db.commit()
                         db.refresh(pa)
+                        storage_salvar_texto(os.path.join(pasta_xmls, arq_nome), arq_conteudo)
                         print("[POOL] criado: id=%d nome_exibicao=%r projeto=%r budget=%.2f"
                               % (pa.id, pa.nome_exibicao, pa.projeto_id, pa.budget_total))
                         self.send_json({"ok": True, "acao": "criado",
@@ -1076,10 +1076,6 @@ class Handler(BaseHTTPRequestHandler):
                     if not pa or pa.projeto_id != nome_safe:
                         self.send_json({"ok": False, "erro": "Ambiente não encontrado"})
                         return
-                    # Salva novo XML sobrescrevendo o arquivo anterior
-                    pasta_xmls = os.path.join(_projeto_path(nome_safe), "xmls")
-                    os.makedirs(pasta_xmls, exist_ok=True)
-                    storage_salvar_texto(os.path.join(pasta_xmls, temp["arq_nome"]), temp["arq_conteudo"])
                     # Atualiza o registro no pool
                     pa.xml_path      = os.path.join("xmls", temp["arq_nome"])
                     pa.ambientes_json = json.dumps(temp["amb"])
@@ -1099,6 +1095,10 @@ class Handler(BaseHTTPRequestHandler):
                             orc.updated_at = datetime.now()
                             recalculados.append(orc.id)
                     db.commit()
+                    # Salva o arquivo no disco somente após commit bem-sucedido
+                    pasta_xmls = os.path.join(_projeto_path(nome_safe), "xmls")
+                    os.makedirs(pasta_xmls, exist_ok=True)
+                    storage_salvar_texto(os.path.join(pasta_xmls, temp["arq_nome"]), temp["arq_conteudo"])
                     session_set("pool_xml_temp", None)
                     print("[POOL] sobrescrito: id=%d nome=%r budget=%.2f orcamentos_recalc=%s"
                           % (pa.id, pa.nome_exibicao, pa.budget_total, recalculados))
@@ -1134,10 +1134,6 @@ class Handler(BaseHTTPRequestHandler):
                     # versao=2 → "_v1", versao=3 → "_v2" ...
                     nome_exib_novo   = "%s_v%d" % (pa_orig.nome, nova_versao - 1)
                     arq_nome_novo    = "%s.xml" % nome_exib_novo
-                    # Salva XML com nome da nova versão para coexistir com a anterior
-                    pasta_xmls = os.path.join(_projeto_path(nome_safe), "xmls")
-                    os.makedirs(pasta_xmls, exist_ok=True)
-                    storage_salvar_texto(os.path.join(pasta_xmls, arq_nome_novo), temp["arq_conteudo"])
                     _usuario = get_usuario_sessao(self)
                     pa_novo = PoolAmbiente(
                         projeto_id=    nome_safe,
@@ -1153,6 +1149,9 @@ class Handler(BaseHTTPRequestHandler):
                     db.add(pa_novo)
                     db.commit()
                     db.refresh(pa_novo)
+                    pasta_xmls = os.path.join(_projeto_path(nome_safe), "xmls")
+                    os.makedirs(pasta_xmls, exist_ok=True)
+                    storage_salvar_texto(os.path.join(pasta_xmls, arq_nome_novo), temp["arq_conteudo"])
                     session_set("pool_xml_temp", None)
                     print("[POOL] nova versao: id=%d nome_exibicao=%r versao=%d budget=%.2f"
                           % (pa_novo.id, pa_novo.nome_exibicao, pa_novo.versao, pa_novo.budget_total))
@@ -1210,9 +1209,6 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 db = get_session()
                 try:
-                    pasta_xmls = os.path.join(_projeto_path(nome_safe), "xmls")
-                    os.makedirs(pasta_xmls, exist_ok=True)
-                    storage_salvar_texto(os.path.join(pasta_xmls, temp["arq_nome"]), temp["arq_conteudo"])
                     _usuario = get_usuario_sessao(self)
                     pa = PoolAmbiente(
                         projeto_id=    nome_safe,
@@ -1228,6 +1224,9 @@ class Handler(BaseHTTPRequestHandler):
                     db.add(pa)
                     db.commit()
                     db.refresh(pa)
+                    pasta_xmls = os.path.join(_projeto_path(nome_safe), "xmls")
+                    os.makedirs(pasta_xmls, exist_ok=True)
+                    storage_salvar_texto(os.path.join(pasta_xmls, temp["arq_nome"]), temp["arq_conteudo"])
                     session_set("pool_xml_temp", None)
                     print("[POOL] criado_forcado: id=%d nome=%r" % (pa.id, pa.nome_exibicao))
                     self.send_json({"ok": True, "acao": "criado",
