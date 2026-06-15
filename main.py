@@ -842,8 +842,21 @@ class Handler(BaseHTTPRequestHandler):
                 db.add(c)
                 db.commit()
                 db.refresh(c)
-                _tentar_sync_omie(c, db)
+                cliente_id = c.id
                 self.send_json({"ok": True, "cliente": _cliente_dict(c)})
+
+                def _sync_bg():
+                    db2 = get_session()
+                    try:
+                        c2 = db2.get(Cliente, cliente_id)
+                        if c2:
+                            _tentar_sync_omie(c2, db2)
+                    except Exception:
+                        pass
+                    finally:
+                        db2.close()
+
+                threading.Thread(target=_sync_bg, daemon=True).start()
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)})
