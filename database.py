@@ -42,12 +42,12 @@ class Usuario(Base):
 
     @property
     def limite_desconto(self) -> float:
-        limites = {"consultor": 10.0, "gerente": 20.0, "diretor": 100.0}
+        limites = {"consultor": 10.0, "gerente": 20.0, "diretor": 50.0, "admin": 50.0}
         return limites.get(self.nivel, 0.0)
 
     @property
     def pode_ver_parametros(self) -> bool:
-        return self.nivel in ("gerente", "diretor")
+        return self.nivel in ("gerente", "diretor", "admin")
 
 
 class Sessao(Base):
@@ -97,6 +97,9 @@ class Cliente(Base):
     estado        = Column(String(2),   nullable=True)
     observacoes   = Column(Text,        nullable=True)
     omie_codigo   = Column(String(40),  nullable=True)
+    omie_sync_status = Column(String(20),  nullable=True)   # ok | erro | pendente
+    omie_sync_erro   = Column(Text,        nullable=True)
+    omie_sync_at     = Column(DateTime,    nullable=True)
     criado_em     = Column(DateTime,    default=datetime.utcnow)
     atualizado_em = Column(DateTime,    onupdate=datetime.utcnow)
 
@@ -193,6 +196,9 @@ def _migrar_colunas():
             ("numero",      "VARCHAR(20)"),
             ("complemento", "VARCHAR(100)"),
             ("bairro",      "VARCHAR(100)"),
+            ("omie_sync_status", "VARCHAR(20)"),
+            ("omie_sync_erro",   "TEXT"),
+            ("omie_sync_at",     "DATETIME"),
         ]
         for col, tipo in novas:
             if col not in existing:
