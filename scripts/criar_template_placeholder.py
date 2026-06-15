@@ -1,7 +1,9 @@
-"""Gera config/contrato_template.docx com todas as variáveis do sistema."""
+"""Gera config/contrato_template.docx com todas as variáveis do sistema.
+Execute a partir da raiz do projeto: python scripts/criar_template_placeholder.py
+Renderização das variáveis em tempo de execução usa docxtpl (Jinja2).
+"""
 import os
 from docx import Document
-from docx.shared import Pt
 
 os.makedirs("config", exist_ok=True)
 
