@@ -2173,8 +2173,11 @@ async function carregarOrcamentos(){
     const d = await r.json();
     if(!d.ok) return;
     _orcamentos = d.orcamentos || [];
-    if(!_orcamentoAtivoId && _orcamentos.length > 0)
-      _orcamentoAtivoId = projetoAtivo.orcamento_ativo_id || _orcamentos[0].id;
+    if(!_orcamentoAtivoId && _orcamentos.length > 0){
+      const ultimo = _orcamentos.reduce((max, o) =>
+        (o.updated_at || '') > (max.updated_at || '') ? o : max, _orcamentos[0]);
+      _orcamentoAtivoId = projetoAtivo.orcamento_ativo_id || ultimo.id;
+    }
     if(_orcamentoAtivoId) await ativarOrcamento(_orcamentoAtivoId);
     else renderOrcamentosBar();
   }catch(e){}
