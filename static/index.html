@@ -6180,11 +6180,29 @@ async function copiarEnderecoCliente() {
   } catch(e) { showToast('Erro ao buscar endereço: ' + e.message, true); }
 }
 
+function _lerCondicaoPagamentoAtual() {
+  const resumoEl  = document.getElementById('neg-resumo-parcelas');
+  const descricao = (resumoEl?.textContent || '').trim();
+  const ayAtivo   = document.getElementById('painel-aymore')?.style.display !== 'none';
+  const ccAtivo   = document.getElementById('painel-cartao')?.style.display !== 'none';
+  let entrada = 0;
+  if (ayAtivo)
+    entrada = parseFloat(document.getElementById('ay-entrada')?.value || '0') || 0;
+  else if (ccAtivo)
+    entrada = parseFloat(document.getElementById('cc-entrada')?.value || '0') || 0;
+  else {
+    const m = descricao.match(/R\$\s*([\d.]+,\d{2})\s*de\s*entrada/i);
+    if (m) entrada = parseFloat(m[1].replace(/\./g,'').replace(',','.')) || 0;
+  }
+  return { descricao, entrada };
+}
+
 function abrirModalAprovacaoOrcamento() {
   if (!_orcamentoAtivoId) {
     mostrarErroModal('Selecione um orçamento antes de aprovar.\nAbra a aba de negociação e ative o orçamento desejado.');
     return;
   }
+  const pagAtual = _lerCondicaoPagamentoAtual();
   document.getElementById('modal-aprovacao-overlay')?.remove();
   const ov = document.createElement('div');
   ov.id = 'modal-aprovacao-overlay';
@@ -6206,11 +6224,12 @@ function abrirModalAprovacaoOrcamento() {
           padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.8rem;white-space:nowrap">= Cliente</button>
       </div>
       <label style="font-size:.85rem;display:block;margin-bottom:4px">Entrada (R$)</label>
-      <input id="apr-entrada" type="number" value="0" min="0" step="100"
+      <input id="apr-entrada" type="number" value="${pagAtual.entrada}" min="0" step="100"
         style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
         color:var(--fg);padding:8px;border-radius:4px;font-size:.9rem;margin-bottom:14px">
       <label style="font-size:.85rem;display:block;margin-bottom:4px">Descri&#xe7;&#xe3;o das parcelas</label>
-      <input id="apr-parcelas" type="text" placeholder="ex: 10x de R$ 4.820,00"
+      <input id="apr-parcelas" type="text" value="${pagAtual.descricao.replace(/"/g,'&quot;')}"
+        placeholder="ex: 10x de R$ 4.820,00"
         style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
         color:var(--fg);padding:8px;border-radius:4px;font-size:.9rem;margin-bottom:14px">
       <label style="font-size:.85rem;display:block;margin-bottom:4px">Adendo (opcional)</label>
