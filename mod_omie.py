@@ -147,6 +147,7 @@ def _listar_projetos():
             'nome_projeto':   proj.get('nome_projeto', proj.get('cliente', '')),
             'cliente_nome':   cliente_nome,
             'cliente_id':     proj.get('cliente_id'),
+            'cliente_cpf':    cli.get('cpf', '') if isinstance(cli, dict) else '',
             'parceiro_id':    proj.get('parceiro_id'),
             'atualizado_em':  proj.get('atualizado_em', ''),
             'n_ambientes':    len(proj.get('ambientes', [])),
