@@ -289,6 +289,67 @@ body{overflow:hidden}
 /* Impostos TF */
 .tf-tax-box{background:rgba(239,159,39,.05);border:1px solid rgba(239,159,39,.18);border-radius:8px;padding:11px 14px;margin:10px 0}
 .tf-tax-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--warn);margin-bottom:10px}
+
+/* ── Ciclo do Projeto ── */
+.btn-ciclo {
+  background: var(--section, #1a2a1a);
+  color: var(--ok, #4caf82);
+  border: 1px solid var(--ok, #4caf82);
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: .85rem;
+  cursor: pointer;
+  margin-left: 8px;
+}
+.btn-ciclo:hover { background: var(--ok, #4caf82); color: #000; }
+
+#ciclo-panel {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+#ciclo-panel.ativo { display: flex; }
+
+.ciclo-card {
+  background: var(--card, #132013);
+  border: 1px solid var(--border, #2a3a2a);
+  border-radius: 6px;
+  padding: 12px 16px;
+}
+.ciclo-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.ciclo-card-header .etapa-num {
+  font-size: .75rem;
+  color: var(--muted, #6a7a6a);
+  min-width: 28px;
+}
+.ciclo-card-header .etapa-nome { flex: 1; font-weight: 500; }
+.ciclo-card-header .etapa-badge {
+  font-size: .75rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.badge-pendente    { background: #2a2a1a; color: var(--warn, #c8a84b); }
+.badge-em_andamento{ background: #1a2a2a; color: var(--section, #4b8bc8); }
+.badge-vigente,
+.badge-concluido,
+.badge-aprovado    { background: #1a2a1a; color: var(--ok, #4caf82); }
+.badge-bloqueado   { background: #1a1a1a; color: var(--muted, #6a7a6a); }
+
+.ciclo-card-body {
+  display: none;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, #2a3a2a);
+}
+.ciclo-card-body.aberto { display: block; }
 </style>
 </head>
 <body>
@@ -624,6 +685,9 @@ body{overflow:hidden}
           </div>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
+        <button id="btn-abrir-ciclo" class="btn-ciclo" onclick="abrirCiclo()" title="Ciclo do Projeto">
+          &#x27F3; Ciclo
+        </button>
       </div>
     </div>
 
@@ -969,6 +1033,11 @@ body{overflow:hidden}
     <div class="action-row">
       <button class="btn btn-ok" onclick="showToast('Orcamento salvo!')">&#x1F4BE; Salvar orcamento</button>
       <button class="btn btn-amber" onclick="aprovarOrcamento()">&#x2713; Aprovar Orcamento &#x2192;</button>
+    </div>
+
+    <!-- Ciclo do Projeto (EP-08) -->
+    <div id="ciclo-panel">
+      <!-- preenchido por renderCiclo() -->
     </div>
 
   </div>
@@ -5857,6 +5926,357 @@ document.addEventListener('keydown', function(e){
     }
   }
 });
+
+// ── Ciclo do Projeto ──────────────────────────────────────────────────────────
+
+const ETAPAS_CICLO = [
+  { codigo: "1",   nome: "Captação do cliente",               sub: false },
+  { codigo: "2",   nome: "Briefing",                          sub: false },
+  { codigo: "3",   nome: "Criação do projeto",                sub: false },
+  { codigo: "4",   nome: "Primeiro orçamento",                sub: false },
+  { codigo: "5",   nome: "Revisão de projeto",                sub: false },
+  { codigo: "6",   nome: "Aprovação do orçamento pelo cliente", sub: false },
+  { codigo: "7",   nome: "Contrato",                          sub: false, acao: "contrato" },
+  { codigo: "8",   nome: "Aprovação financeira I",            sub: false },
+  { codigo: "9",   nome: "Solicitação de medição",            sub: false },
+  { codigo: "10",  nome: "Planta de pontos medidos",          sub: false },
+  { codigo: "11",  nome: "Projeto executivo",                 sub: false },
+  { codigo: "11a", nome: "Planta de pontos de PE",            sub: true },
+  { codigo: "11b", nome: "Reunião de alinhamento",            sub: true },
+  { codigo: "11c", nome: "Revisão de PE",                     sub: true },
+  { codigo: "11d", nome: "Aprovação financeira II",           sub: true },
+  { codigo: "11e", nome: "Aprovação do PE pelo cliente",      sub: true },
+  { codigo: "12",  nome: "Implantação do pedido",             sub: false },
+  { codigo: "13",  nome: "Produção",                          sub: false },
+  { codigo: "14",  nome: "Entrega no depósito",               sub: false },
+  { codigo: "15",  nome: "Emissão da NFe do cliente",         sub: false },
+  { codigo: "16",  nome: "Entrega no cliente",                sub: false },
+  { codigo: "17",  nome: "Montagem",                          sub: false },
+  { codigo: "17a", nome: "Pendências de montagem",            sub: true },
+  { codigo: "18",  nome: "Assistência pós Montagem",          sub: false },
+  { codigo: "19",  nome: "Vistoria final",                    sub: false },
+  { codigo: "20",  nome: "Aprovação final",                   sub: false },
+];
+
+let _cicloAberto = false;
+let _cicloData   = {};
+
+function abrirCiclo() {
+  _cicloAberto = true;
+  document.getElementById('ciclo-panel').classList.add('ativo');
+  const negArea = document.getElementById('neg-area') || document.querySelector('.neg-container');
+  if (negArea) negArea.style.display = 'none';
+  carregarCiclo();
+}
+
+function fecharCiclo() {
+  _cicloAberto = false;
+  document.getElementById('ciclo-panel').classList.remove('ativo');
+  const negArea = document.getElementById('neg-area') || document.querySelector('.neg-container');
+  if (negArea) negArea.style.display = '';
+}
+
+async function carregarCiclo() {
+  if (!projetoAtivo) return;
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo`,
+                          { credentials: 'same-origin' });
+    const d = await r.json();
+    if (!d.ok) return;
+    _cicloData = {};
+    for (const e of (d.ciclo || [])) _cicloData[e.etapa_codigo] = e;
+    renderCiclo();
+  } catch(e) { console.error('Erro ao carregar ciclo:', e); }
+}
+
+function renderCiclo() {
+  const panel = document.getElementById('ciclo-panel');
+  if (!panel) return;
+  panel.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <h3 style="margin:0;color:var(--ok)">Ciclo do Projeto</h3>
+      <button onclick="fecharCiclo()" style="margin-left:auto;background:none;border:none;
+        color:var(--muted);cursor:pointer;font-size:1.1rem">&#x2715; Negociação</button>
+    </div>
+  `;
+  for (const etapa of ETAPAS_CICLO) {
+    const dados  = _cicloData[etapa.codigo] || {};
+    const status = dados.status || (parseInt(etapa.codigo) <= 6 ? "concluido" : "bloqueado");
+    const badge  = `<span class="etapa-badge badge-${status}">${status}</span>`;
+    const indent = etapa.sub ? 'margin-left:24px;' : '';
+    const card   = document.createElement('div');
+    card.className = 'ciclo-card';
+    card.style.cssText = indent;
+    card.innerHTML = `
+      <div class="ciclo-card-header" onclick="toggleCicloCard('${etapa.codigo}')">
+        <span class="etapa-num">${etapa.codigo}</span>
+        <span class="etapa-nome">${etapa.nome}</span>
+        ${badge}
+      </div>
+      <div class="ciclo-card-body" id="ciclo-body-${etapa.codigo}">
+        ${etapa.acao === 'contrato' ? _renderCardContrato() : _renderCardGenerico(etapa, dados)}
+      </div>
+    `;
+    panel.appendChild(card);
+  }
+}
+
+function toggleCicloCard(codigo) {
+  const body = document.getElementById(`ciclo-body-${codigo}`);
+  if (body) body.classList.toggle('aberto');
+  if (codigo === '7' && body && body.classList.contains('aberto')) {
+    carregarDadosContrato();
+  }
+}
+
+function _renderCardGenerico(etapa, dados) {
+  return `<p style="color:var(--muted);font-size:.85rem;margin:0">
+    ${dados.observacoes || 'Nenhuma informação registrada.'}
+  </p>`;
+}
+
+function _renderCardContrato() {
+  return `<div id="contrato-ui">
+    <p style="color:var(--muted);font-size:.85rem">Carregando...</p>
+  </div>`;
+}
+
+async function carregarDadosContrato() {
+  if (!projetoAtivo) return;
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato`,
+                          { credentials: 'same-origin' });
+    const d = await r.json();
+    renderContratoUI(d.contrato);
+  } catch(e) { showToast('Erro ao carregar contrato: ' + e.message, true); }
+}
+
+function renderContratoUI(contrato) {
+  const ui = document.getElementById('contrato-ui');
+  if (!ui) return;
+  if (!contrato) {
+    ui.innerHTML = `
+      <p style="color:var(--muted);font-size:.85rem;margin-bottom:8px">
+        Nenhum contrato gerado. Preencha os dados e gere o contrato.
+      </p>
+      ${_formGerarContrato()}
+    `;
+    return;
+  }
+  const temPdf = contrato.tem_pdf;
+  const status = contrato.status;
+  ui.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+      <strong>Status:</strong>
+      <span class="etapa-badge badge-${status}">${status}</span>
+    </div>
+    ${temPdf ? `
+      <div style="margin-bottom:12px">
+        <iframe src="/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato/pdf"
+                style="width:100%;height:480px;border:1px solid var(--border);border-radius:4px"></iframe>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <a href="/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato/pdf"
+             target="_blank" class="btn-ciclo" style="text-decoration:none">
+            &#x2B07; Baixar PDF
+          </a>
+          ${status !== 'vigente' ? `<button onclick="abrirModalAdendo()" class="btn-ciclo">Editar Adendo</button>` : ''}
+        </div>
+      </div>
+    ` : ''}
+    ${status !== 'vigente' ? `
+      <div style="margin-top:12px">
+        <strong style="font-size:.85rem">Assinaturas:</strong>
+        ${_renderAssinaturas(contrato.assinaturas)}
+      </div>
+    ` : '<p style="color:var(--ok)">&#x2713; Contrato vigente — ambas as partes assinaram.</p>'}
+  `;
+}
+
+function _formGerarContrato() {
+  return `
+    <div style="display:flex;flex-direction:column;gap:8px;max-width:480px">
+      <label style="font-size:.85rem">Endereço de instalação</label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input id="ctrt-end-instalacao" type="text" placeholder="Rua, nº - Bairro - Cidade/UF"
+          style="flex:1;background:var(--input,#0d1a0d);border:1px solid var(--border);
+          color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
+        <button onclick="copiarEnderecoCliente()" title="Copiar endereço do cliente"
+          style="background:none;border:1px solid var(--border);color:var(--muted);
+          padding:4px 8px;border-radius:4px;cursor:pointer;font-size:.8rem">= Cliente</button>
+      </div>
+      <label style="font-size:.85rem">Entrada (R$)</label>
+      <input id="ctrt-entrada" type="number" value="0" min="0" step="100"
+        style="background:var(--input,#0d1a0d);border:1px solid var(--border);
+        color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
+      <label style="font-size:.85rem">Descrição das parcelas</label>
+      <input id="ctrt-parcelas" type="text" placeholder="ex: 10x de R$ 4.820,00"
+        style="background:var(--input,#0d1a0d);border:1px solid var(--border);
+        color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
+      <label style="font-size:.85rem">Adendo (opcional)</label>
+      <textarea id="ctrt-adendo" rows="3"
+        style="background:var(--input,#0d1a0d);border:1px solid var(--border);
+        color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem;resize:vertical"></textarea>
+      <button onclick="gerarContrato()" class="btn-ciclo" style="align-self:flex-start">
+        Gerar Contrato
+      </button>
+    </div>
+  `;
+}
+
+function _renderAssinaturas(lista) {
+  const partes = ['loja', 'cliente'];
+  return partes.map(parte => {
+    const ass = (lista || []).find(a => a.parte === parte);
+    return ass
+      ? `<div style="color:var(--ok);font-size:.85rem">&#x2713; ${parte}: ${ass.nome} — ${ass.assinado_em.slice(0,10)}</div>`
+      : `<div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+           <span style="color:var(--muted);font-size:.85rem">&#x2B1C; ${parte}</span>
+           <button onclick="abrirModalAssinatura('${parte}')" class="btn-ciclo" style="padding:2px 8px;font-size:.8rem">
+             Assinar como ${parte}
+           </button>
+         </div>`;
+  }).join('');
+}
+
+async function copiarEnderecoCliente() {
+  try {
+    const rProj = await fetch(`/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}`,
+                              { credentials: 'same-origin' });
+    const dProj = await rProj.json();
+    const clienteId = dProj.projeto && dProj.projeto.cliente_id;
+    if (!clienteId) { showToast('Projeto sem cliente vinculado.', true); return; }
+    const rCli = await fetch(`/api/clientes/${clienteId}`, { credentials: 'same-origin' });
+    const dCli = await rCli.json();
+    const c = dCli.cliente;
+    if (!c) { showToast('Cliente não encontrado.', true); return; }
+    const end = [c.logradouro, c.numero, c.bairro, c.cidade, c.estado].filter(Boolean).join(', ');
+    const input = document.getElementById('ctrt-end-instalacao');
+    if (input && end) { input.value = end; }
+    else showToast('Endereço do cliente não cadastrado.', true);
+  } catch(e) { showToast('Erro ao buscar endereço: ' + e.message, true); }
+}
+
+async function gerarContrato() {
+  const endInstalacao = (document.getElementById('ctrt-end-instalacao')?.value || '').trim();
+  const entrada       = parseFloat(document.getElementById('ctrt-entrada')?.value || '0');
+  const parcelas      = (document.getElementById('ctrt-parcelas')?.value || '').trim();
+  const adendo        = (document.getElementById('ctrt-adendo')?.value || '').trim();
+  if (!_orcamentoAtivoId) {
+    showToast('Selecione um orçamento antes de gerar o contrato.', true);
+    return;
+  }
+  showToast('Gerando contrato...', false);
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orcamento_id:        _orcamentoAtivoId,
+        endereco_instalacao: endInstalacao,
+        entrada_valor:       entrada,
+        parcelas_descricao:  parcelas,
+        adendo:              adendo,
+      }),
+    });
+    const d = await r.json();
+    if (!d.ok) { showToast('Erro: ' + d.erro, true); return; }
+    showToast('Contrato gerado com sucesso!', false);
+    carregarDadosContrato();
+  } catch(e) { showToast('Erro de rede: ' + e.message, true); }
+}
+
+function abrirModalAssinatura(parte) {
+  const overlay = document.createElement('div');
+  overlay.id = 'modal-assinatura-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:var(--card,#132013);border:1px solid var(--border);border-radius:8px;padding:24px;min-width:360px;max-width:480px">
+      <h4 style="margin:0 0 16px">Assinar como: <strong>${parte}</strong></h4>
+      <label style="font-size:.85rem">Nome completo</label>
+      <input id="sig-nome" type="text" placeholder="Nome completo"
+        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
+      <label style="font-size:.85rem">CPF</label>
+      <input id="sig-cpf" type="text" placeholder="000.000.000-00"
+        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
+      <label style="display:flex;gap:8px;align-items:center;margin-bottom:16px;font-size:.85rem">
+        <input type="checkbox" id="sig-aceite">
+        Li e aceito os termos do contrato
+      </label>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="fecharModalAssinatura()" class="btn-ciclo" style="border-color:var(--muted);color:var(--muted)">Cancelar</button>
+        <button onclick="confirmarAssinatura('${parte}')" class="btn-ciclo">Confirmar Assinatura</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function fecharModalAssinatura() {
+  const el = document.getElementById('modal-assinatura-overlay');
+  if (el) el.remove();
+}
+
+async function confirmarAssinatura(parte) {
+  const nome   = (document.getElementById('sig-nome')?.value || '').trim();
+  const cpf    = (document.getElementById('sig-cpf')?.value || '').trim();
+  const aceite = document.getElementById('sig-aceite')?.checked;
+  if (!nome || !cpf) { showToast('Nome e CPF são obrigatórios.', true); return; }
+  if (!aceite) { showToast('É necessário aceitar os termos.', true); return; }
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato/assinar`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parte, nome, cpf }),
+    });
+    const d = await r.json();
+    if (!d.ok) { showToast('Erro: ' + d.erro, true); return; }
+    showToast(`&#x2713; Assinatura da ${parte} registrada.`, false);
+    fecharModalAssinatura();
+    carregarDadosContrato();
+    carregarCiclo();
+  } catch(e) { showToast('Erro de rede: ' + e.message, true); }
+}
+
+function abrirModalAdendo() {
+  fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato`, { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(d => {
+      const adendo = d.contrato?.adendo || '';
+      const overlay = document.createElement('div');
+      overlay.id = 'modal-adendo-overlay';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+      overlay.innerHTML = `
+        <div style="background:var(--card,#132013);border:1px solid var(--border);border-radius:8px;padding:24px;min-width:400px;max-width:560px">
+          <h4 style="margin:0 0 12px">Editar Adendo</h4>
+          <textarea id="adendo-texto" rows="6" style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;font-size:.85rem;resize:vertical">${adendo}</textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+            <button onclick="document.getElementById('modal-adendo-overlay').remove()"
+              class="btn-ciclo" style="border-color:var(--muted);color:var(--muted)">Cancelar</button>
+            <button onclick="salvarAdendo()" class="btn-ciclo">Salvar e Regenerar PDF</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+    });
+}
+
+async function salvarAdendo() {
+  const adendo = document.getElementById('adendo-texto')?.value || '';
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato`, {
+      method: 'PATCH',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adendo }),
+    });
+    const d = await r.json();
+    document.getElementById('modal-adendo-overlay')?.remove();
+    if (d.ok) { showToast('Adendo salvo e PDF regenerado.', false); carregarDadosContrato(); }
+    else showToast('Erro: ' + d.erro, true);
+  } catch(e) { showToast('Erro de rede: ' + e.message, true); }
+}
 </script>
 
 <!-- Modal: Aprovacao / Exportacao para Omie -->
