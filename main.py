@@ -1686,7 +1686,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not contrato:
                         self.send_json({"ok": False, "erro": "Contrato não encontrado"}, code=404)
                         return
-                    if contrato.status == "vigente":
+                    if contrato.status in ("vigente", "assinado"):
                         self.send_json({"ok": False, "erro": "Contrato já está vigente"}, code=400)
                         return
                     ja_assinou = any(a.parte == parte for a in contrato.assinaturas)
@@ -1708,14 +1708,14 @@ class Handler(BaseHTTPRequestHandler):
                     db.add(assinatura)
                     partes_assinadas = {a.parte for a in contrato.assinaturas} | {parte}
                     if "loja" in partes_assinadas and "cliente" in partes_assinadas:
-                        contrato.status = "vigente"
+                        contrato.status = "assinado"
                         etapa7 = db.query(CicloEtapa).filter_by(
                             projeto_nome=nome_safe, etapa_codigo="7"
                         ).first()
                         if not etapa7:
                             etapa7 = CicloEtapa(projeto_nome=nome_safe, etapa_codigo="7")
                             db.add(etapa7)
-                        etapa7.status       = "vigente"
+                        etapa7.status       = "assinado"
                         etapa7.concluido_em = datetime.utcnow()
                         etapa7.responsavel_id = usuario["id"]
                     elif parte == "loja":
@@ -1775,9 +1775,9 @@ class Handler(BaseHTTPRequestHandler):
                     db.commit()
                     pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
                     contrato.pdf_path = pdf_path
-                    contrato.status   = "gerado"
+                    contrato.status   = "para_assinatura"
                     db.commit()
-                    self.send_json({"ok": True, "contrato_id": contrato.id, "status": "gerado"})
+                    self.send_json({"ok": True, "contrato_id": contrato.id, "status": "para_assinatura"})
                 except Exception as e:
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -1835,6 +1835,30 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(length) if length else b'{}'
 
+            m = re.match(r'^/orcamentos/(\d+)/valor$', path)
+            if m:
+                oid = int(m.group(1))
+                req = json.loads(body)
+                db = get_session()
+                try:
+                    orc = db.get(Orcamento, oid)
+                    if not orc:
+                        self.send_json({"ok": False, "erro": "Orçamento não encontrado"}, code=404)
+                        return
+                    if "valor_total" in req:
+                        orc.valor_total = float(req["valor_total"] or 0)
+                    if "forma_pagamento" in req:
+                        orc.forma_pagamento = req["forma_pagamento"] or None
+                    orc.updated_at = datetime.utcnow()
+                    db.commit()
+                    self.send_json({"ok": True})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
             m = re.match(r'^/api/projetos/([^/]+)/status$', path)
             if m:
                 nome_safe = unquote(m.group(1))
@@ -1871,8 +1895,8 @@ class Handler(BaseHTTPRequestHandler):
                         if etapa.status == "pendente" and novo_status != "pendente":
                             etapa.iniciado_em = datetime.utcnow()
                         etapa.status = novo_status
-                        if novo_status in ("concluido", "aprovado", "vigente", "implantado",
-                                           "realizado", "entregue", "emitida"):
+                        if novo_status in ("concluido", "aprovado", "assinado", "vigente",
+                                           "implantado", "realizado", "entregue", "emitida"):
                             etapa.concluido_em  = datetime.utcnow()
                             etapa.responsavel_id = usuario["id"]
                     if obs is not None:
@@ -1902,7 +1926,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not contrato:
                         self.send_json({"ok": False, "erro": "Contrato não encontrado"}, code=404)
                         return
-                    if contrato.status == "vigente":
+                    if contrato.status in ("vigente", "assinado"):
                         self.send_json({"ok": False,
                                         "erro": "Contrato vigente não pode ser editado"}, code=400)
                         return
