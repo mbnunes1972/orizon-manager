@@ -24,7 +24,7 @@ Quando o sistema tiver múltiplos usuários operando simultaneamente, implementa
 | 3 | Criação do projeto | Consultor | — | ✓ |
 | 4 | Primeiro orçamento | Consultor | — | ✓ |
 | 5 | Revisão de projeto | Projetista | índice de revisão (v1, v2…) | parcial (EP-07) |
-| 6 | Aprovação do projeto | Gerente/Diretor | pendente / aprovado | parcial |
+| 6 | Aprovação do orçamento pelo cliente | Cliente + Consultor | pendente / em revisão / aprovado | parcial |
 | 7 | **Contrato** | Consultor | rascunho / gerado / assinado loja / assinado cliente / vigente | — |
 | 8 | **Aprovação financeira I** | Gerente | pendente / aprovada / rejeitada | — |
 | 9 | Solicitação de medição | Assist. Logístico | aprovada / reprovada / venda programada | — |
@@ -51,6 +51,7 @@ Quando o sistema tiver múltiplos usuários operando simultaneamente, implementa
 ### Regras de sequenciamento
 
 - Cada etapa numerada (1–20) só fica disponível após a anterior estar em status final positivo.
+- **Etapa 6 — Aprovação do orçamento pelo cliente:** o cliente aprova o orçamento junto com o consultor na tela de negociação (botão já existente). O gerente só intervém se houver desconto acima do limite do consultor — autorização delegada já implementada. Essa etapa equivale ao `bloquear_projeto()` atual. **Kanban futuro:** o projeto ficará em ciclo entre status "Em revisão" e "Aguardando aprovação do cliente" até o cliente aprovar e avançar para Contrato. Ao reprovar, o cliente solicita nova revisão e o projeto retorna à etapa 5.
 - Etapas com subfases (11a–11e) seguem sequência interna própria; a etapa 11 avança para 12 apenas quando 11e está aprovado.
 - A flag `⚑` em Pendências de montagem (17a) é visível na lista de projetos e na aba Ciclo, independente do status geral da etapa 17. Pendências resolvidas antes da vistoria final podem ser desmarcadas sem bloquear o avanço.
 - Etapas 13 e 14 (produção e entrega no depósito) podem ser atualizadas por qualquer usuário logado; não exigem perfil específico.
@@ -118,11 +119,14 @@ O template é um arquivo `.docx` com marcadores no formato `{{variavel}}`. Vari�
 | `{{entrada_valor}}` | valor da entrada |
 | `{{parcelas_descricao}}` | descrição textual do parcelamento |
 | `{{ambientes_lista}}` | lista dos ambientes incluídos |
+| `{{endereco_instalacao}}` | endereço do local de instalação dos móveis |
 | `{{consultor_nome}}` | `usuarios.nome` (consultor do projeto) |
 | `{{data_contrato}}` | data de geração do PDF |
 | `{{adendo}}` | texto livre adicionado pelo consultor (vazio se não houver) |
 
 O template `.docx` fica em `config/contrato_template.docx`. Para atualizar o modelo, substituir o arquivo — sem necessidade de alteração de código.
+
+> **Endereço de instalação:** ao gerar o contrato, se `endereco_instalacao` não estiver preenchido no projeto, o sistema pergunta: *"O endereço de instalação é o mesmo endereço do cliente?"*. Se sim, copia automaticamente. Se não, exibe campo para preenchimento manual antes de gerar o PDF.
 
 ### 3.3 Modelo de dados
 
@@ -176,18 +180,39 @@ hash_sha256     TEXT
 
 ### 4.1 Contexto
 
-A distribuidora (loja Dalmóbile) recebe mercadoria da fábrica acompanhada de uma NFe. Com base nessa NFe, emite sua própria NFe para o cliente final. A emissão é delegada ao Omie ERP via API; o Omie_V3 orquestra o fluxo e registra os dados.
+A distribuidora (loja Dalmóbile) recebe mercadoria da fábrica acompanhada de uma NFe com a lista detalhada de materiais (itens individuais com NCM, código, descrição e valor). Essa lista detalhada — e não os 16 grupos de produtos usados no orçamento/pedido — é o que alimenta a entrada em estoque no Omie e o que deve compor a NFe emitida para o cliente.
+
+**Distinção crítica entre as duas fases:**
+- **Fase de orçamento/pedido (etapas 4–12):** os XMLs do Promob são agrupados em 16 categorias padronizadas para envio ao Omie via `IncluirPedVenda`. Esse agrupamento é uma simplificação comercial — suficiente para o pedido de venda.
+- **Fase de NFe/estoque (etapas 14–15):** a NFe da fábrica traz os itens reais individualmente (móveis, ferragens, painéis, etc.), vindos da fábrica e de outros fornecedores. A entrada em estoque e a emissão da NFe ao cliente precisam espelhar essa lista detalhada para que saída de estoque e nota fiscal sejam coerentes.
 
 ### 4.2 Fluxo
 
+**Subfase A — Entrada da NFe da fábrica e registro em estoque:**
+
 1. Etapa 14 (Entrega no depósito) marcada como `recebido`.
-2. Usuário faz upload do XML da NFe da fábrica **ou** informa a chave de acesso (44 dígitos).
-3. Sistema parseia o XML e extrai: número NF, série, CNPJ emitente, itens, valores, CFOP.
-4. Sistema exibe resumo dos dados da NFe da fábrica para conferência.
-5. Sistema monta o payload para o Omie com: dados do cliente, itens mapeados pelos 16 grupos de produtos, valores com margem aplicada, CFOP de revenda.
-6. Chamada à API Omie (`IncluirNFe` ou endpoint equivalente) → retorna chave de acesso da NFe emitida.
-7. Sistema grava chave + número NF + PDF (DANFE) e avança o pipeline para etapa 16.
-8. DANFE disponível para download na aba Ciclo.
+2. Usuário faz upload do XML da NFe da fábrica (podem ser múltiplos XMLs para um mesmo projeto, se houver fornecedores adicionais).
+3. Sistema parseia cada XML e extrai a lista detalhada de itens: código do produto, descrição, NCM, CFOP, unidade, quantidade, valor unitário, valor total.
+4. Sistema exibe a lista de itens para conferência pelo usuário.
+5. Sistema registra a entrada em estoque no Omie via API (`LancarMovimentoEstoque` ou endpoint equivalente), item a item, vinculando ao projeto.
+6. Confirmação de entrada em estoque gravada em `nfe_itens` com status por item.
+
+**Subfase B — Emissão da NFe ao cliente:**
+
+7. Com o estoque registrado, o sistema monta o payload da NFe do cliente usando **a mesma lista detalhada de itens** recebida da fábrica, aplicando:
+   - Preços de venda ao cliente (valor do orçamento aprovado distribuído proporcionalmente entre os itens, ou margem fixa sobre o custo de entrada)
+   - CFOP de revenda (5.102 para dentro do estado, 6.102 para fora)
+   - Dados do cliente (razão social, CPF/CNPJ, endereço)
+8. Chamada à API Omie para emissão da NFe → retorna chave de acesso (44 dígitos) e DANFE.
+9. Sistema grava chave + número NF + DANFE e dá baixa no estoque dos itens (saída automática vinculada à NFe emitida).
+10. Etapa 15 avança para 16.
+11. DANFE disponível para download na aba Ciclo.
+
+> **Nota sobre precificação dos itens na NFe do cliente:** a NFe fiscal exige valor por item. Como o orçamento foi fechado por ambiente (não por SKU), a distribuição do valor total entre os itens da lista da fábrica pode seguir dois critérios — a definir na implementação:
+> - **Proporcional ao custo:** cada item recebe o mesmo percentual de margem sobre seu custo de entrada
+> - **Valor fixo de venda por item:** mantém os preços exatamente como vieram na NFe da fábrica e a margem é calculada globalmente
+>
+> Registrar aqui a decisão quando tomada.
 
 ### 4.3 Modelo de dados
 
@@ -199,27 +224,44 @@ tipo            TEXT        -- fabrica | cliente
 numero_nf       TEXT
 serie           TEXT
 chave_acesso    TEXT        -- 44 dígitos
-xml_path        TEXT        -- XML da NF (local)
-danfe_path      TEXT        -- PDF do DANFE (local)
+xml_path        TEXT        -- XML da NF salvo localmente
+danfe_path      TEXT        -- PDF do DANFE salvo localmente
 emitida_em      DATETIME
-omie_status     TEXT        -- pendente | emitida | erro
+omie_status     TEXT        -- pendente | estoque_registrado | emitida | erro
 omie_erro       TEXT        -- mensagem de erro se houver
+
+-- Tabela nfe_itens
+id              INTEGER PRIMARY KEY
+nfe_id          INTEGER FK → nfes_projeto
+codigo_produto  TEXT
+descricao       TEXT
+ncm             TEXT
+cfop            TEXT
+unidade         TEXT
+quantidade      DECIMAL
+valor_unitario  DECIMAL
+valor_total     DECIMAL
+estoque_status  TEXT        -- pendente | entrada_ok | saida_ok | erro
 ```
 
 ### 4.4 Endpoints
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| `POST` | `/api/projetos/<nome>/nfe/fabrica` | Registra XML/chave da NFe da fábrica; retorna dados extraídos |
-| `POST` | `/api/projetos/<nome>/nfe/cliente` | Monta payload e envia para Omie; salva retorno |
+| `POST` | `/api/projetos/<nome>/nfe/fabrica` | Registra XML da NFe da fábrica; parseia itens; retorna lista para conferência |
+| `POST` | `/api/projetos/<nome>/nfe/fabrica/confirmar` | Confirma conferência e registra entrada em estoque no Omie |
+| `POST` | `/api/projetos/<nome>/nfe/cliente` | Monta NFe do cliente com lista detalhada de itens e envia ao Omie |
 | `GET` | `/api/projetos/<nome>/nfe/cliente` | Retorna status + chave + link do DANFE |
 
 ### 4.5 Critérios de aceite
 
-- [ ] Upload do XML da fábrica extrai dados corretamente
-- [ ] Resumo dos dados da NFe fábrica exibido antes de emitir
-- [ ] Payload enviado ao Omie com dados do cliente e itens mapeados pelos 16 grupos
+- [ ] Upload do XML da fábrica parseia todos os itens individualmente (código, NCM, qtd, valor)
+- [ ] Lista detalhada de itens exibida para conferência antes de registrar estoque
+- [ ] Entrada em estoque registrada no Omie item a item
+- [ ] NFe do cliente usa a mesma lista detalhada de itens (não os 16 grupos)
+- [ ] CFOP de revenda aplicado corretamente (dentro/fora do estado)
 - [ ] Chave de acesso e DANFE gravados após sucesso no Omie
+- [ ] Saída de estoque vinculada à NFe emitida
 - [ ] Erro retornado pelo Omie exibido como toast + gravado em `omie_erro`
 - [ ] Etapa 15 avança para 16 apenas após NFe emitida com sucesso
 
