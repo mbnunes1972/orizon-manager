@@ -1572,7 +1572,7 @@ let _perfisConfig = null;
 // ── Usuário autenticado ───────────────────────────────────────
 let _usuarioAtual = null;
 
-const _LIMITES_NIVEL = { consultor: 10, gerente: 20, diretor: 50 };
+const _LIMITES_NIVEL = { consultor: 10, gerente: 20, diretor: 50, admin: 50 };
 
 async function carregarUsuarioAutenticado(){
   try {
@@ -1581,6 +1581,8 @@ async function carregarUsuarioAutenticado(){
     const d = await r.json();
     if(!d.ok){ window.location.href = '/login'; return; }
     _usuarioAtual = d.usuario;
+    const _navAdmin = document.getElementById('nav-07');
+    if (_navAdmin) _navAdmin.style.display = (_usuarioAtual && _usuarioAtual.nivel === 'admin') ? '' : 'none';
     _atualizarUIUsuario();
     _carregarDadosExtrasUsuario();
   } catch(e){ console.warn('[AUTH] Erro ao carregar usuário:', e); }
@@ -4095,7 +4097,7 @@ function abrirModalAutorizacaoSidebar(desconto, limite){
   return new Promise(resolve => {
     _resolveAutorizacaoSidebar = resolve;
     const nivel = _usuarioAtual?.nivel || 'consultor';
-    const nivelLabel = { consultor: 'Consultor', gerente: 'Gerente', diretor: 'Diretor' }[nivel] || nivel;
+    const nivelLabel = { consultor: 'Consultor', gerente: 'Gerente', diretor: 'Diretor', admin: 'Admin' }[nivel] || nivel;
     document.getElementById('auth-modal-msg').textContent =
       `Seu limite como ${nivelLabel} é ${limite}%. O desconto solicitado é ${desconto}%.`;
     document.getElementById('auth-modal-login').value = '';
@@ -4474,7 +4476,7 @@ function abrirModalAutorizacao(desconto, limite){
     modal.dataset.contexto = 'modal_params'; // contexto explícito
     modal.dataset.desconto = desconto;
     const nivel = _usuarioAtual?.nivel || 'consultor';
-    const nivelLabel = { consultor: 'Consultor', gerente: 'Gerente', diretor: 'Diretor' }[nivel] || nivel;
+    const nivelLabel = { consultor: 'Consultor', gerente: 'Gerente', diretor: 'Diretor', admin: 'Admin' }[nivel] || nivel;
     document.getElementById('auth-modal-msg').textContent =
       `Seu limite como ${nivelLabel} é ${limite}%. O desconto solicitado é ${desconto}%.`;
     document.getElementById('auth-modal-login').value = '';
