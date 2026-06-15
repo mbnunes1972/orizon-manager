@@ -9,7 +9,7 @@ from email import policy as _email_policy
 from datetime import datetime, date, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
-from database import init_db, get_session, Cliente, Parceiro, Orcamento, PoolAmbiente, OrcamentoAmbiente
+from database import init_db, get_session, Cliente, Parceiro, Orcamento, PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status
 from urllib.parse import urlparse
 
 from storage import (
@@ -36,6 +36,48 @@ from mod_omie import (
 )
 from mod_margens import calcular_margens, _normalizar_faixas
 from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada, calcular_total_flex
+
+def _enriquecer_projetos_com_status(projetos):
+    """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
+    if not projetos:
+        return
+    from sqlalchemy import func
+    nomes = [p['nome_safe'] for p in projetos if p.get('nome_safe')]
+    if not nomes:
+        return
+    db = get_session()
+    try:
+        metas = db.query(Projeto).filter(Projeto.nome_safe.in_(nomes)).all()
+        meta_map = {m.nome_safe: m for m in metas}
+
+        subq = (
+            db.query(
+                Orcamento.projeto_id,
+                func.max(Orcamento.updated_at).label("max_at")
+            )
+            .filter(Orcamento.projeto_id.in_(nomes))
+            .group_by(Orcamento.projeto_id)
+            .subquery()
+        )
+        orc_rows = (
+            db.query(Orcamento)
+            .join(subq, (Orcamento.projeto_id == subq.c.projeto_id) &
+                        (Orcamento.updated_at == subq.c.max_at))
+            .all()
+        )
+        orc_map = {o.projeto_id: o.valor_total for o in orc_rows}
+
+        for p in projetos:
+            ns = p.get('nome_safe')
+            if not ns:
+                continue
+            meta = meta_map.get(ns)
+            p['status']                 = meta.status     if meta else None
+            p['status_at']              = meta.status_at.isoformat() if meta and meta.status_at else None
+            p['perdido_em']             = meta.perdido_em.isoformat() if meta and meta.perdido_em else None
+            p['ultimo_orcamento_valor'] = orc_map.get(ns)
+    finally:
+        db.close()
 
 def _enriquecer_projetos_com_pool(projetos):
     """Para projetos EP-07, sobrescreve n_ambientes/n_selecionados com contagens do pool."""
@@ -189,6 +231,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/projetos":
             projetos = _listar_projetos()
             _enriquecer_projetos_com_pool(projetos)
+            _enriquecer_projetos_com_status(projetos)
             self.send_json({"ok": True, "projetos": projetos})
 
         elif path == "/projetos/buscar":
@@ -197,6 +240,7 @@ class Handler(BaseHTTPRequestHandler):
             locais = _buscar_projetos(q)
             for p in locais: p['origem'] = 'local'
             _enriquecer_projetos_com_pool(locais)
+            _enriquecer_projetos_com_status(locais)
             omie_res = _buscar_projetos_omie(q)
             nomes_locais = {p['nome_projeto'].lower() for p in locais}
             omie_unicos = [p for p in omie_res if p['nome_projeto'].lower() not in nomes_locais]
