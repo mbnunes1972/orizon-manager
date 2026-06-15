@@ -10,8 +10,22 @@ import hashlib
 from datetime import datetime
 from docxtpl import DocxTemplate
 
-TEMPLATE_PATH = os.path.join("config", "contrato_template.docx")
-CONTRATOS_DIR = "CONTRATOS"
+_THIS_DIR     = os.path.dirname(os.path.abspath(__file__))
+CONTRATOS_DIR = os.path.join(_THIS_DIR, "CONTRATOS")
+
+_TEMPLATE_CANDIDATOS = [
+    os.path.join(_THIS_DIR, "Modelo de Contrato.docx"),
+    os.path.join(_THIS_DIR, "config", "contrato_template.docx"),
+]
+
+def _encontrar_template() -> str:
+    for p in _TEMPLATE_CANDIDATOS:
+        if os.path.exists(p):
+            return p
+    raise FileNotFoundError(
+        "Template de contrato não encontrado.\n"
+        "Adicione 'Modelo de Contrato.docx' na raiz do projeto."
+    )
 
 
 def _libreoffice_cmd() -> str:
@@ -82,12 +96,10 @@ def gerar_pdf_contrato(contrato_id: int, variaveis: dict) -> str:
     Lança FileNotFoundError se o template não existir.
     Lança RuntimeError se a conversão LibreOffice falhar.
     """
-    if not os.path.exists(TEMPLATE_PATH):
-        raise FileNotFoundError(f"Template não encontrado: {TEMPLATE_PATH}")
-
+    template_path = _encontrar_template()
     os.makedirs(CONTRATOS_DIR, exist_ok=True)
 
-    doc = DocxTemplate(TEMPLATE_PATH)
+    doc = DocxTemplate(template_path)
     doc.render(variaveis)
 
     docx_path = os.path.join(CONTRATOS_DIR, f"contrato_{contrato_id}.docx")
@@ -101,8 +113,14 @@ def gerar_pdf_contrato(contrato_id: int, variaveis: dict) -> str:
             capture_output=True,
             timeout=120,
         )
+    except FileNotFoundError:
+        raise RuntimeError(
+            "LibreOffice não encontrado.\n"
+            "Instale o LibreOffice para gerar PDF.\n"
+            f"O arquivo .docx foi salvo em:\n{docx_path}"
+        )
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"LibreOffice falhou ao converter PDF: {e.stderr.decode(errors='replace')}") from e
+        raise RuntimeError(f"LibreOffice falhou ao converter PDF:\n{e.stderr.decode(errors='replace')}") from e
     except subprocess.TimeoutExpired:
         raise RuntimeError("LibreOffice demorou mais de 120s — possível travamento na conversão")
 

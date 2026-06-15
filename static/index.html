@@ -292,16 +292,18 @@ body{overflow:hidden}
 
 /* ── Ciclo do Projeto ── */
 .btn-ciclo {
-  background: var(--section, #1a2a1a);
-  color: var(--ok, #4caf82);
-  border: 1px solid var(--ok, #4caf82);
+  background: #1a1200;
+  color: #f0c84a;
+  border: 1px solid #b8960c;
   border-radius: 4px;
   padding: 4px 12px;
   font-size: .85rem;
   cursor: pointer;
   margin-left: 8px;
+  font-weight: 500;
+  letter-spacing: .02em;
 }
-.btn-ciclo:hover { background: var(--ok, #4caf82); color: #000; }
+.btn-ciclo:hover { background: #b8960c; color: #000; }
 
 #ciclo-panel {
   display: none;
@@ -685,8 +687,8 @@ body{overflow:hidden}
           </div>
         </div>
         <button class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
-        <button id="btn-abrir-ciclo" class="btn-ciclo" onclick="abrirCiclo()" title="Ciclo do Projeto">
-          &#x27F3; Ciclo
+        <button id="btn-abrir-ciclo" class="btn-ciclo" onclick="abrirCiclo()" title="Etapas do Projeto">
+          Etapas do Projeto
         </button>
       </div>
     </div>
@@ -6037,8 +6039,26 @@ function _renderCardGenerico(etapa, dados) {
 
 function _renderCardContrato() {
   return `<div id="contrato-ui">
-    <p style="color:var(--muted);font-size:.85rem">Carregando...</p>
+    <p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">Carregando...</p>
   </div>`;
+}
+
+function mostrarErroModal(mensagem) {
+  document.getElementById('erro-modal-overlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'erro-modal-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center';
+  ov.innerHTML = `
+    <div style="background:#1a0a0a;border:2px solid var(--err,#c84b4b);border-radius:10px;
+      padding:32px 40px;max-width:540px;width:90%;text-align:center">
+      <div style="font-size:2rem;margin-bottom:16px">&#x26A0;</div>
+      <p style="color:#f08080;font-size:1.1rem;line-height:1.6;margin:0 0 24px;white-space:pre-wrap">${mensagem}</p>
+      <button onclick="document.getElementById('erro-modal-overlay').remove()"
+        style="background:#c84b4b;color:#fff;border:none;border-radius:6px;
+        padding:10px 28px;font-size:1rem;cursor:pointer;font-weight:600">Fechar</button>
+    </div>
+  `;
+  document.body.appendChild(ov);
 }
 
 async function carregarDadosContrato() {
@@ -6056,10 +6076,14 @@ function renderContratoUI(contrato) {
   if (!ui) return;
   if (!contrato) {
     ui.innerHTML = `
-      <p style="color:var(--muted);font-size:.85rem;margin-bottom:8px">
-        Nenhum contrato gerado. Preencha os dados e gere o contrato.
+      <p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">
+        Orçamento aprovado pelo cliente. Preencha os dados complementares para emitir o contrato.
       </p>
-      ${_formGerarContrato()}
+      <button onclick="abrirModalAprovacaoOrcamento()"
+        style="background:#b8960c;color:#000;border:none;border-radius:6px;
+        padding:10px 24px;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:.03em">
+        &#x2713; Aprovar Or&#xe7;amento e Gerar Contrato
+      </button>
     `;
     return;
   }
@@ -6156,16 +6180,86 @@ async function copiarEnderecoCliente() {
   } catch(e) { showToast('Erro ao buscar endereço: ' + e.message, true); }
 }
 
-async function gerarContrato() {
-  const endInstalacao = (document.getElementById('ctrt-end-instalacao')?.value || '').trim();
-  const entrada       = parseFloat(document.getElementById('ctrt-entrada')?.value || '0');
-  const parcelas      = (document.getElementById('ctrt-parcelas')?.value || '').trim();
-  const adendo        = (document.getElementById('ctrt-adendo')?.value || '').trim();
+function abrirModalAprovacaoOrcamento() {
   if (!_orcamentoAtivoId) {
-    showToast('Selecione um orçamento antes de gerar o contrato.', true);
+    mostrarErroModal('Selecione um orçamento antes de aprovar.\nAbra a aba de negociação e ative o orçamento desejado.');
     return;
   }
-  showToast('Gerando contrato...', false);
+  document.getElementById('modal-aprovacao-overlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'modal-aprovacao-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;display:flex;align-items:center;justify-content:center;overflow-y:auto';
+  ov.innerHTML = `
+    <div style="background:var(--card,#132013);border:1px solid #b8960c;border-radius:10px;
+      padding:28px 32px;min-width:380px;max-width:520px;width:90%;margin:24px auto">
+      <h3 style="margin:0 0 4px;color:#f0c84a">Aprovar Or&#xe7;amento</h3>
+      <p style="color:var(--muted);font-size:.85rem;margin:0 0 20px">
+        Preencha os dados complementares para emitir o contrato.
+      </p>
+      <label style="font-size:.85rem;display:block;margin-bottom:4px">Endere&#xe7;o de instala&#xe7;&#xe3;o</label>
+      <div style="display:flex;gap:6px;margin-bottom:14px">
+        <input id="apr-end" type="text" placeholder="Rua, n&#xba; &#x2013; Bairro &#x2013; Cidade/UF"
+          style="flex:1;background:var(--input,#0d1a0d);border:1px solid var(--border);
+          color:var(--fg);padding:8px;border-radius:4px;font-size:.9rem">
+        <button onclick="copiarEnderecoClienteModal()" title="Copiar endere&#xe7;o do cliente"
+          style="background:none;border:1px solid var(--border);color:var(--muted);
+          padding:4px 10px;border-radius:4px;cursor:pointer;font-size:.8rem;white-space:nowrap">= Cliente</button>
+      </div>
+      <label style="font-size:.85rem;display:block;margin-bottom:4px">Entrada (R$)</label>
+      <input id="apr-entrada" type="number" value="0" min="0" step="100"
+        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+        color:var(--fg);padding:8px;border-radius:4px;font-size:.9rem;margin-bottom:14px">
+      <label style="font-size:.85rem;display:block;margin-bottom:4px">Descri&#xe7;&#xe3;o das parcelas</label>
+      <input id="apr-parcelas" type="text" placeholder="ex: 10x de R$ 4.820,00"
+        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+        color:var(--fg);padding:8px;border-radius:4px;font-size:.9rem;margin-bottom:14px">
+      <label style="font-size:.85rem;display:block;margin-bottom:4px">Adendo (opcional)</label>
+      <textarea id="apr-adendo" rows="3"
+        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+        color:var(--fg);padding:8px;border-radius:4px;font-size:.9rem;resize:vertical;margin-bottom:20px"></textarea>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('modal-aprovacao-overlay').remove()"
+          style="background:none;border:1px solid var(--muted);color:var(--muted);
+          border-radius:6px;padding:8px 20px;cursor:pointer">Cancelar</button>
+        <button onclick="gerarContrato()"
+          style="background:#b8960c;color:#000;border:none;border-radius:6px;
+          padding:10px 24px;font-size:.95rem;font-weight:700;cursor:pointer">
+          Gerar Contrato
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+}
+
+async function copiarEnderecoClienteModal() {
+  try {
+    const rProj = await fetch(`/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}`, { credentials: 'same-origin' });
+    const dProj = await rProj.json();
+    const clienteId = dProj.projeto && dProj.projeto.cliente_id;
+    if (!clienteId) { showToast('Projeto sem cliente vinculado.', true); return; }
+    const rCli = await fetch(`/api/clientes/${clienteId}`, { credentials: 'same-origin' });
+    const dCli = await rCli.json();
+    const c = dCli.cliente;
+    if (!c) { showToast('Cliente não encontrado.', true); return; }
+    const end = [c.logradouro, c.numero, c.bairro, c.cidade, c.estado].filter(Boolean).join(', ');
+    const input = document.getElementById('apr-end');
+    if (input && end) input.value = end;
+    else showToast('Endereço do cliente não cadastrado.', true);
+  } catch(e) { showToast('Erro ao buscar endereço: ' + e.message, true); }
+}
+
+async function gerarContrato() {
+  const endInstalacao = (document.getElementById('apr-end')?.value || '').trim();
+  const entrada       = parseFloat(document.getElementById('apr-entrada')?.value || '0');
+  const parcelas      = (document.getElementById('apr-parcelas')?.value || '').trim();
+  const adendo        = (document.getElementById('apr-adendo')?.value || '').trim();
+  if (!_orcamentoAtivoId) {
+    mostrarErroModal('Nenhum orçamento ativo.\nVolte à negociação e selecione o orçamento a aprovar.');
+    return;
+  }
+  const btn = document.querySelector('#modal-aprovacao-overlay button[onclick="gerarContrato()"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Gerando...'; }
   try {
     const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato`, {
       method: 'POST',
@@ -6180,10 +6274,18 @@ async function gerarContrato() {
       }),
     });
     const d = await r.json();
-    if (!d.ok) { showToast('Erro: ' + d.erro, true); return; }
+    if (!d.ok) {
+      mostrarErroModal('Erro ao gerar contrato:\n\n' + (d.erro || 'Falha desconhecida'));
+      if (btn) { btn.disabled = false; btn.textContent = 'Gerar Contrato'; }
+      return;
+    }
+    document.getElementById('modal-aprovacao-overlay')?.remove();
     showToast('Contrato gerado com sucesso!', false);
     carregarDadosContrato();
-  } catch(e) { showToast('Erro de rede: ' + e.message, true); }
+  } catch(e) {
+    mostrarErroModal('Erro de rede ao gerar contrato:\n\n' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Gerar Contrato'; }
+  }
 }
 
 function abrirModalAssinatura(parte) {
