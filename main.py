@@ -10,7 +10,7 @@ from datetime import datetime, date, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
 from database import init_db, get_session, Cliente, Parceiro, Orcamento, PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 
 from storage import (
     _BASE_DIR, PROJETOS_DIR, CPF_CORINGA,
@@ -607,6 +607,10 @@ class Handler(BaseHTTPRequestHandler):
                             bloquear_projeto(nome_safe_para_bloquear)
                             log_cb("Projeto bloqueado — XMLs travados com hash SHA-256.", "ok")
                             session_set("projeto_bloqueado", True)
+                            try:
+                                upsert_projeto_status(nome_safe_para_bloquear, "convertido")
+                            except Exception as e_st:
+                                log_cb(f"Aviso: status convertido não pôde ser salvo: {e_st}", "warn")
                         except Exception as e_lock:
                             log_cb("Aviso: nao foi possivel bloquear o projeto: %s" % e_lock, "warn")
                 except Exception as e:
@@ -1616,6 +1620,29 @@ class Handler(BaseHTTPRequestHandler):
 
         self.send_response(404)
         self.end_headers()
+
+    def do_PATCH(self):
+        try:
+            path = urlparse(self.path).path
+            length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(length) if length else b'{}'
+
+            m = re.match(r'^/api/projetos/([^/]+)/status$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                req = json.loads(body)
+                novo_status = (req.get('status') or '').strip().lower()
+                VALIDOS = {'quente', 'morno', 'frio', 'perdido'}
+                if novo_status not in VALIDOS:
+                    self.send_json({"ok": False, "erro": f"Status inválido. Use: {', '.join(sorted(VALIDOS))}"})
+                    return
+                upsert_projeto_status(nome_safe, novo_status)
+                self.send_json({"ok": True, "status": novo_status})
+                return
+
+            self.send_json({"ok": False, "erro": "Rota não encontrada"})
+        except Exception as e:
+            self.send_json({"ok": False, "erro": str(e)})
 
 
 # ── Helper ────────────────────────────────────────────────────────────────────
