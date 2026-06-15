@@ -829,8 +829,7 @@ body{overflow:hidden}
             <option value="Mastercard">Mastercard</option>
           </select>
         </div>
-        <div>
-          <label>Data do Contrato</label>
+        <div style="display:none">
           <input type="date" id="cc-data-contrato" oninput="atualizarCartao()">
         </div>
       </div>
@@ -865,7 +864,7 @@ body{overflow:hidden}
         <div class="plano-wrap">
           <div class="plano-hdr">Plano de Pagamento</div>
           <table class="plano-tbl">
-            <thead><tr><th style="width:40px">#</th><th>Tipo</th><th>Vencimento</th><th style="text-align:right">Valor</th></tr></thead>
+            <thead><tr><th style="width:40px">#</th><th>Tipo</th><th style="display:none">Vencimento</th><th style="text-align:right">Valor</th></tr></thead>
             <tbody id="cc-parc-body"></tbody>
           </table>
         </div>
@@ -1034,7 +1033,7 @@ body{overflow:hidden}
     <!-- Acoes -->
     <div class="action-row">
       <button class="btn btn-ok" onclick="showToast('Orcamento salvo!')">&#x1F4BE; Salvar orcamento</button>
-      <button class="btn btn-amber" onclick="aprovarOrcamento()">&#x2713; Aprovar Orcamento &#x2192;</button>
+      <button class="btn btn-amber" onclick="aprovarOrcamento()" title="Envia o pedido de venda para o Omie ERP">&#x1F4E4; Enviar para Omie</button>
     </div>
 
     <!-- Ciclo do Projeto (EP-08) -->
@@ -3298,14 +3297,14 @@ async function atualizarCartao() {
     return `<tr style="background:${bg}">
       <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
       <td style="padding:8px 12px"><span style="background:${bg};color:${color};border-radius:4px;padding:2px 8px;font-size:10px;border:1px solid ${color}40">${label}</span></td>
-      <td style="padding:8px 12px;color:var(--muted);font-size:11px">${esc(p.data)}</td>
+      <td style="display:none">${esc(p.data)}</td>
       <td style="padding:8px 12px;text-align:right;font-weight:700;color:${valorReal?color:'var(--muted)'}">
         ${valorReal !== null ? 'R$ '+fmt(valorReal) : '—'}
       </td>
     </tr>`;
   }).join('');
   tbody.innerHTML += `<tr style="border-top:1px solid var(--border2)">
-    <td colspan="3" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
+    <td colspan="2" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
     <td style="padding:10px 12px;text-align:right;font-weight:900;color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
   </tr>`;
   _atualizarImpostos('cc', d.total_cliente);
@@ -3533,7 +3532,7 @@ function atualizarUIBloqueio() {
     if (bloqueado) {
       btnAprovar.innerHTML = '&#x1F512; Aprovado';
     } else {
-      btnAprovar.innerHTML = '&#x2713; Aprovar Orcamento &#x2192;';
+      btnAprovar.innerHTML = '&#x1F4E4; Enviar para Omie';
     }
   }
 
@@ -6089,30 +6088,44 @@ function renderContratoUI(contrato) {
   }
   const temPdf = contrato.tem_pdf;
   const status = contrato.status;
+  const pdfUrl = `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato/pdf`;
+  const jaAssinou = (contrato.assinaturas || []).length > 0;
+
   ui.innerHTML = `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
       <strong>Status:</strong>
       <span class="etapa-badge badge-${status}">${status}</span>
+      ${status !== 'vigente' && temPdf ? `<button onclick="abrirModalAdendo()" class="btn-ciclo" style="margin-left:auto;font-size:.8rem">Editar Adendo</button>` : ''}
     </div>
+
     ${temPdf ? `
-      <div style="margin-bottom:12px">
-        <iframe src="/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato/pdf"
-                style="width:100%;height:480px;border:1px solid var(--border);border-radius:4px"></iframe>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <a href="/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato/pdf"
-             target="_blank" class="btn-ciclo" style="text-decoration:none">
-            &#x2B07; Baixar PDF
+      <div style="margin-bottom:16px">
+        <p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">
+          Leia o contrato antes de assinar. Role até o final para confirmar leitura.
+        </p>
+        <iframe src="${pdfUrl}" style="width:100%;height:560px;border:1px solid var(--border);border-radius:6px"></iframe>
+        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+          <a href="${pdfUrl}" target="_blank" class="btn-ciclo" style="text-decoration:none;font-size:.82rem">
+            &#x2B07; Abrir em nova aba
           </a>
-          ${status !== 'vigente' ? `<button onclick="abrirModalAdendo()" class="btn-ciclo">Editar Adendo</button>` : ''}
         </div>
       </div>
-    ` : ''}
-    ${status !== 'vigente' ? `
-      <div style="margin-top:12px">
-        <strong style="font-size:.85rem">Assinaturas:</strong>
-        ${_renderAssinaturas(contrato.assinaturas)}
-      </div>
-    ` : '<p style="color:var(--ok)">&#x2713; Contrato vigente — ambas as partes assinaram.</p>'}
+
+      ${status === 'vigente'
+        ? `<p style="color:var(--ok);margin:0">&#x2713; Contrato vigente — ambas as partes assinaram.</p>`
+        : `<div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:8px">
+            <label style="display:flex;gap:10px;align-items:center;cursor:pointer;margin-bottom:14px">
+              <input type="checkbox" id="chk-leu-contrato" onchange="toggleAssinaturas()"
+                ${jaAssinou ? 'checked' : ''}>
+              <span style="font-size:.9rem">Li o contrato na íntegra e estou de acordo com os termos</span>
+            </label>
+            <div id="secao-assinaturas" style="display:${jaAssinou ? 'block' : 'none'}">
+              <strong style="font-size:.85rem;color:var(--muted)">Assinaturas:</strong>
+              <div style="margin-top:8px">${_renderAssinaturas(contrato.assinaturas)}</div>
+            </div>
+          </div>`
+      }
+    ` : `<p style="color:var(--muted);font-size:.85rem">PDF ainda não gerado.</p>`}
   `;
 }
 
@@ -6145,6 +6158,12 @@ function _formGerarContrato() {
       </button>
     </div>
   `;
+}
+
+function toggleAssinaturas() {
+  const chk = document.getElementById('chk-leu-contrato');
+  const sec = document.getElementById('secao-assinaturas');
+  if (sec) sec.style.display = chk?.checked ? 'block' : 'none';
 }
 
 function _renderAssinaturas(lista) {
