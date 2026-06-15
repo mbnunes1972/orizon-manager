@@ -2174,13 +2174,20 @@ async function carregarOrcamentos(){
     if(!d.ok) return;
     _orcamentos = d.orcamentos || [];
     if(!_orcamentoAtivoId && _orcamentos.length > 0){
-      // Seleciona o orçamento com updated_at mais recente;
-      // se nenhum foi salvo ainda, usa o primeiro (ordem 1)
-      const comData = _orcamentos.filter(o => o.updated_at);
-      const ultimo = comData.length
-        ? comData.reduce((max, o) => o.updated_at > max.updated_at ? o : max, comData[0])
-        : _orcamentos[0];
-      _orcamentoAtivoId = ultimo.id;
+      // 1. Preferir último orçamento que o usuário estava visualizando (localStorage)
+      const savedId = projetoAtivo
+        ? parseInt(localStorage.getItem('lastOrc_'+projetoAtivo.nome_safe)||'0') : 0;
+      const savedOrc = savedId && _orcamentos.find(o => o.id === savedId);
+      if(savedOrc){
+        _orcamentoAtivoId = savedOrc.id;
+      } else {
+        // 2. Fallback: orçamento com updated_at mais recente
+        const comData = _orcamentos.filter(o => o.updated_at);
+        const ultimo = comData.length
+          ? comData.reduce((max, o) => o.updated_at > max.updated_at ? o : max, comData[0])
+          : _orcamentos[0];
+        _orcamentoAtivoId = ultimo.id;
+      }
     }
     if(_orcamentoAtivoId) await ativarOrcamento(_orcamentoAtivoId);
     else renderOrcamentosBar();
@@ -2275,6 +2282,7 @@ async function _aplicarFiltroOrcamento(id){
 // Change 5: remove agendarCalculo() — renderTabelaNeg já é chamado por _aplicarFiltroOrcamento
 async function ativarOrcamento(id){
   _orcamentoAtivoId = id;
+  if(projetoAtivo) localStorage.setItem('lastOrc_'+projetoAtivo.nome_safe, id);
   renderOrcamentosBar();
   await _aplicarFiltroOrcamento(id);
 }
