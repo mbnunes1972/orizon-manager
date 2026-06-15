@@ -610,7 +610,21 @@ body{overflow:hidden}
         <div class="page-title">Negociacao</div>
         <div class="page-sub" id="neg-orc-nome-hdr">Valores finais apresentados ao cliente</div>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="position:relative">
+          <button class="btn btn-ghost btn-sm" id="neg-status-btn"
+                  onclick="negStatusClick(event)" style="font-size:11px;min-width:90px">
+            — Status &#9660;
+          </button>
+          <div class="proj-status-dd" id="neg-status-dd" style="right:0;left:auto">
+            <div class="proj-status-dd-item" onclick="negStatusSet('quente')">🔥 Quente</div>
+            <div class="proj-status-dd-item" onclick="negStatusSet('morno')">● Morno</div>
+            <div class="proj-status-dd-item" onclick="negStatusSet('frio')">❄ Frio</div>
+            <div class="proj-status-dd-item" onclick="negStatusSet('perdido')">✗ Perdido</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
+      </div>
     </div>
 
     <!-- Barra de orçamentos (EP-07) — oculta por padrão, exibida só se projeto tem orcamentos no banco -->
@@ -1939,11 +1953,15 @@ const _PROJ_STATUS_LABEL = {
 
 function _projStatusBadge(p){
   const s = p.status;
-  if(!s) return `<span class="proj-status-badge sem">—</span>`;
+  const ns = esc(p.nome_safe||'');
   if(s === 'convertido') return `<span class="proj-status-badge convertido">✓ Convertido</span>`;
+  if(!s){
+    return `<span class="proj-status-badge sem" style="cursor:pointer"
+                 onclick="projStatusClick(event,'${ns}')">— Definir</span>`;
+  }
   const info = _PROJ_STATUS_LABEL[s] || {label:s, cls:'sem'};
   return `<span class="proj-status-badge ${info.cls}" style="cursor:pointer"
-               onclick="projStatusClick(event,'${esc(p.nome_safe||'')}')">${esc(info.label)}</span>`;
+               onclick="projStatusClick(event,'${ns}')">${esc(info.label)}</span>`;
 }
 
 function renderProjResultados(lista){
@@ -2019,9 +2037,57 @@ function projToggleStatusFilter(e){
   document.getElementById('proj-status-filter-dd')?.classList.toggle('open');
 }
 
+// ── Status do projeto na page-02 ───────────────────────────────────────────────
+let _projetoStatusAtual = null;
+
+function negAtualizarStatusBtn(){
+  const btn = document.getElementById('neg-status-btn');
+  if(!btn) return;
+  const s = _projetoStatusAtual;
+  const labels = { quente:'🔥 Quente', morno:'● Morno', frio:'❄ Frio',
+                   convertido:'✓ Convertido', perdido:'✗ Perdido' };
+  btn.textContent = (s && labels[s] ? labels[s] : '— Status') + ' ▾';
+  btn.style.color = s === 'quente' ? '#f05a50'
+                  : s === 'morno'  ? '#d4a017'
+                  : s === 'frio'   ? 'var(--section)'
+                  : s === 'convertido' ? 'var(--ok)'
+                  : s === 'perdido'    ? 'var(--muted)'
+                  : '';
+  // Oculta dropdown se projeto bloqueado (convertido)
+  const dd = document.getElementById('neg-status-dd');
+  if(dd) dd.style.display = s === 'convertido' ? 'none' : '';
+}
+
+function negStatusClick(e){
+  e.stopPropagation();
+  if(_projetoStatusAtual === 'convertido') return;
+  document.querySelectorAll('.proj-status-dd.open').forEach(d=>d.classList.remove('open'));
+  document.getElementById('neg-status-dd')?.classList.toggle('open');
+}
+
+async function negStatusSet(novoStatus){
+  document.getElementById('neg-status-dd')?.classList.remove('open');
+  if(!projetoAtivo) return;
+  try{
+    const r = await fetch('/api/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/status', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({status: novoStatus})
+    });
+    const d = await r.json();
+    if(!d.ok){ showToast('Erro: '+esc(d.erro||'falha'), true); return; }
+    _projetoStatusAtual = novoStatus;
+    negAtualizarStatusBtn();
+    // Sincroniza na lista local para que ao voltar para page-00 apareça correto
+    const p = _projListaBase.find(x=>x.nome_safe===projetoAtivo.nome_safe);
+    if(p) p.status = novoStatus;
+    showToast('Status atualizado');
+  }catch(e){ showToast('Erro: '+esc(String(e)), true); }
+}
+
 document.addEventListener('click', ()=>{
   document.querySelectorAll('.proj-status-dd.open, .proj-status-filter-dd.open')
     .forEach(d=>d.classList.remove('open'));
+  document.getElementById('neg-status-dd')?.classList.remove('open');
 });
 
 function projAplicarFiltros(){
@@ -2088,6 +2154,10 @@ async function abrirProjeto(nome_safe){
       } catch(e){}
     }
     unlockNav(1); unlockNav(2);
+    // Sincroniza status do projeto na page-02
+    const _pMeta = _projListaBase.find(x=>x.nome_safe===nome_safe);
+    _projetoStatusAtual = _pMeta ? (_pMeta.status || null) : null;
+    negAtualizarStatusBtn();
     atualizarUIBloqueio();
     await carregarOrcamentos();  // EP-07: carrega lista de orçamentos
     goPage(2);  // vai direto para negociação
@@ -2429,6 +2499,8 @@ async function criarProjeto(){
     _orcamentos = []; _orcamentoAtivoId = null; _orcAmbientesAtivos = null;
     esconderFormNovoProjeto();
     unlockNav(1); unlockNav(2);
+    _projetoStatusAtual = null;
+    negAtualizarStatusBtn();
     await carregarOrcamentos();
     goPage(2);
   }catch(e){ st.textContent = 'Erro: '+e; st.style.color = 'var(--err)'; }
