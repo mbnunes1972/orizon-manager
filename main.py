@@ -245,8 +245,12 @@ class Handler(BaseHTTPRequestHandler):
                 return
             db2 = get_session()
             try:
+                from sqlalchemy import or_
                 clientes = db2.query(Cliente).filter(
-                    Cliente.omie_sync_status.in_(["erro", "pendente"])
+                    or_(
+                        Cliente.omie_sync_status.in_(["erro", "pendente"]),
+                        Cliente.omie_sync_status.is_(None)
+                    )
                 ).order_by(Cliente.omie_sync_at.desc()).all()
                 self.send_json({"ok": True, "clientes": [_cliente_dict(c) for c in clientes]})
             finally:
