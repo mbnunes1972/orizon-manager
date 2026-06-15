@@ -1524,7 +1524,6 @@ const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 const fmt = n => Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 
 let projetoAtivo    = null;
-let _projBuscaTimer = null;
 // Fonte de verdade para o toggle "Incluir custos adicionais?" — sobrevive a qualquer
 // sobrescrita de projetoAtivo.margens (race condition com salvarDescontoAutomatico).
 let _incluirCustos = false;
@@ -1931,57 +1930,135 @@ function showToast(msg, isErr){
 }
 
 // ---- Page 00: Projetos -------------------------------------------------------
-function debounceProjBusca(val){
-  clearTimeout(_projBuscaTimer);
-  const q = val.trim();
-  const hint = document.getElementById('proj-search-hint');
-  if(q.length < 2){
-    document.getElementById('proj-resultados').innerHTML='';
-    hint.textContent = 'Digite ao menos 2 caracteres para buscar';
-    document.getElementById('proj-spinner').style.display='none';
-    return;
-  }
-  hint.textContent='';
-  document.getElementById('proj-spinner').style.display='block';
-  _projBuscaTimer = setTimeout(()=>executarBuscaProjeto(q), 400);
-}
+const _PROJ_STATUS_LABEL = {
+  quente:     { label: '🔥 Quente',    cls: 'quente'     },
+  morno:      { label: '● Morno',      cls: 'morno'      },
+  frio:       { label: '❄ Frio',       cls: 'frio'       },
+  convertido: { label: '✓ Convertido', cls: 'convertido' },
+  perdido:    { label: '✗ Perdido',    cls: 'perdido'    },
+};
 
-async function executarBuscaProjeto(q){
-  try{
-    const r = await fetch('/projetos/buscar?q='+encodeURIComponent(q));
-    const d = await r.json();
-    document.getElementById('proj-spinner').style.display='none';
-    const hint = document.getElementById('proj-search-hint');
-    if(!d.ok){ hint.textContent='Erro: '+(d.erro||'falha'); return; }
-    if(!d.projetos.length){
-      hint.textContent='Nenhum projeto encontrado';
-      document.getElementById('proj-resultados').innerHTML='';
-      return;
-    }
-    hint.textContent = d.projetos.length+' projeto(s) encontrado(s)';
-    renderProjResultados(d.projetos);
-  }catch(e){
-    document.getElementById('proj-spinner').style.display='none';
-    document.getElementById('proj-search-hint').textContent='Erro: '+e;
-  }
+function _projStatusBadge(p){
+  const s = p.status;
+  if(!s) return `<span class="proj-status-badge sem">—</span>`;
+  if(s === 'convertido') return `<span class="proj-status-badge convertido">✓ Convertido</span>`;
+  const info = _PROJ_STATUS_LABEL[s] || {label:s, cls:'sem'};
+  return `<span class="proj-status-badge ${info.cls}" style="cursor:pointer"
+               onclick="projStatusClick(event,'${esc(p.nome_safe||'')}')">${esc(info.label)}</span>`;
 }
 
 function renderProjResultados(lista){
-  if(!lista.length){
-    document.getElementById('proj-resultados').innerHTML =
-      '<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Nenhum projeto encontrado.</div>';
+  const el = document.getElementById('proj-resultados');
+  if(!lista || !lista.length){
+    el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Nenhum projeto encontrado.</div>';
     return;
   }
-  document.getElementById('proj-resultados').innerHTML = lista.map(p=>`
-    <div class="proj-card-item" onclick="abrirProjeto('${esc(p.nome_safe)}')">
-      <div class="proj-card-nome">${esc(p.nome_projeto)} <span class="badge-origem ${esc(p.origem||'local')}">${esc((p.origem||'local').toUpperCase())}</span></div>
-      <div class="proj-card-cli">${esc(p.cliente_nome||'—')}</div>
-      <div class="proj-card-meta">
-        <span>${p.n_ambientes||0} ambiente(s)</span>
-        <span style="color:var(--ok)">${p.n_selecionados||0} selecionado(s)</span>
-        ${p.atualizado_em?'<span style="color:var(--muted)">'+esc(p.atualizado_em.substring(0,10))+'</span>':''}
-      </div>
-    </div>`).join('');
+  const fmt = v => v != null ? 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '—';
+  const fmtData = s => s ? s.substring(0,10).split('-').reverse().join('/') : '—';
+  el.innerHTML = `
+    <table class="proj-table">
+      <thead><tr>
+        <th style="width:130px">Status</th>
+        <th style="width:100px">Data</th>
+        <th>Projeto</th>
+        <th>Cliente</th>
+        <th style="width:140px;text-align:right">Último Orçamento</th>
+      </tr></thead>
+      <tbody>${lista.map(p=>`
+        <tr class="proj-row">
+          <td class="cell-status" style="position:relative">
+            ${_projStatusBadge(p)}
+            <div class="proj-status-dd" id="proj-dd-${esc(p.nome_safe||'')}">
+              ${['quente','morno','frio','perdido'].map(s=>`
+                <div class="proj-status-dd-item"
+                     onclick="projStatusSet('${esc(p.nome_safe||'')}','${s}')">
+                  ${esc(_PROJ_STATUS_LABEL[s].label)}
+                </div>`).join('')}
+            </div>
+          </td>
+          <td onclick="abrirProjeto('${esc(p.nome_safe||'')}')">${fmtData(p.atualizado_em||p.criado_em||'')}</td>
+          <td onclick="abrirProjeto('${esc(p.nome_safe||'')}')" style="font-weight:600">${esc(p.nome_projeto||'—')}</td>
+          <td onclick="abrirProjeto('${esc(p.nome_safe||'')}')" style="color:var(--muted)">${esc(p.cliente_nome||'—')}</td>
+          <td onclick="abrirProjeto('${esc(p.nome_safe||'')}')" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px">${fmt(p.ultimo_orcamento_valor)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function projStatusClick(e, nomeSafe){
+  e.stopPropagation();
+  document.querySelectorAll('.proj-status-dd.open').forEach(d=>{
+    if(d.id !== 'proj-dd-'+nomeSafe) d.classList.remove('open');
+  });
+  const dd = document.getElementById('proj-dd-'+nomeSafe);
+  if(dd) dd.classList.toggle('open');
+}
+
+async function projStatusSet(nomeSafe, novoStatus){
+  const dd = document.getElementById('proj-dd-'+nomeSafe);
+  if(dd) dd.classList.remove('open');
+  try{
+    const r = await fetch('/api/projetos/'+encodeURIComponent(nomeSafe)+'/status', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({status: novoStatus})
+    });
+    const d = await r.json();
+    if(!d.ok){ showToast('Erro: '+esc(d.erro||'falha'), true); return; }
+    const p = _projListaBase.find(x=>x.nome_safe===nomeSafe);
+    if(p){ p.status = novoStatus; p.status_at = new Date().toISOString(); }
+    projAplicarFiltros();
+  }catch(e){ showToast('Erro: '+esc(String(e)), true); }
+}
+
+function projToggleStatusFilter(e){
+  e.stopPropagation();
+  document.getElementById('proj-status-filter-dd')?.classList.toggle('open');
+}
+
+document.addEventListener('click', ()=>{
+  document.querySelectorAll('.proj-status-dd.open, .proj-status-filter-dd.open')
+    .forEach(d=>d.classList.remove('open'));
+});
+
+function projAplicarFiltros(){
+  const txt = (document.getElementById('proj-search')?.value || '').trim().toLowerCase();
+  const checks = [...(document.querySelectorAll('#proj-status-filter-dd input[type=checkbox]') || [])];
+  const ativos = new Set(checks.filter(c=>c.checked).map(c=>c.value));
+  const todosAtivos = checks.length === 0 || checks.every(c=>c.checked) || checks.every(c=>!c.checked);
+
+  let lista = [..._projListaBase];
+
+  if(txt.length >= 2){
+    lista = lista.filter(p=>
+      (p.nome_projeto||'').toLowerCase().includes(txt) ||
+      (p.cliente_nome||'').toLowerCase().includes(txt) ||
+      (p.cliente_cpf||'').replace(/\D/g,'').includes(txt.replace(/\D/g,''))
+    );
+  }
+
+  if(!todosAtivos){
+    lista = lista.filter(p=>{
+      const s = p.status || 'sem';
+      return ativos.has(s);
+    });
+  }
+
+  lista.sort((a,b)=>{
+    const da = a.atualizado_em||a.criado_em||'';
+    const db2 = b.atualizado_em||b.criado_em||'';
+    return db2.localeCompare(da);
+  });
+
+  const hint = document.getElementById('proj-search-hint');
+  if(hint) hint.textContent = lista.length ? `${lista.length} projeto(s)` : 'Nenhum resultado';
+
+  const btn = document.getElementById('proj-status-filter-btn');
+  if(btn){
+    const n = checks.filter(c=>c.checked).length;
+    btn.textContent = todosAtivos ? 'Status ▾' : `Status (${n}) ▾`;
+  }
+
+  renderProjResultados(lista);
 }
 
 async function abrirProjeto(nome_safe){
@@ -5193,9 +5270,8 @@ async function cliSalvar(){
   } catch(e){ erro.textContent = 'Erro de conexão.'; }
 }
 
-// ── Módulo Projetos — carregamento e ordenação ────────────────────────────────
-let _projOrdemAsc   = false;  // false = mais recente primeiro
-let _projListaBase  = [];     // cache dos projetos carregados
+// ── Módulo Projetos — carregamento ────────────────────────────────────────────
+let _projListaBase = [];
 
 async function projCarregar(){
   try {
@@ -5203,47 +5279,8 @@ async function projCarregar(){
     const d = await r.json();
     if(!d.ok) return;
     _projListaBase = d.projetos || [];
-    projRenderOrdenado();
+    projAplicarFiltros();
   } catch(e){}
-}
-
-function projRenderOrdenado(){
-  const lista = [..._projListaBase].sort((a, b) => {
-    const da = a.atualizado_em || a.criado_em || '';
-    const db2 = b.atualizado_em || b.criado_em || '';
-    return _projOrdemAsc ? da.localeCompare(db2) : db2.localeCompare(da);
-  });
-  const hint = document.getElementById('proj-search-hint');
-  if(hint) hint.textContent = lista.length
-    ? `${lista.length} projeto(s) — ${_projOrdemAsc ? '↑ mais antigo primeiro' : '↓ mais recente primeiro'}`
-    : '';
-  renderProjResultados(lista);
-}
-
-function projToggleOrdem(){
-  _projOrdemAsc = !_projOrdemAsc;
-  projRenderOrdenado();
-}
-
-function projFiltrar(q){
-  const s = (q || '').trim().toLowerCase();
-  document.getElementById('proj-spinner').style.display = 'block';
-  clearTimeout(window._projFiltrarTimer);
-  window._projFiltrarTimer = setTimeout(async () => {
-    document.getElementById('proj-spinner').style.display = 'none';
-    if(s.length < 2){
-      projRenderOrdenado();
-      return;
-    }
-    // Para busca com texto, usa endpoint de busca (inclui Omie)
-    try {
-      const r = await fetch('/projetos/buscar?q='+encodeURIComponent(s));
-      const d = await r.json();
-      const hint = document.getElementById('proj-search-hint');
-      if(hint) hint.textContent = d.projetos?.length ? d.projetos.length+' encontrado(s)' : 'Nenhum resultado';
-      renderProjResultados(d.projetos || []);
-    } catch(e){}
-  }, 350);
 }
 
 // ── Parceiro no formulário de novo projeto ────────────────────────────────────
