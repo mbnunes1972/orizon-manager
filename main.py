@@ -63,6 +63,40 @@ def _serve_html():
     with open(path, encoding="utf-8") as f:
         return f.read()
 
+def _tentar_sync_omie(c, db):
+    """Tenta criar cliente no Omie. Atualiza omie_sync_* em c e faz db.commit()."""
+    from datetime import datetime as _dt
+    if not c.cpf:
+        c.omie_sync_status = "pendente"
+        c.omie_sync_erro   = "CPF não informado — necessário para registro no Omie"
+        c.omie_sync_at     = _dt.utcnow()
+        db.commit()
+        return
+
+    cfg = config_carregar()
+    key    = cfg.get("app_key", "")
+    secret = cfg.get("app_secret", "")
+    if not key or not secret:
+        c.omie_sync_status = "pendente"
+        c.omie_sync_erro   = "Credenciais Omie não configuradas"
+        c.omie_sync_at     = _dt.utcnow()
+        db.commit()
+        return
+
+    _set_credenciais(key, secret)
+    try:
+        codigo = criar_cliente(c.nome, c.cpf, lambda msg, tipo="info": None)
+        c.omie_codigo      = str(codigo)
+        c.omie_sync_status = "ok"
+        c.omie_sync_erro   = None
+        c.omie_sync_at     = _dt.utcnow()
+    except Exception as e:
+        c.omie_sync_status = "erro"
+        c.omie_sync_erro   = str(e)
+        c.omie_sync_at     = _dt.utcnow()
+    db.commit()
+
+
 # == HANDLERS HTTP ==
 # == HANDLERS HTTP ==
 # -- Multipart -----------------------------------------------------------------
@@ -808,6 +842,7 @@ class Handler(BaseHTTPRequestHandler):
                 db.add(c)
                 db.commit()
                 db.refresh(c)
+                _tentar_sync_omie(c, db)
                 self.send_json({"ok": True, "cliente": _cliente_dict(c)})
             except Exception as e:
                 db.rollback()
@@ -1515,7 +1550,10 @@ def _cliente_dict(c) -> dict:
         "cidade":      c.cidade      or "",
         "estado":      c.estado      or "",
         "observacoes": c.observacoes or "",
-        "omie_codigo": c.omie_codigo or "",
+        "omie_codigo":       c.omie_codigo or "",
+        "omie_sync_status":  c.omie_sync_status or "",
+        "omie_sync_erro":    c.omie_sync_erro   or "",
+        "omie_sync_at":      c.omie_sync_at.isoformat() if c.omie_sync_at else "",
         "criado_em":   c.criado_em.strftime("%Y-%m-%d") if c.criado_em else "",
     }
 
