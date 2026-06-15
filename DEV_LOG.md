@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-12 (sessão 5)
+> Atualizado em: 2026-06-14 (sessão 6 — verificação de estado)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -16,6 +16,8 @@
 - Projeto vinculado a cliente obrigatório
 - Lista de projetos ordenada com busca
 - EP-07 completo: upload, pool, orçamentos, cálculos, desconto individual, limites
+- Toggle "Incluir custos adicionais" corrigido: `_incluirCustos` como fonte de verdade global (evita race condition com `carregarMargensSalvas`)
+- **Total Flex (US-14) completo:** `mod_fin/total_flex.py` — juros compostos por dias reais, última parcela auto-calculada, taxa lida exclusivamente de `config/total_flex.json`, painel completo no frontend com edição livre de datas/valores
 
 ### [EP-07] Estado atual do versionamento de orçamentos
 
@@ -52,8 +54,7 @@
   - Bloqueia save de parâmetros; reverte desconto individual em tempo real
 
 ### [PENDENTE]
-- Bug toggle "incluir custos adicionais" (da sessão 2) — ainda em aberto
-- Total Flex (US-14) — planejado para v0.2.0
+- Módulo Clientes e Parceiros vinculados a orçamentos (planejado)
 
 ### [DECIDIDO]
 - Pool de ambientes permanente por projeto (XMLs nunca deletados)

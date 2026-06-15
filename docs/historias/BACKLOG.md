@@ -160,7 +160,7 @@
 
 ---
 
-### US-09 — Toggle de custos adicionais `[BUG CONHECIDO]`
+### US-09 — Toggle de custos adicionais `[IMPLEMENTADO]`
 
 **Como** consultor de vendas,  
 **quero** ativar ou desativar a inclusão de custos internos no preço ao cliente,  
@@ -171,8 +171,6 @@
 - Quando ativado: custos internos fazem gross-up no preço ao cliente
 - Quando desativado: custos internos não afetam o preço visível ao cliente
 - Estado do toggle persistido corretamente entre aberturas do modal
-
-> **⚠ Bug:** `carregarMargensSalvas()` sobrescreve `projetoAtivo.margens.incluir_custos` ao recarregar do servidor, fazendo o toggle ignorar a última seleção do usuário.
 
 ---
 
@@ -237,7 +235,7 @@
 
 ---
 
-### US-14 — Total Flex `[PLANEJADO]`
+### US-14 — Total Flex `[IMPLEMENTADO]`
 
 **Como** consultor de vendas,  
 **quero** oferecer um plano de parcelas flexíveis com juros compostos sobre saldo devedor,  
@@ -248,9 +246,7 @@
 - Juros compostos calculados sobre dias reais entre vencimentos
 - Última parcela calculada automaticamente para zerar o saldo (campo de valor travado, data editável)
 - Taxa mensal lida **exclusivamente pelo backend** (nunca exposta no frontend, variáveis JS, logs ou DevTools)
-- Configuração da taxa em `total_flex.json` no servidor
-
-> **📌 Referência:** Spec técnica completa em `docs/modulos/financeiro/Spec_TotalFlex_v1.docx`
+- Configuração da taxa em `config/total_flex.json` no servidor
 
 ---
 

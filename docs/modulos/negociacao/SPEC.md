@@ -1,7 +1,6 @@
 # Módulo de Negociação — SPEC
 
-**Status:** `[IMPLEMENTADO]` — atualizado 2026-06-12  
-> Bug toggle "Incluir custos adicionais?" ainda pendente — ver [PENDENTE]
+**Status:** `[IMPLEMENTADO]` — atualizado 2026-06-14
 
 ---
 
@@ -134,21 +133,6 @@ O sistema impõe um **teto absoluto de 35%** no desconto total, independente do 
 |---|---|
 | Salvar orçamento | Salva estado atual no projeto.json — pode continuar editando |
 | Aprovar orçamento | Bloqueia o projeto — não permite mais alterações — avança para exportação Omie |
-
----
-
-## [PENDENTE] Bug — Toggle "Incluir custos adicionais?"
-
-**Descrição:** O toggle não persiste corretamente entre aberturas do modal.
-
-**Fluxo do bug:**
-1. Marcar toggle → Salvar → ok ✓
-2. Entrar/sair sem salvar → ok ✓
-3. Entrar novamente → toggle aparece desmarcado ✗
-
-**Causa identificada:** `carregarMargensSalvas` recarrega do servidor após fechar o modal sem salvar, e o servidor retorna o JSON onde `incluir_custos` pode estar desatualizado.
-
-**Arquivos:** `static/index.html` — funções `fecharModalParams`, `carregarMargensSalvas`, `abrirModalParams`.
 
 ---
 
