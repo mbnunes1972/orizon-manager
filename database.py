@@ -3,7 +3,7 @@ database.py — Conexão SQLAlchemy + modelos de dados
 Omie_V3 | Dalmóbile
 """
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship
 from datetime import datetime
 import hashlib
@@ -185,6 +185,65 @@ class OrcamentoAmbiente(Base):
 
     orcamento     = relationship("Orcamento",     back_populates="ambientes")
     pool_ambiente = relationship("PoolAmbiente",  back_populates="orcamento_links")
+
+
+# ── Ciclo do Projeto ──────────────────────────────────────────────────────────
+
+class CicloEtapa(Base):
+    """Estado de cada etapa do pipeline por projeto."""
+    __tablename__ = "ciclo_etapas"
+
+    id             = Column(Integer,  primary_key=True, autoincrement=True)
+    projeto_nome   = Column(Text,     nullable=False)   # nome_safe
+    etapa_codigo   = Column(Text,     nullable=False)   # "7", "11b", "17a" etc.
+    status         = Column(Text,     nullable=False, default="pendente")
+    responsavel_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    iniciado_em    = Column(DateTime, nullable=True)
+    concluido_em   = Column(DateTime, nullable=True)
+    observacoes    = Column(Text,     nullable=True)
+
+    __table_args__ = (UniqueConstraint("projeto_nome", "etapa_codigo", name="uq_ciclo_etapa"),)
+
+    responsavel = relationship("Usuario", foreign_keys=[responsavel_id])
+
+
+class Contrato(Base):
+    """Contrato gerado a partir do orçamento aprovado."""
+    __tablename__ = "contratos"
+
+    id                   = Column(Integer,  primary_key=True, autoincrement=True)
+    projeto_nome         = Column(Text,     nullable=False)
+    orcamento_id         = Column(Integer,  ForeignKey("orcamentos.id"), nullable=False)
+    template_path        = Column(Text,     nullable=False, default="config/contrato_template.docx")
+    pdf_path             = Column(Text,     nullable=True)
+    endereco_instalacao  = Column(Text,     nullable=True)
+    status               = Column(Text,     nullable=False, default="rascunho")
+    # status: rascunho | gerado | assinado_loja | assinado_cliente | vigente
+    adendo               = Column(Text,     nullable=True)
+    gerado_em            = Column(DateTime, nullable=True)
+    gerado_por_id        = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    d4sign_uuid          = Column(Text,     nullable=True)   # fase futura D4Sign
+
+    gerado_por   = relationship("Usuario",  foreign_keys=[gerado_por_id])
+    orcamento    = relationship("Orcamento", foreign_keys=[orcamento_id])
+    assinaturas  = relationship("ContratoAssinatura", back_populates="contrato",
+                                cascade="all, delete-orphan")
+
+
+class ContratoAssinatura(Base):
+    """Registro de assinatura interna (MVP) ou confirmação D4Sign (futuro)."""
+    __tablename__ = "contratos_assinaturas"
+
+    id           = Column(Integer,  primary_key=True, autoincrement=True)
+    contrato_id  = Column(Integer,  ForeignKey("contratos.id"), nullable=False)
+    parte        = Column(Text,     nullable=False)   # loja | cliente
+    nome         = Column(Text,     nullable=False)
+    cpf          = Column(Text,     nullable=False)
+    assinado_em  = Column(DateTime, nullable=False, default=datetime.utcnow)
+    ip_origem    = Column(Text,     nullable=True)
+    hash_sha256  = Column(Text,     nullable=False)
+
+    contrato = relationship("Contrato", back_populates="assinaturas")
 
 
 # ── Inicialização ─────────────────────────────────────────────────────────────
