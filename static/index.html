@@ -78,6 +78,28 @@ input:focus{border-color:var(--accent)}
 .proj-card-cli{font-size:11px;color:var(--muted);margin-bottom:6px}
 .proj-card-meta{display:flex;gap:12px;font-size:10px;color:var(--muted)}
 .proj-card-meta span{color:var(--section)}
+/* Tabela de projetos */
+.proj-table{width:100%;border-collapse:collapse;font-size:13px}
+.proj-table th{text-align:left;padding:7px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600}
+.proj-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+.proj-table tr.proj-row:hover td{background:rgba(232,97,26,.04);cursor:pointer}
+.proj-table tr.proj-row td.cell-status{cursor:default}
+.proj-status-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.proj-status-badge.quente{background:rgba(240,90,80,.12);color:#f05a50}
+.proj-status-badge.morno{background:rgba(251,191,36,.12);color:#d4a017}
+.proj-status-badge.frio{background:rgba(96,165,250,.12);color:var(--section)}
+.proj-status-badge.convertido{background:rgba(25,201,160,.12);color:var(--ok)}
+.proj-status-badge.perdido{background:rgba(120,120,120,.12);color:var(--muted)}
+.proj-status-badge.sem{background:transparent;color:var(--muted)}
+.proj-status-dd{position:absolute;top:100%;left:0;z-index:300;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);min-width:140px;overflow:hidden;display:none}
+.proj-status-dd.open{display:block}
+.proj-status-dd-item{padding:8px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.proj-status-dd-item:hover{background:var(--surface)}
+.proj-status-filter-wrap{position:relative;display:inline-block}
+.proj-status-filter-dd{position:absolute;top:100%;right:0;z-index:300;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);min-width:160px;padding:6px 0;display:none;margin-top:4px}
+.proj-status-filter-dd.open{display:block}
+.proj-status-filter-item{display:flex;align-items:center;gap:8px;padding:6px 14px;font-size:12px;cursor:pointer}
+.proj-status-filter-item:hover{background:var(--surface)}
 .search-wrap{position:relative;margin-bottom:12px}
 .search-wrap input{padding-right:36px}
 .search-spinner{display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%)}
@@ -486,13 +508,9 @@ body{overflow:hidden}
 
   <!-- PAGE 00: Projetos -->
   <div class="page active" id="page-00">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
-      <div class="page-title">Projetos</div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-ghost btn-sm" onclick="projToggleOrdem()" id="btn-proj-ordem"
-                title="Inverter ordem" style="font-size:13px;padding:5px 10px">&#x21C5;</button>
-        <button class="btn btn-primary btn-sm" onclick="mostrarFormNovoProjeto()">+ Novo projeto</button>
-      </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div class="page-title" style="margin:0">Projetos</div>
+      <button class="btn btn-primary btn-sm" onclick="mostrarFormNovoProjeto()">+ Novo Projeto</button>
     </div>
     <div id="form-novo-projeto" class="p00-form" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -551,9 +569,26 @@ body{overflow:hidden}
         <span id="novo-proj-status" style="font-size:11px;color:var(--muted)"></span>
       </div>
     </div>
-    <div class="search-wrap">
-      <input type="text" id="proj-search" placeholder="Filtrar projetos..." oninput="projFiltrar(this.value)">
-      <div class="search-spinner" id="proj-spinner"><div class="spinner"></div></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+      <div style="flex:1;position:relative;min-width:200px">
+        <input type="text" id="proj-search" placeholder="Filtrar por nome, cliente ou CPF..."
+               oninput="projAplicarFiltros()" class="inp" style="width:100%;box-sizing:border-box;padding-right:32px">
+        <div class="search-spinner" id="proj-spinner" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)"><div class="spinner"></div></div>
+      </div>
+      <div class="proj-status-filter-wrap">
+        <button class="btn btn-ghost btn-sm" id="proj-status-filter-btn"
+                onclick="projToggleStatusFilter(event)" style="font-size:11px;white-space:nowrap">
+          Status &#9660;
+        </button>
+        <div class="proj-status-filter-dd" id="proj-status-filter-dd">
+          <label class="proj-status-filter-item"><input type="checkbox" value="quente"     checked onchange="projAplicarFiltros()"> 🔥 Quente</label>
+          <label class="proj-status-filter-item"><input type="checkbox" value="morno"      checked onchange="projAplicarFiltros()"> ● Morno</label>
+          <label class="proj-status-filter-item"><input type="checkbox" value="frio"       checked onchange="projAplicarFiltros()"> ❄ Frio</label>
+          <label class="proj-status-filter-item"><input type="checkbox" value="convertido" checked onchange="projAplicarFiltros()"> ✓ Convertido</label>
+          <label class="proj-status-filter-item"><input type="checkbox" value="perdido"    checked onchange="projAplicarFiltros()"> ✗ Perdido</label>
+          <label class="proj-status-filter-item"><input type="checkbox" value="sem"        checked onchange="projAplicarFiltros()"> — Sem status</label>
+        </div>
+      </div>
     </div>
     <div id="proj-search-hint" style="font-size:11px;color:var(--muted);height:16px;margin-bottom:8px"></div>
     <div id="proj-resultados"></div>
