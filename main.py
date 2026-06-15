@@ -1874,7 +1874,7 @@ class Handler(BaseHTTPRequestHandler):
                         if novo_status in ("concluido", "aprovado", "vigente", "implantado",
                                            "realizado", "entregue", "emitida"):
                             etapa.concluido_em  = datetime.utcnow()
-                            etapa.responsavel_id = usuario.id
+                            etapa.responsavel_id = usuario["id"]
                     if obs is not None:
                         etapa.observacoes = obs
                     db.commit()
@@ -1994,7 +1994,7 @@ def _montar_dados_projeto_para_contrato(nome_safe: str, orcamento_id: int, db) -
     Lança ValueError se dados essenciais estiverem faltando.
     """
     import json as _json
-    proj_path = os.path.join("PROJETOS", nome_safe, "projeto.json")
+    proj_path = os.path.join(PROJETOS_DIR, nome_safe, "projeto.json")
     if not os.path.exists(proj_path):
         raise ValueError(f"Projeto não encontrado: {nome_safe}")
     with open(proj_path, encoding="utf-8") as f:
