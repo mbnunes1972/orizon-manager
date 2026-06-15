@@ -5770,6 +5770,10 @@ document.addEventListener('DOMContentLoaded', function(){
     dz2.addEventListener('dragleave', () => dz2.classList.remove('drag'));
     dz2.addEventListener('drop',      e => { e.preventDefault(); dz2.classList.remove('drag'); uploadXmls(e.dataTransfer.files); });
   }
+  // Carrega a lista de projetos automaticamente ao abrir a aplicação
+  if(document.getElementById('page-00')?.classList.contains('active')){
+    projCarregar();
+  }
 });
 
 // ---- Aprovacao / Exportacao --------------------------------------------------
@@ -6005,7 +6009,7 @@ function renderCiclo() {
   `;
   for (const etapa of ETAPAS_CICLO) {
     const dados  = _cicloData[etapa.codigo] || {};
-    const status = dados.status || (parseInt(etapa.codigo) <= 6 ? "concluido" : "bloqueado");
+    const status = dados.status || "pendente";
     const badge  = `<span class="etapa-badge badge-${status}">${status}</span>`;
     const indent = etapa.sub ? 'margin-left:24px;' : '';
     const card   = document.createElement('div');
@@ -6079,19 +6083,22 @@ function renderContratoUI(contrato) {
   if (!contrato) {
     ui.innerHTML = `
       <p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">
-        Orçamento aprovado pelo cliente. Preencha os dados complementares para emitir o contrato.
+        Use o bot&atilde;o "Aprovar Or&ccedil;amento" na tela de negocia&ccedil;&atilde;o para iniciar o contrato.
       </p>
-      <button onclick="abrirModalAprovacaoOrcamento()"
+      <button onclick="fecharCiclo();abrirAprovacaoComDados()"
         style="background:#b8960c;color:#000;border:none;border-radius:6px;
-        padding:10px 24px;font-size:1rem;font-weight:700;cursor:pointer;letter-spacing:.03em">
-        &#x2713; Aprovar Or&#xe7;amento e Gerar Contrato
+        padding:8px 18px;font-size:.9rem;font-weight:700;cursor:pointer">
+        &#x2713; Aprovar Or&ccedil;amento
       </button>
     `;
     return;
   }
-  const temPdf = contrato.tem_pdf;
-  const status = contrato.status;
-  const pdfUrl = `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato/pdf`;
+  const temArquivo  = contrato.tem_pdf;
+  const arquivoTipo = contrato.arquivo_tipo || (temArquivo ? "pdf" : "");
+  const temPdf      = temArquivo && arquivoTipo === "pdf";
+  const temDocx     = temArquivo && arquivoTipo === "docx";
+  const status      = contrato.status;
+  const pdfUrl      = `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato/pdf`;
   const jaAssinou = (contrato.assinaturas || []).length > 0;
 
   ui.innerHTML = `
@@ -6101,35 +6108,49 @@ function renderContratoUI(contrato) {
       ${!['assinado','vigente'].includes(status) && temPdf ? `<button onclick="abrirModalAdendo()" class="btn-ciclo" style="margin-left:auto;font-size:.8rem">Editar Adendo</button>` : ''}
     </div>
 
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      ${temArquivo ? `
+        <a href="${pdfUrl}" target="_blank" class="btn-ciclo" style="text-decoration:none;font-size:.82rem">
+          &#x2B07; ${temDocx ? 'Baixar .docx' : 'Abrir PDF'}
+        </a>` : ''}
+      ${!['assinado','vigente'].includes(status) ? `
+        <button onclick="fecharCiclo();abrirAprovacaoComDados()" class="btn-ciclo" style="font-size:.82rem">
+          Revisar dados / Regenerar
+        </button>` : ''}
+    </div>
+
+    ${temDocx && !temPdf ? `
+      <div style="background:#1a1200;border:1px solid #b8960c;border-radius:6px;padding:12px 14px;margin-bottom:14px">
+        <p style="color:#f0c84a;font-size:.85rem;margin:0">
+          &#x26A0; LibreOffice n&atilde;o encontrado no servidor.<br>
+          O contrato foi salvo em formato Word (.docx). Baixe acima para visualizar.<br>
+          Instale o LibreOffice no servidor para gera&ccedil;&atilde;o autom&aacute;tica em PDF.
+        </p>
+      </div>` : ''}
+
     ${temPdf ? `
       <div style="margin-bottom:16px">
         <p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">
-          Leia o contrato antes de assinar. Role até o final para confirmar leitura.
+          Leia o contrato antes de assinar.
         </p>
         <iframe src="${pdfUrl}" style="width:100%;height:560px;border:1px solid var(--border);border-radius:6px"></iframe>
-        <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
-          <a href="${pdfUrl}" target="_blank" class="btn-ciclo" style="text-decoration:none;font-size:.82rem">
-            &#x2B07; Abrir em nova aba
-          </a>
-          ${!['assinado','vigente'].includes(status) ? `<button onclick="abrirAprovacaoComDados()" class="btn-ciclo" style="font-size:.82rem">Revisar dados / Regenerar</button>` : ''}
-        </div>
-      </div>
+      </div>` : ''}
 
-      ${['assinado','vigente'].includes(status)
-        ? `<p style="color:var(--ok);margin:0">&#x2713; Contrato assinado — ambas as partes confirmaram.</p>`
-        : `<div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:8px">
-            <label style="display:flex;gap:10px;align-items:center;cursor:pointer;margin-bottom:14px">
-              <input type="checkbox" id="chk-leu-contrato" onchange="toggleAssinaturas()"
-                ${jaAssinou ? 'checked' : ''}>
-              <span style="font-size:.9rem">Li o contrato na íntegra e estou de acordo com os termos</span>
-            </label>
-            <div id="secao-assinaturas" style="display:${jaAssinou ? 'block' : 'none'}">
-              <strong style="font-size:.85rem;color:var(--muted)">Assinaturas:</strong>
-              <div style="margin-top:8px">${_renderAssinaturas(contrato.assinaturas)}</div>
-            </div>
-          </div>`
-      }
-    ` : `<p style="color:var(--muted);font-size:.85rem">PDF ainda não gerado.</p>`}
+    ${['assinado','vigente'].includes(status)
+      ? `<p style="color:var(--ok);margin:0">&#x2713; Contrato assinado — ambas as partes confirmaram.</p>`
+      : temArquivo ? `
+        <div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:8px">
+          <label style="display:flex;gap:10px;align-items:center;cursor:pointer;margin-bottom:14px">
+            <input type="checkbox" id="chk-leu-contrato" onchange="toggleAssinaturas()"
+              ${jaAssinou ? 'checked' : ''}>
+            <span style="font-size:.9rem">Li o contrato e estou de acordo com os termos</span>
+          </label>
+          <div id="secao-assinaturas" style="display:${jaAssinou ? 'block' : 'none'}">
+            <strong style="font-size:.85rem;color:var(--muted)">Assinaturas:</strong>
+            <div style="margin-top:8px">${_renderAssinaturas(contrato.assinaturas)}</div>
+          </div>
+        </div>` : ''
+    }
   `;
 }
 
@@ -6438,10 +6459,12 @@ async function gerarContrato() {
     document.getElementById('modal-aprovacao-overlay')?.remove();
     // Abre a aba Ciclo no card 7 automaticamente
     abrirCiclo();
-    setTimeout(() => {
-      toggleCicloCard('7');
-    }, 300);
-    showToast('Contrato gerado! Revise e assine na aba Etapas do Projeto.', false);
+    setTimeout(() => { toggleCicloCard('7'); }, 300);
+    if (d.aviso) {
+      setTimeout(() => mostrarErroModal('Contrato gerado (Word):\n\n' + d.aviso), 400);
+    } else {
+      showToast('Contrato gerado! Revise e assine na aba Etapas do Projeto.', false);
+    }
   } catch(e) {
     mostrarErroModal('Erro de rede ao gerar contrato:\n\n' + e.message);
     if (btn) { btn.disabled = false; btn.textContent = 'Gerar Contrato'; }

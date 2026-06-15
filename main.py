@@ -36,7 +36,8 @@ from mod_omie import (
 )
 from mod_margens import calcular_margens, _normalizar_faixas
 from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada, calcular_total_flex
-from mod_contrato import calcular_hash_assinatura, montar_variaveis_contrato, gerar_pdf_contrato
+from mod_contrato import (calcular_hash_assinatura, montar_variaveis_contrato,
+                          gerar_pdf_contrato, LibreOfficeIndisponivel)
 
 def _enriquecer_projetos_com_status(projetos):
     """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
@@ -500,17 +501,22 @@ class Handler(BaseHTTPRequestHandler):
                                  .order_by(Contrato.id.desc())\
                                  .first()
                     if not contrato or not contrato.pdf_path or not os.path.exists(contrato.pdf_path):
-                        self.send_json({"ok": False, "erro": "PDF não encontrado"}, code=404)
+                        self.send_json({"ok": False, "erro": "Arquivo não encontrado"}, code=404)
                         return
+                    eh_pdf  = contrato.pdf_path.endswith(".pdf")
+                    ct      = "application/pdf" if eh_pdf else \
+                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    ext     = "pdf" if eh_pdf else "docx"
                     with open(contrato.pdf_path, 'rb') as f:
-                        pdf_data = f.read()
+                        arq_data = f.read()
                     self.send_response(200)
-                    self.send_header("Content-Type", "application/pdf")
-                    self.send_header("Content-Length", len(pdf_data))
+                    self.send_header("Content-Type", ct)
+                    self.send_header("Content-Length", len(arq_data))
+                    disp = "inline" if eh_pdf else "attachment"
                     self.send_header("Content-Disposition",
-                                     f'inline; filename="contrato_{nome_safe}.pdf"')
+                                     f'{disp}; filename="contrato_{nome_safe}.{ext}"')
                     self.end_headers()
-                    self.wfile.write(pdf_data)
+                    self.wfile.write(arq_data)
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
@@ -534,13 +540,18 @@ class Handler(BaseHTTPRequestHandler):
                         "nome":        a.nome,
                         "assinado_em": a.assinado_em.isoformat(),
                     } for a in contrato.assinaturas]
+                    tem_arquivo = bool(contrato.pdf_path and os.path.exists(contrato.pdf_path))
+                    arquivo_tipo = ""
+                    if tem_arquivo:
+                        arquivo_tipo = "pdf" if contrato.pdf_path.endswith(".pdf") else "docx"
                     self.send_json({"ok": True, "contrato": {
                         "id":                   contrato.id,
                         "status":               contrato.status,
                         "endereco_instalacao":  contrato.endereco_instalacao or "",
                         "adendo":               contrato.adendo or "",
                         "gerado_em":            contrato.gerado_em.isoformat() if contrato.gerado_em else None,
-                        "tem_pdf":              bool(contrato.pdf_path and os.path.exists(contrato.pdf_path)),
+                        "tem_pdf":              tem_arquivo,
+                        "arquivo_tipo":         arquivo_tipo,
                         "assinaturas":          assinaturas,
                     }})
                 except Exception as e:
@@ -1773,11 +1784,30 @@ class Handler(BaseHTTPRequestHandler):
                     contrato.gerado_por_id       = usuario["id"]
                     contrato.status              = "rascunho"
                     db.commit()
-                    pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
-                    contrato.pdf_path = pdf_path
-                    contrato.status   = "para_assinatura"
+                    aviso = None
+                    try:
+                        pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
+                        contrato.pdf_path = pdf_path
+                    except LibreOfficeIndisponivel as lo:
+                        # Salva o .docx e avança mesmo sem PDF
+                        contrato.pdf_path = lo.docx_path
+                        aviso = str(lo)
+                    contrato.status = "para_assinatura"
+                    # Marcar etapa 6 (Aprovação do orçamento) como concluída
+                    etapa6 = db.query(CicloEtapa).filter_by(
+                        projeto_nome=nome_safe, etapa_codigo="6"
+                    ).first()
+                    if not etapa6:
+                        etapa6 = CicloEtapa(projeto_nome=nome_safe, etapa_codigo="6")
+                        db.add(etapa6)
+                    etapa6.status       = "concluido"
+                    etapa6.concluido_em = datetime.utcnow()
+                    etapa6.responsavel_id = usuario["id"]
                     db.commit()
-                    self.send_json({"ok": True, "contrato_id": contrato.id, "status": "para_assinatura"})
+                    resp = {"ok": True, "contrato_id": contrato.id, "status": "para_assinatura"}
+                    if aviso:
+                        resp["aviso"] = aviso
+                    self.send_json(resp)
                 except Exception as e:
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)

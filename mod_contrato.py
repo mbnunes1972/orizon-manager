@@ -89,12 +89,24 @@ def montar_variaveis_contrato(
     }
 
 
+class LibreOfficeIndisponivel(Exception):
+    """LibreOffice não encontrado — .docx gerado mas PDF pendente."""
+    def __init__(self, docx_path: str):
+        self.docx_path = docx_path
+        super().__init__(
+            "LibreOffice não encontrado no servidor.\n"
+            "O arquivo Word (.docx) foi gerado e está disponível para download.\n"
+            "Instale o LibreOffice no servidor para gerar PDF automaticamente."
+        )
+
+
 def gerar_pdf_contrato(contrato_id: int, variaveis: dict) -> str:
     """
     Preenche o template .docx, salva o .docx e converte para PDF.
     Retorna o caminho do PDF gerado.
     Lança FileNotFoundError se o template não existir.
-    Lança RuntimeError se a conversão LibreOffice falhar.
+    Lança LibreOfficeIndisponivel se o LibreOffice não estiver instalado (com docx_path).
+    Lança RuntimeError se a conversão LibreOffice falhar por outro motivo.
     """
     template_path = _encontrar_template()
     os.makedirs(CONTRATOS_DIR, exist_ok=True)
@@ -114,11 +126,7 @@ def gerar_pdf_contrato(contrato_id: int, variaveis: dict) -> str:
             timeout=120,
         )
     except FileNotFoundError:
-        raise RuntimeError(
-            "LibreOffice não encontrado.\n"
-            "Instale o LibreOffice para gerar PDF.\n"
-            f"O arquivo .docx foi salvo em:\n{docx_path}"
-        )
+        raise LibreOfficeIndisponivel(docx_path)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"LibreOffice falhou ao converter PDF:\n{e.stderr.decode(errors='replace')}") from e
     except subprocess.TimeoutExpired:
