@@ -225,7 +225,6 @@ def get_session():
 
 def upsert_projeto_status(nome_safe: str, status: str, perdido_em=None):
     """Cria ou atualiza o registro de status do projeto. Thread-safe via sessão própria."""
-    from datetime import datetime as _dt
     db = get_session()
     try:
         p = db.get(Projeto, nome_safe)
@@ -234,9 +233,9 @@ def upsert_projeto_status(nome_safe: str, status: str, perdido_em=None):
             db.add(p)
         antigo_status = p.status
         p.status    = status
-        p.status_at = _dt.utcnow()
+        p.status_at = datetime.utcnow()
         if status == "perdido":
-            p.perdido_em = perdido_em or _dt.utcnow()
+            p.perdido_em = perdido_em or datetime.utcnow()
         elif antigo_status == "perdido" and status != "perdido":
             p.perdido_em = None
         db.commit()
