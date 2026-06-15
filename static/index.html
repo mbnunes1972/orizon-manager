@@ -5490,7 +5490,7 @@ async function adminRetry(id) {
   try {
     const r = await fetch('/api/admin/omie-sync/'+id+'/retry', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
     const d = await r.json();
-    if (!d.ok) { showToast('Erro: '+(d.erro||'falha'), true); if(btn){btn.disabled=false;btn.textContent='↺ Tentar';} return; }
+    if (!d.ok) { showToast('Erro: '+esc(d.erro||'falha'), true); if(btn){btn.disabled=false;btn.textContent='↺ Tentar';} return; }
     if (d.cliente.omie_sync_status === 'ok') {
       const row = document.getElementById('admin-row-'+id);
       if (row) row.remove();
@@ -5500,12 +5500,12 @@ async function adminRetry(id) {
         lista.innerHTML = '<div style="color:var(--ok);font-size:12px;text-align:center;padding:20px">✓ Nenhum pendente — todos sincronizados.</div>';
       }
     } else {
-      showToast('Ainda com erro: '+(d.cliente.omie_sync_erro||'—'), true);
+      showToast('Ainda com erro: '+esc(d.cliente.omie_sync_erro||'—'), true);
       if (btn) { btn.disabled=false; btn.textContent='↺ Tentar'; }
       adminCarregar();
     }
   } catch(e) {
-    showToast('Erro: '+e, true);
+    showToast('Erro: '+esc(String(e)), true);
     if (btn) { btn.disabled=false; btn.textContent='↺ Tentar'; }
   }
 }
