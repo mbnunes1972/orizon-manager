@@ -1,6 +1,6 @@
 # Histórias de Usuário — Omie_V3
 
-> Versão de referência: **v0.2.0** | Junho 2026 — atualizado 2026-06-12
+> Versão de referência: **v0.2.0** | Junho 2026 — atualizado 2026-06-15
 > Repositório: [github.com/mbnunes1972/omie_v3](https://github.com/mbnunes1972/omie_v3)
 
 **Convenções de status:**
@@ -19,6 +19,8 @@
 - [EP-05 — Cadastro de Clientes e Parceiros](#ep-05--cadastro-de-clientes-e-parceiros)
 - [EP-06 — Infraestrutura e Deploy](#ep-06--infraestrutura-e-deploy)
 - [EP-07 — Versionamento de Orçamentos](#ep-07--versionamento-de-orçamentos)
+- [EP-08 — Sincronização Omie e Painel Admin](#ep-08--sincronização-omie-e-painel-admin)
+- [EP-09 — Lista de Projetos e Pipeline de Vendas](#ep-09--lista-de-projetos-e-pipeline-de-vendas)
 
 ---
 
@@ -445,5 +447,95 @@
 
 ---
 
-*Documento mantido em `docs/historias/BACKLOG.md`*  
+---
+
+## EP-08 — Sincronização Omie e Painel Admin
+
+> Registro automático de clientes no Omie ao cadastrar, painel de monitoramento e reprocessamento de falhas, e perfil de administrador do sistema.
+
+---
+
+### US-27 — Perfil Administrador `[IMPLEMENTADO]`
+
+**Como** administrador do sistema,
+**quero** acessar o sistema com um perfil separado dos perfis de vendas,
+**para que** possa monitorar integrações, corrigir erros e gerenciar o sistema sem interferir nos fluxos comerciais.
+
+**Critérios de aceite:**
+- Nível `admin` no banco com acesso completo a vendas (limite de desconto 50%) e ao painel de administração
+- Item `⚙ Admin` na sidebar visível apenas para usuários admin
+- Page-07 (Painel Admin) acessível exclusivamente para role `admin`
+- Criação de usuários admin diretamente no banco (sem interface de vendas)
+
+---
+
+### US-28 — Registro automático de cliente no Omie `[IMPLEMENTADO]`
+
+**Como** sistema,
+**quero** registrar o cliente no Omie automaticamente ao criar o cadastro local,
+**para que** o cliente já exista no Omie quando o orçamento for aprovado, sem intervenção manual.
+
+**Critérios de aceite:**
+- Ao salvar cliente via `POST /api/clientes` → tenta `criar_cliente()` no Omie em background thread (não bloqueia a resposta HTTP)
+- Sucesso → grava `omie_codigo` e `omie_sync_status = 'ok'`
+- Sem CPF → `omie_sync_status = 'pendente'` com mensagem explicativa
+- Sem credenciais Omie → `omie_sync_status = 'pendente'`
+- Erro de API → `omie_sync_status = 'erro'` com mensagem do erro gravada em `omie_sync_erro`
+
+---
+
+### US-29 — Painel Admin: fila Omie e reprocessamento `[IMPLEMENTADO]`
+
+**Como** administrador,
+**quero** visualizar todos os clientes com falha ou pendência na sincronização com o Omie e reprocessá-los,
+**para que** nenhum cliente fique sem registro no Omie sem que eu saiba.
+
+**Critérios de aceite:**
+- Painel exibe clientes com `omie_sync_status` = `erro` ou `pendente` (incluindo `null`)
+- Cada entrada mostra: nome, CPF, status, mensagem de erro e timestamp
+- Botão "Tentar" por entrada → chama `POST /api/admin/omie-sync/<id>/retry` (síncrono)
+- Sucesso → linha removida da fila
+- Erro → toast com mensagem, linha permanece para nova tentativa
+- Botão "Atualizar" recarrega a fila
+
+---
+
+## EP-09 — Lista de Projetos e Pipeline de Vendas
+
+> Visualização e gestão dos projetos em formato de tabela com pipeline de status comercial.
+
+---
+
+### US-30 — Lista de projetos em tabela `[IMPLEMENTADO]`
+
+**Como** consultor de vendas,
+**quero** ver todos os projetos em uma tabela com informações relevantes,
+**para que** encontre rapidamente o projeto que preciso e tenha uma visão do portfólio.
+
+**Critérios de aceite:**
+- Tabela com colunas: Status | Data (última alteração) | Projeto | Cliente | Último Orçamento (valor)
+- Filtro de texto único busca simultaneamente em nome do projeto, nome do cliente e CPF do cliente
+- Ordenação padrão: data decrescente (mais recente primeiro)
+- Duplo clique na linha ou botão "Abrir →" entra no projeto
+- Ao abrir projeto: vai direto para o orçamento ativo na última visita (localStorage por projeto)
+
+---
+
+### US-31 — Pipeline de status por projeto `[IMPLEMENTADO]`
+
+**Como** gerente de vendas,
+**quero** classificar cada projeto com um status de pipeline,
+**para que** acompanhe o avanço das negociações e identifique projetos em risco.
+
+**Critérios de aceite:**
+- Status disponíveis: `quente` / `morno` / `frio` / `perdido` (selecionáveis via dropdown inline na lista)
+- `convertido`: setado automaticamente ao aprovar orçamento — não editável via dropdown
+- `perdido`: grava `perdido_em` automaticamente; ao sair de "perdido", `perdido_em` é zerado
+- Dropdown de status também disponível no cabeçalho da tela de negociação (page-02)
+- Filtro multi-seleção por status na lista (OR lógico): pode selecionar 1, 2, 3 ou todos os status
+- Botão do filtro exibe contagem dos status ativos quando não está "todos"
+
+---
+
+*Documento mantido em `docs/historias/BACKLOG.md`*
 *Atualizar a cada funcionalidade concluída ou nova história identificada.*

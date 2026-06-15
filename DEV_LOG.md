@@ -4,20 +4,32 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-14 (sessão 6 — verificação de estado)
+> Atualizado em: 2026-06-15 (sessão 6 — admin + omie sync + lista projetos + pipeline)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
 - Sistema de autenticação completo: login, logout, sessões via cookie
-- Três níveis: Diretor (50%), Gerente (20%), Consultor (10%)
-- Usuários: `pdm2026` (Pedro/Diretor), `lds2026` (Luiz/Gerente), `mds2026` (Marcia/Consultora)
+- **Quatro níveis:** Diretor (50%), Gerente (20%), Consultor (10%), **Admin (50% + painel admin)**
+- Usuários de vendas: `pdm2026` (Pedro/Diretor), `lds2026` (Luiz/Gerente), `mds2026` (Marcia/Consultora)
+- Usuário admin de teste: `admin2026` / senha `admin123` — **alterar antes de produção**
 - Módulo Clientes completo com ViaCEP, máscaras, CRUD, unicidade
+- **Auto-sync Omie:** ao criar cliente, tenta registrar no Omie em background thread; grava `omie_sync_status` (`ok`/`pendente`/`erro`) + `omie_sync_erro` na tabela `clientes`
 - Módulo Parceiros completo com tipos, comissão padrão, CRUD
+- **Painel Admin (page-07):** fila de clientes com sync pendente/erro, botão "Tentar" por cliente
 - Projeto vinculado a cliente obrigatório
-- Lista de projetos ordenada com busca
+- **Lista de projetos redesenhada:** tabela com Status | Data | Projeto | Cliente | Último Orçamento
+  - Duplo clique ou botão "Abrir →" entra no projeto
+  - Filtro de texto simultâneo por nome do projeto, nome do cliente e CPF
+  - Filtro multi-seleção de status (OR lógico)
+  - Dropdown inline para alterar status direto na lista
+- **Pipeline de status por projeto:** `quente` / `morno` / `frio` / `convertido` / `perdido`
+  - `convertido` setado automaticamente ao aprovar orçamento (via `bloquear_projeto`)
+  - `perdido` grava `perdido_em` automaticamente
+  - Botão de status na page-02 (cabeçalho da negociação)
 - EP-07 completo: upload, pool, orçamentos, cálculos, desconto individual, limites
-- Toggle "Incluir custos adicionais" corrigido: `_incluirCustos` como fonte de verdade global (evita race condition com `carregarMargensSalvas`)
-- **Total Flex (US-14) completo:** `mod_fin/total_flex.py` — juros compostos por dias reais, última parcela auto-calculada, taxa lida exclusivamente de `config/total_flex.json`, painel completo no frontend com edição livre de datas/valores
+- Toggle "Incluir custos adicionais" corrigido: `_incluirCustos` como fonte de verdade global
+- **Total Flex (US-14) completo:** `mod_fin/total_flex.py` — juros compostos por dias reais
+- **Último orçamento ativo** persistido por projeto em localStorage; ao abrir projeto vai direto para o orçamento que estava ativo na última visita
 
 ### [EP-07] Estado atual do versionamento de orçamentos
 
@@ -54,7 +66,9 @@
   - Bloqueia save de parâmetros; reverte desconto individual em tempo real
 
 ### [PENDENTE]
+- `salvarOrcamento()` no frontend é stub (só mostra toast) — não persiste nada além do que já é auto-salvo nos endpoints de ambiente/margem
 - Módulo Clientes e Parceiros vinculados a orçamentos (planejado)
+- Alterar senha do usuário `admin2026` antes de ir para produção
 
 ### [DECIDIDO]
 - Pool de ambientes permanente por projeto (XMLs nunca deletados)
@@ -65,29 +79,84 @@
 - Banco: SQLite + SQLAlchemy
 - Servidor DEV: `167.88.33.121:8765`
 - GitHub: `https://github.com/mbnunes1972/omie_v3`
+- Auto-sync Omie ao criar cliente: background thread (não bloqueia HTTP); falha silenciosa → fila no painel admin
+- Status "convertido" nunca via dropdown — apenas automático ao aprovar orçamento
+- Último orçamento ativo por projeto: localStorage (não backend) — suficiente para uso em loja fixa
+- `projetos_meta` (banco): metadados de pipeline; `PROJETOS/*/projeto.json` ainda é a fonte de dados do projeto
 
 ### [CONTEXTO] Arquivos e variáveis chave
 **Arquivos principais:**
-- `main.py` — servidor HTTP, todas as rotas; `_enriquecer_projetos_com_pool()` enriquece listagens
-- `database.py` — SQLAlchemy: `Usuario`, `Sessao`, `LogAutorizacao`, `Cliente`, `Parceiro`, `PoolAmbiente`, `Orcamento`, `OrcamentoAmbiente`
+- `main.py` — servidor HTTP, todas as rotas; `_enriquecer_projetos_com_pool()` e `_enriquecer_projetos_com_status()` enriquecem listagens; `do_PATCH` para status; `_tentar_sync_omie()` para sync Omie
+- `database.py` — SQLAlchemy: `Usuario`, `Sessao`, `LogAutorizacao`, `Cliente`, `Parceiro`, `PoolAmbiente`, `Orcamento`, `OrcamentoAmbiente`, **`Projeto`** (projetos_meta); `upsert_projeto_status()`
+- `mod_omie.py` — `_listar_projetos()` retorna `cliente_cpf`; `bloquear_projeto()` seta status "convertido"
 - `static/index.html` — frontend SPA completo
 - `PROJETOS/*/projeto.json` — dados persistidos de cada projeto (legado; EP-07 usa banco)
 
+**Tabelas novas (sessão 6):**
+- `projetos_meta` — `nome_safe` PK, `status`, `status_at`, `perdido_em`
+- Campos novos em `clientes` — `omie_sync_status`, `omie_sync_erro`, `omie_sync_at`
+
+**Rotas novas (sessão 6):**
+- `GET /api/admin/omie-sync` — lista clientes com sync pendente/erro (role admin)
+- `POST /api/admin/omie-sync/<id>/retry` — reprocessa sync de um cliente (role admin)
+- `PATCH /api/projetos/<nome>/status` — altera status do projeto (quente/morno/frio/perdido)
+
 **Variáveis JS chave EP-07:**
 - `_orcamentos` — lista de orçamentos do projeto ativo
-- `_orcamentoAtivoId` — ID do orçamento sendo visualizado
+- `_orcamentoAtivoId` — ID do orçamento sendo visualizado (persistido em `localStorage['lastOrc_<nome_safe>']`)
 - `_orcAmbientesAtivos` — ambientes do orçamento ativo (null = modo legado)
 - `_descIndividual` — `{ chave: pct }` desconto individual; EP-07 usa `'ep07_'+pa.id`
 - `_margemAtual` — desconto total % atualizado por `mpAtualizarApoio()`; base do limite 35%
 - `_LIMITE_DESC_TOTAL` — constante `35`
-- `carregarOrcamentos()` — busca GET /projetos/<nome>/orcamentos
-- `ativarOrcamento(id)` — troca aba e chama GET /orcamentos/<id>/ambientes
+- `_projListaBase` — cache da lista de projetos carregada
+- `_projetoStatusAtual` — status do projeto ativo na page-02
+- `carregarOrcamentos()` — busca GET /projetos/<nome>/orcamentos; seleciona por localStorage → updated_at → ordem
+- `ativarOrcamento(id)` — troca aba, grava em localStorage, chama GET /orcamentos/<id>/ambientes
 - `abrirPainelPool()` — abre modal com GET /projetos/<nome>/pool?orcamento_id=<oid>
 - `uploadXmls()` — em modo EP-07 usa exclusivamente POST /projetos/<nome>/pool
 
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-15 (sessão 6 — admin + omie sync + lista projetos + pipeline)
+**Commits:** `0bcc154` → `44863eb`
+
+**Funcionalidades adicionadas:**
+
+**EP-08 — Sincronização Omie e Painel Admin:**
+- **Role Admin:** novo nível `admin` no banco — acesso total a vendas + painel exclusivo (page-07). Limite de desconto 50%. Usuário de teste: `admin2026`/`admin123`
+- **Auto-sync cliente → Omie:** `POST /api/clientes` tenta `criar_cliente()` em background thread após salvar localmente. Grava `omie_sync_status` (`ok`/`pendente`/`erro`) + `omie_sync_erro` na tabela `clientes`. Pendente = sem CPF ou sem credenciais Omie; Erro = falha da API
+- **Painel Admin (page-07):** lista clientes com sync pendente/erro com botão "Tentar" por entrada. Acessível apenas para role `admin`. Nav item `⚙ Admin` aparece na sidebar somente para admin
+- **PATCH `/api/projetos/<nome>/status`:** muda status do projeto (quente/morno/frio/perdido). Rejeita "convertido" via API
+- **Convertido automático:** `bloquear_projeto()` seta status `convertido` em `projetos_meta` ao aprovar
+
+**EP-09 — Lista de Projetos e Pipeline de Vendas:**
+- **Lista redesenhada:** tabela com colunas Status | Data | Projeto | Cliente | Último Orçamento. Substitui cards anteriores
+- **Filtro de texto:** busca simultânea em nome do projeto, nome do cliente e CPF do cliente (client-side)
+- **Filtro multi-select de status:** dropdown com checkboxes por status (OR lógico); botão mostra contagem ativa
+- **Status pipeline:** `quente` / `morno` / `frio` / `convertido` / `perdido`. Tabela `projetos_meta` no banco
+  - `perdido` grava `perdido_em` automaticamente
+  - Dropdown inline na lista para alterar status
+  - Botão de status no cabeçalho da page-02 (negociação)
+- **UX lista:** duplo clique ou botão "Abrir →" entra no projeto; `goPage(n)` corrigido para navegar mesmo sem nav item na sidebar
+- **Último orçamento ativo:** `ativarOrcamento(id)` grava em `localStorage['lastOrc_<nome_safe>']`; `carregarOrcamentos()` restaura ao reabrir projeto
+
+**Bugs corrigidos:**
+- `goPage(2)` bloqueava com `if(!navEl) return` após remoção de `nav-02` — corrigido para `if(navEl && navEl.classList.contains('locked')) return`
+- Badge de status `—` (sem status) não era clicável — corrigido para abrir dropdown
+- `orcamento_ativo_id` no `projeto.json` sempre apontava para Orçamento 1 — descartado em favor de localStorage + `updated_at`
+- Subquery `func.max(updated_at)` indeterminística com empate — substituída por `.order_by(updated_at.desc(), id.desc()).first()`
+- Clientes com `omie_sync_status IS NULL` invisíveis no painel admin — corrigido com `or_(in_(), is_(None))`
+- Missing `return` após "Cliente não encontrado" no retry endpoint
+
+**Sidebar e navegação:**
+- Removidos: `nav-new-amb` (Novo Ambiente), `nav-02` (Negociação), `nav-03` (Exportar)
+- Adicionado: `nav-07` Admin (oculto por padrão, visível apenas para role admin)
+- Barra de orçamentos: `Ambientes` | `Novo Ambiente` | `Novo Orçamento` (3 botões)
+- `unlockNav(2)` e `unlockNav(3)` mantidos por compatibilidade (null-safe)
+
+---
 
 ### Sessão 2026-06-12 (sessão 5 — bugs EP-07 + desconto individual + limites + UX)
 **Commits:** `5ccb96d`, `019eb6b`, `b6e8d3f`, `74a4710`, `5349427`, `f1a0c30`
