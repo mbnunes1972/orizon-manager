@@ -9,7 +9,7 @@ from email import policy as _email_policy
 from datetime import datetime, date, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
-from database import init_db, get_session, Cliente, Parceiro, Orcamento, PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status
+from database import init_db, get_session, Cliente, Parceiro, Orcamento, PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status, CicloEtapa, Contrato, ContratoAssinatura
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -36,6 +36,7 @@ from mod_omie import (
 )
 from mod_margens import calcular_margens, _normalizar_faixas
 from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada, calcular_total_flex
+from mod_contrato import calcular_hash_assinatura, montar_variaveis_contrato, gerar_pdf_contrato
 
 def _enriquecer_projetos_com_status(projetos):
     """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
@@ -461,6 +462,89 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": True, "projetos": projetos, "cliente": _cliente_dict(c)})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)})
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                db = get_session()
+                try:
+                    etapas = db.query(CicloEtapa)\
+                               .filter_by(projeto_nome=nome_safe)\
+                               .order_by(CicloEtapa.etapa_codigo)\
+                               .all()
+                    resultado = [{
+                        "etapa_codigo":  e.etapa_codigo,
+                        "status":        e.status,
+                        "responsavel_id": e.responsavel_id,
+                        "iniciado_em":   e.iniciado_em.isoformat() if e.iniciado_em else None,
+                        "concluido_em":  e.concluido_em.isoformat() if e.concluido_em else None,
+                        "observacoes":   e.observacoes or "",
+                    } for e in etapas]
+                    self.send_json({"ok": True, "ciclo": resultado})
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/contrato/pdf$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                db = get_session()
+                try:
+                    contrato = db.query(Contrato)\
+                                 .filter_by(projeto_nome=nome_safe)\
+                                 .order_by(Contrato.id.desc())\
+                                 .first()
+                    if not contrato or not contrato.pdf_path or not os.path.exists(contrato.pdf_path):
+                        self.send_json({"ok": False, "erro": "PDF não encontrado"}, code=404)
+                        return
+                    with open(contrato.pdf_path, 'rb') as f:
+                        pdf_data = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/pdf")
+                    self.send_header("Content-Length", len(pdf_data))
+                    self.send_header("Content-Disposition",
+                                     f'inline; filename="contrato_{nome_safe}.pdf"')
+                    self.end_headers()
+                    self.wfile.write(pdf_data)
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/contrato$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                db = get_session()
+                try:
+                    contrato = db.query(Contrato)\
+                                 .filter_by(projeto_nome=nome_safe)\
+                                 .order_by(Contrato.id.desc())\
+                                 .first()
+                    if not contrato:
+                        self.send_json({"ok": True, "contrato": None})
+                        return
+                    assinaturas = [{
+                        "parte":       a.parte,
+                        "nome":        a.nome,
+                        "assinado_em": a.assinado_em.isoformat(),
+                    } for a in contrato.assinaturas]
+                    self.send_json({"ok": True, "contrato": {
+                        "id":                   contrato.id,
+                        "status":               contrato.status,
+                        "endereco_instalacao":  contrato.endereco_instalacao or "",
+                        "adendo":               contrato.adendo or "",
+                        "gerado_em":            contrato.gerado_em.isoformat() if contrato.gerado_em else None,
+                        "tem_pdf":              bool(contrato.pdf_path and os.path.exists(contrato.pdf_path)),
+                        "assinaturas":          assinaturas,
+                    }})
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
                     db.close()
                 return
@@ -1638,6 +1722,44 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 upsert_projeto_status(nome_safe, novo_status)
                 self.send_json({"ok": True, "status": novo_status})
+                return
+
+            m = re.match(r'^/api/projetos/([^/]+)/ciclo/([^/]+)$', path)
+            if m:
+                nome_safe   = unquote(m.group(1))
+                etapa_cod   = unquote(m.group(2))
+                usuario     = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                req = json.loads(body)
+                novo_status = req.get("status", "").strip()
+                obs         = req.get("observacoes")
+                db = get_session()
+                try:
+                    etapa = db.query(CicloEtapa).filter_by(
+                        projeto_nome=nome_safe, etapa_codigo=etapa_cod
+                    ).first()
+                    if not etapa:
+                        etapa = CicloEtapa(projeto_nome=nome_safe, etapa_codigo=etapa_cod)
+                        db.add(etapa)
+                    if novo_status:
+                        if etapa.status == "pendente" and novo_status != "pendente":
+                            etapa.iniciado_em = datetime.utcnow()
+                        etapa.status = novo_status
+                        if novo_status in ("concluido", "aprovado", "vigente", "implantado",
+                                           "realizado", "entregue", "emitida"):
+                            etapa.concluido_em  = datetime.utcnow()
+                            etapa.responsavel_id = usuario.id
+                    if obs is not None:
+                        etapa.observacoes = obs
+                    db.commit()
+                    self.send_json({"ok": True, "etapa_codigo": etapa_cod, "status": etapa.status})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
                 return
 
             self.send_json({"ok": False, "erro": "Rota não encontrada"})
