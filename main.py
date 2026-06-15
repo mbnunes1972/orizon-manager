@@ -238,6 +238,20 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif path == "/api/admin/omie-sync":
+            usuario = get_usuario_sessao(self)
+            if not usuario or usuario.get("nivel") != "admin":
+                self.send_json({"ok": False, "erro": "Acesso negado"})
+                return
+            db2 = get_session()
+            try:
+                clientes = db2.query(Cliente).filter(
+                    Cliente.omie_sync_status.in_(["erro", "pendente"])
+                ).order_by(Cliente.omie_sync_at.desc()).all()
+                self.send_json({"ok": True, "clientes": [_cliente_dict(c) for c in clientes]})
+            finally:
+                db2.close()
+
         elif path.endswith(".html") and path != "/":
             nome    = path.lstrip("/")
             caminho = os.path.join(_BASE_DIR, nome)
@@ -1418,6 +1432,24 @@ class Handler(BaseHTTPRequestHandler):
                 proj["margens"] = m_atual
                 _salvar_projeto(proj)
                 self.send_json({"ok": True, "margens": proj["margens"]})
+                return
+
+            m_sync = _re.match(r"^/api/admin/omie-sync/(\d+)/retry$", path)
+            if m_sync:
+                usuario = get_usuario_sessao(self)
+                if not usuario or usuario.get("nivel") != "admin":
+                    self.send_json({"ok": False, "erro": "Acesso negado"})
+                    return
+                db2 = get_session()
+                try:
+                    c = db2.get(Cliente, int(m_sync.group(1)))
+                    if not c:
+                        self.send_json({"ok": False, "erro": "Cliente não encontrado"})
+                        return
+                    _tentar_sync_omie(c, db2)
+                    self.send_json({"ok": True, "cliente": _cliente_dict(c)})
+                finally:
+                    db2.close()
                 return
 
             m = _re.match(r"^/projetos/([^/]+)/ambientes/(adicionar|remover|atualizar|selecao)$", path)
