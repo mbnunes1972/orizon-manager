@@ -304,9 +304,7 @@ body{overflow:hidden}
     <div class="nav-item active" id="nav-00" onclick="goPage(0)">&#x25C8; Projetos</div>
     <div class="nav-item" id="nav-05" onclick="goPage(5)">&#x1F465; Clientes</div>
     <div class="nav-item" id="nav-06" onclick="goPage(6)">&#x1F91D; Parceiros</div>
-    <div class="nav-item locked" id="nav-new-amb" onclick="abrirModalNovoAmbiente()" style="color:var(--muted)">+ Novo ambiente</div>
-    <div class="nav-item locked" id="nav-02" onclick="goPage(2)">&#x25C6; Negociacao</div>
-    <div class="nav-item locked" id="nav-03" onclick="goPage(3)">&#x2191; Exportar</div>
+    <div class="nav-item" id="nav-07" onclick="goPage(7)" style="display:none">&#x2699;&#xFE0F; Admin</div>
   </nav>
 
   <!-- Parâmetros de negociação (visível apenas na page-02) -->
@@ -588,9 +586,11 @@ body{overflow:hidden}
                    margin-right:4px;white-space:nowrap">Orçamento:</span>
       <span id="neg-orc-tabs" style="display:flex;gap:4px;flex-wrap:wrap;flex:1"></span>
       <button class="btn btn-ghost btn-sm" onclick="abrirPainelPool()"
-              style="font-size:11px;padding:4px 10px">Ambientes &#9660;</button>
+              style="font-size:11px;padding:4px 10px">Ambientes</button>
+      <button class="btn btn-ghost btn-sm" onclick="abrirModalNovoAmbiente()"
+              style="font-size:11px;padding:4px 10px;margin-left:4px">Novo Ambiente</button>
       <button class="btn btn-ghost btn-sm" onclick="abrirModalNovoOrc()"
-              style="font-size:11px;padding:4px 10px;margin-left:4px">+ Novo</button>
+              style="font-size:11px;padding:4px 10px;margin-left:4px">Novo Orçamento</button>
     </div>
 
     <!-- Linha Bruto → Desconto → Líquido -->
@@ -1823,22 +1823,10 @@ function goPage(n){
   if(n===5) cliCarregar();
   if(n===6) parCarregar();
   if(n===9) cfgRenderizarPerfis();
-  // "Novo ambiente" só fica habilitado na negociação com projeto aberto
-  const nb = document.getElementById('nav-new-amb');
-  if(nb){
-    if(n === 2 && projetoAtivo) nb.classList.remove('locked');
-    else nb.classList.add('locked');
-  }
 }
 function unlockNav(n){
   const el = document.getElementById('nav-0'+n);
   if(el) el.classList.remove('locked');
-  // Novo ambiente desbloqueado apenas quando estamos na negociação
-  const nb = document.getElementById('nav-new-amb');
-  if(nb && n===2){
-    const page02 = document.getElementById('page-02');
-    if(page02 && page02.classList.contains('active')) nb.classList.remove('locked');
-  }
 }
 // Funções modal novo ambiente
 function abrirModalNovoAmbiente(){
@@ -3254,14 +3242,6 @@ function atualizarUIBloqueio() {
     } else {
       btnAprovar.innerHTML = '&#x2713; Aprovar Orcamento &#x2192;';
     }
-  }
-
-  // Botao "Novo ambiente" na sidebar
-  const navAmb = document.getElementById('nav-new-amb');
-  if (navAmb) {
-    navAmb.style.opacity       = bloqueado ? '0.3' : '';
-    navAmb.style.pointerEvents = bloqueado ? 'none' : '';
-    navAmb.title = bloqueado ? 'Projeto bloqueado — adicao de ambientes nao permitida' : '';
   }
 
   // Botoes Remover dentro da tabela de ambientes (re-renderizados; controlado via renderAmbientes)
