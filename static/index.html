@@ -1983,7 +1983,7 @@ function renderProjResultados(lista){
         <th style="width:70px"></th>
       </tr></thead>
       <tbody>${lista.map(p=>`
-        <tr class="proj-row">
+        <tr class="proj-row" ondblclick="abrirProjeto('${esc(p.nome_safe||'')}')">
           <td class="cell-status" style="position:relative">
             ${_projStatusBadge(p)}
             <div class="proj-status-dd" id="proj-dd-${esc(p.nome_safe||'')}">
