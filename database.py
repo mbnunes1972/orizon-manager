@@ -119,6 +119,16 @@ class Parceiro(Base):
     criado_em           = Column(DateTime,     default=datetime.utcnow)
 
 
+class Projeto(Base):
+    """Metadados de pipeline por projeto. nome_safe é a chave natural (nome da pasta)."""
+    __tablename__ = "projetos_meta"
+
+    nome_safe  = Column(String,   primary_key=True)
+    status     = Column(String(20), nullable=True)   # quente | morno | frio | convertido | perdido
+    status_at  = Column(DateTime,   nullable=True)
+    perdido_em = Column(DateTime,   nullable=True)
+
+
 # ── EP-07: Versionamento de Orçamentos ───────────────────────────────────────
 
 class PoolAmbiente(Base):
@@ -211,3 +221,27 @@ def _migrar_colunas():
 
 def get_session():
     return Session()
+
+
+def upsert_projeto_status(nome_safe: str, status: str, perdido_em=None):
+    """Cria ou atualiza o registro de status do projeto. Thread-safe via sessão própria."""
+    from datetime import datetime as _dt
+    db = get_session()
+    try:
+        p = db.get(Projeto, nome_safe)
+        if not p:
+            p = Projeto(nome_safe=nome_safe)
+            db.add(p)
+        antigo_status = p.status
+        p.status    = status
+        p.status_at = _dt.utcnow()
+        if status == "perdido":
+            p.perdido_em = perdido_em or _dt.utcnow()
+        elif antigo_status == "perdido" and status != "perdido":
+            p.perdido_em = None
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
