@@ -3268,6 +3268,13 @@ function atualizarUIBloqueio() {
     btn.disabled = bloqueado;
     btn.style.opacity = bloqueado ? '0.35' : '';
   });
+
+  // Botao Novo Ambiente
+  const btnNovoAmb = document.querySelector('[onclick="abrirModalNovoAmbiente()"]');
+  if (btnNovoAmb) {
+    btnNovoAmb.disabled = bloqueado;
+    btnNovoAmb.style.opacity = bloqueado ? '0.35' : '';
+  }
 }
 
 // ---- Provisao de Impostos (todas as modalidades) -----------------------------
