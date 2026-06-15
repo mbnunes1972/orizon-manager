@@ -41,7 +41,6 @@ def _enriquecer_projetos_com_status(projetos):
     """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
     if not projetos:
         return
-    from sqlalchemy import func
     nomes = [p['nome_safe'] for p in projetos if p.get('nome_safe')]
     if not nomes:
         return
@@ -50,22 +49,15 @@ def _enriquecer_projetos_com_status(projetos):
         metas = db.query(Projeto).filter(Projeto.nome_safe.in_(nomes)).all()
         meta_map = {m.nome_safe: m for m in metas}
 
-        subq = (
-            db.query(
-                Orcamento.projeto_id,
-                func.max(Orcamento.updated_at).label("max_at")
-            )
-            .filter(Orcamento.projeto_id.in_(nomes))
-            .group_by(Orcamento.projeto_id)
-            .subquery()
-        )
-        orc_rows = (
-            db.query(Orcamento)
-            .join(subq, (Orcamento.projeto_id == subq.c.projeto_id) &
-                        (Orcamento.updated_at == subq.c.max_at))
-            .all()
-        )
-        orc_map = {o.projeto_id: o.valor_total for o in orc_rows}
+        # Pega o orçamento mais recente por projeto (desempate por id desc)
+        orc_map = {}
+        for nome in nomes:
+            orc = (db.query(Orcamento)
+                     .filter(Orcamento.projeto_id == nome)
+                     .order_by(Orcamento.updated_at.desc(), Orcamento.id.desc())
+                     .first())
+            if orc:
+                orc_map[nome] = orc.valor_total
 
         for p in projetos:
             ns = p.get('nome_safe')
