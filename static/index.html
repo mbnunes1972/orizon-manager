@@ -6185,6 +6185,19 @@ function _formGerarContrato() {
   `;
 }
 
+function mascaraMoedaInput(el) {
+  let v = el.value.replace(/\D/g, '');
+  if (!v) { el.value = ''; return; }
+  const num = parseInt(v) / 100;
+  el.value = 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function mascaraMoedaValor(el) {
+  mascaraMoedaInput(el);
+}
+function parseMoeda(str) {
+  return parseFloat((str || '0').replace(/[R$\s.]/g, '').replace(',', '.')) || 0;
+}
+
 function toggleAssinaturas() {
   const chk = document.getElementById('chk-leu-contrato');
   const sec = document.getElementById('secao-assinaturas');
@@ -6353,7 +6366,9 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
         </div>
         <div style="margin-bottom:8px">
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Entrada (R$)</label>
-          <input id="apr-entrada" type="number" value="${pagAtual.entrada}" min="0" step="100"
+          <input id="apr-entrada" type="text" inputmode="numeric"
+            value="${pagAtual.entrada > 0 ? 'R$ ' + pagAtual.entrada.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}"
+            placeholder="R$ 0,00" oninput="mascaraMoedaInput(this)"
             style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
         </div>
@@ -6407,7 +6422,7 @@ async function copiarEnderecoClienteModal() {
 
 async function gerarContrato() {
   const endInstalacao = (document.getElementById('apr-end')?.value || '').trim();
-  const entrada       = parseFloat(document.getElementById('apr-entrada')?.value || '0');
+  const entrada       = parseMoeda(document.getElementById('apr-entrada')?.value);
   const parcelas      = (document.getElementById('apr-parcelas')?.value || '').trim();
   const adendo        = (document.getElementById('apr-adendo')?.value || '').trim();
   const nome          = (document.getElementById('apr-nome')?.value || '').trim();

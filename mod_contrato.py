@@ -79,6 +79,7 @@ def montar_variaveis_contrato(
         "projeto_data":        projeto.get("criado_em", ""),
         "orcamento_nome":      orcamento.get("nome", ""),
         "valor_total":         _formatar_valor(orcamento.get("valor_total", 0.0)),
+        "valor_liquido":       _formatar_valor(orcamento.get("valor_liquido", 0.0)),
         "forma_pagamento":     orcamento.get("forma_pagamento", ""),
         "entrada_valor":       _formatar_valor(entrada_valor),
         "parcelas_descricao":  parcelas_descricao or "",

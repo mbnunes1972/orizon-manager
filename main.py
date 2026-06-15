@@ -474,8 +474,28 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     etapas = db.query(CicloEtapa)\
                                .filter_by(projeto_nome=nome_safe)\
-                               .order_by(CicloEtapa.etapa_codigo)\
                                .all()
+                    codigos_existentes = {e.etapa_codigo for e in etapas}
+                    # Auto-completar etapas 1-5 para projetos que já têm negociação
+                    ETAPAS_PRE = ["1","2","3","4","5"]
+                    if not any(c in codigos_existentes for c in ETAPAS_PRE):
+                        tem_negociacao = db.query(Orcamento).filter(
+                            Orcamento.projeto_id == nome_safe,
+                            Orcamento.valor_total > 0
+                        ).first()
+                        if tem_negociacao:
+                            agora = datetime.utcnow()
+                            for cod in ETAPAS_PRE:
+                                nova = CicloEtapa(
+                                    projeto_nome=nome_safe,
+                                    etapa_codigo=cod,
+                                    status="concluido",
+                                    concluido_em=agora,
+                                )
+                                db.add(nova)
+                                etapas.append(nova)
+                            db.commit()
+                    etapas_sorted = sorted(etapas, key=lambda e: e.etapa_codigo)
                     resultado = [{
                         "etapa_codigo":  e.etapa_codigo,
                         "status":        e.status,
@@ -483,7 +503,7 @@ class Handler(BaseHTTPRequestHandler):
                         "iniciado_em":   e.iniciado_em.isoformat() if e.iniciado_em else None,
                         "concluido_em":  e.concluido_em.isoformat() if e.concluido_em else None,
                         "observacoes":   e.observacoes or "",
-                    } for e in etapas]
+                    } for e in etapas_sorted]
                     self.send_json({"ok": True, "ciclo": resultado})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -2084,7 +2104,8 @@ def _montar_dados_projeto_para_contrato(nome_safe: str, orcamento_id: int, db) -
     }
     orcamento_dict = {
         "nome":            orcamento.nome,
-        "valor_total":     orcamento.valor_total or 0.0,
+        "valor_total":     orcamento.valor_total  or 0.0,
+        "valor_liquido":   orcamento.valor_liquido or 0.0,
         "forma_pagamento": orcamento.forma_pagamento or "",
         "ambientes":       nomes_ambientes,
     }
