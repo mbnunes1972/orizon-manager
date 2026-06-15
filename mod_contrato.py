@@ -80,11 +80,12 @@ def gerar_pdf_contrato(contrato_id: int, variaveis: dict) -> str:
     Preenche o template .docx, salva o .docx e converte para PDF.
     Retorna o caminho do PDF gerado.
     Lança FileNotFoundError se o template não existir.
+    Lança RuntimeError se a conversão LibreOffice falhar.
     """
-    os.makedirs(CONTRATOS_DIR, exist_ok=True)
-
     if not os.path.exists(TEMPLATE_PATH):
         raise FileNotFoundError(f"Template não encontrado: {TEMPLATE_PATH}")
+
+    os.makedirs(CONTRATOS_DIR, exist_ok=True)
 
     doc = DocxTemplate(TEMPLATE_PATH)
     doc.render(variaveis)
@@ -92,11 +93,17 @@ def gerar_pdf_contrato(contrato_id: int, variaveis: dict) -> str:
     docx_path = os.path.join(CONTRATOS_DIR, f"contrato_{contrato_id}.docx")
     doc.save(docx_path)
 
-    subprocess.run(
-        [_libreoffice_cmd(), "--headless", "--convert-to", "pdf",
-         "--outdir", CONTRATOS_DIR, docx_path],
-        check=True,
-        capture_output=True,
-    )
+    try:
+        subprocess.run(
+            [_libreoffice_cmd(), "--headless", "--convert-to", "pdf",
+             "--outdir", CONTRATOS_DIR, docx_path],
+            check=True,
+            capture_output=True,
+            timeout=120,
+        )
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"LibreOffice falhou ao converter PDF: {e.stderr.decode(errors='replace')}") from e
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("LibreOffice demorou mais de 120s — possível travamento na conversão")
 
     return os.path.join(CONTRATOS_DIR, f"contrato_{contrato_id}.pdf")

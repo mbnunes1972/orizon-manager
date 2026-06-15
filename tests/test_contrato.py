@@ -96,7 +96,9 @@ def test_gerar_pdf_chama_libreoffice():
 
         resultado = gerar_pdf_contrato(contrato_id=99, variaveis=variaveis)
 
-    assert mock_doc.render.called
-    assert mock_doc.save.called
-    assert mock_run.called
+    mock_doc.render.assert_called_once_with(variaveis)
+    mock_doc.save.assert_called_once_with(os.path.join("CONTRATOS", "contrato_99.docx"))
+    run_args = mock_run.call_args[0][0]
+    assert "--convert-to" in run_args
+    assert "pdf" in run_args
     assert "99" in resultado
