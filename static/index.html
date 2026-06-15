@@ -1861,13 +1861,12 @@ function goPage(n){
   const navId  = n === 9 ? 'nav-cfg' : 'nav-0'+n;
   const pageId = n === 9 ? 'page-09' : 'page-0'+n;
   const navEl  = document.getElementById(navId);
-  if(!navEl) return;
-  if(navEl.classList.contains('locked')) return;
+  if(navEl && navEl.classList.contains('locked')) return;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   const pageEl = document.getElementById(pageId);
   if(pageEl) pageEl.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
-  navEl.classList.add('active');
+  if(navEl) navEl.classList.add('active');
   const sbParams = document.getElementById('sb-params');
   if(sbParams) sbParams.style.display = n===2 ? 'block' : 'none';
   if(n===2 && projetoAtivo) carregarMargensSalvas();
@@ -1963,6 +1962,7 @@ function renderProjResultados(lista){
         <th>Projeto</th>
         <th>Cliente</th>
         <th style="width:140px;text-align:right">Último Orçamento</th>
+        <th style="width:70px"></th>
       </tr></thead>
       <tbody>${lista.map(p=>`
         <tr class="proj-row">
@@ -1976,10 +1976,14 @@ function renderProjResultados(lista){
                 </div>`).join('')}
             </div>
           </td>
-          <td onclick="abrirProjeto('${esc(p.nome_safe||'')}')">${fmtData(p.atualizado_em||p.criado_em||'')}</td>
-          <td onclick="abrirProjeto('${esc(p.nome_safe||'')}')" style="font-weight:600">${esc(p.nome_projeto||'—')}</td>
-          <td onclick="abrirProjeto('${esc(p.nome_safe||'')}')" style="color:var(--muted)">${esc(p.cliente_nome||'—')}</td>
-          <td onclick="abrirProjeto('${esc(p.nome_safe||'')}')" style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px">${fmt(p.ultimo_orcamento_valor)}</td>
+          <td>${fmtData(p.atualizado_em||p.criado_em||'')}</td>
+          <td style="font-weight:600">${esc(p.nome_projeto||'—')}</td>
+          <td style="color:var(--muted)">${esc(p.cliente_nome||'—')}</td>
+          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px">${fmt(p.ultimo_orcamento_valor)}</td>
+          <td style="text-align:center">
+            <button class="btn btn-ghost btn-sm" onclick="abrirProjeto('${esc(p.nome_safe||'')}')"
+                    style="font-size:11px;padding:3px 10px">Abrir &#x2192;</button>
+          </td>
         </tr>`).join('')}
       </tbody>
     </table>`;
