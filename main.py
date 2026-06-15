@@ -1661,6 +1661,130 @@ class Handler(BaseHTTPRequestHandler):
                     _salvar_projeto(proj)
                     self.send_json({"ok": True})
 
+            # POST /api/projetos/<nome>/contrato/assinar — registra assinatura
+            m = _re.match(r'^/api/projetos/([^/]+)/contrato/assinar$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario   = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                req   = json.loads(body)
+                parte = (req.get("parte") or "").strip()
+                nome  = (req.get("nome")  or "").strip()
+                cpf   = (req.get("cpf")   or "").strip()
+                if parte not in ("loja", "cliente"):
+                    self.send_json({"ok": False, "erro": "parte deve ser 'loja' ou 'cliente'"}, code=400)
+                    return
+                if not nome or not cpf:
+                    self.send_json({"ok": False, "erro": "nome e cpf são obrigatórios"}, code=400)
+                    return
+                db = get_session()
+                try:
+                    contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
+                                 .order_by(Contrato.id.desc()).first()
+                    if not contrato:
+                        self.send_json({"ok": False, "erro": "Contrato não encontrado"}, code=404)
+                        return
+                    if contrato.status == "vigente":
+                        self.send_json({"ok": False, "erro": "Contrato já está vigente"}, code=400)
+                        return
+                    ja_assinou = any(a.parte == parte for a in contrato.assinaturas)
+                    if ja_assinou:
+                        self.send_json({"ok": False, "erro": f"Parte '{parte}' já assinou"}, code=400)
+                        return
+                    timestamp = datetime.utcnow().isoformat()
+                    ip        = self.client_address[0] if self.client_address else ""
+                    hash_sig  = calcular_hash_assinatura(nome, cpf, contrato.id, timestamp)
+                    assinatura = ContratoAssinatura(
+                        contrato_id=contrato.id,
+                        parte=parte,
+                        nome=nome,
+                        cpf=cpf,
+                        assinado_em=datetime.utcnow(),
+                        ip_origem=ip,
+                        hash_sha256=hash_sig,
+                    )
+                    db.add(assinatura)
+                    partes_assinadas = {a.parte for a in contrato.assinaturas} | {parte}
+                    if "loja" in partes_assinadas and "cliente" in partes_assinadas:
+                        contrato.status = "vigente"
+                        etapa7 = db.query(CicloEtapa).filter_by(
+                            projeto_nome=nome_safe, etapa_codigo="7"
+                        ).first()
+                        if not etapa7:
+                            etapa7 = CicloEtapa(projeto_nome=nome_safe, etapa_codigo="7")
+                            db.add(etapa7)
+                        etapa7.status       = "vigente"
+                        etapa7.concluido_em = datetime.utcnow()
+                        etapa7.responsavel_id = usuario["id"]
+                    elif parte == "loja":
+                        contrato.status = "assinado_loja"
+                    else:
+                        contrato.status = "assinado_cliente"
+                    db.commit()
+                    self.send_json({"ok": True, "status": contrato.status, "parte": parte})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # POST /api/projetos/<nome>/contrato — gera PDF do contrato
+            m = _re.match(r'^/api/projetos/([^/]+)/contrato$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario   = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                req                  = json.loads(body)
+                orcamento_id         = req.get("orcamento_id")
+                endereco_instalacao  = (req.get("endereco_instalacao") or "").strip()
+                entrada_valor        = float(req.get("entrada_valor") or 0)
+                parcelas_descricao   = req.get("parcelas_descricao") or ""
+                adendo               = req.get("adendo") or ""
+                if not orcamento_id:
+                    self.send_json({"ok": False, "erro": "orcamento_id obrigatório"}, code=400)
+                    return
+                db = get_session()
+                try:
+                    projeto_dict, cliente_dict, orcamento_dict = \
+                        _montar_dados_projeto_para_contrato(nome_safe, orcamento_id, db)
+                    variaveis = montar_variaveis_contrato(
+                        projeto=projeto_dict,
+                        cliente=cliente_dict,
+                        orcamento=orcamento_dict,
+                        endereco_instalacao=endereco_instalacao,
+                        entrada_valor=entrada_valor,
+                        parcelas_descricao=parcelas_descricao,
+                        adendo=adendo,
+                    )
+                    contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
+                                 .order_by(Contrato.id.desc()).first()
+                    if not contrato:
+                        contrato = Contrato(projeto_nome=nome_safe, orcamento_id=orcamento_id)
+                        db.add(contrato)
+                        db.flush()
+                    contrato.endereco_instalacao = endereco_instalacao
+                    contrato.adendo              = adendo
+                    contrato.gerado_em           = datetime.utcnow()
+                    contrato.gerado_por_id       = usuario["id"]
+                    contrato.status              = "rascunho"
+                    db.commit()
+                    pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
+                    contrato.pdf_path = pdf_path
+                    contrato.status   = "gerado"
+                    db.commit()
+                    self.send_json({"ok": True, "contrato_id": contrato.id, "status": "gerado"})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
             else:
                 self.send_response(404)
                 self.end_headers()
@@ -1762,6 +1886,48 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            m = re.match(r'^/api/projetos/([^/]+)/contrato$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario   = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                req    = json.loads(body)
+                adendo = req.get("adendo") or ""
+                db = get_session()
+                try:
+                    contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
+                                 .order_by(Contrato.id.desc()).first()
+                    if not contrato:
+                        self.send_json({"ok": False, "erro": "Contrato não encontrado"}, code=404)
+                        return
+                    if contrato.status == "vigente":
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato vigente não pode ser editado"}, code=400)
+                        return
+                    contrato.adendo = adendo
+                    db.commit()
+                    projeto_dict, cliente_dict, orcamento_dict = \
+                        _montar_dados_projeto_para_contrato(nome_safe, contrato.orcamento_id, db)
+                    variaveis = montar_variaveis_contrato(
+                        projeto=projeto_dict, cliente=cliente_dict,
+                        orcamento=orcamento_dict,
+                        endereco_instalacao=contrato.endereco_instalacao or "",
+                        entrada_valor=0.0, parcelas_descricao="",
+                        adendo=adendo,
+                    )
+                    pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
+                    contrato.pdf_path = pdf_path
+                    db.commit()
+                    self.send_json({"ok": True, "status": contrato.status})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
             self.send_json({"ok": False, "erro": "Rota não encontrada"})
         except Exception as e:
             self.send_json({"ok": False, "erro": str(e)})
@@ -1820,6 +1986,55 @@ def _orcamento_dict(o) -> dict:
         "updated_at":      o.updated_at.strftime("%Y-%m-%d %H:%M") if o.updated_at else "",
         "ambientes":       [],  # preenchido por rotas específicas
     }
+
+
+def _montar_dados_projeto_para_contrato(nome_safe: str, orcamento_id: int, db) -> tuple:
+    """
+    Retorna (projeto_dict, cliente_dict, orcamento_dict) para geração do contrato.
+    Lança ValueError se dados essenciais estiverem faltando.
+    """
+    import json as _json
+    proj_path = os.path.join("PROJETOS", nome_safe, "projeto.json")
+    if not os.path.exists(proj_path):
+        raise ValueError(f"Projeto não encontrado: {nome_safe}")
+    with open(proj_path, encoding="utf-8") as f:
+        proj = _json.load(f)
+
+    orcamento = db.get(Orcamento, orcamento_id)
+    if not orcamento or orcamento.projeto_id != nome_safe:
+        raise ValueError(f"Orçamento {orcamento_id} não pertence ao projeto {nome_safe}")
+
+    ambientes_orc = db.query(OrcamentoAmbiente)\
+                      .filter_by(orcamento_id=orcamento_id)\
+                      .join(PoolAmbiente)\
+                      .all()
+    nomes_ambientes = [oa.pool_ambiente.nome_exibicao for oa in ambientes_orc]
+
+    cliente_id = proj.get("cliente_id")
+    cliente = db.get(Cliente, cliente_id) if cliente_id else None
+
+    projeto_dict = {
+        "nome_projeto": proj.get("nome_projeto", nome_safe),
+        "criado_em":    proj.get("criado_em", ""),
+        "consultor":    proj.get("consultor_nome", ""),
+    }
+    cliente_dict = {
+        "nome":       cliente.nome       if cliente else proj.get("nome_cliente", ""),
+        "cpf":        cliente.cpf        if cliente else "",
+        "telefone":   cliente.telefone   if cliente else "",
+        "logradouro": cliente.logradouro if cliente else "",
+        "numero":     cliente.numero     if cliente else "",
+        "bairro":     cliente.bairro     if cliente else "",
+        "cidade":     cliente.cidade     if cliente else "",
+        "estado":     cliente.estado     if cliente else "",
+    }
+    orcamento_dict = {
+        "nome":            orcamento.nome,
+        "valor_total":     orcamento.valor_total or 0.0,
+        "forma_pagamento": orcamento.forma_pagamento or "",
+        "ambientes":       nomes_ambientes,
+    }
+    return projeto_dict, cliente_dict, orcamento_dict
 
 
 def _parceiro_dict(p) -> dict:
