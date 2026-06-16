@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-15 (sessão 6 — admin + omie sync + lista projetos + pipeline)
+> Atualizado em: 2026-06-15 (sessão 7 — ciclo completo 20 etapas + módulo contrato + aprovar orçamento)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -30,6 +30,13 @@
 - Toggle "Incluir custos adicionais" corrigido: `_incluirCustos` como fonte de verdade global
 - **Total Flex (US-14) completo:** `mod_fin/total_flex.py` — juros compostos por dias reais
 - **Último orçamento ativo** persistido por projeto em localStorage; ao abrir projeto vai direto para o orçamento que estava ativo na última visita
+- **Módulo Ciclo (EP-10):** aba "Ciclo" na page-02 com 20 etapas em 2 colunas; etapas 1-5 auto-completas para projetos com negociação ativa
+- **Módulo Contrato (EP-10):** `mod_contrato.py` gera PDF via LibreOffice (fallback gracioso para .docx); template `config/contrato_template.docx` com 13 variáveis Jinja2; hash SHA-256 de assinatura
+- **Status contrato:** `rascunho` → `para_assinatura` → `assinado`; badges CSS dedicados
+- **Aprovar Orçamento reformulado:** modal exibe dados do cliente, CPF/endereço de instalação obrigatórios se vazios, condições de pagamento pré-carregadas; salva `valor_negociado` e `forma_pagamento` no orçamento antes de gerar contrato
+- **Pós-aprovação:** botões Salvar/Aprovar ocultos após etapa 6 concluída; "Voltar ao Orçamento" protegido por senha de gerente (`POST /ciclo/desfazer_aprovacao`)
+- **Auto-load projetos** ao iniciar app (`DOMContentLoaded → projCarregar()`)
+- **LibreOffice gracioso:** `LibreOfficeIndisponivel` salva `.docx` e avança status sem travar o fluxo
 
 ### [EP-07] Estado atual do versionamento de orçamentos
 
@@ -69,6 +76,9 @@
 - `salvarOrcamento()` no frontend é stub (só mostra toast) — não persiste nada além do que já é auto-salvo nos endpoints de ambiente/margem
 - Módulo Clientes e Parceiros vinculados a orçamentos (planejado)
 - Alterar senha do usuário `admin2026` antes de ir para produção
+- **Template do contrato:** ajustes nas variáveis (backlog anotado no último commit — ver `docs/` ou `CONTRATOS/`)
+- **LibreOffice no VPS:** verificar disponibilidade; app funciona sem ele (fallback .docx), mas PDF é o ideal
+- Etapa 6 do ciclo: marcada ao gerar contrato — testar fluxo completo no VPS
 
 ### [DECIDIDO]
 - Pool de ambientes permanente por projeto (XMLs nunca deletados)
@@ -101,6 +111,28 @@
 - `POST /api/admin/omie-sync/<id>/retry` — reprocessa sync de um cliente (role admin)
 - `PATCH /api/projetos/<nome>/status` — altera status do projeto (quente/morno/frio/perdido)
 
+**Tabelas novas (sessão 7):**
+- `ciclo_etapas` — `projeto`, `numero`, `status`, `concluido_em`, `concluido_por`
+- `contratos` — `projeto`, `orcamento_id`, `status`, `arquivo_path`, `arquivo_tipo`, `gerado_em`
+- `contrato_assinaturas` — `contrato_id`, `tipo` (cliente/empresa), `hash`, `assinado_em`, `assinado_por`
+- Campo novo em `orcamentos` — `valor_negociado`, `forma_pagamento`
+
+**Rotas novas (sessão 7):**
+- `GET /api/projetos/<nome>/ciclo` — retorna 20 etapas (auto-cria 1-5 se negociação presente)
+- `PATCH /api/projetos/<nome>/ciclo_etapas` — marca etapa como concluída/pendente
+- `POST /api/projetos/<nome>/contrato` — gera contrato (PDF ou .docx fallback)
+- `PATCH /api/projetos/<nome>/contrato` — atualiza status do contrato
+- `POST /api/projetos/<nome>/contrato/assinar` — registra assinatura com hash SHA-256
+- `GET /api/projetos/<nome>/contrato` — retorna metadados do contrato (inclui `arquivo_tipo`)
+- `GET /api/projetos/<nome>/contrato/pdf` — serve o arquivo (PDF ou .docx com Content-Type correto)
+- `PATCH /api/orcamentos/<id>/valor` — salva `valor_negociado` e `forma_pagamento`
+- `POST /api/projetos/<nome>/ciclo/desfazer_aprovacao` — valida gerente e reseta etapas 6+7
+
+**Arquivos novos (sessão 7):**
+- `mod_contrato.py` — geração de contrato via docxtpl + LibreOffice; `LibreOfficeIndisponivel`
+- `config/contrato_template.docx` — template com 13 variáveis Jinja2
+- `scripts/configurar_template_contrato.py` — insere variáveis no .docx base
+
 **Variáveis JS chave EP-07:**
 - `_orcamentos` — lista de orçamentos do projeto ativo
 - `_orcamentoAtivoId` — ID do orçamento sendo visualizado (persistido em `localStorage['lastOrc_<nome_safe>']`)
@@ -118,6 +150,55 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-15 (sessão 7 — ciclo completo 20 etapas + módulo contrato + aprovar orçamento)
+**Commits:** `3861470` → `b5d2ad3` (13:39 → 21:19)
+
+**Spec e planejamento:**
+- `docs/`: spec ciclo completo com 20 etapas, contrato, NFe cliente (2 iterações com correção de etapa 6 e endereço de instalação)
+- Plano de implementação do módulo de contrato (7 tasks, TDD)
+
+**Backend — módulo ciclo + contrato:**
+- Models: `CicloEtapa`, `Contrato`, `ContratoAssinatura` (SQLAlchemy)
+- `mod_contrato.py`: geração de docx via `docxtpl` + conversão para PDF via LibreOffice; fallback `LibreOfficeIndisponivel` salva `.docx` e avança status sem travar; hash SHA-256 de assinatura
+- `config/contrato_template.docx`: template com 13 variáveis Jinja2 (cliente, valores, parcelas, endereços)
+- `scripts/configurar_template_contrato.py`: popula automaticamente as variáveis no .docx base
+- `main.py`: `_montar_dados()` inclui `valor_liquido`; 9 novas rotas (ciclo, contrato, orcamento valor)
+- Auto-criação de etapas 1-5 como concluídas no `GET /ciclo` para projetos com negociação ativa
+
+**Interface — aba Ciclo (page-02):**
+- Nova aba "Ciclo" na barra superior da page-02
+- 20 etapas em 2 colunas (esq: 1-10, dir: 11-20); toggle clique para concluir/reabrir
+- Card 7 (Contrato): botão gerar, preview, download PDF/docx, botão assinar, campo senha gerente
+- Card 16 (Adendo): UI placeholder para futuro
+- Após gerar contrato: abre aba Ciclo no card 7 automaticamente
+- Botões "Salvar Parâmetros" e "Aprovar Orçamento" ocultos quando etapa 6 concluída
+- `carregarCicloSilencioso()`: carrega `_cicloData` ao abrir projeto sem exibir o painel
+
+**Interface — Aprovar Orçamento reformulado:**
+- `salvarValorNegociado()`: persiste valor negociado e forma de pagamento antes de abrir modal
+- Modal de aprovação: dados do cliente, CPF e endereço de instalação destacados se vazios, condições de pagamento pré-carregadas da negociação ativa
+- Status renomeados: `gerado` → `para_assinatura`, `vigente` → `assinado`
+- Badges CSS para `para_assinatura`, `rascunho`, `assinado`
+- Botão Omie removido da action-row (migrado para etapa 12 do Ciclo)
+- Campo entrada com máscara moeda `R$ X.XXX,XX` em tempo real; `parseMoeda()` para leitura
+- `mascaraMoedaInput()` reescrita: cursor estável, formato centavos-first correto
+
+**"Voltar ao Orçamento" (desfazer aprovação):**
+- `abrirModalVoltarOrcamento()`: modal com login/senha de gerente
+- `POST /ciclo/desfazer_aprovacao`: valida gerente, reseta etapas 6 e 7; disponível somente antes de contrato assinado
+
+**Bugs corrigidos:**
+- Auto-load projetos ao abrir app (`DOMContentLoaded → projCarregar()`)
+- LibreOffice indisponível: exceção `LibreOfficeIndisponivel` específica — salva .docx e avança sem crash
+- Etapa 6 não era mais hardcoded como concluída — marcada corretamente ao gerar contrato
+- Card 7: exibe botão baixar .docx + aviso dourado quando LibreOffice não disponível
+- `GET /contrato/pdf` serve .docx com `Content-Type` e `Content-Disposition` corretos; retorna `arquivo_tipo`
+- `usuario.id` → `usuario['id']` no PATCH ciclo (fix KeyError)
+- `PROJETOS_DIR` absoluto no helper contrato (fix path relativo)
+- Botão dourado `Etapas do Projeto` e template do usuário corrigidos
+
+---
 
 ### Sessão 2026-06-15 (sessão 6 — admin + omie sync + lista projetos + pipeline)
 **Commits:** `0bcc154` → `44863eb`
