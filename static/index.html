@@ -6582,6 +6582,86 @@ async function copiarEnderecoClienteModal() {
   } catch(e) { showToast('Erro ao buscar endereço: ' + e.message, true); }
 }
 
+function _capturarPagamento(formaEntrada, formaParcelas) {
+  const ayAtivo = document.getElementById('painel-aymore')?.style.display !== 'none';
+  const ccAtivo = document.getElementById('painel-cartao')?.style.display !== 'none';
+  const vpAtivo = document.getElementById('painel-vp')?.style.display !== 'none';
+  const tfAtivo = document.getElementById('painel-tf')?.style.display !== 'none';
+
+  const nomesForma = {
+    aymore: 'Financiamento Aymoré', cartao: 'Cartão de Crédito',
+    vp: 'Venda Programada', tf: 'Total Flex', avista: 'À Vista / Boleto Loja',
+  };
+
+  const entradaStr = document.getElementById('apr-entrada')?.value || '';
+  const entrada = (function parseMoedaLocal(str) {
+    if (!str) return 0;
+    const s = str.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+    return parseFloat(s) || 0;
+  })(entradaStr);
+
+  const entradaData = (() => {
+    if (ayAtivo) return document.getElementById('ay-data-contrato')?.value || '';
+    if (vpAtivo) return document.getElementById('vp-data-contrato')?.value || '';
+    if (tfAtivo) return document.getElementById('tf-data-contrato')?.value || '';
+    return '';
+  })();
+
+  // Cartão: só texto, sem datas
+  if (ccAtivo) {
+    const ccParcelasEl = document.getElementById('cc-parcelas');
+    const nParcelas    = parseInt(ccParcelasEl?.value || '1') || 1;
+    const totalEl      = document.getElementById('neg-total-final');
+    const rawTotal     = (totalEl?.value || '').replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,'');
+    const total        = parseFloat(rawTotal) || 0;
+    const valParcela   = nParcelas > 1 && (total - entrada) > 0 ? (total - entrada) / nParcelas : 0;
+    const fmt = (v) => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    let texto = fmt(total);
+    if (entrada > 0)
+      texto += ' — Entrada de ' + fmt(entrada);
+    if (nParcelas > 1 && valParcela > 0)
+      texto += ' e ' + nParcelas + 'x ' + fmt(valParcela);
+    return {
+      tipo: 'cartao', nome_forma: 'Cartão de Crédito',
+      texto, parcelas: [], entrada_valor: entrada,
+      entrada_data: '', entrada_forma: formaEntrada,
+    };
+  }
+
+  // Para outros tipos: coletar linhas da tabela do painel ativo
+  const tipo = ayAtivo ? 'aymore' : vpAtivo ? 'vp' : tfAtivo ? 'tf' : 'avista';
+  const nomeForma = nomesForma[tipo];
+  const painelMap = { aymore: 'painel-aymore', vp: 'painel-vp', tf: 'painel-tf', avista: null };
+  const painelId  = painelMap[tipo];
+
+  const parcelas = [];
+  if (painelId) {
+    const tbody = document.querySelector('#' + painelId + ' tbody');
+    if (tbody) {
+      let seq = 1;
+      tbody.querySelectorAll('tr').forEach(tr => {
+        const tds = tr.querySelectorAll('td');
+        if (tds.length < 2) return;
+        const desc  = (tds[0]?.textContent || '').trim();
+        const data  = (tds[1]?.textContent || '').trim();
+        const valor = (tds[2]?.textContent || tds[1]?.textContent || '').trim();
+        // Pular linhas de cabeçalho, "Assinatura", "Entrada" (tratada separadamente) e linhas vazias
+        if (!desc || desc === 'Assinatura' || desc.toLowerCase().includes('contrato')) return;
+        if (desc.toLowerCase().includes('entrada')) return;
+        parcelas.push({ seq: seq++, descricao: desc, data, valor, forma: formaParcelas });
+      });
+    }
+  }
+
+  return {
+    tipo, nome_forma: nomeForma,
+    parcelas, texto: '',
+    entrada_valor: entrada,
+    entrada_data:  entradaData,
+    entrada_forma: formaEntrada,
+  };
+}
+
 async function gerarContrato() {
   const endInstalacao = (document.getElementById('apr-end')?.value || '').trim();
   const entrada       = parseMoeda(document.getElementById('apr-entrada')?.value);
@@ -6602,6 +6682,8 @@ async function gerarContrato() {
 
   const btn = document.querySelector('#modal-aprovacao-overlay button[onclick="gerarContrato()"]');
   if (btn) { btn.disabled = true; btn.textContent = 'Gerando...'; }
+
+  const pagamento = _capturarPagamento(formaEntrada, formaParcelas);
 
   try {
     // Salvar CPF e dados complementares no cadastro do cliente, se preenchidos
@@ -6629,6 +6711,7 @@ async function gerarContrato() {
         adendo:              adendo,
         forma_entrada:       formaEntrada,
         forma_parcelas:      formaParcelas,
+        pagamento_json:      JSON.stringify(pagamento),
       }),
     });
     const d = await r.json();

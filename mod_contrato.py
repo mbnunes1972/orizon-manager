@@ -4,6 +4,7 @@ Usa docxtpl (Jinja2) para preencher variáveis e LibreOffice headless para conve
 """
 
 import os
+import json
 import platform
 import subprocess
 import hashlib
@@ -51,6 +52,79 @@ def _formatar_valor(valor: float) -> str:
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def _formatar_data_br(iso_date: str) -> str:
+    """Converte 'YYYY-MM-DD' → 'DD/MM/AAAA'. Retorna '—' se inválido."""
+    if not iso_date or len(iso_date) < 10:
+        return "—"
+    try:
+        return datetime.strptime(iso_date[:10], "%Y-%m-%d").strftime("%d/%m/%Y")
+    except ValueError:
+        return iso_date
+
+
+def _parse_valor_float(val_str: str) -> float:
+    """Converte 'R$ 4.820,00' → 4820.0."""
+    if not val_str:
+        return 0.0
+    s = val_str.replace("R$", "").replace(" ", "").replace(".", "").replace(",", ".")
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
+
+def _formatar_bloco_pagamento(
+    pagamento_json_str: str,
+    forma_entrada_label: str = "Pix",
+) -> str:
+    """
+    Gera bloco de texto descritivo do pagamento para inserção no template.
+    Cartão: texto livre. Demais: tabela de parcelas.
+    """
+    if not pagamento_json_str:
+        return ""
+    try:
+        pag = json.loads(pagamento_json_str)
+    except Exception:
+        return pagamento_json_str
+
+    tipo          = pag.get("tipo", "")
+    nome_forma    = pag.get("nome_forma", "")
+    parcelas      = pag.get("parcelas", [])
+    entrada_valor = float(pag.get("entrada_valor", 0) or 0)
+    entrada_data  = pag.get("entrada_data", "")
+    texto         = pag.get("texto", "")
+
+    linhas = [f"Forma de Pagamento: {nome_forma}"]
+
+    if tipo == "cartao":
+        linhas.append(texto)
+        return "\n".join(linhas)
+
+    # Tabela
+    ent_fmt  = _formatar_valor(entrada_valor)
+    ent_data = _formatar_data_br(entrada_data)
+    linhas.append("")
+    linhas.append(f"{'#':<5}{'Descrição':<22}{'Data':<14}{'Valor':<18}Forma")
+    linhas.append("-" * 72)
+    linhas.append(f"{'Ent':<5}{'Entrada':<22}{ent_data:<14}{ent_fmt:<18}{forma_entrada_label}")
+
+    total_parcelas = 0.0
+    for p in parcelas:
+        seq   = str(p.get("seq", ""))
+        desc  = str(p.get("descricao", ""))[:20]
+        data  = _formatar_data_br(p.get("data", ""))
+        val   = str(p.get("valor", ""))
+        forma = str(p.get("forma", ""))
+        linhas.append(f"{seq:<5}{desc:<22}{data:<14}{val:<18}{forma}")
+        total_parcelas += _parse_valor_float(val)
+
+    total_geral = entrada_valor + total_parcelas
+    linhas.append("-" * 72)
+    linhas.append(f"{'Total':<41}{_formatar_valor(total_geral)}")
+    return "\n".join(linhas)
+
+
 def montar_variaveis_contrato(
     projeto: dict,
     cliente: dict,
@@ -61,6 +135,7 @@ def montar_variaveis_contrato(
     adendo: str | None,
     forma_entrada: str = "pix",
     forma_parcelas: str = "boleto",
+    pagamento_json: str = "",      # JSON com cronograma de parcelas
 ) -> dict:
     """Constrói o dicionário de variáveis para renderizar o template."""
     _FORMAS = {
@@ -77,6 +152,10 @@ def montar_variaveis_contrato(
         cliente.get("estado", ""),
     ]))
     ambientes = orcamento.get("ambientes", [])
+    bloco_pag = _formatar_bloco_pagamento(
+        pagamento_json,
+        forma_entrada_label=_FORMAS.get(forma_entrada, forma_entrada),
+    )
     return {
         "cliente_nome":                    cliente.get("nome", ""),
         "cliente_cpf":                     cliente.get("cpf", ""),
@@ -95,6 +174,7 @@ def montar_variaveis_contrato(
         "forma_pagamento":                 orcamento.get("forma_pagamento", ""),
         "entrada_valor":                   _formatar_valor(entrada_valor),
         "parcelas_descricao":              parcelas_descricao or "",
+        "pagamento_bloco":                 bloco_pag or parcelas_descricao or "",
         "ambientes_lista":                 "\n".join(ambientes),
         "consultor_nome":                  projeto.get("consultor", ""),
         "data_contrato":                   datetime.now().strftime("%d/%m/%Y"),

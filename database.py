@@ -217,6 +217,7 @@ class Contrato(Base):
     template_path        = Column(Text,     nullable=False, default="config/contrato_template.docx")
     pdf_path             = Column(Text,     nullable=True)
     endereco_instalacao  = Column(Text,     nullable=True)
+    pagamento_json       = Column(Text,     nullable=True)   # JSON com cronograma de parcelas
     status               = Column(Text,     nullable=False, default="rascunho")
     # status: rascunho | gerado | assinado_loja | assinado_cliente | vigente
     adendo               = Column(Text,     nullable=True)

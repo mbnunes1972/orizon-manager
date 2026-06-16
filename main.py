@@ -1818,6 +1818,7 @@ class Handler(BaseHTTPRequestHandler):
                 adendo               = req.get("adendo") or ""
                 forma_entrada        = req.get("forma_entrada", "pix")
                 forma_parcelas       = req.get("forma_parcelas", "boleto")
+                pagamento_json_str   = req.get("pagamento_json", "")
                 if not orcamento_id:
                     self.send_json({"ok": False, "erro": "orcamento_id obrigatório"}, code=400)
                     return
@@ -1835,6 +1836,7 @@ class Handler(BaseHTTPRequestHandler):
                         adendo=adendo,
                         forma_entrada=forma_entrada,
                         forma_parcelas=forma_parcelas,
+                        pagamento_json=pagamento_json_str,
                     )
                     contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
                                  .order_by(Contrato.id.desc()).first()
@@ -1843,6 +1845,7 @@ class Handler(BaseHTTPRequestHandler):
                         db.add(contrato)
                         db.flush()
                     contrato.endereco_instalacao = endereco_instalacao
+                    contrato.pagamento_json      = pagamento_json_str
                     contrato.adendo              = adendo
                     contrato.gerado_em           = datetime.utcnow()
                     contrato.gerado_por_id       = usuario["id"]
