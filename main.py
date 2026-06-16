@@ -586,7 +586,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path   = urlparse(self.path).path
         length = int(self.headers.get("Content-Length", 0))
-        body   = self.rfile.read(length)
+        body   = self.rfile.read(length) if length else b'{}'
 
         if handle_auth_post(self, path, body): return
         if path == "/config":
@@ -1696,11 +1696,11 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r'^/api/projetos/([^/]+)/ciclo/desfazer_aprovacao$', path)
             if m:
                 nome_safe = unquote(m.group(1))
-                req   = json.loads(body)
-                login = (req.get("login") or "").strip()
-                senha = (req.get("senha") or "").strip()
                 db = get_session()
                 try:
+                    req   = json.loads(body or b'{}')
+                    login = (req.get("login") or "").strip()
+                    senha = (req.get("senha") or "").strip()
                     autorizador = db.query(Usuario).filter_by(login=login, ativo=1).first()
                     if not autorizador or not autorizador.check_senha(senha):
                         self.send_json({"ok": False, "erro": "Credenciais inválidas"})
