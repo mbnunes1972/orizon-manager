@@ -2631,6 +2631,14 @@ function npDeselecionarCliente(){
   setTimeout(() => document.getElementById('novo-proj-cli').focus(), 50);
 }
 
+function npAbrirBriefingCliente() {
+  const cliId   = document.getElementById('novo-proj-cliente-id')?.value;
+  const cliNome = document.getElementById('np-cli-chip-nome')?.textContent
+               || document.getElementById('novo-proj-cli')?.value || '';
+  if (!cliId) { showToast('Selecione um cliente primeiro', true); return; }
+  cliAbrirBriefing(parseInt(cliId), cliNome);
+}
+
 function npAbrirCadastroCliente(){
   _npCadastrandoCliente = true;
   const nomeBusca = (document.getElementById('novo-proj-cli')?.value || '').trim();
@@ -2660,7 +2668,10 @@ async function criarProjeto(){
     const rb = await fetch('/api/clientes/' + clienteId + '/briefing', {credentials:'same-origin'});
     const db_ = await rb.json();
     if (!db_.ok || !db_.briefing || !db_.briefing.completo) {
-      st.textContent = 'Preencha o briefing do cliente antes de criar o projeto.';
+      st.innerHTML = 'Briefing incompleto. <button onclick="npAbrirBriefingCliente()" ' +
+        'style="background:none;border:1px solid var(--dalm-gold);color:var(--dalm-gold);' +
+        'border-radius:4px;padding:2px 10px;font-size:.8rem;cursor:pointer;margin-left:6px">' +
+        '✎ Preencher Briefing</button>';
       st.style.color = 'var(--err)';
       return;
     }
@@ -6225,9 +6236,74 @@ function toggleCicloCard(codigo) {
 }
 
 function _renderCardGenerico(etapa, dados) {
-  return `<p style="color:var(--muted);font-size:.85rem;margin:0">
-    ${dados.observacoes || 'Nenhuma informação registrada.'}
-  </p>`;
+  const concluido = dados.status === 'concluido';
+  const dt = dados.concluido_em
+    ? new Date(dados.concluido_em).toLocaleDateString('pt-BR') : '';
+
+  // Card especial etapa 1 — Captação / Cadastro do cliente
+  if (etapa.codigo === '1') {
+    const cli     = (projetoAtivo && projetoAtivo.cliente) || {};
+    const cliId   = projetoAtivo?.cliente_id || cli.id || '';
+    const cliNome = cli.nome  || projetoAtivo?.nome_cliente || '—';
+    const cliCpf  = cli.cpf   || '';
+    const cliEmail= cli.email || '';
+    const cliTel  = cli.telefone || '';
+    return `
+      <div style="font-size:.85rem;color:var(--muted);margin-bottom:10px;line-height:1.8">
+        <div><strong style="color:var(--text);font-size:.95rem">${cliNome}</strong></div>
+        ${cliCpf  ? `<div>CPF: <span style="color:var(--text)">${cliCpf}</span></div>`   : ''}
+        ${cliEmail? `<div>E-mail: <span style="color:var(--text)">${cliEmail}</span></div>` : ''}
+        ${cliTel  ? `<div>Tel: <span style="color:var(--text)">${cliTel}</span></div>`   : ''}
+      </div>
+      ${cliId ? `<button onclick="cliAbrirModal(${cliId})"
+        style="background:none;border:1px solid var(--dalm-gold);color:var(--dalm-gold);
+        border-radius:5px;padding:5px 14px;font-size:.82rem;cursor:pointer">
+        ✎ Editar Cadastro</button>` : ''}
+      ${concluido ? `<span style="margin-left:8px;font-size:.8rem;color:var(--ok)">✓ Concluído${dt?' em '+dt:''}</span>` : ''}`;
+  }
+
+  // Card especial etapa 2 — Briefing
+  if (etapa.codigo === '2') {
+    const briefLocked = _cicloData['4']?.status === 'concluido';
+    const cli     = (projetoAtivo && projetoAtivo.cliente) || {};
+    const cliId   = projetoAtivo?.cliente_id || cli.id || '';
+    const cliNome = cli.nome || projetoAtivo?.nome_cliente || '';
+    return `
+      <div style="margin-bottom:10px;font-size:.85rem;color:var(--muted)">
+        ${concluido
+          ? `<span style="color:var(--ok)">✓ Briefing completo${dt?' — preenchido em '+dt:''}</span>`
+          : `<span style="color:var(--warn)">⚠ Briefing pendente — campos obrigatórios não preenchidos</span>`}
+        ${briefLocked ? `<span style="margin-left:10px;font-size:.75rem;color:var(--muted);
+          border:1px solid var(--muted);border-radius:3px;padding:1px 6px">🔒 bloqueado após 1º orçamento</span>` : ''}
+      </div>
+      ${cliId ? `<button onclick="cliAbrirBriefing(${cliId}, '${(cliNome).replace(/'/g,"\\'")}')"
+        style="background:none;border:1px solid var(--dalm-gold);color:var(--dalm-gold);
+        border-radius:5px;padding:5px 14px;font-size:.82rem;cursor:pointer">
+        ${briefLocked ? '👁 Ver Briefing' : '✎ ' + (concluido ? 'Editar' : 'Preencher') + ' Briefing'}
+      </button>` : ''}`;
+  }
+
+  // Cards genéricos — toggle + notas
+  const btnLabel = concluido ? '↺ Reabrir' : '✓ Marcar como Concluída';
+  const btnStyle = concluido
+    ? 'border:1px solid var(--muted);color:var(--muted);background:none'
+    : 'background:var(--dalm-gold);color:#000;border:none;font-weight:700';
+  return `
+    <div style="font-size:.82rem;color:var(--muted);margin-bottom:10px">
+      ${concluido
+        ? `✓ Concluída${dt ? ' em ' + dt : ''}`
+        : 'Pendente'}
+    </div>
+    <textarea id="obs-etapa-${etapa.codigo}"
+      placeholder="Observações sobre esta etapa..."
+      style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);
+        border-radius:4px;background:var(--card);color:var(--text);font-size:.82rem;
+        resize:vertical;min-height:60px;margin-bottom:10px"
+    >${dados.observacoes || ''}</textarea>
+    <button onclick="toggleSalvarEtapa('${etapa.codigo}')"
+      style="${btnStyle};border-radius:5px;padding:6px 16px;font-size:.82rem;cursor:pointer">
+      ${btnLabel}
+    </button>`;
 }
 
 function _renderCardAprovacaoFinanceira(dados) {
@@ -6294,6 +6370,27 @@ async function toggleCicloEtapa(codigo) {
   } catch(e) { showToast('Erro de rede: ' + e.message, true); }
 }
 
+async function toggleSalvarEtapa(codigo) {
+  if (!projetoAtivo) return;
+  const obs = document.getElementById('obs-etapa-' + codigo)?.value || '';
+  const dados = _cicloData[codigo] || {};
+  const novoStatus = dados.status === 'concluido' ? 'pendente' : 'concluido';
+  try {
+    const r = await fetch(
+      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${encodeURIComponent(codigo)}`,
+      {
+        method: 'PATCH', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: novoStatus, observacoes: obs }),
+      }
+    );
+    const d = await r.json();
+    if (!d.ok) { showToast('Erro: ' + (d.erro || 'falha'), true); return; }
+    showToast(novoStatus === 'concluido' ? 'Etapa concluída!' : 'Etapa reaberta.');
+    await carregarCiclo();
+  } catch(e) { showToast('Erro de rede: ' + e.message, true); }
+}
+
 function _renderCardContrato() {
   return `<div id="contrato-ui">
     <p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">Carregando...</p>
@@ -6301,21 +6398,39 @@ function _renderCardContrato() {
 }
 
 function mostrarErroModal(mensagem) {
+  mostrarErroComAcao(mensagem, null, null);
+}
+
+function mostrarErroComAcao(mensagem, labelAcao, fnAcao) {
   document.getElementById('erro-modal-overlay')?.remove();
   const ov = document.createElement('div');
   ov.id = 'erro-modal-overlay';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center';
+  const btnAcao = labelAcao ? `
+    <button id="erro-modal-btn-acao"
+      style="background:var(--dalm-gold,#9C7A3C);color:#000;border:none;border-radius:6px;
+      padding:10px 28px;font-size:1rem;cursor:pointer;font-weight:600;margin-right:12px">
+      ${labelAcao}</button>` : '';
   ov.innerHTML = `
     <div style="background:#1a0a0a;border:2px solid var(--err,#c84b4b);border-radius:10px;
       padding:32px 40px;max-width:540px;width:90%;text-align:center">
       <div style="font-size:2rem;margin-bottom:16px">&#x26A0;</div>
       <p style="color:#f08080;font-size:1.1rem;line-height:1.6;margin:0 0 24px;white-space:pre-wrap">${mensagem}</p>
-      <button onclick="document.getElementById('erro-modal-overlay').remove()"
-        style="background:#c84b4b;color:#fff;border:none;border-radius:6px;
-        padding:10px 28px;font-size:1rem;cursor:pointer;font-weight:600">Fechar</button>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        ${btnAcao}
+        <button onclick="document.getElementById('erro-modal-overlay').remove()"
+          style="background:#c84b4b;color:#fff;border:none;border-radius:6px;
+          padding:10px 28px;font-size:1rem;cursor:pointer;font-weight:600">Fechar</button>
+      </div>
     </div>
   `;
   document.body.appendChild(ov);
+  if (labelAcao && fnAcao) {
+    document.getElementById('erro-modal-btn-acao').onclick = () => {
+      ov.remove();
+      fnAcao();
+    };
+  }
 }
 
 async function carregarDadosContrato() {
@@ -6617,10 +6732,14 @@ async function abrirAprovacaoComDados() {
       const rb = await fetch('/api/clientes/' + clienteParaBriefing.id + '/briefing', {credentials:'same-origin'});
       const db_ = await rb.json();
       if (!db_.ok || !db_.briefing || !db_.briefing.completo) {
-        mostrarErroModal(
-          'Briefing incompleto.\n\n' +
-          'Preencha os dados obrigatórios do briefing do cliente antes de aprovar o orçamento.\n\n' +
-          'Campos obrigatórios: tipo de imóvel, budget estimado, categoria de proposta, prazo desejado e flexibilidade de prazo.'
+        mostrarErroComAcao(
+          'Briefing incompleto.\n\nPreencha os dados obrigatórios do briefing do cliente antes de aprovar o orçamento.\n\nCampos obrigatórios: tipo de imóvel, budget estimado, categoria de proposta, prazo desejado e flexibilidade de prazo.',
+          'Abrir Briefing',
+          () => {
+            const cliId   = clienteParaBriefing.id;
+            const cliNome = clienteParaBriefing.nome || '';
+            cliAbrirBriefing(cliId, cliNome);
+          }
         );
         return;
       }
@@ -7162,6 +7281,11 @@ function _bfPreencherForm(b) {
 }
 
 async function bfSalvar() {
+  // Bloqueio após 1º orçamento criado (etapa 4 concluída no projeto ativo)
+  if (_cicloData['4']?.status === 'concluido') {
+    showToast('Briefing bloqueado — o 1º orçamento já foi criado. Solicite autorização gerencial para editar.', true);
+    return;
+  }
   const obrig = {
     'bf-tipo-imovel':   'Tipo de imóvel',
     'bf-budget':        'Budget estimado',
