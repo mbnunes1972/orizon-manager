@@ -6240,19 +6240,20 @@ function _formGerarContrato() {
 }
 
 function mascaraMoedaInput(el) {
-  const cursor = el.selectionStart;
-  const oldLen = el.value.length;
-  const digits = el.value.replace(/\D/g, '');
-  if (!digits || digits === '0') { el.value = ''; return; }
-  const cents = parseInt(digits, 10);
-  const reais = Math.floor(cents / 100);
-  const ctvs  = cents % 100;
-  const milhar = reais.toLocaleString('pt-BR');
-  el.value = 'R$ ' + milhar + ',' + String(ctvs).padStart(2, '0');
-  // mantém cursor no final se estava no final; caso contrário ajusta deslocamento
-  const diff = el.value.length - oldLen;
-  if (cursor !== null && cursor < oldLen) {
-    try { el.setSelectionRange(cursor + diff, cursor + diff); } catch(e) {}
+  // Remove tudo exceto dígitos e vírgula
+  const raw = el.value.replace(/[^0-9,]/g, '');
+  const partes = raw.split(',');
+  let inteiro = partes[0].replace(/^0+/, '') || '0';
+  // Adiciona separador de milhar
+  inteiro = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  let resultado = 'R$ ' + inteiro;
+  if (partes.length > 1) {
+    resultado += ',' + partes[1].slice(0, 2);
+  }
+  const cursorFim = el.selectionStart === el.value.length;
+  el.value = resultado;
+  if (cursorFim) {
+    el.setSelectionRange(resultado.length, resultado.length);
   }
 }
 function parseMoeda(str) {
