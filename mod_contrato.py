@@ -62,6 +62,133 @@ def _formatar_data_br(iso_date: str) -> str:
         return iso_date
 
 
+_TELEFONE_LOJA = "(12) 3341-8777"
+
+
+def _calcular_datas_mensais(data_primeira: str, n: int) -> list:
+    """Retorna lista de n datas mensais a partir de data_primeira (ISO string YYYY-MM-DD)."""
+    if not data_primeira or len(data_primeira) < 10:
+        return ["—"] * n
+    try:
+        from datetime import date
+        import calendar
+        d = date.fromisoformat(data_primeira[:10])
+        datas = []
+        for i in range(n):
+            mes = d.month + i
+            ano = d.year + (mes - 1) // 12
+            mes = ((mes - 1) % 12) + 1
+            dia = min(d.day, calendar.monthrange(ano, mes)[1])
+            datas.append(date(ano, mes, dia).strftime("%d/%m/%Y"))
+        return datas
+    except Exception:
+        return ["—"] * n
+
+
+def construir_contexto(cliente: dict, usuario: dict, forma_pagamento_json: str) -> dict:
+    """
+    Monta o dicionário completo para docxtpl.
+
+    cliente: dict de _cliente_dict() — inclui logradouro/cep/estado (residencial) e inst_* (instalação)
+    usuario: dict com nome, telefone (pode ser None), email
+    forma_pagamento_json: string JSON de orcamento.forma_pagamento
+    """
+    # ── Consultor ────────────────────────────────────────────────────────────
+    consultor_tel = (usuario.get("telefone") or "").strip() or _TELEFONE_LOJA
+
+    # ── Endereço de instalação ────────────────────────────────────────────────
+    inst_mesmo = cliente.get("inst_mesmo_residencial", True)
+    if inst_mesmo:
+        inst_logradouro  = cliente.get("logradouro",  "")
+        inst_numero      = cliente.get("numero",      "")
+        inst_complemento = cliente.get("complemento", "")
+        inst_bairro      = cliente.get("bairro",      "")
+        inst_cidade      = cliente.get("cidade",      "")
+        inst_cep         = cliente.get("cep",         "")
+        inst_uf          = cliente.get("estado",      "")
+    else:
+        inst_logradouro  = cliente.get("inst_logradouro",  "")
+        inst_numero      = cliente.get("inst_numero",      "")
+        inst_complemento = cliente.get("inst_complemento", "")
+        inst_bairro      = cliente.get("inst_bairro",      "")
+        inst_cidade      = cliente.get("inst_cidade",      "")
+        inst_cep         = cliente.get("inst_cep",         "")
+        inst_uf          = cliente.get("inst_uf",          "")
+
+    # ── Pagamento ─────────────────────────────────────────────────────────────
+    try:
+        pag = json.loads(forma_pagamento_json) if forma_pagamento_json else {}
+    except Exception:
+        pag = {}
+
+    tipo           = pag.get("tipo", "")
+    entrada_valor  = float(pag.get("entrada_valor", 0) or 0)
+    entrada_tipo   = pag.get("entrada_tipo", "")
+    entrada_data   = _formatar_data_br(pag.get("entrada_data", ""))
+    modalidade     = pag.get("nome_forma", "")
+    num_parcelas   = int(pag.get("num_parcelas", 0) or 0)
+    data_primeira  = pag.get("data_primeira_parcela", "")
+    parcelas_json  = pag.get("parcelas", [])
+
+    # Constrói grade p01..p24
+    if tipo == "cartao":
+        datas_parcelas = ["—"] * 24
+    elif tipo in ("aymore", "vp", "venda_programada"):
+        calculadas = _calcular_datas_mensais(data_primeira, num_parcelas)
+        datas_parcelas = (calculadas + ["—"] * 24)[:24]
+    elif tipo == "total_flex":
+        # Total Flex: datas 100% livres — lidas diretamente do JSON
+        datas_tf = [_formatar_data_br(p.get("data", "")) for p in parcelas_json]
+        datas_parcelas = (datas_tf + ["—"] * 24)[:24]
+    elif tipo == "avista":
+        saldo_data = _formatar_data_br(
+            parcelas_json[0].get("data", "") if parcelas_json else ""
+        )
+        datas_parcelas = [saldo_data] + ["—"] * 23
+    else:
+        datas_parcelas = ["—"] * 24
+
+    ctx = {
+        # Consultor
+        "consultor_nome":  usuario.get("nome", ""),
+        "consultor_tel":   consultor_tel,
+        "consultor_email": usuario.get("email", "") or "",
+        # Cliente
+        "cliente_nome":     cliente.get("nome",      ""),
+        "cliente_cpf":      cliente.get("cpf",       ""),
+        "cliente_email":    cliente.get("email",     ""),
+        "cliente_telefone": cliente.get("telefone",  ""),
+        # Endereço residencial
+        "res_logradouro":  cliente.get("logradouro",  ""),
+        "res_numero":      cliente.get("numero",      ""),
+        "res_complemento": cliente.get("complemento", ""),
+        "res_bairro":      cliente.get("bairro",      ""),
+        "res_cidade":      cliente.get("cidade",      ""),
+        "res_cep":         cliente.get("cep",         ""),
+        "res_uf":          cliente.get("estado",      ""),
+        # Endereço de instalação
+        "inst_logradouro":  inst_logradouro,
+        "inst_numero":      inst_numero,
+        "inst_complemento": inst_complemento,
+        "inst_bairro":      inst_bairro,
+        "inst_cidade":      inst_cidade,
+        "inst_cep":         inst_cep,
+        "inst_uf":          inst_uf,
+        # Pagamento — cabeçalho
+        "pgto_entrada_valor":  _formatar_valor(entrada_valor),
+        "pgto_entrada_tipo":   entrada_tipo,
+        "pgto_entrada_data":   entrada_data,
+        "pgto_modalidade":     modalidade,
+        "pgto_num_parcelas":   str(num_parcelas) if num_parcelas else "—",
+        "pgto_data_primeira":  _formatar_data_br(data_primeira),
+        # Grade de datas p01..p24
+        **{"p%02d_data" % (i + 1): datas_parcelas[i] for i in range(24)},
+        # Campo legado
+        "data_contrato": datetime.now().strftime("%d/%m/%Y"),
+    }
+    return ctx
+
+
 def _parse_valor_float(val_str: str) -> float:
     """Converte 'R$ 4.820,00' → 4820.0."""
     if not val_str:
