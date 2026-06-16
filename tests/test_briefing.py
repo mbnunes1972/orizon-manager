@@ -60,7 +60,8 @@ def test_briefing_incompleto_levanta_erro():
     db = get_session()
     b = Briefing(cliente_id=cliente_id, data_atendimento=datetime.utcnow())
     db.add(b)
-    with pytest.raises(Exception):
+    from sqlalchemy.exc import IntegrityError
+    with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
     db.close()

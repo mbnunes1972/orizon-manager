@@ -146,7 +146,7 @@ class Briefing(Base):
     cliente_id            = Column(Integer,  ForeignKey("clientes.id"), nullable=False)
     projeto_nome          = Column(Text,     nullable=True)
     criado_em             = Column(DateTime, default=datetime.utcnow)
-    atualizado_em         = Column(DateTime, nullable=True)
+    atualizado_em         = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
 
     # Obrigatórios (gate etapa 2)
     data_atendimento      = Column(DateTime, nullable=False)
