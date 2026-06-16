@@ -2000,12 +2000,14 @@ class Handler(BaseHTTPRequestHandler):
                         "telefone": _get_usuario_telefone(usuario["id"], db),
                         "email":    usuario.get("email", "") or "",
                     }
+                    # pagamento_json_str = JSON completo enviado pela aprovação (prioridade)
+                    # fallback: forma_pagamento do orçamento (texto curto ou JSON salvo)
+                    pag_json = pagamento_json_str or orcamento_dict.get("forma_pagamento", "") or ""
                     variaveis = construir_contexto(
                         cliente_dict,
                         usuario_ctx,
-                        orcamento_dict.get("forma_pagamento", ""),
+                        pag_json,
                     )
-                    # Campos legados ainda usados pelo template ou pelo adendo
                     variaveis.update({
                         "projeto_nome":    projeto_dict.get("nome_projeto", ""),
                         "orcamento_nome":  orcamento_dict.get("nome", ""),
@@ -2228,12 +2230,12 @@ class Handler(BaseHTTPRequestHandler):
                         "telefone": _get_usuario_telefone(usuario["id"], db),
                         "email":    usuario.get("email", "") or "",
                     }
+                    pag_json = contrato.pagamento_json or orcamento_dict.get("forma_pagamento", "") or ""
                     variaveis = construir_contexto(
                         cliente_dict,
                         usuario_ctx,
-                        orcamento_dict.get("forma_pagamento", ""),
+                        pag_json,
                     )
-                    # Campos legados ainda usados pelo template ou pelo adendo
                     variaveis.update({
                         "projeto_nome":    projeto_dict.get("nome_projeto", ""),
                         "orcamento_nome":  orcamento_dict.get("nome", ""),
@@ -2241,8 +2243,8 @@ class Handler(BaseHTTPRequestHandler):
                         "valor_negociado": _formatar_valor(orcamento_dict.get("valor_total", 0)),
                         "valor_liquido":   _formatar_valor(orcamento_dict.get("valor_liquido", 0)),
                         "ambientes_lista": "\n".join(orcamento_dict.get("ambientes", [])),
-                        "tem_adendo":      bool(req.get("adendo")),
-                        "adendo":          req.get("adendo") or "",
+                        "tem_adendo":      bool(adendo),
+                        "adendo":          adendo or "",
                         "consultor_nome":  usuario.get("nome", ""),
                     })
                     pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
@@ -2418,6 +2420,11 @@ def _montar_dados_projeto_para_contrato(nome_safe: str, orcamento_id: int, db) -
     nomes_ambientes = [oa.pool_ambiente.nome_exibicao for oa in ambientes_orc]
 
     cliente_id = proj.get("cliente_id")
+    # Fallback: projetos_meta também guarda cliente_id para projetos novos
+    if not cliente_id:
+        p_meta = db.query(Projeto).filter_by(nome_safe=nome_safe).first()
+        if p_meta:
+            cliente_id = p_meta.cliente_id
     cliente = db.get(Cliente, cliente_id) if cliente_id else None
 
     projeto_dict = {
@@ -2427,10 +2434,20 @@ def _montar_dados_projeto_para_contrato(nome_safe: str, orcamento_id: int, db) -
     }
     if cliente:
         cliente_dict = _cliente_dict(cliente)
+        # Preenche campos vazios do banco com o que foi salvo no projeto.json
+        cli_proj = proj.get("cliente") or {}
+        for campo in ("nome", "cpf", "email", "telefone"):
+            if not cliente_dict.get(campo) and cli_proj.get(campo):
+                cliente_dict[campo] = cli_proj[campo]
     else:
+        # Projeto legado sem registro no banco: usa dados do projeto.json
+        cli_proj = proj.get("cliente") or {}
         cliente_dict = {
-            "nome": proj.get("nome_cliente", ""), "cpf": "", "email": "",
-            "telefone": "", "logradouro": "", "numero": "", "complemento": "",
+            "nome":     cli_proj.get("nome")  or proj.get("nome_cliente", ""),
+            "cpf":      cli_proj.get("cpf")   or "",
+            "email":    cli_proj.get("email") or "",
+            "telefone": cli_proj.get("telefone") or "",
+            "logradouro": "", "numero": "", "complemento": "",
             "bairro": "", "cidade": "", "estado": "", "cep": "",
             "inst_mesmo_residencial": True,
             "inst_logradouro": "", "inst_numero": "", "inst_complemento": "",

@@ -144,6 +144,35 @@ def main():
                 pass
             parcela_idx += 1
 
+    # ── Parágrafos do corpo — data e assinatura ───────────────────────────────
+    paras = doc.paragraphs
+
+    # P122: "São José dos Campos - SP, 09 de junho de 2026."
+    # → substituir data por placeholder
+    for para in paras:
+        t = para.text.strip()
+        if t.startswith("São José dos Campos") and ("de 2026" in t or "de 20" in t):
+            for run in para.runs:
+                run.text = ""
+            if para.runs:
+                para.runs[0].text = "São José dos Campos - SP, {{ data_contrato }}."
+            else:
+                para.add_run("São José dos Campos - SP, {{ data_contrato }}.")
+            break
+
+    # P128: nome hardcoded do assinante da empresa (berê Ferreira Machado)
+    # → substituir pelo nome do consultor/responsável
+    for para in paras:
+        t = para.text.strip()
+        if "Ferreira Machado" in t or ("787.834" in t):
+            for run in para.runs:
+                run.text = ""
+            if para.runs:
+                para.runs[0].text = "{{ consultor_nome }}"
+            else:
+                para.add_run("{{ consultor_nome }}")
+            break
+
     doc.save(DEST)
     print(f"Template salvo: {DEST}")
 
