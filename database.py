@@ -352,6 +352,30 @@ def _migrar_colunas():
         if "cliente_id" not in prj_cols:
             cur.execute("ALTER TABLE projetos_meta ADD COLUMN cliente_id INTEGER")
 
+        # ── contratos ─────────────────────────────────────────────────────────
+        cur.execute("PRAGMA table_info(contratos)")
+        con_cols = {row[1] for row in cur.fetchall()}
+        for col, tipo in [
+            ("pagamento_json",  "TEXT"),
+            ("endereco_instalacao", "TEXT"),
+            ("adendo",          "TEXT"),
+            ("d4sign_uuid",     "TEXT"),
+            ("gerado_por_id",   "INTEGER"),
+        ]:
+            if col not in con_cols:
+                cur.execute(f"ALTER TABLE contratos ADD COLUMN {col} {tipo}")
+
+        # ── orcamentos ────────────────────────────────────────────────────────
+        cur.execute("PRAGMA table_info(orcamentos)")
+        orc_cols = {row[1] for row in cur.fetchall()}
+        for col, tipo in [
+            ("valor_liquido",   "REAL DEFAULT 0"),
+            ("forma_pagamento", "TEXT"),
+            ("updated_at",      "DATETIME"),
+        ]:
+            if col not in orc_cols:
+                cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")
+
         conn.commit()
     except Exception:
         pass
