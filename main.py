@@ -39,7 +39,8 @@ from mod_omie import (
 from mod_margens import calcular_margens, _normalizar_faixas
 from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada, calcular_total_flex
 from mod_contrato import (calcular_hash_assinatura, montar_variaveis_contrato,
-                          gerar_pdf_contrato, LibreOfficeIndisponivel)
+                          gerar_pdf_contrato, LibreOfficeIndisponivel,
+                          construir_contexto, _formatar_valor)
 
 def _enriquecer_projetos_com_status(projetos):
     """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
@@ -1969,18 +1970,30 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     projeto_dict, cliente_dict, orcamento_dict = \
                         _montar_dados_projeto_para_contrato(nome_safe, orcamento_id, db)
-                    variaveis = montar_variaveis_contrato(
-                        projeto=projeto_dict,
-                        cliente=cliente_dict,
-                        orcamento=orcamento_dict,
-                        endereco_instalacao=endereco_instalacao,
-                        entrada_valor=entrada_valor,
-                        parcelas_descricao=parcelas_descricao,
-                        adendo=adendo,
-                        forma_entrada=forma_entrada,
-                        forma_parcelas=forma_parcelas,
-                        pagamento_json=pagamento_json_str,
+                    from mod_contrato import construir_contexto
+                    from mod_contrato import _formatar_valor
+                    usuario_ctx = {
+                        "nome":     usuario.get("nome", ""),
+                        "telefone": _get_usuario_telefone(usuario["id"], db),
+                        "email":    usuario.get("email", "") or "",
+                    }
+                    variaveis = construir_contexto(
+                        cliente_dict,
+                        usuario_ctx,
+                        orcamento_dict.get("forma_pagamento", ""),
                     )
+                    # Campos legados ainda usados pelo template ou pelo adendo
+                    variaveis.update({
+                        "projeto_nome":    projeto_dict.get("nome_projeto", ""),
+                        "orcamento_nome":  orcamento_dict.get("nome", ""),
+                        "valor_total":     _formatar_valor(orcamento_dict.get("valor_total", 0)),
+                        "valor_negociado": _formatar_valor(orcamento_dict.get("valor_total", 0)),
+                        "valor_liquido":   _formatar_valor(orcamento_dict.get("valor_liquido", 0)),
+                        "ambientes_lista": "\n".join(orcamento_dict.get("ambientes", [])),
+                        "tem_adendo":      bool(req.get("adendo")),
+                        "adendo":          req.get("adendo") or "",
+                        "consultor_nome":  usuario.get("nome", ""),
+                    })
                     contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
                                  .order_by(Contrato.id.desc()).first()
                     if not contrato:
@@ -2185,13 +2198,30 @@ class Handler(BaseHTTPRequestHandler):
                     db.commit()
                     projeto_dict, cliente_dict, orcamento_dict = \
                         _montar_dados_projeto_para_contrato(nome_safe, contrato.orcamento_id, db)
-                    variaveis = montar_variaveis_contrato(
-                        projeto=projeto_dict, cliente=cliente_dict,
-                        orcamento=orcamento_dict,
-                        endereco_instalacao=contrato.endereco_instalacao or "",
-                        entrada_valor=0.0, parcelas_descricao="",
-                        adendo=adendo,
+                    from mod_contrato import construir_contexto
+                    from mod_contrato import _formatar_valor
+                    usuario_ctx = {
+                        "nome":     usuario.get("nome", ""),
+                        "telefone": _get_usuario_telefone(usuario["id"], db),
+                        "email":    usuario.get("email", "") or "",
+                    }
+                    variaveis = construir_contexto(
+                        cliente_dict,
+                        usuario_ctx,
+                        orcamento_dict.get("forma_pagamento", ""),
                     )
+                    # Campos legados ainda usados pelo template ou pelo adendo
+                    variaveis.update({
+                        "projeto_nome":    projeto_dict.get("nome_projeto", ""),
+                        "orcamento_nome":  orcamento_dict.get("nome", ""),
+                        "valor_total":     _formatar_valor(orcamento_dict.get("valor_total", 0)),
+                        "valor_negociado": _formatar_valor(orcamento_dict.get("valor_total", 0)),
+                        "valor_liquido":   _formatar_valor(orcamento_dict.get("valor_liquido", 0)),
+                        "ambientes_lista": "\n".join(orcamento_dict.get("ambientes", [])),
+                        "tem_adendo":      bool(req.get("adendo")),
+                        "adendo":          req.get("adendo") or "",
+                        "consultor_nome":  usuario.get("nome", ""),
+                    })
                     pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
                     contrato.pdf_path = pdf_path
                     db.commit()
@@ -2336,6 +2366,12 @@ def _orcamento_dict(o) -> dict:
     }
 
 
+def _get_usuario_telefone(usuario_id: int, db) -> str:
+    """Retorna telefone do usuário ou string vazia se não encontrado."""
+    u = db.get(Usuario, usuario_id)
+    return (u.telefone or "").strip() if u else ""
+
+
 def _montar_dados_projeto_para_contrato(nome_safe: str, orcamento_id: int, db) -> tuple:
     """
     Retorna (projeto_dict, cliente_dict, orcamento_dict) para geração do contrato.
@@ -2366,17 +2402,17 @@ def _montar_dados_projeto_para_contrato(nome_safe: str, orcamento_id: int, db) -
         "criado_em":    proj.get("criado_em", ""),
         "consultor":    proj.get("consultor_nome", ""),
     }
-    cliente_dict = {
-        "nome":       cliente.nome       if cliente else proj.get("nome_cliente", ""),
-        "cpf":        cliente.cpf        if cliente else "",
-        "email":      cliente.email      if cliente else "",
-        "telefone":   cliente.telefone   if cliente else "",
-        "logradouro": cliente.logradouro if cliente else "",
-        "numero":     cliente.numero     if cliente else "",
-        "bairro":     cliente.bairro     if cliente else "",
-        "cidade":     cliente.cidade     if cliente else "",
-        "estado":     cliente.estado     if cliente else "",
-    }
+    if cliente:
+        cliente_dict = _cliente_dict(cliente)
+    else:
+        cliente_dict = {
+            "nome": proj.get("nome_cliente", ""), "cpf": "", "email": "",
+            "telefone": "", "logradouro": "", "numero": "", "complemento": "",
+            "bairro": "", "cidade": "", "estado": "", "cep": "",
+            "inst_mesmo_residencial": True,
+            "inst_logradouro": "", "inst_numero": "", "inst_complemento": "",
+            "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": "",
+        }
     orcamento_dict = {
         "nome":            orcamento.nome,
         "valor_total":     orcamento.valor_total  or 0.0,
