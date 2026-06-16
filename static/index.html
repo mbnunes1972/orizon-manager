@@ -2209,6 +2209,9 @@ async function abrirProjeto(nome_safe){
     const r = await fetch('/projetos/'+encodeURIComponent(nome_safe));
     const d = await r.json();
     if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+    // Resetar estado do ciclo antes de trocar de projeto
+    if (_cicloAberto) fecharCiclo();
+    _cicloData = {};
     projetoAtivo = d.projeto;
     // Reset orçamento ao trocar de projeto
     _orcamentos = []; _orcamentoAtivoId = null; _orcAmbientesAtivos = null;
@@ -2577,6 +2580,9 @@ async function criarProjeto(){
     });
     const d = await r.json();
     if(!d.ok){ st.textContent = 'Erro: '+(d.erro||'falha'); st.style.color = 'var(--err)'; return; }
+    // Resetar estado do ciclo antes de trocar de projeto
+    if (_cicloAberto) fecharCiclo();
+    _cicloData = {};
     projetoAtivo = d.projeto;
     st.textContent = 'Projeto criado!'; st.style.color = 'var(--ok)';
     setTimeout(() => st.textContent = '', 3000);
