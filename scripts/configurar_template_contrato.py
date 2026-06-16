@@ -111,11 +111,58 @@ doc.save(DESTINO)
 print(f"Template configurado e salvo em: {DESTINO}")
 print("\nVariáveis inseridas:")
 variaveis = [
-    "{{ cliente_nome }}", "{{ cliente_cpf }}", "{{ cliente_telefone }}",
-    "{{ cliente_endereco }}", "{{ endereco_instalacao }}",
-    "{{ projeto_nome }}", "{{ orcamento_nome }}",
-    "{{ ambientes_lista }}", "{{ valor_total }}", "{{ valor_liquido }}",
-    "{{ entrada_valor }}", "{{ parcelas_descricao }}", "{{ data_contrato }}",
+    # Dados do cliente
+    "{{ cliente_nome }}",
+    "{{ cliente_cpf }}",
+    "{{ cliente_telefone }}",
+    "{{ cliente_email }}",
+    "{{ cliente_endereco }}",
+    "{{ cliente_endereco_correspondencia }}",
+    "{{ cliente_endereco_instalacao }}",
+    "{{ endereco_instalacao }}",
+    # Projeto e orçamento
+    "{{ projeto_nome }}",
+    "{{ orcamento_nome }}",
+    "{{ ambientes_lista }}",
+    # Valores
+    "{{ valor_total }}",
+    "{{ valor_liquido }}",
+    "{{ valor_negociado }}",
+    "{{ entrada_valor }}",
+    "{{ entrada_forma }}",
+    "{{ parcelas_descricao }}",
+    "{{ parcelas_forma }}",
+    "{{ pagamento_bloco }}",
+    # Datas e consultor
+    "{{ data_contrato }}",
+    "{{ consultor_nome }}",
+    # Adendo (condicional)
+    "{{ tem_adendo }}",
+    "{{ adendo }}",
 ]
 for v in variaveis:
     print(f"  {v}")
+
+# ── Uso de tem_adendo no template Word ───────────────────────────────────────
+# Para incluir um adendo com assinaturas, adicione ao final do seu Modelo de
+# Contrato.docx o seguinte bloco (usando docxtpl / Jinja2):
+#
+#   {% if tem_adendo %}
+#   ADENDO
+#   {{ adendo }}
+#
+#   Assinatura do Cliente: _________________________   Data: ___/___/______
+#   Assinatura Empresa:    _________________________   Data: ___/___/______
+#   {% endif %}
+#
+# Após editar o modelo Word, execute novamente este script para regenerar
+# config/contrato_template.docx com as variáveis atualizadas.
+# ─────────────────────────────────────────────────────────────────────────────
+print("\nDica — Bloco de adendo para o template Word:")
+print("  {% if tem_adendo %}")
+print("  ADENDO")
+print("  {{ adendo }}")
+print("")
+print("  Assinatura do Cliente: _________________________   Data: ___/___/______")
+print("  Assinatura Empresa:    _________________________   Data: ___/___/______")
+print("  {% endif %}")

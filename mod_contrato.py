@@ -178,6 +178,7 @@ def montar_variaveis_contrato(
         "ambientes_lista":                 "\n".join(ambientes),
         "consultor_nome":                  projeto.get("consultor", ""),
         "data_contrato":                   datetime.now().strftime("%d/%m/%Y"),
+        "tem_adendo":                      bool(adendo),
         "adendo":                          adendo or "",
         "entrada_forma":                   _FORMAS.get(forma_entrada, forma_entrada),
         "parcelas_forma":                  _FORMAS.get(forma_parcelas, forma_parcelas),
