@@ -497,11 +497,12 @@ class Handler(BaseHTTPRequestHandler):
                     # Auto-completar etapas 1-5 para projetos que já têm negociação
                     ETAPAS_PRE = ["1","2","3","4","5"]
                     if not any(c in codigos_existentes for c in ETAPAS_PRE):
+                        p_meta = db.query(Projeto).filter_by(nome_safe=nome_safe).first()
+                        eh_legado = (p_meta is None) or (p_meta.cliente_id is None)
                         tem_negociacao = db.query(Orcamento).filter(
                             Orcamento.projeto_id == nome_safe,
-                            Orcamento.valor_total > 0
-                        ).first()
-                        if tem_negociacao:
+                        ).count() > 0
+                        if tem_negociacao and eh_legado:
                             agora = datetime.utcnow()
                             for cod in ETAPAS_PRE:
                                 nova = CicloEtapa(
@@ -962,6 +963,41 @@ class Handler(BaseHTTPRequestHandler):
                     raise
                 finally:
                     _db_orc.close()
+
+                # Link cliente_id no projetos_meta e marcar etapas 1, 2, 3
+                _db_ciclo = get_session()
+                try:
+                    p_meta = _db_ciclo.get(Projeto, proj['nome_safe'])
+                    if not p_meta:
+                        p_meta = Projeto(nome_safe=proj['nome_safe'])
+                        _db_ciclo.add(p_meta)
+                    p_meta.cliente_id = int(cliente_id)
+                    _db_ciclo.commit()
+
+                    agora = datetime.utcnow()
+                    uid_ciclo = _usuario['id'] if _usuario else None
+                    for cod in ["1", "2", "3"]:
+                        etapa = _db_ciclo.query(CicloEtapa).filter_by(
+                            projeto_nome=proj['nome_safe'], etapa_codigo=cod
+                        ).first()
+                        if not etapa:
+                            etapa = CicloEtapa(
+                                projeto_nome=proj['nome_safe'],
+                                etapa_codigo=cod,
+                                status="concluido",
+                                concluido_em=agora,
+                                responsavel_id=uid_ciclo,
+                            )
+                            _db_ciclo.add(etapa)
+                        elif etapa.status != "concluido":
+                            etapa.status         = "concluido"
+                            etapa.concluido_em   = agora
+                            etapa.responsavel_id = uid_ciclo
+                    _db_ciclo.commit()
+                except Exception as _e_ciclo:
+                    print("[CICLO] Erro ao marcar etapas 1-3: %s" % _e_ciclo)
+                finally:
+                    _db_ciclo.close()
 
                 # Garante credenciais carregadas (main() já carrega, mas reforça)
                 if not get_omie_key():
@@ -1890,6 +1926,26 @@ class Handler(BaseHTTPRequestHandler):
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
                     return
+                # Verificar endereço de instalação antes de gerar contrato
+                _db_gate = get_session()
+                try:
+                    _p_meta = _db_gate.query(Projeto).filter_by(nome_safe=nome_safe).first()
+                    if _p_meta and _p_meta.cliente_id:
+                        _cli_gate = _db_gate.get(Cliente, _p_meta.cliente_id)
+                        if _cli_gate:
+                            _tem_inst = (
+                                _cli_gate.inst_mesmo_residencial
+                                or _cli_gate.inst_logradouro
+                            )
+                            if not _tem_inst:
+                                self.send_json({
+                                    "ok": False,
+                                    "erro": "Endereço de instalação obrigatório antes de gerar o contrato. "
+                                            "Edite o cadastro do cliente e preencha o endereço de instalação."
+                                }, code=400)
+                                return
+                finally:
+                    _db_gate.close()
                 req                  = json.loads(body)
                 orcamento_id         = req.get("orcamento_id")
                 endereco_instalacao  = (req.get("endereco_instalacao") or "").strip()

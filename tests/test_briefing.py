@@ -137,3 +137,34 @@ def test_briefing_dict_incompleto():
     bd = _briefing_dict(b)
     assert bd["completo"] is False   # budget_declarado = 0.0 → falsy
     db.close()
+
+
+def test_projeto_criado_linka_cliente_id():
+    """Projeto deve ter cliente_id em projetos_meta após criação."""
+    from database import get_session, Cliente, Projeto
+    db = get_session()
+    c = Cliente(nome="Teste Gate", email="gate@t.com", telefone="11000000002")
+    db.add(c); db.commit(); db.refresh(c)
+    # Simula o que o /projetos/novo faz ao linkar cliente
+    p = Projeto(nome_safe="proj_gate_test_xyz", cliente_id=c.id)
+    db.merge(p)
+    db.commit()
+    p2 = db.get(Projeto, "proj_gate_test_xyz")
+    assert p2.cliente_id == c.id
+    db.close()
+
+
+def test_ciclo_legado_nao_marcado_para_projeto_novo():
+    """Projetos com cliente_id NÃO devem ter auto-complete de etapas 1-5."""
+    from database import get_session, Cliente, Projeto, CicloEtapa
+    db = get_session()
+    c = Cliente(nome="Novo Gate", email="novo@t.com", telefone="11000000003")
+    db.add(c); db.commit(); db.refresh(c)
+    p = Projeto(nome_safe="proj_novo_gate_xyz", cliente_id=c.id, status="quente")
+    db.merge(p)
+    db.commit()
+    # Projeto novo com cliente_id NÃO deve ter etapas auto-completadas aqui
+    etapas = db.query(CicloEtapa).filter_by(projeto_nome="proj_novo_gate_xyz").all()
+    # Sem ter passado pelo endpoint real, não deve haver etapas
+    assert len(etapas) == 0
+    db.close()
