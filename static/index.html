@@ -6165,7 +6165,7 @@ function renderContratoUI(contrato) {
         </a>` : ''}
       ${!['assinado','vigente'].includes(status) ? `
         <button onclick="fecharCiclo();abrirAprovacaoComDados()" class="btn-ciclo" style="font-size:.82rem">
-          Revisar / Regenerar
+          Revisar
         </button>
         <button onclick="abrirModalVoltarOrcamento()" class="btn-ciclo"
           style="font-size:.82rem;border-color:var(--warn,#c8a84b);color:var(--warn,#c8a84b)">
@@ -6191,12 +6191,17 @@ function renderContratoUI(contrato) {
       </div>` : ''}
 
     ${['assinado','vigente'].includes(status)
-      ? `<p style="color:var(--ok);margin:0">&#x2713; Contrato assinado — ambas as partes confirmaram.</p>`
+      ? `<div>
+          <p style="color:var(--ok);margin:0 0 14px">&#x2713; Contrato assinado — ambas as partes confirmaram.</p>
+          <button onclick="fecharCiclo();toggleCicloCard('8')" class="btn-ciclo" style="font-size:.9rem">
+            &#x27A1; Avan&ccedil;ar &mdash; Aprova&ccedil;&atilde;o Financeira I
+          </button>
+        </div>`
       : temArquivo ? `
         <div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:8px">
           <label style="display:flex;gap:10px;align-items:center;cursor:pointer;margin-bottom:14px">
             <input type="checkbox" id="chk-leu-contrato" onchange="toggleAssinaturas()"
-              ${jaAssinou ? 'checked' : ''}>
+              ${jaAssinou ? 'checked disabled' : ''}>
             <span style="font-size:.9rem">Li o contrato e estou de acordo com os termos</span>
           </label>
           <div id="secao-assinaturas" style="display:${jaAssinou ? 'block' : 'none'}">
