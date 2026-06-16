@@ -1692,6 +1692,46 @@ class Handler(BaseHTTPRequestHandler):
                     _salvar_projeto(proj)
                     self.send_json({"ok": True})
 
+            # POST /api/projetos/<nome>/ciclo/desfazer_aprovacao — volta ao orçamento (requer gerente)
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/desfazer_aprovacao$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                req   = json.loads(body)
+                login = (req.get("login") or "").strip()
+                senha = (req.get("senha") or "").strip()
+                db = get_session()
+                try:
+                    autorizador = db.query(Usuario).filter_by(login=login, ativo=1).first()
+                    if not autorizador or not autorizador.check_senha(senha):
+                        self.send_json({"ok": False, "erro": "Credenciais inválidas"})
+                        return
+                    if autorizador.nivel not in ("gerente", "diretor", "admin"):
+                        self.send_json({"ok": False, "erro": "Necessário nível Gerente ou Diretor"})
+                        return
+                    # Verifica se contrato está assinado — nesse caso não pode voltar
+                    contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
+                                 .order_by(Contrato.id.desc()).first()
+                    if contrato and contrato.status in ("assinado", "vigente"):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato já assinado — não é possível voltar ao orçamento"})
+                        return
+                    # Resetar etapa 6 (e 7 se existir sem assinatura)
+                    e6 = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo="6").first()
+                    if e6: db.delete(e6)
+                    e7 = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo="7").first()
+                    if e7: db.delete(e7)
+                    # Resetar contrato para rascunho
+                    if contrato:
+                        contrato.status = "rascunho"
+                    db.commit()
+                    self.send_json({"ok": True})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
             # POST /api/projetos/<nome>/contrato/assinar — registra assinatura
             m = _re.match(r'^/api/projetos/([^/]+)/contrato/assinar$', path)
             if m:

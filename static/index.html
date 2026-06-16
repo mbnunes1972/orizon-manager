@@ -2233,6 +2233,7 @@ async function abrirProjeto(nome_safe){
     negAtualizarStatusBtn();
     atualizarUIBloqueio();
     await carregarOrcamentos();  // EP-07: carrega lista de orçamentos
+    carregarCicloSilencioso();   // carrega dados do ciclo em background para verificar aprovação
     goPage(2);  // vai direto para negociação
   }catch(e){ showToast('Erro: '+e, true); }
 }
@@ -5984,17 +5985,60 @@ function fecharCiclo() {
   if (negArea) negArea.style.display = '';
 }
 
-async function carregarCiclo() {
+async function _fetchCiclo() {
   if (!projetoAtivo) return;
+  const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo`,
+                        { credentials: 'same-origin' });
+  const d = await r.json();
+  if (!d.ok) return;
+  _cicloData = {};
+  for (const e of (d.ciclo || [])) _cicloData[e.etapa_codigo] = e;
+}
+
+async function carregarCiclo() {
   try {
-    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo`,
-                          { credentials: 'same-origin' });
-    const d = await r.json();
-    if (!d.ok) return;
-    _cicloData = {};
-    for (const e of (d.ciclo || [])) _cicloData[e.etapa_codigo] = e;
+    await _fetchCiclo();
     renderCiclo();
+    atualizarBotoesAprovacao();
   } catch(e) { console.error('Erro ao carregar ciclo:', e); }
+}
+
+async function carregarCicloSilencioso() {
+  // Carrega dados do ciclo sem abrir o painel — apenas para atualizar estado dos botões
+  try {
+    await _fetchCiclo();
+    atualizarBotoesAprovacao();
+  } catch(e) {}
+}
+
+function _orcamentoAprovado() {
+  // Retorna true se etapa 6 está concluída (orçamento aprovado)
+  return _cicloData['6']?.status === 'concluido';
+}
+
+function atualizarBotoesAprovacao() {
+  const aprovado = _orcamentoAprovado();
+  const actionRow = document.querySelector('#page-02 .action-row');
+  if (!actionRow) return;
+  const btnSalvar  = actionRow.querySelector('.btn-ok');
+  const btnAprovar = actionRow.querySelector('.btn-amber');
+  if (aprovado) {
+    if (btnSalvar)  { btnSalvar.style.display  = 'none'; }
+    if (btnAprovar) { btnAprovar.style.display = 'none'; }
+    // Mostrar label informativo se ainda não existe
+    if (!actionRow.querySelector('#label-aprovado')) {
+      const label = document.createElement('span');
+      label.id = 'label-aprovado';
+      label.style.cssText = 'color:#f0c84a;font-size:.85rem;padding:6px 12px;border:1px solid #b8960c;border-radius:4px;background:#1a1200';
+      label.innerHTML = '&#x1F512; Or&ccedil;amento aprovado &mdash; em gera&ccedil;&atilde;o de contrato';
+      actionRow.appendChild(label);
+    }
+  } else {
+    if (btnSalvar)  { btnSalvar.style.display  = ''; }
+    if (btnAprovar) { btnAprovar.style.display = ''; }
+    const label = actionRow.querySelector('#label-aprovado');
+    if (label) label.remove();
+  }
 }
 
 function renderCiclo() {
@@ -6115,7 +6159,11 @@ function renderContratoUI(contrato) {
         </a>` : ''}
       ${!['assinado','vigente'].includes(status) ? `
         <button onclick="fecharCiclo();abrirAprovacaoComDados()" class="btn-ciclo" style="font-size:.82rem">
-          Revisar dados / Regenerar
+          Revisar / Regenerar
+        </button>
+        <button onclick="abrirModalVoltarOrcamento()" class="btn-ciclo"
+          style="font-size:.82rem;border-color:var(--warn,#c8a84b);color:var(--warn,#c8a84b)">
+          &#x21A9; Voltar ao Or&ccedil;amento
         </button>` : ''}
     </div>
 
@@ -6186,16 +6234,86 @@ function _formGerarContrato() {
 }
 
 function mascaraMoedaInput(el) {
-  let v = el.value.replace(/\D/g, '');
-  if (!v) { el.value = ''; return; }
-  const num = parseInt(v) / 100;
-  el.value = 'R$ ' + num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-function mascaraMoedaValor(el) {
-  mascaraMoedaInput(el);
+  const cursor = el.selectionStart;
+  const oldLen = el.value.length;
+  const digits = el.value.replace(/\D/g, '');
+  if (!digits || digits === '0') { el.value = ''; return; }
+  const cents = parseInt(digits, 10);
+  const reais = Math.floor(cents / 100);
+  const ctvs  = cents % 100;
+  const milhar = reais.toLocaleString('pt-BR');
+  el.value = 'R$ ' + milhar + ',' + String(ctvs).padStart(2, '0');
+  // mantém cursor no final se estava no final; caso contrário ajusta deslocamento
+  const diff = el.value.length - oldLen;
+  if (cursor !== null && cursor < oldLen) {
+    try { el.setSelectionRange(cursor + diff, cursor + diff); } catch(e) {}
+  }
 }
 function parseMoeda(str) {
-  return parseFloat((str || '0').replace(/[R$\s.]/g, '').replace(',', '.')) || 0;
+  if (!str) return 0;
+  // aceita "R$ 1.234,56" e "1234.56" e "1234,56"
+  const s = str.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
+  return parseFloat(s) || 0;
+}
+
+function abrirModalVoltarOrcamento() {
+  document.getElementById('modal-voltar-overlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'modal-voltar-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center';
+  ov.innerHTML = `
+    <div style="background:var(--card,#132013);border:1px solid var(--warn,#c8a84b);border-radius:8px;padding:24px;min-width:340px;max-width:440px">
+      <h4 style="margin:0 0 6px;color:var(--warn)">&#x21A9; Voltar ao Or&ccedil;amento</h4>
+      <p style="color:var(--muted);font-size:.85rem;margin:0 0 16px">
+        Esta a&ccedil;&atilde;o requer autoriza&ccedil;&atilde;o de um Gerente ou Diretor.<br>
+        O contrato atual ser&aacute; marcado como rascunho e o or&ccedil;amento poder&aacute; ser editado novamente.
+      </p>
+      <label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:3px">Login do Gerente/Diretor</label>
+      <input id="vt-login" type="text" autocomplete="off"
+        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+        color:var(--fg);padding:7px;border-radius:4px;font-size:.9rem;margin-bottom:10px">
+      <label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:3px">Senha</label>
+      <input id="vt-senha" type="password"
+        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+        color:var(--fg);padding:7px;border-radius:4px;font-size:.9rem;margin-bottom:6px">
+      <p id="vt-erro" style="color:#f08080;font-size:.82rem;min-height:1.2em;margin:0 0 14px"></p>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('modal-voltar-overlay').remove()"
+          style="background:none;border:1px solid var(--muted);color:var(--muted);border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">
+          Cancelar
+        </button>
+        <button onclick="confirmarVoltarOrcamento()"
+          style="background:var(--warn,#c8a84b);color:#000;border:none;border-radius:5px;
+          padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">
+          Confirmar Retorno
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+  setTimeout(() => document.getElementById('vt-login')?.focus(), 80);
+}
+
+async function confirmarVoltarOrcamento() {
+  const login = (document.getElementById('vt-login')?.value || '').trim();
+  const senha = (document.getElementById('vt-senha')?.value || '');
+  const erroEl = document.getElementById('vt-erro');
+  if (!login || !senha) { if(erroEl) erroEl.textContent = 'Preencha login e senha.'; return; }
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/desfazer_aprovacao`, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login, senha }),
+    });
+    const d = await r.json();
+    if (!d.ok) { if(erroEl) erroEl.textContent = d.erro || 'Credenciais inválidas.'; return; }
+    document.getElementById('modal-voltar-overlay')?.remove();
+    showToast('Retornou ao orçamento. Edições liberadas.', false);
+    // Recarrega ciclo e atualiza botões
+    await carregarCicloSilencioso();
+    if (_cicloAberto) { await carregarCiclo(); }
+    fecharCiclo();
+  } catch(e) { if(erroEl) erroEl.textContent = 'Erro de rede: ' + e.message; }
 }
 
 function toggleAssinaturas() {

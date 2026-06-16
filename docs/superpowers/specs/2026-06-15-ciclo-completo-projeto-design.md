@@ -308,3 +308,19 @@ A tabela é genérica o suficiente para suportar todas as 20 etapas e subfases s
 ---
 
 *Spec criada em 2026-06-15. Atualizar a cada decisão relevante sobre o pipeline ou módulos prioritários.*
+
+---
+
+## Backlog: Ajustes pendentes no template do contrato (PDF)
+
+> Identificados em 2026-06-15. Requerem edição do Word + revisão do mapeamento de variáveis.
+
+| # | Problema | Ação necessária |
+|---|----------|----------------|
+| 1 | Valores por ambiente não listados individualmente | Criar tabela dinâmica com `{% for amb in ambientes %}` no template |
+| 2 | Texto mal distribuído / quebras de linha incorretas | Ajustar estilos de parágrafo no Word template |
+| 3 | Marca Dalmóbile distorcida | Verificar imagem/logo no header do .docx — recolocar em resolução correta |
+| 4 | Campos em posições erradas | Revisar mapeamento de variáveis vs. posições no template Word |
+| 5 | Valor líquido e total fora de contexto | Alinhar `{{ valor_total }}` e `{{ valor_liquido }}` com as células corretas da tabela |
+| 6 | Linhas de parcelas fixas removidas | Implementar loop `{% for parcela in parcelas %}` quando dados de parcelamento estiverem estruturados |
+
