@@ -9,7 +9,9 @@ from email import policy as _email_policy
 from datetime import datetime, date, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
-from database import init_db, get_session, Cliente, Parceiro, Orcamento, PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status, CicloEtapa, Contrato, ContratoAssinatura
+from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
+                       PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status,
+                       CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing)
 from urllib.parse import urlparse, unquote
 
 from storage import (

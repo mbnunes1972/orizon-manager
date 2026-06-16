@@ -28,6 +28,7 @@ class Usuario(Base):
     login         = Column(String(60),  nullable=False, unique=True)
     senha_hash    = Column(String(64),  nullable=False)
     nivel         = Column(String(20),  nullable=False)   # diretor | gerente | consultor
+    telefone      = Column(String(20),  nullable=True)
     ativo         = Column(Integer,     default=1)
     criado_em     = Column(DateTime,    default=datetime.utcnow)
 
@@ -96,6 +97,14 @@ class Cliente(Base):
     cidade        = Column(String(80),  nullable=True)
     estado        = Column(String(2),   nullable=True)
     observacoes   = Column(Text,        nullable=True)
+    inst_mesmo_residencial = Column(Integer,     default=1)   # 1=True, 0=False
+    inst_logradouro        = Column(String(200), nullable=True)
+    inst_numero            = Column(String(20),  nullable=True)
+    inst_complemento       = Column(String(100), nullable=True)
+    inst_bairro            = Column(String(100), nullable=True)
+    inst_cidade            = Column(String(80),  nullable=True)
+    inst_cep               = Column(String(9),   nullable=True)
+    inst_uf                = Column(String(2),   nullable=True)
     omie_codigo   = Column(String(40),  nullable=True)
     omie_sync_status = Column(String(20),  nullable=True)   # ok | erro | pendente
     omie_sync_erro   = Column(Text,        nullable=True)
@@ -124,9 +133,57 @@ class Projeto(Base):
     __tablename__ = "projetos_meta"
 
     nome_safe  = Column(String,   primary_key=True)
+    cliente_id = Column(Integer,  ForeignKey("clientes.id"), nullable=True)
     status     = Column(String(20), nullable=True)   # quente | morno | frio | convertido | perdido
     status_at  = Column(DateTime,   nullable=True)
     perdido_em = Column(DateTime,   nullable=True)
+
+
+class Briefing(Base):
+    __tablename__ = "briefings"
+
+    id                    = Column(Integer,  primary_key=True, autoincrement=True)
+    cliente_id            = Column(Integer,  ForeignKey("clientes.id"), nullable=False)
+    projeto_nome          = Column(Text,     nullable=True)
+    criado_em             = Column(DateTime, default=datetime.utcnow)
+    atualizado_em         = Column(DateTime, nullable=True)
+
+    # Obrigatórios (gate etapa 2)
+    data_atendimento      = Column(DateTime, nullable=False)
+    consultor_id          = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    tipo_imovel           = Column(Text,     nullable=False)
+    budget_declarado      = Column(Float,    nullable=False)
+    categoria_proposta    = Column(Text,     nullable=False)
+    data_entrega_desejada = Column(Text,     nullable=False)
+    flexibilidade_prazo   = Column(Text,     nullable=False)
+
+    # Opcionais
+    condicao_imovel       = Column(Text,     nullable=True)
+    metragem_m2           = Column(Float,    nullable=True)
+    num_ambientes         = Column(Integer,  nullable=True)
+    ambientes_prioritarios = Column(Text,    nullable=True)
+    tem_arquiteto         = Column(Text,     nullable=True)
+    nome_arquiteto        = Column(Text,     nullable=True)
+    tem_gerente_obra      = Column(Integer,  nullable=True)
+    end_empreendimento    = Column(Text,     nullable=True)
+    estilo_decisao        = Column(Text,     nullable=True)
+    estilo_vida           = Column(Text,     nullable=True)
+    relacao_projeto       = Column(Text,     nullable=True)
+    decisor               = Column(Text,     nullable=True)
+    referencias_visuais   = Column(Text,     nullable=True)
+    obs_referencias       = Column(Text,     nullable=True)
+    experiencia_anterior  = Column(Text,     nullable=True)
+    obs_experiencia       = Column(Text,     nullable=True)
+    tem_budget            = Column(Text,     nullable=True)
+    forma_pagamento_pref  = Column(Text,     nullable=True)
+    data_entrega_limite   = Column(Text,     nullable=True)
+    motivo_prazo          = Column(Text,     nullable=True)
+    nao_abre_mao          = Column(Text,     nullable=True)
+    restricoes            = Column(Text,     nullable=True)
+    obs_livres            = Column(Text,     nullable=True)
+
+    cliente   = relationship("Cliente", foreign_keys=[cliente_id])
+    consultor = relationship("Usuario", foreign_keys=[consultor_id])
 
 
 # ── EP-07: Versionamento de Orçamentos ───────────────────────────────────────
@@ -258,21 +315,43 @@ def _migrar_colunas():
     conn = sqlite3.connect(DB_PATH)
     try:
         cur = conn.cursor()
+
+        # ── clientes ─────────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(clientes)")
-        existing = {row[1] for row in cur.fetchall()}
-        novas = [
-            ("cep",         "VARCHAR(9)"),
-            ("logradouro",  "VARCHAR(200)"),
-            ("numero",      "VARCHAR(20)"),
-            ("complemento", "VARCHAR(100)"),
-            ("bairro",      "VARCHAR(100)"),
-            ("omie_sync_status", "VARCHAR(20)"),
-            ("omie_sync_erro",   "TEXT"),
-            ("omie_sync_at",     "DATETIME"),
-        ]
-        for col, tipo in novas:
-            if col not in existing:
+        cli_cols = {row[1] for row in cur.fetchall()}
+        for col, tipo in [
+            ("cep",                    "VARCHAR(9)"),
+            ("logradouro",             "VARCHAR(200)"),
+            ("numero",                 "VARCHAR(20)"),
+            ("complemento",            "VARCHAR(100)"),
+            ("bairro",                 "VARCHAR(100)"),
+            ("omie_sync_status",       "VARCHAR(20)"),
+            ("omie_sync_erro",         "TEXT"),
+            ("omie_sync_at",           "DATETIME"),
+            ("inst_mesmo_residencial", "INTEGER DEFAULT 1"),
+            ("inst_logradouro",        "VARCHAR(200)"),
+            ("inst_numero",            "VARCHAR(20)"),
+            ("inst_complemento",       "VARCHAR(100)"),
+            ("inst_bairro",            "VARCHAR(100)"),
+            ("inst_cidade",            "VARCHAR(80)"),
+            ("inst_cep",               "VARCHAR(9)"),
+            ("inst_uf",                "VARCHAR(2)"),
+        ]:
+            if col not in cli_cols:
                 cur.execute(f"ALTER TABLE clientes ADD COLUMN {col} {tipo}")
+
+        # ── usuarios ─────────────────────────────────────────────────────────
+        cur.execute("PRAGMA table_info(usuarios)")
+        usr_cols = {row[1] for row in cur.fetchall()}
+        if "telefone" not in usr_cols:
+            cur.execute("ALTER TABLE usuarios ADD COLUMN telefone VARCHAR(20)")
+
+        # ── projetos_meta ─────────────────────────────────────────────────────
+        cur.execute("PRAGMA table_info(projetos_meta)")
+        prj_cols = {row[1] for row in cur.fetchall()}
+        if "cliente_id" not in prj_cols:
+            cur.execute("ALTER TABLE projetos_meta ADD COLUMN cliente_id INTEGER")
+
         conn.commit()
     except Exception:
         pass
