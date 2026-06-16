@@ -6072,7 +6072,11 @@ function renderCiclo() {
         ${badge}
       </div>
       <div class="ciclo-card-body" id="ciclo-body-${etapa.codigo}">
-        ${etapa.acao === 'contrato' ? _renderCardContrato() : _renderCardGenerico(etapa, dados)}
+        ${etapa.acao === 'contrato'
+          ? _renderCardContrato()
+          : etapa.codigo === '8'
+            ? _renderCardAprovacaoFinanceira(dados)
+            : _renderCardGenerico(etapa, dados)}
       </div>
     `;
     panel.appendChild(card);
@@ -6091,6 +6095,70 @@ function _renderCardGenerico(etapa, dados) {
   return `<p style="color:var(--muted);font-size:.85rem;margin:0">
     ${dados.observacoes || 'Nenhuma informação registrada.'}
   </p>`;
+}
+
+function _renderCardAprovacaoFinanceira(dados) {
+  const concluido = dados.status === 'concluido';
+  if (concluido) {
+    const dt = dados.concluido_em
+      ? new Date(dados.concluido_em).toLocaleDateString('pt-BR')
+      : '';
+    return `
+      <p style="color:var(--ok);margin:0 0 10px">
+        &#x2713; Aprovação financeira concluída${dt ? ' em ' + dt : ''}.
+      </p>
+      <button onclick="toggleCicloEtapa('8')"
+        style="background:none;border:1px solid var(--muted);color:var(--muted);
+        border-radius:5px;padding:4px 12px;font-size:.8rem;cursor:pointer">
+        Reabrir
+      </button>`;
+  }
+  return `
+    <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px">
+      Confirme que a análise de crédito ou aprovação interna foi concluída.
+    </p>
+    <button onclick="concluirAprovacaoFinanceira()"
+      style="background:#b8960c;color:#000;border:none;border-radius:6px;
+      padding:8px 18px;font-size:.9rem;font-weight:700;cursor:pointer">
+      &#x2713; Marcar Aprovação Financeira como Concluída
+    </button>`;
+}
+
+async function concluirAprovacaoFinanceira() {
+  if (!projetoAtivo) return;
+  try {
+    const r = await fetch(
+      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/8`,
+      {
+        method: 'PATCH', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'concluido' }),
+      }
+    );
+    const d = await r.json();
+    if (!d.ok) { showToast('Erro: ' + (d.erro || 'falha'), true); return; }
+    showToast('Aprovação Financeira I concluída!', false);
+    await carregarCiclo();
+  } catch(e) { showToast('Erro de rede: ' + e.message, true); }
+}
+
+async function toggleCicloEtapa(codigo) {
+  if (!projetoAtivo) return;
+  const dados = _cicloData[codigo] || {};
+  const novoStatus = dados.status === 'concluido' ? 'pendente' : 'concluido';
+  try {
+    const r = await fetch(
+      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${encodeURIComponent(codigo)}`,
+      {
+        method: 'PATCH', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: novoStatus }),
+      }
+    );
+    const d = await r.json();
+    if (!d.ok) { showToast('Erro: ' + (d.erro || 'falha'), true); return; }
+    await carregarCiclo();
+  } catch(e) { showToast('Erro de rede: ' + e.message, true); }
 }
 
 function _renderCardContrato() {
