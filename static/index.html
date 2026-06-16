@@ -7527,10 +7527,9 @@ function bfFechar() {
       <div><label style="font-size:12px;color:var(--muted)">Decisor final</label>
         <select id="bf-decisor" style="width:100%;padding:8px;border:1px solid var(--dalm-gold);border-radius:4px;background:var(--card);color:var(--text);">
           <option value="">Selecione...</option>
-          <option value="cliente">Só o cliente</option>
-          <option value="casal">Casal</option>
-          <option value="socio">Sócio / Empresa</option>
-          <option value="terceiro">Terceiro</option>
+          <option value="cliente">Cliente</option>
+          <option value="arquiteto">Arquiteto</option>
+          <option value="socio">Sócio</option>
         </select></div>
       <div><label style="font-size:12px;color:var(--muted)">Experiência anterior</label>
         <select id="bf-experiencia" style="width:100%;padding:8px;border:1px solid var(--dalm-gold);border-radius:4px;background:var(--card);color:var(--text);">
@@ -7581,8 +7580,8 @@ function bfFechar() {
       <textarea id="bf-obs-livres" rows="3" placeholder="Impressões, contexto familiar..." style="width:100%;padding:8px;border:1px solid var(--dalm-gold);border-radius:4px;background:var(--card);color:var(--text);resize:vertical;box-sizing:border-box;"></textarea></div>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button onclick="bfFechar()" style="padding:10px 20px;border:1px solid var(--dalm-gold);border-radius:6px;background:none;color:var(--dalm-gold);cursor:pointer;">Cancelar</button>
-      <button onclick="bfSalvar()" class="btn-primary">Salvar Briefing</button>
+      <button onclick="bfFechar()" class="btn" style="border:1px solid var(--dalm-gold);background:none;color:var(--dalm-gold);">Cancelar</button>
+      <button onclick="bfSalvar()" class="btn btn-primary">Salvar Briefing</button>
     </div>
   </div>
 </div>
