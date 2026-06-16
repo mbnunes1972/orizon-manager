@@ -242,6 +242,22 @@ class Handler(BaseHTTPRequestHandler):
             omie_unicos = [p for p in omie_res if p['nome_projeto'].lower() not in nomes_locais]
             self.send_json({'ok': True, 'projetos': locais + omie_unicos})
 
+        m = re.match(r"^/api/clientes/(\d+)/briefing$", path)
+        if m:
+            db = get_session()
+            try:
+                b = db.query(Briefing).filter_by(cliente_id=int(m.group(1)))\
+                      .order_by(Briefing.id.desc()).first()
+                if not b:
+                    self.send_json({"ok": True, "briefing": None})
+                    return
+                self.send_json({"ok": True, "briefing": _briefing_dict(b)})
+            except Exception as e:
+                self.send_json({"ok": False, "erro": str(e)})
+            finally:
+                db.close()
+            return
+
         elif path == "/api/clientes":
             from urllib.parse import parse_qs
             q  = (parse_qs(urlparse(self.path).query).get('q') or [''])[0].strip().lower()
@@ -1038,6 +1054,64 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        m_bf = re.match(r"^/api/clientes/(\d+)/briefing$", path)
+        if m_bf:
+            cliente_id = int(m_bf.group(1))
+            usuario    = get_usuario_sessao(self)
+            req        = json.loads(body) if body else {}
+            db         = get_session()
+            try:
+                c = db.get(Cliente, cliente_id)
+                if not c:
+                    self.send_json({"ok": False, "erro": "Cliente não encontrado"})
+                    return
+                b = db.query(Briefing).filter_by(cliente_id=cliente_id)\
+                      .order_by(Briefing.id.desc()).first()
+                if not b:
+                    b = Briefing(
+                        cliente_id=cliente_id,
+                        data_atendimento=datetime.utcnow(),
+                        tipo_imovel="",
+                        budget_declarado=0.0,
+                        categoria_proposta="",
+                        data_entrega_desejada="",
+                        flexibilidade_prazo="",
+                    )
+                    db.add(b)
+                for campo in ["tipo_imovel", "categoria_proposta",
+                               "data_entrega_desejada", "flexibilidade_prazo"]:
+                    if campo in req:
+                        setattr(b, campo, req[campo])
+                if "budget_declarado" in req:
+                    b.budget_declarado = float(req["budget_declarado"] or 0)
+                opcionais = [
+                    "condicao_imovel", "metragem_m2", "num_ambientes",
+                    "ambientes_prioritarios", "tem_arquiteto", "nome_arquiteto",
+                    "tem_gerente_obra", "end_empreendimento", "estilo_decisao",
+                    "estilo_vida", "relacao_projeto", "decisor", "referencias_visuais",
+                    "obs_referencias", "experiencia_anterior", "obs_experiencia",
+                    "tem_budget", "forma_pagamento_pref", "data_entrega_limite",
+                    "motivo_prazo", "nao_abre_mao", "restricoes", "obs_livres",
+                ]
+                for campo in opcionais:
+                    if campo in req:
+                        setattr(b, campo, req[campo])
+                if usuario:
+                    b.consultor_id = usuario["id"]
+                b.atualizado_em = datetime.utcnow()
+                db.commit()
+                db.refresh(b)
+                bd = _briefing_dict(b)
+                if bd["completo"]:
+                    _marcar_etapa_cliente(cliente_id, "2", db, usuario)
+                self.send_json({"ok": True, "briefing": bd})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)})
+            finally:
+                db.close()
+            return
+
         elif re.match(r"^/api/clientes/(\d+)/editar$", path):
             m_cli = re.match(r"^/api/clientes/(\d+)/editar$", path)
             req   = json.loads(body) if body else {}
@@ -1049,10 +1123,14 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 campos = ["nome","cpf","email","telefone","whatsapp",
                           "cep","logradouro","numero","complemento",
-                          "bairro","cidade","estado","observacoes"]
+                          "bairro","cidade","estado","observacoes",
+                          "inst_logradouro","inst_numero","inst_complemento",
+                          "inst_bairro","inst_cidade","inst_cep","inst_uf"]
                 for f in campos:
                     if f in req:
                         setattr(c, f, (req[f] or "").strip() or None)
+                if "inst_mesmo_residencial" in req:
+                    c.inst_mesmo_residencial = 1 if req["inst_mesmo_residencial"] else 0
                 if "nome" in req and not c.nome:
                     self.send_json({"ok": False, "erro": "Nome é obrigatório"})
                     return
@@ -2075,12 +2153,85 @@ def _cliente_dict(c) -> dict:
         "cidade":      c.cidade      or "",
         "estado":      c.estado      or "",
         "observacoes": c.observacoes or "",
+        "inst_mesmo_residencial": bool(c.inst_mesmo_residencial if c.inst_mesmo_residencial is not None else 1),
+        "inst_logradouro":  c.inst_logradouro  or "",
+        "inst_numero":      c.inst_numero      or "",
+        "inst_complemento": c.inst_complemento or "",
+        "inst_bairro":      c.inst_bairro      or "",
+        "inst_cidade":      c.inst_cidade      or "",
+        "inst_cep":         c.inst_cep         or "",
+        "inst_uf":          c.inst_uf          or "",
         "omie_codigo":       c.omie_codigo or "",
         "omie_sync_status":  c.omie_sync_status or "",
         "omie_sync_erro":    c.omie_sync_erro   or "",
         "omie_sync_at":      c.omie_sync_at.isoformat() if c.omie_sync_at else "",
         "criado_em":   c.criado_em.strftime("%Y-%m-%d") if c.criado_em else "",
     }
+
+
+_BRIEFING_OBRIGATORIOS = [
+    "tipo_imovel", "budget_declarado", "categoria_proposta",
+    "data_entrega_desejada", "flexibilidade_prazo",
+]
+
+def _briefing_dict(b) -> dict:
+    d = {
+        "id":                    b.id,
+        "cliente_id":            b.cliente_id,
+        "projeto_nome":          b.projeto_nome or "",
+        "data_atendimento":      b.data_atendimento.isoformat() if b.data_atendimento else "",
+        "consultor_id":          b.consultor_id,
+        "tipo_imovel":           b.tipo_imovel           or "",
+        "budget_declarado":      b.budget_declarado       or 0.0,
+        "categoria_proposta":    b.categoria_proposta     or "",
+        "data_entrega_desejada": b.data_entrega_desejada  or "",
+        "flexibilidade_prazo":   b.flexibilidade_prazo    or "",
+        "condicao_imovel":       b.condicao_imovel        or "",
+        "metragem_m2":           b.metragem_m2,
+        "num_ambientes":         b.num_ambientes,
+        "ambientes_prioritarios":b.ambientes_prioritarios or "",
+        "tem_arquiteto":         b.tem_arquiteto          or "",
+        "nome_arquiteto":        b.nome_arquiteto         or "",
+        "tem_gerente_obra":      bool(b.tem_gerente_obra),
+        "end_empreendimento":    b.end_empreendimento     or "",
+        "estilo_decisao":        b.estilo_decisao         or "[]",
+        "estilo_vida":           b.estilo_vida            or "[]",
+        "relacao_projeto":       b.relacao_projeto        or "[]",
+        "decisor":               b.decisor                or "",
+        "referencias_visuais":   b.referencias_visuais    or "[]",
+        "obs_referencias":       b.obs_referencias        or "",
+        "experiencia_anterior":  b.experiencia_anterior   or "",
+        "obs_experiencia":       b.obs_experiencia        or "",
+        "tem_budget":            b.tem_budget             or "",
+        "forma_pagamento_pref":  b.forma_pagamento_pref   or "",
+        "data_entrega_limite":   b.data_entrega_limite    or "",
+        "motivo_prazo":          b.motivo_prazo           or "[]",
+        "nao_abre_mao":          b.nao_abre_mao           or "",
+        "restricoes":            b.restricoes             or "",
+        "obs_livres":            b.obs_livres             or "",
+    }
+    d["completo"] = all(d.get(f) for f in _BRIEFING_OBRIGATORIOS)
+    return d
+
+
+def _marcar_etapa_cliente(cliente_id: int, etapa_codigo: str, db, usuario):
+    """Marca uma etapa do ciclo como concluída em todos os projetos vinculados ao cliente."""
+    from datetime import datetime as _dt
+    projetos = db.query(Projeto).filter_by(cliente_id=cliente_id).all()
+    agora = _dt.utcnow()
+    uid = usuario["id"] if usuario else None
+    for p in projetos:
+        etapa = db.query(CicloEtapa).filter_by(
+            projeto_nome=p.nome_safe, etapa_codigo=etapa_codigo
+        ).first()
+        if not etapa:
+            etapa = CicloEtapa(projeto_nome=p.nome_safe, etapa_codigo=etapa_codigo)
+            db.add(etapa)
+        if etapa.status != "concluido":
+            etapa.status         = "concluido"
+            etapa.concluido_em   = agora
+            etapa.responsavel_id = uid
+    db.commit()
 
 
 def _pool_ambiente_dict(pa) -> dict:

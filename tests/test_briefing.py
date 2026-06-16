@@ -91,3 +91,49 @@ def test_inst_mesmo_residencial_default():
     c = db.get(Cliente, cliente_id)
     assert c.inst_mesmo_residencial == 1
     db.close()
+
+
+def test_briefing_dict_completo_true():
+    from database import get_session, Cliente, Briefing
+    from datetime import datetime
+    from main import _briefing_dict
+    db = get_session()
+    c = Cliente(nome="Maria", email="m@t.com", telefone="11999990000")
+    db.add(c); db.commit(); db.refresh(c)
+    b = Briefing(
+        cliente_id=c.id,
+        data_atendimento=datetime.utcnow(),
+        tipo_imovel="casa",
+        budget_declarado=80000.0,
+        categoria_proposta="exclusiva",
+        data_entrega_desejada="2027-03-01",
+        flexibilidade_prazo="flexivel",
+    )
+    db.add(b); db.commit(); db.refresh(b)
+    bd = _briefing_dict(b)
+    assert bd["completo"] is True
+    assert bd["tipo_imovel"] == "casa"
+    assert bd["budget_declarado"] == 80000.0
+    db.close()
+
+
+def test_briefing_dict_incompleto():
+    from database import get_session, Cliente, Briefing
+    from datetime import datetime
+    from main import _briefing_dict
+    db = get_session()
+    c = Cliente(nome="Pedro", email="p@t.com", telefone="11000000001")
+    db.add(c); db.commit(); db.refresh(c)
+    b = Briefing(
+        cliente_id=c.id,
+        data_atendimento=datetime.utcnow(),
+        tipo_imovel="apartamento",
+        budget_declarado=0.0,       # zero = falsy → incompleto
+        categoria_proposta="refinada",
+        data_entrega_desejada="2027-01-01",
+        flexibilidade_prazo="rigido",
+    )
+    db.add(b); db.commit(); db.refresh(b)
+    bd = _briefing_dict(b)
+    assert bd["completo"] is False   # budget_declarado = 0.0 → falsy
+    db.close()
