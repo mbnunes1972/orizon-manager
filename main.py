@@ -270,7 +270,30 @@ class Handler(BaseHTTPRequestHandler):
                         (Cliente.nome.ilike(f"%{q}%")) |
                         (Cliente.cpf.ilike(f"%{q}%"))
                     )
-                clientes = [_cliente_dict(c) for c in query.all()]
+                all_clientes = query.all()
+                # IDs com briefing completo
+                cli_ids = [c.id for c in all_clientes]
+                briefings_ok = set()
+                if cli_ids:
+                    bfs = db.query(Briefing.cliente_id).filter(
+                        Briefing.cliente_id.in_(cli_ids),
+                        Briefing.tipo_imovel != None,
+                        Briefing.tipo_imovel != "",
+                        Briefing.budget_declarado != None,
+                        Briefing.budget_declarado != 0,
+                        Briefing.categoria_proposta != None,
+                        Briefing.categoria_proposta != "",
+                        Briefing.data_entrega_desejada != None,
+                        Briefing.data_entrega_desejada != "",
+                        Briefing.flexibilidade_prazo != None,
+                        Briefing.flexibilidade_prazo != "",
+                    ).all()
+                    briefings_ok = {b[0] for b in bfs}
+                clientes = []
+                for c in all_clientes:
+                    cd = _cliente_dict(c)
+                    cd["tem_briefing"] = c.id in briefings_ok
+                    clientes.append(cd)
                 self.send_json({"ok": True, "clientes": clientes})
             except Exception as e:
                 self.send_json({"ok": False, "erro": str(e), "clientes": []})
