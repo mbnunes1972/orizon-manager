@@ -6371,16 +6371,23 @@ async function copiarEnderecoCliente() {
 
 async function salvarValorNegociado() {
   if (!_orcamentoAtivoId) return;
-  const elTotal = document.getElementById('neg-total-final');
-  const elPag   = document.getElementById('neg-pagamento');
-  const raw = (elTotal?.value || '').replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,'');
-  const valor = parseFloat(raw) || 0;
+  const elTotal   = document.getElementById('neg-total-final');
+  const elAvista  = document.getElementById('neg-avista');
+  const elPag     = document.getElementById('neg-pagamento');
+  const rawTotal  = (elTotal?.value || '').replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,'');
+  const rawAvista = (elAvista?.textContent || '').replace(/[R$\s.]/g,'').replace(',','.');
+  const valor        = parseFloat(rawTotal)  || 0;
+  const valorLiquido = parseFloat(rawAvista) || 0;
   if (!valor) return;
   try {
     await fetch(`/orcamentos/${_orcamentoAtivoId}/valor`, {
       method: 'PATCH', credentials: 'same-origin',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ valor_total: valor, forma_pagamento: elPag?.value || null }),
+      body: JSON.stringify({
+        valor_total:     valor,
+        valor_liquido:   valorLiquido,
+        forma_pagamento: elPag?.value || null,
+      }),
     });
   } catch(e) { console.warn('salvarValorNegociado:', e); }
 }

@@ -1937,6 +1937,8 @@ class Handler(BaseHTTPRequestHandler):
                         return
                     if "valor_total" in req:
                         orc.valor_total = float(req["valor_total"] or 0)
+                    if "valor_liquido" in req:
+                        orc.valor_liquido = float(req["valor_liquido"] or 0)
                     if "forma_pagamento" in req:
                         orc.forma_pagamento = req["forma_pagamento"] or None
                     orc.updated_at = datetime.utcnow()
@@ -2135,6 +2137,7 @@ def _montar_dados_projeto_para_contrato(nome_safe: str, orcamento_id: int, db) -
     cliente_dict = {
         "nome":       cliente.nome       if cliente else proj.get("nome_cliente", ""),
         "cpf":        cliente.cpf        if cliente else "",
+        "email":      cliente.email      if cliente else "",
         "telefone":   cliente.telefone   if cliente else "",
         "logradouro": cliente.logradouro if cliente else "",
         "numero":     cliente.numero     if cliente else "",
