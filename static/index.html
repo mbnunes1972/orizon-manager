@@ -12,6 +12,8 @@
   --accent:#5DCAA5; --ok:#5DCAA5; --warn:#EF9F27;
   --create:#a78bfa; --section:#60a5fa; --err:#F0997B;
   --text:#9FE1CB; --muted:#4d7a4d;
+  /* Dourado Orizon/Dalmóbile */
+  --dalm-gold:#f0c84a; --dalm-gold-light:#daa84a;
   /* Cartão teal */
   --teal-bg:#04342C; --teal-brd:#0F6E56; --teal-text:#9FE1CB; --teal-lbl:#5DCAA5;
   /* Cartão amber */
@@ -6113,33 +6115,34 @@ document.addEventListener('keydown', function(e){
 
 // ── Ciclo do Projeto ──────────────────────────────────────────────────────────
 
+// toggleavel: true → etapa sem documento/ação concreta; pode ser marcada manualmente
 const ETAPAS_CICLO = [
-  { codigo: "1",   nome: "Captação do cliente",               sub: false },
-  { codigo: "2",   nome: "Briefing",                          sub: false },
-  { codigo: "3",   nome: "Criação do projeto",                sub: false },
-  { codigo: "4",   nome: "Primeiro orçamento",                sub: false },
-  { codigo: "5",   nome: "Revisão de projeto",                sub: false },
-  { codigo: "6",   nome: "Aprovação do orçamento pelo cliente", sub: false },
-  { codigo: "7",   nome: "Contrato",                          sub: false, acao: "contrato" },
-  { codigo: "8",   nome: "Aprovação financeira I",            sub: false },
-  { codigo: "9",   nome: "Solicitação de medição",            sub: false },
-  { codigo: "10",  nome: "Planta de pontos medidos",          sub: false },
-  { codigo: "11",  nome: "Projeto executivo",                 sub: false },
-  { codigo: "11a", nome: "Planta de pontos de PE",            sub: true },
-  { codigo: "11b", nome: "Reunião de alinhamento",            sub: true },
-  { codigo: "11c", nome: "Revisão de PE",                     sub: true },
-  { codigo: "11d", nome: "Aprovação financeira II",           sub: true },
-  { codigo: "11e", nome: "Aprovação do PE pelo cliente",      sub: true },
-  { codigo: "12",  nome: "Implantação do pedido",             sub: false },
-  { codigo: "13",  nome: "Produção",                          sub: false },
-  { codigo: "14",  nome: "Entrega no depósito",               sub: false },
-  { codigo: "15",  nome: "Emissão da NFe do cliente",         sub: false },
-  { codigo: "16",  nome: "Entrega no cliente",                sub: false },
-  { codigo: "17",  nome: "Montagem",                          sub: false },
-  { codigo: "17a", nome: "Pendências de montagem",            sub: true },
-  { codigo: "18",  nome: "Assistência pós Montagem",          sub: false },
-  { codigo: "19",  nome: "Vistoria final",                    sub: false },
-  { codigo: "20",  nome: "Aprovação final",                   sub: false },
+  { codigo: "1",   nome: "Captação do cliente",                sub: false },
+  { codigo: "2",   nome: "Briefing",                           sub: false },
+  { codigo: "3",   nome: "Criação do projeto",                 sub: false },
+  { codigo: "4",   nome: "Primeiro orçamento",                 sub: false },
+  { codigo: "5",   nome: "Revisão de projeto",                 sub: false, toggleavel: true },
+  { codigo: "6",   nome: "Aprovação do orçamento pelo cliente",sub: false },
+  { codigo: "7",   nome: "Contrato",                           sub: false, acao: "contrato" },
+  { codigo: "8",   nome: "Aprovação financeira I",             sub: false },
+  { codigo: "9",   nome: "Solicitação de medição",             sub: false, toggleavel: true },
+  { codigo: "10",  nome: "Planta de pontos medidos",           sub: false },
+  { codigo: "11",  nome: "Projeto executivo",                  sub: false },
+  { codigo: "11a", nome: "Planta de pontos de PE",             sub: true },
+  { codigo: "11b", nome: "Reunião de alinhamento",             sub: true,  toggleavel: true },
+  { codigo: "11c", nome: "Revisão de PE",                      sub: true },
+  { codigo: "11d", nome: "Aprovação financeira II",            sub: true },
+  { codigo: "11e", nome: "Aprovação do PE pelo cliente",       sub: true },
+  { codigo: "12",  nome: "Implantação do pedido",              sub: false },
+  { codigo: "13",  nome: "Produção",                           sub: false },
+  { codigo: "14",  nome: "Entrega no depósito",                sub: false, toggleavel: true },
+  { codigo: "15",  nome: "Emissão da NFe do cliente",          sub: false },
+  { codigo: "16",  nome: "Entrega no cliente",                 sub: false, toggleavel: true },
+  { codigo: "17",  nome: "Montagem",                           sub: false, toggleavel: true },
+  { codigo: "17a", nome: "Pendências de montagem",             sub: true,  toggleavel: true },
+  { codigo: "18",  nome: "Assistência pós Montagem",           sub: false, toggleavel: true },
+  { codigo: "19",  nome: "Vistoria final",                     sub: false, toggleavel: true },
+  { codigo: "20",  nome: "Aprovação final",                    sub: false, toggleavel: true },
 ];
 
 let _cicloAberto = false;
@@ -6278,11 +6281,11 @@ function _renderCardGenerico(etapa, dados) {
     const cliEmail= cli.email || '';
     const cliTel  = cli.telefone || '';
     return `
-      <div style="font-size:.85rem;color:var(--muted);margin-bottom:10px;line-height:1.8">
-        <div><strong style="color:var(--text);font-size:.95rem">${cliNome}</strong></div>
-        ${cliCpf  ? `<div>CPF: <span style="color:var(--text)">${cliCpf}</span></div>`   : ''}
-        ${cliEmail? `<div>E-mail: <span style="color:var(--text)">${cliEmail}</span></div>` : ''}
-        ${cliTel  ? `<div>Tel: <span style="color:var(--text)">${cliTel}</span></div>`   : ''}
+      <div style="font-size:.85rem;color:var(--dalm-gold-light);margin-bottom:10px;line-height:1.8">
+        <div><strong style="color:var(--dalm-gold);font-size:.95rem">${cliNome}</strong></div>
+        ${cliCpf  ? `<div>CPF: ${cliCpf}</div>`   : ''}
+        ${cliEmail? `<div>E-mail: ${cliEmail}</div>` : ''}
+        ${cliTel  ? `<div>Tel: ${cliTel}</div>`   : ''}
       </div>
       ${cliId ? `<button onclick="cliAbrirModal(${cliId})"
         style="background:none;border:1px solid var(--dalm-gold);color:var(--dalm-gold);
@@ -6312,27 +6315,30 @@ function _renderCardGenerico(etapa, dados) {
       </button>` : ''}`;
   }
 
-  // Cards genéricos — toggle + notas
-  const btnLabel = concluido ? '↺ Reabrir' : '✓ Marcar como Concluída';
-  const btnStyle = concluido
-    ? 'border:1px solid var(--muted);color:var(--muted);background:none'
-    : 'background:var(--dalm-gold);color:#000;border:none;font-weight:700';
+  // Cards genéricos — observações + toggle (somente para etapas sem ação concreta)
+  const statusLabel = concluido
+    ? `<span style="color:var(--ok)">✓ Concluída${dt ? ' em ' + dt : ''}</span>`
+    : `<span style="color:var(--dalm-gold-light)">Pendente</span>`;
+
+  const btnToggle = etapa.toggleavel ? (() => {
+    const btnLabel = concluido ? '↺ Reabrir' : '✓ Marcar como Concluída';
+    const btnStyle = concluido
+      ? 'border:1px solid var(--muted);color:var(--muted);background:none'
+      : 'background:var(--dalm-gold);color:#000;border:none;font-weight:700';
+    return `<button onclick="toggleSalvarEtapa('${etapa.codigo}')"
+      style="${btnStyle};border-radius:5px;padding:6px 16px;font-size:.82rem;cursor:pointer;margin-top:10px">
+      ${btnLabel}</button>`;
+  })() : '';
+
   return `
-    <div style="font-size:.82rem;color:var(--muted);margin-bottom:10px">
-      ${concluido
-        ? `✓ Concluída${dt ? ' em ' + dt : ''}`
-        : 'Pendente'}
-    </div>
+    <div style="font-size:.82rem;margin-bottom:8px">${statusLabel}</div>
     <textarea id="obs-etapa-${etapa.codigo}"
       placeholder="Observações sobre esta etapa..."
       style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);
-        border-radius:4px;background:var(--card);color:var(--text);font-size:.82rem;
-        resize:vertical;min-height:60px;margin-bottom:10px"
+        border-radius:4px;background:var(--surface);color:var(--dalm-gold-light);font-size:.82rem;
+        resize:vertical;min-height:60px"
     >${dados.observacoes || ''}</textarea>
-    <button onclick="toggleSalvarEtapa('${etapa.codigo}')"
-      style="${btnStyle};border-radius:5px;padding:6px 16px;font-size:.82rem;cursor:pointer">
-      ${btnLabel}
-    </button>`;
+    ${btnToggle}`;
 }
 
 function _renderCardAprovacaoFinanceira(dados) {
