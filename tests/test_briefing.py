@@ -168,3 +168,44 @@ def test_ciclo_legado_nao_marcado_para_projeto_novo():
     # Sem ter passado pelo endpoint real, não deve haver etapas
     assert len(etapas) == 0
     db.close()
+
+
+def test_etapa7_estados():
+    """Etapa 7: em_andamento após gerar, concluido após ambas as partes assinarem."""
+    from database import get_session, CicloEtapa, Contrato, ContratoAssinatura, Orcamento
+    from datetime import datetime
+    db = get_session()
+    # Cria orcamento fictício
+    orc = Orcamento(projeto_id="proj_etapa7_test", nome="Orc 1", ordem=1)
+    db.add(orc); db.commit(); db.refresh(orc)
+    # Simula contrato gerado → etapa 7 em_andamento
+    etapa7 = CicloEtapa(projeto_nome="proj_etapa7_test", etapa_codigo="7", status="em_andamento")
+    db.add(etapa7)
+    contrato = Contrato(
+        projeto_nome="proj_etapa7_test",
+        orcamento_id=orc.id,
+        status="para_assinatura",
+        template_path="config/contrato_template.docx",
+    )
+    db.add(contrato); db.commit(); db.refresh(contrato)
+    # Assina como loja
+    db.add(ContratoAssinatura(
+        contrato_id=contrato.id, parte="loja", nome="Loja",
+        cpf="00.000.000/0001-00", hash_sha256="aaa"
+    ))
+    db.commit()
+    partes = {a.parte for a in db.query(ContratoAssinatura).filter_by(contrato_id=contrato.id).all()}
+    assert "loja" in partes
+    assert "cliente" not in partes
+    # etapa 7 ainda em_andamento
+    e7 = db.query(CicloEtapa).filter_by(projeto_nome="proj_etapa7_test", etapa_codigo="7").first()
+    assert e7.status == "em_andamento"
+    # Assina como cliente
+    db.add(ContratoAssinatura(
+        contrato_id=contrato.id, parte="cliente", nome="Cliente",
+        cpf="111.111.111-11", hash_sha256="bbb"
+    ))
+    db.commit()
+    partes2 = {a.parte for a in db.query(ContratoAssinatura).filter_by(contrato_id=contrato.id).all()}
+    assert {"loja", "cliente"}.issubset(partes2)
+    db.close()

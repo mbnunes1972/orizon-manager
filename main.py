@@ -1895,6 +1895,17 @@ class Handler(BaseHTTPRequestHandler):
                     db.add(assinatura)
                     partes_assinadas = {a.parte for a in contrato.assinaturas} | {parte}
                     if "loja" in partes_assinadas and "cliente" in partes_assinadas:
+                        contrato.status = "assinado_loja"
+                    elif parte == "loja":
+                        contrato.status = "assinado_loja"
+                    else:
+                        contrato.status = "assinado_cliente"
+                    db.commit()
+                    # Verificar se ambas as partes assinaram → fechar etapa 7
+                    assinaturas = db.query(ContratoAssinatura)\
+                                    .filter_by(contrato_id=contrato.id).all()
+                    partes_assinadas = {a.parte for a in assinaturas}
+                    if {"loja", "cliente"}.issubset(partes_assinadas):
                         contrato.status = "assinado"
                         etapa7 = db.query(CicloEtapa).filter_by(
                             projeto_nome=nome_safe, etapa_codigo="7"
@@ -1902,14 +1913,10 @@ class Handler(BaseHTTPRequestHandler):
                         if not etapa7:
                             etapa7 = CicloEtapa(projeto_nome=nome_safe, etapa_codigo="7")
                             db.add(etapa7)
-                        etapa7.status       = "assinado"
-                        etapa7.concluido_em = datetime.utcnow()
+                        etapa7.status        = "concluido"
+                        etapa7.concluido_em  = datetime.utcnow()
                         etapa7.responsavel_id = usuario["id"]
-                    elif parte == "loja":
-                        contrato.status = "assinado_loja"
-                    else:
-                        contrato.status = "assinado_cliente"
-                    db.commit()
+                        db.commit()
                     self.send_json({"ok": True, "status": contrato.status, "parte": parte})
                 except Exception as e:
                     db.rollback()
@@ -2006,6 +2013,15 @@ class Handler(BaseHTTPRequestHandler):
                     etapa6.status       = "concluido"
                     etapa6.concluido_em = datetime.utcnow()
                     etapa6.responsavel_id = usuario["id"]
+                    db.commit()
+                    # Marcar etapa 7 como "em_andamento" (contrato gerado, aguardando assinatura)
+                    etapa7 = db.query(CicloEtapa).filter_by(
+                        projeto_nome=nome_safe, etapa_codigo="7"
+                    ).first()
+                    if not etapa7:
+                        etapa7 = CicloEtapa(projeto_nome=nome_safe, etapa_codigo="7")
+                        db.add(etapa7)
+                    etapa7.status = "em_andamento"
                     db.commit()
                     resp = {"ok": True, "contrato_id": contrato.id, "status": "para_assinatura"}
                     if aviso:
