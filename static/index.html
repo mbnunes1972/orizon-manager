@@ -5907,29 +5907,34 @@ async function salvarOrcamento(){
   if(!projetoAtivo){ showToast('Nenhum projeto ativo', true); return; }
   if(!_orcamentoAtivoId){ showToast('Nenhum orçamento ativo', true); return; }
 
+  // Gate: só considera o orçamento "criado" quando há pelo menos um ambiente incluído
+  const temAmbientes = _orcAmbientesAtivos !== null
+    ? _orcAmbientesAtivos.length > 0
+    : (projetoAtivo.ambientes || []).length > 0;
+
   // 1. Persiste valor negociado, valor líquido e forma de pagamento
   await salvarValorNegociado();
 
-  // 2. Marca etapa 4 (Primeiro orçamento) como concluída
-  //    e etapa 5 (Revisão de projeto) como pendente se ainda não concluída
-  try {
-    const etapa4atual = _cicloData['4']?.status;
-    if (etapa4atual !== 'concluido') {
-      await fetch(
-        `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/4`,
-        {
-          method: 'PATCH', credentials: 'same-origin',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ status: 'concluido' }),
-        }
-      );
-    }
-  } catch(e) { console.warn('salvarOrcamento etapa4:', e); }
-
-  // 3. Recarrega o ciclo silenciosamente para refletir o novo estado
-  await carregarCicloSilencioso();
-
-  showToast('Orçamento salvo — etapa "Primeiro orçamento" concluída!');
+  // 2. Marca etapa 4 como concluída SOMENTE se há ambientes no orçamento
+  if (temAmbientes) {
+    try {
+      const etapa4atual = _cicloData['4']?.status;
+      if (etapa4atual !== 'concluido') {
+        await fetch(
+          `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/4`,
+          {
+            method: 'PATCH', credentials: 'same-origin',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ status: 'concluido' }),
+          }
+        );
+      }
+    } catch(e) { console.warn('salvarOrcamento etapa4:', e); }
+    await carregarCicloSilencioso();
+    showToast('Orçamento salvo!');
+  } else {
+    showToast('Orçamento salvo. Adicione ambientes para concluir a etapa "Primeiro orçamento".', false);
+  }
 }
 
 // Event listeners drag-drop para o modal de novo ambiente
