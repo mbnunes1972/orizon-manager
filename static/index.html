@@ -1069,7 +1069,7 @@ body{overflow:hidden}
 
     <!-- Acoes -->
     <div class="action-row">
-      <button class="btn btn-ok" onclick="showToast('Orcamento salvo!')">&#x1F4BE; Salvar Orcamento</button>
+      <button class="btn btn-ok" onclick="salvarOrcamento()">&#x1F4BE; Salvar Orcamento</button>
       <button class="btn btn-amber" onclick="abrirAprovacaoComDados()" title="Aprovar orçamento e iniciar contrato">&#x2713; Aprovar Orcamento</button>
     </div>
 
@@ -5903,9 +5903,33 @@ async function adminRetry(id) {
 }
 
 // ---- Init --------------------------------------------------------------------
-function salvarOrcamento(){
+async function salvarOrcamento(){
   if(!projetoAtivo){ showToast('Nenhum projeto ativo', true); return; }
-  showToast('Orcamento salvo em ' + projetoAtivo.nome_projeto);
+  if(!_orcamentoAtivoId){ showToast('Nenhum orçamento ativo', true); return; }
+
+  // 1. Persiste valor negociado, valor líquido e forma de pagamento
+  await salvarValorNegociado();
+
+  // 2. Marca etapa 4 (Primeiro orçamento) como concluída
+  //    e etapa 5 (Revisão de projeto) como pendente se ainda não concluída
+  try {
+    const etapa4atual = _cicloData['4']?.status;
+    if (etapa4atual !== 'concluido') {
+      await fetch(
+        `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/4`,
+        {
+          method: 'PATCH', credentials: 'same-origin',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ status: 'concluido' }),
+        }
+      );
+    }
+  } catch(e) { console.warn('salvarOrcamento etapa4:', e); }
+
+  // 3. Recarrega o ciclo silenciosamente para refletir o novo estado
+  await carregarCicloSilencioso();
+
+  showToast('Orçamento salvo — etapa "Primeiro orçamento" concluída!');
 }
 
 // Event listeners drag-drop para o modal de novo ambiente
