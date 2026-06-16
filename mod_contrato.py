@@ -59,8 +59,16 @@ def montar_variaveis_contrato(
     entrada_valor: float,
     parcelas_descricao: str,
     adendo: str | None,
+    forma_entrada: str = "pix",
+    forma_parcelas: str = "boleto",
 ) -> dict:
     """Constrói o dicionário de variáveis para renderizar o template."""
+    _FORMAS = {
+        "pix": "Pix", "transferencia": "Transferência Bancária",
+        "boleto": "Boleto Bancário", "cartao_credito": "Cartão de Crédito",
+        "cartao_debito": "Cartão de Débito", "cheque": "Cheque",
+        "debito_automatico": "Débito Automático",
+    }
     endereco_cliente = ", ".join(filter(None, [
         cliente.get("logradouro", ""),
         cliente.get("numero", ""),
@@ -91,6 +99,8 @@ def montar_variaveis_contrato(
         "consultor_nome":                  projeto.get("consultor", ""),
         "data_contrato":                   datetime.now().strftime("%d/%m/%Y"),
         "adendo":                          adendo or "",
+        "entrada_forma":                   _FORMAS.get(forma_entrada, forma_entrada),
+        "parcelas_forma":                  _FORMAS.get(forma_parcelas, forma_parcelas),
     }
 
 

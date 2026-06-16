@@ -6509,6 +6509,31 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
             style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
         </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Forma de Pagamento da Entrada</label>
+          <select id="apr-forma-entrada"
+            style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+            color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
+            <option value="pix">Pix</option>
+            <option value="transferencia">Transfer&ecirc;ncia Banc&aacute;ria</option>
+            <option value="boleto">Boleto Banc&aacute;rio</option>
+            <option value="cartao_credito">Cart&atilde;o de Cr&eacute;dito</option>
+            <option value="cartao_debito">Cart&atilde;o de D&eacute;bito</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Forma das Parcelas</label>
+          <select id="apr-forma-parcelas"
+            style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+            color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
+            <option value="boleto">Boleto Banc&aacute;rio</option>
+            <option value="debito_automatico">D&eacute;bito Autom&aacute;tico</option>
+            <option value="transferencia">Transfer&ecirc;ncia Banc&aacute;ria</option>
+            <option value="cartao_credito">Cart&atilde;o de Cr&eacute;dito</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </div>
         <div>
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Descri&ccedil;&atilde;o das parcelas</label>
           <input id="apr-parcelas" type="text" value="${pagAtual.descricao.replace(/"/g,'&quot;')}"
@@ -6566,6 +6591,8 @@ async function gerarContrato() {
   const cpf           = (document.getElementById('apr-cpf')?.value || '').trim();
   const telefone      = (document.getElementById('apr-telefone')?.value || '').trim();
   const email         = (document.getElementById('apr-email')?.value || '').trim();
+  const formaEntrada  = document.getElementById('apr-forma-entrada')?.value || 'pix';
+  const formaParcelas = document.getElementById('apr-forma-parcelas')?.value || 'boleto';
 
   if (!_orcamentoAtivoId) {
     mostrarErroModal('Nenhum orçamento ativo.\nVolte à negociação e selecione o orçamento a aprovar.');
@@ -6600,6 +6627,8 @@ async function gerarContrato() {
         entrada_valor:       entrada,
         parcelas_descricao:  parcelas,
         adendo:              adendo,
+        forma_entrada:       formaEntrada,
+        forma_parcelas:      formaParcelas,
       }),
     });
     const d = await r.json();

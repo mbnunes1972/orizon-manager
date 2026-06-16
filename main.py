@@ -1816,6 +1816,8 @@ class Handler(BaseHTTPRequestHandler):
                 entrada_valor        = float(req.get("entrada_valor") or 0)
                 parcelas_descricao   = req.get("parcelas_descricao") or ""
                 adendo               = req.get("adendo") or ""
+                forma_entrada        = req.get("forma_entrada", "pix")
+                forma_parcelas       = req.get("forma_parcelas", "boleto")
                 if not orcamento_id:
                     self.send_json({"ok": False, "erro": "orcamento_id obrigatório"}, code=400)
                     return
@@ -1831,6 +1833,8 @@ class Handler(BaseHTTPRequestHandler):
                         entrada_valor=entrada_valor,
                         parcelas_descricao=parcelas_descricao,
                         adendo=adendo,
+                        forma_entrada=forma_entrada,
+                        forma_parcelas=forma_parcelas,
                     )
                     contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
                                  .order_by(Contrato.id.desc()).first()
