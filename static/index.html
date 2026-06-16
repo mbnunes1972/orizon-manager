@@ -307,11 +307,14 @@ body{overflow:hidden}
 
 #ciclo-panel {
   display: none;
+  position: absolute;
+  inset: 0;
+  background: var(--bg, #0d0d0d);
+  z-index: 20;
   flex-direction: column;
   gap: 8px;
   padding: 16px;
-  max-width: 720px;
-  margin: 0 auto;
+  overflow-y: auto;
 }
 #ciclo-panel.ativo { display: flex; }
 
@@ -692,7 +695,7 @@ body{overflow:hidden}
   </div>
 
   <!-- PAGE 02: Negociacao (novo layout) -->
-  <div class="page" id="page-02">
+  <div class="page" id="page-02" style="position:relative;">
     <!-- Banner: projeto bloqueado apos aprovacao -->
     <div class="bloqueio-banner" id="neg-bloqueio-banner">
       <div class="bloqueio-icon">&#x1F512;</div>
@@ -1321,7 +1324,7 @@ body{overflow:hidden}
         <div style="grid-column:1/-1;margin-top:16px;padding-top:12px;border-top:1px solid rgba(156,122,60,.2);">
           <div style="font-weight:600;color:var(--dalm-gold);margin-bottom:8px;">Endereço de Instalação</div>
           <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;">
-            <input type="checkbox" id="cli-inst-mesmo" checked onchange="cliToggleInstEnd(this.checked)">
+            <input type="checkbox" id="cli-inst-mesmo" onchange="cliToggleInstEnd(this.checked)">
             <span style="color:var(--text)">Mesmo endereço residencial</span>
           </label>
           <div id="cli-inst-fields" style="display:none;">
@@ -2657,12 +2660,9 @@ async function criarProjeto(){
     const rb = await fetch('/api/clientes/' + clienteId + '/briefing', {credentials:'same-origin'});
     const db_ = await rb.json();
     if (!db_.ok || !db_.briefing || !db_.briefing.completo) {
-      const ok = confirm(
-        'Este cliente ainda não tem briefing completo.\n\n' +
-        'O projeto pode ser criado, mas é recomendado preencher o briefing antes de avançar para orçamento.\n\n' +
-        'Continuar mesmo assim?'
-      );
-      if (!ok) return;
+      st.textContent = 'Preencha o briefing do cliente antes de criar o projeto.';
+      st.style.color = 'var(--err)';
+      return;
     }
   } catch(e) { /* ignora erro de rede */ }
   st.textContent = 'Criando...'; st.style.color = 'var(--muted)';
@@ -5302,7 +5302,7 @@ async function cliAbrirModal(id){
   });
   // Reset inst address fields
   const elInstMesmoReset = document.getElementById('cli-inst-mesmo');
-  if (elInstMesmoReset) { elInstMesmoReset.checked = true; cliToggleInstEnd(true); }
+  if (elInstMesmoReset) { elInstMesmoReset.checked = false; cliToggleInstEnd(false); }
   ['cli-inst-logradouro','cli-inst-numero','cli-inst-complemento','cli-inst-bairro','cli-inst-cidade','cli-inst-cep','cli-inst-uf'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
@@ -5493,6 +5493,12 @@ async function cliSalvar(){
   const erro = document.getElementById('cli-modal-erro');
   erro.textContent = '';
   if(!nome){ erro.textContent = 'Nome é obrigatório.'; return; }
+  const email = document.getElementById('cli-email').value.trim();
+  const cpf   = document.getElementById('cli-cpf').value.trim();
+  const tel   = document.getElementById('cli-tel').value.trim();
+  if(!email){ erro.textContent = 'E-mail é obrigatório.'; document.getElementById('cli-email').focus(); return; }
+  if(!cpf)  { erro.textContent = 'CPF é obrigatório.';   document.getElementById('cli-cpf').focus();   return; }
+  if(!tel)  { erro.textContent = 'Telefone é obrigatório.'; document.getElementById('cli-tel').focus(); return; }
 
   // Verificação de nome duplicado (somente novo cadastro, somente se ainda não confirmado homônimo)
   if(!id && !_cliHomonimoConfirmado){
@@ -6102,16 +6108,12 @@ let _cicloData   = {};
 function abrirCiclo() {
   _cicloAberto = true;
   document.getElementById('ciclo-panel').classList.add('ativo');
-  const negArea = document.getElementById('neg-area') || document.querySelector('.neg-container');
-  if (negArea) negArea.style.display = 'none';
   carregarCiclo();
 }
 
 function fecharCiclo() {
   _cicloAberto = false;
   document.getElementById('ciclo-panel').classList.remove('ativo');
-  const negArea = document.getElementById('neg-area') || document.querySelector('.neg-container');
-  if (negArea) negArea.style.display = '';
 }
 
 async function _fetchCiclo() {
@@ -6175,9 +6177,10 @@ function renderCiclo() {
   if (!panel) return;
   panel.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-      <h3 style="margin:0;color:var(--ok)">Ciclo do Projeto</h3>
-      <button onclick="fecharCiclo()" style="margin-left:auto;background:none;border:none;
-        color:var(--muted);cursor:pointer;font-size:1.1rem">&#x2715; Negociação</button>
+      <button onclick="fecharCiclo()" style="background:none;border:1px solid var(--dalm-gold);
+        border-radius:6px;color:var(--dalm-gold);cursor:pointer;font-size:.9rem;padding:6px 14px;
+        display:flex;align-items:center;gap:6px;">&#x2190; Voltar</button>
+      <h3 style="margin:0;color:var(--dalm-gold)">Etapas do Projeto</h3>
     </div>
   `;
   for (const etapa of ETAPAS_CICLO) {
@@ -6606,6 +6609,22 @@ async function abrirAprovacaoComDados() {
   if (!_orcamentoAtivoId) {
     mostrarErroModal('Selecione um orçamento antes de aprovar.\nAbra a aba de negociação e ative o orçamento desejado.');
     return;
+  }
+  // Verificar briefing completo antes de aprovar
+  const clienteParaBriefing = await _carregarClienteProjeto();
+  if (clienteParaBriefing && clienteParaBriefing.id) {
+    try {
+      const rb = await fetch('/api/clientes/' + clienteParaBriefing.id + '/briefing', {credentials:'same-origin'});
+      const db_ = await rb.json();
+      if (!db_.ok || !db_.briefing || !db_.briefing.completo) {
+        mostrarErroModal(
+          'Briefing incompleto.\n\n' +
+          'Preencha os dados obrigatórios do briefing do cliente antes de aprovar o orçamento.\n\n' +
+          'Campos obrigatórios: tipo de imóvel, budget estimado, categoria de proposta, prazo desejado e flexibilidade de prazo.'
+        );
+        return;
+      }
+    } catch(e) { /* ignora erro de rede — não bloqueia */ }
   }
   showToast('Carregando dados...', false);
   await salvarValorNegociado();
