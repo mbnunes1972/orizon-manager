@@ -7049,7 +7049,26 @@ async function gerarContrato() {
     mostrarErroModal('Nenhum orçamento ativo.\nVolte à negociação e selecione o orçamento a aprovar.');
     return;
   }
-  if (!nome) { mostrarErroModal('Nome do cliente é obrigatório.'); return; }
+
+  // Verifica dados obrigatórios do cliente para o contrato
+  const camposFaltando = [];
+  if (!nome)          camposFaltando.push('Nome do cliente');
+  if (!cpf)           camposFaltando.push('CPF');
+  if (!telefone)      camposFaltando.push('Telefone');
+  if (!email)         camposFaltando.push('E-mail');
+  if (!endInstalacao) camposFaltando.push('Endereço de instalação');
+
+  if (camposFaltando.length > 0) {
+    const cliId = projetoAtivo?.cliente_id;
+    mostrarErroComAcao(
+      'Dados incompletos para emissão do contrato:\n\n• ' + camposFaltando.join('\n• ') +
+      '\n\nAbra o cadastro do cliente para completar os dados.\n' +
+      'A passagem para assinatura com dados incompletos exigirá senha gerencial.',
+      'Abrir Cadastro',
+      () => { if (cliId) cliAbrirModal(cliId); }
+    );
+    return;
+  }
 
   const btn = document.querySelector('#modal-aprovacao-overlay button[onclick="gerarContrato()"]');
   if (btn) { btn.disabled = true; btn.textContent = 'Gerando...'; }
