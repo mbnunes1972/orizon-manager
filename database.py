@@ -308,6 +308,7 @@ class ContratoAssinatura(Base):
 def init_db():
     Base.metadata.create_all(ENGINE)
     _migrar_colunas()
+    _migrar_dados()
 
 def _migrar_colunas():
     """Adiciona colunas novas em tabelas existentes sem perder dados."""
@@ -377,6 +378,38 @@ def _migrar_colunas():
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")
 
         conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+def _run_migracoes(conn):
+    """Migrações de DADOS (não de schema), idempotentes, rastreadas em schema_migrations.
+    Recebe uma conexão sqlite3 (facilita teste com :memory:)."""
+    cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS schema_migrations (
+        id          TEXT PRIMARY KEY,
+        aplicada_em DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    cur.execute("SELECT id FROM schema_migrations")
+    aplicadas = {r[0] for r in cur.fetchall()}
+
+    # 2026-06-17: trocar etapa_codigo 2<->3 (Briefing <-> Criação do projeto).
+    # A troca direta colidiria com UNIQUE(projeto_nome, etapa_codigo); usa código temporário.
+    if "etapas_swap_2_3" not in aplicadas:
+        cur.execute("UPDATE ciclo_etapas SET etapa_codigo='_swap2' WHERE etapa_codigo='2'")
+        cur.execute("UPDATE ciclo_etapas SET etapa_codigo='2'      WHERE etapa_codigo='3'")
+        cur.execute("UPDATE ciclo_etapas SET etapa_codigo='3'      WHERE etapa_codigo='_swap2'")
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('etapas_swap_2_3')")
+
+    conn.commit()
+
+
+def _migrar_dados():
+    """Abre a conexão real e roda as migrações de dados idempotentes."""
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        _run_migracoes(conn)
     except Exception:
         pass
     finally:
