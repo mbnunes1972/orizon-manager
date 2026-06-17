@@ -2633,14 +2633,6 @@ function npDeselecionarCliente(){
   setTimeout(() => document.getElementById('novo-proj-cli').focus(), 50);
 }
 
-function npAbrirBriefingCliente() {
-  const cliId   = document.getElementById('novo-proj-cliente-id')?.value;
-  const cliNome = document.getElementById('np-cli-chip-nome')?.textContent
-               || document.getElementById('novo-proj-cli')?.value || '';
-  if (!cliId) { showToast('Selecione um cliente primeiro', true); return; }
-  cliAbrirBriefing(parseInt(cliId), cliNome);
-}
-
 function npAbrirCadastroCliente(){
   _npCadastrandoCliente = true;
   const nomeBusca = (document.getElementById('novo-proj-cli')?.value || '').trim();
@@ -6806,7 +6798,7 @@ async function abrirAprovacaoComDados() {
       const db_ = await rb.json();
       if (!db_.ok || !db_.briefing || !db_.briefing.completo) {
         mostrarErroComAcao(
-          'Briefing incompleto.\n\nPreencha os dados obrigatórios do briefing do cliente antes de aprovar o orçamento.\n\nCampos obrigatórios: tipo de imóvel, budget estimado, categoria de proposta, prazo desejado e flexibilidade de prazo.',
+          'Briefing incompleto.\n\nPreencha os dados obrigatórios do briefing do projeto antes de aprovar o orçamento.\n\nCampos obrigatórios: tipo de imóvel, budget estimado, categoria de proposta, prazo desejado e flexibilidade de prazo.',
           'Abrir Briefing',
           () => {
             abrirBriefingProjeto(projetoAtivo.nome_safe, (projetoAtivo.cliente||{}).nome || '');
