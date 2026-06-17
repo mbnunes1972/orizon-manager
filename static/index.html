@@ -7131,7 +7131,7 @@ async function coletarSignatarioOverride() {
         <h3 style="margin:0 0 12px;color:#f0c84a;font-size:1rem">Dados do signatário (contrato)</h3>
         ${campos.map(([k,lbl]) => `
           <label style="display:block;font-size:.75rem;color:var(--muted);margin:6px 0 2px">${lbl}</label>
-          <input id="sig-${k}" value="${(base[k]||'').toString().replace(/"/g,'&quot;')}"
+          <input id="sigov-${k}" value="${(base[k]||'').toString().replace(/"/g,'&quot;')}"
             style="width:100%;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
         `).join('')}
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
@@ -7143,7 +7143,7 @@ async function coletarSignatarioOverride() {
     ov.querySelector('#sig-cancel').onclick = () => { ov.remove(); resolve(null); };
     ov.querySelector('#sig-ok').onclick = () => {
       const out = { inst_mesmo_residencial: true };
-      campos.forEach(([k]) => { out[k] = document.getElementById('sig-'+k).value.trim(); });
+      campos.forEach(([k]) => { out[k] = document.getElementById('sigov-'+k).value.trim(); });
       ov.remove(); resolve(out);
     };
   });
