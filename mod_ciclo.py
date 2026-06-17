@@ -38,6 +38,13 @@ ETAPA_NOME = {
 
 STATUS_CONCLUIDO = "concluido"
 
+# Status que contam como "etapa concluída" para fins de gating (espelha o
+# conjunto de status conclusivos do handler PATCH /ciclo em main.py).
+STATUS_CONCLUSIVOS = frozenset({
+    "concluido", "aprovado", "assinado", "vigente",
+    "implantado", "realizado", "entregue", "emitida",
+})
+
 
 def _parse_codigo(codigo):
     """'11a' -> (11, 'a'); '2' -> (2, ''). Para ordenação e agrupamento por pai."""
@@ -83,7 +90,7 @@ def pode_avancar(codigo, status_por_codigo):
     ant = etapa_anterior(codigo)
     if ant is None:
         return True
-    return status_por_codigo.get(ant) == STATUS_CONCLUIDO
+    return status_por_codigo.get(ant) in STATUS_CONCLUSIVOS
 
 
 def codigos_a_resetar(codigo_alvo, codigos_existentes):

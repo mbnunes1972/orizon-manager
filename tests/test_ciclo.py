@@ -19,6 +19,13 @@ def test_pode_avancar_principal_exige_anterior_concluida():
     assert mc.pode_avancar("4", {}) is False
 
 
+def test_pode_avancar_aceita_status_conclusivos_alternativos():
+    # Etapas da cauda concluem com status alternativos (ex.: 'entregue', 'implantado').
+    assert mc.pode_avancar("13", {"12": "implantado"}) is True
+    assert mc.pode_avancar("8", {"7": "assinado"}) is True
+    assert mc.pode_avancar("4", {"3": "em_andamento"}) is False
+
+
 def test_pode_avancar_primeira_etapa_sempre_liberada():
     assert mc.pode_avancar("1", {}) is True
 
