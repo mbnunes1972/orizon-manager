@@ -7048,6 +7048,17 @@ async function gerarContrato() {
 
   const pagamento = _capturarPagamento(formaEntrada, formaParcelas);
 
+  // É o próprio cliente cadastrado que vai assinar?
+  let signatarioOverride = null;
+  const ehCliente = confirm('O signatário do contrato é o próprio cliente cadastrado?');
+  if (!ehCliente) {
+    signatarioOverride = await coletarSignatarioOverride();
+    if (!signatarioOverride) {  // cancelou
+      if (btn) { btn.disabled = false; btn.textContent = 'Gerar Contrato'; }
+      return;
+    }
+  }
+
   try {
     const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato`, {
       method: 'POST', credentials: 'same-origin',
@@ -7060,6 +7071,7 @@ async function gerarContrato() {
         forma_entrada:      formaEntrada,
         forma_parcelas:     formaParcelas,
         pagamento_json:     JSON.stringify(pagamento),
+        signatario_override: signatarioOverride,
       }),
     });
     const d = await r.json();
@@ -7096,6 +7108,45 @@ async function gerarContrato() {
     mostrarErroModal('Erro de rede ao gerar contrato:\n\n' + e.message);
     if (btn) { btn.disabled = false; btn.textContent = 'Gerar Contrato'; }
   }
+}
+
+async function coletarSignatarioOverride() {
+  // Pré-preenche com o cadastro do cliente do projeto, se houver.
+  let base = {};
+  try {
+    const c = await _carregarClienteProjeto();
+    if (c) base = c;
+  } catch(e) {}
+  return new Promise((resolve) => {
+    const campos = [
+      ['nome','Nome'], ['cpf','CPF/CNPJ'], ['email','E-mail'], ['telefone','Telefone'],
+      ['logradouro','Logradouro'], ['numero','Número'], ['complemento','Complemento'],
+      ['bairro','Bairro'], ['cidade','Cidade'], ['cep','CEP'], ['estado','Estado/UF'],
+    ];
+    const ov = document.createElement('div');
+    ov.id = 'modal-signatario-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 0';
+    ov.innerHTML = `
+      <div style="background:var(--card,#132013);border:1px solid #b8960c;border-radius:10px;padding:22px 26px;min-width:340px;max-width:520px;width:92%;margin:auto">
+        <h3 style="margin:0 0 12px;color:#f0c84a;font-size:1rem">Dados do signatário (contrato)</h3>
+        ${campos.map(([k,lbl]) => `
+          <label style="display:block;font-size:.75rem;color:var(--muted);margin:6px 0 2px">${lbl}</label>
+          <input id="sig-${k}" value="${(base[k]||'').toString().replace(/"/g,'&quot;')}"
+            style="width:100%;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
+        `).join('')}
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+          <button id="sig-cancel" style="background:none;border:1px solid var(--border);color:var(--muted);padding:7px 16px;border-radius:5px;cursor:pointer">Cancelar</button>
+          <button id="sig-ok" style="background:#b8960c;color:#1a1200;border:none;font-weight:600;padding:7px 18px;border-radius:5px;cursor:pointer">Usar estes dados</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('#sig-cancel').onclick = () => { ov.remove(); resolve(null); };
+    ov.querySelector('#sig-ok').onclick = () => {
+      const out = { inst_mesmo_residencial: true };
+      campos.forEach(([k]) => { out[k] = document.getElementById('sig-'+k).value.trim(); });
+      ov.remove(); resolve(out);
+    };
+  });
 }
 
 function abrirModalAssinatura(parte) {
