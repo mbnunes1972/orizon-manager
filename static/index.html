@@ -6119,7 +6119,7 @@ const ETAPAS_CICLO = [
   { codigo: "2",   nome: "Criação do projeto",                 sub: false },
   { codigo: "3",   nome: "Briefing",                           sub: false },
   { codigo: "4",   nome: "Primeiro orçamento",                 sub: false },
-  { codigo: "5",   nome: "Revisão de projeto",                 sub: false, toggleavel: true },
+  { codigo: "5",   nome: "Revisão de projeto",                 sub: false },
   { codigo: "6",   nome: "Aprovação do orçamento pelo cliente",sub: false },
   { codigo: "7",   nome: "Contrato",                           sub: false, acao: "contrato" },
   { codigo: "8",   nome: "Aprovação financeira I",             sub: false },
@@ -6327,6 +6327,15 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
         border-radius:5px;padding:5px 14px;font-size:.82rem;cursor:pointer">
         ${briefLocked ? '👁 Ver Briefing' : '✎ ' + (concluido ? 'Editar' : 'Preencher') + ' Briefing'}
       </button>` : ''}`;
+  }
+
+  // Card especial etapa 5 — Revisão: concluída apenas pela aprovação do orçamento
+  if (etapa.codigo === '5' && !concluido) {
+    return `
+      <div style="font-size:.85rem;color:var(--muted);line-height:1.7">
+        Em revis&atilde;o. Esta etapa &eacute; conclu&iacute;da automaticamente ao clicar
+        <strong style="color:var(--text)">Aprovar Or&ccedil;amento</strong> na aba Negocia&ccedil;&atilde;o.
+      </div>`;
   }
 
   // Cards genéricos — observações + toggle (somente para etapas sem ação concreta)
