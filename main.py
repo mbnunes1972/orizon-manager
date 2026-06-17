@@ -1861,7 +1861,9 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False,
                                         "erro": "Contrato já assinado — não é possível voltar ao orçamento"})
                         return
-                    # Resetar etapa 6 (e 7 se existir sem assinatura)
+                    # Resetar etapas 5, 6 e 7 (a aprovação concluiu 5+6 e iniciou a 7)
+                    e5 = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo="5").first()
+                    if e5: db.delete(e5)
                     e6 = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo="6").first()
                     if e6: db.delete(e6)
                     e7 = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo="7").first()
@@ -2103,6 +2105,17 @@ class Handler(BaseHTTPRequestHandler):
                         contrato.pdf_path = lo.docx_path
                         aviso = str(lo)
                     contrato.status = "para_assinatura"
+                    # Marcar etapa 5 (Revisão de projeto) como concluída — a aprovação
+                    # conclui Revisão e Aprovação juntas.
+                    etapa5 = db.query(CicloEtapa).filter_by(
+                        projeto_nome=nome_safe, etapa_codigo="5"
+                    ).first()
+                    if not etapa5:
+                        etapa5 = CicloEtapa(projeto_nome=nome_safe, etapa_codigo="5")
+                        db.add(etapa5)
+                    etapa5.status         = "concluido"
+                    etapa5.concluido_em   = datetime.utcnow()
+                    etapa5.responsavel_id = usuario["id"]
                     # Marcar etapa 6 (Aprovação do orçamento) como concluída
                     etapa6 = db.query(CicloEtapa).filter_by(
                         projeto_nome=nome_safe, etapa_codigo="6"
