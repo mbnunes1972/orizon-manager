@@ -224,14 +224,21 @@ def test_briefing_projeto_completo_helper():
         return Briefing(**base)
 
     class _Q:
-        def __init__(self, r): self._r = r
-        def filter_by(self, **k): return self
-        def order_by(self, *a): return self
+        def __init__(self, r, spy): self._r = r; self._spy = spy
+        def filter_by(self, **k): self._spy["filter_by"] = k; return self
+        def order_by(self, *a): self._spy["order_by_called"] = True; return self
         def first(self): return self._r
     class _DB:
-        def __init__(self, r): self._r = r
-        def query(self, *a): return _Q(self._r)
+        def __init__(self, r): self._r = r; self.spy = {}
+        def query(self, *a): return _Q(self._r, self.spy)
 
-    assert main._briefing_projeto_completo("P", _DB(mk())) is True
-    assert main._briefing_projeto_completo("P", _DB(None)) is False
-    assert main._briefing_projeto_completo("P", _DB(mk(budget_declarado=0.0))) is False
+    # com briefing completo -> True; e a query filtra por projeto_nome correto
+    db_ok = _DB(mk())
+    assert main._briefing_projeto_completo("Projeto_X", db_ok) is True
+    assert db_ok.spy.get("filter_by") == {"projeto_nome": "Projeto_X"}
+    assert db_ok.spy.get("order_by_called") is True
+
+    # sem briefing (None) -> False
+    assert main._briefing_projeto_completo("Projeto_X", _DB(None)) is False
+    # briefing com obrigatório faltando -> False
+    assert main._briefing_projeto_completo("Projeto_X", _DB(mk(budget_declarado=0.0))) is False
