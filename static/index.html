@@ -6790,7 +6790,11 @@ async function abrirAprovacaoComDados() {
     mostrarErroModal('Selecione um orçamento antes de aprovar.\nAbra a aba de negociação e ative o orçamento desejado.');
     return;
   }
-  if (!_orcAmbientesAtivos || _orcAmbientesAtivos.length === 0) {
+  // Gate: ambiente check usa o mesmo critério de salvarOrcamento
+  const _temAmbientes = _orcAmbientesAtivos !== null
+    ? _orcAmbientesAtivos.length > 0
+    : (projetoAtivo.ambientes || []).length > 0;
+  if (!_temAmbientes) {
     mostrarErroModal('Adicione ao menos um ambiente (XML) e salve o orçamento antes de aprovar.');
     return;
   }
