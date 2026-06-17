@@ -1067,10 +1067,12 @@ class Handler(BaseHTTPRequestHandler):
 
         elif path == "/api/clientes":
             req  = json.loads(body) if body else {}
-            nome = (req.get("nome") or "").strip()
-            if not nome:
-                self.send_json({"ok": False, "erro": "Nome é obrigatório"})
+            faltando = validar_cadastro_minimo(req)
+            if faltando:
+                self.send_json({"ok": False,
+                                "erro": "Campos obrigatórios faltando: " + ", ".join(faltando)})
                 return
+            nome = (req.get("nome") or "").strip()
             cpf = (req.get("cpf") or "").strip() or None
             db  = get_session()
             try:
@@ -2335,6 +2337,17 @@ class Handler(BaseHTTPRequestHandler):
 
 
 # ── Helper ────────────────────────────────────────────────────────────────────
+def validar_cadastro_minimo(req: dict) -> list:
+    """Campos mínimos obrigatórios para criar um cliente: nome, e-mail, telefone.
+    Retorna a lista de rótulos faltando (vazia se ok). CPF/endereço são opcionais
+    na criação — a completude para o contrato é cobrada na aprovação."""
+    faltando = []
+    for campo, rotulo in [("nome", "Nome"), ("email", "E-mail"), ("telefone", "Telefone")]:
+        if not (req.get(campo) or "").strip():
+            faltando.append(rotulo)
+    return faltando
+
+
 def _cliente_dict(c) -> dict:
     return {
         "id":          c.id,
