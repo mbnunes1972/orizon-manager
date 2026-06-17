@@ -6353,6 +6353,7 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
     : '';
 
   return `
+    ${bloqueada ? `<div style="color:var(--muted);font-size:.82rem;margin-bottom:8px">&#x1F512; Conclua a etapa anterior antes de iniciar esta.</div>` : ''}
     <div style="font-size:.82rem;margin-bottom:8px">${statusLabel}</div>
     <textarea id="obs-etapa-${etapa.codigo}"
       placeholder="Observações sobre esta etapa..."
@@ -6410,25 +6411,6 @@ async function concluirAprovacaoFinanceira() {
     const d = await r.json();
     if (!d.ok) { showToast('Erro: ' + (d.erro || 'falha'), true); return; }
     showToast('Aprovação Financeira I concluída!', false);
-    await carregarCiclo();
-  } catch(e) { showToast('Erro de rede: ' + e.message, true); }
-}
-
-async function toggleCicloEtapa(codigo) {
-  if (!projetoAtivo) return;
-  const dados = _cicloData[codigo] || {};
-  const novoStatus = dados.status === 'concluido' ? 'pendente' : 'concluido';
-  try {
-    const r = await fetch(
-      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${encodeURIComponent(codigo)}`,
-      {
-        method: 'PATCH', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: novoStatus }),
-      }
-    );
-    const d = await r.json();
-    if (!d.ok) { showToast('Erro: ' + (d.erro || 'falha'), true); return; }
     await carregarCiclo();
   } catch(e) { showToast('Erro de rede: ' + e.message, true); }
 }
