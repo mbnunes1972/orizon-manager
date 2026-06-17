@@ -6211,19 +6211,20 @@ function atualizarBotoesAprovacao() {
   if (aprovado) {
     if (btnSalvar)  { btnSalvar.style.display  = 'none'; }
     if (btnAprovar) { btnAprovar.style.display = 'none'; }
-    // Mostrar label informativo se ainda não existe
-    if (!actionRow.querySelector('#label-aprovado')) {
-      const label = document.createElement('span');
-      label.id = 'label-aprovado';
-      label.style.cssText = 'color:#f0c84a;font-size:.85rem;padding:6px 12px;border:1px solid #b8960c;border-radius:4px;background:#1a1200';
-      label.innerHTML = '&#x1F512; Or&ccedil;amento aprovado &mdash; em gera&ccedil;&atilde;o de contrato';
-      actionRow.appendChild(label);
+    // Botão clicável que leva à assinatura do contrato (etapa 7 no Ciclo)
+    if (!actionRow.querySelector('#btn-assinar-contrato')) {
+      const btn = document.createElement('button');
+      btn.id = 'btn-assinar-contrato';
+      btn.style.cssText = 'color:#1a1200;background:#b8960c;border:none;font-size:.85rem;font-weight:600;padding:8px 16px;border-radius:4px;cursor:pointer';
+      btn.innerHTML = '&#x1F512; Or&ccedil;amento aprovado &ndash; assinar contrato';
+      btn.onclick = () => { abrirCiclo(); setTimeout(() => toggleCicloCard('7'), 300); };
+      actionRow.appendChild(btn);
     }
   } else {
     if (btnSalvar)  { btnSalvar.style.display  = ''; }
     if (btnAprovar) { btnAprovar.style.display = ''; }
-    const label = actionRow.querySelector('#label-aprovado');
-    if (label) label.remove();
+    const b = actionRow.querySelector('#btn-assinar-contrato');
+    if (b) b.remove();
   }
 }
 
