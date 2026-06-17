@@ -2,7 +2,8 @@
 mod_ciclo.py — Ordem canônica das etapas do ciclo e regras de gating sequencial.
 
 Fonte única da verdade (backend) para "qual é a etapa anterior" e se uma etapa
-pode avançar. Espelha o ETAPAS_CICLO do frontend (static/index.html).
+pode avançar. A ordem aqui (2=Criação do projeto, 3=Briefing) é a canônica nova;
+o ETAPAS_CICLO do frontend é alinhado a ela na tarefa de frontend.
 """
 
 # Etapas PRINCIPAIS, na ordem. Sub-etapas ("11a".."11e", "17a") NÃO entram aqui

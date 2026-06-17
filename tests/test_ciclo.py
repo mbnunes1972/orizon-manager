@@ -1,6 +1,3 @@
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
 import mod_ciclo as mc
 
 
@@ -42,3 +39,13 @@ def test_reabertura_bloqueada_por_contrato():
     assert mc.reabertura_bloqueada_por_contrato(["3", "7"], "vigente") is True
     assert mc.reabertura_bloqueada_por_contrato(["3", "7"], "rascunho") is False
     assert mc.reabertura_bloqueada_por_contrato(["8", "9"], "assinado") is False
+
+
+def test_chave_ordenacao():
+    assert mc.chave_ordenacao("11a") == (11, "a")
+    assert mc.chave_ordenacao("2") == (2, "")
+
+
+def test_etapa_nome_em_sincronia_com_principais():
+    # Toda etapa principal tem nome e vice-versa.
+    assert set(mc.ETAPA_NOME) == set(mc.ETAPAS_PRINCIPAIS)
