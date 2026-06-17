@@ -6,17 +6,37 @@
 
 ## Visão geral
 
-Sistema de autenticação com três níveis de acesso, sessões server-side e autorização delegada para descontos acima do limite do usuário.
+Sistema de autenticação com quatro níveis de acesso, sessões server-side e autorização delegada para descontos acima do limite do usuário.
 
 ---
 
 ## Níveis de acesso
 
-| Nível | Limite desconto | Vê parâmetros internos | Pode autorizar |
-|---|---|---|---|
-| `consultor` | 10% | Não | Não |
-| `gerente` | 20% | Sim | Até 20% |
-| `diretor` | 50% | Sim | Até 50% |
+| Nível | Limite desconto | Vê parâmetros internos | Pode autorizar | Painel exclusivo |
+|---|---|---|---|---|
+| `consultor` | 10% | Não | Não | — |
+| `gerente` | 20% | Sim | Até 20% | — |
+| `diretor` | 50% | Sim | Até 50% | — |
+| `admin` | 50% | Sim | Até 50% | Painel Admin (page-07) |
+
+`gerente`, `diretor` e `admin` podem autorizar ações gerenciais (ex.: reabrir etapas em
+cascata via `POST /api/projetos/<nome>/ciclo/<codigo>/reabrir` e `desfazer_aprovacao`),
+validadas por login+senha e auditadas em `log_acoes_gerenciais`.
+
+**Usuários atuais** (no banco): `pdm2026` (diretor), `lds2026` (gerente), `mds2026`
+(consultor) — criados por `seed.py` — e `admin2026` (admin, nome "Administrador"),
+presente no banco mas **não** no `seed.py`. (Senha de teste do admin deve ser trocada
+antes de produção.)
+
+### Papel do `admin` (atual × pretendido)
+
+- **Hoje:** acesso total a vendas + **Painel Admin (page-07)** — fila de sincronização
+  Omie (clientes com `omie_sync_status` pendente/erro, botão "Tentar" por cliente).
+  Rotas exclusivas: `GET /api/admin/omie-sync`, `POST /api/admin/omie-sync/<id>/retry`.
+- **Direção pretendida:** evoluir o `admin` para um papel de **configuração do sistema**
+  (não apenas vendas + sync). Primeiro candidato concreto: o **painel de configuração de
+  loja** que fornecerá as **testemunhas do contrato** (hoje hardcoded em `mod_contrato._TESTEMUNHAS`
+  — ver `docs/modulos/contratos/SPEC.md`).
 
 ---
 
