@@ -1885,11 +1885,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not solicitante:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
                     return
-                req   = json.loads(body or b'{}')
-                login = (req.get("login") or "").strip()
-                senha = (req.get("senha") or "").strip()
                 db = get_session()
                 try:
+                    req   = json.loads(body or b'{}')
+                    login = (req.get("login") or "").strip()
+                    senha = (req.get("senha") or "").strip()
                     autorizador = db.query(Usuario).filter_by(login=login, ativo=1).first()
                     if not autorizador or not autorizador.check_senha(senha):
                         self.send_json({"ok": False, "erro": "Credenciais inválidas"}, code=403)
