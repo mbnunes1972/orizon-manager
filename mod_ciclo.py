@@ -36,8 +36,6 @@ ETAPA_NOME = {
     "20": "Aprovação final",
 }
 
-STATUS_CONCLUIDO = "concluido"
-
 # Status que contam como "etapa concluída" para fins de gating (espelha o
 # conjunto de status conclusivos do handler PATCH /ciclo em main.py).
 STATUS_CONCLUSIVOS = frozenset({

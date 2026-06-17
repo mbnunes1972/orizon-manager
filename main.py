@@ -2180,7 +2180,6 @@ class Handler(BaseHTTPRequestHandler):
                     if novo_status and novo_status != "pendente":
                         todas = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe).all()
                         status_por_codigo = {e.etapa_codigo: e.status for e in todas}
-                        status_por_codigo[etapa_cod] = etapa.status
                         if not mod_ciclo.pode_avancar(etapa_cod, status_por_codigo):
                             ant = mod_ciclo.etapa_anterior(etapa_cod)
                             nome_ant = mod_ciclo.ETAPA_NOME.get(ant, ant)
@@ -2193,8 +2192,7 @@ class Handler(BaseHTTPRequestHandler):
                         if etapa.status == "pendente" and novo_status != "pendente":
                             etapa.iniciado_em = datetime.utcnow()
                         etapa.status = novo_status
-                        if novo_status in ("concluido", "aprovado", "assinado", "vigente",
-                                           "implantado", "realizado", "entregue", "emitida"):
+                        if novo_status in mod_ciclo.STATUS_CONCLUSIVOS:
                             etapa.concluido_em  = datetime.utcnow()
                             etapa.responsavel_id = usuario["id"]
                     if obs is not None:
