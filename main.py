@@ -1357,6 +1357,12 @@ class Handler(BaseHTTPRequestHandler):
             if m_novo_orc:
                 nome_safe = m_novo_orc.group(1)
                 db = get_session()
+                if not _briefing_projeto_completo(nome_safe, db):
+                    db.close()
+                    self.send_json({"ok": False,
+                                    "erro": "Preencha o briefing do projeto antes de iniciar a negociação."},
+                                   code=400)
+                    return
                 _orc_dict = None
                 try:
                     req      = json.loads(body.decode("utf-8", "replace")) if body else {}
@@ -1396,6 +1402,16 @@ class Handler(BaseHTTPRequestHandler):
             m_pool = _re.match(r"^/projetos/([^/]+)/pool$", path)
             if m_pool:
                 nome_safe = m_pool.group(1)
+                _db_bf = get_session()
+                try:
+                    _bf_ok = _briefing_projeto_completo(nome_safe, _db_bf)
+                finally:
+                    _db_bf.close()
+                if not _bf_ok:
+                    self.send_json({"ok": False,
+                                    "erro": "Preencha o briefing do projeto antes de subir XML."},
+                                   code=400)
+                    return
                 ct = self.headers.get("Content-Type", "")
                 arquivos, _ = _parse_multipart(body, ct)
                 if not arquivos:
