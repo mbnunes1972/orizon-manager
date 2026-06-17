@@ -6790,6 +6790,10 @@ async function abrirAprovacaoComDados() {
     mostrarErroModal('Selecione um orçamento antes de aprovar.\nAbra a aba de negociação e ative o orçamento desejado.');
     return;
   }
+  if (!_orcAmbientesAtivos || _orcAmbientesAtivos.length === 0) {
+    mostrarErroModal('Adicione ao menos um ambiente (XML) e salve o orçamento antes de aprovar.');
+    return;
+  }
   // Verificar briefing completo antes de aprovar
   const clienteParaBriefing = await _carregarClienteProjeto();
   if (clienteParaBriefing && clienteParaBriefing.id) {
@@ -7065,7 +7069,11 @@ async function gerarContrato() {
           d.campos_faltando.join('\n• ') +
           '\n\nAbra o cadastro do cliente para completar.',
           'Abrir Cadastro',
-          () => { if (cliId) cliAbrirModal(cliId); }
+          () => {
+            document.getElementById('erro-modal-overlay')?.remove();
+            document.getElementById('modal-aprovacao-overlay')?.remove();
+            if (cliId) cliAbrirModal(cliId);
+          }
         );
       } else {
         mostrarErroModal('Erro ao gerar contrato:\n\n' + (d.erro || 'Falha desconhecida'));
