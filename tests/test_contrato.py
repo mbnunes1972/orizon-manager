@@ -259,7 +259,7 @@ def test_preencher_signatario_e_testemunhas(tmp_path):
     path = preencher_contrato(91001, ctx)
     full = "\n".join(p.text for p in Document(path).paragraphs)
     os.remove(path)
-    assert "Ana Cliente" in full
-    assert "Consultor Z" not in full
+    assert "Ana Cliente CPF/CNPJ:" in full   # cliente é o 2º signatário (par. 128)
+    assert "Consultor Z" in full             # consultor PERMANECE no cabeçalho (par. 0)
     assert "Jaime Perinazzo" in full
     assert "Felipe Guizalberte" in full

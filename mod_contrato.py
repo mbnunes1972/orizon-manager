@@ -222,14 +222,13 @@ def preencher_contrato(contrato_id: int, ctx: dict) -> str:
     tables = doc.tables
 
     # ── Parágrafo 0: "Consultor: ... Telefone: ... e-mail:" ──────────────────
-    # Deixa em branco (o cliente e testemunhas são os signatários identificados)
-    # p0 = doc.paragraphs[0]
-    # linha_consultor = (
-    #     f"Consultor: {ctx.get('consultor_nome', '')}\t\t\t\t\t"
-    #     f"Telefone: {ctx.get('consultor_tel', '')}\t\t\t\t"
-    #     f"e-mail: {ctx.get('consultor_email', '')}"
-    # )
-    # _set_para(p0, linha_consultor)
+    p0 = doc.paragraphs[0]
+    linha_consultor = (
+        f"Consultor: {ctx.get('consultor_nome', '')}\t\t\t\t\t"
+        f"Telefone: {ctx.get('consultor_tel', '')}\t\t\t\t"
+        f"e-mail: {ctx.get('consultor_email', '')}"
+    )
+    _set_para(p0, linha_consultor)
 
     # ── Tabela 0: Identificação do cliente ────────────────────────────────────
     _set_cell(tables[0].rows[1].cells[0], ctx.get("cliente_nome", ""))
