@@ -10,6 +10,7 @@ import json
 import platform
 import subprocess
 import hashlib
+import re as _re_cpf
 from datetime import datetime
 from docx import Document
 
@@ -103,6 +104,21 @@ def _set_para(para, text: str):
         run.font.size = font_size
     if bold is not None:
         run.bold = bold
+
+
+def _relabel_cpf_cnpj(doc):
+    """Substitui 'CPF' por 'CPF/CNPJ' em parágrafos e células, sem duplicar."""
+    def fix(para):
+        for run in para.runs:
+            if "CPF" in run.text:
+                run.text = _re_cpf.sub(r'CPF(?!/CNPJ)', 'CPF/CNPJ', run.text)
+    for para in doc.paragraphs:
+        fix(para)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    fix(para)
 
 
 # ── Parser de pagamento ───────────────────────────────────────────────────────
@@ -305,6 +321,7 @@ def preencher_contrato(contrato_id: int, ctx: dict) -> str:
             _set_para(para, f"CPF/CNPJ: {_TESTEMUNHAS[_w_idx][1]}")
             _w_idx += 1
 
+    _relabel_cpf_cnpj(doc)
     docx_path = os.path.join(CONTRATOS_DIR, f"contrato_{contrato_id}.docx")
     doc.save(docx_path)
     return docx_path

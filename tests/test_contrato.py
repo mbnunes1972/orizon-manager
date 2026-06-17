@@ -263,3 +263,29 @@ def test_preencher_signatario_e_testemunhas(tmp_path):
     assert "Consultor Z" in full             # consultor PERMANECE no cabeçalho (par. 0)
     assert "Jaime Perinazzo" in full
     assert "Felipe Guizalberte" in full
+
+
+def test_contrato_cpf_vira_cpf_cnpj():
+    import os, re
+    from mod_contrato import preencher_contrato, _MODELO, construir_contexto
+    if not os.path.exists(_MODELO):
+        return
+    from docx import Document
+    ctx = construir_contexto(
+        cliente={"nome": "X", "cpf": "1", "email": "", "telefone": "",
+                 "logradouro": "", "numero": "", "complemento": "", "bairro": "",
+                 "cidade": "", "cep": "", "estado": "", "inst_mesmo_residencial": True,
+                 "inst_logradouro": "", "inst_numero": "", "inst_complemento": "",
+                 "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": ""},
+        usuario={"nome": "Y", "telefone": "", "email": ""}, forma_pagamento_json="")
+    path = preencher_contrato(91002, ctx)
+    doc = Document(path)
+    texts = [p.text for p in doc.paragraphs]
+    for tb in doc.tables:
+        for row in tb.rows:
+            for c in row.cells:
+                texts.append(c.text)
+    os.remove(path)
+    blob = " ".join(texts)
+    assert re.search(r'CPF(?!/CNPJ)', blob) is None
+    assert "CPF/CNPJ/CNPJ" not in blob
