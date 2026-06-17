@@ -21,6 +21,12 @@ _MODELO = os.path.join(_THIS_DIR, "modelo_contrato_final.docx")
 _TELEFONE_LOJA = "(12) 3341-8777"
 _EMAIL_LOJA    = "sac@dalmobilesjc.com.br"
 
+# Testemunhas provisórias — TODO: vir do painel de configuração de loja.
+_TESTEMUNHAS = [
+    ("Jaime Perinazzo",     "xxx.xxx.xxx-xx"),
+    ("Felipe Guizalberte",  "yyy.yyy.yyy-yy"),
+]
+
 
 # ── Utilitários ───────────────────────────────────────────────────────────────
 
@@ -216,13 +222,14 @@ def preencher_contrato(contrato_id: int, ctx: dict) -> str:
     tables = doc.tables
 
     # ── Parágrafo 0: "Consultor: ... Telefone: ... e-mail:" ──────────────────
-    p0 = doc.paragraphs[0]
-    linha_consultor = (
-        f"Consultor: {ctx.get('consultor_nome', '')}\t\t\t\t\t"
-        f"Telefone: {ctx.get('consultor_tel', '')}\t\t\t\t"
-        f"e-mail: {ctx.get('consultor_email', '')}"
-    )
-    _set_para(p0, linha_consultor)
+    # Deixa em branco (o cliente e testemunhas são os signatários identificados)
+    # p0 = doc.paragraphs[0]
+    # linha_consultor = (
+    #     f"Consultor: {ctx.get('consultor_nome', '')}\t\t\t\t\t"
+    #     f"Telefone: {ctx.get('consultor_tel', '')}\t\t\t\t"
+    #     f"e-mail: {ctx.get('consultor_email', '')}"
+    # )
+    # _set_para(p0, linha_consultor)
 
     # ── Tabela 0: Identificação do cliente ────────────────────────────────────
     _set_cell(tables[0].rows[1].cells[0], ctx.get("cliente_nome", ""))
@@ -283,20 +290,21 @@ def preencher_contrato(contrato_id: int, ctx: dict) -> str:
 
     # ── Parágrafos do corpo — data, assinatura e identificação do cliente ─────
     data_hoje = ctx.get("data_contrato", datetime.now().strftime("%d/%m/%Y"))
+    _w_idx = 0  # índice da testemunha atual
     for para in doc.paragraphs:
         t = para.text.strip()
         # Data do contrato
         if t.startswith("São José dos Campos") and ("de 20" in t or "de 2026" in t):
             _set_para(para, f"São José dos Campos - SP, {data_hoje}.")
-        # Assinante da empresa (rep. comercial / consultor)
+        # 2º signatário = CLIENTE (a linha INSPIRIUM acima permanece intacta)
         elif "Ferreira Machado" in t or "787.834" in t:
-            _set_para(para, ctx.get("consultor_nome", ""))
-        # Identificação do cliente (NOME: / Documento:)
-        elif t == "NOME:":
-            _set_para(para, f"NOME: {ctx.get('cliente_nome', '')}")
-        elif t == "Documento:":
-            _set_para(para, f"Documento: {ctx.get('cliente_cpf', '')}")
-            break   # preenche só o primeiro par (do cliente); testemunhas ficam em branco
+            _set_para(para, f"{ctx.get('cliente_nome', '')} CPF/CNPJ: {ctx.get('cliente_cpf', '')}")
+        # Testemunhas (dois pares NOME:/Documento:)
+        elif t == "NOME:" and _w_idx < len(_TESTEMUNHAS):
+            _set_para(para, f"NOME: {_TESTEMUNHAS[_w_idx][0]}")
+        elif t == "Documento:" and _w_idx < len(_TESTEMUNHAS):
+            _set_para(para, f"CPF/CNPJ: {_TESTEMUNHAS[_w_idx][1]}")
+            _w_idx += 1
 
     docx_path = os.path.join(CONTRATOS_DIR, f"contrato_{contrato_id}.docx")
     doc.save(docx_path)

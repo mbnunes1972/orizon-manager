@@ -239,3 +239,27 @@ def test_email_fallback_consultor():
     ctx = construir_contexto(cliente, {"nome": "X", "telefone": "", "email": ""}, "")
     assert ctx["consultor_email"] == "sac@dalmobilesjc.com.br"
     assert ctx["consultor_tel"]   == "(12) 3341-8777"
+
+
+def test_preencher_signatario_e_testemunhas(tmp_path):
+    import os
+    from mod_contrato import preencher_contrato, _MODELO, construir_contexto
+    if not os.path.exists(_MODELO):
+        return
+    from docx import Document
+    ctx = construir_contexto(
+        cliente={"nome": "Ana Cliente", "cpf": "111.222.333-44", "email": "a@x.com",
+                 "telefone": "(12) 9", "logradouro": "Rua A", "numero": "1", "complemento": "",
+                 "bairro": "Centro", "cidade": "SJC", "cep": "12000", "estado": "SP",
+                 "inst_mesmo_residencial": True, "inst_logradouro": "", "inst_numero": "",
+                 "inst_complemento": "", "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": ""},
+        usuario={"nome": "Consultor Z", "telefone": "", "email": ""},
+        forma_pagamento_json="",
+    )
+    path = preencher_contrato(91001, ctx)
+    full = "\n".join(p.text for p in Document(path).paragraphs)
+    os.remove(path)
+    assert "Ana Cliente" in full
+    assert "Consultor Z" not in full
+    assert "Jaime Perinazzo" in full
+    assert "Felipe Guizalberte" in full
