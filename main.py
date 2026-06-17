@@ -2145,6 +2145,18 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     projeto_dict, cliente_dict, orcamento_dict = \
                         _montar_dados_projeto_para_contrato(nome_safe, orcamento_id, db)
+                    # Gate: orçamento precisa ter ao menos um ambiente (1º orçamento concluído).
+                    if not orcamento_dict.get("ambientes"):
+                        self.send_json({
+                            "ok": False,
+                            "erro": "O orçamento não tem ambientes. Conclua o primeiro orçamento "
+                                    "(com ambientes) antes de aprovar.",
+                        }, code=400)
+                        return
+                    # Signatário alternativo: substitui o cadastro só para este contrato.
+                    _override = req.get("signatario_override")
+                    if isinstance(_override, dict) and _override.get("nome"):
+                        cliente_dict = {**cliente_dict, **{k: v for k, v in _override.items() if v not in (None, "")}}
                     from mod_contrato import construir_contexto
                     from mod_contrato import _formatar_valor
                     from mod_contrato import validar_cliente_para_contrato
