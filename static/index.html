@@ -6877,34 +6877,16 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
 
       <h3 style="margin:0 0 2px;color:#f0c84a;font-size:1rem">&#x2713; Aprovar Or&ccedil;amento</h3>
       <p style="color:var(--muted);font-size:.8rem;margin:0 0 18px">
-        Confirme os dados do cliente e preencha os campos obrigat&oacute;rios para emitir o contrato.
+        Confirme o pagamento e gere o contrato. Os dados do cliente v&ecirc;m do cadastro.
       </p>
 
       <div style="border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:14px">
-        <div style="font-size:.75rem;color:#f0c84a;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
-          Dados do Cliente
+        <div style="font-size:.75rem;color:#f0c84a;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
+          Cliente
         </div>
-        ${_campo('apr-nome', 'Nome', c.nome, 'text', 'Nome completo', true)}
-        ${_campo('apr-cpf',  'CPF', c.cpf,  'text', '000.000.000-00', true)}
-        ${_campo('apr-telefone', 'Telefone', c.telefone, 'text', '(00) 00000-0000', false)}
-        ${_campo('apr-email', 'E-mail', c.email, 'email', 'email@exemplo.com', false)}
-      </div>
-
-      <div style="border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:14px">
-        <div style="font-size:.75rem;color:#f0c84a;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
-          Endere&ccedil;o de Instala&ccedil;&atilde;o
-        </div>
-        <div style="display:flex;gap:6px;margin-bottom:8px">
-          <input id="apr-end" type="text" value="${endCliente.replace(/"/g,'&quot;')}"
-            placeholder="Rua, n&ordm; &ndash; Bairro &ndash; Cidade/UF"
-            style="flex:1;background:var(--input,#0d1a0d);border:1px solid var(--border);
-            color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
-          ${endCliente ? `<button onclick="document.getElementById('apr-end').value='${endCliente.replace(/'/g,"\\'")}'"
-            style="background:none;border:1px solid var(--border);color:var(--muted);
-            padding:4px 8px;border-radius:4px;cursor:pointer;font-size:.78rem;white-space:nowrap">= Cliente</button>` : ''}
-        </div>
-        <p style="color:var(--muted);font-size:.78rem;margin:0">
-          Se diferente do endere&ccedil;o do cliente, preencha acima.
+        <div style="font-size:.92rem;color:var(--fg)">${c.nome || '&mdash;'}</div>
+        <p style="color:var(--muted);font-size:.76rem;margin:6px 0 0">
+          Dados e endere&ccedil;o v&ecirc;m do cadastro do cliente. Se algo faltar, o sistema avisar&aacute; ao gerar o contrato.
         </p>
       </div>
 
@@ -6974,23 +6956,6 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
     </div>
   `;
   document.body.appendChild(ov);
-}
-
-async function copiarEnderecoClienteModal() {
-  try {
-    const rProj = await fetch(`/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}`, { credentials: 'same-origin' });
-    const dProj = await rProj.json();
-    const clienteId = dProj.projeto && dProj.projeto.cliente_id;
-    if (!clienteId) { showToast('Projeto sem cliente vinculado.', true); return; }
-    const rCli = await fetch(`/api/clientes/${clienteId}`, { credentials: 'same-origin' });
-    const dCli = await rCli.json();
-    const c = dCli.cliente;
-    if (!c) { showToast('Cliente não encontrado.', true); return; }
-    const end = [c.logradouro, c.numero, c.bairro, c.cidade, c.estado].filter(Boolean).join(', ');
-    const input = document.getElementById('apr-end');
-    if (input && end) input.value = end;
-    else showToast('Endereço do cliente não cadastrado.', true);
-  } catch(e) { showToast('Erro ao buscar endereço: ' + e.message, true); }
 }
 
 function _capturarPagamento(formaEntrada, formaParcelas) {
@@ -7074,39 +7039,14 @@ function _capturarPagamento(formaEntrada, formaParcelas) {
 }
 
 async function gerarContrato() {
-  const endInstalacao = (document.getElementById('apr-end')?.value || '').trim();
+  const adendo        = (document.getElementById('apr-adendo')?.value || '').trim();
   const entrada       = parseMoeda(document.getElementById('apr-entrada')?.value);
   const parcelas      = (document.getElementById('apr-parcelas')?.value || '').trim();
-  const adendo        = (document.getElementById('apr-adendo')?.value || '').trim();
-  const nome          = (document.getElementById('apr-nome')?.value || '').trim();
-  const cpf           = (document.getElementById('apr-cpf')?.value || '').trim();
-  const telefone      = (document.getElementById('apr-telefone')?.value || '').trim();
-  const email         = (document.getElementById('apr-email')?.value || '').trim();
   const formaEntrada  = document.getElementById('apr-forma-entrada')?.value || 'pix';
   const formaParcelas = document.getElementById('apr-forma-parcelas')?.value || 'boleto';
 
   if (!_orcamentoAtivoId) {
     mostrarErroModal('Nenhum orçamento ativo.\nVolte à negociação e selecione o orçamento a aprovar.');
-    return;
-  }
-
-  // Verifica dados obrigatórios do cliente para o contrato
-  const camposFaltando = [];
-  if (!nome)          camposFaltando.push('Nome do cliente');
-  if (!cpf)           camposFaltando.push('CPF');
-  if (!telefone)      camposFaltando.push('Telefone');
-  if (!email)         camposFaltando.push('E-mail');
-  if (!endInstalacao) camposFaltando.push('Endereço de instalação');
-
-  if (camposFaltando.length > 0) {
-    const cliId = projetoAtivo?.cliente_id;
-    mostrarErroComAcao(
-      'Dados incompletos para emissão do contrato:\n\n• ' + camposFaltando.join('\n• ') +
-      '\n\nAbra o cadastro do cliente para completar os dados.\n' +
-      'A passagem para assinatura com dados incompletos exigirá senha gerencial.',
-      'Abrir Cadastro',
-      () => { if (cliId) cliAbrirModal(cliId); }
-    );
     return;
   }
 
@@ -7116,42 +7056,38 @@ async function gerarContrato() {
   const pagamento = _capturarPagamento(formaEntrada, formaParcelas);
 
   try {
-    // Salvar CPF e dados complementares no cadastro do cliente, se preenchidos
-    if (cpf || telefone || email) {
-      const rP = await fetch(`/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}`, { credentials: 'same-origin' });
-      const dP = await rP.json();
-      const clienteId = dP.projeto?.cliente_id;
-      if (clienteId) {
-        await fetch(`/api/clientes/${clienteId}`, {
-          method: 'PATCH', credentials: 'same-origin',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ cpf, telefone, email }),
-        });
-      }
-    }
-
     const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato`, {
       method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        orcamento_id:        _orcamentoAtivoId,
-        endereco_instalacao: endInstalacao,
-        entrada_valor:       entrada,
-        parcelas_descricao:  parcelas,
-        adendo:              adendo,
-        forma_entrada:       formaEntrada,
-        forma_parcelas:      formaParcelas,
-        pagamento_json:      JSON.stringify(pagamento),
+        orcamento_id:       _orcamentoAtivoId,
+        entrada_valor:      entrada,
+        parcelas_descricao: parcelas,
+        adendo:             adendo,
+        forma_entrada:      formaEntrada,
+        forma_parcelas:     formaParcelas,
+        pagamento_json:     JSON.stringify(pagamento),
       }),
     });
     const d = await r.json();
     if (!d.ok) {
-      mostrarErroModal('Erro ao gerar contrato:\n\n' + (d.erro || 'Falha desconhecida'));
       if (btn) { btn.disabled = false; btn.textContent = 'Gerar Contrato'; }
+      if (Array.isArray(d.campos_faltando) && d.campos_faltando.length) {
+        const cliId = projetoAtivo?.cliente_id;
+        mostrarErroComAcao(
+          'Cadastro Incompleto\n\n' +
+          'Faltam estes dados do cliente para emitir o contrato:\n\n• ' +
+          d.campos_faltando.join('\n• ') +
+          '\n\nAbra o cadastro do cliente para completar.',
+          'Abrir Cadastro',
+          () => { if (cliId) cliAbrirModal(cliId); }
+        );
+      } else {
+        mostrarErroModal('Erro ao gerar contrato:\n\n' + (d.erro || 'Falha desconhecida'));
+      }
       return;
     }
     document.getElementById('modal-aprovacao-overlay')?.remove();
-    // Abre a aba Ciclo no card 7 automaticamente
     abrirCiclo();
     setTimeout(() => { toggleCicloCard('7'); }, 300);
     if (d.aviso) {
