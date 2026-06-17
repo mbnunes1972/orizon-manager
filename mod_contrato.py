@@ -152,6 +152,52 @@ def _parse_pagamento(pag_json_str: str) -> dict:
     }
 
 
+# ── Validação de dados do cliente ─────────────────────────────────────────────
+
+def validar_cliente_para_contrato(cliente: dict) -> list:
+    """
+    Retorna a lista de rótulos dos campos obrigatórios que estão vazios para
+    gerar um contrato a partir do dict do cliente (formato _cliente_dict).
+
+    Lista vazia → cliente está completo e pode gerar o contrato.
+
+    Regra: identificação + endereço residencial são sempre obrigatórios.
+    O endereço de instalação só é cobrado quando NÃO for o mesmo do residencial
+    (inst_mesmo_residencial falso) — quando é o mesmo, o residencial é reutilizado.
+    Complemento é opcional em ambos.
+    """
+    obrigatorios = [
+        ("nome",       "Nome"),
+        ("cpf",        "CPF"),
+        ("email",      "E-mail"),
+        ("telefone",   "Telefone"),
+        ("logradouro", "Logradouro (residencial)"),
+        ("numero",     "Número (residencial)"),
+        ("bairro",     "Bairro (residencial)"),
+        ("cidade",     "Cidade (residencial)"),
+        ("cep",        "CEP (residencial)"),
+        ("estado",     "Estado/UF (residencial)"),
+    ]
+
+    inst_mesmo = cliente.get("inst_mesmo_residencial", True)
+    if not inst_mesmo:
+        obrigatorios += [
+            ("inst_logradouro", "Logradouro (instalação)"),
+            ("inst_numero",     "Número (instalação)"),
+            ("inst_bairro",     "Bairro (instalação)"),
+            ("inst_cidade",     "Cidade (instalação)"),
+            ("inst_cep",        "CEP (instalação)"),
+            ("inst_uf",         "UF (instalação)"),
+        ]
+
+    faltando = []
+    for campo, rotulo in obrigatorios:
+        valor = cliente.get(campo)
+        if not (valor and str(valor).strip()):
+            faltando.append(rotulo)
+    return faltando
+
+
 # ── Preenchimento dinâmico do modelo ─────────────────────────────────────────
 
 def preencher_contrato(contrato_id: int, ctx: dict) -> str:

@@ -166,6 +166,68 @@ def test_construir_contexto_total_flex():
     assert ctx["p06_data"] == "—"
 
 
+def _cliente_completo():
+    """Cliente com todos os campos obrigatórios para gerar contrato."""
+    return {
+        "nome": "Ana Silva", "cpf": "123.456.789-00",
+        "email": "ana@test.com", "telefone": "(12) 99999-0000",
+        "logradouro": "Rua A", "numero": "100", "complemento": "",
+        "bairro": "Centro", "cidade": "SJC", "cep": "12200-000", "estado": "SP",
+        "inst_mesmo_residencial": True,
+        "inst_logradouro": "", "inst_numero": "", "inst_complemento": "",
+        "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": "",
+    }
+
+
+def test_validar_cliente_completo_sem_faltas():
+    from mod_contrato import validar_cliente_para_contrato
+    assert validar_cliente_para_contrato(_cliente_completo()) == []
+
+
+def test_validar_cliente_sem_endereco_residencial():
+    from mod_contrato import validar_cliente_para_contrato
+    c = _cliente_completo()
+    for campo in ("logradouro", "numero", "bairro", "cidade", "cep", "estado"):
+        c[campo] = ""
+    faltando = validar_cliente_para_contrato(c)
+    # Todos os 6 campos residenciais devem ser apontados como faltando
+    assert len(faltando) == 6
+    joined = " ".join(faltando).lower()
+    for termo in ("logradouro", "número", "bairro", "cidade", "cep", "estado"):
+        assert termo in joined
+
+
+def test_validar_cliente_sem_contato():
+    from mod_contrato import validar_cliente_para_contrato
+    c = _cliente_completo()
+    c["email"] = ""
+    c["telefone"] = None
+    faltando = validar_cliente_para_contrato(c)
+    joined = " ".join(faltando).lower()
+    assert "e-mail" in joined
+    assert "telefone" in joined
+
+
+def test_validar_inst_diferente_exige_endereco_instalacao():
+    from mod_contrato import validar_cliente_para_contrato
+    c = _cliente_completo()
+    c["inst_mesmo_residencial"] = False
+    # inst_* vazios → devem ser cobrados
+    faltando = validar_cliente_para_contrato(c)
+    joined = " ".join(faltando).lower()
+    assert "instalação" in joined
+    # Preenchendo inst_* → sem faltas
+    c.update({"inst_logradouro": "Rua C", "inst_numero": "20", "inst_bairro": "Jardim",
+              "inst_cidade": "SP", "inst_cep": "02000-000", "inst_uf": "SP"})
+    assert validar_cliente_para_contrato(c) == []
+
+
+def test_validar_inst_mesma_nao_exige_inst_fields():
+    from mod_contrato import validar_cliente_para_contrato
+    c = _cliente_completo()  # inst_mesmo_residencial=True, inst_* vazios
+    assert validar_cliente_para_contrato(c) == []
+
+
 def test_email_fallback_consultor():
     from mod_contrato import construir_contexto
     cliente = {"nome": "X", "cpf": "", "email": "", "telefone": "",
