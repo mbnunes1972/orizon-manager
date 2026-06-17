@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-15 (sessão 7 — ciclo completo 20 etapas + módulo contrato + aprovar orçamento)
+> Atualizado em: 2026-06-17 (sessão 8 — redesenho do ciclo A–E: etapas/gating, cadastro, aprovação, briefing por-projeto, contrato)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -31,7 +31,7 @@
 - **Total Flex (US-14) completo:** `mod_fin/total_flex.py` — juros compostos por dias reais
 - **Último orçamento ativo** persistido por projeto em localStorage; ao abrir projeto vai direto para o orçamento que estava ativo na última visita
 - **Módulo Ciclo (EP-10):** aba "Ciclo" na page-02 com 20 etapas em 2 colunas; etapas 1-5 auto-completas para projetos com negociação ativa
-- **Módulo Contrato (EP-10):** `mod_contrato.py` gera PDF via LibreOffice (fallback gracioso para .docx); template `config/contrato_template.docx` com 13 variáveis Jinja2; hash SHA-256 de assinatura
+- **Módulo Contrato (EP-10):** `mod_contrato.py` gera PDF via python-docx preenchimento direto em `modelo_contrato_final.docx`; 2º signatário = cliente; testemunhas provisórias; tags de nomenclatura cinza nos campos editáveis; CPF/CNPJ em campos; hash SHA-256 de assinatura
 - **Status contrato:** `rascunho` → `para_assinatura` → `assinado`; badges CSS dedicados
 - **Aprovar Orçamento reformulado:** modal exibe dados do cliente, CPF/endereço de instalação obrigatórios se vazios, condições de pagamento pré-carregadas; salva `valor_negociado` e `forma_pagamento` no orçamento antes de gerar contrato
 - **Pós-aprovação:** botões Salvar/Aprovar ocultos após etapa 6 concluída; "Voltar ao Orçamento" protegido por senha de gerente (`POST /ciclo/desfazer_aprovacao`)
@@ -150,6 +150,17 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-17 (sessão 8 — redesenho do ciclo de vida, sub-projetos A–E)
+**Spec e implementação:**
+- **A) Etapas — ordem + gating:** códigos renumerados ("2"=Criação do projeto, "3"=Briefing); gating sequencial (PATCH /ciclo rejeita 400 se etapa anterior não concluída; UI mostra 🔒); sub-etapas livres; reabertura em cascata por gerente via POST /api/projetos/<nome>/ciclo/<codigo>/reabrir (auditada em `log_acoes_gerenciais`, bloqueia se contrato assinado); criar projeto marca etapas 1 e 2 (Briefing 3 pendente); módulo `mod_ciclo.py`
+- **B) Cadastro completo na aprovação:** criar cliente exige nome+email+telefone (CPF opcional); modal de aprovação não edita mais cliente; `validar_cliente_para_contrato` bloqueia contrato sem cadastro completo (HTTP 400 + `campos_faltando` → popup "Cadastro Incompleto")
+- **C) Aprovação — semântica + botão:** "Aprovar Orçamento" conclui Revisão (5) e Aprovação (6) juntas; etapa 5 sem toggle manual; `desfazer_aprovacao` reseta 5/6/7; botão pós-aprovação "Orçamento aprovado – assinar contrato" leva ao card de assinatura
+- **D) Briefing obrigatório por-projeto:** briefing agora por-projeto (coluna `briefings.projeto_nome`); endpoints GET/POST /api/projetos/<nome>/briefing; etapa 3 marcada só no projeto; criar projeto → briefing obrigatório → negociação; backend bloqueia orçamentos/pool sem briefing completo do projeto (400)
+- **E) Contrato — signatário/testemunhas/formatação + enforcement:** 2º signatário = cliente (não consultor); INSPIRIUM intacta; testemunhas provisórias (Jaime Perinazzo/Felipe Guizalberte); CPF→CPF/CNPJ; tags de nomenclatura (rótulo cinza ~7pt) nos campos editáveis; gate de ambiente (POST /contrato 400 sem ambientes); `signatario_override` (modal "é o cliente cadastrado?"); bug-fixes: popup troca de modal, bloqueio de aprovação sem ambiente
+- **Banco novo:** tabela `log_acoes_gerenciais`; coluna `briefings.projeto_nome`; tabela `schema_migrations`
+
+---
 
 ### Sessão 2026-06-15 (sessão 7 — ciclo completo 20 etapas + módulo contrato + aprovar orçamento)
 **Commits:** `3861470` → `b5d2ad3` (13:39 → 21:19)

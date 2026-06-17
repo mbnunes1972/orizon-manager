@@ -122,6 +122,8 @@
 | POST | `/projetos/<nome>/ambientes/adicionar` | Adiciona ambiente via XML |
 | POST | `/projetos/<nome>/ambientes/remover` | Remove ambiente |
 | POST | `/projetos/<nome>/ambientes/selecao` | Atualiza seleção de ambientes |
+| POST | `/projetos/<nome>/orcamentos` | Cria orçamento do projeto — retorna **400** se o briefing do projeto não está completo |
+| POST | `/projetos/<nome>/pool` | Adiciona ao pool do projeto — retorna **400** se o briefing do projeto não está completo |
 
 ### POST `/projetos/novo`
 ```json
@@ -155,6 +157,32 @@
 
 ---
 
+## Ciclo de etapas & Briefing
+
+| Método | Rota | Descrição |
+|---|---|---|
+| PATCH | `/api/projetos/<nome>/ciclo/<codigo>` | Atualiza status de uma etapa do ciclo. Aplica **gating sequencial**: retorna **400** se tentar avançar uma etapa fora de ordem (etapa anterior não concluída) |
+| POST | `/api/projetos/<nome>/ciclo/<codigo>/reabrir` | Reabre uma etapa em **cascata** (a etapa-alvo e todas as posteriores voltam a `pendente`). Requer login+senha de **gerente** (nível `gerente`/`diretor`/`admin`); cada reabertura é auditada em `log_acoes_gerenciais`. Retorna **400** se a reabertura desfizer um contrato já assinado/vigente |
+| GET | `/api/projetos/<nome>/briefing` | Retorna o briefing daquele projeto (briefing por-projeto) |
+| POST | `/api/projetos/<nome>/briefing` | Cria/atualiza o briefing daquele projeto. Quando os campos obrigatórios estão preenchidos, marca a etapa 3 (Briefing) do projeto |
+
+### POST `/api/projetos/<nome>/ciclo/<codigo>/reabrir`
+```json
+// Request
+{ "login": "lds2026", "senha": "teste234" }
+
+// Response sucesso
+{ "ok": true, "resetadas": ["3", "4", "5"] }
+
+// Response erro (gerente)
+{ "ok": false, "erro": "Necessário nível Gerente ou Diretor" }   // code 403
+
+// Response erro (contrato assinado)
+{ "ok": false, "erro": "Contrato já assinado — não é possível reabrir esta etapa" }   // code 400
+```
+
+---
+
 ## Negociação / Cálculos
 
 | Método | Rota | Descrição |
@@ -165,6 +193,33 @@
 | POST | `/calcular_venda_programada` | Simula venda programada |
 | POST | `/calcular_total_flex` | Simula Total Flex |
 | GET | `/pagamentos` | Lista modalidades de pagamento disponíveis |
+
+---
+
+## Contratos
+
+| Método | Rota | Descrição |
+|---|---|---|
+| POST | `/api/projetos/<nome>/contrato` | Gera o contrato do projeto a partir de um orçamento. Aceita `signatario_override` (substitui os dados do signatário só para este contrato). Retorna **400** se o orçamento não tem ambientes ou se o cadastro do cliente está incompleto |
+
+### POST `/api/projetos/<nome>/contrato`
+```json
+// Request
+{
+  "orcamento_id": 12,
+  "endereco_instalacao": "...",
+  "entrada_valor": 0,
+  "parcelas_descricao": "...",
+  "adendo": "",
+  "forma_entrada": "pix",
+  "forma_parcelas": "boleto",
+  "pagamento_json": "...",
+  "signatario_override": { "nome": "...", "cpf": "...", "email": "..." }
+}
+
+// Response erro (sem ambientes)
+{ "ok": false, "erro": "O orçamento não tem ambientes. Conclua o primeiro orçamento (com ambientes) antes de aprovar." }   // code 400
+```
 
 ---
 

@@ -47,8 +47,10 @@ Projeto carregado
 
 ### Botões de ação
 - "Salvar orçamento" — salva estado sem avançar
-- "Aprovar orçamento →" — bloqueia o projeto e avança para exportação
+- "Aprovar orçamento →" — bloqueia o projeto, conclui Revisão + Aprovação e gera o contrato (ver "Aprovação do orçamento")
 - "⚙ Parâmetros" — abre modal de parâmetros internos
+
+Após a aprovação, o botão passa a exibir **"Orçamento aprovado – assinar contrato"** (clicável), que leva ao card de assinatura do contrato (etapa 7).
 
 ---
 
@@ -132,7 +134,24 @@ O sistema impõe um **teto absoluto de 35%** no desconto total, independente do 
 | Ação | Efeito |
 |---|---|
 | Salvar orçamento | Salva estado atual no projeto.json — pode continuar editando |
-| Aprovar orçamento | Bloqueia o projeto — não permite mais alterações — avança para exportação Omie |
+| Aprovar orçamento | Bloqueia o projeto — não permite mais alterações — conclui as etapas 5 (Revisão) e 6 (Aprovação) juntas e gera o contrato (etapa 7 em andamento) |
+
+---
+
+## Aprovação do orçamento
+
+"Aprovar Orçamento" só é possível quando **todas** as pré-condições estão atendidas:
+
+1. **≥1 ambiente no orçamento** (etapa 4 — Primeiro orçamento — concluída, vinda de XML do Promob).
+2. **Briefing do projeto completo** (os 5 campos obrigatórios; ver módulo de Projetos — briefing por projeto).
+3. **Cadastro do cliente completo** (`validar_cliente_para_contrato`; ver módulo de Clientes — "Cadastro completo antes do contrato").
+
+O **modal de aprovação não edita mais dados do cliente** — exibe o **nome como read-only** e captura apenas o **pagamento** (entrada/parcelas/forma) e o adendo. Dados de cadastro faltando disparam o popup "Cadastro Incompleto" (não há edição inline).
+
+Ao aprovar:
+- Conclui as etapas **5 (Revisão)** e **6 (Aprovação)** juntas.
+- Gera o **contrato** e entra na **etapa 7 (Contrato em andamento)**.
+- O botão de aprovação vira **"Orçamento aprovado – assinar contrato"** (clicável), que leva ao card de assinatura (etapa 7).
 
 ---
 

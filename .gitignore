@@ -3,7 +3,7 @@
 *.pyo
 omie_config.json
 omie_grupos_cache.json
-PROJETOS/
+/PROJETOS/
 *.xlsx
 .env
 .pytest_cache/

@@ -58,6 +58,22 @@ Registro de todas as autorizações delegadas de desconto.
 
 ---
 
+### `log_acoes_gerenciais`
+Auditoria de ações destrutivas autorizadas por gerente (ex.: reabertura de etapa em cascata).
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| id | Integer PK | |
+| solicitante_id | FK → usuarios | Quem pediu a ação (null se não identificado) |
+| autorizador_id | FK → usuarios | Quem autorizou (NOT NULL) |
+| acao | Text | Tipo de ação, ex.: `"reabrir_cascata"` |
+| projeto_nome | Text | nome_safe do projeto afetado |
+| etapa_alvo | Text | Código da etapa-alvo da ação |
+| contexto | Text (JSON) | Detalhes (ex.: etapas resetadas e status anterior) |
+| criado_em | DateTime | Automático |
+
+---
+
 ### `clientes`
 Cadastro de clientes com endereço completo.
 
@@ -99,6 +115,39 @@ Cadastro de parceiros comerciais (arquitetos, designers, corretores etc.)
 | criado_em | DateTime | | |
 
 **Tipos de parceiro:** `arquiteto` / `designer` / `decorador` / `corretor` / `engenheiro` / `indicador`
+
+---
+
+### `briefings`
+Briefing do atendimento. A coluna **`projeto_nome`** torna o briefing **por-projeto** (cada projeto tem o seu).
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| id | Integer PK | ✓ | |
+| cliente_id | FK → clientes | ✓ | Cliente do briefing |
+| projeto_nome | Text | | nome_safe do projeto — briefing por-projeto |
+| criado_em | DateTime | | Automático |
+| atualizado_em | DateTime | | Automático via onupdate |
+| data_atendimento | DateTime | ✓ | Gate da etapa Briefing |
+| consultor_id | FK → usuarios | | |
+| tipo_imovel | Text | ✓ | |
+| budget_declarado | Float | ✓ | |
+| categoria_proposta | Text | ✓ | |
+| data_entrega_desejada | Text | ✓ | |
+| flexibilidade_prazo | Text | ✓ | |
+| (demais campos) | Text/Float/Integer | | Opcionais: condição/metragem/ambientes/arquiteto/decisor etc. |
+
+Quando os campos obrigatórios estão preenchidos, a etapa 3 (Briefing) do projeto é marcada como concluída.
+
+---
+
+### `schema_migrations`
+Rastreia migrações de **dados** idempotentes já aplicadas (ex.: troca de códigos de etapa 2↔3).
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| id | Text PK | Identificador da migração, ex.: `etapas_swap_2_3` |
+| aplicada_em | DateTime | Default `CURRENT_TIMESTAMP` |
 
 ---
 
@@ -150,6 +199,9 @@ Além do banco SQLite, alguns dados são persistidos em arquivos JSON:
 usuarios (1) ──── (N) sessoes
 usuarios (1) ──── (N) log_autorizacoes (como solicitante)
 usuarios (1) ──── (N) log_autorizacoes (como autorizador)
+usuarios (1) ──── (N) log_acoes_gerenciais (como solicitante)
+usuarios (1) ──── (N) log_acoes_gerenciais (como autorizador)
+clientes (1) ──── (N) briefings (via cliente_id; um briefing por projeto via projeto_nome)
 clientes (1) ──── (N) projetos (via cliente_id no projeto.json)
 parceiros (1) ─── (N) projetos (via parceiro_id no projeto.json)
 ```
@@ -180,4 +232,24 @@ def _migrar_colunas():
     conn.close()
 ```
 
-Chamar `_migrar_colunas()` no início do `init_db()`.
+Chamar `_migrar_colunas()` no início do `init_db()`. Exemplo já aplicado por esse padrão: a coluna `projeto_nome` (TEXT) foi adicionada à tabela `briefings` para torná-lo por-projeto.
+
+### Migrações de dados (idempotentes)
+
+Migrações que alteram **dados** (não schema) são rastreadas na tabela `schema_migrations` para rodarem uma única vez, via `_run_migracoes(conn)`:
+
+```python
+def _run_migracoes(conn):
+    cur = conn.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS schema_migrations (
+        id          TEXT PRIMARY KEY,
+        aplicada_em DATETIME DEFAULT CURRENT_TIMESTAMP)""")
+    aplicadas = {r[0] for r in cur.execute("SELECT id FROM schema_migrations")}
+
+    if "etapas_swap_2_3" not in aplicadas:
+        # ... aplica a troca de códigos de etapa 2<->3 ...
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('etapas_swap_2_3')")
+    conn.commit()
+```
+
+Cada migração só roda se seu `id` ainda não estiver em `schema_migrations`.

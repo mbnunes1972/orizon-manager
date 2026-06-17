@@ -24,6 +24,16 @@ Cadastro centralizado de clientes com endereço completo, busca por nome/CPF, in
 - Máscara automática em telefone e WhatsApp
 - Validação de CPF único
 
+### Cadastro mínimo na criação
+- A criação de um cliente exige apenas **nome + e-mail + telefone**. **CPF é opcional na criação** (assim como o endereço).
+- Validação no backend: `validar_cadastro_minimo` (em `POST /api/clientes`). Faltando nome, e-mail ou telefone, retorna HTTP 400 indicando os campos ausentes; o formulário de novo cliente também valida antes do submit.
+- CPF e endereço são cobrados **depois**, na aprovação do orçamento / geração do contrato (ver "Cadastro completo antes do contrato"). O cliente nasce com o mínimo e é completado antes de virar contrato.
+
+### Cadastro completo antes do contrato
+- Antes da **geração do contrato**, o cadastro precisa estar **COMPLETO**: nome, CPF, e-mail, telefone e **endereço residencial completo** (logradouro, número, bairro, cidade, CEP, UF); endereço de **instalação** quando diferente do residencial.
+- Validação no backend: `validar_cliente_para_contrato` (autoridade única do que falta), aplicada no `POST /api/projetos/<nome>/contrato`. Faltando algo, o endpoint retorna **HTTP 400** com a lista `campos_faltando`.
+- No frontend, esse 400 dispara o popup **"Cadastro Incompleto"**, listando exatamente os campos faltando retornados pelo backend, com botão **"Abrir Cadastro"** que leva ao painel de cadastro do cliente. O modal de aprovação **não** edita mais dados do cliente — o painel de cadastro é o único lugar para completá-los.
+
 ### Vinculação com projetos
 - Todo projeto exige um cliente associado (`cliente_id`)
 - Ao criar projeto: campo de busca de cliente por nome ou CPF
@@ -53,21 +63,25 @@ Cadastro centralizado de clientes com endereço completo, busca por nome/CPF, in
 
 ## Campos do cadastro
 
-| Campo | Obrigatório | Formato | Observação |
-|---|---|---|---|
-| Nome completo | ✓ | Texto livre | |
-| CPF | ✓ | 000.000.000-00 | Único no banco |
-| E-mail | | email@dominio.com | |
-| Telefone | | (12) 3811-5199 | Máscara automática |
-| WhatsApp | | (12) 98115-1998 | Máscara automática |
-| CEP | | 00000-000 | Busca automática ViaCEP |
-| Logradouro | | Texto | Preenchido pelo CEP |
-| Número | | Texto | Manual |
-| Complemento | | Texto | Manual, opcional |
-| Bairro | | Texto | Preenchido pelo CEP |
-| Cidade | | Texto | Preenchido pelo CEP |
-| Estado (UF) | | 2 letras | Preenchido pelo CEP |
-| Observações | | Texto livre | |
+Coluna **"Obrigatório na criação"** = exigido por `validar_cadastro_minimo` ao criar o cliente.
+Coluna **"Obrigatório p/ contrato"** = exigido por `validar_cliente_para_contrato` antes de gerar o contrato.
+
+| Campo | Obrig. na criação | Obrig. p/ contrato | Formato | Observação |
+|---|---|---|---|---|
+| Nome completo | ✓ | ✓ | Texto livre | |
+| E-mail | ✓ | ✓ | email@dominio.com | |
+| Telefone | ✓ | ✓ | (12) 3811-5199 | Máscara automática |
+| CPF | | ✓ | 000.000.000-00 | Único no banco; cobrado antes do contrato |
+| WhatsApp | | | (12) 98115-1998 | Máscara automática |
+| CEP | | ✓ | 00000-000 | Busca automática ViaCEP |
+| Logradouro | | ✓ | Texto | Preenchido pelo CEP (residencial) |
+| Número | | ✓ | Texto | Manual |
+| Complemento | | | Texto | Manual, opcional |
+| Bairro | | ✓ | Texto | Preenchido pelo CEP |
+| Cidade | | ✓ | Texto | Preenchido pelo CEP |
+| Estado (UF) | | ✓ | 2 letras | Preenchido pelo CEP |
+| Endereço de instalação | | condicional | — | Exigido quando difere do residencial (`inst_*`) |
+| Observações | | | Texto livre | |
 
 ---
 

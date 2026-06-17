@@ -11,6 +11,13 @@ O processo comercial da Dalmobile e dividido em 6 fases,
 totalizando 38 etapas desde a captacao do cliente ate o pos-venda.
 Este fluxo e a base para o Kanban comercial (v0.4.0).
 
+> NOTA: este mapeamento de 38 etapas e a referencia CONCEITUAL do processo
+> comercial. O ciclo de vida REALMENTE IMPLEMENTADO no sistema e o
+> **ciclo de 20 etapas** (`mod_ciclo.py` + `ciclo_etapas`), com ordem
+> renumerada e gating sequencial — descrito na secao
+> "Ciclo de 20 etapas implementado (reality atual)" mais abaixo e detalhado
+> em `docs/modulos/projetos/SPEC.md`.
+
 ---
 
 ## Fase 1 - Pre-venda / Captacao
@@ -108,8 +115,90 @@ Agrupamento sugerido no Kanban:
 
 ---
 
+## Ciclo de 20 etapas implementado (reality atual)
+
+O que esta efetivamente implementado no sistema (`mod_ciclo.py`, tabela
+`ciclo_etapas`, `PATCH /api/projetos/<nome>/ciclo/<codigo>`) e um ciclo de
+**20 etapas principais** (algumas com sub-etapas), com **gating sequencial**.
+Este e o fluxo operacional vigente; o mapeamento de 38 etapas acima permanece
+como referencia conceitual do processo comercial.
+
+### Ordem das etapas (renumerada)
+
+| Codigo | Etapa |
+|---|---|
+| 1 | Captacao do cliente |
+| 2 | Criacao do projeto |
+| 3 | Briefing |
+| 4 | Primeiro orcamento |
+| 5 | Revisao de projeto |
+| 6 | Aprovacao do orcamento pelo cliente |
+| 7 | Contrato |
+| 8 | Aprovacao financeira I |
+| 9 | Solicitacao de medicao |
+| 10 | Planta de pontos medidos |
+| 11 | Projeto executivo (sub-etapas 11a-11e) |
+| 12 | Implantacao do pedido |
+| 13 | Producao |
+| 14 | Entrega no deposito |
+| 15 | Emissao da NFe do cliente |
+| 16 | Entrega no cliente |
+| 17 | Montagem (sub-etapa 17a) |
+| 18 | Assistencia pos Montagem |
+| 19 | Vistoria final |
+| 20 | Aprovacao final |
+
+> CORRECAO DE ORDEM: antes a etapa 2 era *Briefing* e a 3 era *Criacao do
+> projeto*. A ordem foi INVERTIDA — agora 2 = Criacao do projeto e 3 = Briefing
+> (renumeracao real, com migracao de banco trocando `etapa_codigo` 2 e 3 nas
+> linhas existentes).
+
+### Gating sequencial
+
+Uma etapa PRINCIPAL so pode ser iniciada (`em_andamento`) ou concluida se a
+principal imediatamente anterior estiver concluida.
+
+- Backend: `PATCH /api/projetos/<nome>/ciclo/<codigo>` rejeita com HTTP 400 as
+  tentativas fora de ordem; os endpoints de acao que avancam etapas (ex.:
+  geracao de contrato = etapa 7) tambem validam o gating antes de executar.
+- Frontend: etapas bloqueadas exibem 🔒, ficam nao-expansiveis e com acoes
+  desabilitadas; so a "etapa corrente" (primeira principal nao concluida) tem
+  acoes ativas.
+- Sub-etapas (`11a-11e`, `17a`) sao LIVRES dentro do pai (nao entram no gating).
+- Etapa 1 (Captacao) nao tem anterior — sempre liberada.
+- Status que contam como "concluida": `concluido`, `aprovado`, `assinado`,
+  `vigente`, `implantado`, `realizado`, `entregue`, `emitida`.
+
+### Marcacao automatica e conclusoes
+
+- Ao CRIAR o projeto: etapas 1 (Captacao) e 2 (Criacao) ficam concluidas; a
+  3 (Briefing) fica PENDENTE e vira a etapa corrente (o Briefing e obrigatorio
+  por projeto — nao nasce concluido).
+- Etapa 4 (Primeiro orcamento): concluida ao salvar um orcamento com >=1
+  ambiente (XML do Promob).
+- Etapa 5 (Revisao): NAO tem toggle manual — e concluida automaticamente pela
+  aprovacao do orcamento, junto da etapa 6.
+- "Aprovar Orcamento" conclui as etapas 5 e 6 JUNTAS e entra na 7 (Contrato em
+  `em_andamento`); o botao pos-aprovacao leva ao card de assinatura do contrato.
+
+### Reabertura em cascata (gerencial)
+
+`POST /api/projetos/<nome>/ciclo/<codigo>/reabrir` (com login + senha de nivel
+gerente/diretor/admin) reabre a etapa-alvo e todas as posteriores (voltam a
+`pendente`; sub-etapas dos pais afetados tambem). E auditada na tabela
+`log_acoes_gerenciais` e BLOQUEADA se a cascata desfizer um contrato
+assinado/vigente (etapa 7). Ha tambem `POST .../ciclo/desfazer_aprovacao`
+(gerencial), que reseta as etapas 5/6/7 e devolve o contrato a rascunho.
+
+A logica de ordem/gating fica centralizada em `mod_ciclo.py` (constante
+`ETAPAS_PRINCIPAIS` + helpers `etapa_anterior` / `pode_avancar` /
+`codigos_a_resetar`).
+
+---
+
 ## Referencias
 
+- docs/modulos/projetos/SPEC.md (ciclo de 20 etapas + gating — implementado)
 - docs/modulos/kanban/SPEC.md
 - docs/modulos/pos_venda/SPEC.md
 - docs/historias/BACKLOG.md
