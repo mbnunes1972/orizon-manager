@@ -1357,7 +1357,7 @@ class Handler(BaseHTTPRequestHandler):
             if m_novo_orc:
                 nome_safe = m_novo_orc.group(1)
                 db = get_session()
-                if not _briefing_projeto_completo(nome_safe, db):
+                if not _briefing_projeto_completo(unquote(nome_safe), db):
                     db.close()
                     self.send_json({"ok": False,
                                     "erro": "Preencha o briefing do projeto antes de iniciar a negociação."},
@@ -1404,7 +1404,7 @@ class Handler(BaseHTTPRequestHandler):
                 nome_safe = m_pool.group(1)
                 _db_bf = get_session()
                 try:
-                    _bf_ok = _briefing_projeto_completo(nome_safe, _db_bf)
+                    _bf_ok = _briefing_projeto_completo(unquote(nome_safe), _db_bf)
                 finally:
                     _db_bf.close()
                 if not _bf_ok:
