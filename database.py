@@ -80,6 +80,23 @@ class LogAutorizacao(Base):
     autorizador  = relationship("Usuario", back_populates="autorizacoes", foreign_keys=[autorizador_id])
 
 
+class LogAcaoGerencial(Base):
+    """Auditoria de ações destrutivas autorizadas por gerente (ex.: reabrir cascata)."""
+    __tablename__ = "log_acoes_gerenciais"
+
+    id             = Column(Integer,  primary_key=True, autoincrement=True)
+    solicitante_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    autorizador_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=False)
+    acao           = Column(Text,     nullable=False)   # ex.: "reabrir_cascata"
+    projeto_nome   = Column(Text,     nullable=True)
+    etapa_alvo     = Column(Text,     nullable=True)
+    contexto       = Column(Text,     nullable=True)    # JSON
+    criado_em      = Column(DateTime, default=datetime.utcnow)
+
+    solicitante = relationship("Usuario", foreign_keys=[solicitante_id])
+    autorizador = relationship("Usuario", foreign_keys=[autorizador_id])
+
+
 class Cliente(Base):
     __tablename__ = "clientes"
 

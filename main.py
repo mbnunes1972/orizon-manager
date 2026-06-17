@@ -11,7 +11,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
 from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status,
-                       CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing)
+                       CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
+                       LogAcaoGerencial)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -1868,6 +1869,67 @@ class Handler(BaseHTTPRequestHandler):
                         contrato.status = "rascunho"
                     db.commit()
                     self.send_json({"ok": True})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # POST /api/projetos/<nome>/ciclo/<codigo>/reabrir — reabre em cascata (requer gerente)
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/([^/]+)/reabrir$', path)
+            if m:
+                nome_safe   = unquote(m.group(1))
+                etapa_cod   = unquote(m.group(2))
+                solicitante = get_usuario_sessao(self)
+                if not solicitante:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                req   = json.loads(body or b'{}')
+                login = (req.get("login") or "").strip()
+                senha = (req.get("senha") or "").strip()
+                db = get_session()
+                try:
+                    autorizador = db.query(Usuario).filter_by(login=login, ativo=1).first()
+                    if not autorizador or not autorizador.check_senha(senha):
+                        self.send_json({"ok": False, "erro": "Credenciais inválidas"}, code=403)
+                        return
+                    if autorizador.nivel not in ("gerente", "diretor", "admin"):
+                        self.send_json({"ok": False, "erro": "Necessário nível Gerente ou Diretor"}, code=403)
+                        return
+                    todas    = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe).all()
+                    codigos  = [e.etapa_codigo for e in todas]
+                    resetar  = mod_ciclo.codigos_a_resetar(etapa_cod, codigos)
+                    # Trava: não reabrir se desfaz contrato assinado/vigente
+                    contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
+                                 .order_by(Contrato.id.desc()).first()
+                    cstatus  = contrato.status if contrato else ""
+                    if mod_ciclo.reabertura_bloqueada_por_contrato(resetar, cstatus):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato já assinado — não é possível reabrir esta etapa"},
+                                       code=400)
+                        return
+                    resetar_set = set(resetar)
+                    status_anterior = {e.etapa_codigo: e.status for e in todas
+                                       if e.etapa_codigo in resetar_set}
+                    for e in todas:
+                        if e.etapa_codigo in resetar_set:
+                            e.status         = "pendente"
+                            e.iniciado_em    = None
+                            e.concluido_em   = None
+                            e.responsavel_id = None
+                    log = LogAcaoGerencial(
+                        solicitante_id=solicitante["id"],
+                        autorizador_id=autorizador.id,
+                        acao="reabrir_cascata",
+                        projeto_nome=nome_safe,
+                        etapa_alvo=etapa_cod,
+                        contexto=json.dumps({"resetadas": sorted(resetar_set),
+                                             "status_anterior": status_anterior}),
+                    )
+                    db.add(log)
+                    db.commit()
+                    self.send_json({"ok": True, "resetadas": sorted(resetar_set)})
                 except Exception as e:
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
