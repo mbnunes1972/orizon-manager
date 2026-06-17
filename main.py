@@ -261,6 +261,23 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        m = re.match(r"^/api/projetos/([^/]+)/briefing$", path)
+        if m:
+            nome_safe = unquote(m.group(1))
+            db = get_session()
+            try:
+                b = db.query(Briefing).filter_by(projeto_nome=nome_safe)\
+                      .order_by(Briefing.id.desc()).first()
+                if not b:
+                    self.send_json({"ok": True, "briefing": None})
+                    return
+                self.send_json({"ok": True, "briefing": _briefing_dict(b)})
+            except Exception as e:
+                self.send_json({"ok": False, "erro": str(e)})
+            finally:
+                db.close()
+            return
+
         elif path == "/api/clientes":
             from urllib.parse import parse_qs
             q  = (parse_qs(urlparse(self.path).query).get('q') or [''])[0].strip().lower()
@@ -1120,6 +1137,75 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        m_bp = re.match(r"^/api/projetos/([^/]+)/briefing$", path)
+        if m_bp:
+            nome_safe = unquote(m_bp.group(1))
+            usuario   = get_usuario_sessao(self)
+            req       = json.loads(body) if body else {}
+            db        = get_session()
+            try:
+                p_meta = db.query(Projeto).filter_by(nome_safe=nome_safe).first()
+                cliente_id = p_meta.cliente_id if p_meta else None
+                if not cliente_id:
+                    self.send_json({"ok": False, "erro": "Projeto sem cliente vinculado"})
+                    return
+                b = db.query(Briefing).filter_by(projeto_nome=nome_safe)\
+                      .order_by(Briefing.id.desc()).first()
+                if not b:
+                    b = Briefing(
+                        cliente_id=cliente_id,
+                        projeto_nome=nome_safe,
+                        data_atendimento=datetime.utcnow(),
+                        tipo_imovel="",
+                        budget_declarado=0.0,
+                        categoria_proposta="",
+                        data_entrega_desejada="",
+                        flexibilidade_prazo="",
+                    )
+                    db.add(b)
+                for campo in ["tipo_imovel", "categoria_proposta",
+                               "data_entrega_desejada", "flexibilidade_prazo"]:
+                    if campo in req:
+                        setattr(b, campo, req[campo])
+                if "budget_declarado" in req:
+                    b.budget_declarado = float(req["budget_declarado"] or 0)
+                opcionais = [
+                    "condicao_imovel", "metragem_m2", "num_ambientes",
+                    "ambientes_prioritarios", "tem_arquiteto", "nome_arquiteto",
+                    "tem_gerente_obra", "end_empreendimento", "estilo_decisao",
+                    "estilo_vida", "relacao_projeto", "decisor", "referencias_visuais",
+                    "obs_referencias", "experiencia_anterior", "obs_experiencia",
+                    "tem_budget", "forma_pagamento_pref", "data_entrega_limite",
+                    "motivo_prazo", "nao_abre_mao", "restricoes", "obs_livres",
+                ]
+                for campo in opcionais:
+                    if campo in req:
+                        setattr(b, campo, req[campo])
+                if usuario:
+                    b.consultor_id = usuario["id"]
+                b.atualizado_em = datetime.utcnow()
+                db.commit()
+                db.refresh(b)
+                bd = _briefing_dict(b)
+                if bd["completo"]:
+                    etapa3 = db.query(CicloEtapa).filter_by(
+                        projeto_nome=nome_safe, etapa_codigo="3"
+                    ).first()
+                    if not etapa3:
+                        etapa3 = CicloEtapa(projeto_nome=nome_safe, etapa_codigo="3")
+                        db.add(etapa3)
+                    etapa3.status        = "concluido"
+                    etapa3.concluido_em  = datetime.utcnow()
+                    etapa3.responsavel_id = usuario["id"] if usuario else None
+                    db.commit()
+                self.send_json({"ok": True, "briefing": bd})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)})
+            finally:
+                db.close()
+            return
+
         m_bf = re.match(r"^/api/clientes/(\d+)/briefing$", path)
         if m_bf:
             cliente_id = int(m_bf.group(1))
@@ -1168,8 +1254,6 @@ class Handler(BaseHTTPRequestHandler):
                 db.commit()
                 db.refresh(b)
                 bd = _briefing_dict(b)
-                if bd["completo"]:
-                    _marcar_etapa_cliente(cliente_id, "3", db, usuario)
                 self.send_json({"ok": True, "briefing": bd})
             except Exception as e:
                 db.rollback()
