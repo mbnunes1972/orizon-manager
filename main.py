@@ -989,7 +989,7 @@ class Handler(BaseHTTPRequestHandler):
                 finally:
                     _db_orc.close()
 
-                # Link cliente_id no projetos_meta e marcar etapas 1, 2, 3
+                # Link cliente_id no projetos_meta e marcar etapas 1 e 2 (Briefing fica pendente)
                 _db_ciclo = get_session()
                 try:
                     p_meta = _db_ciclo.get(Projeto, proj['nome_safe'])
@@ -1022,7 +1022,7 @@ class Handler(BaseHTTPRequestHandler):
                             etapa.responsavel_id = uid_ciclo
                     _db_ciclo.commit()
                 except Exception as _e_ciclo:
-                    print("[CICLO] Erro ao marcar etapas 1-3: %s" % _e_ciclo)
+                    print("[CICLO] Erro ao marcar etapas iniciais: %s" % _e_ciclo)
                 finally:
                     _db_ciclo.close()
 
