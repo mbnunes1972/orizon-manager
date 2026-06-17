@@ -1001,7 +1001,9 @@ class Handler(BaseHTTPRequestHandler):
 
                     agora = datetime.utcnow()
                     uid_ciclo = _usuario['id'] if _usuario else None
-                    for cod in ["1", "2", "3"]:
+                    # Marca apenas Captação(1) e Criação do projeto(2). Briefing(3) fica
+                    # pendente — vira a "etapa corrente" e deve ser preenchido (sub-projeto D).
+                    for cod in ["1", "2"]:
                         etapa = _db_ciclo.query(CicloEtapa).filter_by(
                             projeto_nome=proj['nome_safe'], etapa_codigo=cod
                         ).first()
@@ -1164,7 +1166,7 @@ class Handler(BaseHTTPRequestHandler):
                 db.refresh(b)
                 bd = _briefing_dict(b)
                 if bd["completo"]:
-                    _marcar_etapa_cliente(cliente_id, "2", db, usuario)
+                    _marcar_etapa_cliente(cliente_id, "3", db, usuario)
                 self.send_json({"ok": True, "briefing": bd})
             except Exception as e:
                 db.rollback()
