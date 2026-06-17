@@ -6118,8 +6118,8 @@ document.addEventListener('keydown', function(e){
 // toggleavel: true → etapa sem documento/ação concreta; pode ser marcada manualmente
 const ETAPAS_CICLO = [
   { codigo: "1",   nome: "Captação do cliente",                sub: false },
-  { codigo: "2",   nome: "Briefing",                           sub: false },
-  { codigo: "3",   nome: "Criação do projeto",                 sub: false },
+  { codigo: "2",   nome: "Criação do projeto",                 sub: false },
+  { codigo: "3",   nome: "Briefing",                           sub: false },
   { codigo: "4",   nome: "Primeiro orçamento",                 sub: false },
   { codigo: "5",   nome: "Revisão de projeto",                 sub: false, toggleavel: true },
   { codigo: "6",   nome: "Aprovação do orçamento pelo cliente",sub: false },
@@ -6144,6 +6144,20 @@ const ETAPAS_CICLO = [
   { codigo: "19",  nome: "Vistoria final",                     sub: false, toggleavel: true },
   { codigo: "20",  nome: "Aprovação final",                    sub: false, toggleavel: true },
 ];
+
+// Ordem canônica das etapas PRINCIPAIS (espelha mod_ciclo.py no backend).
+const ETAPAS_PRINCIPAIS = ["1","2","3","4","5","6","7","8","9","10",
+                           "11","12","13","14","15","16","17","18","19","20"];
+// Status que contam como "etapa concluída" (espelha STATUS_CONCLUSIVOS no backend).
+const STATUS_CONCLUSIVOS = new Set(["concluido","aprovado","assinado","vigente",
+                                    "implantado","realizado","entregue","emitida"]);
+// Bloqueada = etapa principal cuja anterior (na ordem) não está concluída.
+function _etapaBloqueada(codigo) {
+  const i = ETAPAS_PRINCIPAIS.indexOf(codigo);
+  if (i <= 0) return false;                 // sub-etapa (não está na lista) ou a primeira → nunca bloqueada
+  const ant = ETAPAS_PRINCIPAIS[i - 1];
+  return !STATUS_CONCLUSIVOS.has(_cicloData[ant]?.status);
+}
 
 let _cicloAberto = false;
 let _cicloData   = {};
@@ -6227,10 +6241,12 @@ function renderCiclo() {
     </div>
   `;
   for (const etapa of ETAPAS_CICLO) {
-    const dados    = _cicloData[etapa.codigo] || {};
-    const etStatus = dados.status || "pendente";
+    const dados     = _cicloData[etapa.codigo] || {};
+    const bloqueada = _etapaBloqueada(etapa.codigo) && !STATUS_CONCLUSIVOS.has(dados.status);
+    const etStatus  = bloqueada ? 'bloqueado' : (dados.status || "pendente");
     const etIcone  = etStatus === 'concluido'    ? '&#x2713;' :
-                     etStatus === 'em_andamento'  ? '&#x25C9;' : '&#x25CB;';
+                     etStatus === 'em_andamento'  ? '&#x25C9;' :
+                     etStatus === 'bloqueado'     ? '&#x1F512;' : '&#x25CB;';
     const etCor    = etStatus === 'concluido'    ? 'var(--ok, #50c878)' :
                      etStatus === 'em_andamento'  ? 'var(--dalm-gold)' : 'var(--muted)';
     const andamentoLabel = (etStatus === 'em_andamento' && etapa.codigo === '7')
@@ -6242,7 +6258,7 @@ function renderCiclo() {
     card.className = 'ciclo-card';
     card.style.cssText = indent;
     card.innerHTML = `
-      <div class="ciclo-card-header" onclick="toggleCicloCard('${etapa.codigo}')">
+      <div class="ciclo-card-header"${bloqueada ? '' : ` onclick="toggleCicloCard('${etapa.codigo}')"`}>
         <span class="etapa-num" style="color:${etCor}">${etIcone}</span>
         <span class="etapa-nome">${etapa.nome}${andamentoLabel}</span>
         ${badge}
@@ -6251,8 +6267,8 @@ function renderCiclo() {
         ${etapa.acao === 'contrato'
           ? _renderCardContrato()
           : etapa.codigo === '8'
-            ? _renderCardAprovacaoFinanceira(dados)
-            : _renderCardGenerico(etapa, dados)}
+            ? _renderCardAprovacaoFinanceira(dados, bloqueada)
+            : _renderCardGenerico(etapa, dados, bloqueada)}
       </div>
     `;
     panel.appendChild(card);
@@ -6267,7 +6283,7 @@ function toggleCicloCard(codigo) {
   }
 }
 
-function _renderCardGenerico(etapa, dados) {
+function _renderCardGenerico(etapa, dados, bloqueada) {
   const concluido = dados.status === 'concluido';
   const dt = dados.concluido_em
     ? new Date(dados.concluido_em).toLocaleDateString('pt-BR') : '';
@@ -6294,8 +6310,8 @@ function _renderCardGenerico(etapa, dados) {
       ${concluido ? `<span style="margin-left:8px;font-size:.8rem;color:var(--ok)">✓ Concluído${dt?' em '+dt:''}</span>` : ''}`;
   }
 
-  // Card especial etapa 2 — Briefing
-  if (etapa.codigo === '2') {
+  // Card especial etapa 3 — Briefing
+  if (etapa.codigo === '3') {
     const briefLocked = _cicloData['4']?.status === 'concluido';
     const cli     = (projetoAtivo && projetoAtivo.cliente) || {};
     const cliId   = projetoAtivo?.cliente_id || cli.id || '';
@@ -6320,7 +6336,7 @@ function _renderCardGenerico(etapa, dados) {
     ? `<span style="color:var(--ok)">✓ Concluída${dt ? ' em ' + dt : ''}</span>`
     : `<span style="color:var(--muted)">Pendente</span>`;
 
-  const btnToggle = etapa.toggleavel ? (() => {
+  const btnToggle = (etapa.toggleavel && !bloqueada) ? (() => {
     const btnLabel = concluido ? '↺ Reabrir' : '✓ Marcar como Concluída';
     const btnStyle = concluido
       ? 'border:1px solid var(--text);color:var(--text);background:none'
@@ -6330,6 +6346,12 @@ function _renderCardGenerico(etapa, dados) {
       ${btnLabel}</button>`;
   })() : '';
 
+  const btnReabrir = (STATUS_CONCLUSIVOS.has(dados.status) && ETAPAS_PRINCIPAIS.includes(etapa.codigo))
+    ? `<button onclick="abrirModalReabrir('${etapa.codigo}')"
+         style="border:1px solid var(--muted);color:var(--muted);background:none;border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer;margin-top:10px;margin-left:8px">
+         🔓 Reabrir (gerente)</button>`
+    : '';
+
   return `
     <div style="font-size:.82rem;margin-bottom:8px">${statusLabel}</div>
     <textarea id="obs-etapa-${etapa.codigo}"
@@ -6338,10 +6360,10 @@ function _renderCardGenerico(etapa, dados) {
         border-radius:4px;background:var(--surface);color:var(--text);font-size:.82rem;
         resize:vertical;min-height:60px"
     >${dados.observacoes || ''}</textarea>
-    ${btnToggle}`;
+    ${btnToggle}${btnReabrir}`;
 }
 
-function _renderCardAprovacaoFinanceira(dados) {
+function _renderCardAprovacaoFinanceira(dados, bloqueada) {
   const concluido = dados.status === 'concluido';
   if (concluido) {
     const dt = dados.concluido_em
@@ -6351,11 +6373,17 @@ function _renderCardAprovacaoFinanceira(dados) {
       <p style="color:var(--ok);margin:0 0 10px">
         &#x2713; Aprovação financeira concluída${dt ? ' em ' + dt : ''}.
       </p>
-      <button onclick="toggleCicloEtapa('8')"
-        style="background:none;border:1px solid var(--muted);color:var(--muted);
-        border-radius:5px;padding:4px 12px;font-size:.8rem;cursor:pointer">
-        Reabrir
+      <button onclick="abrirModalReabrir('8')"
+        style="border:1px solid var(--muted);color:var(--muted);background:none;
+        border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer">
+        🔓 Reabrir (gerente)
       </button>`;
+  }
+  if (bloqueada) {
+    return `
+      <p style="color:var(--muted);font-size:.85rem;margin:0">
+        🔒 Conclua a etapa anterior para liberar esta etapa.
+      </p>`;
   }
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px">
@@ -6424,6 +6452,38 @@ async function toggleSalvarEtapa(codigo) {
     showToast(novoStatus === 'concluido' ? 'Etapa concluída!' : 'Etapa reaberta.');
     await carregarCiclo();
   } catch(e) { showToast('Erro de rede: ' + e.message, true); }
+}
+
+let _reabrirCodigo = null;
+
+function abrirModalReabrir(codigo) {
+  _reabrirCodigo = codigo;
+  const nome = (ETAPAS_CICLO.find(e => e.codigo === codigo) || {}).nome || codigo;
+  const ok = confirm(
+    `Reabrir "${nome}" reabrirá TAMBÉM todas as etapas seguintes (volta tudo a pendente).\n` +
+    `Esta ação exige autorização de GERENTE e será registrada.\n\nDeseja continuar?`);
+  if (!ok) { _reabrirCodigo = null; return; }
+  const login = prompt('Login do gerente:');
+  if (!login) { _reabrirCodigo = null; return; }
+  const senha = prompt('Senha do gerente:');
+  if (!senha) { _reabrirCodigo = null; return; }
+  reabrirEtapaCascata(login, senha);
+}
+
+async function reabrirEtapaCascata(login, senha) {
+  if (!projetoAtivo || !_reabrirCodigo) return;
+  try {
+    const r = await fetch(
+      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${encodeURIComponent(_reabrirCodigo)}/reabrir`,
+      { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login, senha }) });
+    const d = await r.json();
+    if (!d.ok) { showToast('Erro: ' + (d.erro || 'falha'), true); return; }
+    showToast('Etapas reabertas: ' + (d.resetadas || []).join(', '));
+    _reabrirCodigo = null;
+    await carregarCiclo();
+  } catch (e) { showToast('Erro de rede: ' + e.message, true); }
 }
 
 function _renderCardContrato() {
