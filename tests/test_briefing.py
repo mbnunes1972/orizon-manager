@@ -209,3 +209,29 @@ def test_etapa7_estados():
     partes2 = {a.parte for a in db.query(ContratoAssinatura).filter_by(contrato_id=contrato.id).all()}
     assert {"loja", "cliente"}.issubset(partes2)
     db.close()
+
+
+def test_briefing_projeto_completo_helper():
+    import main
+    from database import Briefing
+    from datetime import datetime
+
+    def mk(**kw):
+        base = dict(cliente_id=1, projeto_nome="P", data_atendimento=datetime.utcnow(),
+                    tipo_imovel="apto", budget_declarado=1000.0, categoria_proposta="x",
+                    data_entrega_desejada="2026-12-01", flexibilidade_prazo="alta")
+        base.update(kw)
+        return Briefing(**base)
+
+    class _Q:
+        def __init__(self, r): self._r = r
+        def filter_by(self, **k): return self
+        def order_by(self, *a): return self
+        def first(self): return self._r
+    class _DB:
+        def __init__(self, r): self._r = r
+        def query(self, *a): return _Q(self._r)
+
+    assert main._briefing_projeto_completo("P", _DB(mk())) is True
+    assert main._briefing_projeto_completo("P", _DB(None)) is False
+    assert main._briefing_projeto_completo("P", _DB(mk(budget_declarado=0.0))) is False

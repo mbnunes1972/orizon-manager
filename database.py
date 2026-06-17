@@ -394,6 +394,12 @@ def _migrar_colunas():
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")
 
+        # ── briefings ─────────────────────────────────────────────────────────
+        cur.execute("PRAGMA table_info(briefings)")
+        bf_cols = {row[1] for row in cur.fetchall()}
+        if "projeto_nome" not in bf_cols:
+            cur.execute("ALTER TABLE briefings ADD COLUMN projeto_nome TEXT")
+
         conn.commit()
     except Exception:
         pass

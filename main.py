@@ -2440,6 +2440,16 @@ def _briefing_dict(b) -> dict:
     return d
 
 
+def _briefing_projeto_completo(nome_safe, db) -> bool:
+    """True se o projeto tem um briefing POR-PROJETO com todos os obrigatórios
+    preenchidos. Briefings legados (projeto_nome NULL) não são considerados."""
+    b = db.query(Briefing).filter_by(projeto_nome=nome_safe)\
+          .order_by(Briefing.id.desc()).first()
+    if not b:
+        return False
+    return _briefing_dict(b)["completo"]
+
+
 def _briefing_locked(cliente_id: int, briefing_completo: bool, db) -> bool:
     """
     Retorna True se o briefing deve ser somente-leitura.
