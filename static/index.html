@@ -6864,9 +6864,6 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
   document.getElementById('modal-aprovacao-overlay')?.remove();
 
   const c = cliente || {};
-  const endCliente = [c.logradouro, c.numero, c.bairro, c.cidade, c.estado].filter(Boolean).join(', ');
-  const semCpf     = !c.cpf;
-  const semEnd     = !c.logradouro;
 
   const ov = document.createElement('div');
   ov.id = 'modal-aprovacao-overlay';
