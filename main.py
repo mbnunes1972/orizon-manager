@@ -41,6 +41,7 @@ from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada,
 from mod_contrato import (calcular_hash_assinatura, montar_variaveis_contrato,
                           gerar_pdf_contrato, LibreOfficeIndisponivel,
                           construir_contexto, _formatar_valor)
+import mod_ciclo
 
 def _enriquecer_projetos_com_status(projetos):
     """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
@@ -538,7 +539,7 @@ class Handler(BaseHTTPRequestHandler):
                                 db.add(nova)
                                 etapas.append(nova)
                             db.commit()
-                    etapas_sorted = sorted(etapas, key=lambda e: e.etapa_codigo)
+                    etapas_sorted = sorted(etapas, key=lambda e: mod_ciclo.chave_ordenacao(e.etapa_codigo))
                     resultado = [{
                         "etapa_codigo":  e.etapa_codigo,
                         "status":        e.status,
@@ -1957,26 +1958,9 @@ class Handler(BaseHTTPRequestHandler):
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
                     return
-                # Verificar endereço de instalação antes de gerar contrato
-                _db_gate = get_session()
-                try:
-                    _p_meta = _db_gate.query(Projeto).filter_by(nome_safe=nome_safe).first()
-                    if _p_meta and _p_meta.cliente_id:
-                        _cli_gate = _db_gate.get(Cliente, _p_meta.cliente_id)
-                        if _cli_gate:
-                            _tem_inst = (
-                                _cli_gate.inst_mesmo_residencial
-                                or _cli_gate.inst_logradouro
-                            )
-                            if not _tem_inst:
-                                self.send_json({
-                                    "ok": False,
-                                    "erro": "Endereço de instalação obrigatório antes de gerar o contrato. "
-                                            "Edite o cadastro do cliente e preencha o endereço de instalação."
-                                }, code=400)
-                                return
-                finally:
-                    _db_gate.close()
+                # A validação completa do cadastro do cliente (identificação +
+                # endereço) ocorre mais abaixo, após montar cliente_dict, via
+                # validar_cliente_para_contrato() — valida o dado realmente renderizado.
                 req                  = json.loads(body)
                 orcamento_id         = req.get("orcamento_id")
                 endereco_instalacao  = (req.get("endereco_instalacao") or "").strip()
@@ -1995,6 +1979,18 @@ class Handler(BaseHTTPRequestHandler):
                         _montar_dados_projeto_para_contrato(nome_safe, orcamento_id, db)
                     from mod_contrato import construir_contexto
                     from mod_contrato import _formatar_valor
+                    from mod_contrato import validar_cliente_para_contrato
+                    # Valida os dados que serão de fato renderizados no documento.
+                    # Impede gerar contrato com endereço/contato em branco.
+                    faltando = validar_cliente_para_contrato(cliente_dict)
+                    if faltando:
+                        self.send_json({
+                            "ok": False,
+                            "erro": "Cadastro do cliente incompleto — preencha antes de gerar o contrato. "
+                                    "Campos faltando: " + ", ".join(faltando),
+                            "campos_faltando": faltando,
+                        }, code=400)
+                        return
                     usuario_ctx = {
                         "nome":     usuario.get("nome", ""),
                         "telefone": _get_usuario_telefone(usuario["id"], db),
@@ -2180,6 +2176,19 @@ class Handler(BaseHTTPRequestHandler):
                     if not etapa:
                         etapa = CicloEtapa(projeto_nome=nome_safe, etapa_codigo=etapa_cod)
                         db.add(etapa)
+                    # Gating sequencial: etapa principal só avança se a anterior está concluída.
+                    if novo_status and novo_status != "pendente":
+                        todas = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe).all()
+                        status_por_codigo = {e.etapa_codigo: e.status for e in todas}
+                        status_por_codigo[etapa_cod] = etapa.status
+                        if not mod_ciclo.pode_avancar(etapa_cod, status_por_codigo):
+                            ant = mod_ciclo.etapa_anterior(etapa_cod)
+                            nome_ant = mod_ciclo.ETAPA_NOME.get(ant, ant)
+                            self.send_json({
+                                "ok": False,
+                                "erro": f"Conclua a etapa anterior ({nome_ant}) antes de iniciar esta.",
+                            }, code=400)
+                            return
                     if novo_status:
                         if etapa.status == "pendente" and novo_status != "pendente":
                             etapa.iniciado_em = datetime.utcnow()
@@ -2338,7 +2347,29 @@ def _briefing_dict(b) -> dict:
         "obs_livres":            b.obs_livres             or "",
     }
     d["completo"] = all(d.get(f) for f in _BRIEFING_OBRIGATORIOS)
+    # locked é calculado dinamicamente pelo endpoint GET (não aqui)
+    d["locked"] = False
     return d
+
+
+def _briefing_locked(cliente_id: int, briefing_completo: bool, db) -> bool:
+    """
+    Retorna True se o briefing deve ser somente-leitura.
+    Regra: briefing COMPLETO + pelo menos um projeto novo do cliente com etapa 4 concluída.
+    Projetos legados (sem cliente_id em projetos_meta) não bloqueiam o briefing.
+    """
+    if not briefing_completo:
+        return False   # briefing incompleto → sempre editável (precisa ser preenchido)
+    projetos = db.query(Projeto).filter_by(cliente_id=cliente_id).all()
+    if not projetos:
+        return False   # nenhum projeto novo → não bloqueia
+    for p in projetos:
+        etapa4 = db.query(CicloEtapa).filter_by(
+            projeto_nome=p.nome_safe, etapa_codigo="4", status="concluido"
+        ).first()
+        if etapa4:
+            return True
+    return False
 
 
 def _marcar_etapa_cliente(cliente_id: int, etapa_codigo: str, db, usuario):
