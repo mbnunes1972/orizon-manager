@@ -5507,10 +5507,8 @@ async function cliSalvar(){
   erro.textContent = '';
   if(!nome){ erro.textContent = 'Nome é obrigatório.'; return; }
   const email = document.getElementById('cli-email').value.trim();
-  const cpf   = document.getElementById('cli-cpf').value.trim();
   const tel   = document.getElementById('cli-tel').value.trim();
   if(!email){ erro.textContent = 'E-mail é obrigatório.'; document.getElementById('cli-email').focus(); return; }
-  if(!cpf)  { erro.textContent = 'CPF é obrigatório.';   document.getElementById('cli-cpf').focus();   return; }
   if(!tel)  { erro.textContent = 'Telefone é obrigatório.'; document.getElementById('cli-tel').focus(); return; }
 
   // Verificação de nome duplicado (somente novo cadastro, somente se ainda não confirmado homônimo)
