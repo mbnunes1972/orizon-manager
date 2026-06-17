@@ -13,6 +13,7 @@ import hashlib
 import re as _re_cpf
 from datetime import datetime
 from docx import Document
+from docx.shared import Pt, RGBColor
 
 _THIS_DIR     = os.path.dirname(os.path.abspath(__file__))
 CONTRATOS_DIR = os.path.join(_THIS_DIR, "CONTRATOS")
@@ -67,17 +68,20 @@ def _unique_cells(row):
     return cells
 
 
-def _set_cell(cell, text: str):
-    """Substitui o conteúdo de uma célula pelo texto, preservando a formatação do primeiro run."""
+def _set_cell(cell, text: str, rotulo: str = None):
+    """Substitui o conteúdo de uma célula. Se `rotulo`, adiciona uma tag cinza pequena acima."""
     para = cell.paragraphs[0]
     font_name = font_size = bold = None
     if para.runs:
         r0 = para.runs[0]
-        font_name = r0.font.name
-        font_size = r0.font.size
-        bold = r0.bold
+        font_name = r0.font.name; font_size = r0.font.size; bold = r0.bold
     for run in para.runs:
         run.text = ""
+    if rotulo:
+        rl = para.add_run(rotulo)
+        rl.font.size = Pt(7)
+        rl.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+        para.add_run().add_break()
     run = para.add_run(text)
     if font_name:
         run.font.name = font_name
@@ -87,16 +91,19 @@ def _set_cell(cell, text: str):
         run.bold = bold
 
 
-def _set_para(para, text: str):
-    """Substitui o conteúdo de um parágrafo, preservando a formatação do primeiro run."""
+def _set_para(para, text: str, rotulo: str = None):
+    """Substitui o conteúdo de um parágrafo. Se `rotulo`, adiciona uma tag cinza pequena acima."""
     font_name = font_size = bold = None
     if para.runs:
         r0 = para.runs[0]
-        font_name = r0.font.name
-        font_size = r0.font.size
-        bold = r0.bold
+        font_name = r0.font.name; font_size = r0.font.size; bold = r0.bold
     for run in para.runs:
         run.text = ""
+    if rotulo:
+        rl = para.add_run(rotulo)
+        rl.font.size = Pt(7)
+        rl.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+        para.add_run().add_break()
     run = para.add_run(text)
     if font_name:
         run.font.name = font_name
@@ -247,36 +254,36 @@ def preencher_contrato(contrato_id: int, ctx: dict) -> str:
     _set_para(p0, linha_consultor)
 
     # ── Tabela 0: Identificação do cliente ────────────────────────────────────
-    _set_cell(tables[0].rows[1].cells[0], ctx.get("cliente_nome", ""))
-    _set_cell(tables[0].rows[1].cells[1], ctx.get("cliente_cpf",  ""))
-    _set_cell(tables[0].rows[2].cells[0], ctx.get("cliente_email", ""))
-    _set_cell(tables[0].rows[2].cells[1], ctx.get("cliente_telefone", ""))
+    _set_cell(tables[0].rows[1].cells[0], ctx.get("cliente_nome", ""),     rotulo="Nome")
+    _set_cell(tables[0].rows[1].cells[1], ctx.get("cliente_cpf",  ""),     rotulo="CPF/CNPJ")
+    _set_cell(tables[0].rows[2].cells[0], ctx.get("cliente_email", ""),    rotulo="E-mail")
+    _set_cell(tables[0].rows[2].cells[1], ctx.get("cliente_telefone", ""), rotulo="Telefone")
 
     # ── Tabela 1: Endereço residencial ────────────────────────────────────────
-    _set_cell(_unique_cells(tables[1].rows[1])[0], ctx.get("res_logradouro", ""))
+    _set_cell(_unique_cells(tables[1].rows[1])[0], ctx.get("res_logradouro", ""), rotulo="Logradouro")
     t1r2 = _unique_cells(tables[1].rows[2])
     if len(t1r2) >= 3:
-        _set_cell(t1r2[0], ctx.get("res_numero",      ""))
-        _set_cell(t1r2[1], ctx.get("res_complemento", ""))
-        _set_cell(t1r2[2], ctx.get("res_bairro",      ""))
+        _set_cell(t1r2[0], ctx.get("res_numero",      ""), rotulo="Número")
+        _set_cell(t1r2[1], ctx.get("res_complemento", ""), rotulo="Complemento")
+        _set_cell(t1r2[2], ctx.get("res_bairro",      ""), rotulo="Bairro")
     t1r3 = _unique_cells(tables[1].rows[3])
     if len(t1r3) >= 3:
-        _set_cell(t1r3[0], ctx.get("res_cidade", ""))
-        _set_cell(t1r3[1], ctx.get("res_cep",    ""))
-        _set_cell(t1r3[2], ctx.get("res_uf",     ""))
+        _set_cell(t1r3[0], ctx.get("res_cidade", ""), rotulo="Cidade")
+        _set_cell(t1r3[1], ctx.get("res_cep",    ""), rotulo="CEP")
+        _set_cell(t1r3[2], ctx.get("res_uf",     ""), rotulo="Estado/UF")
 
     # ── Tabela 2: Endereço de instalação ──────────────────────────────────────
-    _set_cell(_unique_cells(tables[2].rows[1])[0], ctx.get("inst_logradouro", ""))
+    _set_cell(_unique_cells(tables[2].rows[1])[0], ctx.get("inst_logradouro", ""), rotulo="Logradouro")
     t2r2 = _unique_cells(tables[2].rows[2])
     if len(t2r2) >= 3:
-        _set_cell(t2r2[0], ctx.get("inst_numero",      ""))
-        _set_cell(t2r2[1], ctx.get("inst_complemento", ""))
-        _set_cell(t2r2[2], ctx.get("inst_bairro",      ""))
+        _set_cell(t2r2[0], ctx.get("inst_numero",      ""), rotulo="Número")
+        _set_cell(t2r2[1], ctx.get("inst_complemento", ""), rotulo="Complemento")
+        _set_cell(t2r2[2], ctx.get("inst_bairro",      ""), rotulo="Bairro")
     t2r3 = _unique_cells(tables[2].rows[3])
     if len(t2r3) >= 3:
-        _set_cell(t2r3[0], ctx.get("inst_cidade", ""))
-        _set_cell(t2r3[1], ctx.get("inst_cep",    ""))
-        _set_cell(t2r3[2], ctx.get("inst_uf",     ""))
+        _set_cell(t2r3[0], ctx.get("inst_cidade", ""), rotulo="Cidade")
+        _set_cell(t2r3[1], ctx.get("inst_cep",    ""), rotulo="CEP")
+        _set_cell(t2r3[2], ctx.get("inst_uf",     ""), rotulo="Estado/UF")
 
     # ── Tabela 3: Forma de pagamento ──────────────────────────────────────────
     pag = ctx.get("_pag", {})
@@ -284,13 +291,13 @@ def preencher_contrato(contrato_id: int, ctx: dict) -> str:
     r1u = _unique_cells(t3.rows[1])   # 3 células únicas: Entrada | Tipo | Data
     r2u = _unique_cells(t3.rows[2])   # 3 células únicas: Modalidade | Parcelas | DataPrimeira
     if len(r1u) >= 3:
-        _set_cell(r1u[0], pag.get("entrada_valor", ""))
-        _set_cell(r1u[1], pag.get("entrada_tipo",  ""))
-        _set_cell(r1u[2], pag.get("entrada_data",  ""))
+        _set_cell(r1u[0], pag.get("entrada_valor", ""), rotulo="Entrada")
+        _set_cell(r1u[1], pag.get("entrada_tipo",  ""), rotulo="Tipo")
+        _set_cell(r1u[2], pag.get("entrada_data",  ""), rotulo="Data")
     if len(r2u) >= 3:
-        _set_cell(r2u[0], pag.get("modalidade",    ""))
-        _set_cell(r2u[1], pag.get("num_parcelas",  ""))
-        _set_cell(r2u[2], pag.get("data_primeira", ""))
+        _set_cell(r2u[0], pag.get("modalidade",    ""), rotulo="Modalidade")
+        _set_cell(r2u[1], pag.get("num_parcelas",  ""), rotulo="Parcelas")
+        _set_cell(r2u[2], pag.get("data_primeira", ""), rotulo="1ª data")
     datas = pag.get("datas", ["—"] * 24)
     p_idx = 0
     for row_idx in range(3, 11):
@@ -310,15 +317,16 @@ def preencher_contrato(contrato_id: int, ctx: dict) -> str:
         t = para.text.strip()
         # Data do contrato
         if t.startswith("São José dos Campos") and ("de 20" in t or "de 2026" in t):
-            _set_para(para, f"São José dos Campos - SP, {data_hoje}.")
+            _set_para(para, f"São José dos Campos - SP, {data_hoje}.", rotulo="Data")
         # 2º signatário = CLIENTE (a linha INSPIRIUM acima permanece intacta)
         elif "Ferreira Machado" in t or "787.834" in t:
-            _set_para(para, f"{ctx.get('cliente_nome', '')} CPF/CNPJ: {ctx.get('cliente_cpf', '')}")
+            _set_para(para, f"{ctx.get('cliente_nome', '')} CPF/CNPJ: {ctx.get('cliente_cpf', '')}",
+                      rotulo="Cliente (signatário)")
         # Testemunhas (dois pares NOME:/Documento:)
         elif t == "NOME:" and _w_idx < len(_TESTEMUNHAS):
-            _set_para(para, f"NOME: {_TESTEMUNHAS[_w_idx][0]}")
+            _set_para(para, f"NOME: {_TESTEMUNHAS[_w_idx][0]}", rotulo="Testemunha")
         elif t == "Documento:" and _w_idx < len(_TESTEMUNHAS):
-            _set_para(para, f"CPF/CNPJ: {_TESTEMUNHAS[_w_idx][1]}")
+            _set_para(para, f"CPF/CNPJ: {_TESTEMUNHAS[_w_idx][1]}", rotulo="CPF/CNPJ")
             _w_idx += 1
 
     _relabel_cpf_cnpj(doc)

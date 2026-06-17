@@ -289,3 +289,27 @@ def test_contrato_cpf_vira_cpf_cnpj():
     blob = " ".join(texts)
     assert re.search(r'CPF(?!/CNPJ)', blob) is None
     assert "CPF/CNPJ/CNPJ" not in blob
+
+
+def test_contrato_tags_nomenclatura():
+    import os
+    from mod_contrato import preencher_contrato, _MODELO, construir_contexto
+    if not os.path.exists(_MODELO):
+        return
+    from docx import Document
+    from docx.shared import Pt
+    ctx = construir_contexto(
+        cliente={"nome": "Ana", "cpf": "1", "email": "a@x.com", "telefone": "(12)9",
+                 "logradouro": "Rua A", "numero": "10", "complemento": "", "bairro": "Centro",
+                 "cidade": "SJC", "cep": "12000", "estado": "SP", "inst_mesmo_residencial": True,
+                 "inst_logradouro": "", "inst_numero": "", "inst_complemento": "",
+                 "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": ""},
+        usuario={"nome": "Y", "telefone": "", "email": ""}, forma_pagamento_json="")
+    path = preencher_contrato(91003, ctx)
+    doc = Document(path)
+    cell = doc.tables[0].rows[1].cells[0]
+    runs = cell.paragraphs[0].runs
+    os.remove(path)
+    rotulos = [r.text for r in runs if r.font.size == Pt(7)]
+    assert "Nome" in rotulos
+    assert "Ana" in cell.text
