@@ -253,6 +253,27 @@ def _proteger_editaveis(doc, runs):
 
 # ── Parser de pagamento ───────────────────────────────────────────────────────
 
+_FORMA_LABELS = {
+    "pix": "Pix",
+    "ted": "TED",
+    "transferencia": "TED",
+    "boleto": "Boleto",
+    "cheque": "Cheque",
+    "dinheiro": "Dinheiro",
+    "cartao_credito": "Cartão de Crédito",
+    "cartao_debito": "Cartão de Débito",
+    "debito_automatico": "Débito Automático",
+}
+
+
+def _forma_label(codigo: str) -> str:
+    """Converte código de forma de pagamento em rótulo pt-BR. Idempotente:
+    um rótulo já formatado (não encontrado no mapa) é devolvido como veio."""
+    if not codigo:
+        return ""
+    return _FORMA_LABELS.get(str(codigo).strip().lower(), str(codigo).strip())
+
+
 def _parse_pagamento(pag_json_str: str) -> dict:
     """
     Normaliza o JSON de pagamento capturado pelo frontend (_capturarPagamento).
@@ -273,9 +294,16 @@ def _parse_pagamento(pag_json_str: str) -> dict:
     nome_forma   = pag.get("nome_forma") or ""
     entrada_val  = float(pag.get("entrada_valor") or 0)
     entrada_data = _formatar_data_br(pag.get("entrada_data") or "")
-    entrada_tipo = pag.get("entrada_forma") or pag.get("entrada_tipo") or ""
+    entrada_tipo = _forma_label(pag.get("entrada_forma") or pag.get("entrada_tipo") or "")
     parcelas     = pag.get("parcelas") or []
     num_parcelas = len(parcelas)
+
+    if tipo == "cartao":
+        forma_parcela = "Cartão de Crédito"
+    elif parcelas:
+        forma_parcela = _forma_label(parcelas[0].get("forma") or "")
+    else:
+        forma_parcela = ""
 
     # Grade p01..p24 — datas e valores diretamente das parcelas reais capturadas
     datas, valores = [], []
@@ -300,6 +328,7 @@ def _parse_pagamento(pag_json_str: str) -> dict:
         "valores":          valores,        # lista de 24 strings (valor ou "")
         "valor_contrato":   _formatar_valor(total_cliente),
         "texto_cartao":     pag.get("texto_cartao") or "",
+        "forma_parcela":    forma_parcela,
     }
 
 
@@ -384,6 +413,7 @@ def _montar_mapping(ctx, pag):
         "DATA_ENTRADA":     pag.get("entrada_data", "") or "",
         "MODALIDADE":       pag.get("nome_forma", "") or "",
         "NUM_PARCELAS":     pag.get("num_parcelas", "") or "",
+        "TIPO":             pag.get("forma_parcela", "") or "",
         "TOTAL_CONTRATO":   pag.get("valor_contrato", "") or "",
         "CONSULTOR_NOME":     ctx.get("consultor_nome", "") or "",
         "CONSULTOR_TELEFONE": ctx.get("consultor_tel", "") or "",
@@ -391,6 +421,9 @@ def _montar_mapping(ctx, pag):
         "TESTEMUNHA_1_DOC":  _TESTEMUNHAS[0][1],
         "TESTEMUNHA_2_NOME": _TESTEMUNHAS[1][0],
         "TESTEMUNHA_2_DOC":  _TESTEMUNHAS[1][1],
+        "NOME_TESTEMUNHA_1": _TESTEMUNHAS[0][0],
+        "NOME_TESTEMUNHA2":  _TESTEMUNHAS[1][0],
+        "NOME_TESTEMUNHA_2": _TESTEMUNHAS[1][0],
     }
 
 

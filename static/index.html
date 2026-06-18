@@ -240,6 +240,7 @@ body{overflow:hidden}
 .neg-hdr-lbl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
 .neg-hdr-val{font-size:18px;font-weight:900;font-family:'Epilogue',sans-serif}
 .neg-hdr-val.ok{color:var(--ok)} .neg-hdr-val.warn{color:var(--warn)}
+.neg-locked { opacity: .6; cursor: not-allowed; }
 /* Painel modalidade */
 .mod-panel{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:18px;margin-bottom:14px}
 .mod-panel-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:14px}
@@ -363,6 +364,14 @@ body{overflow:hidden}
 .home-tab { padding:8px 20px;background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--dalm-gold-light);font-size:14px;transition:color .15s; }
 .home-tab.ativo { color:var(--dalm-gold);border-bottom-color:var(--dalm-gold);font-weight:600; }
 .home-tab:hover { color:var(--dalm-gold); }
+
+/* Calendário: ícone visível e campo inteiro clicável */
+input[type="date"] { cursor: pointer; }
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 1;
+  filter: invert(0.7);
+}
 </style>
 </head>
 <body>
@@ -437,6 +446,14 @@ body{overflow:hidden}
     <select id="neg-parcelas" onchange="onParcelasChange()" class="sb-select">
       <option value="1">1x</option>
     </select>
+
+    <label class="sb-label" id="neg-forma-entrada-lbl">Forma da entrada</label>
+    <select id="neg-forma-entrada" onchange="onFormaChange()" class="sb-select"></select>
+
+    <div id="neg-forma-parcela-wrap">
+      <label class="sb-label">Forma das parcelas</label>
+      <select id="neg-forma-parcela" onchange="onFormaChange()" class="sb-select"></select>
+    </div>
 
     <!-- Params exclusivos do Total Flex (visivel so quando TF ativo) -->
     <div id="sb-tf-extras" style="display:none;border-top:1px solid var(--border);margin-top:6px;padding-top:8px">
@@ -1049,6 +1066,38 @@ body{overflow:hidden}
               <tbody id="tf-parc-body"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Painel À Vista -->
+    <div class="mod-panel" id="painel-avista" style="display:none">
+      <div class="mod-panel-title">&#x1F4B5; A Vista</div>
+      <div class="mod-grid">
+        <div>
+          <label>Valor da entrada</label>
+          <input type="text" id="av-entrada-valor" inputmode="numeric"
+                 placeholder="R$ 0,00" oninput="mascaraMoedaInput(this); avistaRecalcular()">
+        </div>
+        <div>
+          <label>Data da entrada</label>
+          <input type="date" id="av-entrada-data" oninput="avistaRecalcular()">
+        </div>
+        <div>
+          <label>Forma da entrada</label>
+          <select id="av-entrada-forma" onchange="avistaRecalcular()"></select>
+        </div>
+        <div>
+          <label>Valor da liquidacao</label>
+          <input type="text" id="av-liq-valor" readonly>
+        </div>
+        <div>
+          <label>Data da liquidacao</label>
+          <input type="date" id="av-liq-data" oninput="avistaRecalcular()">
+        </div>
+        <div>
+          <label>Forma da liquidacao</label>
+          <select id="av-liq-forma" onchange="avistaRecalcular()"></select>
         </div>
       </div>
     </div>
@@ -3026,6 +3075,64 @@ let _faixasAtivas    = [];
 let _tipoAtivo       = 'avista';
 window._planoPagamento = null;  // plano estruturado do painel de pagamento ativo (preenchido pelos render)
 let _codigoPagAtivo  = 'a_vista';  // código da modalidade selecionada (ex: 'cartao_credito')
+let _formaEntrada = 'pix';
+let _formaParcela = 'boleto';
+
+const _FORMAS_ENTRADA = [['pix','Pix'],['ted','TED'],['boleto','Boleto']];
+const _FORMAS_AVISTA  = [['pix','Pix'],['ted','TED'],['boleto','Boleto'],['cheque','Cheque'],['dinheiro','Dinheiro']];
+const _FORMAS_PARC_VPTF = [['boleto','Boleto'],['cheque','Cheque']];
+
+function _preencherSelectFormas(sel, opcoes, valorAtual) {
+  sel.innerHTML = opcoes.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+  if (opcoes.find(([v]) => v === valorAtual)) sel.value = valorAtual;
+  else sel.value = opcoes[0] ? opcoes[0][0] : '';
+  return sel.value;
+}
+
+function onFormaChange() {
+  const selE = document.getElementById('neg-forma-entrada');
+  const selP = document.getElementById('neg-forma-parcela');
+  if (selE) _formaEntrada = selE.value;
+  if (selP && !selP.disabled) _formaParcela = selP.value;
+  agendarCalculo();
+}
+
+// Aplica as regras de forma de pagamento por modalidade.
+function atualizarFormasPagamento(codigo) {
+  const selE  = document.getElementById('neg-forma-entrada');
+  const lblE  = document.getElementById('neg-forma-entrada-lbl');
+  const wrapP = document.getElementById('neg-forma-parcela-wrap');
+  const selP  = document.getElementById('neg-forma-parcela');
+  if (!selE || !selP) return;
+
+  if (codigo === 'a_vista') {
+    // À vista usa o painel-avista (entrada + liquidação); oculta estes seletores.
+    lblE.style.display = 'none';
+    selE.style.display = 'none';
+    wrapP.style.display = 'none';
+    return;
+  }
+  lblE.style.display = ''; selE.style.display = ''; wrapP.style.display = '';
+
+  // Entrada: sempre Pix/TED/Boleto
+  _formaEntrada = _preencherSelectFormas(selE, _FORMAS_ENTRADA, _formaEntrada);
+
+  // Parcelas: depende da modalidade
+  if (codigo === 'cartao_credito' || codigo === 'cartao_credito_x') {
+    selP.innerHTML = '<option value="cartao_credito">Cartão de Crédito</option>';
+    selP.value = 'cartao_credito'; selP.disabled = true; _formaParcela = 'cartao_credito';
+  } else if (codigo === 'aymore') {
+    selP.innerHTML = '<option value="boleto">Boleto</option>';
+    selP.value = 'boleto'; selP.disabled = true; _formaParcela = 'boleto';
+  } else if (codigo === 'venda_programada' || codigo === 'total_flex') {
+    selP.disabled = false;
+    _formaParcela = _preencherSelectFormas(selP, _FORMAS_PARC_VPTF, _formaParcela);
+  } else {
+    selP.disabled = false;
+    _formaParcela = _preencherSelectFormas(selP, _FORMAS_ENTRADA, _formaParcela);
+  }
+}
+
 let _descontoAvista  = 0.0;
 let _acrescimoFin    = 0.0;
 let _descricaoPag    = 'A Vista';
@@ -3099,6 +3206,8 @@ async function onPagamentoChange(){
     cartaoMostrarPainel(codigo === 'cartao_credito' || codigo === 'cartao_credito_x');
     vpMostrarPainel(codigo === 'venda_programada');
     tfMostrarPainel(codigo === 'total_flex');
+    avistaMostrarPainel(codigo === 'a_vista');
+    atualizarFormasPagamento(codigo);
   } catch(e){
     console.error('[PAG] Erro ao carregar faixas:', e);
     _faixasAtivas=[]; _tipoAtivo='avista'; _descontoAvista=0; _acrescimoFin=0;
@@ -3107,6 +3216,8 @@ async function onPagamentoChange(){
     cartaoMostrarPainel(false);
     vpMostrarPainel(false);
     tfMostrarPainel(false);
+    avistaMostrarPainel(false);
+    atualizarFormasPagamento('a_vista');
   }
   agendarCalculo();
 }
@@ -3315,11 +3426,11 @@ async function atualizarAymore() {
     tipo: 'aymore', nome_forma: 'Financiamento Aymoré',
     entrada_valor: entrada,
     entrada_data: document.getElementById('ay-data-contrato')?.value || '',
-    entrada_forma: '',
+    entrada_forma: _formaEntrada,
     total_cliente: d.total_cliente, texto_cartao: '',
     parcelas: (d.parcelas || [])
       .filter(p => p.tipo === 'primeira' || p.tipo === 'parcela')
-      .map((p, i) => ({ num: i + 1, data: p.data, valor: d.valor_parcela })),
+      .map((p, i) => ({ num: i + 1, data: p.data, valor: d.valor_parcela, forma: _formaParcela })),
   };
   _atualizarImpostos('ay', d.total_cliente);
   atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
@@ -3424,7 +3535,7 @@ async function atualizarCartao() {
   if (n > 1 && d.valor_parcela > 0) _ccTexto += ' e ' + n + 'x R$ ' + fmt(d.valor_parcela);
   window._planoPagamento = {
     tipo: 'cartao', nome_forma: 'Cartão de Crédito',
-    entrada_valor: entrada, entrada_data: '', entrada_forma: '',
+    entrada_valor: entrada, entrada_data: '', entrada_forma: _formaEntrada,
     total_cliente: d.total_cliente,
     texto_cartao: _ccTexto,
     parcelas: [],
@@ -3569,11 +3680,11 @@ async function atualizarVP() {
     tipo: 'vp', nome_forma: 'Venda Programada',
     entrada_valor: entrada,
     entrada_data: document.getElementById('vp-data-contrato')?.value || '',
-    entrada_forma: '',
+    entrada_forma: _formaEntrada,
     total_cliente: d.total_cliente, texto_cartao: '',
     parcelas: (d.parcelas || [])
       .filter(p => p.tipo === 'primeira' || p.tipo === 'parcela')
-      .map((p, i) => ({ num: i + 1, data: p.data, valor: p.valor })),
+      .map((p, i) => ({ num: i + 1, data: p.data, valor: p.valor, forma: _formaParcela })),
   };
   _atualizarImpostos('vp', d.total_cliente);
   atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
@@ -3823,6 +3934,44 @@ function tfMostrarPainel(mostrar) {
   }
 }
 
+function avistaMostrarPainel(mostrar) {
+  const p = document.getElementById('painel-avista');
+  if (p) p.style.display = mostrar ? 'block' : 'none';
+  if (mostrar) {
+    const selE = document.getElementById('av-entrada-forma');
+    const selL = document.getElementById('av-liq-forma');
+    if (selE && !selE.options.length)
+      selE.innerHTML = _FORMAS_AVISTA.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+    if (selL && !selL.options.length)
+      selL.innerHTML = _FORMAS_AVISTA.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+    const dE = document.getElementById('av-entrada-data');
+    if (dE && !dE.value) dE.value = new Date().toISOString().split('T')[0];
+    avistaRecalcular();
+  }
+}
+
+function avistaRecalcular() {
+  const total   = _ayGetValorVenda() || 0;
+  const entrada = parseMoeda(document.getElementById('av-entrada-valor')?.value) || 0;
+  const saldo   = Math.max(0, total - entrada);
+  const elLiq = document.getElementById('av-liq-valor');
+  if (elLiq) elLiq.value = 'R$ ' + fmt(saldo);
+
+  const entradaData  = document.getElementById('av-entrada-data')?.value || '';
+  const liqData      = document.getElementById('av-liq-data')?.value || '';
+  const entradaForma = document.getElementById('av-entrada-forma')?.value || 'pix';
+  const liqForma     = document.getElementById('av-liq-forma')?.value || 'pix';
+
+  window._planoPagamento = {
+    tipo: 'avista', nome_forma: 'A Vista',
+    entrada_valor: entrada,
+    entrada_data: entradaData,
+    entrada_forma: entradaForma,
+    total_cliente: total, texto_cartao: '',
+    parcelas: saldo > 0 ? [{ num: 1, data: liqData, valor: saldo, forma: liqForma }] : [],
+  };
+}
+
 function tfDataContratoChange() {
   _tfDatas = []; _tfValores = [];
   tfAtualizarLimite();
@@ -4004,10 +4153,10 @@ async function atualizarTF() {
     tipo: 'tf', nome_forma: 'Total Flex',
     entrada_valor: entrada,
     entrada_data: document.getElementById('tf-data-contrato')?.value || '',
-    entrada_forma: '',
+    entrada_forma: _formaEntrada,
     total_cliente: totalCliente, texto_cartao: '',
     parcelas: (d.parcelas || [])
-      .map((p, i) => ({ num: i + 1, data: p.data_iso, valor: p.valor_efetivo })),
+      .map((p, i) => ({ num: i + 1, data: p.data_iso, valor: p.valor_efetivo, forma: _formaParcela })),
   };
   atualizarResumoParcelas(entrada, n_parc, ultima.valor_efetivo, totalCliente);
   _ep07DistribuirFinanciado(totalCliente, valorAvista);
@@ -4235,6 +4384,9 @@ function negToggleAll(checked){
   agendarCalculo();
 }
 function negTotalIniciarEdicao(el){
+  // Após aprovação a negociação está travada — não permite editar o total.
+  if ((typeof _orcamentoAprovado === 'function' && _orcamentoAprovado()) ||
+      el.classList.contains('neg-locked')) return;
   el._editando = true;
   el.removeAttribute('readonly');
   el.style.background   = 'var(--surface)';
@@ -5972,6 +6124,14 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 });
 
+// Abre o calendário nativo ao clicar em qualquer parte de um campo de data
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('input[type="date"]');
+  if (el && !el.disabled && !el.readOnly && typeof el.showPicker === 'function') {
+    try { el.showPicker(); } catch (_) { /* alguns navegadores bloqueiam fora de gesto */ }
+  }
+});
+
 // ---- Aprovacao / Exportacao --------------------------------------------------
 let _expPollTimer = null;
 
@@ -6222,8 +6382,41 @@ function _orcamentoAprovado() {
   return _cicloData['6']?.status === 'concluido';
 }
 
+// Trava/destrava todos os controles de edição da negociação — tanto os
+// parâmetros na sidebar (#sb-params: desconto, modalidade, parcelas, formas,
+// taxa TF) quanto a área principal (#page-02: tabela, painéis, datas, total),
+// exceto os botões de ação (tratados em atualizarBotoesAprovacao).
+function aplicarBloqueioNegociacao(travar) {
+  const roots = ['sb-params', 'page-02']
+    .map(id => document.getElementById(id))
+    .filter(Boolean);
+  if (!roots.length) return;
+  const alvos = [];
+  roots.forEach(r => r.querySelectorAll('input, select, textarea').forEach(el => alvos.push(el)));
+  alvos.forEach(el => {
+    if (el.closest('.action-row')) return;            // não mexe nos botões de ação
+    if (travar) {
+      if (el.tagName === 'SELECT') el.disabled = true;
+      else el.readOnly = true;
+      el.classList.add('neg-locked');
+    } else {
+      // só destrava o que ESTE bloqueio travou
+      if (el.classList.contains('neg-locked')) {
+        if (el.tagName === 'SELECT') el.disabled = false;
+        else el.readOnly = false;
+        el.classList.remove('neg-locked');
+      }
+    }
+  });
+  // Reaplica as regras de forma (parcelas fixas voltam a ficar disabled corretamente)
+  if (!travar && typeof atualizarFormasPagamento === 'function') {
+    atualizarFormasPagamento(document.getElementById('neg-pagamento')?.value || 'a_vista');
+  }
+}
+
 function atualizarBotoesAprovacao() {
   const aprovado = _orcamentoAprovado();
+  aplicarBloqueioNegociacao(aprovado);
   const actionRow = document.querySelector('#page-02 .action-row');
   if (!actionRow) return;
   const btnSalvar  = actionRow.querySelector('.btn-ok');
@@ -6240,11 +6433,22 @@ function atualizarBotoesAprovacao() {
       btn.onclick = () => { abrirCiclo(); setTimeout(() => toggleCicloCard('7'), 300); };
       actionRow.appendChild(btn);
     }
+    if (!actionRow.querySelector('#btn-rever-orcamento')) {
+      const btnR = document.createElement('button');
+      btnR.id = 'btn-rever-orcamento';
+      btnR.className = 'btn btn-ghost';
+      btnR.style.cssText = 'border-color:var(--warn,#c8a84b);color:var(--warn,#c8a84b);font-size:.85rem;font-weight:600;padding:8px 16px;border-radius:4px;cursor:pointer';
+      btnR.innerHTML = '&#x270E; Rever Or&ccedil;amento';
+      btnR.onclick = () => abrirModalReverOrcamento();
+      actionRow.appendChild(btnR);
+    }
   } else {
     if (btnSalvar)  { btnSalvar.style.display  = ''; }
     if (btnAprovar) { btnAprovar.style.display = ''; }
     const b = actionRow.querySelector('#btn-assinar-contrato');
     if (b) b.remove();
+    const bR = actionRow.querySelector('#btn-rever-orcamento');
+    if (bR) bR.remove();
   }
 }
 
@@ -6587,10 +6791,6 @@ function renderContratoUI(contrato) {
       ${!['assinado','vigente'].includes(status) ? `
         <button onclick="fecharCiclo();abrirAprovacaoComDados()" class="btn-ciclo" style="font-size:.82rem">
           Revisar
-        </button>
-        <button onclick="abrirModalVoltarOrcamento()" class="btn-ciclo"
-          style="font-size:.82rem;border-color:var(--warn,#c8a84b);color:var(--warn,#c8a84b)">
-          &#x21A9; Voltar ao Or&ccedil;amento
         </button>` : ''}
     </div>
 
@@ -6744,14 +6944,14 @@ function parseMoeda(str) {
   return parseFloat(s) || 0;
 }
 
-function abrirModalVoltarOrcamento() {
+function abrirModalReverOrcamento() {
   document.getElementById('modal-voltar-overlay')?.remove();
   const ov = document.createElement('div');
   ov.id = 'modal-voltar-overlay';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center';
   ov.innerHTML = `
     <div style="background:var(--card,#132013);border:1px solid var(--warn,#c8a84b);border-radius:8px;padding:24px;min-width:340px;max-width:440px">
-      <h4 style="margin:0 0 6px;color:var(--warn)">&#x21A9; Voltar ao Or&ccedil;amento</h4>
+      <h4 style="margin:0 0 6px;color:var(--warn)">&#x270E; Rever Or&ccedil;amento</h4>
       <p style="color:var(--muted);font-size:.85rem;margin:0 0 16px">
         Esta a&ccedil;&atilde;o requer autoriza&ccedil;&atilde;o de um Gerente ou Diretor.<br>
         O contrato atual ser&aacute; marcado como rascunho e o or&ccedil;amento poder&aacute; ser editado novamente.
@@ -6796,11 +6996,12 @@ async function confirmarVoltarOrcamento() {
     const d = await r.json();
     if (!d.ok) { if(erroEl) erroEl.textContent = d.erro || 'Credenciais inválidas.'; return; }
     document.getElementById('modal-voltar-overlay')?.remove();
-    showToast('Retornou ao orçamento. Edições liberadas.', false);
+    showToast('Orçamento reaberto. Edições liberadas.', false);
     // Recarrega ciclo e atualiza botões
     await carregarCicloSilencioso();
     if (_cicloAberto) { await carregarCiclo(); }
     fecharCiclo();
+    atualizarBotoesAprovacao();
   } catch(e) { if(erroEl) erroEl.textContent = 'Erro de rede: ' + e.message; }
 }
 
@@ -6862,7 +7063,9 @@ async function salvarValorNegociado() {
       body: JSON.stringify({
         valor_total:     valor,
         valor_liquido:   valorLiquido,
-        forma_pagamento: elPag?.value || null,
+        forma_pagamento: (typeof _capturarPagamento === 'function' && window._planoPagamento)
+          ? JSON.stringify(_capturarPagamento(_formaEntrada, _formaParcela))
+          : (elPag?.value || null),
       }),
     });
   } catch(e) { console.warn('salvarValorNegociado:', e); }
@@ -7001,6 +7204,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
             <option value="cartao_credito">Cart&atilde;o de Cr&eacute;dito</option>
             <option value="cartao_debito">Cart&atilde;o de D&eacute;bito</option>
             <option value="cheque">Cheque</option>
+            <option value="dinheiro">Dinheiro</option>
           </select>
         </div>
         <div style="margin-bottom:8px">
@@ -7044,6 +7248,18 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
     </div>
   `;
   document.body.appendChild(ov);
+
+  // Pré-seleciona as formas de pagamento a partir da negociação ativa.
+  const _mapForma = (v) => (v === 'ted' ? 'transferencia' : v);
+  const _setSelectSeExiste = (sel, val) => {
+    if (!sel || !val) return;
+    const alvo = _mapForma(val);
+    if ([...sel.options].some(o => o.value === alvo)) sel.value = alvo;
+  };
+  const _pp = window._planoPagamento || {};
+  _setSelectSeExiste(document.getElementById('apr-forma-entrada'), _pp.entrada_forma);
+  const _formaParc = (_pp.parcelas && _pp.parcelas[0] && _pp.parcelas[0].forma) || null;
+  _setSelectSeExiste(document.getElementById('apr-forma-parcelas'), _formaParc);
 }
 
 function _capturarPagamento(formaEntrada, formaParcelas) {
@@ -7060,7 +7276,12 @@ function _capturarPagamento(formaEntrada, formaParcelas) {
     entrada_forma: formaEntrada || base.entrada_forma || '',
     total_cliente: base.total_cliente || 0,
     texto_cartao: base.texto_cartao || '',
-    parcelas: (base.parcelas || []).map(p => ({ num: p.num, data: p.data, valor: p.valor, forma: formaParcelas })),
+    // À vista: a forma da liquidação é independente (pix/dinheiro) e vive na
+    // própria parcela — preserva-a; nas demais modalidades a forma é única.
+    parcelas: (base.parcelas || []).map(p => ({
+      num: p.num, data: p.data, valor: p.valor,
+      forma: base.tipo === 'avista' ? (p.forma || formaParcelas) : formaParcelas,
+    })),
   };
 }
 

@@ -166,7 +166,21 @@ git commit -m "feat(contrato): rotulos de forma de pagamento + forma_parcela + m
 **Files:**
 - Create: `scripts/inserir_marcador_tipo.py`
 - Modify: `modelo_contrato_mapeado.docx` (saída do script)
+- Modify: `mod_contrato.py` (`_montar_mapping` — mapear marcadores de testemunha do template)
 - Test: `tests/test_contrato.py`
+
+> **Ajuste pré-existente (decidido com o usuário):** o template usa `[NOME_TESTEMUNHA_1]` e `[NOME_TESTEMUNHA2]`, mas `_montar_mapping` só fornece `TESTEMUNHA_1_NOME`/`TESTEMUNHA_2_NOME`. Isso deixa marcadores crus no contrato e 3 testes vermelhos. Alinhar o código ao template adicionando em `_montar_mapping`: `"NOME_TESTEMUNHA_1": _TESTEMUNHAS[0][0]` e `"NOME_TESTEMUNHA2": _TESTEMUNHAS[1][0]` (manter as chaves antigas é inofensivo). Isso reverde `test_geracao_completa_sem_marcadores_remanescentes`, `test_preencher_signatario_e_testemunhas` e `test_protegido_mantem_texto_e_valores`.
+
+- [ ] **Step 0: Mapear os marcadores de testemunha do template**
+
+Em `_montar_mapping` (`mod_contrato.py`), junto das chaves `TESTEMUNHA_*`, adicionar:
+
+```python
+        "NOME_TESTEMUNHA_1": _TESTEMUNHAS[0][0],
+        "NOME_TESTEMUNHA2":  _TESTEMUNHAS[1][0],
+```
+
+Rodar `python -m pytest tests/test_contrato.py -q` e confirmar que os 3 testes antes vermelhos passam (antes de criar o marcador `[TIPO]`, o `test_geracao_completa_com_forma_parcela` ainda falhará — isso é esperado e resolvido nos passos seguintes).
 
 - [ ] **Step 1: Escrever o teste que falha**
 

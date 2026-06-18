@@ -638,3 +638,98 @@ def test_converter_pdf_nao_regenera_docx(monkeypatch):
     assert chamou["preencher"] is False
     assert chamou["convert_path"] == "/tmp/contrato_5.docx"
     assert out.endswith("contrato_5.pdf")
+
+
+# ── Forma de pagamento: rótulos pt-BR + forma_parcela + marcador TIPO ──────────
+
+def test_forma_label_mapeia_codigos():
+    from mod_contrato import _forma_label
+    assert _forma_label("pix") == "Pix"
+    assert _forma_label("ted") == "TED"
+    assert _forma_label("transferencia") == "TED"
+    assert _forma_label("boleto") == "Boleto"
+    assert _forma_label("cheque") == "Cheque"
+    assert _forma_label("dinheiro") == "Dinheiro"
+    assert _forma_label("cartao_credito") == "Cartão de Crédito"
+    assert _forma_label("") == ""
+    assert _forma_label("Boleto") == "Boleto"   # já-rótulo passa adiante
+
+
+def test_parse_pagamento_forma_parcela_de_parcelas():
+    import json
+    from mod_contrato import _parse_pagamento
+    pag = json.dumps({
+        "tipo": "venda_programada", "nome_forma": "Venda Programada",
+        "entrada_valor": 1000, "entrada_forma": "pix", "total_cliente": 5000,
+        "parcelas": [
+            {"num": 1, "data": "10/07/2026", "valor": 2000.0, "forma": "cheque"},
+            {"num": 2, "data": "10/08/2026", "valor": 2000.0, "forma": "cheque"},
+        ],
+    })
+    d = _parse_pagamento(pag)
+    assert d["entrada_tipo"] == "Pix"
+    assert d["forma_parcela"] == "Cheque"
+
+
+def test_parse_pagamento_forma_parcela_cartao():
+    import json
+    from mod_contrato import _parse_pagamento
+    d = _parse_pagamento(json.dumps({
+        "tipo": "cartao", "nome_forma": "Cartão de Crédito",
+        "texto_cartao": "12x R$ 10.000,00", "total_cliente": 120000, "parcelas": []}))
+    assert d["forma_parcela"] == "Cartão de Crédito"
+
+
+def test_montar_mapping_inclui_tipo():
+    from mod_contrato import _montar_mapping
+    ctx = {}
+    pag = {"forma_parcela": "Boleto", "entrada_tipo": "Pix", "num_parcelas": "3"}
+    m = _montar_mapping(ctx, pag)
+    assert m["TIPO"] == "Boleto"
+    assert m["FORMA_ENTRADA"] == "Pix"
+
+
+def test_template_tem_marcador_tipo():
+    import os
+    from docx import Document
+    from mod_contrato import _MODELO
+    assert os.path.exists(_MODELO)
+    d = Document(_MODELO)
+    blob = "\n".join(p.text for p in d.paragraphs)
+    for t in d.tables:
+        for row in t.rows:
+            for c in row.cells:
+                blob += "\n" + c.text
+    assert "[TIPO]" in blob
+    assert "[NUM_PARCELAS]" in blob
+
+
+def test_geracao_completa_com_forma_parcela():
+    import os, json, re
+    from docx import Document
+    from mod_contrato import preencher_contrato, construir_contexto
+    ctx = construir_contexto(
+        cliente={"nome": "Ana", "cpf": "1", "email": "a@x.com", "telefone": "(12)9",
+                 "logradouro": "Rua A", "numero": "10", "complemento": "", "bairro": "Centro",
+                 "cidade": "SJC", "cep": "12000", "estado": "SP", "inst_mesmo_residencial": True,
+                 "inst_logradouro": "", "inst_numero": "", "inst_complemento": "",
+                 "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": ""},
+        usuario={"nome": "Z", "telefone": "", "email": ""},
+        forma_pagamento_json=json.dumps({
+            "tipo": "venda_programada", "nome_forma": "Venda Programada",
+            "entrada_valor": 1000, "entrada_data": "2026-06-18", "entrada_forma": "pix",
+            "total_cliente": 5000.0, "texto_cartao": "",
+            "parcelas": [{"num": i+1, "data": f"18/{7+i:02d}/2026", "valor": 2000.0,
+                          "forma": "cheque"} for i in range(2)]}))
+    ctx["num_contrato"] = "INS-2026-06-18-001"; ctx["data_contrato"] = "18/06/2026"
+    path = preencher_contrato(93001, ctx)
+    doc = Document(path)
+    blob = "\n".join(p.text for p in doc.paragraphs)
+    for t in doc.tables:
+        for row in t.rows:
+            for c in row.cells:
+                blob += "\n" + c.text
+    os.remove(path)
+    assert "Cheque" in blob
+    assert "Pix" in blob
+    assert re.findall(r'\[[A-Za-z0-9_ ]+\]', blob) == []
