@@ -4384,6 +4384,9 @@ function negToggleAll(checked){
   agendarCalculo();
 }
 function negTotalIniciarEdicao(el){
+  // Após aprovação a negociação está travada — não permite editar o total.
+  if ((typeof _orcamentoAprovado === 'function' && _orcamentoAprovado()) ||
+      el.classList.contains('neg-locked')) return;
   el._editando = true;
   el.removeAttribute('readonly');
   el.style.background   = 'var(--surface)';
@@ -7273,7 +7276,12 @@ function _capturarPagamento(formaEntrada, formaParcelas) {
     entrada_forma: formaEntrada || base.entrada_forma || '',
     total_cliente: base.total_cliente || 0,
     texto_cartao: base.texto_cartao || '',
-    parcelas: (base.parcelas || []).map(p => ({ num: p.num, data: p.data, valor: p.valor, forma: formaParcelas })),
+    // À vista: a forma da liquidação é independente (pix/dinheiro) e vive na
+    // própria parcela — preserva-a; nas demais modalidades a forma é única.
+    parcelas: (base.parcelas || []).map(p => ({
+      num: p.num, data: p.data, valor: p.valor,
+      forma: base.tipo === 'avista' ? (p.forma || formaParcelas) : formaParcelas,
+    })),
   };
 }
 
