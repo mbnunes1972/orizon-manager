@@ -6620,6 +6620,8 @@ function renderContratoUI(contrato) {
         </div>`
       : temArquivo ? `
         <div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:8px">
+          <button onclick="abrirModalEditarContrato()" class="btn-ciclo"
+                  style="font-size:.85rem;margin-bottom:12px">&#x270E; Editar contrato (gerencial)</button>
           <label style="display:flex;gap:10px;align-items:center;cursor:pointer;margin-bottom:14px">
             <input type="checkbox" id="chk-leu-contrato" onchange="toggleAssinaturas()"
               ${jaAssinou ? 'checked disabled' : ''}>
@@ -6663,6 +6665,59 @@ function _formGerarContrato() {
       </button>
     </div>
   `;
+}
+
+function abrirModalEditarContrato() {
+  document.getElementById('modal-editar-contrato-overlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'modal-editar-contrato-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+  ov.innerHTML = `
+    <div style="background:var(--card,#132013);border:1px solid #b8960c;border-radius:10px;padding:24px 28px;min-width:340px;max-width:460px;width:92%">
+      <h3 style="margin:0 0 4px;color:#f0c84a;font-size:1rem">&#x270E; Editar contrato</h3>
+      <p style="color:var(--muted);font-size:.8rem;margin:0 0 16px">
+        Apenas os campos do contrato podem ser corrigidos. Requer autoriza&ccedil;&atilde;o gerencial.
+        Ao salvar no editor, o PDF &eacute; regerado automaticamente.
+      </p>
+      <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Abrir com</label>
+      <select id="edit-app" style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:10px">
+        <option value="word">Microsoft Word</option>
+        <option value="libreoffice">LibreOffice</option>
+      </select>
+      <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Login gerencial</label>
+      <input id="edit-login" type="text" autocomplete="username" style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:10px">
+      <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Senha</label>
+      <input id="edit-senha" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:8px">
+      <div id="edit-erro" style="color:#ff6b6b;font-size:.8rem;min-height:16px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('modal-editar-contrato-overlay').remove()" style="background:none;border:1px solid var(--muted);color:var(--muted);border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">Cancelar</button>
+        <button id="edit-btn-abrir" onclick="confirmarEditarContrato()" style="background:#b8960c;color:#000;border:none;border-radius:5px;padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">Abrir para editar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+}
+
+async function confirmarEditarContrato() {
+  const app   = document.getElementById('edit-app').value;
+  const login = document.getElementById('edit-login').value.trim();
+  const senha = document.getElementById('edit-senha').value;
+  const erroEl = document.getElementById('edit-erro');
+  const btn = document.getElementById('edit-btn-abrir');
+  erroEl.textContent = '';
+  if (!login || !senha) { erroEl.textContent = 'Informe login e senha.'; return; }
+  btn.disabled = true; btn.textContent = 'Abrindo...';
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato/editar`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, credentials: 'same-origin',
+      body: JSON.stringify({ app, login, senha })
+    });
+    const d = await r.json();
+    if (!d.ok) { erroEl.textContent = d.erro || 'Falha ao abrir.'; btn.disabled = false; btn.textContent = 'Abrir para editar'; return; }
+    document.getElementById('modal-editar-contrato-overlay').remove();
+    alert('Abrindo o contrato no ' + (d.app === 'libreoffice' ? 'LibreOffice' : 'Word') + '. Ao salvar e fechar o editor, o PDF será regerado automaticamente.');
+  } catch (e) {
+    erroEl.textContent = 'Erro de conexão.'; btn.disabled = false; btn.textContent = 'Abrir para editar';
+  }
 }
 
 function mascaraMoedaInput(el) {
