@@ -463,3 +463,38 @@ def test_template_oficial_tem_marcadores():
     assert "[TOTAL_CONTRATO]" in blob
     assert "[DATA_PARCELA_1]" in blob
     assert "[VALOR_PARCELA]" in blob
+
+
+def test_parse_pagamento_estrutura_real():
+    import json
+    from mod_contrato import _parse_pagamento
+    pag = json.dumps({
+        "tipo": "aymore", "nome_forma": "Financiamento Aymoré",
+        "entrada_valor": 20000, "entrada_data": "2026-06-18", "entrada_forma": "pix",
+        "total_cliente": 129572.01, "texto_cartao": "",
+        "parcelas": [
+            {"num": 1, "data": "18/07/2026", "valor": 4820.00},
+            {"num": 2, "data": "17/08/2026", "valor": 4820.00},
+        ],
+    })
+    d = _parse_pagamento(pag)
+    assert d["num_parcelas_int"] == 2
+    assert d["valores"][0] == "R$ 4.820,00"
+    assert d["valores"][1] == "R$ 4.820,00"
+    assert d["valores"][2] == ""
+    assert d["datas"][0] == "18/07/2026"
+    assert d["datas"][2] == ""
+    assert d["valor_contrato"] == "R$ 129.572,01"
+    assert len(d["valores"]) == 24 and len(d["datas"]) == 24
+
+
+def test_parse_pagamento_cartao_texto():
+    import json
+    from mod_contrato import _parse_pagamento
+    d = _parse_pagamento(json.dumps({
+        "tipo": "cartao", "nome_forma": "Cartão de Crédito",
+        "texto_cartao": "12x R$ 10.000,00", "total_cliente": 120000, "parcelas": []}))
+    assert d["texto_cartao"] == "12x R$ 10.000,00"
+    assert d["num_parcelas_int"] == 0
+    assert d["valores"] == [""] * 24
+    assert d["valor_contrato"] == "R$ 120.000,00"

@@ -61,6 +61,15 @@ def _formatar_valor(valor: float) -> str:
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def _formatar_valor_str(v):
+    """Aceita número ou string já formatada; devolve 'R$ x.xxx,xx' (ou '' se vazio)."""
+    if v is None or v == "":
+        return ""
+    if isinstance(v, (int, float)):
+        return _formatar_valor(v)
+    return str(v).strip()
+
+
 def _formatar_data_br(data: str) -> str:
     """Converte ISO 'YYYY-MM-DD' → 'DD/MM/AAAA'. Datas já em DD/MM são passadas direto."""
     if not data:
@@ -196,20 +205,15 @@ def _parse_pagamento(pag_json_str: str) -> dict:
     parcelas     = pag.get("parcelas") or []
     num_parcelas = len(parcelas)
 
-    # Primeira data de parcela
-    data_primeira = ""
-    if parcelas:
-        data_primeira = _formatar_data_br(parcelas[0].get("data") or "")
-
-    # Grade p01..p24 — datas e valores diretamente das parcelas capturadas
+    # Grade p01..p24 — datas e valores diretamente das parcelas reais capturadas
     datas, valores = [], []
-    if tipo != "cartao":
-        for p in parcelas:
-            datas.append(_formatar_data_br(p.get("data") or ""))
-            valores.append((p.get("valor") or "").strip())
-    datas   = (datas   + ["—"] * 24)[:24]
-    valores = (valores + [""]  * 24)[:24]
+    for p in parcelas:
+        datas.append(_formatar_data_br(p.get("data") or ""))
+        valores.append(_formatar_valor_str(p.get("valor")))
+    datas   = (datas   + [""] * 24)[:24]
+    valores = (valores + [""] * 24)[:24]
 
+    total_cliente = pag.get("total_cliente") or 0
     return {
         "tipo":             tipo,
         "nome_forma":       nome_forma,
@@ -219,9 +223,11 @@ def _parse_pagamento(pag_json_str: str) -> dict:
         "modalidade":       nome_forma,
         "num_parcelas":     str(num_parcelas) if num_parcelas else "—",
         "num_parcelas_int": num_parcelas,
-        "data_primeira":    data_primeira,
-        "datas":            datas,          # lista de 24 strings (data ou "—")
+        "data_primeira":    (datas[0] if datas and datas[0] else ""),
+        "datas":            datas,          # lista de 24 strings (data ou "")
         "valores":          valores,        # lista de 24 strings (valor ou "")
+        "valor_contrato":   _formatar_valor(total_cliente),
+        "texto_cartao":     pag.get("texto_cartao") or "",
     }
 
 
