@@ -6424,11 +6424,22 @@ function atualizarBotoesAprovacao() {
       btn.onclick = () => { abrirCiclo(); setTimeout(() => toggleCicloCard('7'), 300); };
       actionRow.appendChild(btn);
     }
+    if (!actionRow.querySelector('#btn-rever-orcamento')) {
+      const btnR = document.createElement('button');
+      btnR.id = 'btn-rever-orcamento';
+      btnR.className = 'btn btn-ghost';
+      btnR.style.cssText = 'border-color:var(--warn,#c8a84b);color:var(--warn,#c8a84b);font-size:.85rem;font-weight:600;padding:8px 16px;border-radius:4px;cursor:pointer';
+      btnR.innerHTML = '&#x270E; Rever Or&ccedil;amento';
+      btnR.onclick = () => abrirModalReverOrcamento();
+      actionRow.appendChild(btnR);
+    }
   } else {
     if (btnSalvar)  { btnSalvar.style.display  = ''; }
     if (btnAprovar) { btnAprovar.style.display = ''; }
     const b = actionRow.querySelector('#btn-assinar-contrato');
     if (b) b.remove();
+    const bR = actionRow.querySelector('#btn-rever-orcamento');
+    if (bR) bR.remove();
   }
 }
 
@@ -6771,10 +6782,6 @@ function renderContratoUI(contrato) {
       ${!['assinado','vigente'].includes(status) ? `
         <button onclick="fecharCiclo();abrirAprovacaoComDados()" class="btn-ciclo" style="font-size:.82rem">
           Revisar
-        </button>
-        <button onclick="abrirModalVoltarOrcamento()" class="btn-ciclo"
-          style="font-size:.82rem;border-color:var(--warn,#c8a84b);color:var(--warn,#c8a84b)">
-          &#x21A9; Voltar ao Or&ccedil;amento
         </button>` : ''}
     </div>
 
@@ -6928,14 +6935,14 @@ function parseMoeda(str) {
   return parseFloat(s) || 0;
 }
 
-function abrirModalVoltarOrcamento() {
+function abrirModalReverOrcamento() {
   document.getElementById('modal-voltar-overlay')?.remove();
   const ov = document.createElement('div');
   ov.id = 'modal-voltar-overlay';
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center';
   ov.innerHTML = `
     <div style="background:var(--card,#132013);border:1px solid var(--warn,#c8a84b);border-radius:8px;padding:24px;min-width:340px;max-width:440px">
-      <h4 style="margin:0 0 6px;color:var(--warn)">&#x21A9; Voltar ao Or&ccedil;amento</h4>
+      <h4 style="margin:0 0 6px;color:var(--warn)">&#x270E; Rever Or&ccedil;amento</h4>
       <p style="color:var(--muted);font-size:.85rem;margin:0 0 16px">
         Esta a&ccedil;&atilde;o requer autoriza&ccedil;&atilde;o de um Gerente ou Diretor.<br>
         O contrato atual ser&aacute; marcado como rascunho e o or&ccedil;amento poder&aacute; ser editado novamente.
@@ -6980,11 +6987,12 @@ async function confirmarVoltarOrcamento() {
     const d = await r.json();
     if (!d.ok) { if(erroEl) erroEl.textContent = d.erro || 'Credenciais inválidas.'; return; }
     document.getElementById('modal-voltar-overlay')?.remove();
-    showToast('Retornou ao orçamento. Edições liberadas.', false);
+    showToast('Orçamento reaberto. Edições liberadas.', false);
     // Recarrega ciclo e atualiza botões
     await carregarCicloSilencioso();
     if (_cicloAberto) { await carregarCiclo(); }
     fecharCiclo();
+    atualizarBotoesAprovacao();
   } catch(e) { if(erroEl) erroEl.textContent = 'Erro de rede: ' + e.message; }
 }
 
