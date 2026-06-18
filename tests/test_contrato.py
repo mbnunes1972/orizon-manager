@@ -733,3 +733,47 @@ def test_geracao_completa_com_forma_parcela():
     assert "Cheque" in blob
     assert "Pix" in blob
     assert re.findall(r'\[[A-Za-z0-9_ ]+\]', blob) == []
+
+
+# ── Assinaturas: formatação uniforme do nome do cliente ───────────────────────
+
+def test_template_assinaturas_normalizadas():
+    from docx import Document
+    from mod_contrato import _MODELO
+    d = Document(_MODELO)
+    alvos = {"[NOME_CLIENTE]": False, "[NOME_TESTEMUNHA_2]": False}
+    for p in d.paragraphs:
+        for marc in list(alvos):
+            if marc in p.text:
+                alvos[marc] = True
+                assert p.style.name == "Heading 2", f"{marc} estilo={p.style.name}"
+                # sem run inicial vazio/quebra de linha
+                assert p.runs and (p.runs[0].text or "").strip() != ""
+    assert all(alvos.values()), f"marcadores não encontrados: {alvos}"
+
+
+def test_assinatura_cliente_mesmo_estilo_da_empresa():
+    import os
+    from docx import Document
+    from mod_contrato import preencher_contrato, construir_contexto
+    ctx = construir_contexto(
+        cliente={"nome": "Ana Cliente", "cpf": "111.222.333-44", "email": "a@x.com",
+                 "telefone": "(12)9", "logradouro": "Rua A", "numero": "10",
+                 "complemento": "", "bairro": "Centro", "cidade": "SJC", "cep": "12000",
+                 "estado": "SP", "inst_mesmo_residencial": True, "inst_logradouro": "",
+                 "inst_numero": "", "inst_complemento": "", "inst_bairro": "",
+                 "inst_cidade": "", "inst_cep": "", "inst_uf": ""},
+        usuario={"nome": "Z", "telefone": "", "email": ""},
+        forma_pagamento_json="")
+    path = preencher_contrato(94001, ctx)
+    d = Document(path)
+    estilo_cliente = estilo_empresa = None
+    for p in d.paragraphs:
+        if "Ana Cliente" in p.text:
+            estilo_cliente = p.style.name
+        if "INSPIRIUM MOVEIS PLANEJADOS" in p.text:
+            estilo_empresa = p.style.name
+    os.remove(path)
+    assert estilo_cliente == "Heading 2"
+    assert estilo_empresa == "Heading 2"
+    assert estilo_cliente == estilo_empresa
