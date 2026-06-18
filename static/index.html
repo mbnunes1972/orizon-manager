@@ -1069,6 +1069,38 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       </div>
     </div>
 
+    <!-- Painel À Vista -->
+    <div class="mod-panel" id="painel-avista" style="display:none">
+      <div class="mod-panel-title">&#x1F4B5; A Vista</div>
+      <div class="mod-grid">
+        <div>
+          <label>Valor da entrada</label>
+          <input type="text" id="av-entrada-valor" inputmode="numeric"
+                 placeholder="R$ 0,00" oninput="mascaraMoedaInput(this); avistaRecalcular()">
+        </div>
+        <div>
+          <label>Data da entrada</label>
+          <input type="date" id="av-entrada-data" oninput="avistaRecalcular()">
+        </div>
+        <div>
+          <label>Forma da entrada</label>
+          <select id="av-entrada-forma" onchange="avistaRecalcular()"></select>
+        </div>
+        <div>
+          <label>Valor da liquidacao</label>
+          <input type="text" id="av-liq-valor" readonly>
+        </div>
+        <div>
+          <label>Data da liquidacao</label>
+          <input type="date" id="av-liq-data" oninput="avistaRecalcular()">
+        </div>
+        <div>
+          <label>Forma da liquidacao</label>
+          <select id="av-liq-forma" onchange="avistaRecalcular()"></select>
+        </div>
+      </div>
+    </div>
+
     <!-- Resumo e total -->
     <div class="card" style="margin-bottom:14px">
       <div class="total-contract">
@@ -3173,6 +3205,7 @@ async function onPagamentoChange(){
     cartaoMostrarPainel(codigo === 'cartao_credito' || codigo === 'cartao_credito_x');
     vpMostrarPainel(codigo === 'venda_programada');
     tfMostrarPainel(codigo === 'total_flex');
+    avistaMostrarPainel(codigo === 'a_vista');
     atualizarFormasPagamento(codigo);
   } catch(e){
     console.error('[PAG] Erro ao carregar faixas:', e);
@@ -3182,6 +3215,7 @@ async function onPagamentoChange(){
     cartaoMostrarPainel(false);
     vpMostrarPainel(false);
     tfMostrarPainel(false);
+    avistaMostrarPainel(false);
     atualizarFormasPagamento('a_vista');
   }
   agendarCalculo();
@@ -3897,6 +3931,44 @@ function tfMostrarPainel(mostrar) {
     tfEntradaChange();
     atualizarTF();
   }
+}
+
+function avistaMostrarPainel(mostrar) {
+  const p = document.getElementById('painel-avista');
+  if (p) p.style.display = mostrar ? 'block' : 'none';
+  if (mostrar) {
+    const selE = document.getElementById('av-entrada-forma');
+    const selL = document.getElementById('av-liq-forma');
+    if (selE && !selE.options.length)
+      selE.innerHTML = _FORMAS_AVISTA.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+    if (selL && !selL.options.length)
+      selL.innerHTML = _FORMAS_AVISTA.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+    const dE = document.getElementById('av-entrada-data');
+    if (dE && !dE.value) dE.value = new Date().toISOString().split('T')[0];
+    avistaRecalcular();
+  }
+}
+
+function avistaRecalcular() {
+  const total   = _ayGetValorVenda() || 0;
+  const entrada = parseMoeda(document.getElementById('av-entrada-valor')?.value) || 0;
+  const saldo   = Math.max(0, total - entrada);
+  const elLiq = document.getElementById('av-liq-valor');
+  if (elLiq) elLiq.value = 'R$ ' + fmt(saldo);
+
+  const entradaData  = document.getElementById('av-entrada-data')?.value || '';
+  const liqData      = document.getElementById('av-liq-data')?.value || '';
+  const entradaForma = document.getElementById('av-entrada-forma')?.value || 'pix';
+  const liqForma     = document.getElementById('av-liq-forma')?.value || 'pix';
+
+  window._planoPagamento = {
+    tipo: 'avista', nome_forma: 'A Vista',
+    entrada_valor: entrada,
+    entrada_data: entradaData,
+    entrada_forma: entradaForma,
+    total_cliente: total, texto_cartao: '',
+    parcelas: saldo > 0 ? [{ num: 1, data: liqData, valor: saldo, forma: liqForma }] : [],
+  };
 }
 
 function tfDataContratoChange() {
