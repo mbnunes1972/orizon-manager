@@ -548,3 +548,19 @@ def test_preencher_grade_cartao_primeiro_campo():
     blob = " ".join(c.text for row in t3.rows for c in row.cells)
     assert "12x R$ 10.000,00" in c0
     assert _TRACO in blob
+
+
+def test_converter_pdf_nao_regenera_docx(monkeypatch):
+    import mod_contrato
+    chamou = {"preencher": False, "convert_path": None}
+    monkeypatch.setattr(mod_contrato, "preencher_contrato",
+                        lambda *a, **k: chamou.__setitem__("preencher", True) or "X")
+    def fake_run(cmd, **kw):
+        chamou["convert_path"] = cmd[-1]
+        class R: pass
+        return R()
+    monkeypatch.setattr(mod_contrato.subprocess, "run", fake_run)
+    out = mod_contrato._converter_pdf("/tmp/contrato_5.docx")
+    assert chamou["preencher"] is False
+    assert chamou["convert_path"] == "/tmp/contrato_5.docx"
+    assert out.endswith("contrato_5.pdf")

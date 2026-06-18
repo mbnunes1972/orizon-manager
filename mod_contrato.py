@@ -442,13 +442,8 @@ def _libreoffice_cmd() -> str:
     return "libreoffice"
 
 
-def gerar_pdf_contrato(contrato_id: int, variaveis: dict) -> str:
-    """
-    Preenche o modelo de contrato com os dados de variaveis e converte para PDF.
-    Retorna o caminho do PDF (ou .docx se LibreOffice indisponível).
-    """
-    docx_path = preencher_contrato(contrato_id, variaveis)
-
+def _converter_pdf(docx_path: str) -> str:
+    """Converte um .docx EXISTENTE em PDF (não regenera o docx). Retorna o caminho do PDF."""
     try:
         subprocess.run(
             [_libreoffice_cmd(), "--headless", "--convert-to", "pdf",
@@ -464,7 +459,17 @@ def gerar_pdf_contrato(contrato_id: int, variaveis: dict) -> str:
     except subprocess.TimeoutExpired:
         raise RuntimeError("LibreOffice demorou mais de 120s")
 
-    return os.path.join(CONTRATOS_DIR, f"contrato_{contrato_id}.pdf")
+    base = os.path.splitext(os.path.basename(docx_path))[0]
+    return os.path.join(CONTRATOS_DIR, f"{base}.pdf")
+
+
+def gerar_pdf_contrato(contrato_id: int, variaveis: dict) -> str:
+    """
+    Preenche o modelo de contrato com os dados de variaveis e converte para PDF.
+    Retorna o caminho do PDF (ou .docx se LibreOffice indisponível).
+    """
+    docx_path = preencher_contrato(contrato_id, variaveis)
+    return _converter_pdf(docx_path)
 
 
 # ── Legado — mantido para compatibilidade com chamadas antigas ────────────────
