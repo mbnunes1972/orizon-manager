@@ -445,3 +445,21 @@ def test_cabecalho_num_contrato_substituido():
     assert "17/06/2026" in blob
     assert "[Num_Contrato]" not in blob
     assert "Data_contrato" not in blob
+
+
+def test_template_oficial_tem_marcadores():
+    import os
+    from docx import Document
+    from mod_contrato import _MODELO
+    assert os.path.basename(_MODELO) == "modelo_contrato_mapeado.docx"
+    assert os.path.exists(_MODELO)
+    d = Document(_MODELO)
+    blob = "\n".join(p.text for p in d.paragraphs)
+    for t in d.tables:
+        for row in t.rows:
+            for c in row.cells:
+                blob += "\n" + c.text
+    assert "[NOME_CLIENTE]" in blob
+    assert "[TOTAL_CONTRATO]" in blob
+    assert "[DATA_PARCELA_1]" in blob
+    assert "[VALOR_PARCELA]" in blob

@@ -18,7 +18,7 @@ from docx.shared import Pt, RGBColor
 _THIS_DIR     = os.path.dirname(os.path.abspath(__file__))
 CONTRATOS_DIR = os.path.join(_THIS_DIR, "CONTRATOS")
 
-_MODELO = os.path.join(_THIS_DIR, "modelo_contrato_final.docx")
+_MODELO = os.path.join(_THIS_DIR, "modelo_contrato_mapeado.docx")
 
 _TELEFONE_LOJA = "(12) 3341-8777"
 _EMAIL_LOJA    = "sac@dalmobilesjc.com.br"
