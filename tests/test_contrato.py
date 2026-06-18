@@ -532,3 +532,38 @@ def test_substituir_marcadores_em_tabela():
     _substituir_marcadores(d, {"NOME_CLIENTE": "Bia"})
     assert "Bia" in t.rows[0].cells[0].text
     assert "[NOME_CLIENTE]" not in t.rows[0].cells[0].text
+
+
+# ── Grade de parcelas por posição (valor+data, traços, cartão) ─────────────────
+
+def test_preencher_grade_valores_datas_e_tracos():
+    from docx import Document
+    from mod_contrato import _MODELO, _preencher_grade, _TRACO
+    d = Document(_MODELO)
+    pag = {"tipo": "aymore", "num_parcelas_int": 2,
+           "valores": ["R$ 4.820,00", "R$ 4.820,00"] + [""] * 22,
+           "datas":   ["18/07/2026", "17/08/2026"] + [""] * 22,
+           "texto_cartao": ""}
+    _preencher_grade(d, pag)
+    t3 = d.tables[3]
+    blob = " ".join(c.text for row in t3.rows for c in row.cells)
+    assert "R$ 4.820,00" in blob
+    assert "18/07/2026" in blob and "17/08/2026" in blob
+    assert _TRACO in blob
+    assert "[VALOR_PARCELA]" not in blob
+    assert "[DATA_PARCELA_3]" not in blob
+    assert len(t3.rows) == 11
+
+
+def test_preencher_grade_cartao_primeiro_campo():
+    from docx import Document
+    from mod_contrato import _MODELO, _preencher_grade, _TRACO
+    d = Document(_MODELO)
+    _preencher_grade(d, {"tipo": "cartao", "num_parcelas_int": 0,
+                         "valores": [""] * 24, "datas": [""] * 24,
+                         "texto_cartao": "12x R$ 10.000,00"})
+    t3 = d.tables[3]
+    c0 = t3.rows[3].cells[0].text
+    blob = " ".join(c.text for row in t3.rows for c in row.cells)
+    assert "12x R$ 10.000,00" in c0
+    assert _TRACO in blob

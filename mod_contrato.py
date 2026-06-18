@@ -187,6 +187,56 @@ def _set_para(para, text: str, rotulo: str = None):
         run.bold = bold
 
 
+def _set_cell_text(cell, txt):
+    """Escreve txt no 1º parágrafo da célula, preservando o estilo; zera runs extras."""
+    par = cell.paragraphs[0]
+    if par.runs:
+        par.runs[0].text = txt
+        for r in par.runs[1:]:
+            r.text = ""
+    else:
+        par.text = txt
+    for extra in cell.paragraphs[1:]:
+        for r in extra.runs:
+            r.text = ""
+
+
+def _preencher_grade(doc, pag):
+    """Preenche a grade de parcelas (tabela 3, linhas 3-10) por posição.
+
+    Cada linha tem 6 células ÚNICAS no padrão (valor, data) × 3, embora a célula
+    de data do meio seja mesclada e apareça duplicada em ``row.cells``. Usamos
+    ``_unique_cells`` para indexar os pares (0,1), (2,3), (4,5) corretamente.
+
+    Regras:
+      - parcela p (1-based) válida (p <= num e valores[p-1] não vazio):
+        valor na célula de valor; data (ou _TRACO se vazia) na célula de data.
+      - slot vazio: _TRACO em ambas as células.
+      - cartão: 1ª célula de valor = texto_cartao, sua data = ""; resto = _TRACO.
+    """
+    tipo    = pag.get("tipo", "")
+    num     = pag.get("num_parcelas_int", 0)
+    valores = pag.get("valores", [""] * 24)
+    datas   = pag.get("datas",   [""] * 24)
+    texto   = pag.get("texto_cartao", "")
+    t3 = doc.tables[3]
+    for gi, row_idx in enumerate(range(3, 11)):
+        cells = _unique_cells(t3.rows[row_idx])
+        for j, (vcol, dcol) in enumerate([(0, 1), (2, 3), (4, 5)]):
+            if dcol >= len(cells):
+                break
+            p = gi * 3 + j + 1
+            if tipo == "cartao":
+                _set_cell_text(cells[vcol], texto if p == 1 else _TRACO)
+                _set_cell_text(cells[dcol], "" if p == 1 else _TRACO)
+            elif p <= num and valores[p-1]:
+                _set_cell_text(cells[vcol], valores[p-1])
+                _set_cell_text(cells[dcol], datas[p-1] or _TRACO)
+            else:
+                _set_cell_text(cells[vcol], _TRACO)
+                _set_cell_text(cells[dcol], _TRACO)
+
+
 def _relabel_cpf_cnpj(doc):
     """Substitui 'CPF' por 'CPF/CNPJ' em parágrafos e células, sem duplicar."""
     def fix(para):
