@@ -421,6 +421,9 @@ def _montar_mapping(ctx, pag):
         "TESTEMUNHA_1_DOC":  _TESTEMUNHAS[0][1],
         "TESTEMUNHA_2_NOME": _TESTEMUNHAS[1][0],
         "TESTEMUNHA_2_DOC":  _TESTEMUNHAS[1][1],
+        "NOME_TESTEMUNHA_1": _TESTEMUNHAS[0][0],
+        "NOME_TESTEMUNHA2":  _TESTEMUNHAS[1][0],
+        "NOME_TESTEMUNHA_2": _TESTEMUNHAS[1][0],
     }
 
 

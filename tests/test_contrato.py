@@ -687,3 +687,49 @@ def test_montar_mapping_inclui_tipo():
     m = _montar_mapping(ctx, pag)
     assert m["TIPO"] == "Boleto"
     assert m["FORMA_ENTRADA"] == "Pix"
+
+
+def test_template_tem_marcador_tipo():
+    import os
+    from docx import Document
+    from mod_contrato import _MODELO
+    assert os.path.exists(_MODELO)
+    d = Document(_MODELO)
+    blob = "\n".join(p.text for p in d.paragraphs)
+    for t in d.tables:
+        for row in t.rows:
+            for c in row.cells:
+                blob += "\n" + c.text
+    assert "[TIPO]" in blob
+    assert "[NUM_PARCELAS]" in blob
+
+
+def test_geracao_completa_com_forma_parcela():
+    import os, json, re
+    from docx import Document
+    from mod_contrato import preencher_contrato, construir_contexto
+    ctx = construir_contexto(
+        cliente={"nome": "Ana", "cpf": "1", "email": "a@x.com", "telefone": "(12)9",
+                 "logradouro": "Rua A", "numero": "10", "complemento": "", "bairro": "Centro",
+                 "cidade": "SJC", "cep": "12000", "estado": "SP", "inst_mesmo_residencial": True,
+                 "inst_logradouro": "", "inst_numero": "", "inst_complemento": "",
+                 "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": ""},
+        usuario={"nome": "Z", "telefone": "", "email": ""},
+        forma_pagamento_json=json.dumps({
+            "tipo": "venda_programada", "nome_forma": "Venda Programada",
+            "entrada_valor": 1000, "entrada_data": "2026-06-18", "entrada_forma": "pix",
+            "total_cliente": 5000.0, "texto_cartao": "",
+            "parcelas": [{"num": i+1, "data": f"18/{7+i:02d}/2026", "valor": 2000.0,
+                          "forma": "cheque"} for i in range(2)]}))
+    ctx["num_contrato"] = "INS-2026-06-18-001"; ctx["data_contrato"] = "18/06/2026"
+    path = preencher_contrato(93001, ctx)
+    doc = Document(path)
+    blob = "\n".join(p.text for p in doc.paragraphs)
+    for t in doc.tables:
+        for row in t.rows:
+            for c in row.cells:
+                blob += "\n" + c.text
+    os.remove(path)
+    assert "Cheque" in blob
+    assert "Pix" in blob
+    assert re.findall(r'\[[A-Za-z0-9_ ]+\]', blob) == []
