@@ -68,16 +68,44 @@ O Claude Code lê os arquivos diretamente — não precisa colar o conteúdo.
 - Nunca editar arquivos diretamente no servidor — sempre via git pull
 - Branch padrão: `main`
 
-### Servidor de desenvolvimento
-- IP: `167.88.33.121` | Porta: `8765`
-- Acesso: `ssh root@167.88.33.121`
-- App roda em screen: `screen -r omie`
-- Para atualizar: `cd /root/omie_v3 && git pull && pkill -f "python3 main.py" && python3 main.py`
+### Servidor de produção/DEV
+- IP: `167.88.33.121` | Porta: `8765` | URL: `http://167.88.33.121:8765`
+- Acesso: `ssh root@167.88.33.121` | Projeto em `/root/omie_v3`
+- App roda em screen `omie_v3` (Detached), iniciado com `OMIE_HOST=0.0.0.0` (bind externo)
+  e log em `app.log`. Ver: `screen -r omie_v3` (sair sem matar: `Ctrl+A` depois `D`).
+- **Bind:** `main.py` lê `OMIE_HOST` (padrão `127.0.0.1` no dev local). Em produção
+  é obrigatório `OMIE_HOST=0.0.0.0`, senão o app fica acessível só por localhost.
+- **Firewall:** a porta 8765/TCP precisa estar liberada (`ufw allow 8765/tcp` e,
+  se houver, no painel do provedor do VPS).
+
+#### Runbook de deploy (rodar no servidor via ssh)
+```bash
+cd /root/omie_v3
+pkill -f main.py; sleep 1
+for s in $(screen -ls | grep -oE '[0-9]+\.omie_v3'); do screen -S "$s" -X quit; done
+screen -wipe
+git fetch origin && git reset --hard origin/main
+# Dependências (Ubuntu 24.04 / PEP 668 — usar apt, não pip):
+apt install -y python3-docx python3-openpyxl python3-requests python3-sqlalchemy
+ufw allow 8765/tcp 2>/dev/null
+# Banco descartável no servidor (recria limpo + usuários). OMITIR se for preservar dados.
+rm -f omie.db && python3 seed.py
+# Sobe em screen, bind externo, com log:
+screen -S omie_v3 -dm bash -c 'cd /root/omie_v3 && OMIE_HOST=0.0.0.0 python3 main.py > app.log 2>&1'
+sleep 3; ss -ltnp | grep 8765; tail -8 app.log
+curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:8765   # esperado: 302
+```
 
 ### Banco de dados
-- SQLite local: `omie.db` na raiz do projeto
-- Para recriar usuários: `python seed.py`
-- Migrações futuras: usar SQLAlchemy (já configurado)
+- SQLite: `omie.db` na raiz — **NÃO versionado** (está no `.gitignore`); cada ambiente
+  tem o seu. Não comitar `omie.db`.
+- Para recriar usuários (ou um banco novo): `python seed.py` (cria schema via `init_db` + usuários)
+- Migrações: SQLAlchemy + `_migrar_colunas`/`schema_migrations` (já configurado)
+
+### Dependências
+- Listadas em `requirements.txt`. Local: `pip install -r requirements.txt`.
+- Servidor (Ubuntu 24.04, PEP 668): instalar via `apt` (ver runbook) — `pip install`
+  system-wide é bloqueado (`externally-managed-environment`).
 
 ### Testes básicos após cada mudança
 1. Login com cada nível (Consultor, Gerente, Diretor)
