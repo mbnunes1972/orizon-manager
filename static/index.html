@@ -6496,6 +6496,14 @@ function renderCiclo() {
     `;
     panel.appendChild(card);
   }
+  // Botão "Voltar" também ao final da lista de etapas (usabilidade)
+  const rodape = document.createElement('div');
+  rodape.style.cssText = 'margin-top:14px;display:flex';
+  rodape.innerHTML = `
+    <button onclick="fecharCiclo()" style="background:none;border:1px solid var(--dalm-gold);
+      border-radius:6px;color:var(--dalm-gold);cursor:pointer;font-size:.9rem;padding:6px 14px;
+      display:flex;align-items:center;gap:6px;">&#x2190; Voltar</button>`;
+  panel.appendChild(rodape);
 }
 
 function toggleCicloCard(codigo) {
