@@ -638,3 +638,52 @@ def test_converter_pdf_nao_regenera_docx(monkeypatch):
     assert chamou["preencher"] is False
     assert chamou["convert_path"] == "/tmp/contrato_5.docx"
     assert out.endswith("contrato_5.pdf")
+
+
+# ── Forma de pagamento: rótulos pt-BR + forma_parcela + marcador TIPO ──────────
+
+def test_forma_label_mapeia_codigos():
+    from mod_contrato import _forma_label
+    assert _forma_label("pix") == "Pix"
+    assert _forma_label("ted") == "TED"
+    assert _forma_label("transferencia") == "TED"
+    assert _forma_label("boleto") == "Boleto"
+    assert _forma_label("cheque") == "Cheque"
+    assert _forma_label("dinheiro") == "Dinheiro"
+    assert _forma_label("cartao_credito") == "Cartão de Crédito"
+    assert _forma_label("") == ""
+    assert _forma_label("Boleto") == "Boleto"   # já-rótulo passa adiante
+
+
+def test_parse_pagamento_forma_parcela_de_parcelas():
+    import json
+    from mod_contrato import _parse_pagamento
+    pag = json.dumps({
+        "tipo": "venda_programada", "nome_forma": "Venda Programada",
+        "entrada_valor": 1000, "entrada_forma": "pix", "total_cliente": 5000,
+        "parcelas": [
+            {"num": 1, "data": "10/07/2026", "valor": 2000.0, "forma": "cheque"},
+            {"num": 2, "data": "10/08/2026", "valor": 2000.0, "forma": "cheque"},
+        ],
+    })
+    d = _parse_pagamento(pag)
+    assert d["entrada_tipo"] == "Pix"
+    assert d["forma_parcela"] == "Cheque"
+
+
+def test_parse_pagamento_forma_parcela_cartao():
+    import json
+    from mod_contrato import _parse_pagamento
+    d = _parse_pagamento(json.dumps({
+        "tipo": "cartao", "nome_forma": "Cartão de Crédito",
+        "texto_cartao": "12x R$ 10.000,00", "total_cliente": 120000, "parcelas": []}))
+    assert d["forma_parcela"] == "Cartão de Crédito"
+
+
+def test_montar_mapping_inclui_tipo():
+    from mod_contrato import _montar_mapping
+    ctx = {}
+    pag = {"forma_parcela": "Boleto", "entrada_tipo": "Pix", "num_parcelas": "3"}
+    m = _montar_mapping(ctx, pag)
+    assert m["TIPO"] == "Boleto"
+    assert m["FORMA_ENTRADA"] == "Pix"
