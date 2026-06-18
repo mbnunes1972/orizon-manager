@@ -88,17 +88,19 @@ def test_construir_contexto_aymore():
         "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": "",
     }
     usuario = {"nome": "Pedro", "telefone": None, "email": "pedro@loja.com"}
-    # Formato _capturarPagamento (datas já em DD/MM/YYYY)
+    # Estrutura NOVA (_capturarPagamento): parcelas com valor numérico, total_cliente
     forma = json.dumps({
         "tipo": "aymore",
         "nome_forma": "Financiamento Aymoré",
         "entrada_valor": 5000.0,
         "entrada_forma": "Boleto",
         "entrada_data": "2026-07-15",
+        "total_cliente": 3000.0,
+        "texto_cartao": "",
         "parcelas": [
-            {"seq": 1, "descricao": "Parcela 01", "data": "15/08/2026", "valor": "R$ 1.000,00", "forma": "Boleto"},
-            {"seq": 2, "descricao": "Parcela 02", "data": "15/09/2026", "valor": "R$ 1.000,00", "forma": "Boleto"},
-            {"seq": 3, "descricao": "Parcela 03", "data": "15/10/2026", "valor": "R$ 1.000,00", "forma": "Boleto"},
+            {"num": 1, "data": "15/08/2026", "valor": 1000.0},
+            {"num": 2, "data": "15/09/2026", "valor": 1000.0},
+            {"num": 3, "data": "15/10/2026", "valor": 1000.0},
         ]
     })
     ctx = construir_contexto(cliente, usuario, forma)
@@ -107,10 +109,14 @@ def test_construir_contexto_aymore():
     assert ctx["consultor_email"] == "pedro@loja.com"
     assert ctx["cliente_nome"] == "João Silva"
     assert ctx["inst_logradouro"] == "Rua A"           # mesmo endereço residencial
-    assert ctx["pgto_entrada_valor"] == "R$ 5.000,00"
-    assert ctx["p01_data"] == "15/08/2026"
-    assert ctx["p02_data"] == "15/09/2026"
-    assert ctx["p04_data"] == "—"                      # parcelas além de 3 = "—"
+    pag = ctx["_pag"]
+    assert pag["entrada_valor"] == "R$ 5.000,00"
+    assert pag["valor_contrato"] == "R$ 3.000,00"
+    assert pag["num_parcelas_int"] == 3
+    assert pag["valores"][0] == "R$ 1.000,00"
+    assert pag["datas"][0] == "15/08/2026"
+    assert pag["datas"][1] == "15/09/2026"
+    assert pag["datas"][3] == ""                       # parcelas além de 3 = ""
     assert "data_contrato" in ctx
 
 
@@ -128,13 +134,17 @@ def test_construir_contexto_cartao():
     forma = json.dumps({
         "tipo": "cartao", "nome_forma": "Cartão de Crédito",
         "entrada_valor": 0, "entrada_data": "", "parcelas": [],
+        "texto_cartao": "12x R$ 10.000,00", "total_cliente": 120000,
     })
     ctx = construir_contexto(cliente, usuario, forma)
     assert ctx["consultor_tel"] == "12988880000"
     assert ctx["consultor_email"] == "sac@dalmobilesjc.com.br"   # fallback email
-    assert ctx["p01_data"] == "—"
-    assert ctx["p12_data"] == "—"
-    assert ctx["p24_data"] == "—"
+    pag = ctx["_pag"]
+    assert pag["num_parcelas_int"] == 0
+    assert pag["texto_cartao"] == "12x R$ 10.000,00"
+    assert pag["valor_contrato"] == "R$ 120.000,00"
+    assert pag["datas"] == [""] * 24
+    assert pag["valores"] == [""] * 24
 
 
 def test_construir_contexto_total_flex():
@@ -151,9 +161,9 @@ def test_construir_contexto_total_flex():
     forma = json.dumps({
         "tipo": "tf", "nome_forma": "Total Flex",
         "entrada_valor": 3000.0, "entrada_data": "01/07/2026",
+        "total_cliente": 10000.0, "texto_cartao": "",
         "parcelas": [
-            {"seq": i, "descricao": f"Parcela {i:02d}", "data": f"10/{6+i:02d}/2026",
-             "valor": "R$ 2.000,00", "forma": "Boleto"}
+            {"num": i, "data": f"10/{6+i:02d}/2026", "valor": 2000.0}
             for i in range(1, 6)
         ]
     })
@@ -161,9 +171,12 @@ def test_construir_contexto_total_flex():
     assert ctx["consultor_tel"] == "(12) 3341-8777"
     assert ctx["inst_logradouro"] == "Rua C"
     assert ctx["res_logradouro"] == "Av B"
-    assert ctx["p01_data"] == "10/07/2026"
-    assert ctx["p05_data"] == "10/11/2026"
-    assert ctx["p06_data"] == "—"
+    pag = ctx["_pag"]
+    assert pag["num_parcelas_int"] == 5
+    assert pag["datas"][0] == "10/07/2026"
+    assert pag["datas"][4] == "10/11/2026"
+    assert pag["datas"][5] == ""
+    assert pag["valores"][0] == "R$ 2.000,00"
 
 
 def _cliente_completo():
@@ -265,54 +278,52 @@ def test_preencher_signatario_e_testemunhas(tmp_path):
     assert "Felipe Guizalberte" in full
 
 
-def test_contrato_cpf_vira_cpf_cnpj():
-    import os, re
-    from mod_contrato import preencher_contrato, _MODELO, construir_contexto
-    if not os.path.exists(_MODELO):
-        return
+# NOTA: testes removidos nesta tarefa (comportamento intencionalmente eliminado,
+# agora responsabilidade do modelo modelo_contrato_mapeado.docx):
+#   - test_contrato_cpf_vira_cpf_cnpj: o relabel "CPF"->"CPF/CNPJ" era feito em
+#     codigo (_relabel_cpf_cnpj, removido); o modelo ja traz "CPF/CNPJ" no texto.
+#   - test_contrato_tags_nomenclatura: os rotulos cinza Pt-7 (_set_cell rotulo=)
+#     foram removidos; o modelo ja contem os rotulos fixos das celulas.
+
+
+def test_geracao_completa_sem_marcadores_remanescentes():
+    import os, json, re
     from docx import Document
+    from docx.oxml.ns import qn
+    from mod_contrato import preencher_contrato, construir_contexto
     ctx = construir_contexto(
-        cliente={"nome": "X", "cpf": "1", "email": "", "telefone": "",
-                 "logradouro": "", "numero": "", "complemento": "", "bairro": "",
-                 "cidade": "", "cep": "", "estado": "", "inst_mesmo_residencial": True,
-                 "inst_logradouro": "", "inst_numero": "", "inst_complemento": "",
-                 "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": ""},
-        usuario={"nome": "Y", "telefone": "", "email": ""}, forma_pagamento_json="")
-    path = preencher_contrato(91002, ctx)
+        cliente={"nome": "Ana Cliente", "cpf": "111.222.333-44", "email": "a@x.com",
+                 "telefone": "(12) 90000-0000", "logradouro": "Rua A", "numero": "10",
+                 "complemento": "ap 1", "bairro": "Centro", "cidade": "SJC", "cep": "12000-000",
+                 "estado": "SP", "inst_mesmo_residencial": True, "inst_logradouro": "",
+                 "inst_numero": "", "inst_complemento": "", "inst_bairro": "", "inst_cidade": "",
+                 "inst_cep": "", "inst_uf": ""},
+        usuario={"nome": "Consultor Z", "telefone": "(12) 91111-1111", "email": "z@x.com"},
+        forma_pagamento_json=json.dumps({
+            "tipo": "aymore", "nome_forma": "Financiamento Aymoré",
+            "entrada_valor": 20000, "entrada_data": "2026-06-18", "entrada_forma": "pix",
+            "total_cliente": 129572.01, "texto_cartao": "",
+            "parcelas": [{"num": i+1, "data": f"18/{7+i:02d}/2026", "valor": 4820.0} for i in range(3)]}))
+    ctx["num_contrato"]  = "INS-2026-06-17-009"
+    ctx["data_contrato"] = "17/06/2026"
+    path = preencher_contrato(92001, ctx)
     doc = Document(path)
-    texts = [p.text for p in doc.paragraphs]
-    for tb in doc.tables:
-        for row in tb.rows:
+    blob = "\n".join(p.text for p in doc.paragraphs)
+    for t in doc.tables:
+        for row in t.rows:
             for c in row.cells:
-                texts.append(c.text)
+                blob += "\n" + c.text
+    for sec in doc.sections:
+        for h in (sec.header,):
+            blob += "\n" + "\n".join(tt.text or "" for tt in h._element.iter(qn('w:t')))
     os.remove(path)
-    blob = " ".join(texts)
-    assert re.search(r'CPF(?!/CNPJ)', blob) is None
-    assert "CPF/CNPJ/CNPJ" not in blob
-
-
-def test_contrato_tags_nomenclatura():
-    import os
-    from mod_contrato import preencher_contrato, _MODELO, construir_contexto
-    if not os.path.exists(_MODELO):
-        return
-    from docx import Document
-    from docx.shared import Pt
-    ctx = construir_contexto(
-        cliente={"nome": "Ana", "cpf": "1", "email": "a@x.com", "telefone": "(12)9",
-                 "logradouro": "Rua A", "numero": "10", "complemento": "", "bairro": "Centro",
-                 "cidade": "SJC", "cep": "12000", "estado": "SP", "inst_mesmo_residencial": True,
-                 "inst_logradouro": "", "inst_numero": "", "inst_complemento": "",
-                 "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": ""},
-        usuario={"nome": "Y", "telefone": "", "email": ""}, forma_pagamento_json="")
-    path = preencher_contrato(91003, ctx)
-    doc = Document(path)
-    cell = doc.tables[0].rows[1].cells[0]
-    runs = cell.paragraphs[0].runs
-    os.remove(path)
-    rotulos = [r.text for r in runs if r.font.size == Pt(7)]
-    assert "Nome" in rotulos
-    assert "Ana" in cell.text
+    sobra = re.findall(r'\[[A-Za-z0-9_ ]+\]', blob)
+    assert sobra == [], f"marcadores não substituídos: {sobra}"
+    assert "Ana Cliente" in blob
+    assert "INS-2026-06-17-009" in blob and "17/06/2026" in blob
+    assert "R$ 129.572,01" in blob
+    assert "R$ 4.820,00" in blob
+    assert "Jaime Perinazzo" in blob and "Felipe Guizalberte" in blob
 
 
 # ── Número do contrato ─────────────────────────────────────────────────────────
@@ -383,42 +394,12 @@ def _ctx_parcelas(n):
                                           "parcelas": parcelas}))
 
 
-def test_grade_ordinais_valores_traços_e_linhas_removidas():
-    import os
-    from mod_contrato import preencher_contrato, _MODELO
-    if not os.path.exists(_MODELO):
-        return
-    from docx import Document
-    ctx = _ctx_parcelas(5)
-    path = preencher_contrato(91004, ctx)
-    doc = Document(path)
-    t3 = doc.tables[3]
-    blob = " ".join(c.text for row in t3.rows for c in row.cells)
-    n_rows = len(t3.rows)
-    os.remove(path)
-    # ordinais + valores nas 5 parcelas
-    assert "1ª" in blob and "R$ 100,00" in blob
-    assert "5ª" in blob and "R$ 500,00" in blob
-    # parcela 6 (slot vazio na linha) vira traços, não "6ª"
-    assert "6ª" not in blob
-    assert "--------" in blob
-    # linhas das parcelas 7..24 removidas: header(3) + 2 linhas de grade = 5 linhas
-    assert "7ª" not in blob
-    assert n_rows == 5
-
-
-def test_grade_a_vista_remove_todas_as_linhas():
-    import os
-    from mod_contrato import preencher_contrato, _MODELO
-    if not os.path.exists(_MODELO):
-        return
-    from docx import Document
-    ctx = _ctx_parcelas(0)         # à vista: nenhuma parcela
-    path = preencher_contrato(91005, ctx)
-    doc = Document(path)
-    n_rows = len(doc.tables[3].rows)
-    os.remove(path)
-    assert n_rows == 3             # só as 3 linhas de cabeçalho da seção
+# NOTA: testes removidos nesta tarefa (comportamento intencionalmente eliminado):
+#   - test_grade_ordinais_valores_tracos_e_linhas_removidas: a grade nao usa mais
+#     ordinais ("Nª") e nao remove linhas; _preencher_grade preenche por posicao
+#     (valor+data, _TRACO nos slots vazios) preservando as 11 linhas da tabela.
+#   - test_grade_a_vista_remove_todas_as_linhas: idem; linhas nao sao mais removidas.
+#     Cobertura atual: test_preencher_grade_* e test_geracao_completa_*.
 
 
 # ── Cabeçalho: num_contrato e data_contrato ───────────────────────────────────
@@ -445,3 +426,125 @@ def test_cabecalho_num_contrato_substituido():
     assert "17/06/2026" in blob
     assert "[Num_Contrato]" not in blob
     assert "Data_contrato" not in blob
+
+
+def test_template_oficial_tem_marcadores():
+    import os
+    from docx import Document
+    from mod_contrato import _MODELO
+    assert os.path.basename(_MODELO) == "modelo_contrato_mapeado.docx"
+    assert os.path.exists(_MODELO)
+    d = Document(_MODELO)
+    blob = "\n".join(p.text for p in d.paragraphs)
+    for t in d.tables:
+        for row in t.rows:
+            for c in row.cells:
+                blob += "\n" + c.text
+    assert "[NOME_CLIENTE]" in blob
+    assert "[TOTAL_CONTRATO]" in blob
+    assert "[DATA_PARCELA_1]" in blob
+    assert "[VALOR_PARCELA]" in blob
+
+
+def test_parse_pagamento_estrutura_real():
+    import json
+    from mod_contrato import _parse_pagamento
+    pag = json.dumps({
+        "tipo": "aymore", "nome_forma": "Financiamento Aymoré",
+        "entrada_valor": 20000, "entrada_data": "2026-06-18", "entrada_forma": "pix",
+        "total_cliente": 129572.01, "texto_cartao": "",
+        "parcelas": [
+            {"num": 1, "data": "18/07/2026", "valor": 4820.00},
+            {"num": 2, "data": "17/08/2026", "valor": 4820.00},
+        ],
+    })
+    d = _parse_pagamento(pag)
+    assert d["num_parcelas_int"] == 2
+    assert d["valores"][0] == "R$ 4.820,00"
+    assert d["valores"][1] == "R$ 4.820,00"
+    assert d["valores"][2] == ""
+    assert d["datas"][0] == "18/07/2026"
+    assert d["datas"][2] == ""
+    assert d["valor_contrato"] == "R$ 129.572,01"
+    assert len(d["valores"]) == 24 and len(d["datas"]) == 24
+
+
+def test_parse_pagamento_cartao_texto():
+    import json
+    from mod_contrato import _parse_pagamento
+    d = _parse_pagamento(json.dumps({
+        "tipo": "cartao", "nome_forma": "Cartão de Crédito",
+        "texto_cartao": "12x R$ 10.000,00", "total_cliente": 120000, "parcelas": []}))
+    assert d["texto_cartao"] == "12x R$ 10.000,00"
+    assert d["num_parcelas_int"] == 0
+    assert d["valores"] == [""] * 24
+    assert d["valor_contrato"] == "R$ 120.000,00"
+
+
+def test_substituir_marcadores_basico():
+    from docx import Document
+    from mod_contrato import _substituir_marcadores
+    d = Document()
+    d.add_paragraph("Cliente: [NOME_CLIENTE] CPF/CNPJ: [CPF]")
+    d.add_paragraph("Desconhecido: [NAO_EXISTE]")
+    _substituir_marcadores(d, {"NOME_CLIENTE": "Ana Lima", "CPF": "111.222.333-44"})
+    txt = "\n".join(p.text for p in d.paragraphs)
+    assert "Cliente: Ana Lima CPF/CNPJ: 111.222.333-44" in txt
+    assert "[NAO_EXISTE]" in txt          # desconhecido permanece
+
+
+def test_substituir_marcadores_case_e_duplo_colchete():
+    from docx import Document
+    from mod_contrato import _substituir_marcadores
+    d = Document()
+    d.add_paragraph("N: [Num_Contrato]  D: [[Data_contrato]")
+    _substituir_marcadores(d, {"NUM_CONTRATO": "INS-2026-06-17-001", "DATA_CONTRATO": "17/06/2026"})
+    txt = d.paragraphs[0].text
+    assert "INS-2026-06-17-001" in txt and "17/06/2026" in txt
+    assert "[" not in txt
+
+
+def test_substituir_marcadores_em_tabela():
+    from docx import Document
+    from mod_contrato import _substituir_marcadores
+    d = Document()
+    t = d.add_table(rows=1, cols=1)
+    t.rows[0].cells[0].paragraphs[0].add_run("Nome\n[NOME_CLIENTE]")
+    _substituir_marcadores(d, {"NOME_CLIENTE": "Bia"})
+    assert "Bia" in t.rows[0].cells[0].text
+    assert "[NOME_CLIENTE]" not in t.rows[0].cells[0].text
+
+
+# ── Grade de parcelas por posição (valor+data, traços, cartão) ─────────────────
+
+def test_preencher_grade_valores_datas_e_tracos():
+    from docx import Document
+    from mod_contrato import _MODELO, _preencher_grade, _TRACO
+    d = Document(_MODELO)
+    pag = {"tipo": "aymore", "num_parcelas_int": 2,
+           "valores": ["R$ 4.820,00", "R$ 4.820,00"] + [""] * 22,
+           "datas":   ["18/07/2026", "17/08/2026"] + [""] * 22,
+           "texto_cartao": ""}
+    _preencher_grade(d, pag)
+    t3 = d.tables[3]
+    blob = " ".join(c.text for row in t3.rows for c in row.cells)
+    assert "R$ 4.820,00" in blob
+    assert "18/07/2026" in blob and "17/08/2026" in blob
+    assert _TRACO in blob
+    assert "[VALOR_PARCELA]" not in blob
+    assert "[DATA_PARCELA_3]" not in blob
+    assert len(t3.rows) == 11
+
+
+def test_preencher_grade_cartao_primeiro_campo():
+    from docx import Document
+    from mod_contrato import _MODELO, _preencher_grade, _TRACO
+    d = Document(_MODELO)
+    _preencher_grade(d, {"tipo": "cartao", "num_parcelas_int": 0,
+                         "valores": [""] * 24, "datas": [""] * 24,
+                         "texto_cartao": "12x R$ 10.000,00"})
+    t3 = d.tables[3]
+    c0 = t3.rows[3].cells[0].text
+    blob = " ".join(c.text for row in t3.rows for c in row.cells)
+    assert "12x R$ 10.000,00" in c0
+    assert _TRACO in blob
