@@ -29,8 +29,28 @@ _TESTEMUNHAS = [
     ("Felipe Guizalberte",  "yyy.yyy.yyy-yy"),
 ]
 
+_CODIGO_LOJA = "INS"       # 3 letras da loja — TODO: vir do painel de configuração de loja
+_TRACO       = "--------"  # preenche slots de parcela inexistentes
+
 
 # ── Utilitários ───────────────────────────────────────────────────────────────
+
+
+def gerar_num_contrato(existing_nums, loja: str = _CODIGO_LOJA, data=None) -> str:
+    """Próximo número de contrato no formato 'LOJA-AAAA-MM-DD-SEQ'.
+
+    `existing_nums`: iterável com os num_contrato já existentes (qualquer loja).
+    A sequência (SEQ) é CONTÍNUA por loja (máximo existente + 1), não reinicia por dia.
+    """
+    data = data or datetime.now()
+    pref = f"{loja}-"
+    maxseq = 0
+    for n in (existing_nums or []):
+        if n and n.startswith(pref):
+            tail = n.rsplit("-", 1)[-1]
+            if tail.isdigit():
+                maxseq = max(maxseq, int(tail))
+    return f"{loja}-{data:%Y-%m-%d}-{maxseq + 1:03d}"
 
 def calcular_hash_assinatura(nome: str, cpf: str, contrato_id: int, timestamp: str) -> str:
     dados = f"{nome}|{cpf}|{contrato_id}|{timestamp}"
@@ -128,6 +148,28 @@ def _relabel_cpf_cnpj(doc):
                     fix(para)
 
 
+def _preencher_cabecalho(doc, ctx):
+    """Substitui os marcadores [Num_Contrato] e [Data_contrato] nos cabeçalhos.
+
+    Os marcadores ficam numa caixa de texto do cabeçalho, então iteramos os
+    elementos <w:t> via XML (cobre txbxContent). Tolera bracket extra ('[[').
+    """
+    from docx.oxml.ns import qn
+    num  = str(ctx.get("num_contrato", "") or "")
+    data = str(ctx.get("data_contrato", "") or "")
+
+    def fix(text):
+        text = _re_cpf.sub(r'\[+\s*num[_ ]?contrato\s*\]',  num,  text, flags=_re_cpf.I)
+        text = _re_cpf.sub(r'\[+\s*data[_ ]?contrato\s*\]', data, text, flags=_re_cpf.I)
+        return text
+
+    for sec in doc.sections:
+        for hdr in (sec.header, sec.first_page_header, sec.even_page_header):
+            for t_el in hdr._element.iter(qn('w:t')):
+                if t_el.text and '[' in t_el.text:
+                    t_el.text = fix(t_el.text)
+
+
 # ── Parser de pagamento ───────────────────────────────────────────────────────
 
 def _parse_pagamento(pag_json_str: str) -> dict:
@@ -159,25 +201,27 @@ def _parse_pagamento(pag_json_str: str) -> dict:
     if parcelas:
         data_primeira = _formatar_data_br(parcelas[0].get("data") or "")
 
-    # Grade p01..p24 — lê datas diretamente das parcelas capturadas
-    datas = []
-    if tipo == "cartao":
-        datas = ["—"] * 24
-    else:
+    # Grade p01..p24 — datas e valores diretamente das parcelas capturadas
+    datas, valores = [], []
+    if tipo != "cartao":
         for p in parcelas:
             datas.append(_formatar_data_br(p.get("data") or ""))
-        datas = (datas + ["—"] * 24)[:24]
+            valores.append((p.get("valor") or "").strip())
+    datas   = (datas   + ["—"] * 24)[:24]
+    valores = (valores + [""]  * 24)[:24]
 
     return {
-        "tipo":           tipo,
-        "nome_forma":     nome_forma,
-        "entrada_valor":  _formatar_valor(entrada_val),
-        "entrada_tipo":   entrada_tipo,
-        "entrada_data":   entrada_data,
-        "modalidade":     nome_forma,
-        "num_parcelas":   str(num_parcelas) if num_parcelas else "—",
-        "data_primeira":  data_primeira,
-        "datas":          datas,          # lista de 24 strings
+        "tipo":             tipo,
+        "nome_forma":       nome_forma,
+        "entrada_valor":    _formatar_valor(entrada_val),
+        "entrada_tipo":     entrada_tipo,
+        "entrada_data":     entrada_data,
+        "modalidade":       nome_forma,
+        "num_parcelas":     str(num_parcelas) if num_parcelas else "—",
+        "num_parcelas_int": num_parcelas,
+        "data_primeira":    data_primeira,
+        "datas":            datas,          # lista de 24 strings (data ou "—")
+        "valores":          valores,        # lista de 24 strings (valor ou "")
     }
 
 
@@ -298,17 +342,31 @@ def preencher_contrato(contrato_id: int, ctx: dict) -> str:
         _set_cell(r2u[0], pag.get("modalidade",    ""), rotulo="Modalidade")
         _set_cell(r2u[1], pag.get("num_parcelas",  ""), rotulo="Parcelas")
         _set_cell(r2u[2], pag.get("data_primeira", ""), rotulo="1ª data")
-    datas = pag.get("datas", ["—"] * 24)
-    p_idx = 0
-    for row_idx in range(3, 11):
-        if p_idx >= 24:
-            break
-        row_cells = t3.rows[row_idx].cells
-        for col in [1, 3, 5]:
-            if p_idx >= 24 or col >= len(row_cells):
+    # Grade de parcelas (linhas 3-10): célula do ordinal (0/2/4) = "Nª  <valor>",
+    # célula ao lado (1/3/5) = data. Slots sem parcela = traços; linhas totalmente
+    # vazias são removidas da tabela.
+    datas   = pag.get("datas",   ["—"] * 24)
+    valores = pag.get("valores", [""]  * 24)
+    num     = pag.get("num_parcelas_int", 0)
+    _rows_remover = []
+    for gi, row_idx in enumerate(range(3, 11)):    # 8 linhas, 3 parcelas cada
+        row       = t3.rows[row_idx]
+        row_cells = row.cells
+        if gi * 3 + 1 > num:                        # primeira parcela da linha já passou → linha vazia
+            _rows_remover.append(row)
+            continue
+        for j, (ord_col, data_col) in enumerate([(0, 1), (2, 3), (4, 5)]):
+            if data_col >= len(row_cells):
                 break
-            _set_cell(row_cells[col], datas[p_idx])
-            p_idx += 1
+            p = gi * 3 + j + 1                      # nº da parcela (1-based)
+            if p <= num:
+                _set_cell(row_cells[ord_col],  f"{p}ª  {valores[p-1]}".rstrip())
+                _set_cell(row_cells[data_col], datas[p-1])
+            else:
+                _set_cell(row_cells[ord_col],  _TRACO)
+                _set_cell(row_cells[data_col], _TRACO)
+    for row in _rows_remover:
+        row._element.getparent().remove(row._element)
 
     # ── Parágrafos do corpo — data, assinatura e identificação do cliente ─────
     data_hoje = ctx.get("data_contrato", datetime.now().strftime("%d/%m/%Y"))
@@ -329,6 +387,7 @@ def preencher_contrato(contrato_id: int, ctx: dict) -> str:
             _set_para(para, f"CPF/CNPJ: {_TESTEMUNHAS[_w_idx][1]}", rotulo="CPF/CNPJ")
             _w_idx += 1
 
+    _preencher_cabecalho(doc, ctx)
     _relabel_cpf_cnpj(doc)
     docx_path = os.path.join(CONTRATOS_DIR, f"contrato_{contrato_id}.docx")
     doc.save(docx_path)

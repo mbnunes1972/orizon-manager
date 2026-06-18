@@ -313,3 +313,135 @@ def test_contrato_tags_nomenclatura():
     rotulos = [r.text for r in runs if r.font.size == Pt(7)]
     assert "Nome" in rotulos
     assert "Ana" in cell.text
+
+
+# ── Número do contrato ─────────────────────────────────────────────────────────
+
+def test_gerar_num_contrato_formato():
+    from datetime import datetime
+    from mod_contrato import gerar_num_contrato
+    n = gerar_num_contrato([], data=datetime(2026, 6, 17))
+    assert n == "INS-2026-06-17-001"
+
+
+def test_gerar_num_contrato_sequencia_continua():
+    from datetime import datetime
+    from mod_contrato import gerar_num_contrato
+    existentes = ["INS-2026-06-15-001", "INS-2026-06-16-002", "ORZ-2026-06-16-009"]
+    # máximo da loja INS é 002 → próximo 003 (sequência contínua, ignora outra loja)
+    n = gerar_num_contrato(existentes, data=datetime(2026, 6, 17))
+    assert n == "INS-2026-06-17-003"
+
+
+def test_gerar_num_contrato_loja_customizada():
+    from datetime import datetime
+    from mod_contrato import gerar_num_contrato
+    n = gerar_num_contrato([], loja="ORZ", data=datetime(2026, 1, 5))
+    assert n == "ORZ-2026-01-05-001"
+
+
+# ── Valores das parcelas ───────────────────────────────────────────────────────
+
+def test_parse_pagamento_valores_alinhados():
+    from mod_contrato import _parse_pagamento
+    pag = json.dumps({
+        "tipo": "aymore", "nome_forma": "Aymoré",
+        "parcelas": [
+            {"seq": 1, "data": "2026-07-10", "valor": "R$ 100,00"},
+            {"seq": 2, "data": "2026-08-10", "valor": "R$ 200,00"},
+        ],
+    })
+    d = _parse_pagamento(pag)
+    assert d["num_parcelas_int"] == 2
+    assert d["valores"][0] == "R$ 100,00"
+    assert d["valores"][1] == "R$ 200,00"
+    assert d["valores"][2] == ""        # preenchido até 24
+    assert len(d["valores"]) == 24
+
+
+def test_parse_pagamento_cartao_sem_valores():
+    from mod_contrato import _parse_pagamento
+    d = _parse_pagamento(json.dumps({"tipo": "cartao", "nome_forma": "Cartão"}))
+    assert d["valores"] == [""] * 24
+    assert d["num_parcelas_int"] == 0
+
+
+# ── Grade de parcelas: ordinais, valores, traços, linhas removidas ─────────────
+
+def _ctx_parcelas(n):
+    from mod_contrato import construir_contexto
+    parcelas = [{"seq": i + 1, "data": f"2026-{7+i:02d}-10", "valor": f"R$ {i+1}00,00"}
+                for i in range(n)]
+    return construir_contexto(
+        cliente={"nome": "Ana", "cpf": "1", "email": "a@x.com", "telefone": "(12)9",
+                 "logradouro": "Rua A", "numero": "10", "complemento": "", "bairro": "Centro",
+                 "cidade": "SJC", "cep": "12000", "estado": "SP", "inst_mesmo_residencial": True,
+                 "inst_logradouro": "", "inst_numero": "", "inst_complemento": "",
+                 "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": ""},
+        usuario={"nome": "Y", "telefone": "", "email": ""},
+        forma_pagamento_json=json.dumps({"tipo": "aymore", "nome_forma": "Aymoré",
+                                          "parcelas": parcelas}))
+
+
+def test_grade_ordinais_valores_traços_e_linhas_removidas():
+    import os
+    from mod_contrato import preencher_contrato, _MODELO
+    if not os.path.exists(_MODELO):
+        return
+    from docx import Document
+    ctx = _ctx_parcelas(5)
+    path = preencher_contrato(91004, ctx)
+    doc = Document(path)
+    t3 = doc.tables[3]
+    blob = " ".join(c.text for row in t3.rows for c in row.cells)
+    n_rows = len(t3.rows)
+    os.remove(path)
+    # ordinais + valores nas 5 parcelas
+    assert "1ª" in blob and "R$ 100,00" in blob
+    assert "5ª" in blob and "R$ 500,00" in blob
+    # parcela 6 (slot vazio na linha) vira traços, não "6ª"
+    assert "6ª" not in blob
+    assert "--------" in blob
+    # linhas das parcelas 7..24 removidas: header(3) + 2 linhas de grade = 5 linhas
+    assert "7ª" not in blob
+    assert n_rows == 5
+
+
+def test_grade_a_vista_remove_todas_as_linhas():
+    import os
+    from mod_contrato import preencher_contrato, _MODELO
+    if not os.path.exists(_MODELO):
+        return
+    from docx import Document
+    ctx = _ctx_parcelas(0)         # à vista: nenhuma parcela
+    path = preencher_contrato(91005, ctx)
+    doc = Document(path)
+    n_rows = len(doc.tables[3].rows)
+    os.remove(path)
+    assert n_rows == 3             # só as 3 linhas de cabeçalho da seção
+
+
+# ── Cabeçalho: num_contrato e data_contrato ───────────────────────────────────
+
+def test_cabecalho_num_contrato_substituido():
+    import os
+    from mod_contrato import preencher_contrato, _MODELO
+    if not os.path.exists(_MODELO):
+        return
+    from docx import Document
+    from docx.oxml.ns import qn
+    ctx = _ctx_parcelas(2)
+    ctx["num_contrato"]  = "INS-2026-06-17-007"
+    ctx["data_contrato"] = "17/06/2026"
+    path = preencher_contrato(91006, ctx)
+    doc = Document(path)
+    hdr_text = []
+    for sec in doc.sections:
+        for h in (sec.header, sec.first_page_header, sec.even_page_header):
+            hdr_text += [t.text for t in h._element.iter(qn('w:t')) if t.text]
+    os.remove(path)
+    blob = " ".join(hdr_text)
+    assert "INS-2026-06-17-007" in blob
+    assert "17/06/2026" in blob
+    assert "[Num_Contrato]" not in blob
+    assert "Data_contrato" not in blob

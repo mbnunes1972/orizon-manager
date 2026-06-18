@@ -2207,6 +2207,13 @@ class Handler(BaseHTTPRequestHandler):
                     contrato.gerado_em           = datetime.utcnow()
                     contrato.gerado_por_id       = usuario["id"]
                     contrato.status              = "rascunho"
+                    # Número do contrato (gerado uma vez; mantido em regerações).
+                    if not contrato.num_contrato:
+                        from mod_contrato import gerar_num_contrato
+                        _existing = [c.num_contrato for c in db.query(Contrato)
+                                     .filter(Contrato.num_contrato.isnot(None)).all()]
+                        contrato.num_contrato = gerar_num_contrato(_existing)
+                    variaveis["num_contrato"] = contrato.num_contrato
                     db.commit()
                     aviso = None
                     try:

@@ -286,6 +286,7 @@ class Contrato(Base):
     __tablename__ = "contratos"
 
     id                   = Column(Integer,  primary_key=True, autoincrement=True)
+    num_contrato         = Column(Text,     nullable=True)   # LOJA-AAAA-MM-DD-SEQ
     projeto_nome         = Column(Text,     nullable=False)
     orcamento_id         = Column(Integer,  ForeignKey("orcamentos.id"), nullable=False)
     template_path        = Column(Text,     nullable=False, default="config/contrato_template.docx")
@@ -379,6 +380,7 @@ def _migrar_colunas():
             ("adendo",          "TEXT"),
             ("d4sign_uuid",     "TEXT"),
             ("gerado_por_id",   "INTEGER"),
+            ("num_contrato",    "VARCHAR(30)"),
         ]:
             if col not in con_cols:
                 cur.execute(f"ALTER TABLE contratos ADD COLUMN {col} {tipo}")
