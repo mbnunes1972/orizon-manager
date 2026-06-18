@@ -363,6 +363,14 @@ body{overflow:hidden}
 .home-tab { padding:8px 20px;background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--dalm-gold-light);font-size:14px;transition:color .15s; }
 .home-tab.ativo { color:var(--dalm-gold);border-bottom-color:var(--dalm-gold);font-weight:600; }
 .home-tab:hover { color:var(--dalm-gold); }
+
+/* Calendário: ícone visível e campo inteiro clicável */
+input[type="date"] { cursor: pointer; }
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 1;
+  filter: invert(0.7);
+}
 </style>
 </head>
 <body>
@@ -5969,6 +5977,14 @@ document.addEventListener('DOMContentLoaded', function(){
   // Carrega a lista de projetos automaticamente ao abrir a aplicação
   if(document.getElementById('page-00')?.classList.contains('active')){
     projCarregar();
+  }
+});
+
+// Abre o calendário nativo ao clicar em qualquer parte de um campo de data
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('input[type="date"]');
+  if (el && !el.disabled && !el.readOnly && typeof el.showPicker === 'function') {
+    try { el.showPicker(); } catch (_) { /* alguns navegadores bloqueiam fora de gesto */ }
   }
 });
 
