@@ -272,7 +272,7 @@ def test_preencher_signatario_e_testemunhas(tmp_path):
     path = preencher_contrato(91001, ctx)
     full = "\n".join(p.text for p in Document(path).paragraphs)
     os.remove(path)
-    assert "Ana Cliente CPF/CNPJ:" in full   # cliente é o 2º signatário (par. 128)
+    assert "Ana Cliente\nCPF/CNPJ:" in full   # cliente: nome numa linha, CPF/CNPJ na linha de baixo
     assert "Consultor Z" in full             # consultor PERMANECE no cabeçalho (par. 0)
     assert "Jaime Perinazzo" in full
     assert "Felipe Guizalberte" in full
@@ -777,3 +777,30 @@ def test_assinatura_cliente_mesmo_estilo_da_empresa():
     assert estilo_cliente == "Heading 2"
     assert estilo_empresa == "Heading 2"
     assert estilo_cliente == estilo_empresa
+
+
+def test_assinaturas_nome_e_cpf_em_linhas_separadas():
+    """Cada signatário do bloco de assinatura tem o NOME numa linha e o
+    CPF/CNPJ na linha imediatamente abaixo (mesmo padrão para todos)."""
+    from docx import Document
+    from mod_contrato import _MODELO
+    d = Document(_MODELO)
+    pars = [(p.text or "").strip() for p in d.paragraphs]
+
+    def linha_seguinte(marcador, prefixo_cpf):
+        for i, t in enumerate(pars):
+            if marcador in t:
+                # o marcador deve estar sozinho (sem CPF/CNPJ na mesma linha)
+                assert "CPF" not in t and "CNPJ" not in t, f"{marcador} ainda tem CPF na mesma linha: {t!r}"
+                # a próxima linha não-vazia deve começar com o rótulo de CPF/CNPJ
+                j = i + 1
+                while j < len(pars) and not pars[j]:
+                    j += 1
+                assert j < len(pars) and pars[j].startswith(prefixo_cpf), \
+                    f"linha de CPF de {marcador} inesperada: {pars[j] if j < len(pars) else None!r}"
+                return
+        raise AssertionError(f"marcador {marcador} não encontrado")
+
+    linha_seguinte("[NOME_CLIENTE]", "CPF/CNPJ:")
+    linha_seguinte("[NOME_TESTEMUNHA_1]", "CPF:")
+    linha_seguinte("[NOME_TESTEMUNHA_2]", "CPF:")
