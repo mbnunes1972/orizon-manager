@@ -237,43 +237,6 @@ def _preencher_grade(doc, pag):
                 _set_cell_text(cells[dcol], _TRACO)
 
 
-def _relabel_cpf_cnpj(doc):
-    """Substitui 'CPF' por 'CPF/CNPJ' em parágrafos e células, sem duplicar."""
-    def fix(para):
-        for run in para.runs:
-            if "CPF" in run.text:
-                run.text = _re_cpf.sub(r'CPF(?!/CNPJ)', 'CPF/CNPJ', run.text)
-    for para in doc.paragraphs:
-        fix(para)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for para in cell.paragraphs:
-                    fix(para)
-
-
-def _preencher_cabecalho(doc, ctx):
-    """Substitui os marcadores [Num_Contrato] e [Data_contrato] nos cabeçalhos.
-
-    Os marcadores ficam numa caixa de texto do cabeçalho, então iteramos os
-    elementos <w:t> via XML (cobre txbxContent). Tolera bracket extra ('[[').
-    """
-    from docx.oxml.ns import qn
-    num  = str(ctx.get("num_contrato", "") or "")
-    data = str(ctx.get("data_contrato", "") or "")
-
-    def fix(text):
-        text = _re_cpf.sub(r'\[+\s*num[_ ]?contrato\s*\]',  num,  text, flags=_re_cpf.I)
-        text = _re_cpf.sub(r'\[+\s*data[_ ]?contrato\s*\]', data, text, flags=_re_cpf.I)
-        return text
-
-    for sec in doc.sections:
-        for hdr in (sec.header, sec.first_page_header, sec.even_page_header):
-            for t_el in hdr._element.iter(qn('w:t')):
-                if t_el.text and '[' in t_el.text:
-                    t_el.text = fix(t_el.text)
-
-
 # ── Parser de pagamento ───────────────────────────────────────────────────────
 
 def _parse_pagamento(pag_json_str: str) -> dict:
@@ -374,122 +337,69 @@ def validar_cliente_para_contrato(cliente: dict) -> list:
 
 # ── Preenchimento dinâmico do modelo ─────────────────────────────────────────
 
+def _montar_mapping(ctx, pag):
+    """Monta o dicionário {MARCADOR: valor} para _substituir_marcadores().
+
+    Chaves em MAIÚSCULAS sem colchetes, casando com os marcadores do modelo
+    modelo_contrato_mapeado.docx. A grade de parcelas é preenchida à parte por
+    _preencher_grade(); aqui só entram os campos de cabeçalho/identificação.
+    """
+    return {
+        "NUM_CONTRATO":     str(ctx.get("num_contrato", "") or ""),
+        "DATA_CONTRATO":    str(ctx.get("data_contrato", "") or ""),
+        "NOME_CLIENTE":     ctx.get("cliente_nome", "") or "",
+        "CPF":              ctx.get("cliente_cpf", "") or "",
+        "EMAIL":            ctx.get("cliente_email", "") or "",
+        "TELEFONE":         ctx.get("cliente_telefone", "") or "",
+        "RES_LOGRADOURO":   ctx.get("res_logradouro", "") or "",
+        "RES_NUMERO":       ctx.get("res_numero", "") or "",
+        "RES_COMPLEMENTO":  ctx.get("res_complemento", "") or "",
+        "RES_BAIRRO":       ctx.get("res_bairro", "") or "",
+        "RES_CIDADE":       ctx.get("res_cidade", "") or "",
+        "RES_CEP":          ctx.get("res_cep", "") or "",
+        "RES_UF":           ctx.get("res_uf", "") or "",
+        "INST_LOGRADOURO":  ctx.get("inst_logradouro", "") or "",
+        "INST_NUMERO":      ctx.get("inst_numero", "") or "",
+        "INST_COMPLEMENTO": ctx.get("inst_complemento", "") or "",
+        "INST_BAIRRO":      ctx.get("inst_bairro", "") or "",
+        "INST_CIDADE":      ctx.get("inst_cidade", "") or "",
+        "INST_CEP":         ctx.get("inst_cep", "") or "",
+        "INST_UF":          ctx.get("inst_uf", "") or "",
+        "VALOR_ENTRADA":    pag.get("entrada_valor", "") or "",
+        "FORMA_ENTRADA":    pag.get("entrada_tipo", "") or "",
+        "DATA_ENTRADA":     pag.get("entrada_data", "") or "",
+        "MODALIDADE":       pag.get("nome_forma", "") or "",
+        "NUM_PARCELAS":     pag.get("num_parcelas", "") or "",
+        "TOTAL_CONTRATO":   pag.get("valor_contrato", "") or "",
+        "CONSULTOR_NOME":     ctx.get("consultor_nome", "") or "",
+        "CONSULTOR_TELEFONE": ctx.get("consultor_tel", "") or "",
+        "TESTEMUNHA_1_NOME": _TESTEMUNHAS[0][0],
+        "TESTEMUNHA_1_DOC":  _TESTEMUNHAS[0][1],
+        "TESTEMUNHA_2_NOME": _TESTEMUNHAS[1][0],
+        "TESTEMUNHA_2_DOC":  _TESTEMUNHAS[1][1],
+    }
+
+
 def preencher_contrato(contrato_id: int, ctx: dict) -> str:
     """
-    Preenche modelo_contrato_final.docx com os dados de ctx e salva
+    Preenche modelo_contrato_mapeado.docx com os dados de ctx e salva
     como CONTRATOS/contrato_<id>.docx. Retorna o caminho do .docx.
+
+    Geração 100% por marcadores: a grade de parcelas é preenchida por posição
+    (_preencher_grade) e todos os demais campos via substituição de [MARCADOR]
+    (_substituir_marcadores).
     """
     if not os.path.exists(_MODELO):
         raise FileNotFoundError(
             f"Modelo de contrato não encontrado: {_MODELO}\n"
-            "Adicione 'modelo_contrato_final.docx' na raiz do projeto."
+            "Adicione 'modelo_contrato_mapeado.docx' na raiz do projeto."
         )
     os.makedirs(CONTRATOS_DIR, exist_ok=True)
 
     doc = Document(_MODELO)
-    tables = doc.tables
-
-    # ── Parágrafo 0: "Consultor: ... Telefone: ... e-mail:" ──────────────────
-    p0 = doc.paragraphs[0]
-    linha_consultor = (
-        f"Consultor: {ctx.get('consultor_nome', '')}\t\t\t\t\t"
-        f"Telefone: {ctx.get('consultor_tel', '')}\t\t\t\t"
-        f"e-mail: {ctx.get('consultor_email', '')}"
-    )
-    _set_para(p0, linha_consultor)
-
-    # ── Tabela 0: Identificação do cliente ────────────────────────────────────
-    _set_cell(tables[0].rows[1].cells[0], ctx.get("cliente_nome", ""),     rotulo="Nome")
-    _set_cell(tables[0].rows[1].cells[1], ctx.get("cliente_cpf",  ""),     rotulo="CPF/CNPJ")
-    _set_cell(tables[0].rows[2].cells[0], ctx.get("cliente_email", ""),    rotulo="E-mail")
-    _set_cell(tables[0].rows[2].cells[1], ctx.get("cliente_telefone", ""), rotulo="Telefone")
-
-    # ── Tabela 1: Endereço residencial ────────────────────────────────────────
-    _set_cell(_unique_cells(tables[1].rows[1])[0], ctx.get("res_logradouro", ""), rotulo="Logradouro")
-    t1r2 = _unique_cells(tables[1].rows[2])
-    if len(t1r2) >= 3:
-        _set_cell(t1r2[0], ctx.get("res_numero",      ""), rotulo="Número")
-        _set_cell(t1r2[1], ctx.get("res_complemento", ""), rotulo="Complemento")
-        _set_cell(t1r2[2], ctx.get("res_bairro",      ""), rotulo="Bairro")
-    t1r3 = _unique_cells(tables[1].rows[3])
-    if len(t1r3) >= 3:
-        _set_cell(t1r3[0], ctx.get("res_cidade", ""), rotulo="Cidade")
-        _set_cell(t1r3[1], ctx.get("res_cep",    ""), rotulo="CEP")
-        _set_cell(t1r3[2], ctx.get("res_uf",     ""), rotulo="Estado/UF")
-
-    # ── Tabela 2: Endereço de instalação ──────────────────────────────────────
-    _set_cell(_unique_cells(tables[2].rows[1])[0], ctx.get("inst_logradouro", ""), rotulo="Logradouro")
-    t2r2 = _unique_cells(tables[2].rows[2])
-    if len(t2r2) >= 3:
-        _set_cell(t2r2[0], ctx.get("inst_numero",      ""), rotulo="Número")
-        _set_cell(t2r2[1], ctx.get("inst_complemento", ""), rotulo="Complemento")
-        _set_cell(t2r2[2], ctx.get("inst_bairro",      ""), rotulo="Bairro")
-    t2r3 = _unique_cells(tables[2].rows[3])
-    if len(t2r3) >= 3:
-        _set_cell(t2r3[0], ctx.get("inst_cidade", ""), rotulo="Cidade")
-        _set_cell(t2r3[1], ctx.get("inst_cep",    ""), rotulo="CEP")
-        _set_cell(t2r3[2], ctx.get("inst_uf",     ""), rotulo="Estado/UF")
-
-    # ── Tabela 3: Forma de pagamento ──────────────────────────────────────────
     pag = ctx.get("_pag", {})
-    t3 = tables[3]
-    r1u = _unique_cells(t3.rows[1])   # 3 células únicas: Entrada | Tipo | Data
-    r2u = _unique_cells(t3.rows[2])   # 3 células únicas: Modalidade | Parcelas | DataPrimeira
-    if len(r1u) >= 3:
-        _set_cell(r1u[0], pag.get("entrada_valor", ""), rotulo="Entrada")
-        _set_cell(r1u[1], pag.get("entrada_tipo",  ""), rotulo="Tipo")
-        _set_cell(r1u[2], pag.get("entrada_data",  ""), rotulo="Data")
-    if len(r2u) >= 3:
-        _set_cell(r2u[0], pag.get("modalidade",    ""), rotulo="Modalidade")
-        _set_cell(r2u[1], pag.get("num_parcelas",  ""), rotulo="Parcelas")
-        _set_cell(r2u[2], pag.get("data_primeira", ""), rotulo="1ª data")
-    # Grade de parcelas (linhas 3-10): célula do ordinal (0/2/4) = "Nª  <valor>",
-    # célula ao lado (1/3/5) = data. Slots sem parcela = traços; linhas totalmente
-    # vazias são removidas da tabela.
-    datas   = pag.get("datas",   ["—"] * 24)
-    valores = pag.get("valores", [""]  * 24)
-    num     = pag.get("num_parcelas_int", 0)
-    _rows_remover = []
-    for gi, row_idx in enumerate(range(3, 11)):    # 8 linhas, 3 parcelas cada
-        row       = t3.rows[row_idx]
-        row_cells = row.cells
-        if gi * 3 + 1 > num:                        # primeira parcela da linha já passou → linha vazia
-            _rows_remover.append(row)
-            continue
-        for j, (ord_col, data_col) in enumerate([(0, 1), (2, 3), (4, 5)]):
-            if data_col >= len(row_cells):
-                break
-            p = gi * 3 + j + 1                      # nº da parcela (1-based)
-            if p <= num:
-                _set_cell(row_cells[ord_col],  f"{p}ª  {valores[p-1]}".rstrip())
-                _set_cell(row_cells[data_col], datas[p-1])
-            else:
-                _set_cell(row_cells[ord_col],  _TRACO)
-                _set_cell(row_cells[data_col], _TRACO)
-    for row in _rows_remover:
-        row._element.getparent().remove(row._element)
-
-    # ── Parágrafos do corpo — data, assinatura e identificação do cliente ─────
-    data_hoje = ctx.get("data_contrato", datetime.now().strftime("%d/%m/%Y"))
-    _w_idx = 0  # índice da testemunha atual
-    for para in doc.paragraphs:
-        t = para.text.strip()
-        # Data do contrato
-        if t.startswith("São José dos Campos") and ("de 20" in t or "de 2026" in t):
-            _set_para(para, f"São José dos Campos - SP, {data_hoje}.", rotulo="Data")
-        # 2º signatário = CLIENTE (a linha INSPIRIUM acima permanece intacta)
-        elif "Ferreira Machado" in t or "787.834" in t:
-            _set_para(para, f"{ctx.get('cliente_nome', '')} CPF/CNPJ: {ctx.get('cliente_cpf', '')}",
-                      rotulo="Cliente (signatário)")
-        # Testemunhas (dois pares NOME:/Documento:)
-        elif t == "NOME:" and _w_idx < len(_TESTEMUNHAS):
-            _set_para(para, f"NOME: {_TESTEMUNHAS[_w_idx][0]}", rotulo="Testemunha")
-        elif t == "Documento:" and _w_idx < len(_TESTEMUNHAS):
-            _set_para(para, f"CPF/CNPJ: {_TESTEMUNHAS[_w_idx][1]}", rotulo="CPF/CNPJ")
-            _w_idx += 1
-
-    _preencher_cabecalho(doc, ctx)
-    _relabel_cpf_cnpj(doc)
+    _preencher_grade(doc, pag)
+    _substituir_marcadores(doc, _montar_mapping(ctx, pag))
     docx_path = os.path.join(CONTRATOS_DIR, f"contrato_{contrato_id}.docx")
     doc.save(docx_path)
     return docx_path
