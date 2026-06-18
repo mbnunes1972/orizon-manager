@@ -110,6 +110,13 @@ def _subst_paragrafo(par, mapping, coletor=None):
     if "[" not in txt:
         return
     base = par.runs[0] if par.runs else None
+    # Se o 1º run for vazio/quebra de linha (ex.: "\n" antes do marcador), herda a
+    # formatação do primeiro run com conteúdo — evita perder negrito/fonte do marcador.
+    if base is not None and not (base.text or "").strip():
+        for _r in par.runs:
+            if (_r.text or "").strip():
+                base = _r
+                break
     base_name = base.font.name if base is not None else None
     base_size = base.font.size if base is not None else None
     base_bold = base.bold if base is not None else None

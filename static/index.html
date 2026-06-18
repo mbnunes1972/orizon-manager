@@ -3012,7 +3012,7 @@ async function confirmarPoolCarregarAssim(){
 
 async function removerAmbiente(evt, arquivo, idx){
   evt.stopPropagation();
-  if(!confirm('Remover ambiente "'+arquivo+'" do projeto?')) return;
+  if (!(await confirmarPopup('Remover ambiente "' + arquivo + '" do projeto?', {titulo:'Remover ambiente', okLabel:'Remover', cancelLabel:'Cancelar', perigo:true}))) return;
   try{
     const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/ambientes/remover',{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({arquivo:arquivo})
@@ -6496,6 +6496,14 @@ function renderCiclo() {
     `;
     panel.appendChild(card);
   }
+  // Botão "Voltar" também ao final da lista de etapas (usabilidade)
+  const rodape = document.createElement('div');
+  rodape.style.cssText = 'margin-top:14px;display:flex';
+  rodape.innerHTML = `
+    <button onclick="fecharCiclo()" style="background:none;border:1px solid var(--dalm-gold);
+      border-radius:6px;color:var(--dalm-gold);cursor:pointer;font-size:.9rem;padding:6px 14px;
+      display:flex;align-items:center;gap:6px;">&#x2190; Voltar</button>`;
+  panel.appendChild(rodape);
 }
 
 function toggleCicloCard(codigo) {
@@ -6670,18 +6678,17 @@ async function toggleSalvarEtapa(codigo) {
 
 let _reabrirCodigo = null;
 
-function abrirModalReabrir(codigo) {
+async function abrirModalReabrir(codigo) {
   _reabrirCodigo = codigo;
   const nome = (ETAPAS_CICLO.find(e => e.codigo === codigo) || {}).nome || codigo;
-  const ok = confirm(
-    `Reabrir "${nome}" reabrirá TAMBÉM todas as etapas seguintes (volta tudo a pendente).\n` +
-    `Esta ação exige autorização de GERENTE e será registrada.\n\nDeseja continuar?`);
+  const ok = await confirmarPopup(
+    'Reabrir "' + nome + '" reabrirá TAMBÉM todas as etapas seguintes (volta tudo a pendente).\n' +
+    'Esta ação exige autorização de GERENTE e será registrada.\n\nDeseja continuar?',
+    {titulo:'Reabrir etapa', okLabel:'Continuar', cancelLabel:'Cancelar', perigo:true});
   if (!ok) { _reabrirCodigo = null; return; }
-  const login = prompt('Login do gerente:');
-  if (!login) { _reabrirCodigo = null; return; }
-  const senha = prompt('Senha do gerente:');
-  if (!senha) { _reabrirCodigo = null; return; }
-  reabrirEtapaCascata(login, senha);
+  const cred = await pedirCredenciaisGerente({titulo:'Reabrir etapa', mensagem:'Login e senha de gerente/diretor para reabrir as etapas.'});
+  if (!cred) { _reabrirCodigo = null; return; }
+  reabrirEtapaCascata(cred.login, cred.senha);
 }
 
 async function reabrirEtapaCascata(login, senha) {
@@ -6740,6 +6747,105 @@ function mostrarErroComAcao(mensagem, labelAcao, fnAcao) {
       fnAcao();
     };
   }
+}
+
+// ── Popups estilizados (substituem confirm/alert/prompt nativos) ──────────────
+function _popupOverlay(innerHtml) {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;' +
+    'align-items:center;justify-content:center;z-index:99999';
+  ov.innerHTML = '<div style="background:var(--surface,#10231a);border:1px solid var(--border,#2a3f33);' +
+    'border-radius:10px;padding:20px 22px;max-width:460px;width:90%;box-shadow:0 10px 40px rgba(0,0,0,.5)">' +
+    innerHtml + '</div>';
+  document.body.appendChild(ov);
+  return ov;
+}
+
+// Confirmação sim/não. Retorna Promise<boolean>.
+function confirmarPopup(mensagem, opts) {
+  opts = opts || {};
+  const okLabel = opts.okLabel || 'Confirmar';
+  const cancelLabel = opts.cancelLabel || 'Cancelar';
+  const titulo = opts.titulo || 'Confirmação';
+  const perigo = !!opts.perigo;
+  return new Promise((resolve) => {
+    const ov = _popupOverlay(
+      '<h4 style="margin:0 0 10px;color:var(--dalm-gold,#c8a84b);font-size:1rem">' + esc(titulo) + '</h4>' +
+      '<p style="margin:0 0 16px;color:var(--fg,#e8efe9);font-size:.9rem;white-space:pre-line">' + esc(mensagem) + '</p>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+      '<button data-act="cancel" style="background:none;border:1px solid var(--muted);color:var(--muted);' +
+      'border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">' + esc(cancelLabel) + '</button>' +
+      '<button data-act="ok" style="background:' + (perigo ? 'var(--err,#c0392b)' : '#b8960c') + ';color:#000;' +
+      'border:none;border-radius:5px;padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">' + esc(okLabel) + '</button>' +
+      '</div>');
+    const fin = (v) => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+    const onKey = (e) => { if (e.key === 'Escape') fin(false); else if (e.key === 'Enter') fin(true); };
+    ov.querySelector('[data-act="ok"]').onclick = () => fin(true);
+    ov.querySelector('[data-act="cancel"]').onclick = () => fin(false);
+    ov.addEventListener('click', (e) => { if (e.target === ov) fin(false); });
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => ov.querySelector('[data-act="ok"]').focus(), 60);
+  });
+}
+
+// Aviso informativo (substitui alert). Retorna Promise<void>.
+function avisoPopup(mensagem, opts) {
+  opts = opts || {};
+  const titulo = opts.titulo || 'Aviso';
+  const okLabel = opts.okLabel || 'OK';
+  return new Promise((resolve) => {
+    const ov = _popupOverlay(
+      '<h4 style="margin:0 0 10px;color:var(--dalm-gold,#c8a84b);font-size:1rem">' + esc(titulo) + '</h4>' +
+      '<p style="margin:0 0 16px;color:var(--fg,#e8efe9);font-size:.9rem;white-space:pre-line">' + esc(mensagem) + '</p>' +
+      '<div style="display:flex;justify-content:flex-end">' +
+      '<button data-act="ok" style="background:#b8960c;color:#000;border:none;border-radius:5px;' +
+      'padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">' + esc(okLabel) + '</button>' +
+      '</div>');
+    const fin = () => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(); };
+    const onKey = (e) => { if (e.key === 'Escape' || e.key === 'Enter') fin(); };
+    ov.querySelector('[data-act="ok"]').onclick = fin;
+    ov.addEventListener('click', (e) => { if (e.target === ov) fin(); });
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => ov.querySelector('[data-act="ok"]').focus(), 60);
+  });
+}
+
+// Pede login+senha gerencial em popup estilizado. Retorna Promise<{login,senha}|null>.
+function pedirCredenciaisGerente(opts) {
+  opts = opts || {};
+  const titulo = opts.titulo || 'Autorização gerencial';
+  const mensagem = opts.mensagem || 'Esta ação exige login e senha de gerente/diretor.';
+  return new Promise((resolve) => {
+    const ov = _popupOverlay(
+      '<h4 style="margin:0 0 8px;color:var(--warn,#c8a84b);font-size:1rem">&#x1F512; ' + esc(titulo) + '</h4>' +
+      '<p style="margin:0 0 12px;color:var(--muted);font-size:.82rem;white-space:pre-line">' + esc(mensagem) + '</p>' +
+      '<label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Login</label>' +
+      '<input id="_cred-login" type="text" autocomplete="off" style="width:100%;box-sizing:border-box;' +
+      'background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:10px">' +
+      '<label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Senha</label>' +
+      '<input id="_cred-senha" type="password" style="width:100%;box-sizing:border-box;' +
+      'background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">' +
+      '<div id="_cred-erro" style="color:var(--err);font-size:.78rem;min-height:14px;margin-bottom:8px"></div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+      '<button data-act="cancel" style="background:none;border:1px solid var(--muted);color:var(--muted);' +
+      'border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">Cancelar</button>' +
+      '<button data-act="ok" style="background:#b8960c;color:#000;border:none;border-radius:5px;' +
+      'padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">Confirmar</button>' +
+      '</div>');
+    const fin = (v) => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+    const submit = () => {
+      const login = (ov.querySelector('#_cred-login').value || '').trim();
+      const senha = ov.querySelector('#_cred-senha').value || '';
+      if (!login || !senha) { ov.querySelector('#_cred-erro').textContent = 'Preencha login e senha.'; return; }
+      fin({ login: login, senha: senha });
+    };
+    const onKey = (e) => { if (e.key === 'Escape') fin(null); else if (e.key === 'Enter') submit(); };
+    ov.querySelector('[data-act="ok"]').onclick = submit;
+    ov.querySelector('[data-act="cancel"]').onclick = () => fin(null);
+    ov.addEventListener('click', (e) => { if (e.target === ov) fin(null); });
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => ov.querySelector('#_cred-login').focus(), 60);
+  });
 }
 
 async function carregarDadosContrato() {
@@ -6914,7 +7020,7 @@ async function confirmarEditarContrato() {
     const d = await r.json();
     if (!d.ok) { erroEl.textContent = d.erro || 'Falha ao abrir.'; btn.disabled = false; btn.textContent = 'Abrir para editar'; return; }
     document.getElementById('modal-editar-contrato-overlay').remove();
-    alert('Abrindo o contrato no ' + (d.app === 'libreoffice' ? 'LibreOffice' : 'Word') + '. Ao salvar e fechar o editor, o PDF será regerado automaticamente.');
+    avisoPopup('Abrindo o contrato no ' + (d.app === 'libreoffice' ? 'LibreOffice' : 'Word') + '. Ao salvar e fechar o editor, o PDF será regerado automaticamente.', {titulo:'Editar contrato'});
   } catch (e) {
     erroEl.textContent = 'Erro de conexão.'; btn.disabled = false; btn.textContent = 'Abrir para editar';
   }
@@ -7304,7 +7410,8 @@ async function gerarContrato() {
 
   // É o próprio cliente cadastrado que vai assinar?
   let signatarioOverride = null;
-  const ehCliente = confirm('O signatário do contrato é o próprio cliente cadastrado?');
+  const ehCliente = await confirmarPopup('O signatário do contrato é o próprio cliente cadastrado?',
+    {titulo:'Signatário do contrato', okLabel:'Sim, é o cliente', cancelLabel:'Não'});
   if (!ehCliente) {
     signatarioOverride = await coletarSignatarioOverride();
     if (!signatarioOverride) {  // cancelou
