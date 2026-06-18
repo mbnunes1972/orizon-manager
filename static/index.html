@@ -7054,7 +7054,9 @@ async function salvarValorNegociado() {
       body: JSON.stringify({
         valor_total:     valor,
         valor_liquido:   valorLiquido,
-        forma_pagamento: elPag?.value || null,
+        forma_pagamento: (typeof _capturarPagamento === 'function' && window._planoPagamento)
+          ? JSON.stringify(_capturarPagamento(_formaEntrada, _formaParcela))
+          : (elPag?.value || null),
       }),
     });
   } catch(e) { console.warn('salvarValorNegociado:', e); }
@@ -7193,6 +7195,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
             <option value="cartao_credito">Cart&atilde;o de Cr&eacute;dito</option>
             <option value="cartao_debito">Cart&atilde;o de D&eacute;bito</option>
             <option value="cheque">Cheque</option>
+            <option value="dinheiro">Dinheiro</option>
           </select>
         </div>
         <div style="margin-bottom:8px">
@@ -7236,6 +7239,18 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
     </div>
   `;
   document.body.appendChild(ov);
+
+  // Pré-seleciona as formas de pagamento a partir da negociação ativa.
+  const _mapForma = (v) => (v === 'ted' ? 'transferencia' : v);
+  const _setSelectSeExiste = (sel, val) => {
+    if (!sel || !val) return;
+    const alvo = _mapForma(val);
+    if ([...sel.options].some(o => o.value === alvo)) sel.value = alvo;
+  };
+  const _pp = window._planoPagamento || {};
+  _setSelectSeExiste(document.getElementById('apr-forma-entrada'), _pp.entrada_forma);
+  const _formaParc = (_pp.parcelas && _pp.parcelas[0] && _pp.parcelas[0].forma) || null;
+  _setSelectSeExiste(document.getElementById('apr-forma-parcelas'), _formaParc);
 }
 
 function _capturarPagamento(formaEntrada, formaParcelas) {
