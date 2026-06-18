@@ -7288,22 +7288,25 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
       </div>
 
       <div style="border:1px solid var(--border);border-radius:6px;padding:12px 14px;margin-bottom:14px">
-        <div style="font-size:.75rem;color:#f0c84a;text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
+        <div style="font-size:.75rem;color:#f0c84a;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">
           Condi&ccedil;&atilde;o de Pagamento
         </div>
+        <p style="color:var(--muted);font-size:.72rem;margin:0 0 10px">
+          Definida na negocia&ccedil;&atilde;o (somente leitura). Para alterar, volte &agrave; negocia&ccedil;&atilde;o.
+        </p>
         <div style="margin-bottom:8px">
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Entrada (R$)</label>
-          <input id="apr-entrada" type="text" inputmode="numeric"
+          <input id="apr-entrada" type="text" readonly
             value="${pagAtual.entrada > 0 ? 'R$ ' + pagAtual.entrada.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}"
-            placeholder="R$ 0,00" oninput="mascaraMoedaInput(this)"
+            placeholder="R$ 0,00"
             style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
-            color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
+            color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
         </div>
         <div style="margin-bottom:8px">
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Forma de Pagamento da Entrada</label>
-          <select id="apr-forma-entrada"
+          <select id="apr-forma-entrada" disabled
             style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
-            color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
+            color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
             <option value="pix">Pix</option>
             <option value="transferencia">Transfer&ecirc;ncia Banc&aacute;ria</option>
             <option value="boleto">Boleto Banc&aacute;rio</option>
@@ -7315,9 +7318,9 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
         </div>
         <div style="margin-bottom:8px">
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Forma das Parcelas</label>
-          <select id="apr-forma-parcelas"
+          <select id="apr-forma-parcelas" disabled
             style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
-            color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
+            color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
             <option value="boleto">Boleto Banc&aacute;rio</option>
             <option value="debito_automatico">D&eacute;bito Autom&aacute;tico</option>
             <option value="transferencia">Transfer&ecirc;ncia Banc&aacute;ria</option>
@@ -7327,10 +7330,10 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
         </div>
         <div>
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Descri&ccedil;&atilde;o das parcelas</label>
-          <input id="apr-parcelas" type="text" value="${pagAtual.descricao.replace(/"/g,'&quot;')}"
+          <input id="apr-parcelas" type="text" readonly value="${pagAtual.descricao.replace(/"/g,'&quot;')}"
             placeholder="ex: 10x de R$ 4.820,00"
             style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
-            color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
+            color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
         </div>
       </div>
 
