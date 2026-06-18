@@ -6379,12 +6379,18 @@ function _orcamentoAprovado() {
   return _cicloData['6']?.status === 'concluido';
 }
 
-// Trava/destrava todos os controles de edição da negociação (page-02),
+// Trava/destrava todos os controles de edição da negociação — tanto os
+// parâmetros na sidebar (#sb-params: desconto, modalidade, parcelas, formas,
+// taxa TF) quanto a área principal (#page-02: tabela, painéis, datas, total),
 // exceto os botões de ação (tratados em atualizarBotoesAprovacao).
 function aplicarBloqueioNegociacao(travar) {
-  const root = document.getElementById('page-02');
-  if (!root) return;
-  root.querySelectorAll('input, select, textarea').forEach(el => {
+  const roots = ['sb-params', 'page-02']
+    .map(id => document.getElementById(id))
+    .filter(Boolean);
+  if (!roots.length) return;
+  const alvos = [];
+  roots.forEach(r => r.querySelectorAll('input, select, textarea').forEach(el => alvos.push(el)));
+  alvos.forEach(el => {
     if (el.closest('.action-row')) return;            // não mexe nos botões de ação
     if (travar) {
       if (el.tagName === 'SELECT') el.disabled = true;
