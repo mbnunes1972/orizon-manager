@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-17 (sessão 8 — redesenho do ciclo A–E: etapas/gating, cadastro, aprovação, briefing por-projeto, contrato)
+> Atualizado em: 2026-06-18 (sessão 9 — contrato: template por marcadores, pagamento correto, número do contrato, edição protegida)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -31,7 +31,8 @@
 - **Total Flex (US-14) completo:** `mod_fin/total_flex.py` — juros compostos por dias reais
 - **Último orçamento ativo** persistido por projeto em localStorage; ao abrir projeto vai direto para o orçamento que estava ativo na última visita
 - **Módulo Ciclo (EP-10):** aba "Ciclo" na page-02 com 20 etapas em 2 colunas; etapas 1-5 auto-completas para projetos com negociação ativa
-- **Módulo Contrato (EP-10):** `mod_contrato.py` gera PDF via python-docx preenchimento direto em `modelo_contrato_final.docx`; 2º signatário = cliente; testemunhas provisórias; tags de nomenclatura cinza nos campos editáveis; CPF/CNPJ em campos; hash SHA-256 de assinatura
+- **Módulo Contrato (EP-10):** `mod_contrato.py` gera o `.docx` a partir do template por marcadores `modelo_contrato_mapeado.docx` (`_substituir_marcadores` + `_preencher_grade`) → PDF via LibreOffice; **número do contrato** `INS-AAAA-MM-DD-SEQ` no cabeçalho + data; grade de parcelas valor+data (sem ordinal, traços nos vazios); `[TOTAL_CONTRATO]`; 2º signatário = cliente; testemunhas provisórias; hash SHA-256 de assinatura
+- **Contrato editável protegido:** `.docx` sai somente-leitura com regiões editáveis só nos valores (`permStart/permEnd` + `documentProtection`); botão "Editar contrato" (gate gerencial auditado) abre no Word/LibreOffice e regera o PDF a cada salvamento (watcher `contrato_editar.py`)
 - **Status contrato:** `rascunho` → `para_assinatura` → `assinado`; badges CSS dedicados
 - **Aprovar Orçamento reformulado:** modal exibe dados do cliente, CPF/endereço de instalação obrigatórios se vazios, condições de pagamento pré-carregadas; salva `valor_negociado` e `forma_pagamento` no orçamento antes de gerar contrato
 - **Pós-aprovação:** botões Salvar/Aprovar ocultos após etapa 6 concluída; "Voltar ao Orçamento" protegido por senha de gerente (`POST /ciclo/desfazer_aprovacao`)
@@ -150,6 +151,30 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-18 (sessão 9 — contrato: marcadores, pagamento, número, edição protegida)
+**Bug-raiz corrigido (F1):** `_capturarPagamento` (frontend) raspava as colunas da tabela de pagamento por índice e saía com **data e valor trocados**, além de incluir Assinatura/Entrada/Total como parcelas (o valor bruto caía na "13ª parcela"). Causa descoberta inspecionando o `pagamento_json` real do `Contrato` 6. Os testes anteriores passaram porque usavam um JSON **fabricado** — lição: verificar com dados reais.
+
+**F1 — Pagamento correto + grade + template por marcadores:**
+- Frontend expõe `window._planoPagamento` (estruturado: só parcelas reais com `valor` numérico + `data`, `total_cliente`, `texto_cartao`); `_capturarPagamento` retorna esse global (sem raspar DOM) — robusto aos 4 painéis (aymoré/cartão/vp/tf).
+- `modelo_contrato_mapeado.docx` (todo em marcadores `[MARCADOR]`) **promovido a template oficial**; `modelo_contrato_final.docx` aposentado. Geração reescrita: `_substituir_marcadores` (corpo/tabelas/cabeçalho) + `_preencher_grade` (posicional). Removidos `_set_cell`/`_set_para`/`_relabel_cpf_cnpj` (agora é tudo do template).
+- Grade: valor+data por parcela **sem ordinal**, **traços** nos slots vazios (linhas preservadas); cartão no 1º campo (`12x R$ ...`); novo `[TOTAL_CONTRATO]`.
+- `_parse_pagamento` reescrito para a estrutura real (`valores` em dinheiro, `valor_contrato`, `texto_cartao`).
+- Verificado end-to-end com **dados reais** via navegador (Playwright) + `/calcular_aymore`.
+
+**Número do contrato:** `gerar_num_contrato` → `LOJA-AAAA-MM-DD-SEQ` (`INS`, sequência contínua por loja), coluna `contratos.num_contrato` (migração idempotente), gerado uma vez/estável, no cabeçalho com a data abaixo. Ajuste de layout: número e data realinhados à direita (saíam fora da página A4).
+
+**F2 — Contrato editável protegido + edição pontual gerencial:**
+- `preencher_contrato(..., protegido=True)`: valores envoltos em `permStart/permEnd` (editáveis) + `documentProtection edit=readOnly` (texto fixo e cabeçalho travados) — `_proteger_editaveis`.
+- `_converter_pdf(docx_path)` extraído (converte sem regenerar o docx).
+- `POST /api/projetos/<nome>/contrato/editar`: gate gerencial (gerente/diretor/admin, auditado `editar_contrato`), abre o `.docx` no Word/LibreOffice e inicia watcher (`contrato_editar.py`: mtime + lock + debounce + timeout) que regera o PDF a cada salvamento.
+- Botão "✎ Editar contrato" + modal gerencial no frontend.
+
+**Processo:** ambos (F1, F2) pelo pipeline superpowers (spec → plano → subagentes com revisão em duas etapas → verificação com dados reais → merge). Suíte: **93 testes** passando.
+
+**Banco:** coluna `contratos.num_contrato` (VARCHAR(30), via `_migrar_colunas`).
+
+---
 
 ### Sessão 2026-06-17 (sessão 8 — redesenho do ciclo de vida, sub-projetos A–E)
 **Spec e implementação:**

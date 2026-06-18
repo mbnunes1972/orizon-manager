@@ -20,7 +20,8 @@ Sistema de autenticação com quatro níveis de acesso, sessões server-side e a
 | `admin` | 50% | Sim | Até 50% | Painel Admin (page-07) |
 
 `gerente`, `diretor` e `admin` podem autorizar ações gerenciais (ex.: reabrir etapas em
-cascata via `POST /api/projetos/<nome>/ciclo/<codigo>/reabrir` e `desfazer_aprovacao`),
+cascata via `POST /api/projetos/<nome>/ciclo/<codigo>/reabrir`, `desfazer_aprovacao`, e a
+**edição pontual do contrato** via `POST /api/projetos/<nome>/contrato/editar`),
 validadas por login+senha e auditadas em `log_acoes_gerenciais`.
 
 **Usuários atuais** (no banco): `pdm2026` (diretor), `lds2026` (gerente), `mds2026`

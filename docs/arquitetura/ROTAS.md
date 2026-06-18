@@ -200,7 +200,8 @@
 
 | Método | Rota | Descrição |
 |---|---|---|
-| POST | `/api/projetos/<nome>/contrato` | Gera o contrato do projeto a partir de um orçamento. Aceita `signatario_override` (substitui os dados do signatário só para este contrato). Retorna **400** se o orçamento não tem ambientes ou se o cadastro do cliente está incompleto |
+| POST | `/api/projetos/<nome>/contrato` | Gera o contrato do projeto a partir de um orçamento. Gera/atribui `num_contrato` (`LOJA-AAAA-MM-DD-SEQ`, estável em regerações) e produz o `.docx` **protegido** (somente os campos editáveis). Aceita `signatario_override` (substitui os dados do signatário só para este contrato). Retorna **400** se o orçamento não tem ambientes ou se o cadastro do cliente está incompleto |
+| POST | `/api/projetos/<nome>/contrato/editar` | **Edição pontual gerencial:** valida login+senha de **gerente/diretor/admin** (auditado em `log_acoes_gerenciais`, ação `editar_contrato`), abre o `.docx` no app escolhido (`{"app":"word"\|"libreoffice"}`) e inicia um watcher que **regera o PDF a cada salvamento**. Retorna **403** (credenciais/nível) ou **404** (contrato/arquivo ausente) |
 
 ### POST `/api/projetos/<nome>/contrato`
 ```json

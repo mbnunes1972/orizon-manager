@@ -141,6 +141,31 @@ Quando os campos obrigatórios estão preenchidos, a etapa 3 (Briefing) do proje
 
 ---
 
+### `contratos`
+Contrato gerado a partir de um orçamento aprovado.
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| id | Integer PK | ✓ | |
+| num_contrato | Text | | Número do contrato `LOJA-AAAA-MM-DD-SEQ` (ex.: `INS-2026-06-18-001`); sequência contínua por loja; estável em regerações |
+| projeto_nome | Text | ✓ | nome_safe do projeto |
+| orcamento_id | FK → orcamentos | ✓ | Orçamento de origem |
+| template_path | Text | ✓ | Caminho do modelo (default `config/contrato_template.docx`) |
+| pagamento_json | Text | | JSON do plano de pagamento capturado |
+| endereco_instalacao | Text | | |
+| adendo | Text | | Texto livre adicional |
+| pdf_path | Text | | Caminho do PDF/.docx gerado |
+| status | Text | | `rascunho` → `para_assinatura` → `assinado`/`vigente` / `cancelado` |
+| gerado_em | DateTime | | |
+| gerado_por_id | FK → usuarios | | |
+| d4sign_uuid | Text | | Integração de assinatura `[TODO]` |
+
+Colunas adicionadas via `_migrar_colunas()` (idempotente): `pagamento_json`, `endereco_instalacao`, `adendo`, `d4sign_uuid`, `gerado_por_id`, **`num_contrato`**.
+
+A edição pontual gerencial (`POST .../contrato/editar`) é auditada em `log_acoes_gerenciais` (ação `editar_contrato`), não cria tabela própria.
+
+---
+
 ### `schema_migrations`
 Rastreia migrações de **dados** idempotentes já aplicadas (ex.: troca de códigos de etapa 2↔3).
 

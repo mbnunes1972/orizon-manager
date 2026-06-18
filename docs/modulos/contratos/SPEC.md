@@ -53,24 +53,46 @@ O contrato é gerado automaticamente com base nos dados do projeto aprovado:
 
 ## Geração do contrato `[IMPLEMENTADO]`
 
-A geração é feita por **`mod_contrato.preencher_contrato(contrato_id, ctx)`**, que faz o **preenchimento direto com `python-docx`** sobre o arquivo **`modelo_contrato_final.docx`** (raiz do projeto). **Não** há template Jinja2 nem documento pré-processado por variáveis — o código abre o modelo final e escreve nas tabelas/parágrafos de capa e assinatura.
+A geração é feita por **`mod_contrato.preencher_contrato(contrato_id, ctx, protegido=True)`**, sobre o template **`modelo_contrato_mapeado.docx`** (raiz, versionado — `mod_contrato._MODELO`). O template é um **contrato completo com placeholders `[MARCADOR]`** em todos os campos (não há Jinja2). A geração tem duas etapas:
 
-**Estrutura da capa — 4 tabelas preenchidas pelo código:**
-1. Identificação do cliente (nome, CPF/CNPJ, e-mail, telefone…)
-2. Endereço residencial
-3. Endereço de instalação
-4. Forma de pagamento (modalidade, entrada, parcelas)
+1. **Grade de parcelas (por posição):** `_preencher_grade(doc, pag)` escreve a tabela de pagamento (`tables[3]`, linhas 3–10, 24 parcelas) por posição de célula via `_unique_cells` — cada parcela = **valor + data, sem ordinal**. Slots sem parcela viram **traços `--------`** no valor e na data (as linhas são **preservadas**, não removidas). **Cartão:** preenche só o 1º campo com o texto do parcelamento (ex.: `12x R$ 10.000,00`), resto traços.
+2. **Substituição de marcadores:** `_substituir_marcadores(doc, mapping)` substitui todos os `[MARCADOR]` no corpo, tabelas e cabeçalho (tolera `[[` e maiúsc/minúsc; marcador desconhecido é mantido). O mapa vem de `_montar_mapping(ctx, pag)`.
 
-Além das tabelas, o código preenche os **parágrafos de assinatura** (ver seção Assinatura) e a data.
+**Marcadores do template:** `[NOME_CLIENTE]`, `[CPF]`, `[EMAIL]`, `[TELEFONE]`, `[RES_*]`, `[INST_*]`, `[VALOR_ENTRADA]`, `[FORMA_ENTRADA]`, `[DATA_ENTRADA]`, `[MODALIDADE]`, `[NUM_PARCELAS]`, **`[TOTAL_CONTRATO]`** (= "Valor do Contrato"), `[VALOR_PARCELA]`/`[DATA_PARCELA_1..24]` (grade), `[CONSULTOR_NOME]`, `[CONSULTOR_TELEFONE]`, `[DATA_CONTRATO]`, `[TESTEMUNHA_1_NOME]`/`_DOC`, `[TESTEMUNHA_2_NOME]`/`_DOC`, e no **cabeçalho** (caixa de texto) `[Num_Contrato]` + `[Data_contrato]`.
 
-**Construção do contexto:** `construir_contexto(cliente, usuario, forma_pagamento_json)` monta o `ctx` a partir dos dados do cliente, do usuário (consultor) e do JSON de pagamento. O helper `_parse_pagamento` normaliza o JSON da forma de pagamento. Os helpers `_set_cell` / `_set_para` aceitam um `rotulo` opcional que adiciona a tag de nomenclatura (ver abaixo).
+> A diagramação (rótulos dos campos, nome do cliente em uma linha, testemunhas, "CPF/CNPJ") é **propriedade do template** — o código só substitui valores, preservando a formatação. Os helpers antigos `_set_cell`/`_set_para` (rótulos Pt-7) e `_relabel_cpf_cnpj` foram **removidos**.
 
-**Conversão para PDF:** após o preenchimento, o **LibreOffice** converte o `.docx` em PDF. Se o LibreOffice não estiver disponível, o código faz **fallback gracioso** para o próprio `.docx` (exceção `LibreOfficeIndisponivel`, capturada no endpoint), salvando o `.docx` e avançando o fluxo mesmo sem PDF.
+**Número do contrato:** gerado uma vez por `gerar_num_contrato(existing_nums)` no formato **`LOJA-AAAA-MM-DD-SEQ`** (ex.: `INS-2026-06-18-001`), sequência **contínua por loja** (máximo existente + 1). Loja fixa `INS` (`_CODIGO_LOJA`, `[TODO]` painel de loja). Guardado em `Contrato.num_contrato`, estável em regerações. Renderizado no **cabeçalho** (direita) com a **data** logo abaixo — ambos **gerados pelo sistema** (não editáveis).
 
-### Formatação do documento
+**Dados de pagamento:** o frontend monta `window._planoPagamento` (estruturado: só parcelas reais com `valor` numérico + `data`, mais `total_cliente` e `texto_cartao`); `_capturarPagamento` retorna esse objeto (não raspa mais o DOM — era a causa de um bug em que data/valor saíam trocados). O backend `_parse_pagamento` produz `datas[24]`, `valores[24]` (dinheiro), `num_parcelas_int`, `valor_contrato` e `texto_cartao`.
 
-- **"CPF" → "CPF/CNPJ":** o helper `_relabel_cpf_cnpj(doc)` varre o documento (parágrafos + células de tabela) e exibe todo "CPF" como "CPF/CNPJ", sem duplicar onde já está "CPF/CNPJ".
-- **Tags de nomenclatura:** cada campo editável preenchido pelo código recebe uma "tag" — um **rótulo cinza pequeno (~7pt) acima do valor** (ex.: Nome, CPF/CNPJ, CEP, Logradouro, Número, Bairro, Cidade, Estado/UF, Telefone, E-mail, Modalidade, Entrada, Data). Implementado via o parâmetro `rotulo` de `_set_cell` / `_set_para`.
+**Construção do contexto:** `construir_contexto(cliente, usuario, forma_pagamento_json)` monta o `ctx` (dados do cliente, consultor e `_pag` parseado).
+
+**Conversão para PDF:** `_converter_pdf(docx_path)` converte um `.docx` existente em PDF via **LibreOffice** (sem regenerar o docx). `gerar_pdf_contrato` = `preencher_contrato` + `_converter_pdf`. Sem LibreOffice → **fallback gracioso** (`LibreOfficeIndisponivel`, capturada no endpoint): salva o `.docx` e avança o fluxo.
+
+---
+
+## Contrato editável protegido + edição pontual `[IMPLEMENTADO]`
+
+O `.docx` gerado sai **protegido por padrão** (`protegido=True`): o documento inteiro fica
+**somente leitura** (`w:documentProtection edit="readOnly" enforcement="1"`) e **apenas os
+valores de campo** ficam editáveis, cada um envolto por uma região
+`w:permStart`/`w:permEnd` (grupo "everyone") — `_proteger_editaveis(doc, runs)`. O texto
+fixo (cláusulas) e o **cabeçalho (número + data)** ficam travados. A automação
+(LibreOffice→PDF, assinatura) **lê** o arquivo normalmente; a proteção só afeta a edição
+interativa.
+
+**Edição pontual (gerencial):** botão "✎ Editar contrato" na tela do contrato →
+`POST /api/projetos/<nome>/contrato/editar` (gate **gerente/diretor/admin**, auditado em
+`log_acoes_gerenciais`, ação `editar_contrato`). O backend abre o `.docx` no app escolhido
+(**Word** via `os.startfile`, **LibreOffice** via `soffice`) e inicia um **watcher**
+(`contrato_editar.watcher_regerar_pdf`) que, a cada salvamento (mtime cresce + lock
+`~$`/`.~lock` liberado, com debounce e timeout de 30 min), regera o PDF via
+`_converter_pdf` e atualiza `Contrato.pdf_path`. Helper testável de gate:
+`contrato_editar.validar_gerencial(db, login, senha)`.
+
+> A trava "só campos editáveis" se confirma de verdade abrindo no Word/LibreOffice
+> (interativo); os testes cobrem a estrutura OOXML e a lógica de gate/watcher.
 
 ---
 
@@ -117,8 +139,8 @@ Fluxo de status: **rascunho → para_assinatura → assinado/vigente**.
 
 ## Repositório de modelos
 
-- O modelo único utilizado é **`modelo_contrato_final.docx`**, na **raiz do projeto** (não em `templates/contratos/`).
-- O preenchimento é feito por código (`python-docx`) escrevendo nas tabelas/parágrafos do modelo final — **não** há campos de template Jinja2.
+- O modelo único utilizado é **`modelo_contrato_mapeado.docx`**, na **raiz do projeto** e **versionado no git** (o antigo `modelo_contrato_final.docx` foi **aposentado**).
+- O template usa **marcadores `[MARCADOR]`** em todos os campos; o preenchimento é por substituição de marcadores + grade por posição (`python-docx`/lxml) — **não** há Jinja2. O usuário edita este mesmo arquivo para mudar layout/cláusulas.
 - `[VALIDAR]` — quais outros modelos (Folha de Capa, Termo de Venda Programada, Projeto Executivo) devem existir além do contrato de venda.
 
 ---
@@ -134,3 +156,5 @@ Fluxo de status: **rascunho → para_assinatura → assinado/vigente**.
 **US-CON-004** — Como qualquer usuário, quero consultar o histórico de contratos de um projeto.
 
 **US-CON-005** — Como consultor, quero gerar o contrato para um signatário diferente do cliente cadastrado, informando os dados só para aquele contrato (`signatario_override`).
+
+**US-CON-006** — Como gerente/diretor, quero corrigir pontualmente os campos do contrato abrindo o `.docx` no Word/LibreOffice (só os valores editam; o restante fica travado) e ter o PDF regerado automaticamente ao salvar.
