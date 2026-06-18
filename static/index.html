@@ -240,6 +240,7 @@ body{overflow:hidden}
 .neg-hdr-lbl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
 .neg-hdr-val{font-size:18px;font-weight:900;font-family:'Epilogue',sans-serif}
 .neg-hdr-val.ok{color:var(--ok)} .neg-hdr-val.warn{color:var(--warn)}
+.neg-locked { opacity: .6; cursor: not-allowed; }
 /* Painel modalidade */
 .mod-panel{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:18px;margin-bottom:14px}
 .mod-panel-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:14px}
@@ -6378,8 +6379,35 @@ function _orcamentoAprovado() {
   return _cicloData['6']?.status === 'concluido';
 }
 
+// Trava/destrava todos os controles de edição da negociação (page-02),
+// exceto os botões de ação (tratados em atualizarBotoesAprovacao).
+function aplicarBloqueioNegociacao(travar) {
+  const root = document.getElementById('page-02');
+  if (!root) return;
+  root.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.closest('.action-row')) return;            // não mexe nos botões de ação
+    if (travar) {
+      if (el.tagName === 'SELECT') el.disabled = true;
+      else el.readOnly = true;
+      el.classList.add('neg-locked');
+    } else {
+      // só destrava o que ESTE bloqueio travou
+      if (el.classList.contains('neg-locked')) {
+        if (el.tagName === 'SELECT') el.disabled = false;
+        else el.readOnly = false;
+        el.classList.remove('neg-locked');
+      }
+    }
+  });
+  // Reaplica as regras de forma (parcelas fixas voltam a ficar disabled corretamente)
+  if (!travar && typeof atualizarFormasPagamento === 'function') {
+    atualizarFormasPagamento(document.getElementById('neg-pagamento')?.value || 'a_vista');
+  }
+}
+
 function atualizarBotoesAprovacao() {
   const aprovado = _orcamentoAprovado();
+  aplicarBloqueioNegociacao(aprovado);
   const actionRow = document.querySelector('#page-02 .action-row');
   if (!actionRow) return;
   const btnSalvar  = actionRow.querySelector('.btn-ok');
