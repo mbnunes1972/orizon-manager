@@ -2814,9 +2814,13 @@ def main():
 
     init_db()
     port   = 8765
-    server = HTTPServer(("127.0.0.1", port), Handler)
+    # Host de bind configurável: padrão 127.0.0.1 (dev local seguro);
+    # em produção defina OMIE_HOST=0.0.0.0 para aceitar acesso externo.
+    host   = os.environ.get("OMIE_HOST", "127.0.0.1")
+    server = HTTPServer((host, port), Handler)
     url    = "http://127.0.0.1:%d" % port
     print("\n  Promob -> Omie  |  Negociacao de Margens  v7.3")
+    print("  Bind: %s:%d" % (host, port))
     print("  Acesse: %s" % url)
     print("  Pressione Ctrl+C para encerrar\n")
     threading.Timer(1.0, lambda: webbrowser.open(url)).start()
