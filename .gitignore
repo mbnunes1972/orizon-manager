@@ -8,3 +8,5 @@ omie_grupos_cache.json
 *.xlsx
 .env
 .pytest_cache/
+
+omie.db
