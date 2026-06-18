@@ -10,10 +10,8 @@ import json
 import platform
 import subprocess
 import hashlib
-import re as _re_cpf
 from datetime import datetime
 from docx import Document
-from docx.shared import Pt, RGBColor
 
 _THIS_DIR     = os.path.dirname(os.path.abspath(__file__))
 CONTRATOS_DIR = os.path.join(_THIS_DIR, "CONTRATOS")
@@ -140,51 +138,6 @@ def _unique_cells(row):
             seen.add(id(tc))
             cells.append(c)
     return cells
-
-
-def _set_cell(cell, text: str, rotulo: str = None):
-    """Substitui o conteúdo de uma célula. Se `rotulo`, adiciona uma tag cinza pequena acima."""
-    para = cell.paragraphs[0]
-    font_name = font_size = bold = None
-    if para.runs:
-        r0 = para.runs[0]
-        font_name = r0.font.name; font_size = r0.font.size; bold = r0.bold
-    for run in para.runs:
-        run.text = ""
-    if rotulo:
-        rl = para.add_run(rotulo)
-        rl.font.size = Pt(7)
-        rl.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
-        para.add_run().add_break()
-    run = para.add_run(text)
-    if font_name:
-        run.font.name = font_name
-    if font_size:
-        run.font.size = font_size
-    if bold is not None:
-        run.bold = bold
-
-
-def _set_para(para, text: str, rotulo: str = None):
-    """Substitui o conteúdo de um parágrafo. Se `rotulo`, adiciona uma tag cinza pequena acima."""
-    font_name = font_size = bold = None
-    if para.runs:
-        r0 = para.runs[0]
-        font_name = r0.font.name; font_size = r0.font.size; bold = r0.bold
-    for run in para.runs:
-        run.text = ""
-    if rotulo:
-        rl = para.add_run(rotulo)
-        rl.font.size = Pt(7)
-        rl.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
-        para.add_run().add_break()
-    run = para.add_run(text)
-    if font_name:
-        run.font.name = font_name
-    if font_size:
-        run.font.size = font_size
-    if bold is not None:
-        run.bold = bold
 
 
 def _set_cell_text(cell, txt):
