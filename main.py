@@ -2118,6 +2118,82 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # POST /api/projetos/<nome>/contrato/editar — abre o .docx (protegido) no
+            # Word/LibreOffice local e regenera o PDF a cada salvamento (gate gerencial).
+            m = _re.match(r'^/api/projetos/([^/]+)/contrato/editar$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                db = get_session()
+                try:
+                    req   = json.loads(body or b'{}')
+                    app   = (req.get("app") or "word").strip().lower()
+                    login = (req.get("login") or "").strip()
+                    senha = (req.get("senha") or "").strip()
+                    from contrato_editar import validar_gerencial
+                    autorizador, erro = validar_gerencial(db, login, senha)
+                    if erro:
+                        self.send_json({"ok": False, "erro": erro}, code=403)
+                        return
+                    contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
+                                 .order_by(Contrato.id.desc()).first()
+                    if not contrato:
+                        self.send_json({"ok": False, "erro": "Contrato não encontrado"}, code=404)
+                        return
+                    from mod_contrato import CONTRATOS_DIR
+                    docx_path = os.path.join(CONTRATOS_DIR, f"contrato_{contrato.id}.docx")
+                    if not os.path.exists(docx_path):
+                        self.send_json({"ok": False,
+                                        "erro": "Arquivo do contrato (.docx) não encontrado"}, code=404)
+                        return
+                    # auditoria
+                    db.add(LogAcaoGerencial(
+                        autorizador_id=autorizador.id,
+                        acao="editar_contrato",
+                        projeto_nome=nome_safe,
+                        contexto=json.dumps({"app": app, "contrato_id": contrato.id}),
+                    ))
+                    db.commit()
+                    contrato_id = contrato.id
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                    return
+                finally:
+                    db.close()
+                # abrir o app + iniciar watcher (fora da sessão db)
+                import threading
+                from contrato_editar import abrir_no_app, watcher_regerar_pdf
+                import mod_contrato
+                def _on_save(p):
+                    try:
+                        mod_contrato._converter_pdf(p)
+                        s = get_session()
+                        try:
+                            c = s.query(Contrato).get(contrato_id)
+                            if c:
+                                c.pdf_path = os.path.join(CONTRATOS_DIR,
+                                                          f"contrato_{contrato_id}.pdf")
+                                s.commit()
+                        finally:
+                            s.close()
+                    except Exception:
+                        pass
+                # snapshot do mtime ANTES de abrir o app (referência de edição iniciada)
+                mtime_ini = os.path.getmtime(docx_path) if os.path.exists(docx_path) else 0.0
+                try:
+                    abrir_no_app(docx_path, app)
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": f"Falha ao abrir o app: {e}"}, code=500)
+                    return
+                threading.Thread(
+                    target=watcher_regerar_pdf,
+                    args=(docx_path, _on_save),
+                    kwargs={"mtime_ref": mtime_ini},
+                    daemon=True,
+                ).start()
+                self.send_json({"ok": True, "editando": True, "app": app})
+                return
+
             # POST /api/projetos/<nome>/contrato — gera PDF do contrato
             m = _re.match(r'^/api/projetos/([^/]+)/contrato$', path)
             if m:
