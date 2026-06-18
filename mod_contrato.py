@@ -86,6 +86,51 @@ def _formatar_data_br(data: str) -> str:
     return data or "—"
 
 
+# ── Motor de substituição de marcadores [MARCADOR] ────────────────────────────
+
+import re as _re_mark
+_MARK_RE = _re_mark.compile(r'\[+\s*([A-Za-z0-9_ ]+?)\s*\]')
+
+
+def _aplica_mark(texto, mapping):
+    def repl(m):
+        chave = m.group(1).strip().upper().replace(" ", "_")
+        return mapping[chave] if chave in mapping else m.group(0)
+    return _MARK_RE.sub(repl, texto)
+
+
+def _subst_paragrafo(par, mapping):
+    if "[" not in par.text:
+        return
+    novo = _aplica_mark(par.text, mapping)
+    if novo == par.text:
+        return
+    if par.runs:
+        par.runs[0].text = novo
+        for r in par.runs[1:]:
+            r.text = ""
+    else:
+        par.text = novo
+
+
+def _substituir_marcadores(doc, mapping):
+    """Substitui [MARCADOR] (case-insensitive, tolera '[[') no corpo, tabelas e headers.
+    Chaves do mapping SEM colchetes, em MAIÚSCULAS. Marcador sem chave é mantido."""
+    from docx.oxml.ns import qn
+    for par in doc.paragraphs:
+        _subst_paragrafo(par, mapping)
+    for t in doc.tables:
+        for row in t.rows:
+            for cell in row.cells:
+                for par in cell.paragraphs:
+                    _subst_paragrafo(par, mapping)
+    for sec in doc.sections:
+        for hdr in (sec.header, sec.first_page_header, sec.even_page_header):
+            for t_el in hdr._element.iter(qn('w:t')):
+                if t_el.text and "[" in t_el.text:
+                    t_el.text = _aplica_mark(t_el.text, mapping)
+
+
 def _unique_cells(row):
     """Retorna apenas células únicas de uma linha (deduplica células mescladas)."""
     seen, cells = set(), []

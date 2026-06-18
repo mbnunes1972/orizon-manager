@@ -498,3 +498,37 @@ def test_parse_pagamento_cartao_texto():
     assert d["num_parcelas_int"] == 0
     assert d["valores"] == [""] * 24
     assert d["valor_contrato"] == "R$ 120.000,00"
+
+
+def test_substituir_marcadores_basico():
+    from docx import Document
+    from mod_contrato import _substituir_marcadores
+    d = Document()
+    d.add_paragraph("Cliente: [NOME_CLIENTE] CPF/CNPJ: [CPF]")
+    d.add_paragraph("Desconhecido: [NAO_EXISTE]")
+    _substituir_marcadores(d, {"NOME_CLIENTE": "Ana Lima", "CPF": "111.222.333-44"})
+    txt = "\n".join(p.text for p in d.paragraphs)
+    assert "Cliente: Ana Lima CPF/CNPJ: 111.222.333-44" in txt
+    assert "[NAO_EXISTE]" in txt          # desconhecido permanece
+
+
+def test_substituir_marcadores_case_e_duplo_colchete():
+    from docx import Document
+    from mod_contrato import _substituir_marcadores
+    d = Document()
+    d.add_paragraph("N: [Num_Contrato]  D: [[Data_contrato]")
+    _substituir_marcadores(d, {"NUM_CONTRATO": "INS-2026-06-17-001", "DATA_CONTRATO": "17/06/2026"})
+    txt = d.paragraphs[0].text
+    assert "INS-2026-06-17-001" in txt and "17/06/2026" in txt
+    assert "[" not in txt
+
+
+def test_substituir_marcadores_em_tabela():
+    from docx import Document
+    from mod_contrato import _substituir_marcadores
+    d = Document()
+    t = d.add_table(rows=1, cols=1)
+    t.rows[0].cells[0].paragraphs[0].add_run("Nome\n[NOME_CLIENTE]")
+    _substituir_marcadores(d, {"NOME_CLIENTE": "Bia"})
+    assert "Bia" in t.rows[0].cells[0].text
+    assert "[NOME_CLIENTE]" not in t.rows[0].cells[0].text
