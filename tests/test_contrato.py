@@ -550,6 +550,80 @@ def test_preencher_grade_cartao_primeiro_campo():
     assert _TRACO in blob
 
 
+def test_protegido_tem_documentprotection_e_regioes():
+    import json, os
+    from docx import Document
+    from docx.oxml.ns import qn
+    from mod_contrato import preencher_contrato, construir_contexto
+    ctx = construir_contexto(
+        cliente={"nome":"Ana","cpf":"111","email":"a@x.com","telefone":"(12)9","logradouro":"R",
+                 "numero":"1","complemento":"","bairro":"C","cidade":"SJC","cep":"1","estado":"SP",
+                 "inst_mesmo_residencial":True,"inst_logradouro":"","inst_numero":"","inst_complemento":"",
+                 "inst_bairro":"","inst_cidade":"","inst_cep":"","inst_uf":""},
+        usuario={"nome":"Z","telefone":"","email":""},
+        forma_pagamento_json=json.dumps({"tipo":"aymore","nome_forma":"Aymoré","total_cliente":1000,
+            "texto_cartao":"","parcelas":[{"num":1,"data":"18/07/2026","valor":500.0}]}))
+    ctx["num_contrato"]="INS-1"; ctx["data_contrato"]="18/06/2026"
+    p = preencher_contrato(97001, ctx, protegido=True)
+    d = Document(p)
+    prot = d.settings.element.find(qn('w:documentProtection'))
+    body_xml = d.element.body.xml
+    os.remove(p)
+    assert prot is not None and prot.get(qn('w:edit')) == "readOnly"
+    assert "permStart" in body_xml and "permEnd" in body_xml
+    assert "Ana" in body_xml
+
+def test_nao_protegido_sem_documentprotection():
+    import json, os
+    from docx import Document
+    from docx.oxml.ns import qn
+    from mod_contrato import preencher_contrato, construir_contexto
+    ctx = construir_contexto(
+        cliente={"nome":"Ana","cpf":"1","email":"","telefone":"","logradouro":"","numero":"",
+                 "complemento":"","bairro":"","cidade":"","cep":"","estado":"","inst_mesmo_residencial":True,
+                 "inst_logradouro":"","inst_numero":"","inst_complemento":"","inst_bairro":"",
+                 "inst_cidade":"","inst_cep":"","inst_uf":""},
+        usuario={"nome":"Z","telefone":"","email":""},
+        forma_pagamento_json=json.dumps({"tipo":"aymore","nome_forma":"Aymoré","total_cliente":0,
+            "texto_cartao":"","parcelas":[]}))
+    p = preencher_contrato(97002, ctx, protegido=False)
+    d = Document(p)
+    has = d.settings.element.find(qn('w:documentProtection')) is not None
+    body = d.element.body.xml
+    os.remove(p)
+    assert has is False
+    assert "permStart" not in body
+
+def test_protegido_mantem_texto_e_valores():
+    # proteção não altera o conteúdo: mesmos valores que protegido=False
+    import json, os, re
+    from docx import Document
+    from docx.oxml.ns import qn
+    from mod_contrato import preencher_contrato, construir_contexto
+    def gen(protegido):
+        ctx = construir_contexto(
+            cliente={"nome":"Ana Cliente","cpf":"111.222.333-44","email":"a@x.com","telefone":"(12)9",
+                     "logradouro":"Rua A","numero":"10","complemento":"","bairro":"Centro","cidade":"SJC",
+                     "cep":"12000","estado":"SP","inst_mesmo_residencial":True,"inst_logradouro":"",
+                     "inst_numero":"","inst_complemento":"","inst_bairro":"","inst_cidade":"","inst_cep":"","inst_uf":""},
+            usuario={"nome":"Z","telefone":"(12)9","email":"z@x.com"},
+            forma_pagamento_json=json.dumps({"tipo":"aymore","nome_forma":"Aymoré","total_cliente":129572.01,
+                "texto_cartao":"","parcelas":[{"num":i+1,"data":f"18/{7+i:02d}/2026","valor":4820.0} for i in range(3)]}))
+        ctx["num_contrato"]="INS-9"; ctx["data_contrato"]="18/06/2026"
+        p = preencher_contrato(97003, ctx, protegido=protegido)
+        d = Document(p)
+        blob = "\n".join(par.text for par in d.paragraphs)
+        for t in d.tables:
+            for row in t.rows:
+                for c in row.cells: blob += "\n"+c.text
+        os.remove(p)
+        return blob
+    a = gen(True); b = gen(False)
+    assert "Ana Cliente" in a and "R$ 4.820,00" in a and "R$ 129.572,01" in a
+    assert sorted(re.findall(r'\[[A-Za-z0-9_ ]+\]', a)) == []   # nenhum marcador sobra
+    assert a == b   # proteção não muda o texto
+
+
 def test_converter_pdf_nao_regenera_docx(monkeypatch):
     import mod_contrato
     chamou = {"preencher": False, "convert_path": None}

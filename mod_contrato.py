@@ -97,31 +97,61 @@ def _aplica_mark(texto, mapping):
     return _MARK_RE.sub(repl, texto)
 
 
-def _subst_paragrafo(par, mapping):
-    if "[" not in par.text:
+def _subst_paragrafo(par, mapping, coletor=None):
+    """Reconstrói o parágrafo em segmentos (texto fixo × valor substituído),
+    um run por segmento, preservando o estilo do 1º run.
+
+    Quando ``coletor`` é fornecido, cada run que corresponde a um VALOR
+    substituído é anexado a ele (isola o valor para torná-lo editável).
+    O texto resultante (``par.text``) é idêntico ao produzido pela
+    substituição direta — apenas a fragmentação em runs muda.
+    """
+    txt = par.text
+    if "[" not in txt:
         return
-    novo = _aplica_mark(par.text, mapping)
-    if novo == par.text:
-        return
-    if par.runs:
-        par.runs[0].text = novo
-        for r in par.runs[1:]:
-            r.text = ""
-    else:
-        par.text = novo
+    base = par.runs[0] if par.runs else None
+    base_name = base.font.name if base is not None else None
+    base_size = base.font.size if base is not None else None
+    base_bold = base.bold if base is not None else None
+    segs = []  # (texto, eh_valor)
+    pos = 0
+    for m in _MARK_RE.finditer(txt):
+        if m.start() > pos:
+            segs.append((txt[pos:m.start()], False))
+        chave = m.group(1).strip().upper().replace(" ", "_")
+        if chave in mapping:
+            segs.append((mapping[chave], True))
+        else:
+            segs.append((m.group(0), False))
+        pos = m.end()
+    if pos < len(txt):
+        segs.append((txt[pos:], False))
+    # limpa runs existentes
+    for r in list(par.runs):
+        r._r.getparent().remove(r._r)
+    for seg_txt, eh_valor in segs:
+        run = par.add_run(seg_txt)
+        if base_name is not None:
+            run.font.name = base_name
+        if base_size is not None:
+            run.font.size = base_size
+        if base_bold is not None:
+            run.bold = base_bold
+        if eh_valor and coletor is not None:
+            coletor.append(run)
 
 
-def _substituir_marcadores(doc, mapping):
+def _substituir_marcadores(doc, mapping, coletor=None):
     """Substitui [MARCADOR] (case-insensitive, tolera '[[') no corpo, tabelas e headers.
     Chaves do mapping SEM colchetes, em MAIÚSCULAS. Marcador sem chave é mantido."""
     from docx.oxml.ns import qn
     for par in doc.paragraphs:
-        _subst_paragrafo(par, mapping)
+        _subst_paragrafo(par, mapping, coletor)
     for t in doc.tables:
         for row in t.rows:
             for cell in row.cells:
                 for par in cell.paragraphs:
-                    _subst_paragrafo(par, mapping)
+                    _subst_paragrafo(par, mapping, coletor)
     for sec in doc.sections:
         for hdr in (sec.header, sec.first_page_header, sec.even_page_header):
             for t_el in hdr._element.iter(qn('w:t')):
@@ -140,8 +170,12 @@ def _unique_cells(row):
     return cells
 
 
-def _set_cell_text(cell, txt):
-    """Escreve txt no 1º parágrafo da célula, preservando o estilo; zera runs extras."""
+def _set_cell_text(cell, txt, coletor=None):
+    """Escreve txt no 1º parágrafo da célula, preservando o estilo; zera runs extras.
+
+    Quando ``coletor`` é fornecido e ``txt`` é um valor real (não vazio, não _TRACO),
+    o run preenchido é anexado a ele para virar região editável.
+    """
     par = cell.paragraphs[0]
     if par.runs:
         par.runs[0].text = txt
@@ -152,9 +186,11 @@ def _set_cell_text(cell, txt):
     for extra in cell.paragraphs[1:]:
         for r in extra.runs:
             r.text = ""
+    if coletor is not None and txt and txt != _TRACO and par.runs:
+        coletor.append(par.runs[0])
 
 
-def _preencher_grade(doc, pag):
+def _preencher_grade(doc, pag, coletor=None):
     """Preenche a grade de parcelas (tabela 3, linhas 3-10) por posição.
 
     Cada linha tem 6 células ÚNICAS no padrão (valor, data) × 3, embora a célula
@@ -180,14 +216,39 @@ def _preencher_grade(doc, pag):
                 break
             p = gi * 3 + j + 1
             if tipo == "cartao":
-                _set_cell_text(cells[vcol], texto if p == 1 else _TRACO)
-                _set_cell_text(cells[dcol], "" if p == 1 else _TRACO)
+                _set_cell_text(cells[vcol], texto if p == 1 else _TRACO, coletor)
+                _set_cell_text(cells[dcol], "" if p == 1 else _TRACO, coletor)
             elif p <= num and valores[p-1]:
-                _set_cell_text(cells[vcol], valores[p-1])
-                _set_cell_text(cells[dcol], datas[p-1] or _TRACO)
+                _set_cell_text(cells[vcol], valores[p-1], coletor)
+                _set_cell_text(cells[dcol], datas[p-1] or _TRACO, coletor)
             else:
-                _set_cell_text(cells[vcol], _TRACO)
-                _set_cell_text(cells[dcol], _TRACO)
+                _set_cell_text(cells[vcol], _TRACO, coletor)
+                _set_cell_text(cells[dcol], _TRACO, coletor)
+
+
+# ── Proteção: regiões editáveis + documento read-only ─────────────────────────
+
+def _proteger_editaveis(doc, runs):
+    """Envolve cada run de ``runs`` em <w:permStart>/<w:permEnd> (edGrp=everyone)
+    e marca o documento como read-only via <w:documentProtection>.
+
+    Resultado: o documento inteiro fica protegido, exceto os valores preenchidos.
+    """
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    for i, run in enumerate(runs, start=1):
+        ps = OxmlElement('w:permStart')
+        ps.set(qn('w:id'), str(i))
+        ps.set(qn('w:edGrp'), 'everyone')
+        pe = OxmlElement('w:permEnd')
+        pe.set(qn('w:id'), str(i))
+        r = run._r
+        r.addprevious(ps)
+        r.addnext(pe)
+    prot = OxmlElement('w:documentProtection')
+    prot.set(qn('w:edit'), 'readOnly')
+    prot.set(qn('w:enforcement'), '1')
+    doc.settings.element.append(prot)
 
 
 # ── Parser de pagamento ───────────────────────────────────────────────────────
@@ -333,7 +394,7 @@ def _montar_mapping(ctx, pag):
     }
 
 
-def preencher_contrato(contrato_id: int, ctx: dict) -> str:
+def preencher_contrato(contrato_id: int, ctx: dict, protegido: bool = True) -> str:
     """
     Preenche modelo_contrato_mapeado.docx com os dados de ctx e salva
     como CONTRATOS/contrato_<id>.docx. Retorna o caminho do .docx.
@@ -341,6 +402,10 @@ def preencher_contrato(contrato_id: int, ctx: dict) -> str:
     Geração 100% por marcadores: a grade de parcelas é preenchida por posição
     (_preencher_grade) e todos os demais campos via substituição de [MARCADOR]
     (_substituir_marcadores).
+
+    Quando ``protegido`` (padrão), o documento é gerado read-only com cada valor
+    preenchido isolado em uma região editável (permStart/permEnd). O cabeçalho
+    (número + data, gerados pelo sistema) NÃO é editável.
     """
     if not os.path.exists(_MODELO):
         raise FileNotFoundError(
@@ -351,8 +416,11 @@ def preencher_contrato(contrato_id: int, ctx: dict) -> str:
 
     doc = Document(_MODELO)
     pag = ctx.get("_pag", {})
-    _preencher_grade(doc, pag)
-    _substituir_marcadores(doc, _montar_mapping(ctx, pag))
+    coletor = [] if protegido else None
+    _preencher_grade(doc, pag, coletor=coletor)
+    _substituir_marcadores(doc, _montar_mapping(ctx, pag), coletor=coletor)
+    if protegido:
+        _proteger_editaveis(doc, coletor)
     docx_path = os.path.join(CONTRATOS_DIR, f"contrato_{contrato_id}.docx")
     doc.save(docx_path)
     return docx_path
