@@ -3024,6 +3024,7 @@ function agendarCalculo(){
 // ---- Pagamento: estado e carregamento das tabelas ----------------------------
 let _faixasAtivas    = [];
 let _tipoAtivo       = 'avista';
+window._planoPagamento = null;  // plano estruturado do painel de pagamento ativo (preenchido pelos render)
 let _codigoPagAtivo  = 'a_vista';  // código da modalidade selecionada (ex: 'cartao_credito')
 let _descontoAvista  = 0.0;
 let _acrescimoFin    = 0.0;
@@ -3310,6 +3311,16 @@ async function atualizarAymore() {
     <td colspan="3" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
     <td style="padding:10px 12px;text-align:right;font-weight:900;color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
   </tr>`;
+  window._planoPagamento = {
+    tipo: 'aymore', nome_forma: 'Financiamento Aymoré',
+    entrada_valor: entrada,
+    entrada_data: document.getElementById('ay-data-contrato')?.value || '',
+    entrada_forma: '',
+    total_cliente: d.total_cliente, texto_cartao: '',
+    parcelas: (d.parcelas || [])
+      .filter(p => p.tipo === 'primeira' || p.tipo === 'parcela')
+      .map((p, i) => ({ num: i + 1, data: p.data, valor: d.valor_parcela })),
+  };
   _atualizarImpostos('ay', d.total_cliente);
   atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
   _ep07DistribuirFinanciado(d.total_cliente, valorAvista);
@@ -3408,6 +3419,16 @@ async function atualizarCartao() {
     <td colspan="2" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
     <td style="padding:10px 12px;text-align:right;font-weight:900;color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
   </tr>`;
+  let _ccTexto = 'R$ ' + fmt(d.total_cliente);
+  if (entrada > 0) _ccTexto += ' — Entrada de R$ ' + fmt(entrada);
+  if (n > 1 && d.valor_parcela > 0) _ccTexto += ' e ' + n + 'x R$ ' + fmt(d.valor_parcela);
+  window._planoPagamento = {
+    tipo: 'cartao', nome_forma: 'Cartão de Crédito',
+    entrada_valor: entrada, entrada_data: '', entrada_forma: '',
+    total_cliente: d.total_cliente,
+    texto_cartao: _ccTexto,
+    parcelas: [],
+  };
   _atualizarImpostos('cc', d.total_cliente);
   atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
 }
@@ -3544,6 +3565,16 @@ async function atualizarVP() {
   if (elTot && !elTot._editando) elTot.value = fmt(d.total_cliente);
 
   vpRenderTabela(d);
+  window._planoPagamento = {
+    tipo: 'vp', nome_forma: 'Venda Programada',
+    entrada_valor: entrada,
+    entrada_data: document.getElementById('vp-data-contrato')?.value || '',
+    entrada_forma: '',
+    total_cliente: d.total_cliente, texto_cartao: '',
+    parcelas: (d.parcelas || [])
+      .filter(p => p.tipo === 'primeira' || p.tipo === 'parcela')
+      .map((p, i) => ({ num: i + 1, data: p.data, valor: p.valor })),
+  };
   _atualizarImpostos('vp', d.total_cliente);
   atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
 }
@@ -3969,6 +4000,15 @@ async function atualizarTF() {
   _atualizarImpostos('tf', totalCliente);
 
   tfRenderTabela(d, valorAvista, entrada);
+  window._planoPagamento = {
+    tipo: 'tf', nome_forma: 'Total Flex',
+    entrada_valor: entrada,
+    entrada_data: document.getElementById('tf-data-contrato')?.value || '',
+    entrada_forma: '',
+    total_cliente: totalCliente, texto_cartao: '',
+    parcelas: (d.parcelas || [])
+      .map((p, i) => ({ num: i + 1, data: p.data_iso, valor: p.valor_efetivo })),
+  };
   atualizarResumoParcelas(entrada, n_parc, ultima.valor_efetivo, totalCliente);
   _ep07DistribuirFinanciado(totalCliente, valorAvista);
 }
@@ -6952,82 +6992,20 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
 }
 
 function _capturarPagamento(formaEntrada, formaParcelas) {
-  const ayAtivo = document.getElementById('painel-aymore')?.style.display !== 'none';
-  const ccAtivo = document.getElementById('painel-cartao')?.style.display !== 'none';
-  const vpAtivo = document.getElementById('painel-vp')?.style.display !== 'none';
-  const tfAtivo = document.getElementById('painel-tf')?.style.display !== 'none';
-
-  const nomesForma = {
-    aymore: 'Financiamento Aymoré', cartao: 'Cartão de Crédito',
-    vp: 'Venda Programada', tf: 'Total Flex', avista: 'À Vista / Boleto Loja',
+  const base = window._planoPagamento || {
+    tipo: 'avista', nome_forma: 'À Vista / Boleto Loja',
+    entrada_valor: 0, entrada_data: '', entrada_forma: '',
+    total_cliente: 0, texto_cartao: '', parcelas: [],
   };
-
-  const entradaStr = document.getElementById('apr-entrada')?.value || '';
-  const entrada = (function parseMoedaLocal(str) {
-    if (!str) return 0;
-    const s = str.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.');
-    return parseFloat(s) || 0;
-  })(entradaStr);
-
-  const entradaData = (() => {
-    if (ayAtivo) return document.getElementById('ay-data-contrato')?.value || '';
-    if (vpAtivo) return document.getElementById('vp-data-contrato')?.value || '';
-    if (tfAtivo) return document.getElementById('tf-data-contrato')?.value || '';
-    return '';
-  })();
-
-  // Cartão: só texto, sem datas
-  if (ccAtivo) {
-    const ccParcelasEl = document.getElementById('cc-parcelas');
-    const nParcelas    = parseInt(ccParcelasEl?.value || '1') || 1;
-    const totalEl      = document.getElementById('neg-total-final');
-    const rawTotal     = (totalEl?.value || '').replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,'');
-    const total        = parseFloat(rawTotal) || 0;
-    const valParcela   = nParcelas > 1 && (total - entrada) > 0 ? (total - entrada) / nParcelas : 0;
-    const fmt = (v) => 'R$ ' + v.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-    let texto = fmt(total);
-    if (entrada > 0)
-      texto += ' — Entrada de ' + fmt(entrada);
-    if (nParcelas > 1 && valParcela > 0)
-      texto += ' e ' + nParcelas + 'x ' + fmt(valParcela);
-    return {
-      tipo: 'cartao', nome_forma: 'Cartão de Crédito',
-      texto, parcelas: [], entrada_valor: entrada,
-      entrada_data: '', entrada_forma: formaEntrada,
-    };
-  }
-
-  // Para outros tipos: coletar linhas da tabela do painel ativo
-  const tipo = ayAtivo ? 'aymore' : vpAtivo ? 'vp' : tfAtivo ? 'tf' : 'avista';
-  const nomeForma = nomesForma[tipo];
-  const painelMap = { aymore: 'painel-aymore', vp: 'painel-vp', tf: 'painel-tf', avista: null };
-  const painelId  = painelMap[tipo];
-
-  const parcelas = [];
-  if (painelId) {
-    const tbody = document.querySelector('#' + painelId + ' tbody');
-    if (tbody) {
-      let seq = 1;
-      tbody.querySelectorAll('tr').forEach(tr => {
-        const tds = tr.querySelectorAll('td');
-        if (tds.length < 2) return;
-        const desc  = (tds[0]?.textContent || '').trim();
-        const data  = (tds[1]?.textContent || '').trim();
-        const valor = (tds[2]?.textContent || tds[1]?.textContent || '').trim();
-        // Pular linhas de cabeçalho, "Assinatura", "Entrada" (tratada separadamente) e linhas vazias
-        if (!desc || desc === 'Assinatura' || desc.toLowerCase().includes('contrato')) return;
-        if (desc.toLowerCase().includes('entrada')) return;
-        parcelas.push({ seq: seq++, descricao: desc, data, valor, forma: formaParcelas });
-      });
-    }
-  }
-
   return {
-    tipo, nome_forma: nomeForma,
-    parcelas, texto: '',
-    entrada_valor: entrada,
-    entrada_data:  entradaData,
-    entrada_forma: formaEntrada,
+    tipo: base.tipo,
+    nome_forma: base.nome_forma,
+    entrada_valor: base.entrada_valor || 0,
+    entrada_data: base.entrada_data || '',
+    entrada_forma: formaEntrada || base.entrada_forma || '',
+    total_cliente: base.total_cliente || 0,
+    texto_cartao: base.texto_cartao || '',
+    parcelas: (base.parcelas || []).map(p => ({ num: p.num, data: p.data, valor: p.valor, forma: formaParcelas })),
   };
 }
 
