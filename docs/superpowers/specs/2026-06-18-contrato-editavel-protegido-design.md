@@ -150,14 +150,12 @@ Thread em background por sessão de edição:
 > (documentProtection + permStart/permEnd nas posições certas) e a lógica do
 > endpoint/watcher; a confirmação visual final é manual.
 
-## Decisões abertas (para o review do spec)
+## Decisões (resolvidas no review)
 
-1. **Quantas regerações por sessão:** uma (no primeiro salvar/fechar) ou repetir a cada
-   salvamento até o timeout? Sugestão: repetir a cada salvamento, com debounce, até
-   timeout/fechamento.
-2. **Sempre protegido vs. cópia separada:** sugiro o `contrato_<id>.docx` canônico já
-   protegido (correções persistem; automação ignora a proteção). Alternativa: gerar uma
-   cópia `contrato_<id>_editavel.docx` só ao clicar "Editar".
+1. **Regeração do PDF:** a cada salvamento, com **debounce**, até o arquivo fechar (lock
+   liberado) ou o **timeout** (30 min). Não é uma única regeração.
+2. **Arquivo protegido:** o `contrato_<id>.docx` **canônico já sai protegido**
+   (correções persistem nele; a automação ignora a proteção ao ler). Sem cópia separada.
 
 ## Fora de escopo
 - Senha embutida no `.docx` (algoritmo de hash do Word) — descartado a favor do gate no
