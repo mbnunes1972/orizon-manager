@@ -446,6 +446,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <option value="1">1x</option>
     </select>
 
+    <label class="sb-label" id="neg-forma-entrada-lbl">Forma da entrada</label>
+    <select id="neg-forma-entrada" onchange="onFormaChange()" class="sb-select"></select>
+
+    <div id="neg-forma-parcela-wrap">
+      <label class="sb-label">Forma das parcelas</label>
+      <select id="neg-forma-parcela" onchange="onFormaChange()" class="sb-select"></select>
+    </div>
+
     <!-- Params exclusivos do Total Flex (visivel so quando TF ativo) -->
     <div id="sb-tf-extras" style="display:none;border-top:1px solid var(--border);margin-top:6px;padding-top:8px">
       <label class="sb-label" style="display:flex;align-items:center;justify-content:space-between">
@@ -3034,6 +3042,64 @@ let _faixasAtivas    = [];
 let _tipoAtivo       = 'avista';
 window._planoPagamento = null;  // plano estruturado do painel de pagamento ativo (preenchido pelos render)
 let _codigoPagAtivo  = 'a_vista';  // código da modalidade selecionada (ex: 'cartao_credito')
+let _formaEntrada = 'pix';
+let _formaParcela = 'boleto';
+
+const _FORMAS_ENTRADA = [['pix','Pix'],['ted','TED'],['boleto','Boleto']];
+const _FORMAS_AVISTA  = [['pix','Pix'],['ted','TED'],['boleto','Boleto'],['cheque','Cheque'],['dinheiro','Dinheiro']];
+const _FORMAS_PARC_VPTF = [['boleto','Boleto'],['cheque','Cheque']];
+
+function _preencherSelectFormas(sel, opcoes, valorAtual) {
+  sel.innerHTML = opcoes.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+  if (opcoes.find(([v]) => v === valorAtual)) sel.value = valorAtual;
+  else sel.value = opcoes[0] ? opcoes[0][0] : '';
+  return sel.value;
+}
+
+function onFormaChange() {
+  const selE = document.getElementById('neg-forma-entrada');
+  const selP = document.getElementById('neg-forma-parcela');
+  if (selE) _formaEntrada = selE.value;
+  if (selP && !selP.disabled) _formaParcela = selP.value;
+  agendarCalculo();
+}
+
+// Aplica as regras de forma de pagamento por modalidade.
+function atualizarFormasPagamento(codigo) {
+  const selE  = document.getElementById('neg-forma-entrada');
+  const lblE  = document.getElementById('neg-forma-entrada-lbl');
+  const wrapP = document.getElementById('neg-forma-parcela-wrap');
+  const selP  = document.getElementById('neg-forma-parcela');
+  if (!selE || !selP) return;
+
+  if (codigo === 'a_vista') {
+    // À vista usa o painel-avista (entrada + liquidação); oculta estes seletores.
+    lblE.style.display = 'none';
+    selE.style.display = 'none';
+    wrapP.style.display = 'none';
+    return;
+  }
+  lblE.style.display = ''; selE.style.display = ''; wrapP.style.display = '';
+
+  // Entrada: sempre Pix/TED/Boleto
+  _formaEntrada = _preencherSelectFormas(selE, _FORMAS_ENTRADA, _formaEntrada);
+
+  // Parcelas: depende da modalidade
+  if (codigo === 'cartao_credito' || codigo === 'cartao_credito_x') {
+    selP.innerHTML = '<option value="cartao_credito">Cartão de Crédito</option>';
+    selP.value = 'cartao_credito'; selP.disabled = true; _formaParcela = 'cartao_credito';
+  } else if (codigo === 'aymore') {
+    selP.innerHTML = '<option value="boleto">Boleto</option>';
+    selP.value = 'boleto'; selP.disabled = true; _formaParcela = 'boleto';
+  } else if (codigo === 'venda_programada' || codigo === 'total_flex') {
+    selP.disabled = false;
+    _formaParcela = _preencherSelectFormas(selP, _FORMAS_PARC_VPTF, _formaParcela);
+  } else {
+    selP.disabled = false;
+    _formaParcela = _preencherSelectFormas(selP, _FORMAS_ENTRADA, _formaParcela);
+  }
+}
+
 let _descontoAvista  = 0.0;
 let _acrescimoFin    = 0.0;
 let _descricaoPag    = 'A Vista';
@@ -3107,6 +3173,7 @@ async function onPagamentoChange(){
     cartaoMostrarPainel(codigo === 'cartao_credito' || codigo === 'cartao_credito_x');
     vpMostrarPainel(codigo === 'venda_programada');
     tfMostrarPainel(codigo === 'total_flex');
+    atualizarFormasPagamento(codigo);
   } catch(e){
     console.error('[PAG] Erro ao carregar faixas:', e);
     _faixasAtivas=[]; _tipoAtivo='avista'; _descontoAvista=0; _acrescimoFin=0;
@@ -3115,6 +3182,7 @@ async function onPagamentoChange(){
     cartaoMostrarPainel(false);
     vpMostrarPainel(false);
     tfMostrarPainel(false);
+    atualizarFormasPagamento('a_vista');
   }
   agendarCalculo();
 }
@@ -3323,11 +3391,11 @@ async function atualizarAymore() {
     tipo: 'aymore', nome_forma: 'Financiamento Aymoré',
     entrada_valor: entrada,
     entrada_data: document.getElementById('ay-data-contrato')?.value || '',
-    entrada_forma: '',
+    entrada_forma: _formaEntrada,
     total_cliente: d.total_cliente, texto_cartao: '',
     parcelas: (d.parcelas || [])
       .filter(p => p.tipo === 'primeira' || p.tipo === 'parcela')
-      .map((p, i) => ({ num: i + 1, data: p.data, valor: d.valor_parcela })),
+      .map((p, i) => ({ num: i + 1, data: p.data, valor: d.valor_parcela, forma: _formaParcela })),
   };
   _atualizarImpostos('ay', d.total_cliente);
   atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
@@ -3432,7 +3500,7 @@ async function atualizarCartao() {
   if (n > 1 && d.valor_parcela > 0) _ccTexto += ' e ' + n + 'x R$ ' + fmt(d.valor_parcela);
   window._planoPagamento = {
     tipo: 'cartao', nome_forma: 'Cartão de Crédito',
-    entrada_valor: entrada, entrada_data: '', entrada_forma: '',
+    entrada_valor: entrada, entrada_data: '', entrada_forma: _formaEntrada,
     total_cliente: d.total_cliente,
     texto_cartao: _ccTexto,
     parcelas: [],
@@ -3577,11 +3645,11 @@ async function atualizarVP() {
     tipo: 'vp', nome_forma: 'Venda Programada',
     entrada_valor: entrada,
     entrada_data: document.getElementById('vp-data-contrato')?.value || '',
-    entrada_forma: '',
+    entrada_forma: _formaEntrada,
     total_cliente: d.total_cliente, texto_cartao: '',
     parcelas: (d.parcelas || [])
       .filter(p => p.tipo === 'primeira' || p.tipo === 'parcela')
-      .map((p, i) => ({ num: i + 1, data: p.data, valor: p.valor })),
+      .map((p, i) => ({ num: i + 1, data: p.data, valor: p.valor, forma: _formaParcela })),
   };
   _atualizarImpostos('vp', d.total_cliente);
   atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
@@ -4012,10 +4080,10 @@ async function atualizarTF() {
     tipo: 'tf', nome_forma: 'Total Flex',
     entrada_valor: entrada,
     entrada_data: document.getElementById('tf-data-contrato')?.value || '',
-    entrada_forma: '',
+    entrada_forma: _formaEntrada,
     total_cliente: totalCliente, texto_cartao: '',
     parcelas: (d.parcelas || [])
-      .map((p, i) => ({ num: i + 1, data: p.data_iso, valor: p.valor_efetivo })),
+      .map((p, i) => ({ num: i + 1, data: p.data_iso, valor: p.valor_efetivo, forma: _formaParcela })),
   };
   atualizarResumoParcelas(entrada, n_parc, ultima.valor_efetivo, totalCliente);
   _ep07DistribuirFinanciado(totalCliente, valorAvista);
