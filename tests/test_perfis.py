@@ -64,3 +64,15 @@ def test_capacidade_aprovar_financeiro():
     assert perfis.pode("consultor", "aprovar_financeiro") is False
     assert perfis.pode("medidor", "aprovar_financeiro") is False
     assert perfis.pode("inexistente", "aprovar_financeiro") is False
+
+
+def test_capacidades_medicao():
+    assert perfis.pode("medidor", "registrar_medicao") is True
+    assert perfis.pode("diretor", "registrar_medicao") is True
+    assert perfis.pode("gerente_vendas", "registrar_medicao") is False
+    assert perfis.pode("consultor", "registrar_medicao") is False
+    assert perfis.pode("gerente_vendas", "aprovar_medicao_reprovada") is True
+    assert perfis.pode("gerente_adm_fin", "aprovar_medicao_reprovada") is True
+    assert perfis.pode("diretor", "aprovar_medicao_reprovada") is True
+    assert perfis.pode("medidor", "aprovar_medicao_reprovada") is False
+    assert perfis.pode("consultor", "aprovar_medicao_reprovada") is False
