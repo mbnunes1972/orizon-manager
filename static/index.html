@@ -4204,6 +4204,7 @@ async function atualizarTF() {
         body: JSON.stringify(payload),
       });
       d = await r.json();
+      if (myGen !== _tfGen) return;  // descarta resultado obsoleto (chamada mais recente já atualizou)
     }
   } catch(e) { console.error('[TF]', e); return; }
   if (!d.parcelas) { console.warn('[TF]', d.erro || d.erros); return; }
