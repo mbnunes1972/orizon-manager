@@ -28,6 +28,12 @@ _BOOL_KEYS  = ("fora_da_sede", "brinde_ativo", "comissao_arq_ativa",
                "fidelidade_ativa", "incluir_custos")
 
 
+def _coerce_bool(v):
+    if isinstance(v, str):
+        return v.strip().lower() in ("1", "true", "yes", "on")
+    return bool(v)
+
+
 def merge_margens(atual: dict, req: dict) -> dict:
     base = dict(MARGENS_DEFAULT)
     if atual:
@@ -37,7 +43,7 @@ def merge_margens(atual: dict, req: dict) -> dict:
             base[k] = float(req[k])
     for k in _BOOL_KEYS:
         if k in req:
-            base[k] = bool(req[k])
+            base[k] = _coerce_bool(req[k])
     return base
 
 
@@ -50,7 +56,7 @@ def sanear_descontos(pares, ids_validos) -> dict:
         if pid not in ids_validos:
             continue
         pct = float(pct)
-        if pct < 0 or pct > 100:
+        if not (0 <= pct <= 100):
             raise ValueError(f"Desconto fora da faixa 0..100: {pct}")
         out[pid] = pct
     return out

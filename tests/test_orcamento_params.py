@@ -40,3 +40,18 @@ def test_sanear_descontos_rejeita_fora_de_faixa():
 def test_sanear_descontos_aceita_limites():
     out = sanear_descontos({"1": 0, "2": 100}, ids_validos={1, 2})
     assert out == {1: 0.0, 2: 100.0}
+
+
+def test_merge_coage_bool_string_falsy():
+    out = merge_margens({}, {"fora_da_sede": "false", "brinde_ativo": "0"})
+    assert out["fora_da_sede"] is False
+    assert out["brinde_ativo"] is False
+    out2 = merge_margens({}, {"fora_da_sede": "true", "brinde_ativo": "on"})
+    assert out2["fora_da_sede"] is True
+    assert out2["brinde_ativo"] is True
+
+
+def test_sanear_descontos_rejeita_nan():
+    import math
+    with pytest.raises(ValueError):
+        sanear_descontos({"1": math.nan}, ids_validos={1})
