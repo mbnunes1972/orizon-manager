@@ -1785,6 +1785,20 @@ function _verificarLimiteDescTotal(){
 }
 
 // Blur do desconto individual: reverte se ultrapassar o limite total
+async function _persistirDescontosOrc(){
+  if(!_orcamentoAtivoId) return;
+  const lote = {};
+  Object.keys(_descIndividual).forEach(k => {
+    if(k.startsWith('ep07_')) lote[k.slice(5)] = _descIndividual[k];
+  });
+  try{
+    await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/descontos',{
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({descontos: lote}),
+    });
+  }catch(e){}
+}
+
 function _onDescIndBlur(el, key, isEP07){
   if(el._esc) return;
   if(isEP07){
@@ -1801,6 +1815,8 @@ function _onDescIndBlur(el, key, isEP07){
     if(isEP07) renderTabelaNeg(_orcAmbientesAtivos); else renderTabelaNeg();
     mpAtualizarApoio();
     showToast('Desconto total excede o limite máximo de descontos.', true);
+  } else {
+    if(isEP07) _persistirDescontosOrc();
   }
 }
 
@@ -2496,6 +2512,12 @@ async function _aplicarFiltroOrcamento(id){
     const d = await r.json();
     if(!d.ok) return;
     _orcAmbientesAtivos = d.ambientes || [];  // null → legado; array → EP-07
+    if(projetoAtivo) projetoAtivo.margens = d.margens || {};
+    _descIndividual = {};
+    (d.ambientes || []).forEach(pa => {
+      if(pa.desconto_individual_pct) _descIndividual['ep07_'+pa.id] = pa.desconto_individual_pct;
+    });
+    if(typeof carregarMargensSalvas === 'function') carregarMargensSalvas();
     renderTabelaNeg(_orcAmbientesAtivos);
     _atualizarPaineisAbertos();
   }catch(e){}
@@ -2527,7 +2549,8 @@ async function confirmarNovoOrc(){
   if(!projetoAtivo) return;
   try{
     const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/orcamentos',{
-      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({nome})
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({nome, origem_id: _orcamentoAtivoId})
     });
     const d = await r.json();
     if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
@@ -4810,7 +4833,7 @@ async function salvarDescontoAutomatico(){
   const desconto = parseFloat(document.getElementById('neg-desconto').value)||0;
   const mg = Object.assign({}, projetoAtivo.margens||{}, {desconto_pct: desconto});
   try{
-    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/margens',{
+    const r = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/margens',{
       method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(mg),
     });
     const d = await r.json();
@@ -5356,7 +5379,7 @@ async function fecharModalParams(salvar){
       carga_trib:         parseFloat(id('mp-carga-trib').value)||0,
     };
     try{
-      const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/margens',{
+      const r = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/margens',{
         method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(mg),
       });
       const d = await r.json();
