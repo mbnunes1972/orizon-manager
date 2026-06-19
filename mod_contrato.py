@@ -20,6 +20,8 @@ _MODELO = os.path.join(_THIS_DIR, "modelo_contrato_mapeado.docx")
 
 _TELEFONE_LOJA = "(12) 3341-8777"
 _EMAIL_LOJA    = "sac@dalmobilesjc.com.br"
+_NOME_EMPRESA  = "INSPIRIUM MOVEIS PLANEJADOS E DECORACAO LTDA"  # TODO: configurador de lojas
+_CNPJ_EMPRESA  = "19.152.134/0001-56"                            # TODO: configurador de lojas
 
 # Testemunhas provisórias — TODO: vir do painel de configuração de loja.
 _TESTEMUNHAS = [
@@ -151,7 +153,6 @@ def _subst_paragrafo(par, mapping, coletor=None):
 def _substituir_marcadores(doc, mapping, coletor=None):
     """Substitui [MARCADOR] (case-insensitive, tolera '[[') no corpo, tabelas e headers.
     Chaves do mapping SEM colchetes, em MAIÚSCULAS. Marcador sem chave é mantido."""
-    from docx.oxml.ns import qn
     for par in doc.paragraphs:
         _subst_paragrafo(par, mapping, coletor)
     for t in doc.tables:
@@ -159,11 +160,21 @@ def _substituir_marcadores(doc, mapping, coletor=None):
             for cell in row.cells:
                 for par in cell.paragraphs:
                     _subst_paragrafo(par, mapping, coletor)
+    from docx.text.paragraph import Paragraph as _Paragraph
+    _W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
     for sec in doc.sections:
         for hdr in (sec.header, sec.first_page_header, sec.even_page_header):
-            for t_el in hdr._element.iter(qn('w:t')):
-                if t_el.text and "[" in t_el.text:
-                    t_el.text = _aplica_mark(t_el.text, mapping)
+            for par in hdr.paragraphs:
+                _subst_paragrafo(par, mapping)
+            for tbl in hdr.tables:
+                for row in tbl.rows:
+                    for cell in row.cells:
+                        for par in cell.paragraphs:
+                            _subst_paragrafo(par, mapping)
+            # Text boxes (wps:txbx / mc:AlternateContent) hold markers in w:txbxContent
+            for txbx in hdr._element.findall(f'.//{{{_W}}}txbxContent'):
+                for p_el in txbx.findall(f'{{{_W}}}p'):
+                    _subst_paragrafo(_Paragraph(p_el, None), mapping)
 
 
 def _unique_cells(row):
@@ -431,6 +442,11 @@ def _montar_mapping(ctx, pag):
         "NOME_TESTEMUNHA_1": _TESTEMUNHAS[0][0],
         "NOME_TESTEMUNHA2":  _TESTEMUNHAS[1][0],
         "NOME_TESTEMUNHA_2": _TESTEMUNHAS[1][0],
+        "NOME_EMPRESA":      _NOME_EMPRESA,
+        "CNPJ_EMPRESA":      _CNPJ_EMPRESA,
+        "CPF_CLIENTE":       ctx.get("cliente_cpf", "") or "",
+        "CPF_TESTEMUNHA_1":  _TESTEMUNHAS[0][1],
+        "CPF_TESTEMUNHA_2":  _TESTEMUNHAS[1][1],
     }
 
 
