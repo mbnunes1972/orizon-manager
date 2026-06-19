@@ -4830,7 +4830,7 @@ function tfTaxaKeydown(e, el){
 }
 
 async function salvarDescontoAutomatico(){
-  if(!projetoAtivo) return;
+  if(!projetoAtivo || !_orcamentoAtivoId) return;
   const desconto = parseFloat(document.getElementById('neg-desconto').value)||0;
   const mg = Object.assign({}, projetoAtivo.margens||{}, {desconto_pct: desconto});
   try{
@@ -5363,6 +5363,7 @@ async function fecharModalParams(salvar){
     return;
   }
   if(salvar && projetoAtivo){
+    if(!_orcamentoAtivoId){ showToast('Crie ou selecione um orçamento antes de salvar parâmetros.', true); return; }
     const id = s => document.getElementById(s);
     const novoIncluirCustos = document.getElementById('mp-incluir-custos')?.checked || false;
     _incluirCustos = novoIncluirCustos;  // atualiza fonte de verdade ao salvar
