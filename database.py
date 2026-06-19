@@ -259,6 +259,7 @@ class Orcamento(Base):
     margens         = Column(Text,     nullable=True)   # JSON
     desconto_pct    = Column(Float,    default=0.0)
     forma_pagamento = Column(String,   nullable=True)
+    negociacao_json = Column(Text,     nullable=True)   # snapshot das entradas da negociação (JSON)
     valor_total     = Column(Float,    default=0.0)
     valor_liquido   = Column(Float,    default=0.0)
     created_by      = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
@@ -415,6 +416,7 @@ def _migrar_colunas():
             ("valor_liquido",   "REAL DEFAULT 0"),
             ("forma_pagamento", "TEXT"),
             ("updated_at",      "DATETIME"),
+            ("negociacao_json", "TEXT"),
         ]:
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")
