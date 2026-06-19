@@ -6332,7 +6332,13 @@ const STATUS_CONCLUSIVOS = new Set(["concluido","aprovado","assinado","vigente",
 // Bloqueada = etapa principal cuja anterior (na ordem) não está concluída.
 function _etapaBloqueada(codigo) {
   const i = ETAPAS_PRINCIPAIS.indexOf(codigo);
-  if (i <= 0) return false;                 // sub-etapa (não está na lista) ou a primeira → nunca bloqueada
+  if (i < 0) {
+    // sub-etapa: herda o bloqueio da etapa-mãe (desbloqueia junto com ela)
+    const pai = String(parseInt(codigo, 10));
+    if (pai === codigo || ETAPAS_PRINCIPAIS.indexOf(pai) < 0) return false;
+    return _etapaBloqueada(pai);
+  }
+  if (i === 0) return false;                 // primeira etapa nunca bloqueada
   const ant = ETAPAS_PRINCIPAIS[i - 1];
   return !STATUS_CONCLUSIVOS.has(_cicloData[ant]?.status);
 }
