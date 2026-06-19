@@ -814,3 +814,20 @@ def test_montar_mapping_inclui_empresa_e_cpfs():
     assert m["CPF_CLIENTE"] == "111.222.333-44"
     assert m["CPF_TESTEMUNHA_1"] == _TESTEMUNHAS[0][1]
     assert m["CPF_TESTEMUNHA_2"] == _TESTEMUNHAS[1][1]
+
+
+def test_substituir_marcadores_cabecalho_fragmentado():
+    """Marcador fragmentado em múltiplos runs no cabeçalho é substituído."""
+    from docx import Document
+    from docx.oxml.ns import qn
+    from mod_contrato import _substituir_marcadores
+    d = Document()
+    hdr = d.sections[0].header
+    p = hdr.paragraphs[0]
+    p.add_run("[")
+    p.add_run("NUM_CONTRATO")
+    p.add_run("]")
+    _substituir_marcadores(d, {"NUM_CONTRATO": "INS-2026-01-01-001"})
+    txt = "".join(t.text or "" for t in hdr._element.iter(qn('w:t')))
+    assert "INS-2026-01-01-001" in txt
+    assert "[NUM_CONTRATO]" not in txt

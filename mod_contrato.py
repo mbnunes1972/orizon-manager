@@ -153,7 +153,6 @@ def _subst_paragrafo(par, mapping, coletor=None):
 def _substituir_marcadores(doc, mapping, coletor=None):
     """Substitui [MARCADOR] (case-insensitive, tolera '[[') no corpo, tabelas e headers.
     Chaves do mapping SEM colchetes, em MAIÚSCULAS. Marcador sem chave é mantido."""
-    from docx.oxml.ns import qn
     for par in doc.paragraphs:
         _subst_paragrafo(par, mapping, coletor)
     for t in doc.tables:
@@ -161,11 +160,21 @@ def _substituir_marcadores(doc, mapping, coletor=None):
             for cell in row.cells:
                 for par in cell.paragraphs:
                     _subst_paragrafo(par, mapping, coletor)
+    from docx.text.paragraph import Paragraph as _Paragraph
+    _W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
     for sec in doc.sections:
         for hdr in (sec.header, sec.first_page_header, sec.even_page_header):
-            for t_el in hdr._element.iter(qn('w:t')):
-                if t_el.text and "[" in t_el.text:
-                    t_el.text = _aplica_mark(t_el.text, mapping)
+            for par in hdr.paragraphs:
+                _subst_paragrafo(par, mapping)
+            for tbl in hdr.tables:
+                for row in tbl.rows:
+                    for cell in row.cells:
+                        for par in cell.paragraphs:
+                            _subst_paragrafo(par, mapping)
+            # Text boxes (wps:txbx / mc:AlternateContent) hold markers in w:txbxContent
+            for txbx in hdr._element.findall(f'.//{{{_W}}}txbxContent'):
+                for p_el in txbx.findall(f'{{{_W}}}p'):
+                    _subst_paragrafo(_Paragraph(p_el, None), mapping)
 
 
 def _unique_cells(row):
