@@ -91,6 +91,7 @@ input:focus{border-color:var(--accent)}
 .proj-status-badge.morno{background:rgba(251,191,36,.12);color:#d4a017}
 .proj-status-badge.frio{background:rgba(96,165,250,.12);color:var(--section)}
 .proj-status-badge.convertido{background:rgba(25,201,160,.12);color:var(--ok)}
+.proj-status-badge.fechado{background:rgba(180,140,40,.16);color:#c8a84b}
 .proj-status-badge.perdido{background:rgba(120,120,120,.12);color:var(--muted)}
 .proj-status-badge.sem{background:transparent;color:var(--muted)}
 .proj-status-dd{position:absolute;top:100%;left:0;z-index:300;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);min-width:140px;overflow:hidden;display:none}
@@ -703,6 +704,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <label class="proj-status-filter-item"><input type="checkbox" value="morno"      checked onchange="projAplicarFiltros()"> ● Morno</label>
           <label class="proj-status-filter-item"><input type="checkbox" value="frio"       checked onchange="projAplicarFiltros()"> ❄ Frio</label>
           <label class="proj-status-filter-item"><input type="checkbox" value="convertido" checked onchange="projAplicarFiltros()"> ✓ Convertido</label>
+          <label class="proj-status-filter-item"><input type="checkbox" value="fechado" checked onchange="projAplicarFiltros()"> 🔒 Fechado</label>
           <label class="proj-status-filter-item"><input type="checkbox" value="perdido"    checked onchange="projAplicarFiltros()"> ✗ Perdido</label>
           <label class="proj-status-filter-item"><input type="checkbox" value="sem"        checked onchange="projAplicarFiltros()"> — Sem status</label>
         </div>
@@ -742,7 +744,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             <div class="proj-status-dd-item" onclick="negStatusSet('perdido')">✗ Perdido</div>
           </div>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
+        <button id="btn-params" class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
         <button id="btn-abrir-ciclo" class="btn-ciclo" onclick="abrirCiclo()" title="Etapas do Projeto">
           Etapas do Projeto
         </button>
@@ -756,11 +758,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;
                    margin-right:4px;white-space:nowrap">Orçamento:</span>
       <span id="neg-orc-tabs" style="display:flex;gap:4px;flex-wrap:wrap;flex:1"></span>
-      <button class="btn btn-ghost btn-sm" onclick="abrirPainelPool()"
+      <button id="btn-pool" class="btn btn-ghost btn-sm" onclick="abrirPainelPool()"
               style="font-size:11px;padding:4px 10px">Ambientes</button>
-      <button class="btn btn-ghost btn-sm" onclick="abrirModalNovoAmbiente()"
+      <button id="btn-novo-ambiente" class="btn btn-ghost btn-sm" onclick="abrirModalNovoAmbiente()"
               style="font-size:11px;padding:4px 10px;margin-left:4px">Novo Ambiente</button>
-      <button class="btn btn-ghost btn-sm" onclick="abrirModalNovoOrc()"
+      <button id="btn-novo-orc" class="btn btn-ghost btn-sm" onclick="abrirModalNovoOrc()"
               style="font-size:11px;padding:4px 10px;margin-left:4px">Novo Orçamento</button>
     </div>
 
@@ -2184,12 +2186,14 @@ const _PROJ_STATUS_LABEL = {
   frio:       { label: '❄ Frio',       cls: 'frio'       },
   convertido: { label: '✓ Convertido', cls: 'convertido' },
   perdido:    { label: '✗ Perdido',    cls: 'perdido'    },
+  fechado:    { label: '🔒 Fechado',  cls: 'fechado'    },
 };
 
 function _projStatusBadge(p){
   const s = p.status;
   const ns = esc(p.nome_safe||'');
   if(s === 'convertido') return `<span class="proj-status-badge convertido">✓ Convertido</span>`;
+  if(s === 'fechado') return `<span class="proj-status-badge fechado">🔒 Fechado</span>`;
   if(!s){
     return `<span class="proj-status-badge sem" style="cursor:pointer"
                  onclick="projStatusClick(event,'${ns}')">— Definir</span>`;
@@ -2280,22 +2284,23 @@ function negAtualizarStatusBtn(){
   if(!btn) return;
   const s = _projetoStatusAtual;
   const labels = { quente:'🔥 Quente', morno:'● Morno', frio:'❄ Frio',
-                   convertido:'✓ Convertido', perdido:'✗ Perdido' };
+                   convertido:'✓ Convertido', perdido:'✗ Perdido', fechado:'🔒 Fechado' };
   btn.textContent = (s && labels[s] ? labels[s] : '— Status') + ' ▾';
   btn.style.color = s === 'quente' ? '#f05a50'
                   : s === 'morno'  ? '#d4a017'
                   : s === 'frio'   ? 'var(--section)'
                   : s === 'convertido' ? 'var(--ok)'
                   : s === 'perdido'    ? 'var(--muted)'
+                  : s === 'fechado'    ? '#c8a84b'
                   : '';
-  // Oculta dropdown se projeto bloqueado (convertido)
+  // Oculta dropdown se projeto bloqueado (convertido ou fechado)
   const dd = document.getElementById('neg-status-dd');
-  if(dd) dd.style.display = s === 'convertido' ? 'none' : '';
+  if(dd) dd.style.display = (s === 'convertido' || s === 'fechado') ? 'none' : '';
 }
 
 function negStatusClick(e){
   e.stopPropagation();
-  if(_projetoStatusAtual === 'convertido') return;
+  if(_projetoStatusAtual === 'convertido' || _projetoStatusAtual === 'fechado') return;
   document.querySelectorAll('.proj-status-dd.open').forEach(d=>d.classList.remove('open'));
   document.getElementById('neg-status-dd')?.classList.toggle('open');
 }
@@ -6533,6 +6538,7 @@ function _etapaBloqueada(codigo) {
 
 let _cicloAberto = false;
 let _cicloData   = {};
+let _contratoAssinado = false;
 
 function abrirCiclo() {
   _cicloAberto = true;
@@ -6551,6 +6557,7 @@ async function _fetchCiclo() {
                         { credentials: 'same-origin' });
   const d = await r.json();
   if (!d.ok) return;
+  _contratoAssinado = !!d.contrato_assinado;
   _cicloData = {};
   for (const e of (d.ciclo || [])) _cicloData[e.etapa_codigo] = e;
 }
@@ -6611,6 +6618,30 @@ function aplicarBloqueioNegociacao(travar) {
 }
 
 function atualizarBotoesAprovacao() {
+  const assinado = (typeof _contratoAssinado !== 'undefined') && _contratoAssinado;
+  ['btn-params','btn-pool','btn-novo-ambiente','btn-novo-orc'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = assinado ? 'none' : '';
+  });
+  if (assinado) {
+    aplicarBloqueioNegociacao(true);
+    const actionRow = document.querySelector('#page-02 .action-row');
+    if (actionRow) {
+      const bs = actionRow.querySelector('.btn-ok');    if (bs) bs.style.display = 'none';
+      const ba = actionRow.querySelector('.btn-amber');  if (ba) ba.style.display = 'none';
+      const br = actionRow.querySelector('#btn-rever-orcamento'); if (br) br.remove();
+      if (!actionRow.querySelector('#btn-assinar-contrato')) {
+        const btn = document.createElement('button');
+        btn.id = 'btn-assinar-contrato';
+        btn.className = 'btn btn-ghost';
+        btn.style.cssText = 'border-color:var(--warn,#c8a84b);color:var(--warn,#c8a84b);font-size:.85rem;font-weight:600;padding:8px 16px;border-radius:4px;cursor:pointer';
+        btn.innerHTML = '&#x270D; Assinar Contrato';
+        btn.onclick = () => { abrirCiclo(); setTimeout(() => toggleCicloCard('7'), 300); };
+        actionRow.appendChild(btn);
+      }
+    }
+    return;
+  }
   const aprovado = _orcamentoAprovado();
   aplicarBloqueioNegociacao(aprovado);
   const actionRow = document.querySelector('#page-02 .action-row');

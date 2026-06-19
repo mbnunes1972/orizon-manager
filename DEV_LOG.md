@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-19 (sessão 18 — alinhamento do contrato ao template reestruturado: empresa [NOME/CNPJ] + CPFs separados no bloco de assinatura; cabeçalho robusto a fragmentação. Antes: sessão 17 — snapshot da negociação por orçamento)
+> Atualizado em: 2026-06-19 (sessão 19 — trava total pós-assinatura: após a 1ª assinatura, UI esconde edição + backend recusa (403) mutações; novo status terminal "Fechado" na 2ª assinatura. Sub-projeto 2 de 3. Antes: sessão 18 — alinhamento do contrato ao template)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -170,6 +170,23 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-19 (sessão 19 — trava total pós-assinatura + status "Fechado")
+**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação API real + Playwright → merge). Segundo de 3 sub-projetos. Spec/plano em `docs/superpowers/`.
+
+**Comportamento:** a partir da **1ª assinatura** do contrato (qualquer parte), a negociação/projeto fica **congelada**: o frontend esconde Salvar/Parâmetros/Ambientes/Novo Ambiente/Novo Orçamento e o "Rever Orçamento" (mantém **"Assinar Contrato"** para a 2ª parte); o backend **recusa (403)** as mutações. Quando **ambas** as partes assinam, o projeto recebe o status terminal **"🔒 Fechado"** (automático, não editável — como "convertido").
+
+**Backend (`main.py`):**
+- **`_contrato_assinado(nome_safe, db)`** — fonte única (status assinado_loja/cliente/assinado/vigente OU `len(assinaturas)>0`). Exposto em `GET /api/projetos/<nome>/ciclo` como `contrato_assinado`.
+- **Guard 403** em: novo orçamento, pool (+ sobrescrever/nova_versão/criar_forçado), adicionar/remover/renomear ambiente, renomear orçamento, PATCH valor, margens, descontos, PATCH status. (Guard de assinatura colocado **antes** do briefing no novo orçamento p/ 403 consistente.)
+- **Status "fechado"** setado por `upsert_projeto_status` na 2ª assinatura — **após** o `db.commit()` (corrige bug de lock do SQLite que silenciava o update). Projetos já assinados antigos: backfill manual no DEV DB.
+
+**Frontend (`static/index.html`):**
+- `_contratoAssinado` vindo do GET ciclo; `atualizarBotoesAprovacao` esconde a edição quando assinado (caminho não-assinado intacto). Status "🔒 Fechado": label/badge/CSS/filtro + dropdown travado (espelha "convertido", nunca setável manualmente).
+
+**Verificação:** pytest **145** verde (helper `_contrato_assinado` + 4 testes). API real: 403 confirmado em valor/margens/descontos/status/novo-orçamento quando assinado; **status vira "fechado"** ao assinar as 2 partes (sem erro de lock no log). Playwright: botões de edição escondidos, "Assinar Contrato" presente, 0 erros de console.
+
+**Pendente:** sub-projeto 3 (versionamento de documentos). Configurador de lojas (do sub-projeto do contrato).
 
 ### Sessão 2026-06-19 (sessão 18 — alinhar contrato ao template reestruturado)
 **Processo:** pipeline superpowers (intercalado durante o sub-projeto 2, a pedido do usuário). Spec/plano em `docs/superpowers/`. Disparado por uma edição do `modelo_contrato_mapeado.docx` no Word (reestruturação do bloco de assinatura), que quebrou 6 testes de contrato.
