@@ -2508,6 +2508,7 @@ async function salvarRenomearOrc(id, novoNome){
 // Change 4: busca ambientes do orçamento e seta _orcAmbientesAtivos diretamente
 async function _aplicarFiltroOrcamento(id){
   if(!id || !projetoAtivo) return;
+  _negociacaoPendente = null;
   try{
     const r = await fetch('/orcamentos/'+id+'/ambientes');
     const d = await r.json();
@@ -3143,7 +3144,13 @@ function _capturarNegociacao(){
 async function _restaurarNegociacao(snap){
   if (!snap || !snap.codigo) return;
   const sel = document.getElementById('neg-pagamento');
-  if (sel) sel.value = snap.codigo;
+  if (sel) {
+    sel.value = snap.codigo;
+    if (sel.value !== snap.codigo) {
+      console.warn('Negociação salva com modalidade indisponível, ignorando restauração:', snap.codigo);
+      return;
+    }
+  }
   // renderiza o painel da modalidade e carrega faixas (assíncrono)
   if (typeof onPagamentoChange === 'function') await onPagamentoChange();
   // nº de parcelas (dispara onParcelasChange, que p/ TF/VP zera as datas — por isso vem ANTES das datas)
