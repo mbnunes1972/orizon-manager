@@ -28,18 +28,22 @@ Isso quebrou **6 testes** em `tests/test_contrato.py`. Diagnóstico (após ler o
 
 - **Motor robusto a runs:** sim — aplicar ao ramo do **cabeçalho** (o corpo já é robusto).
 - **Estrutura final, alinhar agora.**
-- **Empresa por placeholder:** `_NOME_EMPRESA`/`_CNPJ_EMPRESA` como constantes-placeholder
-  explícitas, com TODO para o futuro **configurador de lojas**.
+- **Empresa por constante:** os valores reais **já constam no template** (cláusula de
+  qualificação + bloco centralizado), então `_NOME_EMPRESA`/`_CNPJ_EMPRESA` recebem esses valores
+  reais (não placeholder), com TODO para o futuro **configurador de lojas**. (Decisão original era
+  placeholder, revista ao descobrir que o dado real já estava no documento — evita regredir o
+  contrato e manter consistência interna.)
 
 ## Mudanças
 
 ### `mod_contrato.py`
-- **Constantes** (junto de `_TELEFONE_LOJA`/`_EMAIL_LOJA`):
+- **Constantes** (junto de `_TELEFONE_LOJA`/`_EMAIL_LOJA`) — valores reais já presentes no
+  template:
   ```python
-  _NOME_EMPRESA = "PREENCHER NOME DA EMPRESA"   # TODO: configurador de lojas
-  _CNPJ_EMPRESA = "PREENCHER CNPJ"              # TODO: configurador de lojas
+  _NOME_EMPRESA = "INSPIRIUM MOVEIS PLANEJADOS E DECORACAO LTDA"  # TODO: configurador de lojas
+  _CNPJ_EMPRESA = "19.152.134/0001-56"                            # TODO: configurador de lojas
   ```
-  (Sem colchetes — para não colidir com a detecção de marcadores `[...]`.)
+  (Sem colchetes — não colidem com a detecção de marcadores `[...]`.)
 - **`_montar_mapping`** ganha:
   - `"NOME_EMPRESA": _NOME_EMPRESA`
   - `"CNPJ_EMPRESA": _CNPJ_EMPRESA`
