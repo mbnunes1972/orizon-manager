@@ -6365,7 +6365,7 @@ const ETAPAS_CICLO = [
   { codigo: "7",   nome: "Contrato",                           sub: false, acao: "contrato" },
   { codigo: "8",   nome: "Aprovação financeira I",             sub: false },
   { codigo: "9",   nome: "Solicitação de medição",             sub: false, toggleavel: true },
-  { codigo: "10",  nome: "Planta de pontos medidos",           sub: false },
+  { codigo: "10",  nome: "Medição",                            sub: false },
   { codigo: "11",  nome: "Projeto executivo",                  sub: false },
   { codigo: "11a", nome: "Planta de pontos de PE",             sub: true },
   { codigo: "11b", nome: "Reunião de alinhamento",             sub: true,  toggleavel: true },
@@ -6431,6 +6431,7 @@ async function _fetchCiclo() {
 async function carregarCiclo() {
   try {
     await _fetchCiclo();
+    await _carregarMedicao();
     renderCiclo();
     atualizarBotoesAprovacao();
   } catch(e) { console.error('Erro ao carregar ciclo:', e); }
@@ -6559,6 +6560,10 @@ function renderCiclo() {
           ? _renderCardContrato()
           : (etapa.codigo === '8' || etapa.codigo === '11d')
             ? _renderCardAprovacaoFinanceira(etapa.codigo, dados, bloqueada)
+          : etapa.codigo === '9'
+            ? _renderCardSolicitacaoMedicao(dados, bloqueada)
+          : etapa.codigo === '10'
+            ? _renderCardMedicao(dados, bloqueada)
             : _renderCardGenerico(etapa, dados, bloqueada)}
       </div>
     `;
@@ -6723,6 +6728,100 @@ async function concluirAprovacaoFinanceira(codigo) {
     showToast('Aprovação financeira concluída!', false);
     await carregarCiclo();
   } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'Aprovação Financeira'}); }
+}
+
+let _medicaoCache = null;
+async function _carregarMedicao() {
+  if (!projetoAtivo) { _medicaoCache = null; return; }
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/medicao`, {credentials:'same-origin'});
+    const d = await r.json();
+    _medicaoCache = d.ok ? d.medicao : null;
+  } catch(e) { _medicaoCache = null; }
+}
+
+function _renderCardSolicitacaoMedicao(dados, bloqueada) {
+  if (dados.status === 'concluido')
+    return `<p style="color:var(--ok);margin:0">&#x2713; Solicitação de medição confirmada.</p>`;
+  if (bloqueada)
+    return `<p style="color:var(--muted);font-size:.85rem;margin:0">🔒 Conclua a etapa anterior.</p>`;
+  return `
+    <p style="color:var(--muted);font-size:.85rem;margin:0 0 10px">Anexe o arquivo de solicitação e confirme com a senha do medidor.</p>
+    <input type="file" id="med-solic-file" style="font-size:.82rem;margin-bottom:10px"><br>
+    <button onclick="enviarSolicitacaoMedicao()" style="background:#b8960c;color:#000;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">&#x2713; Confirmar (medidor)</button>`;
+}
+
+async function enviarSolicitacaoMedicao() {
+  const f = document.getElementById('med-solic-file')?.files[0];
+  if (!f) { await avisoPopup('Selecione o arquivo de solicitação.', {titulo:'Medição'}); return; }
+  const cred = await pedirCredenciaisGerente({titulo:'Solicitação de Medição', mensagem:'Login e senha do Medidor (ou Diretor).'});
+  if (!cred) return;
+  const fd = new FormData();
+  fd.append('arquivo', f); fd.append('login', cred.login); fd.append('senha', cred.senha);
+  const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/medicao/solicitacao`, {method:'POST', credentials:'same-origin', body: fd});
+  const d = await r.json();
+  if (!d.ok) { await avisoPopup(d.erro || 'Falha', {titulo:'Medição'}); return; }
+  showToast('Solicitação de medição confirmada!', false);
+  await carregarCiclo();
+}
+
+function _renderCardMedicao(dados, bloqueada) {
+  if (dados.status === 'concluido')
+    return `<p style="color:var(--ok);margin:0 0 10px">&#x2713; Medição concluída${_medicaoCache && _medicaoCache.parecer ? ' (' + _medicaoCache.parecer + ')' : ''}.</p>
+      <button onclick="abrirModalReabrir('10')" style="border:1px solid var(--muted);color:var(--muted);background:none;border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer">🔓 Reabrir (gerente)</button>`;
+  if (bloqueada)
+    return `<p style="color:var(--muted);font-size:.85rem;margin:0">🔒 Conclua a etapa anterior.</p>`;
+  if (_medicaoCache && _medicaoCache.parecer === 'reprovado') {
+    return `
+      <p style="color:var(--warn,#c8a84b);margin:0 0 10px">Medição <strong>Reprovada</strong> — aguardando decisão comercial.</p>
+      <p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">Anexe o documento de aprovação do cliente e libere com senha de Gerente de Vendas/Adm-Fin/Diretor.</p>
+      <input type="file" id="med-doc-file" style="font-size:.82rem;margin-bottom:10px"><br>
+      <button onclick="enviarDecisaoReprovado()" style="background:#b8960c;color:#000;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">Liberar (decisão comercial)</button>`;
+  }
+  return `
+    <p style="color:var(--muted);font-size:.85rem;margin:0 0 8px">Registre o parecer da medição, anexe a planta promob e confirme com a senha do medidor.</p>
+    <label style="font-size:.82rem">Parecer:
+      <select id="med-parecer" onchange="document.getElementById('med-ambientes-wrap').style.display = this.value==='parcial' ? 'block':'none'">
+        <option value="aprovado">Aprovado</option>
+        <option value="reprovado">Reprovado</option>
+        <option value="parcial">Aprovado Parcialmente</option>
+      </select></label>
+    <div id="med-ambientes-wrap" style="display:none;margin-top:8px">
+      <textarea id="med-ambientes" placeholder="Ambientes aprovados..." style="width:100%;box-sizing:border-box;font-size:.82rem;min-height:48px"></textarea>
+    </div>
+    <div style="margin-top:8px"><input type="file" id="med-planta-file" style="font-size:.82rem"></div>
+    <button onclick="enviarParecerMedicao()" style="margin-top:10px;background:#b8960c;color:#000;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">Registrar parecer (medidor)</button>`;
+}
+
+async function enviarParecerMedicao() {
+  const parecer = document.getElementById('med-parecer')?.value;
+  const ambientes = document.getElementById('med-ambientes')?.value || '';
+  const f = document.getElementById('med-planta-file')?.files[0];
+  if (!f) { await avisoPopup('Anexe a planta promob.', {titulo:'Medição'}); return; }
+  const cred = await pedirCredenciaisGerente({titulo:'Parecer da Medição', mensagem:'Login e senha do Medidor (ou Diretor).'});
+  if (!cred) return;
+  const fd = new FormData();
+  fd.append('planta', f); fd.append('parecer', parecer); fd.append('ambientes_aprovados', ambientes);
+  fd.append('login', cred.login); fd.append('senha', cred.senha);
+  const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/medicao/parecer`, {method:'POST', credentials:'same-origin', body: fd});
+  const d = await r.json();
+  if (!d.ok) { await avisoPopup(d.erro || 'Falha', {titulo:'Medição'}); return; }
+  showToast(d.parecer === 'reprovado' ? 'Parecer registrado: Reprovado (aguardando decisão).' : 'Medição registrada!', false);
+  await carregarCiclo();
+}
+
+async function enviarDecisaoReprovado() {
+  const f = document.getElementById('med-doc-file')?.files[0];
+  if (!f) { await avisoPopup('Anexe o documento de aprovação do cliente.', {titulo:'Medição'}); return; }
+  const cred = await pedirCredenciaisGerente({titulo:'Decisão Comercial', mensagem:'Login e senha de Gerente de Vendas, Adm/Financeiro ou Diretor.'});
+  if (!cred) return;
+  const fd = new FormData();
+  fd.append('doc_cliente', f); fd.append('login', cred.login); fd.append('senha', cred.senha);
+  const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/medicao/decisao-reprovado`, {method:'POST', credentials:'same-origin', body: fd});
+  const d = await r.json();
+  if (!d.ok) { await avisoPopup(d.erro || 'Falha', {titulo:'Medição'}); return; }
+  showToast('Medição liberada (decisão comercial registrada).', false);
+  await carregarCiclo();
 }
 
 async function toggleSalvarEtapa(codigo) {
