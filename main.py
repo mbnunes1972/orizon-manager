@@ -1516,6 +1516,11 @@ class Handler(BaseHTTPRequestHandler):
                                     "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
                                    code=400)
                     return
+                if orc and _contrato_assinado(orc.projeto_id, db):
+                    self.send_json({"ok": False,
+                                    "erro": "Contrato assinado — alterações não permitidas."},
+                                   code=403)
+                    return
                 atual = json.loads(orc.margens) if orc.margens else {}
                 novas = merge_margens(atual, req)
                 orc.margens = json.dumps(novas, ensure_ascii=False)
@@ -1542,6 +1547,12 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False,
                                     "erro": "Preencha o briefing do projeto antes de iniciar a negociação."},
                                    code=400)
+                    return
+                if _contrato_assinado(nome_safe, db):
+                    db.close()
+                    self.send_json({"ok": False,
+                                    "erro": "Contrato assinado — alterações não permitidas."},
+                                   code=403)
                     return
                 _orc_dict = None
                 try:
@@ -1630,6 +1641,12 @@ class Handler(BaseHTTPRequestHandler):
                 hash_novo = _content_hash(amb)
 
                 db = get_session()
+                if _contrato_assinado(nome_safe, db):
+                    db.close()
+                    self.send_json({"ok": False,
+                                    "erro": "Contrato assinado — alterações não permitidas."},
+                                   code=403)
+                    return
                 try:
                     # Busca por nome
                     por_nome = db.query(PoolAmbiente).filter_by(
@@ -1744,6 +1761,12 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Nenhum XML pendente para sobrescrita"})
                     return
                 db = get_session()
+                if _contrato_assinado(nome_safe, db):
+                    db.close()
+                    self.send_json({"ok": False,
+                                    "erro": "Contrato assinado — alterações não permitidas."},
+                                   code=403)
+                    return
                 try:
                     pa = db.get(PoolAmbiente, pid)
                     if not pa or pa.projeto_id != nome_safe:
@@ -1798,6 +1821,12 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Nenhum XML pendente para nova versão"})
                     return
                 db = get_session()
+                if _contrato_assinado(nome_safe, db):
+                    db.close()
+                    self.send_json({"ok": False,
+                                    "erro": "Contrato assinado — alterações não permitidas."},
+                                   code=403)
+                    return
                 try:
                     pa_orig = db.get(PoolAmbiente, pid)
                     if not pa_orig or pa_orig.projeto_id != nome_safe:
@@ -1881,6 +1910,12 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Nenhum XML pendente"})
                     return
                 db = get_session()
+                if _contrato_assinado(nome_safe, db):
+                    db.close()
+                    self.send_json({"ok": False,
+                                    "erro": "Contrato assinado — alterações não permitidas."},
+                                   code=403)
+                    return
                 try:
                     _usuario = get_usuario_sessao(self)
                     pa = PoolAmbiente(
@@ -1922,6 +1957,11 @@ class Handler(BaseHTTPRequestHandler):
                     if not orc:
                         self.send_json({"ok": False, "erro": "Orçamento não encontrado"})
                         return
+                    if orc and _contrato_assinado(orc.projeto_id, db):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato assinado — alterações não permitidas."},
+                                       code=403)
+                        return
                     pa = db.get(PoolAmbiente, pid)
                     link = db.query(OrcamentoAmbiente).filter_by(
                         orcamento_id=oid, pool_ambiente_id=pid
@@ -1960,6 +2000,11 @@ class Handler(BaseHTTPRequestHandler):
                     orc = db.get(Orcamento, oid)
                     if not orc:
                         self.send_json({"ok": False, "erro": "Orçamento não encontrado"})
+                        return
+                    if orc and _contrato_assinado(orc.projeto_id, db):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato assinado — alterações não permitidas."},
+                                       code=403)
                         return
                     pa = db.get(PoolAmbiente, pid)
                     if not pa or pa.projeto_id != orc.projeto_id:
@@ -2652,6 +2697,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not orc or orc.projeto_id != nome_safe:
                     self.send_json({"ok": False, "erro": "Orçamento não encontrado"})
                     return
+                if _contrato_assinado(nome_safe, db):
+                    self.send_json({"ok": False,
+                                    "erro": "Contrato assinado — alterações não permitidas."},
+                                   code=403)
+                    return
                 orc.nome       = novo_nome
                 orc.updated_at = datetime.now()
                 db.commit()
@@ -2681,6 +2731,11 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False,
                                     "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
                                    code=400)
+                    return
+                if orc and _contrato_assinado(orc.projeto_id, db):
+                    self.send_json({"ok": False,
+                                    "erro": "Contrato assinado — alterações não permitidas."},
+                                   code=403)
                     return
                 links = db.query(OrcamentoAmbiente).filter_by(orcamento_id=oid).all()
                 ids_validos = {lk.pool_ambiente_id for lk in links}
@@ -2719,6 +2774,11 @@ class Handler(BaseHTTPRequestHandler):
                     if not orc:
                         self.send_json({"ok": False, "erro": "Orçamento não encontrado"}, code=404)
                         return
+                    if orc and _contrato_assinado(orc.projeto_id, db):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato assinado — alterações não permitidas."},
+                                       code=403)
+                        return
                     if "valor_total" in req:
                         orc.valor_total = float(req["valor_total"] or 0)
                     if "valor_liquido" in req:
@@ -2745,6 +2805,16 @@ class Handler(BaseHTTPRequestHandler):
                 VALIDOS = {'quente', 'morno', 'frio', 'perdido'}
                 if novo_status not in VALIDOS:
                     self.send_json({"ok": False, "erro": f"Status inválido. Use: {', '.join(sorted(VALIDOS))}"})
+                    return
+                _dbck = get_session()
+                try:
+                    _assinado = _contrato_assinado(nome_safe, _dbck)
+                finally:
+                    _dbck.close()
+                if _assinado:
+                    self.send_json({"ok": False,
+                                    "erro": "Contrato assinado — alterações não permitidas."},
+                                   code=403)
                     return
                 upsert_projeto_status(nome_safe, novo_status)
                 self.send_json({"ok": True, "status": novo_status})
