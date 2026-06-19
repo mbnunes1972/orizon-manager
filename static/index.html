@@ -1784,7 +1784,7 @@ function _verificarLimiteDescTotal(){
   return true;
 }
 
-// Blur do desconto individual: reverte se ultrapassar o limite total
+// Persiste no servidor os descontos individuais (EP-07) do orçamento ativo
 async function _persistirDescontosOrc(){
   if(!_orcamentoAtivoId) return;
   const lote = {};
@@ -1796,9 +1796,10 @@ async function _persistirDescontosOrc(){
       method:'PUT', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({descontos: lote}),
     });
-  }catch(e){}
+  }catch(e){ console.error('Falha ao persistir descontos do orcamento:', e); }
 }
 
+// Blur do desconto individual: reverte se ultrapassar o limite total
 function _onDescIndBlur(el, key, isEP07){
   if(el._esc) return;
   if(isEP07){
@@ -2513,11 +2514,11 @@ async function _aplicarFiltroOrcamento(id){
     if(!d.ok) return;
     _orcAmbientesAtivos = d.ambientes || [];  // null → legado; array → EP-07
     if(projetoAtivo) projetoAtivo.margens = d.margens || {};
+    carregarMargensSalvas();
     _descIndividual = {};
     (d.ambientes || []).forEach(pa => {
-      if(pa.desconto_individual_pct) _descIndividual['ep07_'+pa.id] = pa.desconto_individual_pct;
+      if(pa.desconto_individual_pct != null) _descIndividual['ep07_'+pa.id] = pa.desconto_individual_pct;
     });
-    if(typeof carregarMargensSalvas === 'function') carregarMargensSalvas();
     renderTabelaNeg(_orcAmbientesAtivos);
     _atualizarPaineisAbertos();
   }catch(e){}
