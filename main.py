@@ -665,7 +665,9 @@ class Handler(BaseHTTPRequestHandler):
                         "concluido_em":  e.concluido_em.isoformat() if e.concluido_em else None,
                         "observacoes":   e.observacoes or "",
                     } for e in etapas_sorted]
-                    self.send_json({"ok": True, "ciclo": resultado})
+                    assinado = _contrato_assinado(nome_safe, db)
+                    self.send_json({"ok": True, "ciclo": resultado,
+                                    "contrato_assinado": assinado})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
