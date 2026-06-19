@@ -9,6 +9,7 @@ import hashlib
 import secrets
 from datetime import datetime, timedelta
 from database import get_session, Usuario, Sessao, LogAutorizacao
+import perfis
 
 # ── Configuração ──────────────────────────────────────────────────────────────
 SESSION_DURATION_HOURS = 8
@@ -171,4 +172,6 @@ def _usuario_dict(u: Usuario) -> dict:
         "nivel":             u.nivel,
         "limite_desconto":   u.limite_desconto,
         "pode_ver_parametros": u.pode_ver_parametros,
+        "rotulo":              perfis.rotulo(u.nivel),
+        "pode_gerir_usuarios": perfis.pode(u.nivel, "gerir_usuarios"),
     }
