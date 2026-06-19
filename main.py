@@ -2284,6 +2284,10 @@ class Handler(BaseHTTPRequestHandler):
                         etapa7.status        = "concluido"
                         etapa7.concluido_em  = datetime.utcnow()
                         etapa7.responsavel_id = usuario["id"]
+                        try:
+                            upsert_projeto_status(nome_safe, "fechado")
+                        except Exception:
+                            pass
                         db.commit()
                     self.send_json({"ok": True, "status": contrato.status, "parte": parte})
                 except Exception as e:
@@ -3052,6 +3056,20 @@ def _projeto_esta_bloqueado(nome_safe) -> bool:
     Centraliza o gate pos-aprovacao usado pelos handlers de margens/descontos por orcamento."""
     proj = _carregar_projeto(nome_safe)
     return bool(proj and proj.get("bloqueado"))
+
+
+def _contrato_assinado(nome_safe, db) -> bool:
+    """True se o último contrato do projeto tem qualquer assinatura (1ª assinatura)
+    ou status já assinado. Fonte única da trava total pós-assinatura."""
+    c = (db.query(Contrato)
+           .filter_by(projeto_nome=nome_safe)
+           .order_by(Contrato.id.desc())
+           .first())
+    if not c:
+        return False
+    if c.status in ("assinado_loja", "assinado_cliente", "assinado", "vigente"):
+        return True
+    return len(c.assinaturas) > 0
 
 
 def _pool_ambiente_dict(pa) -> dict:

@@ -1,0 +1,65 @@
+import pytest, sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+@pytest.fixture(autouse=True)
+def setup_db(tmp_path, monkeypatch):
+    import database
+    db_file = str(tmp_path / "test.db")
+    monkeypatch.setattr(database, "DB_PATH", db_file)
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    engine = create_engine(f"sqlite:///{db_file}", echo=False)
+    monkeypatch.setattr(database, "ENGINE", engine)
+    monkeypatch.setattr(database, "Session", sessionmaker(bind=engine))
+    database.init_db()
+    yield
+
+
+def _mk_contrato(db, status="rascunho", assinaturas=()):
+    from database import Contrato, ContratoAssinatura, Orcamento
+    from datetime import datetime
+    o = Orcamento(projeto_id="Proj_A", nome="Orçamento 1", ordem=1)
+    db.add(o); db.commit(); db.refresh(o)
+    c = Contrato(projeto_nome="Proj_A", orcamento_id=o.id, status=status)
+    db.add(c); db.commit(); db.refresh(c)
+    for parte in assinaturas:
+        db.add(ContratoAssinatura(contrato_id=c.id, parte=parte, nome="X", cpf="0",
+                                  assinado_em=datetime.utcnow(), hash_sha256="h"))
+    db.commit()
+    return c
+
+
+def test_assinado_false_sem_contrato():
+    from main import _contrato_assinado
+    from database import get_session
+    db = get_session()
+    assert _contrato_assinado("Proj_Inexistente", db) is False
+    db.close()
+
+
+def test_assinado_false_rascunho():
+    from main import _contrato_assinado
+    from database import get_session
+    db = get_session()
+    _mk_contrato(db, status="rascunho")
+    assert _contrato_assinado("Proj_A", db) is False
+    db.close()
+
+
+def test_assinado_true_uma_assinatura():
+    from main import _contrato_assinado
+    from database import get_session
+    db = get_session()
+    _mk_contrato(db, status="assinado_loja", assinaturas=("loja",))
+    assert _contrato_assinado("Proj_A", db) is True
+    db.close()
+
+
+def test_assinado_true_status_vigente():
+    from main import _contrato_assinado
+    from database import get_session
+    db = get_session()
+    _mk_contrato(db, status="vigente")
+    assert _contrato_assinado("Proj_A", db) is True
+    db.close()
