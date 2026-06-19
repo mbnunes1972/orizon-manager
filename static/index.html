@@ -6250,8 +6250,12 @@ async function salvarOrcamento(){
     ? _orcAmbientesAtivos.length > 0
     : (projetoAtivo.ambientes || []).length > 0;
 
-  // 1. Persiste valor negociado, valor líquido e forma de pagamento
-  await salvarValorNegociado();
+  // 1. Persiste valor negociado, valor líquido, forma de pagamento e entradas da negociação
+  const _sv = await salvarValorNegociado();
+  if (!_sv.ok) {
+    showToast('Falha ao salvar o orçamento: ' + (_sv.erro || ''), true);
+    return;
+  }
 
   // 2. Marca etapa 4 como concluída SOMENTE se há ambientes no orçamento
   if (temAmbientes) {
@@ -6302,6 +6306,13 @@ document.addEventListener('click', (e) => {
 let _expPollTimer = null;
 
 async function aprovarOrcamento() {
+  const _sv = await salvarValorNegociado();
+  if (!_sv.ok) {
+    (typeof avisoPopup === 'function')
+      ? avisoPopup('Não foi possível salvar o orçamento — aprovação cancelada. ' + (_sv.erro || ''))
+      : showToast('Não foi possível salvar o orçamento — aprovação cancelada.', true);
+    return;
+  }
   const modal      = document.getElementById('modal-exportar');
   const logBox     = document.getElementById('exp-log-box');
   const banner     = document.getElementById('exp-status-banner');
@@ -7428,7 +7439,7 @@ async function copiarEnderecoCliente() {
 // ── Aprovação de Orçamento (novo fluxo — contrato) ───────────────────────────
 
 async function salvarValorNegociado() {
-  if (!_orcamentoAtivoId) return;
+  if (!_orcamentoAtivoId) return { ok: false, erro: 'Nenhum orçamento ativo' };
   const elTotal   = document.getElementById('neg-total-final');
   const elAvista  = document.getElementById('neg-avista');
   const elPag     = document.getElementById('neg-pagamento');
@@ -7436,9 +7447,8 @@ async function salvarValorNegociado() {
   const rawAvista = (elAvista?.textContent || '').replace(/[R$\s.]/g,'').replace(',','.');
   const valor        = parseFloat(rawTotal)  || 0;
   const valorLiquido = parseFloat(rawAvista) || 0;
-  if (!valor) return;
   try {
-    await fetch(`/orcamentos/${_orcamentoAtivoId}/valor`, {
+    const r = await fetch(`/orcamentos/${_orcamentoAtivoId}/valor`, {
       method: 'PATCH', credentials: 'same-origin',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -7450,7 +7460,12 @@ async function salvarValorNegociado() {
         negociacao_json: JSON.stringify(_capturarNegociacao()),
       }),
     });
-  } catch(e) { console.warn('salvarValorNegociado:', e); }
+    const d = await r.json();
+    return d && d.ok ? { ok: true } : { ok: false, erro: (d && d.erro) || 'Falha ao salvar' };
+  } catch(e) {
+    console.warn('salvarValorNegociado:', e);
+    return { ok: false, erro: 'Erro de conexão ao salvar' };
+  }
 }
 
 async function _carregarClienteProjeto() {
