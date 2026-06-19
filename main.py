@@ -1989,39 +1989,6 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
-            # Rota: POST /projetos/<nome_safe>/margens
-            m_mar = _re.match(r"^/projetos/([^/]+)/margens$", path)
-            if m_mar:
-                nome_safe = m_mar.group(1)
-                req  = json.loads(body)
-                proj = _carregar_projeto(nome_safe)
-                if not proj:
-                    self.send_json({"ok": False, "erro": "Projeto não encontrado"})
-                    return
-                if proj.get("bloqueado"):
-                    self.send_json({"ok": False, "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."})
-                    return
-                # Merge: preserva campos existentes e atualiza os enviados
-                m_atual = proj.get("margens") or {}
-                m_atual.update({
-                    "desconto_pct":          float(req.get("desconto_pct",          m_atual.get("desconto_pct", 0))),
-                    "custo_financeiro_pct":  float(req.get("custo_financeiro_pct",  m_atual.get("custo_financeiro_pct", 0))),
-                    "fora_da_sede":          bool( req.get("fora_da_sede",           m_atual.get("fora_da_sede", False))),
-                    "custo_viagem":       float(req.get("custo_viagem",        m_atual.get("custo_viagem", 0))),
-                    "brinde":             float(req.get("brinde",              m_atual.get("brinde", 0))),
-                    "brinde_ativo":       bool( req.get("brinde_ativo",        m_atual.get("brinde_ativo", False))),
-                    "comissao_arq_pct":   float(req.get("comissao_arq_pct",   m_atual.get("comissao_arq_pct", 0))),
-                    "comissao_arq_ativa": bool( req.get("comissao_arq_ativa",  m_atual.get("comissao_arq_ativa", False))),
-                    "fidelidade_pct":     float(req.get("fidelidade_pct",     m_atual.get("fidelidade_pct", 0))),
-                    "fidelidade_ativa":   bool( req.get("fidelidade_ativa",    m_atual.get("fidelidade_ativa", False))),
-                    "incluir_custos":     bool( req.get("incluir_custos",      m_atual.get("incluir_custos", False))),
-                    "carga_trib":         float(req.get("carga_trib",          m_atual.get("carga_trib", 8.0))),
-                })
-                proj["margens"] = m_atual
-                _salvar_projeto(proj)
-                self.send_json({"ok": True, "margens": proj["margens"]})
-                return
-
             if path == "/api/admin/usuarios":
                 usuario = get_usuario_sessao(self)
                 if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
