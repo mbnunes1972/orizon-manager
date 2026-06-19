@@ -272,7 +272,7 @@ def test_preencher_signatario_e_testemunhas(tmp_path):
     path = preencher_contrato(91001, ctx)
     full = "\n".join(p.text for p in Document(path).paragraphs)
     os.remove(path)
-    assert "Ana Cliente\nCPF/CNPJ:" in full   # cliente: nome numa linha, CPF/CNPJ na linha de baixo
+    assert "Ana Cliente\n111.222.333-44" in full   # nome numa linha, CPF (valor) na linha de baixo
     assert "Consultor Z" in full             # consultor PERMANECE no cabeçalho (par. 0)
     assert "Jaime Perinazzo" in full
     assert "Felipe Guizalberte" in full
@@ -781,26 +781,53 @@ def test_assinatura_cliente_mesmo_estilo_da_empresa():
 
 def test_assinaturas_nome_e_cpf_em_linhas_separadas():
     """Cada signatário do bloco de assinatura tem o NOME numa linha e o
-    CPF/CNPJ na linha imediatamente abaixo (mesmo padrão para todos)."""
+    marcador de CPF/CNPJ na linha imediatamente abaixo (nova estrutura)."""
     from docx import Document
     from mod_contrato import _MODELO
     d = Document(_MODELO)
     pars = [(p.text or "").strip() for p in d.paragraphs]
 
-    def linha_seguinte(marcador, prefixo_cpf):
+    def linha_seguinte(marcador_nome, marcador_doc):
         for i, t in enumerate(pars):
-            if marcador in t:
-                # o marcador deve estar sozinho (sem CPF/CNPJ na mesma linha)
-                assert "CPF" not in t and "CNPJ" not in t, f"{marcador} ainda tem CPF na mesma linha: {t!r}"
-                # a próxima linha não-vazia deve começar com o rótulo de CPF/CNPJ
+            if marcador_nome in t:
+                assert "CPF" not in t and "CNPJ" not in t, f"{marcador_nome} tem doc na mesma linha: {t!r}"
                 j = i + 1
                 while j < len(pars) and not pars[j]:
                     j += 1
-                assert j < len(pars) and pars[j].startswith(prefixo_cpf), \
-                    f"linha de CPF de {marcador} inesperada: {pars[j] if j < len(pars) else None!r}"
+                assert j < len(pars) and marcador_doc in pars[j], \
+                    f"linha de doc de {marcador_nome} inesperada: {pars[j] if j < len(pars) else None!r}"
                 return
-        raise AssertionError(f"marcador {marcador} não encontrado")
+        raise AssertionError(f"marcador {marcador_nome} não encontrado")
 
-    linha_seguinte("[NOME_CLIENTE]", "CPF/CNPJ:")
-    linha_seguinte("[NOME_TESTEMUNHA_1]", "CPF:")
-    linha_seguinte("[NOME_TESTEMUNHA_2]", "CPF:")
+    linha_seguinte("[NOME_EMPRESA]",      "[CNPJ_EMPRESA]")
+    linha_seguinte("[NOME_CLIENTE]",      "[CPF_CLIENTE]")
+    linha_seguinte("[NOME_TESTEMUNHA_1]", "[CPF_TESTEMUNHA_1]")
+    linha_seguinte("[NOME_TESTEMUNHA_2]", "[CPF_TESTEMUNHA_2]")
+
+
+def test_montar_mapping_inclui_empresa_e_cpfs():
+    from mod_contrato import _montar_mapping, _NOME_EMPRESA, _CNPJ_EMPRESA, _TESTEMUNHAS
+    ctx = {"cliente_cpf": "111.222.333-44"}
+    m = _montar_mapping(ctx, {})
+    assert m["NOME_EMPRESA"] == _NOME_EMPRESA
+    assert m["CNPJ_EMPRESA"] == _CNPJ_EMPRESA
+    assert m["CPF_CLIENTE"] == "111.222.333-44"
+    assert m["CPF_TESTEMUNHA_1"] == _TESTEMUNHAS[0][1]
+    assert m["CPF_TESTEMUNHA_2"] == _TESTEMUNHAS[1][1]
+
+
+def test_substituir_marcadores_cabecalho_fragmentado():
+    """Marcador fragmentado em múltiplos runs no cabeçalho é substituído."""
+    from docx import Document
+    from docx.oxml.ns import qn
+    from mod_contrato import _substituir_marcadores
+    d = Document()
+    hdr = d.sections[0].header
+    p = hdr.paragraphs[0]
+    p.add_run("[")
+    p.add_run("NUM_CONTRATO")
+    p.add_run("]")
+    _substituir_marcadores(d, {"NUM_CONTRATO": "INS-2026-01-01-001"})
+    txt = "".join(t.text or "" for t in hdr._element.iter(qn('w:t')))
+    assert "INS-2026-01-01-001" in txt
+    assert "[NUM_CONTRATO]" not in txt
