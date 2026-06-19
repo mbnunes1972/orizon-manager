@@ -8,9 +8,16 @@ Uso: python3 seed.py
 from database import init_db, get_session, Usuario
 
 USUARIOS = [
-    {"nome": "Pedro da Mota",    "login": "pdm2026", "senha": "teste123", "nivel": "diretor"},
-    {"nome": "Luiz da Silva",    "login": "lds2026", "senha": "teste234", "nivel": "gerente"},
-    {"nome": "Marcia dos Santos","login": "mds2026", "senha": "teste345", "nivel": "consultor"},
+    {"nome": "Pedro da Mota",        "login": "pdm2026", "senha": "teste123", "nivel": "diretor"},
+    {"nome": "Luiz da Silva",        "login": "lds2026", "senha": "teste234", "nivel": "gerente_vendas"},
+    {"nome": "Marcia dos Santos",    "login": "mds2026", "senha": "teste345", "nivel": "consultor"},
+    {"nome": "Gabriela Adm/Fin",     "login": "gaf2026", "senha": "teste456", "nivel": "gerente_adm_fin"},
+    {"nome": "Alex Logística",        "login": "alg2026", "senha": "teste567", "nivel": "assistente_logistico"},
+    {"nome": "Carla Conferente",     "login": "ccf2026", "senha": "teste678", "nivel": "conferente"},
+    {"nome": "Sergio Montagem",      "login": "smt2026", "senha": "teste789", "nivel": "supervisor_montagem"},
+    {"nome": "Aline Administrativo", "login": "aad2026", "senha": "teste890", "nivel": "assistente_administrativo"},
+    {"nome": "Paulo Projetista",     "login": "ppe2026", "senha": "teste901", "nivel": "projetista_executivo"},
+    {"nome": "Marcos Medidor",       "login": "med2026", "senha": "teste012", "nivel": "medidor"},
 ]
 
 def seed():
