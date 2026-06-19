@@ -138,3 +138,7 @@ def test_exige_aprovacao_financeira():
     assert mc.exige_aprovacao_financeira("7") is False
     assert mc.exige_aprovacao_financeira("11") is False
     assert mc.exige_aprovacao_financeira("9") is False
+
+
+def test_etapa10_renomeada_medicao():
+    assert mc.ETAPA_NOME["10"] == "Medição"
