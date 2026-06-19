@@ -30,8 +30,25 @@ def test_pode_avancar_primeira_etapa_sempre_liberada():
     assert mc.pode_avancar("1", {}) is True
 
 
-def test_pode_avancar_subetapa_sempre_livre():
-    assert mc.pode_avancar("11b", {}) is True
+def test_etapa_pai():
+    assert mc.etapa_pai("11a") == "11"
+    assert mc.etapa_pai("11e") == "11"
+    assert mc.etapa_pai("17a") == "17"
+    assert mc.etapa_pai("11") is None      # principal não tem "pai"
+    assert mc.etapa_pai("1") is None
+
+
+def test_pode_avancar_subetapa_herda_gating_da_mae():
+    # Sub-etapa do PE (11x) segue o gating da etapa-mãe 11 (que exige a 10 concluída).
+    assert mc.pode_avancar("11a", {"10": "pendente"}) is False
+    assert mc.pode_avancar("11a", {}) is False
+    assert mc.pode_avancar("11a", {"10": "concluido"}) is True
+    # Mesma resposta que a etapa-mãe:
+    for st in ({}, {"10": "pendente"}, {"10": "concluido"}, {"10": "entregue"}):
+        assert mc.pode_avancar("11a", st) == mc.pode_avancar("11", st)
+    # Sub-etapa da Montagem (17a) segue a 17 (que exige a 16 concluída).
+    assert mc.pode_avancar("17a", {"16": "pendente"}) is False
+    assert mc.pode_avancar("17a", {"16": "entregue"}) is True
 
 
 def test_codigos_a_resetar_inclui_alvo_e_posteriores_e_subs():
