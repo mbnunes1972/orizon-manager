@@ -37,10 +37,10 @@ def seed():
             u.set_senha(dados["senha"])
             db.add(u)
             criados += 1
-            print(f"  [criado]    {dados['login']} ({dados['nivel']}) — {dados['nome']}")
+            print(f"  [criado]    {dados['login']} ({dados['nivel']}) - {dados['nome']}")
 
         db.commit()
-        print(f"\n  ✓ {criados} usuário(s) criado(s), {existentes} já existia(m).")
+        print(f"\n  OK: {criados} usuario(s) criado(s), {existentes} ja existia(m).")
     finally:
         db.close()
 
