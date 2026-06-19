@@ -44,6 +44,14 @@ STATUS_CONCLUSIVOS = frozenset({
 })
 
 
+# Etapas que exigem autorização financeira (login+senha de quem pode aprovar).
+ETAPAS_APROVACAO_FINANCEIRA = frozenset({"8", "11d"})
+
+
+def exige_aprovacao_financeira(codigo):
+    return codigo in ETAPAS_APROVACAO_FINANCEIRA
+
+
 def _parse_codigo(codigo):
     """'11a' -> (11, 'a'); '2' -> (2, ''). Para ordenação e agrupamento por pai."""
     num, suf = "", ""
