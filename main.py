@@ -12,7 +12,7 @@ from auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
 from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
-                       LogAcaoGerencial)
+                       LogAcaoGerencial, Medicao)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -43,6 +43,7 @@ from mod_contrato import (calcular_hash_assinatura, montar_variaveis_contrato,
                           gerar_pdf_contrato, LibreOfficeIndisponivel,
                           construir_contexto, _formatar_valor)
 import mod_ciclo
+import mod_medicao
 import perfis
 import mod_usuarios
 
@@ -166,6 +167,43 @@ def _parse_multipart(body, ct):
         elif nome and not params.get("filename"):
             campos[nome] = payload.decode("utf-8", "ignore").strip()
     return arquivos, campos
+
+def _parse_multipart_arquivos(body, ct):
+    """Multipart binário: retorna (arquivos, campos) onde arquivos[name] = (filename, bytes)
+    e campos[name] = texto. (O _parse_multipart é específico p/ XML texto.)"""
+    raw = b"Content-Type: " + ct.encode() + b"\r\n\r\n" + body
+    msg = email.message_from_bytes(raw, policy=_email_policy.compat32)
+    arquivos, campos = {}, {}
+    for part in msg.walk():
+        cd = part.get("Content-Disposition", "")
+        if not cd:
+            continue
+        params = {}
+        for seg in cd.split(";"):
+            seg = seg.strip()
+            if "=" in seg:
+                k, v = seg.split("=", 1)
+                params[k.strip().lower()] = v.strip().strip('"')
+        nome = params.get("name", "")
+        payload = part.get_payload(decode=True)
+        if payload is None:
+            continue
+        if params.get("filename"):
+            arquivos[nome] = (params["filename"], payload)
+        elif nome:
+            campos[nome] = payload.decode("utf-8", "ignore").strip()
+    return arquivos, campos
+
+
+def _usuario_com_capacidade(db, login, senha, capacidade):
+    """Usuario ativo com senha correta e a capacidade dada (perfis), ou None."""
+    u = db.query(Usuario).filter_by(login=(login or "").strip()).first()
+    if not u or not u.ativo or not u.check_senha(senha or ""):
+        return None
+    if not perfis.pode(u.nivel, capacidade):
+        return None
+    return u
+
 
 def _aprovador_financeiro(db, login, senha):
     """Retorna o Usuario apto a aprovar financeiro (ativo, senha correta e perfil com
@@ -602,6 +640,29 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": True, "ciclo": resultado})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/medicao$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                if not get_usuario_sessao(self):
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                db = get_session()
+                try:
+                    md = db.query(Medicao).filter_by(projeto_nome=nome_safe).first()
+                    if not md:
+                        self.send_json({"ok": True, "medicao": None})
+                        return
+                    self.send_json({"ok": True, "medicao": {
+                        "parecer": md.parecer,
+                        "ambientes_aprovados": md.ambientes_aprovados or "",
+                        "tem_solicitacao": bool(md.solicitacao_arquivo),
+                        "tem_planta": bool(md.planta_arquivo),
+                        "tem_doc_cliente": bool(md.doc_cliente_arquivo),
+                    }})
                 finally:
                     db.close()
                 return
@@ -2498,6 +2559,9 @@ class Handler(BaseHTTPRequestHandler):
                 req = json.loads(body)
                 novo_status = req.get("status", "").strip()
                 obs         = req.get("observacoes")
+                if novo_status in mod_ciclo.STATUS_CONCLUSIVOS and etapa_cod in ("9", "10"):
+                    self.send_json({"ok": False, "erro": "Use o fluxo de Medição para concluir esta etapa."}, code=400)
+                    return
                 db = get_session()
                 try:
                     etapa = db.query(CicloEtapa).filter_by(
