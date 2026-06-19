@@ -471,6 +471,30 @@ def _run_migracoes(conn):
     conn.commit()
 
 
+def migrar_margens_para_orcamentos(session, projetos_dir):
+    """Copia margens de cada PROJETOS/<nome>/projeto.json para os Orcamentos do projeto
+    que ainda estão sem margens. Idempotente: só preenche margens vazias/nulas.
+    Retorna o nº de orçamentos atualizados."""
+    import glob, json, os
+    atualizados = 0
+    for pj in glob.glob(os.path.join(projetos_dir, "*", "projeto.json")):
+        try:
+            data = json.loads(open(pj, encoding="utf-8").read())
+        except Exception:
+            continue
+        margens = data.get("margens")
+        if not margens:
+            continue
+        nome_safe = data.get("nome_safe") or os.path.basename(os.path.dirname(pj))
+        for o in session.query(Orcamento).filter_by(projeto_id=nome_safe).all():
+            if not o.margens:
+                o.margens = json.dumps(margens, ensure_ascii=False)
+                atualizados += 1
+    if atualizados:
+        session.commit()
+    return atualizados
+
+
 def _migrar_dados():
     """Abre a conexão real e roda as migrações de dados idempotentes."""
     import sqlite3

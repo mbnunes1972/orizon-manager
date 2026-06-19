@@ -3127,6 +3127,13 @@ def main():
         print("  Aviso: omie_config.json sem credenciais. Configure na sidebar.")
 
     init_db()
+    try:
+        _db_mig = get_session()
+        from database import migrar_margens_para_orcamentos
+        migrar_margens_para_orcamentos(_db_mig, PROJETOS_DIR)
+        _db_mig.close()
+    except Exception as _e:
+        print("[MIGRACAO] margens->orcamento:", _e)
     port   = 8765
     # Host de bind configurável: padrão 127.0.0.1 (dev local seguro);
     # em produção defina OMIE_HOST=0.0.0.0 para aceitar acesso externo.
