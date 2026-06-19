@@ -3129,9 +3129,11 @@ def main():
     init_db()
     try:
         _db_mig = get_session()
-        from database import migrar_margens_para_orcamentos
-        migrar_margens_para_orcamentos(_db_mig, PROJETOS_DIR)
-        _db_mig.close()
+        try:
+            from database import migrar_margens_para_orcamentos
+            migrar_margens_para_orcamentos(_db_mig, PROJETOS_DIR)
+        finally:
+            _db_mig.close()
     except Exception as _e:
         print("[MIGRACAO] margens->orcamento:", _e)
     port   = 8765
