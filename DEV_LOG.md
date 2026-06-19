@@ -4,14 +4,14 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-18 (sessão 14 — sub-projeto 4: workflow de medição; decomposição dos 4 sub-projetos concluída)
+> Atualizado em: 2026-06-19 (sessão 15 — fix: bloqueio pós-aprovação não trava o painel do Ciclo; doc atualizada. Antes: 4 sub-projetos — ciclo, perfis+painel, aprovação financeira, medição)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
 - Sistema de autenticação completo: login, logout, sessões via cookie
-- **Quatro níveis:** Diretor (50%), Gerente (20%), Consultor (10%), **Admin (50% + painel admin)**
-- Usuários de vendas: `pdm2026` (Pedro/Diretor), `lds2026` (Luiz/Gerente), `mds2026` (Marcia/Consultora)
-- Usuário admin de teste: `admin2026` / senha `admin123` — **alterar antes de produção**
+- **10 perfis (`perfis.py`, fonte única):** Diretor (50%), Gerente de Vendas (20%), Consultor (10%), Gerente Administrativo/Financeiro, Assistente Logístico, Conferente, Supervisor de Montagem, Assistente Administrativo, Projetista Executivo, Medidor. Permissões centralizadas: `desconto_max`, `ver_parametros`, `autorizar` (desconto), `gerir_usuarios`, `aprovar_financeiro`, `registrar_medicao`, `aprovar_medicao_reprovada`. Perfil técnico `admin` **aposentado** (migrado para `diretor` via `perfis_v2_2026`). Detalhes em `docs/USUARIOS.md`.
+- **Usuários-exemplo (`seed.py`, 1 por perfil):** `pdm2026` (Diretor), `lds2026` (Ger. Vendas), `mds2026` (Consultor), `gaf2026` (Ger. Adm/Fin), `med2026` (Medidor) + demais — **senhas de exemplo, trocar antes de produção**.
+- **Painel Admin → Usuários:** CRUD (criar/editar perfil/telefone/ativar-desativar/resetar senha), acesso para Diretor ou Gerente Adm/Financeiro; `nav-07` gateado por `pode_gerir_usuarios`.
 - Módulo Clientes completo com ViaCEP, máscaras, CRUD, unicidade
 - **Auto-sync Omie:** ao criar cliente, tenta registrar no Omie em background thread; grava `omie_sync_status` (`ok`/`pendente`/`erro`) + `omie_sync_erro` na tabela `clientes`
 - Módulo Parceiros completo com tipos, comissão padrão, CRUD
@@ -35,7 +35,13 @@
 - **Contrato editável protegido:** `.docx` sai somente-leitura com regiões editáveis só nos valores (`permStart/permEnd` + `documentProtection`); botão "Editar contrato" (gate gerencial auditado) abre no Word/LibreOffice e regera o PDF a cada salvamento (watcher `contrato_editar.py`)
 - **Status contrato:** `rascunho` → `para_assinatura` → `assinado`; badges CSS dedicados
 - **Aprovar Orçamento reformulado:** modal exibe dados do cliente, CPF/endereço de instalação obrigatórios se vazios, condições de pagamento pré-carregadas; salva `valor_negociado` e `forma_pagamento` no orçamento antes de gerar contrato
-- **Pós-aprovação:** botões Salvar/Aprovar ocultos após etapa 6 concluída; "Voltar ao Orçamento" protegido por senha de gerente (`POST /ciclo/desfazer_aprovacao`)
+- **Pós-aprovação:** ao aprovar (etapa 6), a negociação inteira fica **somente-leitura** (`aplicarBloqueioNegociacao`, cobre `#sb-params` + `#page-02`, exceto o `#ciclo-panel`); botões na tela de negociação: **"✍ Assinar Contrato"** + **"✎ Rever Orçamento"** (senha gerencial → `POST /ciclo/desfazer_aprovacao`, libera a edição)
+- **Negociação — formas de pagamento por modalidade:** seletores de forma da entrada/parcelas (cartão/aymoré/VP/TF/à vista); modalidade **À Vista** com entrada (valor+data+forma) e liquidação automática; calendário nativo clicável em todos os campos de data; formas levadas ao contrato (`[FORMA_ENTRADA]`, `[TIPO]`)
+- **Assinatura do contrato:** bloco de assinaturas normalizado (nome numa linha, CPF/CNPJ embaixo, mesma fonte) via `scripts/organizar_assinaturas.py`/`normalizar_assinaturas.py`
+- **UX:** diálogos nativos substituídos por popups estilizados (`confirmarPopup`/`avisoPopup`/`pedirCredenciaisGerente`); `index.html` servido com `Cache-Control: no-cache`
+- **Ciclo — gating de sub-etapas:** sub-etapas (`11a`–`11e`, `17a`) desbloqueiam junto com a etapa-mãe (`mod_ciclo.etapa_pai`)
+- **Aprovação financeira (etapas 8 e 11d):** exige login+senha de quem tem `aprovar_financeiro` (Diretor ou Ger. Adm/Fin; gerente de vendas não); auditado em `log_acoes_gerenciais`
+- **Workflow de Medição (etapas 9 e 10):** etapa 9 = upload da solicitação + senha do medidor; etapa 10 "Medição" = parecer (Aprovado/Reprovado/Parcial+ambientes) + planta promob; **Reprovado em 2 passos** (medidor registra → fica em andamento; Gerente Vendas/Adm-Fin/Diretor anexa doc do cliente + senha → libera). Modelo `Medicao`; arquivos em `PROJETOS/<nome>/medicao/`; guard impede fechar 9/10 pelo toggle genérico
 - **Auto-load projetos** ao iniciar app (`DOMContentLoaded → projCarregar()`)
 - **LibreOffice gracioso:** `LibreOfficeIndisponivel` salva `.docx` e avança status sem travar o fluxo
 
@@ -76,7 +82,8 @@
 ### [PENDENTE]
 - `salvarOrcamento()` no frontend é stub (só mostra toast) — não persiste nada além do que já é auto-salvo nos endpoints de ambiente/margem
 - Módulo Clientes e Parceiros vinculados a orçamentos (planejado)
-- Alterar senha do usuário `admin2026` antes de ir para produção
+- **Trocar as senhas de exemplo do `seed.py`** (10 usuários) antes de produção — pelo Painel Admin → Usuários (perfil técnico `admin` foi aposentado)
+- Refinar espaçamento visual do bloco de assinaturas no PDF (validado por estrutura, não por render — LibreOffice ausente no dev local)
 - **Template do contrato:** ajustes nas variáveis (backlog anotado no último commit — ver `docs/` ou `CONTRATOS/`)
 - **LibreOffice no VPS:** verificar disponibilidade; app funciona sem ele (fallback .docx), mas PDF é o ideal
 - Etapa 6 do ciclo: marcada ao gerar contrato — testar fluxo completo no VPS
@@ -98,10 +105,22 @@
 ### [CONTEXTO] Arquivos e variáveis chave
 **Arquivos principais:**
 - `main.py` — servidor HTTP, todas as rotas; `_enriquecer_projetos_com_pool()` e `_enriquecer_projetos_com_status()` enriquecem listagens; `do_PATCH` para status; `_tentar_sync_omie()` para sync Omie
-- `database.py` — SQLAlchemy: `Usuario`, `Sessao`, `LogAutorizacao`, `Cliente`, `Parceiro`, `PoolAmbiente`, `Orcamento`, `OrcamentoAmbiente`, **`Projeto`** (projetos_meta); `upsert_projeto_status()`
-- `mod_omie.py` — `_listar_projetos()` retorna `cliente_cpf`; `bloquear_projeto()` seta status "convertido"
+- `database.py` — SQLAlchemy: `Usuario`, `Sessao`, `LogAutorizacao`, `LogAcaoGerencial`, `Cliente`, `Parceiro`, `PoolAmbiente`, `Orcamento`, `OrcamentoAmbiente`, **`Projeto`** (projetos_meta), `CicloEtapa`, `Contrato`, `ContratoAssinatura`, **`Medicao`**; migrações de dados em `_run_migracoes` (guard `_tabela_existe`); `Usuario.limite_desconto`/`pode_ver_parametros` delegam a `perfis.py`
+- `perfis.py` — **fonte única dos 10 perfis e permissões** (`PERFIS`, `pode/desconto_max/rotulo/existe/slugs`)
+- `mod_usuarios.py` — validadores puros do CRUD de usuários
+- `mod_ciclo.py` — gating do ciclo (`pode_avancar`, `etapa_pai`, `etapa_anterior`), `ETAPA_NOME` (10 = "Medição"), `ETAPAS_APROVACAO_FINANCEIRA` (8, 11d), `exige_aprovacao_financeira`
+- `mod_medicao.py` — `PARECERES` + `validar_parecer`
+- `mod_omie.py` — `_listar_projetos()` retorna `cliente_cpf`; `bloquear_projeto()` seta status "convertido"; `_projeto_path()`
 - `static/index.html` — frontend SPA completo
-- `PROJETOS/*/projeto.json` — dados persistidos de cada projeto (legado; EP-07 usa banco)
+- `PROJETOS/*/projeto.json` — dados persistidos de cada projeto (legado; EP-07 usa banco); `PROJETOS/<nome>/medicao/` guarda os arquivos da medição
+
+**Perfis e capacidades (sub-projeto 2/3/4):** ver tabela em `docs/USUARIOS.md`. Capacidades: `autorizar` (desconto: diretor+ger.vendas), `gerir_usuarios` (diretor+adm/fin), `aprovar_financeiro` (diretor+adm/fin), `registrar_medicao` (medidor+diretor), `aprovar_medicao_reprovada` (vendas+adm/fin+diretor).
+
+**Tabelas/rotas novas (sub-projetos 2–4):**
+- `medicoes` (1 por projeto); migração de dados `perfis_v2_2026` (gerente→gerente_vendas, admin→diretor)
+- `GET/POST/PATCH /api/admin/usuarios` (gate `gerir_usuarios`)
+- `POST /api/projetos/<nome>/medicao/{solicitacao,parecer,decisao-reprovado}` + `GET .../medicao` + `GET .../medicao/arquivo/<tipo>`
+- `PATCH /ciclo/<codigo>`: gate financeiro (8/11d) e guard de medição (9/10)
 
 **Tabelas novas (sessão 6):**
 - `projetos_meta` — `nome_safe` PK, `status`, `status_at`, `perdido_em`
@@ -151,6 +170,11 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-19 (sessão 15 — fix do bloqueio + atualização de documentação)
+- **Bug pego em uso:** no parecer da medição só dava para selecionar "Aprovado". Causa: o `#ciclo-panel` vive dentro de `#page-02`, e o bloqueio pós-aprovação (`aplicarBloqueioNegociacao`) desabilitava todos os `select`/`input` de `#page-02` — incluindo o select de parecer e os uploads da medição. **Correção:** o bloqueio passa a isentar `#ciclo-panel` (fluxo pós-aprovação precisa ficar interativo); a negociação continua travando. Verificado por Playwright. Commit `87679e3`.
+- **Documentação atualizada:** DEV_LOG ([ESTADO]/[PENDENTE]/[CONTEXTO] revisados para os 10 perfis, painel de usuários, aprovação financeira, medição e correções de negociação) e `docs/USUARIOS.md` já refletindo os perfis/capacidades.
+- **Deploy:** sub-projetos 1–4 + correções empurrados ao GitHub; produção atualizada via runbook (deps já instaladas, `OMIE_HOST=0.0.0.0`, banco recriado/seedado com os 10 perfis, `no-cache` ativo).
 
 ### Sessão 2026-06-18 (sessão 14 — sub-projeto 4: workflow de medição)
 Quarto e último sub-projeto da decomposição (fecha os itens 6 e 7).

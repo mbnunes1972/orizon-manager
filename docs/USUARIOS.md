@@ -23,6 +23,18 @@
 `assistente_logistico`, `conferente`, `supervisor_montagem`,
 `assistente_administrativo`, `projetista_executivo`, `medidor`.)
 
+## Capacidades adicionais (sub-projetos 3 e 4)
+
+Além das colunas acima, `perfis.py` define capacidades específicas de fluxo:
+
+| Capacidade | Perfis que têm | Usada em |
+|---|---|---|
+| `aprovar_financeiro` | Diretor, Gerente Adm/Financeiro | Concluir as etapas 8 e 11d (Aprovação financeira) — exige login+senha |
+| `registrar_medicao` | Medidor, Diretor | Confirmar a etapa 9 (Solicitação) e registrar o parecer da etapa 10 (Medição) |
+| `aprovar_medicao_reprovada` | Gerente de Vendas, Gerente Adm/Financeiro, Diretor | Liberar a Medição quando o parecer é "Reprovado" (decisão comercial, 2º passo) |
+
+> Gerente de **Vendas não** aprova financeiro; **Medidor não** decide o caso Reprovado.
+
 ## Responsabilidades no ciclo (resumo)
 
 - **Diretor / Gerente de Vendas / Consultor:** negociação, orçamento, desconto.
