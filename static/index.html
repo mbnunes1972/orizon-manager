@@ -3108,6 +3108,35 @@ let _codigoPagAtivo  = 'a_vista';  // código da modalidade selecionada (ex: 'ca
 let _formaEntrada = 'pix';
 let _formaParcela = 'boleto';
 
+// Snapshot da negociação — campos de input por modalidade (ids reais do DOM)
+const _NEG_CAMPOS_POR_MODALIDADE = {
+  total_flex:       ['tf-entrada','tf-prazo','tf-taxa-input','tf-data-contrato'],
+  venda_programada: ['vp-entrada','vp-data-contrato'],
+  aymore:           ['ay-entrada','ay-data-contrato','ay-carencia'],
+  cartao_credito:   ['cc-entrada','cc-data-contrato','cc-bandeira'],
+  a_vista:          ['av-entrada-valor','av-entrada-data','av-entrada-forma','av-liq-data','av-liq-forma'],
+};
+
+// Captura as ENTRADAS da negociação ativa (para reproduzir ao reabrir).
+function _capturarNegociacao(){
+  const codigo = _codigoPagAtivo || (document.getElementById('neg-pagamento')?.value) || 'a_vista';
+  const campos = {};
+  (_NEG_CAMPOS_POR_MODALIDADE[codigo] || []).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) campos[id] = el.value;
+  });
+  const snap = {
+    codigo,
+    n_parcelas: parseInt(document.getElementById('neg-parcelas')?.value) || _nParcelasSel || 1,
+    forma_entrada: _formaEntrada,
+    forma_parcela: _formaParcela,
+    campos,
+  };
+  if (codigo === 'total_flex') snap.tf_datas = Array.isArray(_tfDatas) ? _tfDatas.slice() : [];
+  if (codigo === 'venda_programada') snap.vp_datas = Array.isArray(_vpDatas) ? _vpDatas.slice() : [];
+  return snap;
+}
+
 const _FORMAS_ENTRADA = [['pix','Pix'],['ted','TED'],['boleto','Boleto']];
 const _FORMAS_AVISTA  = [['pix','Pix'],['ted','TED'],['boleto','Boleto'],['cheque','Cheque'],['dinheiro','Dinheiro']];
 const _FORMAS_PARC_VPTF = [['boleto','Boleto'],['cheque','Cheque']];
@@ -7367,6 +7396,7 @@ async function salvarValorNegociado() {
         forma_pagamento: (typeof _capturarPagamento === 'function' && window._planoPagamento)
           ? JSON.stringify(_capturarPagamento(_formaEntrada, _formaParcela))
           : (elPag?.value || null),
+        negociacao_json: JSON.stringify(_capturarNegociacao()),
       }),
     });
   } catch(e) { console.warn('salvarValorNegociado:', e); }
