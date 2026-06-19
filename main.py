@@ -205,6 +205,28 @@ def _usuario_com_capacidade(db, login, senha, capacidade):
     return u
 
 
+def _set_etapa_status(db, nome_safe, codigo, status, responsavel_id):
+    etapa = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo=codigo).first()
+    if not etapa:
+        etapa = CicloEtapa(projeto_nome=nome_safe, etapa_codigo=codigo)
+        db.add(etapa)
+    if etapa.status == "pendente" and status != "pendente":
+        etapa.iniciado_em = datetime.utcnow()
+    etapa.status = status
+    if status in mod_ciclo.STATUS_CONCLUSIVOS:
+        etapa.concluido_em = datetime.utcnow()
+        etapa.responsavel_id = responsavel_id
+    return etapa
+
+
+def _get_or_create_medicao(db, nome_safe):
+    md = db.query(Medicao).filter_by(projeto_nome=nome_safe).first()
+    if not md:
+        md = Medicao(projeto_nome=nome_safe)
+        db.add(md)
+    return md
+
+
 def _aprovador_financeiro(db, login, senha):
     """Retorna o Usuario apto a aprovar financeiro (ativo, senha correta e perfil com
     'aprovar_financeiro') ou None."""
@@ -642,6 +664,32 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
                     db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/medicao/arquivo/(solicitacao|planta|doc_cliente)$', path)
+            if m:
+                nome_safe = unquote(m.group(1)); tipo = m.group(2)
+                if not get_usuario_sessao(self):
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    md = db.query(Medicao).filter_by(projeto_nome=nome_safe).first()
+                    fname = md and getattr(md, tipo + "_arquivo", None)
+                finally:
+                    db.close()
+                if not fname:
+                    self.send_json({"ok": False, "erro": "Arquivo não encontrado"}, code=404); return
+                caminho = os.path.join(_projeto_path(nome_safe), "medicao", fname)
+                try:
+                    data = storage_ler_binario(caminho)
+                except Exception:
+                    self.send_json({"ok": False, "erro": "Arquivo não encontrado"}, code=404); return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", len(data))
+                self.send_header("Content-Disposition", 'attachment; filename="%s"' % fname)
+                self.end_headers()
+                self.wfile.write(data)
                 return
 
             m = _re.match(r'^/api/projetos/([^/]+)/medicao$', path)
@@ -2455,6 +2503,106 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as e:
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/medicao/solicitacao$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                if not get_usuario_sessao(self):
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
+                db = get_session()
+                try:
+                    u = _usuario_com_capacidade(db, campos.get("login",""), campos.get("senha",""), "registrar_medicao")
+                    if not u:
+                        self.send_json({"ok": False, "erro": "Confirmação exige login+senha do Medidor (ou Diretor)."}, code=403); return
+                    if "arquivo" not in arquivos:
+                        self.send_json({"ok": False, "erro": "Anexe o arquivo de solicitação de medição."}); return
+                    fname, data = arquivos["arquivo"]
+                    destino = os.path.join(_projeto_path(nome_safe), "medicao", "solicitacao_" + os.path.basename(fname))
+                    storage_salvar_binario(destino, data)
+                    md = _get_or_create_medicao(db, nome_safe)
+                    md.solicitacao_arquivo = os.path.basename(destino)
+                    md.solicitacao_por = u.id
+                    md.solicitacao_em = datetime.utcnow()
+                    _set_etapa_status(db, nome_safe, "9", "concluido", u.id)
+                    db.add(LogAcaoGerencial(solicitante_id=u.id, autorizador_id=u.id,
+                            acao="medicao_solicitacao", projeto_nome=nome_safe, etapa_alvo="9"))
+                    db.commit()
+                    self.send_json({"ok": True})
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/medicao/parecer$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                if not get_usuario_sessao(self):
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
+                parecer = (campos.get("parecer","") or "").strip().lower()
+                ambientes = campos.get("ambientes_aprovados","")
+                erros = mod_medicao.validar_parecer(parecer, ambientes)
+                if erros:
+                    self.send_json({"ok": False, "erro": " ".join(erros)}); return
+                db = get_session()
+                try:
+                    u = _usuario_com_capacidade(db, campos.get("login",""), campos.get("senha",""), "registrar_medicao")
+                    if not u:
+                        self.send_json({"ok": False, "erro": "Registro exige login+senha do Medidor (ou Diretor)."}, code=403); return
+                    if "planta" not in arquivos:
+                        self.send_json({"ok": False, "erro": "Anexe o arquivo promob da Planta de Pontos Medidos."}); return
+                    fname, data = arquivos["planta"]
+                    destino = os.path.join(_projeto_path(nome_safe), "medicao", "planta_" + os.path.basename(fname))
+                    storage_salvar_binario(destino, data)
+                    md = _get_or_create_medicao(db, nome_safe)
+                    md.planta_arquivo = os.path.basename(destino)
+                    md.parecer = parecer
+                    md.ambientes_aprovados = ambientes.strip() if parecer == "parcial" else None
+                    md.medidor_id = u.id
+                    md.medicao_em = datetime.utcnow()
+                    if parecer in ("aprovado", "parcial"):
+                        _set_etapa_status(db, nome_safe, "10", "concluido", u.id)
+                    else:
+                        _set_etapa_status(db, nome_safe, "10", "em_andamento", u.id)
+                    db.add(LogAcaoGerencial(solicitante_id=u.id, autorizador_id=u.id,
+                            acao="medicao_parecer_" + parecer, projeto_nome=nome_safe, etapa_alvo="10"))
+                    db.commit()
+                    self.send_json({"ok": True, "parecer": parecer})
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/medicao/decisao-reprovado$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                solicitante = get_usuario_sessao(self)
+                if not solicitante:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
+                db = get_session()
+                try:
+                    md = db.query(Medicao).filter_by(projeto_nome=nome_safe).first()
+                    if not md or md.parecer != "reprovado":
+                        self.send_json({"ok": False, "erro": "Só aplicável a uma medição com parecer Reprovado."}); return
+                    u = _usuario_com_capacidade(db, campos.get("login",""), campos.get("senha",""), "aprovar_medicao_reprovada")
+                    if not u:
+                        self.send_json({"ok": False, "erro": "Liberação exige login+senha de Gerente de Vendas, Gerente Adm/Financeiro ou Diretor."}, code=403); return
+                    if "doc_cliente" not in arquivos:
+                        self.send_json({"ok": False, "erro": "Anexe o documento de aprovação do cliente."}); return
+                    fname, data = arquivos["doc_cliente"]
+                    destino = os.path.join(_projeto_path(nome_safe), "medicao", "doc_cliente_" + os.path.basename(fname))
+                    storage_salvar_binario(destino, data)
+                    md.doc_cliente_arquivo = os.path.basename(destino)
+                    md.excecao_por = u.id
+                    md.excecao_em = datetime.utcnow()
+                    _set_etapa_status(db, nome_safe, "10", "concluido", u.id)
+                    db.add(LogAcaoGerencial(solicitante_id=solicitante["id"], autorizador_id=u.id,
+                            acao="medicao_excecao_reprovado", projeto_nome=nome_safe, etapa_alvo="10"))
+                    db.commit()
+                    self.send_json({"ok": True})
                 finally:
                     db.close()
                 return
