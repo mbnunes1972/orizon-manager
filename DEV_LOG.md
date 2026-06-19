@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-19 (sessão 16 — parâmetros de negociação por orçamento no banco: margens + desconto individual por ambiente persistidos por orçamento; migração automática do projeto.json. Antes: sessão 15 — fix do bloqueio pós-aprovação)
+> Atualizado em: 2026-06-19 (sessão 17 — snapshot completo da negociação por orçamento: modalidade/formas/parcelas/entrada + datas manuais do Total Flex persistidas e reproduzidas ao reabrir; salvamento garantido ao aprovar. Sub-projeto 1 de 3. Antes: sessão 16 — margens/descontos por orçamento)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -170,6 +170,25 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-19 (sessão 17 — snapshot completo da negociação por orçamento)
+**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → revisão holística → verificação API real + Playwright → merge). Primeiro de 3 sub-projetos decompostos de um pedido maior (1) snapshot da negociação · 2) trava total pós-assinatura · 3) versionamento de documentos). Spec/plano em `docs/superpowers/`.
+
+**Bug relatado:** ao salvar/aprovar, a última negociação de forma de pagamento/parcelamento se perdia. Causa: o plano calculado era salvo em `forma_pagamento`, mas ao reabrir nada restaurava a modalidade, formas, nº de parcelas, entrada e — no Total Flex — as **datas preenchidas manualmente** (limitação anotada na sessão 10).
+
+**Backend:**
+- **`orcamentos.negociacao_json`** (coluna JSON nova): snapshot das **entradas** da negociação (separado do `forma_pagamento`, que segue sendo o plano calculado p/ o contrato).
+- `PATCH /orcamentos/<id>/valor` grava `negociacao_json` (campo opcional; omitir não apaga); `GET /orcamentos/<id>/ambientes` devolve `negociacao` (parseado).
+
+**Frontend (`static/index.html`):**
+- **`_capturarNegociacao()`** (mapa de campos por modalidade) captura modalidade, formas, nº de parcelas, entrada, e as listas de datas/valores manuais (TF: `tf_datas`+`tf_valores`; VP: `vp_datas`). A **taxa TF** (campo mascarado/gated por gerente) é intencionalmente fora do snapshot.
+- **`_restaurarNegociacao()`** reinjeta as entradas após `carregarModalidades()` (ordem: modalidade → parcelas → campos → datas/valores → recálculo) e reproduz o plano com as datas salvas.
+- **Garantia ao aprovar:** `salvarValorNegociado()` retorna `{ok,erro}`; `aprovarOrcamento`/`salvarOrcamento`/`abrirAprovacaoComDados` **abortam** se o salvamento falhar; salvamento com total 0 é bloqueado (evita sobrescrever valor bom com 0).
+- **Race condition do Total Flex** corrigida: `atualizarTF()` ganhou contador de geração `_tfGen` (descarta respostas `inicializar`/`recalcular` obsoletas em voo, ex.: a disparada por `tfMostrarPainel`) — sem ele, a resposta tardia sobrescrevia as datas restauradas.
+
+**Verificação:** pytest **139** verde (coluna + round-trip). API real (login `pdm2026`): **7/7** — grava/lê snapshot, `tf_datas` preservadas, PATCH parcial não apaga o snapshot. Playwright: **datas manuais do Total Flex reproduzidas** ao reabrir (`_tfDatas`/`_tfValores` corretos), 0 erros de console. Dados de demo restaurados depois.
+
+**Pendente (próximos sub-projetos):** trava total pós-assinatura (esconder salvar/criar orçamento, inserir ambientes, alterar parâmetros após contrato assinado); versionamento de documentos (novos criam versão, sem sobrescrever/apagar). Follow-up menor: simetria já aplicada nos guards de geração do TF.
 
 ### Sessão 2026-06-19 (sessão 16 — parâmetros de negociação por orçamento no banco)
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → revisão holística final → verificação por API real + Playwright → merge). Spec/plano em `docs/superpowers/`.
