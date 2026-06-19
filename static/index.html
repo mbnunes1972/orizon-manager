@@ -6434,8 +6434,9 @@ function atualizarBotoesAprovacao() {
     if (!actionRow.querySelector('#btn-assinar-contrato')) {
       const btn = document.createElement('button');
       btn.id = 'btn-assinar-contrato';
-      btn.style.cssText = 'color:#1a1200;background:#b8960c;border:none;font-size:.85rem;font-weight:600;padding:8px 16px;border-radius:4px;cursor:pointer';
-      btn.innerHTML = '&#x1F512; Or&ccedil;amento aprovado &ndash; assinar contrato';
+      btn.className = 'btn btn-ghost';
+      btn.style.cssText = 'border-color:var(--warn,#c8a84b);color:var(--warn,#c8a84b);font-size:.85rem;font-weight:600;padding:8px 16px;border-radius:4px;cursor:pointer';
+      btn.innerHTML = '&#x270D; Assinar Contrato';
       btn.onclick = () => { abrirCiclo(); setTimeout(() => toggleCicloCard('7'), 300); };
       actionRow.appendChild(btn);
     }
