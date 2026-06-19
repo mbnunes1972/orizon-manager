@@ -1503,8 +1503,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not orc:
                     self.send_json({"ok": False, "erro": "Orçamento não encontrado"}, code=404)
                     return
-                proj = _carregar_projeto(orc.projeto_id)
-                if proj and proj.get("bloqueado"):
+                if _projeto_esta_bloqueado(orc.projeto_id):
                     self.send_json({"ok": False,
                                     "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
                                    code=400)
@@ -2692,8 +2691,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not orc:
                     self.send_json({"ok": False, "erro": "Orçamento não encontrado"}, code=404)
                     return
-                proj = _carregar_projeto(orc.projeto_id)
-                if proj and proj.get("bloqueado"):
+                if _projeto_esta_bloqueado(orc.projeto_id):
                     self.send_json({"ok": False,
                                     "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
                                    code=400)
@@ -3065,6 +3063,13 @@ def _marcar_etapa_cliente(cliente_id: int, etapa_codigo: str, db, usuario):
             etapa.concluido_em   = agora
             etapa.responsavel_id = uid
     db.commit()
+
+
+def _projeto_esta_bloqueado(nome_safe) -> bool:
+    """True se o projeto foi aprovado/bloqueado (PROJETOS/<nome>/projeto.json -> 'bloqueado').
+    Centraliza o gate pos-aprovacao usado pelos handlers de margens/descontos por orcamento."""
+    proj = _carregar_projeto(nome_safe)
+    return bool(proj and proj.get("bloqueado"))
 
 
 def _pool_ambiente_dict(pa) -> dict:
