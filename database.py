@@ -278,6 +278,7 @@ class OrcamentoAmbiente(Base):
     pool_ambiente_id = Column(Integer, ForeignKey("pool_ambientes.id"), primary_key=True)
     ordem            = Column(Integer, default=1)
     added_at         = Column(DateTime, default=datetime.utcnow)
+    desconto_individual_pct = Column(Float, nullable=False, default=0.0, server_default="0")
 
     orcamento     = relationship("Orcamento",     back_populates="ambientes")
     pool_ambiente = relationship("PoolAmbiente",  back_populates="orcamento_links")
@@ -417,6 +418,13 @@ def _migrar_colunas():
         ]:
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")
+
+        # ── orcamento_ambientes ───────────────────────────────────────────────
+        cur.execute("PRAGMA table_info(orcamento_ambientes)")
+        oa_cols = {row[1] for row in cur.fetchall()}
+        if "desconto_individual_pct" not in oa_cols:
+            cur.execute("ALTER TABLE orcamento_ambientes "
+                        "ADD COLUMN desconto_individual_pct REAL NOT NULL DEFAULT 0")
 
         # ── briefings ─────────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(briefings)")
