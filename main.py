@@ -896,8 +896,8 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/gerente/verificar":
             req   = json.loads(body)
             senha = req.get("senha", "")
-            perfis = perfis_carregar()
-            senha_correta = perfis.get("perfis", {}).get("gerente", {}).get("senha_gerente", "1234")
+            _perfis_cfg = perfis_carregar()
+            senha_correta = _perfis_cfg.get("perfis", {}).get("gerente", {}).get("senha_gerente", "1234")
             if senha == senha_correta:
                 taxa_cfg = None
                 try:
