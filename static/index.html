@@ -742,7 +742,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             <div class="proj-status-dd-item" onclick="negStatusSet('perdido')">✗ Perdido</div>
           </div>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
+        <button id="btn-params" class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
         <button id="btn-abrir-ciclo" class="btn-ciclo" onclick="abrirCiclo()" title="Etapas do Projeto">
           Etapas do Projeto
         </button>
@@ -756,11 +756,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;
                    margin-right:4px;white-space:nowrap">Orçamento:</span>
       <span id="neg-orc-tabs" style="display:flex;gap:4px;flex-wrap:wrap;flex:1"></span>
-      <button class="btn btn-ghost btn-sm" onclick="abrirPainelPool()"
+      <button id="btn-pool" class="btn btn-ghost btn-sm" onclick="abrirPainelPool()"
               style="font-size:11px;padding:4px 10px">Ambientes</button>
-      <button class="btn btn-ghost btn-sm" onclick="abrirModalNovoAmbiente()"
+      <button id="btn-novo-ambiente" class="btn btn-ghost btn-sm" onclick="abrirModalNovoAmbiente()"
               style="font-size:11px;padding:4px 10px;margin-left:4px">Novo Ambiente</button>
-      <button class="btn btn-ghost btn-sm" onclick="abrirModalNovoOrc()"
+      <button id="btn-novo-orc" class="btn btn-ghost btn-sm" onclick="abrirModalNovoOrc()"
               style="font-size:11px;padding:4px 10px;margin-left:4px">Novo Orçamento</button>
     </div>
 
@@ -6533,6 +6533,7 @@ function _etapaBloqueada(codigo) {
 
 let _cicloAberto = false;
 let _cicloData   = {};
+let _contratoAssinado = false;
 
 function abrirCiclo() {
   _cicloAberto = true;
@@ -6551,6 +6552,7 @@ async function _fetchCiclo() {
                         { credentials: 'same-origin' });
   const d = await r.json();
   if (!d.ok) return;
+  _contratoAssinado = !!d.contrato_assinado;
   _cicloData = {};
   for (const e of (d.ciclo || [])) _cicloData[e.etapa_codigo] = e;
 }
@@ -6611,6 +6613,30 @@ function aplicarBloqueioNegociacao(travar) {
 }
 
 function atualizarBotoesAprovacao() {
+  const assinado = (typeof _contratoAssinado !== 'undefined') && _contratoAssinado;
+  ['btn-params','btn-pool','btn-novo-ambiente','btn-novo-orc'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = assinado ? 'none' : '';
+  });
+  if (assinado) {
+    aplicarBloqueioNegociacao(true);
+    const actionRow = document.querySelector('#page-02 .action-row');
+    if (actionRow) {
+      const bs = actionRow.querySelector('.btn-ok');    if (bs) bs.style.display = 'none';
+      const ba = actionRow.querySelector('.btn-amber');  if (ba) ba.style.display = 'none';
+      const br = actionRow.querySelector('#btn-rever-orcamento'); if (br) br.remove();
+      if (!actionRow.querySelector('#btn-assinar-contrato')) {
+        const btn = document.createElement('button');
+        btn.id = 'btn-assinar-contrato';
+        btn.className = 'btn btn-ghost';
+        btn.style.cssText = 'border-color:var(--warn,#c8a84b);color:var(--warn,#c8a84b);font-size:.85rem;font-weight:600;padding:8px 16px;border-radius:4px;cursor:pointer';
+        btn.innerHTML = '&#x270D; Assinar Contrato';
+        btn.onclick = () => { abrirCiclo(); setTimeout(() => toggleCicloCard('7'), 300); };
+        actionRow.appendChild(btn);
+      }
+    }
+    return;
+  }
   const aprovado = _orcamentoAprovado();
   aplicarBloqueioNegociacao(aprovado);
   const actionRow = document.querySelector('#page-02 .action-row');
