@@ -8,6 +8,7 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship
 from datetime import datetime
 import hashlib
 import os
+import perfis
 
 # ── Conexão ──────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,12 +44,11 @@ class Usuario(Base):
 
     @property
     def limite_desconto(self) -> float:
-        limites = {"consultor": 10.0, "gerente": 20.0, "diretor": 50.0, "admin": 50.0}
-        return limites.get(self.nivel, 0.0)
+        return perfis.desconto_max(self.nivel)
 
     @property
     def pode_ver_parametros(self) -> bool:
-        return self.nivel in ("gerente", "diretor", "admin")
+        return perfis.pode(self.nivel, "ver_parametros")
 
 
 class Sessao(Base):
@@ -421,10 +421,22 @@ def _run_migracoes(conn):
     # 2026-06-17: trocar etapa_codigo 2<->3 (Briefing <-> Criação do projeto).
     # A troca direta colidiria com UNIQUE(projeto_nome, etapa_codigo); usa código temporário.
     if "etapas_swap_2_3" not in aplicadas:
-        cur.execute("UPDATE ciclo_etapas SET etapa_codigo='_swap2' WHERE etapa_codigo='2'")
-        cur.execute("UPDATE ciclo_etapas SET etapa_codigo='2'      WHERE etapa_codigo='3'")
-        cur.execute("UPDATE ciclo_etapas SET etapa_codigo='3'      WHERE etapa_codigo='_swap2'")
-        cur.execute("INSERT INTO schema_migrations(id) VALUES('etapas_swap_2_3')")
+        try:
+            cur.execute("UPDATE ciclo_etapas SET etapa_codigo='_swap2' WHERE etapa_codigo='2'")
+            cur.execute("UPDATE ciclo_etapas SET etapa_codigo='2'      WHERE etapa_codigo='3'")
+            cur.execute("UPDATE ciclo_etapas SET etapa_codigo='3'      WHERE etapa_codigo='_swap2'")
+            cur.execute("INSERT INTO schema_migrations(id) VALUES('etapas_swap_2_3')")
+        except Exception:
+            pass
+
+    # 2026-06-18: 10 perfis — renomeia níveis antigos.
+    if "perfis_v2_2026" not in aplicadas:
+        try:
+            cur.execute("UPDATE usuarios SET nivel='gerente_vendas' WHERE nivel='gerente'")
+            cur.execute("UPDATE usuarios SET nivel='diretor'        WHERE nivel='admin'")
+            cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v2_2026')")
+        except Exception:
+            pass
 
     conn.commit()
 

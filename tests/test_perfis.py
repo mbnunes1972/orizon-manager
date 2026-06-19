@@ -36,3 +36,11 @@ def test_rotulo_e_existe():
     assert perfis.rotulo("gerente_adm_fin") == "Gerente Administrativo/Financeiro"
     assert perfis.existe("medidor") is True
     assert perfis.existe("admin") is False
+
+
+def test_usuario_limite_desconto_delega_perfis():
+    from database import Usuario
+    assert Usuario(nome="X", login="x", nivel="gerente_vendas").limite_desconto == 20.0
+    assert Usuario(nome="X", login="x", nivel="medidor").limite_desconto == 0.0
+    assert Usuario(nome="X", login="x", nivel="diretor").pode_ver_parametros is True
+    assert Usuario(nome="X", login="x", nivel="consultor").pode_ver_parametros is False
