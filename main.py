@@ -1886,6 +1886,11 @@ class Handler(BaseHTTPRequestHandler):
                     if not pa or pa.projeto_id != nome_safe:
                         self.send_json({"ok": False, "erro": "Ambiente não encontrado"})
                         return
+                    if _contrato_assinado(nome_safe, db):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato assinado — alterações não permitidas."},
+                                       code=403)
+                        return
                     pa.nome          = novo_nome
                     pa.nome_exibicao = novo_nome
                     db.commit()
