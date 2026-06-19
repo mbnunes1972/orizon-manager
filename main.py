@@ -167,6 +167,16 @@ def _parse_multipart(body, ct):
             campos[nome] = payload.decode("utf-8", "ignore").strip()
     return arquivos, campos
 
+def _aprovador_financeiro(db, login, senha):
+    """Retorna o Usuario apto a aprovar financeiro (ativo, senha correta e perfil com
+    'aprovar_financeiro') ou None."""
+    u = db.query(Usuario).filter_by(login=(login or "").strip()).first()
+    if not u or not u.ativo or not u.check_senha(senha or ""):
+        return None
+    if not perfis.pode(u.nivel, "aprovar_financeiro"):
+        return None
+    return u
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -2508,15 +2518,34 @@ class Handler(BaseHTTPRequestHandler):
                                 "erro": f"Conclua a etapa anterior ({nome_ant}) antes de iniciar esta.",
                             }, code=400)
                             return
+                    # Aprovação financeira (8/11d): exige login+senha de quem pode aprovar.
+                    aprovador = None
+                    if novo_status in mod_ciclo.STATUS_CONCLUSIVOS and mod_ciclo.exige_aprovacao_financeira(etapa_cod):
+                        aprovador = _aprovador_financeiro(db, req.get("login", ""), req.get("senha", ""))
+                        if not aprovador:
+                            self.send_json({
+                                "ok": False,
+                                "erro": "Apenas Gerente Administrativo/Financeiro ou Diretor podem "
+                                        "aprovar a etapa financeira (login/senha inválidos ou sem permissão).",
+                            }, code=403)
+                            return
                     if novo_status:
                         if etapa.status == "pendente" and novo_status != "pendente":
                             etapa.iniciado_em = datetime.utcnow()
                         etapa.status = novo_status
                         if novo_status in mod_ciclo.STATUS_CONCLUSIVOS:
                             etapa.concluido_em  = datetime.utcnow()
-                            etapa.responsavel_id = usuario["id"]
+                            etapa.responsavel_id = aprovador.id if aprovador else usuario["id"]
                     if obs is not None:
                         etapa.observacoes = obs
+                    if aprovador is not None:
+                        db.add(LogAcaoGerencial(
+                            solicitante_id=usuario["id"],
+                            autorizador_id=aprovador.id,
+                            acao="aprovar_financeiro",
+                            projeto_nome=nome_safe,
+                            etapa_alvo=etapa_cod,
+                        ))
                     db.commit()
                     self.send_json({"ok": True, "etapa_codigo": etapa_cod, "status": etapa.status})
                 except Exception as e:

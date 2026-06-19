@@ -6557,8 +6557,8 @@ function renderCiclo() {
       <div class="ciclo-card-body" id="ciclo-body-${etapa.codigo}">
         ${etapa.acao === 'contrato'
           ? _renderCardContrato()
-          : etapa.codigo === '8'
-            ? _renderCardAprovacaoFinanceira(dados, bloqueada)
+          : (etapa.codigo === '8' || etapa.codigo === '11d')
+            ? _renderCardAprovacaoFinanceira(etapa.codigo, dados, bloqueada)
             : _renderCardGenerico(etapa, dados, bloqueada)}
       </div>
     `;
@@ -6672,21 +6672,22 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
     ${btnToggle}${btnReabrir}`;
 }
 
-function _renderCardAprovacaoFinanceira(dados, bloqueada) {
+function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
   const concluido = dados.status === 'concluido';
   if (concluido) {
     const dt = dados.concluido_em
       ? new Date(dados.concluido_em).toLocaleDateString('pt-BR')
       : '';
+    const reabrir = codigo === '8'
+      ? `<button onclick="abrirModalReabrir('8')"
+           style="border:1px solid var(--muted);color:var(--muted);background:none;
+           border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer">
+           🔓 Reabrir (gerente)</button>`
+      : '';
     return `
       <p style="color:var(--ok);margin:0 0 10px">
         &#x2713; Aprovação financeira concluída${dt ? ' em ' + dt : ''}.
-      </p>
-      <button onclick="abrirModalReabrir('8')"
-        style="border:1px solid var(--muted);color:var(--muted);background:none;
-        border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer">
-        🔓 Reabrir (gerente)
-      </button>`;
+      </p>${reabrir}`;
   }
   if (bloqueada) {
     return `
@@ -6696,31 +6697,32 @@ function _renderCardAprovacaoFinanceira(dados, bloqueada) {
   }
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px">
-      Confirme que a análise de crédito ou aprovação interna foi concluída.
+      Confirme a aprovação financeira. Exige login e senha do Gerente Administrativo/Financeiro ou Diretor.
     </p>
-    <button onclick="concluirAprovacaoFinanceira()"
+    <button onclick="concluirAprovacaoFinanceira('${codigo}')"
       style="background:#b8960c;color:#000;border:none;border-radius:6px;
       padding:8px 18px;font-size:.9rem;font-weight:700;cursor:pointer">
-      &#x2713; Marcar Aprovação Financeira como Concluída
+      &#x2713; Aprovar (gerencial)
     </button>`;
 }
 
-async function concluirAprovacaoFinanceira() {
+async function concluirAprovacaoFinanceira(codigo) {
   if (!projetoAtivo) return;
+  const cred = await pedirCredenciaisGerente({
+    titulo: 'Aprovação Financeira',
+    mensagem: 'Login e senha do Gerente Administrativo/Financeiro ou Diretor.' });
+  if (!cred) return;
   try {
     const r = await fetch(
-      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/8`,
-      {
-        method: 'PATCH', credentials: 'same-origin',
+      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${encodeURIComponent(codigo)}`,
+      { method: 'PATCH', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'concluido' }),
-      }
-    );
+        body: JSON.stringify({ status: 'concluido', login: cred.login, senha: cred.senha }) });
     const d = await r.json();
-    if (!d.ok) { showToast('Erro: ' + (d.erro || 'falha'), true); return; }
-    showToast('Aprovação Financeira I concluída!', false);
+    if (!d.ok) { await avisoPopup(d.erro || 'Falha na aprovação', {titulo:'Aprovação Financeira'}); return; }
+    showToast('Aprovação financeira concluída!', false);
     await carregarCiclo();
-  } catch(e) { showToast('Erro de rede: ' + e.message, true); }
+  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'Aprovação Financeira'}); }
 }
 
 async function toggleSalvarEtapa(codigo) {

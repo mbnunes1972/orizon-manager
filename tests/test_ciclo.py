@@ -130,3 +130,11 @@ def test_swap_2_3_inverte_conteudo():
     pares = dict(cur.fetchall())
     assert pares["2"] == "era_criacao"
     assert pares["3"] == "era_briefing"
+
+
+def test_exige_aprovacao_financeira():
+    assert mc.exige_aprovacao_financeira("8") is True
+    assert mc.exige_aprovacao_financeira("11d") is True
+    assert mc.exige_aprovacao_financeira("7") is False
+    assert mc.exige_aprovacao_financeira("11") is False
+    assert mc.exige_aprovacao_financeira("9") is False
