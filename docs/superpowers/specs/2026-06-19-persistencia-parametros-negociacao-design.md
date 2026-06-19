@@ -50,9 +50,12 @@ nunca apenas no navegador.
   `desconto_individual_pct` em cada ambiente.
 - **Criação de orçamento** (handler atual de "novo orçamento"): copia `margens` do orçamento
   ativo informado (`origem_id` no body) para o novo; defaults se ausente.
-- **Migração** `_run_migracoes` (idempotente, rastreada em `schema_migrations`, id
-  `margens_para_orcamento_2026`): para cada `projeto.json` com `margens`, para cada orçamento
-  do projeto com `margens` vazia, grava o JSON. Não sobrescreve margens já preenchidas.
+- **Migração** `migrar_margens_para_orcamentos(session, projetos_dir)` (chamada no startup
+  logo após `init_db()`, envolta em try/except para nunca bloquear a subida): para cada
+  `projeto.json` com `margens`, para cada orçamento do projeto com `margens` vazia, grava o
+  JSON. Não sobrescreve margens já preenchidas. Idempotente por construção (só preenche
+  vazias), então roda a cada boot sem precisar de `schema_migrations` — o custo é reler os
+  poucos `projeto.json`.
 - `_migrar_colunas`: adiciona `desconto_individual_pct` em `orcamento_ambientes` se ausente.
 - **Aposentar** `POST /projetos/<nome>/margens` (remover handler e seus usos no frontend).
 
