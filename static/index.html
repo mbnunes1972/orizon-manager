@@ -7447,6 +7447,7 @@ async function salvarValorNegociado() {
   const rawAvista = (elAvista?.textContent || '').replace(/[R$\s.]/g,'').replace(',','.');
   const valor        = parseFloat(rawTotal)  || 0;
   const valorLiquido = parseFloat(rawAvista) || 0;
+  if (!valor) return { ok: false, erro: 'Informe o valor total antes de salvar' };
   try {
     const r = await fetch(`/orcamentos/${_orcamentoAtivoId}/valor`, {
       method: 'PATCH', credentials: 'same-origin',
@@ -7512,7 +7513,13 @@ async function abrirAprovacaoComDados() {
     } catch(e) { /* ignora erro de rede — não bloqueia */ }
   }
   showToast('Carregando dados...', false);
-  await salvarValorNegociado();
+  const _sv = await salvarValorNegociado();
+  if (!_sv.ok) {
+    (typeof avisoPopup === 'function')
+      ? avisoPopup('Não foi possível salvar o orçamento — ' + (_sv.erro || ''))
+      : showToast('Não foi possível salvar o orçamento. ' + (_sv.erro || ''), true);
+    return;
+  }
   const cliente  = await _carregarClienteProjeto();
   const pagAtual = _lerCondicaoPagamentoAtual();
   abrirModalAprovacaoOrcamento(cliente, pagAtual);
