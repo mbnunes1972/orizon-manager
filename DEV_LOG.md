@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-18 (sessão 12 — sub-projeto 2: perfis + painel admin de usuários; antes: sub-projeto 1 ciclo)
+> Atualizado em: 2026-06-18 (sessão 13 — sub-projeto 3: aprovação financeira gerencial; antes: sub-projetos 1-2)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -151,6 +151,14 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-18 (sessão 13 — sub-projeto 3: aprovação financeira gerencial)
+Terceiro de 4 sub-projetos (usa a fundação de perfis do sub-projeto 2).
+- **Capacidade `aprovar_financeiro`** em `perfis.py` (Diretor + Gerente Adm/Financeiro; gerente de vendas **não**).
+- **`mod_ciclo.ETAPAS_APROVACAO_FINANCEIRA = {8, 11d}`** + `exige_aprovacao_financeira()`.
+- **Gate no `PATCH /ciclo/<codigo>`:** concluir as etapas 8 ("Aprovação financeira I") e 11d ("Aprovação financeira II") exige `login`+`senha` de quem tem `aprovar_financeiro` (helper `_aprovador_financeiro`); senão **403**. Registra o aprovador como responsável da etapa e audita em `log_acoes_gerenciais` (ação `aprovar_financeiro`).
+- **Frontend:** `concluirAprovacaoFinanceira(codigo)` abre o popup `pedirCredenciaisGerente`; a sub-etapa 11d passou a usar o card de aprovação financeira (igual à 8).
+- **Verificação:** pytest **118** verde; API real confirmou — etapa 8 e 11d: gerente de vendas/consultor → 403, senha errada → 403, Gerente Adm/Fin e Diretor → 200, auditoria registrada. Spec/plano em `docs/superpowers/`.
 
 ### Sessão 2026-06-18 (sessão 12 — sub-projeto 2: perfis + painel admin de usuários)
 Segundo de 4 sub-projetos (fundação reusada pelos sub-projetos 3 e 4).
