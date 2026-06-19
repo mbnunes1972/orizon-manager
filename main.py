@@ -1542,17 +1542,17 @@ class Handler(BaseHTTPRequestHandler):
             if m_novo_orc:
                 nome_safe = m_novo_orc.group(1)
                 db = get_session()
-                if not _briefing_projeto_completo(unquote(nome_safe), db):
-                    db.close()
-                    self.send_json({"ok": False,
-                                    "erro": "Preencha o briefing do projeto antes de iniciar a negociação."},
-                                   code=400)
-                    return
                 if _contrato_assinado(nome_safe, db):
                     db.close()
                     self.send_json({"ok": False,
                                     "erro": "Contrato assinado — alterações não permitidas."},
                                    code=403)
+                    return
+                if not _briefing_projeto_completo(unquote(nome_safe), db):
+                    db.close()
+                    self.send_json({"ok": False,
+                                    "erro": "Preencha o briefing do projeto antes de iniciar a negociação."},
+                                   code=400)
                     return
                 _orc_dict = None
                 try:
@@ -2336,11 +2336,11 @@ class Handler(BaseHTTPRequestHandler):
                         etapa7.status        = "concluido"
                         etapa7.concluido_em  = datetime.utcnow()
                         etapa7.responsavel_id = usuario["id"]
+                        db.commit()
                         try:
                             upsert_projeto_status(nome_safe, "fechado")
-                        except Exception:
-                            pass
-                        db.commit()
+                        except Exception as _e:
+                            print("[FECHADO] upsert_projeto_status falhou:", _e)
                     self.send_json({"ok": True, "status": contrato.status, "parte": parte})
                 except Exception as e:
                     db.rollback()
