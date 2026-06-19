@@ -6,6 +6,8 @@ def _conn_com_usuarios(niveis):
     conn = sqlite3.connect(":memory:")
     cur = conn.cursor()
     cur.execute("CREATE TABLE usuarios (id INTEGER PRIMARY KEY, nivel TEXT)")
+    # tabela vazia para a migração etapas_swap_2_3 rodar inofensiva (sem try/except em produção)
+    cur.execute("CREATE TABLE ciclo_etapas (id INTEGER PRIMARY KEY, projeto_nome TEXT, etapa_codigo TEXT)")
     for i, nv in enumerate(niveis, start=1):
         cur.execute("INSERT INTO usuarios(id, nivel) VALUES (?,?)", (i, nv))
     conn.commit()

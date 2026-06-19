@@ -408,6 +408,12 @@ def _migrar_colunas():
     finally:
         conn.close()
 
+def _tabela_existe(cur, nome):
+    """True se a tabela existe (migração de tabela ausente é no-op — robusto a DBs parciais)."""
+    cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (nome,))
+    return cur.fetchone() is not None
+
+
 def _run_migracoes(conn):
     """Migrações de DADOS (não de schema), idempotentes, rastreadas em schema_migrations.
     Recebe uma conexão sqlite3 (facilita teste com :memory:)."""
@@ -420,23 +426,17 @@ def _run_migracoes(conn):
 
     # 2026-06-17: trocar etapa_codigo 2<->3 (Briefing <-> Criação do projeto).
     # A troca direta colidiria com UNIQUE(projeto_nome, etapa_codigo); usa código temporário.
-    if "etapas_swap_2_3" not in aplicadas:
-        try:
-            cur.execute("UPDATE ciclo_etapas SET etapa_codigo='_swap2' WHERE etapa_codigo='2'")
-            cur.execute("UPDATE ciclo_etapas SET etapa_codigo='2'      WHERE etapa_codigo='3'")
-            cur.execute("UPDATE ciclo_etapas SET etapa_codigo='3'      WHERE etapa_codigo='_swap2'")
-            cur.execute("INSERT INTO schema_migrations(id) VALUES('etapas_swap_2_3')")
-        except Exception:
-            pass
+    if "etapas_swap_2_3" not in aplicadas and _tabela_existe(cur, "ciclo_etapas"):
+        cur.execute("UPDATE ciclo_etapas SET etapa_codigo='_swap2' WHERE etapa_codigo='2'")
+        cur.execute("UPDATE ciclo_etapas SET etapa_codigo='2'      WHERE etapa_codigo='3'")
+        cur.execute("UPDATE ciclo_etapas SET etapa_codigo='3'      WHERE etapa_codigo='_swap2'")
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('etapas_swap_2_3')")
 
     # 2026-06-18: 10 perfis — renomeia níveis antigos.
-    if "perfis_v2_2026" not in aplicadas:
-        try:
-            cur.execute("UPDATE usuarios SET nivel='gerente_vendas' WHERE nivel='gerente'")
-            cur.execute("UPDATE usuarios SET nivel='diretor'        WHERE nivel='admin'")
-            cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v2_2026')")
-        except Exception:
-            pass
+    if "perfis_v2_2026" not in aplicadas and _tabela_existe(cur, "usuarios"):
+        cur.execute("UPDATE usuarios SET nivel='gerente_vendas' WHERE nivel='gerente'")
+        cur.execute("UPDATE usuarios SET nivel='diretor'        WHERE nivel='admin'")
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v2_2026')")
 
     conn.commit()
 
