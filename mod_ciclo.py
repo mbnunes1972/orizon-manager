@@ -23,7 +23,7 @@ ETAPA_NOME = {
     "7": "Contrato",
     "8": "Aprovação financeira I",
     "9": "Solicitação de medição",
-    "10": "Planta de pontos medidos",
+    "10": "Medição",
     "11": "Projeto executivo",
     "12": "Implantação do pedido",
     "13": "Produção",

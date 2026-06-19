@@ -97,6 +97,28 @@ class LogAcaoGerencial(Base):
     autorizador = relationship("Usuario", foreign_keys=[autorizador_id])
 
 
+class Medicao(Base):
+    """Dados de medição por projeto (etapas 9 e 10 do ciclo)."""
+    __tablename__ = "medicoes"
+
+    id                  = Column(Integer, primary_key=True, autoincrement=True)
+    projeto_nome        = Column(String(200), nullable=False, unique=True)
+    # Etapa 9 — solicitação
+    solicitacao_arquivo = Column(String(255), nullable=True)
+    solicitacao_por     = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    solicitacao_em      = Column(DateTime, nullable=True)
+    # Etapa 10 — parecer + planta
+    parecer             = Column(String(20), nullable=True)   # aprovado|reprovado|parcial
+    ambientes_aprovados = Column(Text, nullable=True)
+    planta_arquivo      = Column(String(255), nullable=True)
+    medidor_id          = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    medicao_em          = Column(DateTime, nullable=True)
+    # Reprovado — decisão comercial
+    doc_cliente_arquivo = Column(String(255), nullable=True)
+    excecao_por         = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    excecao_em          = Column(DateTime, nullable=True)
+
+
 class Cliente(Base):
     __tablename__ = "clientes"
 
