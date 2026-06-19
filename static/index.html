@@ -1202,6 +1202,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <!-- PAGE 07: Admin -->
   <div class="page" id="page-07">
     <div class="page-title">&#x2699;&#xFE0F; Painel Admin</div>
+    <div style="border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:18px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <strong style="color:var(--dalm-gold,#c8a84b)">&#x1F465; Usu&aacute;rios</strong>
+        <button class="btn btn-ghost btn-sm" onclick="adminUsuariosNovo()" style="font-size:11px">+ Novo usu&aacute;rio</button>
+        <button class="btn btn-ghost btn-sm" onclick="adminUsuariosCarregar()" style="font-size:11px;margin-left:auto">&#x21BA; Atualizar</button>
+      </div>
+      <div id="admin-usuarios-lista"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+    </div>
     <div class="page-sub">Monitoramento e sincronização Omie</div>
 
     <div class="card" style="margin-bottom:16px">
@@ -1832,8 +1840,6 @@ let _perfisConfig = null;
 // ── Usuário autenticado ───────────────────────────────────────
 let _usuarioAtual = null;
 
-const _LIMITES_NIVEL = { consultor: 10, gerente: 20, diretor: 50, admin: 50 };
-
 async function carregarUsuarioAutenticado(){
   try {
     const r = await fetch('/api/auth/me');
@@ -1842,7 +1848,7 @@ async function carregarUsuarioAutenticado(){
     if(!d.ok){ window.location.href = '/login'; return; }
     _usuarioAtual = d.usuario;
     const _navAdmin = document.getElementById('nav-07');
-    if (_navAdmin) _navAdmin.style.display = (_usuarioAtual && _usuarioAtual.nivel === 'admin') ? '' : 'none';
+    if (_navAdmin) _navAdmin.style.display = (_usuarioAtual && _usuarioAtual.pode_gerir_usuarios) ? '' : 'none';
     _atualizarUIUsuario();
     _carregarDadosExtrasUsuario();
   } catch(e){ console.warn('[AUTH] Erro ao carregar usuário:', e); }
@@ -1869,7 +1875,7 @@ function _atualizarUIUsuario(){
   const mpIni   = document.getElementById('mp-avatar-inicial');
   if(mpNome)  mpNome.textContent  = u.nome;
   if(mpNivel) mpNivel.textContent = nivel;
-  if(mpLim)   mpLim.textContent   = `Limite de desconto: ${_LIMITES_NIVEL[nivel] || 10}%`;
+  if(mpLim)   mpLim.textContent   = `Limite de desconto: ${(_usuarioAtual?.limite_desconto ?? 10)}%`;
   if(mpIni)   mpIni.textContent   = inicial;
 }
 
@@ -1992,8 +1998,8 @@ let _limiteAutorizado = null; // limite temporário após autorização delegada
 
 function cfgGetDescontoMax(){
   if(_limiteAutorizado !== null) return _limiteAutorizado;
-  if(_usuarioAtual && _usuarioAtual.nivel){
-    return _LIMITES_NIVEL[_usuarioAtual.nivel] || 10;
+  if(_usuarioAtual){
+    return (_usuarioAtual?.limite_desconto ?? 10);
   }
   return parseFloat((_perfilAtivo.config && _perfilAtivo.config.desconto_max_pct) || 100);
 }
@@ -2099,7 +2105,7 @@ function goPage(n){
   if(n===0) projCarregar();
   if(n===5) cliCarregar();
   if(n===6) parCarregar();
-  if(n===7) adminCarregar();
+  if(n===7){ adminCarregar(); adminUsuariosCarregar(); }
   if(n===9) cfgRenderizarPerfis();
 }
 function unlockNav(n){
@@ -4625,7 +4631,7 @@ function negValidarLimiteDesconto(val){
   if(disc > max){
     if(el){ el.style.borderColor='var(--err)'; el.style.color='var(--err)'; }
     if(hint){
-      const limiteBase = _usuarioAtual ? (_LIMITES_NIVEL[_usuarioAtual.nivel] || 10) : 10;
+      const limiteBase = (_usuarioAtual?.limite_desconto ?? 10);
       const limiteVigente = _limiteAutorizado !== null ? _limiteAutorizado : limiteBase;
       hint.textContent = '⚠ Limite: ' + limiteVigente + '% — clique OK para autorizar';
       hint.style.display = 'block';
@@ -4895,7 +4901,7 @@ async function carregarMargensSalvas(){
   // (foi aprovado em algum momento anterior)
   _incluirCustos = !!(projetoAtivo.margens||{}).incluir_custos;  // sincroniza fonte de verdade
   const descontoSalvo = parseFloat((projetoAtivo.margens||{}).desconto_pct) || 0;
-  const limiteBase = _usuarioAtual ? (_LIMITES_NIVEL[_usuarioAtual.nivel] || 10) : 10;
+  const limiteBase = (_usuarioAtual?.limite_desconto ?? 10);
   _limiteAutorizado = descontoSalvo > limiteBase ? descontoSalvo : null;
   _descAdicional  = {};
   _descIndividual = {};
@@ -4951,7 +4957,7 @@ function mpDescontoValidar(el){
         // Já foi autorizado — informa que precisa de nova autorização para esse valor maior
         hint.textContent = `Desconto acima do limite autorizado (${_limiteAutorizado}%). Salvar solicitará nova autorização.`;
       } else {
-        const limiteBase = _usuarioAtual ? (_LIMITES_NIVEL[_usuarioAtual.nivel] || 10) : 10;
+        const limiteBase = (_usuarioAtual?.limite_desconto ?? 10);
         hint.textContent = `Limite do seu perfil: ${limiteBase}%. Salvar solicitará autorização.`;
       }
       hint.style.display = 'block';
@@ -6046,6 +6052,61 @@ async function adminCarregar() {
   } catch(e) {
     lista.innerHTML = `<div style="color:var(--err);padding:12px">Erro de conexão: ${esc(String(e))}</div>`;
   }
+}
+
+async function adminUsuariosCarregar() {
+  const box = document.getElementById('admin-usuarios-lista');
+  if (!box) return;
+  try {
+    const r = await fetch('/api/admin/usuarios', { credentials: 'same-origin' });
+    const d = await r.json();
+    if (!d.ok) { box.innerHTML = '<em style="color:var(--err)">' + esc(d.erro || 'Erro') + '</em>'; return; }
+    box.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="text-align:left;color:var(--muted)">
+          <th style="padding:4px 6px">Nome</th><th>Login</th><th>Perfil</th><th>Ativo</th><th></th></tr></thead>
+        <tbody>${d.usuarios.map(u => `
+          <tr style="border-top:1px solid var(--border)">
+            <td style="padding:4px 6px">${esc(u.nome)}</td>
+            <td>${esc(u.login)}</td>
+            <td>${esc(u.rotulo)}</td>
+            <td>${u.ativo ? '✓' : '—'}</td>
+            <td style="text-align:right">
+              <button class="btn btn-ghost btn-sm" style="font-size:10px"
+                onclick='adminUsuariosEditar(${u.id}, ${JSON.stringify(u.nivel)}, ${JSON.stringify(u.telefone)}, ${u.ativo ? 1 : 0})'>Editar</button>
+            </td></tr>`).join('')}</tbody></table>`;
+  } catch(e) { box.innerHTML = '<em style="color:var(--err)">Erro de rede</em>'; }
+}
+
+async function adminUsuariosNovo() {
+  const nome  = prompt('Nome do usuário:'); if (!nome) return;
+  const login = prompt('Login:'); if (!login) return;
+  const senha = prompt('Senha inicial:'); if (!senha) return;
+  const nivel = prompt('Perfil (slug): diretor, gerente_vendas, consultor, gerente_adm_fin, assistente_logistico, conferente, supervisor_montagem, assistente_administrativo, projetista_executivo, medidor', 'consultor');
+  if (!nivel) return;
+  const telefone = prompt('Telefone (opcional):') || '';
+  const r = await fetch('/api/admin/usuarios', { method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ nome, login, senha, nivel, telefone }) });
+  const d = await r.json();
+  if (!d.ok) { await avisoPopup(d.erro || 'Erro ao criar usuário', {titulo:'Usuários'}); return; }
+  showToast('Usuário criado.', false);
+  adminUsuariosCarregar();
+}
+
+async function adminUsuariosEditar(id, nivelAtual, telAtual, ativoAtual) {
+  const nivel = prompt('Perfil (slug):', nivelAtual); if (nivel === null) return;
+  const telefone = prompt('Telefone:', telAtual || ''); if (telefone === null) return;
+  const ativo = confirm('Usuário ATIVO? (Cancelar = inativar)');
+  const senha = prompt('Nova senha (deixe em branco para manter):', '') || '';
+  const payload = { nivel, telefone, ativo };
+  if (senha) payload.senha = senha;
+  const r = await fetch('/api/admin/usuarios/' + id, { method:'PATCH', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  const d = await r.json();
+  if (!d.ok) { await avisoPopup(d.erro || 'Erro ao editar', {titulo:'Usuários'}); return; }
+  showToast('Usuário atualizado.', false);
+  adminUsuariosCarregar();
 }
 
 async function adminRetry(id) {
