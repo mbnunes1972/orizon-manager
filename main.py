@@ -532,8 +532,12 @@ class Handler(BaseHTTPRequestHandler):
                         if pa:
                             d = _pool_ambiente_dict(pa)
                             d["ordem"] = lk.ordem
+                            d["desconto_individual_pct"] = lk.desconto_individual_pct or 0.0
                             ambientes.append(d)
-                    self.send_json({"ok": True, "orcamento_id": oid, "ambientes": ambientes})
+                    orc = db.get(Orcamento, oid)
+                    margens = json.loads(orc.margens) if (orc and orc.margens) else {}
+                    self.send_json({"ok": True, "orcamento_id": oid,
+                                    "margens": margens, "ambientes": ambientes})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
@@ -1547,11 +1551,18 @@ class Handler(BaseHTTPRequestHandler):
                                 .order_by(Orcamento.ordem.desc())
                                 .first())
                     proxima_ordem = (ultimo.ordem + 1) if ultimo else 1
+                    _origem_id = req.get("origem_id")
+                    _margens_novo = None
+                    if _origem_id:
+                        _origem = db.get(Orcamento, int(_origem_id))
+                        if _origem and _origem.margens:
+                            _margens_novo = _origem.margens
                     _usuario = get_usuario_sessao(self)
                     orc = Orcamento(
                         projeto_id=nome_safe,
                         nome=      nome_orc,
                         ordem=     proxima_ordem,
+                        margens=   _margens_novo,
                         created_by=_usuario['id'] if _usuario else None,
                     )
                     db.add(orc)
