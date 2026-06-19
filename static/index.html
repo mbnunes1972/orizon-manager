@@ -2508,12 +2508,14 @@ async function salvarRenomearOrc(id, novoNome){
 // Change 4: busca ambientes do orçamento e seta _orcAmbientesAtivos diretamente
 async function _aplicarFiltroOrcamento(id){
   if(!id || !projetoAtivo) return;
+  _negociacaoPendente = null;
   try{
     const r = await fetch('/orcamentos/'+id+'/ambientes');
     const d = await r.json();
     if(!d.ok) return;
     _orcAmbientesAtivos = d.ambientes || [];  // null → legado; array → EP-07
     if(projetoAtivo) projetoAtivo.margens = d.margens || {};
+    _negociacaoPendente = d.negociacao || null;
     carregarMargensSalvas();
     _descIndividual = {};
     (d.ambientes || []).forEach(pa => {
@@ -3107,6 +3109,88 @@ window._planoPagamento = null;  // plano estruturado do painel de pagamento ativ
 let _codigoPagAtivo  = 'a_vista';  // código da modalidade selecionada (ex: 'cartao_credito')
 let _formaEntrada = 'pix';
 let _formaParcela = 'boleto';
+let _negociacaoPendente = null;  // snapshot da negociação a restaurar após carregarModalidades
+
+// Snapshot da negociação — campos de input por modalidade (ids reais do DOM)
+const _NEG_CAMPOS_POR_MODALIDADE = {
+  total_flex:       ['tf-entrada','tf-prazo','tf-data-contrato'],
+  venda_programada: ['vp-entrada','vp-data-contrato'],
+  aymore:           ['ay-entrada','ay-data-contrato','ay-carencia'],
+  cartao_credito:   ['cc-entrada','cc-data-contrato','cc-bandeira'],
+  a_vista:          ['av-entrada-valor','av-entrada-data','av-entrada-forma','av-liq-data','av-liq-forma'],
+};
+
+// Captura as ENTRADAS da negociação ativa (para reproduzir ao reabrir).
+function _capturarNegociacao(){
+  const codigo = _codigoPagAtivo || (document.getElementById('neg-pagamento')?.value) || 'a_vista';
+  const campos = {};
+  (_NEG_CAMPOS_POR_MODALIDADE[codigo] || []).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) campos[id] = el.value;
+  });
+  const snap = {
+    codigo,
+    n_parcelas: _nParcelasSel || parseInt(document.getElementById('neg-parcelas')?.value) || 1,
+    forma_entrada: _formaEntrada,
+    forma_parcela: _formaParcela,
+    campos,
+  };
+  if (codigo === 'total_flex') {
+    snap.tf_datas   = Array.isArray(_tfDatas)   ? _tfDatas.slice()   : [];
+    snap.tf_valores = Array.isArray(_tfValores) ? _tfValores.slice() : [];
+  }
+  if (codigo === 'venda_programada') snap.vp_datas = Array.isArray(_vpDatas) ? _vpDatas.slice() : [];
+  return snap;
+}
+
+// Reproduz as ENTRADAS salvas da negociação. Chamar APÓS carregarModalidades().
+async function _restaurarNegociacao(snap){
+  if (!snap || !snap.codigo) return;
+  const sel = document.getElementById('neg-pagamento');
+  if (sel) {
+    sel.value = snap.codigo;
+    if (sel.value !== snap.codigo) {
+      console.warn('Negociação salva com modalidade indisponível, ignorando restauração:', snap.codigo);
+      return;
+    }
+  }
+  // renderiza o painel da modalidade e carrega faixas (assíncrono)
+  if (typeof onPagamentoChange === 'function') await onPagamentoChange();
+  // nº de parcelas (dispara onParcelasChange, que p/ TF/VP zera as datas — por isso vem ANTES das datas)
+  const parc = document.getElementById('neg-parcelas');
+  if (parc && snap.n_parcelas) {
+    parc.value = String(snap.n_parcelas);
+    if (typeof onParcelasChange === 'function') onParcelasChange();
+  }
+  // formas
+  if (snap.forma_entrada) _formaEntrada = snap.forma_entrada;
+  if (snap.forma_parcela) _formaParcela = snap.forma_parcela;
+  const selFE = document.getElementById('neg-forma-entrada');
+  const selFP = document.getElementById('neg-forma-parcela');
+  if (selFE && snap.forma_entrada) selFE.value = snap.forma_entrada;
+  if (selFP && snap.forma_parcela && !selFP.disabled) selFP.value = snap.forma_parcela;
+  // campos de input da modalidade: escreve valor e dispara o handler nativo (input+change)
+  const campos = snap.campos || {};
+  Object.keys(campos).forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = campos[id];
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  // datas manuais: setar DEPOIS dos campos (cujos handlers podem ter zerado as listas) e re-renderizar
+  if (snap.codigo === 'total_flex' && Array.isArray(snap.tf_datas)) {
+    _tfGen++;  // invalida qualquer atualizarTF() em voo (ex: o de tfMostrarPainel) para evitar race condition
+    _tfDatas   = snap.tf_datas.slice();
+    _tfValores = Array.isArray(snap.tf_valores) ? snap.tf_valores.slice() : [];
+    if (typeof atualizarTF === 'function') atualizarTF();
+  }
+  if (snap.codigo === 'venda_programada' && Array.isArray(snap.vp_datas)) {
+    _vpDatas = snap.vp_datas.slice();
+    if (typeof atualizarVP === 'function') atualizarVP();
+  }
+  if (typeof agendarCalculo === 'function') agendarCalculo();
+}
 
 const _FORMAS_ENTRADA = [['pix','Pix'],['ted','TED'],['boleto','Boleto']];
 const _FORMAS_AVISTA  = [['pix','Pix'],['ted','TED'],['boleto','Boleto'],['cheque','Cheque'],['dinheiro','Dinheiro']];
@@ -3911,6 +3995,7 @@ let _tfValores       = [];   // valores livres das parcelas 1..n-1 (última é a
 let _tfDatas         = [];   // datas de todas as parcelas (ISO strings)
 let _tfUltimoEditIdx = null; // índice da última parcela editada pelo usuário
 let _tfRevertendo    = false;
+let _tfGen           = 0;    // geração: incrementado antes de cada fetch; stale callbacks são descartados
 
 function _parseValorBR(str) {
   return parseFloat(String(str||'').trim().replace(/\./g,'').replace(',','.')) || 0;
@@ -4051,6 +4136,7 @@ function tfDataChange(input, idx) {
 }
 
 async function atualizarTF() {
+  const myGen    = ++_tfGen;  // captura geração antes de qualquer await; stale calls serão descartadas
   const valorAvista = _ayGetValorVenda();
   const entrada  = parseFloat(document.getElementById('tf-entrada').value) || 0;
   const n        = parseInt(document.getElementById('neg-parcelas').value)  || 2;
@@ -4092,9 +4178,12 @@ async function atualizarTF() {
         body: JSON.stringify(payload),
       });
       d = await r.json();
-      if (d.ok) {
+      // Descartar resultado se uma chamada mais recente (ex: restaurar snapshot) já atualizou o estado
+      if (d.ok && myGen === _tfGen) {
         _tfValores = d.parcelas.filter(p => !p.ultima).map(p => p.valor_digitado);
         _tfDatas   = d.parcelas.map(p => p.data_iso);
+      } else if (myGen !== _tfGen) {
+        return;  // estado foi atualizado por chamada mais recente; não sobrescrever nem renderizar
       }
     } else {
       const parcInput = _tfDatas.slice(0, n).map((dt, i) => ({
@@ -4115,6 +4204,7 @@ async function atualizarTF() {
         body: JSON.stringify(payload),
       });
       d = await r.json();
+      if (myGen !== _tfGen) return;  // descarta resultado obsoleto (chamada mais recente já atualizou)
     }
   } catch(e) { console.error('[TF]', e); return; }
   if (!d.parcelas) { console.warn('[TF]', d.erro || d.erros); return; }
@@ -4935,6 +5025,7 @@ async function carregarMargensSalvas(){
   const el = document.getElementById('neg-desconto');
   if(el) el.value = (projetoAtivo.margens||{}).desconto_pct || 0;
   await carregarModalidades();  // popula dropdowns e dispara calculo
+  if (_negociacaoPendente) { await _restaurarNegociacao(_negociacaoPendente); _negociacaoPendente = null; }
   await carregarPerfil();
   // EP-07: _orcAmbientesAtivos já foi setado por ativarOrcamento (em carregarOrcamentos)
   // executarCalculo usará _orcAmbientesAtivos automaticamente — sem hook necessário aqui
@@ -6170,8 +6261,12 @@ async function salvarOrcamento(){
     ? _orcAmbientesAtivos.length > 0
     : (projetoAtivo.ambientes || []).length > 0;
 
-  // 1. Persiste valor negociado, valor líquido e forma de pagamento
-  await salvarValorNegociado();
+  // 1. Persiste valor negociado, valor líquido, forma de pagamento e entradas da negociação
+  const _sv = await salvarValorNegociado();
+  if (!_sv.ok) {
+    showToast('Falha ao salvar o orçamento: ' + (_sv.erro || ''), true);
+    return;
+  }
 
   // 2. Marca etapa 4 como concluída SOMENTE se há ambientes no orçamento
   if (temAmbientes) {
@@ -6222,6 +6317,13 @@ document.addEventListener('click', (e) => {
 let _expPollTimer = null;
 
 async function aprovarOrcamento() {
+  const _sv = await salvarValorNegociado();
+  if (!_sv.ok) {
+    (typeof avisoPopup === 'function')
+      ? avisoPopup('Não foi possível salvar o orçamento — aprovação cancelada. ' + (_sv.erro || ''))
+      : showToast('Não foi possível salvar o orçamento — aprovação cancelada.', true);
+    return;
+  }
   const modal      = document.getElementById('modal-exportar');
   const logBox     = document.getElementById('exp-log-box');
   const banner     = document.getElementById('exp-status-banner');
@@ -7348,7 +7450,7 @@ async function copiarEnderecoCliente() {
 // ── Aprovação de Orçamento (novo fluxo — contrato) ───────────────────────────
 
 async function salvarValorNegociado() {
-  if (!_orcamentoAtivoId) return;
+  if (!_orcamentoAtivoId) return { ok: false, erro: 'Nenhum orçamento ativo' };
   const elTotal   = document.getElementById('neg-total-final');
   const elAvista  = document.getElementById('neg-avista');
   const elPag     = document.getElementById('neg-pagamento');
@@ -7356,9 +7458,9 @@ async function salvarValorNegociado() {
   const rawAvista = (elAvista?.textContent || '').replace(/[R$\s.]/g,'').replace(',','.');
   const valor        = parseFloat(rawTotal)  || 0;
   const valorLiquido = parseFloat(rawAvista) || 0;
-  if (!valor) return;
+  if (!valor) return { ok: false, erro: 'Informe o valor total antes de salvar' };
   try {
-    await fetch(`/orcamentos/${_orcamentoAtivoId}/valor`, {
+    const r = await fetch(`/orcamentos/${_orcamentoAtivoId}/valor`, {
       method: 'PATCH', credentials: 'same-origin',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
@@ -7367,9 +7469,15 @@ async function salvarValorNegociado() {
         forma_pagamento: (typeof _capturarPagamento === 'function' && window._planoPagamento)
           ? JSON.stringify(_capturarPagamento(_formaEntrada, _formaParcela))
           : (elPag?.value || null),
+        negociacao_json: JSON.stringify(_capturarNegociacao()),
       }),
     });
-  } catch(e) { console.warn('salvarValorNegociado:', e); }
+    const d = await r.json();
+    return d && d.ok ? { ok: true } : { ok: false, erro: (d && d.erro) || 'Falha ao salvar' };
+  } catch(e) {
+    console.warn('salvarValorNegociado:', e);
+    return { ok: false, erro: 'Erro de conexão ao salvar' };
+  }
 }
 
 async function _carregarClienteProjeto() {
@@ -7416,7 +7524,13 @@ async function abrirAprovacaoComDados() {
     } catch(e) { /* ignora erro de rede — não bloqueia */ }
   }
   showToast('Carregando dados...', false);
-  await salvarValorNegociado();
+  const _sv = await salvarValorNegociado();
+  if (!_sv.ok) {
+    (typeof avisoPopup === 'function')
+      ? avisoPopup('Não foi possível salvar o orçamento — ' + (_sv.erro || ''))
+      : showToast('Não foi possível salvar o orçamento. ' + (_sv.erro || ''), true);
+    return;
+  }
   const cliente  = await _carregarClienteProjeto();
   const pagAtual = _lerCondicaoPagamentoAtual();
   abrirModalAprovacaoOrcamento(cliente, pagAtual);

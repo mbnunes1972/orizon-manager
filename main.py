@@ -536,8 +536,10 @@ class Handler(BaseHTTPRequestHandler):
                             ambientes.append(d)
                     orc = db.get(Orcamento, oid)
                     margens = json.loads(orc.margens) if (orc and orc.margens) else {}
+                    negociacao = json.loads(orc.negociacao_json) if (orc and orc.negociacao_json) else None
                     self.send_json({"ok": True, "orcamento_id": oid,
-                                    "margens": margens, "ambientes": ambientes})
+                                    "margens": margens, "negociacao": negociacao,
+                                    "ambientes": ambientes})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
@@ -2717,6 +2719,8 @@ class Handler(BaseHTTPRequestHandler):
                         orc.valor_liquido = float(req["valor_liquido"] or 0)
                     if "forma_pagamento" in req:
                         orc.forma_pagamento = req["forma_pagamento"] or None
+                    if "negociacao_json" in req:
+                        orc.negociacao_json = req["negociacao_json"] or None
                     orc.updated_at = datetime.utcnow()
                     db.commit()
                     self.send_json({"ok": True})
