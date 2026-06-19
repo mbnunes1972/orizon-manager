@@ -3180,6 +3180,7 @@ async function _restaurarNegociacao(snap){
   });
   // datas manuais: setar DEPOIS dos campos (cujos handlers podem ter zerado as listas) e re-renderizar
   if (snap.codigo === 'total_flex' && Array.isArray(snap.tf_datas)) {
+    _tfGen++;  // invalida qualquer atualizarTF() em voo (ex: o de tfMostrarPainel) para evitar race condition
     _tfDatas   = snap.tf_datas.slice();
     _tfValores = Array.isArray(snap.tf_valores) ? snap.tf_valores.slice() : [];
     if (typeof atualizarTF === 'function') atualizarTF();
@@ -3994,6 +3995,7 @@ let _tfValores       = [];   // valores livres das parcelas 1..n-1 (última é a
 let _tfDatas         = [];   // datas de todas as parcelas (ISO strings)
 let _tfUltimoEditIdx = null; // índice da última parcela editada pelo usuário
 let _tfRevertendo    = false;
+let _tfGen           = 0;    // geração: incrementado antes de cada fetch; stale callbacks são descartados
 
 function _parseValorBR(str) {
   return parseFloat(String(str||'').trim().replace(/\./g,'').replace(',','.')) || 0;
@@ -4134,6 +4136,7 @@ function tfDataChange(input, idx) {
 }
 
 async function atualizarTF() {
+  const myGen    = ++_tfGen;  // captura geração antes de qualquer await; stale calls serão descartadas
   const valorAvista = _ayGetValorVenda();
   const entrada  = parseFloat(document.getElementById('tf-entrada').value) || 0;
   const n        = parseInt(document.getElementById('neg-parcelas').value)  || 2;
@@ -4175,9 +4178,12 @@ async function atualizarTF() {
         body: JSON.stringify(payload),
       });
       d = await r.json();
-      if (d.ok) {
+      // Descartar resultado se uma chamada mais recente (ex: restaurar snapshot) já atualizou o estado
+      if (d.ok && myGen === _tfGen) {
         _tfValores = d.parcelas.filter(p => !p.ultima).map(p => p.valor_digitado);
         _tfDatas   = d.parcelas.map(p => p.data_iso);
+      } else if (myGen !== _tfGen) {
+        return;  // estado foi atualizado por chamada mais recente; não sobrescrever nem renderizar
       }
     } else {
       const parcInput = _tfDatas.slice(0, n).map((dt, i) => ({
