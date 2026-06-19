@@ -532,8 +532,12 @@ class Handler(BaseHTTPRequestHandler):
                         if pa:
                             d = _pool_ambiente_dict(pa)
                             d["ordem"] = lk.ordem
+                            d["desconto_individual_pct"] = lk.desconto_individual_pct or 0.0
                             ambientes.append(d)
-                    self.send_json({"ok": True, "orcamento_id": oid, "ambientes": ambientes})
+                    orc = db.get(Orcamento, oid)
+                    margens = json.loads(orc.margens) if (orc and orc.margens) else {}
+                    self.send_json({"ok": True, "orcamento_id": oid,
+                                    "margens": margens, "ambientes": ambientes})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
@@ -1491,6 +1495,36 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif re.match(r"^/api/orcamentos/(\d+)/margens$", path):
+            # ── POST /api/orcamentos/<id>/margens — salva margens do orçamento ─────
+            m_orc_mar = re.match(r"^/api/orcamentos/(\d+)/margens$", path)
+            oid = int(m_orc_mar.group(1))
+            db = get_session()
+            try:
+                from mod_orcamento_params import merge_margens
+                req = json.loads(body.decode("utf-8", "replace")) if body else {}
+                orc = db.get(Orcamento, oid)
+                if not orc:
+                    self.send_json({"ok": False, "erro": "Orçamento não encontrado"}, code=404)
+                    return
+                if _projeto_esta_bloqueado(orc.projeto_id):
+                    self.send_json({"ok": False,
+                                    "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
+                                   code=400)
+                    return
+                atual = json.loads(orc.margens) if orc.margens else {}
+                novas = merge_margens(atual, req)
+                orc.margens = json.dumps(novas, ensure_ascii=False)
+                if "desconto_pct" in req:
+                    orc.desconto_pct = float(req["desconto_pct"])
+                db.commit()
+                self.send_json({"ok": True, "margens": novas})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+
         else:
             import re as _re
 
@@ -1517,11 +1551,18 @@ class Handler(BaseHTTPRequestHandler):
                                 .order_by(Orcamento.ordem.desc())
                                 .first())
                     proxima_ordem = (ultimo.ordem + 1) if ultimo else 1
+                    _origem_id = req.get("origem_id")
+                    _margens_novo = None
+                    if _origem_id:
+                        _origem = db.get(Orcamento, int(_origem_id))
+                        if _origem and _origem.margens:
+                            _margens_novo = _origem.margens
                     _usuario = get_usuario_sessao(self)
                     orc = Orcamento(
                         projeto_id=nome_safe,
                         nome=      nome_orc,
                         ordem=     proxima_ordem,
+                        margens=   _margens_novo,
                         created_by=_usuario['id'] if _usuario else None,
                     )
                     db.add(orc)
@@ -1946,39 +1987,6 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": str(e)})
                 finally:
                     db.close()
-                return
-
-            # Rota: POST /projetos/<nome_safe>/margens
-            m_mar = _re.match(r"^/projetos/([^/]+)/margens$", path)
-            if m_mar:
-                nome_safe = m_mar.group(1)
-                req  = json.loads(body)
-                proj = _carregar_projeto(nome_safe)
-                if not proj:
-                    self.send_json({"ok": False, "erro": "Projeto não encontrado"})
-                    return
-                if proj.get("bloqueado"):
-                    self.send_json({"ok": False, "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."})
-                    return
-                # Merge: preserva campos existentes e atualiza os enviados
-                m_atual = proj.get("margens") or {}
-                m_atual.update({
-                    "desconto_pct":          float(req.get("desconto_pct",          m_atual.get("desconto_pct", 0))),
-                    "custo_financeiro_pct":  float(req.get("custo_financeiro_pct",  m_atual.get("custo_financeiro_pct", 0))),
-                    "fora_da_sede":          bool( req.get("fora_da_sede",           m_atual.get("fora_da_sede", False))),
-                    "custo_viagem":       float(req.get("custo_viagem",        m_atual.get("custo_viagem", 0))),
-                    "brinde":             float(req.get("brinde",              m_atual.get("brinde", 0))),
-                    "brinde_ativo":       bool( req.get("brinde_ativo",        m_atual.get("brinde_ativo", False))),
-                    "comissao_arq_pct":   float(req.get("comissao_arq_pct",   m_atual.get("comissao_arq_pct", 0))),
-                    "comissao_arq_ativa": bool( req.get("comissao_arq_ativa",  m_atual.get("comissao_arq_ativa", False))),
-                    "fidelidade_pct":     float(req.get("fidelidade_pct",     m_atual.get("fidelidade_pct", 0))),
-                    "fidelidade_ativa":   bool( req.get("fidelidade_ativa",    m_atual.get("fidelidade_ativa", False))),
-                    "incluir_custos":     bool( req.get("incluir_custos",      m_atual.get("incluir_custos", False))),
-                    "carga_trib":         float(req.get("carga_trib",          m_atual.get("carga_trib", 8.0))),
-                })
-                proj["margens"] = m_atual
-                _salvar_projeto(proj)
-                self.send_json({"ok": True, "margens": proj["margens"]})
                 return
 
             if path == "/api/admin/usuarios":
@@ -2648,6 +2656,42 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        # ── PUT /api/orcamentos/<id>/descontos — descontos individuais em lote ──
+        m_desc = re.match(r"^/api/orcamentos/(\d+)/descontos$", path)
+        if m_desc:
+            oid = int(m_desc.group(1))
+            db = get_session()
+            try:
+                from mod_orcamento_params import sanear_descontos
+                req = json.loads(body.decode("utf-8", "replace")) if body else {}
+                pares = req.get("descontos", req)   # aceita {"descontos":{...}} ou {...}
+                orc = db.get(Orcamento, oid)
+                if not orc:
+                    self.send_json({"ok": False, "erro": "Orçamento não encontrado"}, code=404)
+                    return
+                if _projeto_esta_bloqueado(orc.projeto_id):
+                    self.send_json({"ok": False,
+                                    "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
+                                   code=400)
+                    return
+                links = db.query(OrcamentoAmbiente).filter_by(orcamento_id=oid).all()
+                ids_validos = {lk.pool_ambiente_id for lk in links}
+                limpos = sanear_descontos(pares, ids_validos)
+                by_id = {lk.pool_ambiente_id: lk for lk in links}
+                for pid, pct in limpos.items():
+                    by_id[pid].desconto_individual_pct = pct
+                db.commit()
+                self.send_json({"ok": True, "descontos": {str(k): v for k, v in limpos.items()}})
+            except ValueError as ve:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(ve)}, code=400)
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
         self.send_response(404)
         self.end_headers()
 
@@ -2999,6 +3043,13 @@ def _marcar_etapa_cliente(cliente_id: int, etapa_codigo: str, db, usuario):
     db.commit()
 
 
+def _projeto_esta_bloqueado(nome_safe) -> bool:
+    """True se o projeto foi aprovado/bloqueado (PROJETOS/<nome>/projeto.json -> 'bloqueado').
+    Centraliza o gate pos-aprovacao usado pelos handlers de margens/descontos por orcamento."""
+    proj = _carregar_projeto(nome_safe)
+    return bool(proj and proj.get("bloqueado"))
+
+
 def _pool_ambiente_dict(pa) -> dict:
     return {
         "id":            pa.id,
@@ -3127,6 +3178,15 @@ def main():
         print("  Aviso: omie_config.json sem credenciais. Configure na sidebar.")
 
     init_db()
+    try:
+        _db_mig = get_session()
+        try:
+            from database import migrar_margens_para_orcamentos
+            migrar_margens_para_orcamentos(_db_mig, PROJETOS_DIR)
+        finally:
+            _db_mig.close()
+    except Exception as _e:
+        print("[MIGRACAO] margens->orcamento:", _e)
     port   = 8765
     # Host de bind configurável: padrão 127.0.0.1 (dev local seguro);
     # em produção defina OMIE_HOST=0.0.0.0 para aceitar acesso externo.

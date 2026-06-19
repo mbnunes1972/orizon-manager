@@ -278,6 +278,7 @@ class OrcamentoAmbiente(Base):
     pool_ambiente_id = Column(Integer, ForeignKey("pool_ambientes.id"), primary_key=True)
     ordem            = Column(Integer, default=1)
     added_at         = Column(DateTime, default=datetime.utcnow)
+    desconto_individual_pct = Column(Float, nullable=False, default=0.0, server_default="0")
 
     orcamento     = relationship("Orcamento",     back_populates="ambientes")
     pool_ambiente = relationship("PoolAmbiente",  back_populates="orcamento_links")
@@ -418,6 +419,13 @@ def _migrar_colunas():
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")
 
+        # ── orcamento_ambientes ───────────────────────────────────────────────
+        cur.execute("PRAGMA table_info(orcamento_ambientes)")
+        oa_cols = {row[1] for row in cur.fetchall()}
+        if "desconto_individual_pct" not in oa_cols:
+            cur.execute("ALTER TABLE orcamento_ambientes "
+                        "ADD COLUMN desconto_individual_pct REAL NOT NULL DEFAULT 0")
+
         # ── briefings ─────────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(briefings)")
         bf_cols = {row[1] for row in cur.fetchall()}
@@ -461,6 +469,30 @@ def _run_migracoes(conn):
         cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v2_2026')")
 
     conn.commit()
+
+
+def migrar_margens_para_orcamentos(session, projetos_dir):
+    """Copia margens de cada PROJETOS/<nome>/projeto.json para os Orcamentos do projeto
+    que ainda estão sem margens. Idempotente: só preenche margens vazias/nulas.
+    Retorna o nº de orçamentos atualizados."""
+    import glob, json, os
+    atualizados = 0
+    for pj in glob.glob(os.path.join(projetos_dir, "*", "projeto.json")):
+        try:
+            data = json.loads(open(pj, encoding="utf-8").read())
+        except Exception:
+            continue
+        margens = data.get("margens")
+        if not margens:
+            continue
+        nome_safe = data.get("nome_safe") or os.path.basename(os.path.dirname(pj))
+        for o in session.query(Orcamento).filter_by(projeto_id=nome_safe).all():
+            if not o.margens:
+                o.margens = json.dumps(margens, ensure_ascii=False)
+                atualizados += 1
+    if atualizados:
+        session.commit()
+    return atualizados
 
 
 def _migrar_dados():
