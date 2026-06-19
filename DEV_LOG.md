@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-19 (sessão 17 — snapshot completo da negociação por orçamento: modalidade/formas/parcelas/entrada + datas manuais do Total Flex persistidas e reproduzidas ao reabrir; salvamento garantido ao aprovar. Sub-projeto 1 de 3. Antes: sessão 16 — margens/descontos por orçamento)
+> Atualizado em: 2026-06-19 (sessão 18 — alinhamento do contrato ao template reestruturado: empresa [NOME/CNPJ] + CPFs separados no bloco de assinatura; cabeçalho robusto a fragmentação. Antes: sessão 17 — snapshot da negociação por orçamento)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -170,6 +170,21 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-19 (sessão 18 — alinhar contrato ao template reestruturado)
+**Processo:** pipeline superpowers (intercalado durante o sub-projeto 2, a pedido do usuário). Spec/plano em `docs/superpowers/`. Disparado por uma edição do `modelo_contrato_mapeado.docx` no Word (reestruturação do bloco de assinatura), que quebrou 6 testes de contrato.
+
+**Diagnóstico (corrigido após ler o motor):** o motor do corpo (`_subst_paragrafo`) já opera no texto concatenado do parágrafo → já é robusto a marcadores fragmentados em runs. As 6 falhas eram **(a) mapeamentos faltando** e **(b) 2 testes presos à estrutura antiga** ("CPF/CNPJ:" inline).
+
+**Mudanças:**
+- **`mod_contrato.py`:** constantes `_NOME_EMPRESA`/`_CNPJ_EMPRESA` com os **valores reais já presentes no template** (`INSPIRIUM MOVEIS PLANEJADOS E DECORACAO LTDA`, CNPJ `19.152.134/0001-56`; TODO: configurador de lojas). `_montar_mapping` ganhou `NOME_EMPRESA`, `CNPJ_EMPRESA`, `CPF_CLIENTE`, `CPF_TESTEMUNHA_1`, `CPF_TESTEMUNHA_2`.
+- **Cabeçalho robusto:** o ramo de headers de `_substituir_marcadores` passou a reusar `_subst_paragrafo` (robusto a runs) em parágrafos, tabelas **e text-boxes** do cabeçalho — descobriu-se que `[Num_Contrato]`/`[Data_contrato]` vivem em **caixas de texto** (`wps:txbx`), não em parágrafos comuns.
+- **Testes:** 2 atualizados ao novo bloco (nome e CPF em marcadores separados); +3 testes novos (mapping, cabeçalho fragmentado).
+- **Template:** o `.docx` reestruturado foi versionado.
+
+**Verificação:** pytest **141** verde. Geração com dados reais (via `preencher_contrato`): zero marcador remanescente; empresa+CNPJ, cliente+CPF, testemunhas e número/data no cabeçalho corretos.
+
+**Pendente:** **configurador de lojas** (origem real de nome/CNPJ/testemunhas/telefone) — projeto futuro; por ora os valores são constantes. Retomar o **sub-projeto 2** (trava pós-assinatura) — a Task 1 dele já está commitada em `feat/trava-pos-assinatura`.
 
 ### Sessão 2026-06-19 (sessão 17 — snapshot completo da negociação por orçamento)
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → revisão holística → verificação API real + Playwright → merge). Primeiro de 3 sub-projetos decompostos de um pedido maior (1) snapshot da negociação · 2) trava total pós-assinatura · 3) versionamento de documentos). Spec/plano em `docs/superpowers/`.
