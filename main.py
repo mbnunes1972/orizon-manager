@@ -1491,6 +1491,37 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif re.match(r"^/api/orcamentos/(\d+)/margens$", path):
+            # ── POST /api/orcamentos/<id>/margens — salva margens do orçamento ─────
+            m_orc_mar = re.match(r"^/api/orcamentos/(\d+)/margens$", path)
+            oid = int(m_orc_mar.group(1))
+            db = get_session()
+            try:
+                from mod_orcamento_params import merge_margens
+                req = json.loads(body.decode("utf-8", "replace")) if body else {}
+                orc = db.get(Orcamento, oid)
+                if not orc:
+                    self.send_json({"ok": False, "erro": "Orçamento não encontrado"}, code=404)
+                    return
+                proj = _carregar_projeto(orc.projeto_id)
+                if proj and proj.get("bloqueado"):
+                    self.send_json({"ok": False,
+                                    "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
+                                   code=400)
+                    return
+                atual = json.loads(orc.margens) if orc.margens else {}
+                novas = merge_margens(atual, req)
+                orc.margens = json.dumps(novas, ensure_ascii=False)
+                if "desconto_pct" in req:
+                    orc.desconto_pct = float(req["desconto_pct"])
+                db.commit()
+                self.send_json({"ok": True, "margens": novas})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+
         else:
             import re as _re
 
