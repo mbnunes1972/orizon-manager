@@ -186,6 +186,8 @@
 
 **Verificação:** pytest **145** verde (helper `_contrato_assinado` + 4 testes). API real: 403 confirmado em valor/margens/descontos/status/novo-orçamento quando assinado; **status vira "fechado"** ao assinar as 2 partes (sem erro de lock no log). Playwright: botões de edição escondidos, "Assinar Contrato" presente, 0 erros de console.
 
+**Fix de follow-up (mesmo dia):** botão "Assinar Contrato" persistia após a 2ª assinatura. Causa: o ramo assinado de `atualizarBotoesAprovacao` sempre recriava o botão. Correção: novo helper `_contrato_totalmente_assinado` + flag `contrato_totalmente_assinado` no GET ciclo; o botão "Assinar Contrato" só aparece na assinatura **parcial** e some quando ambas as partes assinam; "Rever Orçamento" some em qualquer assinatura (já era o caso — o relato de "Rever ainda aparecia" era **cache** do `index.html` antigo). Verificado por Playwright (parcial: rever ausente/assinar presente; total: ambos ausentes). pytest 149.
+
 **Pendente:** sub-projeto 3 (versionamento de documentos). Configurador de lojas (do sub-projeto do contrato).
 
 ### Sessão 2026-06-19 (sessão 18 — alinhar contrato ao template reestruturado)

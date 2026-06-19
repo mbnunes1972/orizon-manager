@@ -666,8 +666,10 @@ class Handler(BaseHTTPRequestHandler):
                         "observacoes":   e.observacoes or "",
                     } for e in etapas_sorted]
                     assinado = _contrato_assinado(nome_safe, db)
+                    total_assinado = _contrato_totalmente_assinado(nome_safe, db)
                     self.send_json({"ok": True, "ciclo": resultado,
-                                    "contrato_assinado": assinado})
+                                    "contrato_assinado": assinado,
+                                    "contrato_totalmente_assinado": total_assinado})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
@@ -3147,6 +3149,21 @@ def _contrato_assinado(nome_safe, db) -> bool:
     if c.status in ("assinado_loja", "assinado_cliente", "assinado", "vigente"):
         return True
     return len(c.assinaturas) > 0
+
+
+def _contrato_totalmente_assinado(nome_safe, db) -> bool:
+    """True somente quando AMBAS as partes assinaram (loja + cliente) — contrato
+    totalmente assinado. Usado para esconder o botão 'Assinar Contrato' (nada mais
+    a assinar). Difere de _contrato_assinado (que é True já na 1ª assinatura)."""
+    c = (db.query(Contrato)
+           .filter_by(projeto_nome=nome_safe)
+           .order_by(Contrato.id.desc())
+           .first())
+    if not c:
+        return False
+    if c.status in ("assinado", "vigente"):
+        return True
+    return {"loja", "cliente"}.issubset({a.parte for a in c.assinaturas})
 
 
 def _pool_ambiente_dict(pa) -> dict:

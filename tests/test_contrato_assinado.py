@@ -63,3 +63,38 @@ def test_assinado_true_status_vigente():
     _mk_contrato(db, status="vigente")
     assert _contrato_assinado("Proj_A", db) is True
     db.close()
+
+
+def test_totalmente_assinado_false_uma_parte():
+    from main import _contrato_totalmente_assinado
+    from database import get_session
+    db = get_session()
+    _mk_contrato(db, status="assinado_cliente", assinaturas=("cliente",))
+    assert _contrato_totalmente_assinado("Proj_A", db) is False
+    db.close()
+
+
+def test_totalmente_assinado_true_status_assinado():
+    from main import _contrato_totalmente_assinado
+    from database import get_session
+    db = get_session()
+    _mk_contrato(db, status="assinado", assinaturas=("loja", "cliente"))
+    assert _contrato_totalmente_assinado("Proj_A", db) is True
+    db.close()
+
+
+def test_totalmente_assinado_true_ambas_partes():
+    from main import _contrato_totalmente_assinado
+    from database import get_session
+    db = get_session()
+    _mk_contrato(db, status="assinado_loja", assinaturas=("loja", "cliente"))
+    assert _contrato_totalmente_assinado("Proj_A", db) is True
+    db.close()
+
+
+def test_totalmente_assinado_false_sem_contrato():
+    from main import _contrato_totalmente_assinado
+    from database import get_session
+    db = get_session()
+    assert _contrato_totalmente_assinado("Proj_Inexistente", db) is False
+    db.close()
