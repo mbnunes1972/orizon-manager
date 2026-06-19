@@ -3110,7 +3110,7 @@ let _formaParcela = 'boleto';
 
 // Snapshot da negociação — campos de input por modalidade (ids reais do DOM)
 const _NEG_CAMPOS_POR_MODALIDADE = {
-  total_flex:       ['tf-entrada','tf-prazo','tf-taxa-input','tf-data-contrato'],
+  total_flex:       ['tf-entrada','tf-prazo','tf-data-contrato'],
   venda_programada: ['vp-entrada','vp-data-contrato'],
   aymore:           ['ay-entrada','ay-data-contrato','ay-carencia'],
   cartao_credito:   ['cc-entrada','cc-data-contrato','cc-bandeira'],
@@ -3127,7 +3127,7 @@ function _capturarNegociacao(){
   });
   const snap = {
     codigo,
-    n_parcelas: parseInt(document.getElementById('neg-parcelas')?.value) || _nParcelasSel || 1,
+    n_parcelas: _nParcelasSel || parseInt(document.getElementById('neg-parcelas')?.value) || 1,
     forma_entrada: _formaEntrada,
     forma_parcela: _formaParcela,
     campos,
