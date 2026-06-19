@@ -2679,6 +2679,43 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        # ── PUT /api/orcamentos/<id>/descontos — descontos individuais em lote ──
+        m_desc = re.match(r"^/api/orcamentos/(\d+)/descontos$", path)
+        if m_desc:
+            oid = int(m_desc.group(1))
+            db = get_session()
+            try:
+                from mod_orcamento_params import sanear_descontos
+                req = json.loads(body.decode("utf-8", "replace")) if body else {}
+                pares = req.get("descontos", req)   # aceita {"descontos":{...}} ou {...}
+                orc = db.get(Orcamento, oid)
+                if not orc:
+                    self.send_json({"ok": False, "erro": "Orçamento não encontrado"}, code=404)
+                    return
+                proj = _carregar_projeto(orc.projeto_id)
+                if proj and proj.get("bloqueado"):
+                    self.send_json({"ok": False,
+                                    "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
+                                   code=400)
+                    return
+                links = db.query(OrcamentoAmbiente).filter_by(orcamento_id=oid).all()
+                ids_validos = {lk.pool_ambiente_id for lk in links}
+                limpos = sanear_descontos(pares, ids_validos)
+                by_id = {lk.pool_ambiente_id: lk for lk in links}
+                for pid, pct in limpos.items():
+                    by_id[pid].desconto_individual_pct = pct
+                db.commit()
+                self.send_json({"ok": True, "descontos": {str(k): v for k, v in limpos.items()}})
+            except ValueError as ve:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(ve)}, code=400)
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
         self.send_response(404)
         self.end_headers()
 
