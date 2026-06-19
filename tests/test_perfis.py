@@ -55,3 +55,12 @@ def test_usuario_dict_inclui_rotulo_e_gerir():
     assert d["limite_desconto"] == 0.0
     d2 = _usuario_dict(Usuario(id=2, nome="C", login="c", nivel="consultor"))
     assert d2["pode_gerir_usuarios"] is False
+
+
+def test_capacidade_aprovar_financeiro():
+    assert perfis.pode("diretor", "aprovar_financeiro") is True
+    assert perfis.pode("gerente_adm_fin", "aprovar_financeiro") is True
+    assert perfis.pode("gerente_vendas", "aprovar_financeiro") is False
+    assert perfis.pode("consultor", "aprovar_financeiro") is False
+    assert perfis.pode("medidor", "aprovar_financeiro") is False
+    assert perfis.pode("inexistente", "aprovar_financeiro") is False
