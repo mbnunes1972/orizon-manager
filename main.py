@@ -44,6 +44,7 @@ from mod_contrato import (calcular_hash_assinatura, montar_variaveis_contrato,
                           construir_contexto, _formatar_valor)
 import mod_ciclo
 import perfis
+import mod_usuarios
 
 def _enriquecer_projetos_com_status(projetos):
     """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
@@ -358,6 +359,21 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, "clientes": [_cliente_dict(c) for c in clientes]})
             finally:
                 db2.close()
+
+        elif path == "/api/admin/usuarios":
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                return
+            db = get_session()
+            try:
+                us = db.query(Usuario).order_by(Usuario.nome).all()
+                self.send_json({"ok": True, "usuarios": [
+                    {"id": u.id, "nome": u.nome, "login": u.login, "nivel": u.nivel,
+                     "rotulo": perfis.rotulo(u.nivel), "telefone": u.telefone or "",
+                     "ativo": bool(u.ativo)} for u in us]})
+            finally:
+                db.close()
 
         elif path.endswith(".html") and path != "/":
             nome    = path.lstrip("/")
@@ -1846,6 +1862,29 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, "margens": proj["margens"]})
                 return
 
+            if path == "/api/admin/usuarios":
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                    return
+                req = json.loads(body) if body else {}
+                db  = get_session()
+                try:
+                    logins = [u.login for u in db.query(Usuario.login).all()]
+                    erros  = mod_usuarios.validar_novo_usuario(req, logins)
+                    if erros:
+                        self.send_json({"ok": False, "erro": " ".join(erros)})
+                        return
+                    u = Usuario(nome=req["nome"].strip(), login=req["login"].strip(),
+                                nivel=req["nivel"].strip(),
+                                telefone=(req.get("telefone") or "").strip())
+                    u.set_senha(req["senha"])
+                    db.add(u); db.commit()
+                    self.send_json({"ok": True, "id": u.id})
+                finally:
+                    db.close()
+                return
+
             m_sync = _re.match(r"^/api/admin/omie-sync/(\d+)/retry$", path)
             if m_sync:
                 usuario = get_usuario_sessao(self)
@@ -2542,6 +2581,33 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as e:
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            m_user = re.match(r"^/api/admin/usuarios/(\d+)$", path)
+            if m_user:
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                    return
+                req = json.loads(body) if body else {}
+                erros = mod_usuarios.validar_edicao_usuario(req)
+                if erros:
+                    self.send_json({"ok": False, "erro": " ".join(erros)})
+                    return
+                db = get_session()
+                try:
+                    u = db.query(Usuario).filter_by(id=int(m_user.group(1))).first()
+                    if not u:
+                        self.send_json({"ok": False, "erro": "Usuário não encontrado"})
+                        return
+                    if "nivel" in req:    u.nivel    = req["nivel"].strip()
+                    if "telefone" in req: u.telefone = (req.get("telefone") or "").strip()
+                    if "ativo" in req:    u.ativo    = 1 if req["ativo"] else 0
+                    if req.get("senha"):  u.set_senha(req["senha"])
+                    db.commit()
+                    self.send_json({"ok": True})
                 finally:
                     db.close()
                 return
