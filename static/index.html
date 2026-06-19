@@ -6539,6 +6539,7 @@ function _etapaBloqueada(codigo) {
 let _cicloAberto = false;
 let _cicloData   = {};
 let _contratoAssinado = false;
+let _contratoTotalmenteAssinado = false;
 
 function abrirCiclo() {
   _cicloAberto = true;
@@ -6558,6 +6559,7 @@ async function _fetchCiclo() {
   const d = await r.json();
   if (!d.ok) return;
   _contratoAssinado = !!d.contrato_assinado;
+  _contratoTotalmenteAssinado = !!d.contrato_totalmente_assinado;
   _cicloData = {};
   for (const e of (d.ciclo || [])) _cicloData[e.etapa_codigo] = e;
 }
@@ -6629,8 +6631,14 @@ function atualizarBotoesAprovacao() {
     if (actionRow) {
       const bs = actionRow.querySelector('.btn-ok');    if (bs) bs.style.display = 'none';
       const ba = actionRow.querySelector('.btn-amber');  if (ba) ba.style.display = 'none';
+      // Rever Orçamento some assim que qualquer parte assina (sem desfazer pós-assinatura)
       const br = actionRow.querySelector('#btn-rever-orcamento'); if (br) br.remove();
-      if (!actionRow.querySelector('#btn-assinar-contrato')) {
+      const assinarExistente = actionRow.querySelector('#btn-assinar-contrato');
+      if (_contratoTotalmenteAssinado) {
+        // Ambas as partes assinaram — nada mais a assinar
+        if (assinarExistente) assinarExistente.remove();
+      } else if (!assinarExistente) {
+        // Assinatura parcial — mantém o acesso para a 2ª parte assinar
         const btn = document.createElement('button');
         btn.id = 'btn-assinar-contrato';
         btn.className = 'btn btn-ghost';
