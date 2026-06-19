@@ -59,6 +59,16 @@ def is_principal(codigo):
     return codigo in ETAPAS_PRINCIPAIS
 
 
+def etapa_pai(codigo):
+    """Etapa principal de uma sub-etapa ('11a' -> '11', '17a' -> '17').
+    Retorna None se o código já for principal ou não tiver pai principal."""
+    num, suf = _parse_codigo(codigo)
+    if not suf:                      # já é principal (sem sufixo)
+        return None
+    pai = str(num)
+    return pai if pai in ETAPAS_PRINCIPAIS else None
+
+
 def etapa_anterior(codigo):
     """Código da etapa principal imediatamente anterior, ou None."""
     if codigo not in ETAPAS_PRINCIPAIS:
@@ -80,11 +90,15 @@ def chave_ordenacao(codigo):
 def pode_avancar(codigo, status_por_codigo):
     """
     True se a etapa pode sair de 'pendente' (iniciar/concluir).
-    Sub-etapas são sempre livres. Principais exigem a anterior concluída.
+    Sub-etapas herdam o gating da etapa-mãe (desbloqueiam junto com ela).
+    Principais exigem a anterior concluída.
     status_por_codigo: dict {codigo: status}.
     """
     if codigo not in ETAPAS_PRINCIPAIS:
-        return True
+        pai = etapa_pai(codigo)
+        if pai is None:
+            return True
+        return pode_avancar(pai, status_por_codigo)
     ant = etapa_anterior(codigo)
     if ant is None:
         return True

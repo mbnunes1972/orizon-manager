@@ -6332,7 +6332,13 @@ const STATUS_CONCLUSIVOS = new Set(["concluido","aprovado","assinado","vigente",
 // Bloqueada = etapa principal cuja anterior (na ordem) não está concluída.
 function _etapaBloqueada(codigo) {
   const i = ETAPAS_PRINCIPAIS.indexOf(codigo);
-  if (i <= 0) return false;                 // sub-etapa (não está na lista) ou a primeira → nunca bloqueada
+  if (i < 0) {
+    // sub-etapa: herda o bloqueio da etapa-mãe (desbloqueia junto com ela)
+    const pai = String(parseInt(codigo, 10));
+    if (pai === codigo || ETAPAS_PRINCIPAIS.indexOf(pai) < 0) return false;
+    return _etapaBloqueada(pai);
+  }
+  if (i === 0) return false;                 // primeira etapa nunca bloqueada
   const ant = ETAPAS_PRINCIPAIS[i - 1];
   return !STATUS_CONCLUSIVOS.has(_cicloData[ant]?.status);
 }
@@ -6428,8 +6434,9 @@ function atualizarBotoesAprovacao() {
     if (!actionRow.querySelector('#btn-assinar-contrato')) {
       const btn = document.createElement('button');
       btn.id = 'btn-assinar-contrato';
-      btn.style.cssText = 'color:#1a1200;background:#b8960c;border:none;font-size:.85rem;font-weight:600;padding:8px 16px;border-radius:4px;cursor:pointer';
-      btn.innerHTML = '&#x1F512; Or&ccedil;amento aprovado &ndash; assinar contrato';
+      btn.className = 'btn btn-ghost';
+      btn.style.cssText = 'border-color:var(--warn,#c8a84b);color:var(--warn,#c8a84b);font-size:.85rem;font-weight:600;padding:8px 16px;border-radius:4px;cursor:pointer';
+      btn.innerHTML = '&#x270D; Assinar Contrato';
       btn.onclick = () => { abrirCiclo(); setTimeout(() => toggleCicloCard('7'), 300); };
       actionRow.appendChild(btn);
     }
