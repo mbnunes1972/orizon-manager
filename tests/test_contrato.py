@@ -804,3 +804,14 @@ def test_assinaturas_nome_e_cpf_em_linhas_separadas():
     linha_seguinte("[NOME_CLIENTE]", "CPF/CNPJ:")
     linha_seguinte("[NOME_TESTEMUNHA_1]", "CPF:")
     linha_seguinte("[NOME_TESTEMUNHA_2]", "CPF:")
+
+
+def test_montar_mapping_inclui_empresa_e_cpfs():
+    from mod_contrato import _montar_mapping, _NOME_EMPRESA, _CNPJ_EMPRESA, _TESTEMUNHAS
+    ctx = {"cliente_cpf": "111.222.333-44"}
+    m = _montar_mapping(ctx, {})
+    assert m["NOME_EMPRESA"] == _NOME_EMPRESA
+    assert m["CNPJ_EMPRESA"] == _CNPJ_EMPRESA
+    assert m["CPF_CLIENTE"] == "111.222.333-44"
+    assert m["CPF_TESTEMUNHA_1"] == _TESTEMUNHAS[0][1]
+    assert m["CPF_TESTEMUNHA_2"] == _TESTEMUNHAS[1][1]

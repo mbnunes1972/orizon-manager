@@ -20,6 +20,8 @@ _MODELO = os.path.join(_THIS_DIR, "modelo_contrato_mapeado.docx")
 
 _TELEFONE_LOJA = "(12) 3341-8777"
 _EMAIL_LOJA    = "sac@dalmobilesjc.com.br"
+_NOME_EMPRESA  = "INSPIRIUM MOVEIS PLANEJADOS E DECORACAO LTDA"  # TODO: configurador de lojas
+_CNPJ_EMPRESA  = "19.152.134/0001-56"                            # TODO: configurador de lojas
 
 # Testemunhas provisórias — TODO: vir do painel de configuração de loja.
 _TESTEMUNHAS = [
@@ -431,6 +433,11 @@ def _montar_mapping(ctx, pag):
         "NOME_TESTEMUNHA_1": _TESTEMUNHAS[0][0],
         "NOME_TESTEMUNHA2":  _TESTEMUNHAS[1][0],
         "NOME_TESTEMUNHA_2": _TESTEMUNHAS[1][0],
+        "NOME_EMPRESA":      _NOME_EMPRESA,
+        "CNPJ_EMPRESA":      _CNPJ_EMPRESA,
+        "CPF_CLIENTE":       ctx.get("cliente_cpf", "") or "",
+        "CPF_TESTEMUNHA_1":  _TESTEMUNHAS[0][1],
+        "CPF_TESTEMUNHA_2":  _TESTEMUNHAS[1][1],
     }
 
 
