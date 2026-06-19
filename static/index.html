@@ -3135,7 +3135,10 @@ function _capturarNegociacao(){
     forma_parcela: _formaParcela,
     campos,
   };
-  if (codigo === 'total_flex') snap.tf_datas = Array.isArray(_tfDatas) ? _tfDatas.slice() : [];
+  if (codigo === 'total_flex') {
+    snap.tf_datas   = Array.isArray(_tfDatas)   ? _tfDatas.slice()   : [];
+    snap.tf_valores = Array.isArray(_tfValores) ? _tfValores.slice() : [];
+  }
   if (codigo === 'venda_programada') snap.vp_datas = Array.isArray(_vpDatas) ? _vpDatas.slice() : [];
   return snap;
 }
@@ -3177,7 +3180,8 @@ async function _restaurarNegociacao(snap){
   });
   // datas manuais: setar DEPOIS dos campos (cujos handlers podem ter zerado as listas) e re-renderizar
   if (snap.codigo === 'total_flex' && Array.isArray(snap.tf_datas)) {
-    _tfDatas = snap.tf_datas.slice();
+    _tfDatas   = snap.tf_datas.slice();
+    _tfValores = Array.isArray(snap.tf_valores) ? snap.tf_valores.slice() : [];
     if (typeof atualizarTF === 'function') atualizarTF();
   }
   if (snap.codigo === 'venda_programada' && Array.isArray(snap.vp_datas)) {
