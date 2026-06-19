@@ -2514,6 +2514,7 @@ async function _aplicarFiltroOrcamento(id){
     if(!d.ok) return;
     _orcAmbientesAtivos = d.ambientes || [];  // null → legado; array → EP-07
     if(projetoAtivo) projetoAtivo.margens = d.margens || {};
+    _negociacaoPendente = d.negociacao || null;
     carregarMargensSalvas();
     _descIndividual = {};
     (d.ambientes || []).forEach(pa => {
@@ -3107,6 +3108,7 @@ window._planoPagamento = null;  // plano estruturado do painel de pagamento ativ
 let _codigoPagAtivo  = 'a_vista';  // código da modalidade selecionada (ex: 'cartao_credito')
 let _formaEntrada = 'pix';
 let _formaParcela = 'boleto';
+let _negociacaoPendente = null;  // snapshot da negociação a restaurar após carregarModalidades
 
 // Snapshot da negociação — campos de input por modalidade (ids reais do DOM)
 const _NEG_CAMPOS_POR_MODALIDADE = {
@@ -3135,6 +3137,47 @@ function _capturarNegociacao(){
   if (codigo === 'total_flex') snap.tf_datas = Array.isArray(_tfDatas) ? _tfDatas.slice() : [];
   if (codigo === 'venda_programada') snap.vp_datas = Array.isArray(_vpDatas) ? _vpDatas.slice() : [];
   return snap;
+}
+
+// Reproduz as ENTRADAS salvas da negociação. Chamar APÓS carregarModalidades().
+async function _restaurarNegociacao(snap){
+  if (!snap || !snap.codigo) return;
+  const sel = document.getElementById('neg-pagamento');
+  if (sel) sel.value = snap.codigo;
+  // renderiza o painel da modalidade e carrega faixas (assíncrono)
+  if (typeof onPagamentoChange === 'function') await onPagamentoChange();
+  // nº de parcelas (dispara onParcelasChange, que p/ TF/VP zera as datas — por isso vem ANTES das datas)
+  const parc = document.getElementById('neg-parcelas');
+  if (parc && snap.n_parcelas) {
+    parc.value = String(snap.n_parcelas);
+    if (typeof onParcelasChange === 'function') onParcelasChange();
+  }
+  // formas
+  if (snap.forma_entrada) _formaEntrada = snap.forma_entrada;
+  if (snap.forma_parcela) _formaParcela = snap.forma_parcela;
+  const selFE = document.getElementById('neg-forma-entrada');
+  const selFP = document.getElementById('neg-forma-parcela');
+  if (selFE && snap.forma_entrada) selFE.value = snap.forma_entrada;
+  if (selFP && snap.forma_parcela && !selFP.disabled) selFP.value = snap.forma_parcela;
+  // campos de input da modalidade: escreve valor e dispara o handler nativo (input+change)
+  const campos = snap.campos || {};
+  Object.keys(campos).forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = campos[id];
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  // datas manuais: setar DEPOIS dos campos (cujos handlers podem ter zerado as listas) e re-renderizar
+  if (snap.codigo === 'total_flex' && Array.isArray(snap.tf_datas)) {
+    _tfDatas = snap.tf_datas.slice();
+    if (typeof atualizarTF === 'function') atualizarTF();
+  }
+  if (snap.codigo === 'venda_programada' && Array.isArray(snap.vp_datas)) {
+    _vpDatas = snap.vp_datas.slice();
+    if (typeof atualizarVP === 'function') atualizarVP();
+  }
+  if (typeof agendarCalculo === 'function') agendarCalculo();
 }
 
 const _FORMAS_ENTRADA = [['pix','Pix'],['ted','TED'],['boleto','Boleto']];
@@ -4964,6 +5007,7 @@ async function carregarMargensSalvas(){
   const el = document.getElementById('neg-desconto');
   if(el) el.value = (projetoAtivo.margens||{}).desconto_pct || 0;
   await carregarModalidades();  // popula dropdowns e dispara calculo
+  if (_negociacaoPendente) { await _restaurarNegociacao(_negociacaoPendente); _negociacaoPendente = null; }
   await carregarPerfil();
   // EP-07: _orcAmbientesAtivos já foi setado por ativarOrcamento (em carregarOrcamentos)
   // executarCalculo usará _orcAmbientesAtivos automaticamente — sem hook necessário aqui
