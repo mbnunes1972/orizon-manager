@@ -44,3 +44,14 @@ def test_usuario_limite_desconto_delega_perfis():
     assert Usuario(nome="X", login="x", nivel="medidor").limite_desconto == 0.0
     assert Usuario(nome="X", login="x", nivel="diretor").pode_ver_parametros is True
     assert Usuario(nome="X", login="x", nivel="consultor").pode_ver_parametros is False
+
+
+def test_usuario_dict_inclui_rotulo_e_gerir():
+    from auth import _usuario_dict
+    from database import Usuario
+    d = _usuario_dict(Usuario(id=1, nome="Ana", login="ana", nivel="gerente_adm_fin"))
+    assert d["rotulo"] == "Gerente Administrativo/Financeiro"
+    assert d["pode_gerir_usuarios"] is True
+    assert d["limite_desconto"] == 0.0
+    d2 = _usuario_dict(Usuario(id=2, nome="C", login="c", nivel="consultor"))
+    assert d2["pode_gerir_usuarios"] is False

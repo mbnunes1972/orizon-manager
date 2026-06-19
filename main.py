@@ -43,6 +43,7 @@ from mod_contrato import (calcular_hash_assinatura, montar_variaveis_contrato,
                           gerar_pdf_contrato, LibreOfficeIndisponivel,
                           construir_contexto, _formatar_valor)
 import mod_ciclo
+import perfis
 
 def _enriquecer_projetos_com_status(projetos):
     """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
@@ -342,7 +343,7 @@ class Handler(BaseHTTPRequestHandler):
 
         elif path == "/api/admin/omie-sync":
             usuario = get_usuario_sessao(self)
-            if not usuario or usuario.get("nivel") != "admin":
+            if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
                 self.send_json({"ok": False, "erro": "Acesso negado"})
                 return
             db2 = get_session()
@@ -1848,7 +1849,7 @@ class Handler(BaseHTTPRequestHandler):
             m_sync = _re.match(r"^/api/admin/omie-sync/(\d+)/retry$", path)
             if m_sync:
                 usuario = get_usuario_sessao(self)
-                if not usuario or usuario.get("nivel") != "admin":
+                if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
                     self.send_json({"ok": False, "erro": "Acesso negado"})
                     return
                 db2 = get_session()
@@ -1957,7 +1958,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not autorizador or not autorizador.check_senha(senha):
                         self.send_json({"ok": False, "erro": "Credenciais inválidas"})
                         return
-                    if autorizador.nivel not in ("gerente", "diretor", "admin"):
+                    if not perfis.pode(autorizador.nivel, "autorizar"):
                         self.send_json({"ok": False, "erro": "Necessário nível Gerente ou Diretor"})
                         return
                     # Verifica se contrato está assinado — nesse caso não pode voltar
@@ -2004,7 +2005,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not autorizador or not autorizador.check_senha(senha):
                         self.send_json({"ok": False, "erro": "Credenciais inválidas"}, code=403)
                         return
-                    if autorizador.nivel not in ("gerente", "diretor", "admin"):
+                    if not perfis.pode(autorizador.nivel, "autorizar"):
                         self.send_json({"ok": False, "erro": "Necessário nível Gerente ou Diretor"}, code=403)
                         return
                     todas    = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe).all()
