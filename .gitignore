@@ -10,3 +10,4 @@ omie_grupos_cache.json
 .pytest_cache/
 
 omie.db
+.claude/settings.local.json
