@@ -195,6 +195,8 @@
 
 **Correção pontual (mesmo dia):** painel de **Cartão** ganhou o campo **"Data da entrada"** (`cc-entrada-data`) na linha de Entrada/Bandeira; o `_planoPagamento.entrada_data` do cartão (antes `''` fixo) passa a lê-lo, refletindo no contrato `[DATA_ENTRADA]`; incluído no snapshot (`negociacao_json`) para persistir por orçamento. Verificado por Playwright.
 
+**Correção pontual (mesmo dia):** **"Data da entrada" em todas as modalidades com entrada** — adicionado também a **Aymoré** (`ay-entrada-data`), **Venda Programada** (`vp-entrada-data`) e **Total Flex** (`tf-entrada-data`); antes essas usavam a *Data do Contrato* como data de entrada. Cada `_planoPagamento.entrada_data` lê o campo novo com fallback para a data do contrato; pré-preenchido com hoje ao abrir o painel; incluído no `negociacao_json`. (Cartão e À vista já tinham.) Tudo reflete no contrato (valor/data/forma da entrada + grade do resíduo). Verificado por Playwright (3/3 modalidades).
+
 ### Sessão 2026-06-19 (sessão 19 — trava total pós-assinatura + status "Fechado")
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação API real + Playwright → merge). Segundo de 3 sub-projetos. Spec/plano em `docs/superpowers/`.
 
