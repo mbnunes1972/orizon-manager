@@ -820,6 +820,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <div id="ay-hint-financiado" style="font-size:10px;color:var(--ok);margin-top:4px"></div>
         </div>
         <div>
+          <label>Data da entrada</label>
+          <input type="date" id="ay-entrada-data" oninput="ayAtualizarCarencia()">
+        </div>
+        <div>
           <label>Data do Contrato</label>
           <input type="date" id="ay-data-contrato" oninput="ayAtualizarCarencia()">
         </div>
@@ -934,11 +938,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Painel Venda Programada -->
     <div class="mod-panel" id="painel-vp" style="display:none">
       <div class="mod-panel-title">&#x1F4C5; Venda Programada</div>
-      <div class="mod-grid" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="mod-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
         <div>
           <label>Entrada (R$) <span id="vp-entrada-pct" style="color:var(--accent);font-size:10px"></span></label>
           <input type="number" id="vp-entrada" value="0" min="0" step="100" oninput="vpEntradaChange()">
           <div id="vp-hint-financiado" style="font-size:10px;color:var(--ok);margin-top:4px"></div>
+        </div>
+        <div>
+          <label>Data da entrada</label>
+          <input type="date" id="vp-entrada-data" oninput="vpDataContratoChange()">
         </div>
         <div>
           <label>Data do Contrato</label>
@@ -995,11 +1003,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Painel Total Flex -->
     <div class="mod-panel" id="painel-tf" style="display:none">
       <div class="mod-panel-title">&#x26A1; Total Flex — Parcelamento Livre</div>
-      <div class="mod-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+      <div class="mod-grid" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr">
         <div>
           <label>Entrada (R$) <span id="tf-entrada-pct" style="color:var(--accent);font-size:10px"></span></label>
           <input type="number" id="tf-entrada" value="0" min="0" step="100" oninput="tfEntradaChange()">
           <div id="tf-hint-financiado" style="font-size:10px;color:var(--ok);margin-top:4px"></div>
+        </div>
+        <div>
+          <label>Data da entrada</label>
+          <input type="date" id="tf-entrada-data" oninput="tfEntradaChange()">
         </div>
         <div>
           <label>Data do Contrato</label>
@@ -3120,9 +3132,9 @@ let _negociacaoPendente = null;  // snapshot da negociação a restaurar após c
 
 // Snapshot da negociação — campos de input por modalidade (ids reais do DOM)
 const _NEG_CAMPOS_POR_MODALIDADE = {
-  total_flex:       ['tf-entrada','tf-prazo','tf-data-contrato'],
-  venda_programada: ['vp-entrada','vp-data-contrato'],
-  aymore:           ['ay-entrada','ay-data-contrato','ay-carencia'],
+  total_flex:       ['tf-entrada','tf-entrada-data','tf-prazo','tf-data-contrato'],
+  venda_programada: ['vp-entrada','vp-entrada-data','vp-data-contrato'],
+  aymore:           ['ay-entrada','ay-entrada-data','ay-data-contrato','ay-carencia'],
   cartao_credito:   ['cc-entrada','cc-entrada-data','cc-data-contrato','cc-bandeira'],
   a_vista:          ['av-entrada-valor','av-entrada-data','av-entrada-forma','av-liq-data','av-liq-forma'],
 };
@@ -3393,6 +3405,8 @@ function ayMostrarPainel(mostrar) {
     const dp = document.getElementById('ay-data-primeira');
     if (!dc.value) dc.value = hoje;
     if (!dp.value) dp.value = _ayAddDias(dc.value || hoje, 30);
+    const _ed = document.getElementById('ay-entrada-data');
+    if (_ed && !_ed.value) _ed.value = hoje;
     ayAtualizarCarencia();
     // Atualizar hint de entrada
     ayEntradaChange();
@@ -3546,7 +3560,7 @@ async function atualizarAymore() {
   window._planoPagamento = {
     tipo: 'aymore', nome_forma: 'Financiamento Aymoré',
     entrada_valor: entrada,
-    entrada_data: document.getElementById('ay-data-contrato')?.value || '',
+    entrada_data: document.getElementById('ay-entrada-data')?.value || document.getElementById('ay-data-contrato')?.value || '',
     entrada_forma: _formaEntrada,
     total_cliente: d.total_cliente, texto_cartao: '',
     parcelas: (d.parcelas || [])
@@ -3676,6 +3690,8 @@ function vpMostrarPainel(mostrar) {
     const hoje = new Date().toISOString().split('T')[0];
     const dc = document.getElementById('vp-data-contrato');
     if (!dc.value) dc.value = hoje;
+    const _ed = document.getElementById('vp-entrada-data');
+    if (_ed && !_ed.value) _ed.value = hoje;
     _vpDatas = [];
     vpAtualizarLimite();
     vpEntradaChange();
@@ -3800,7 +3816,7 @@ async function atualizarVP() {
   window._planoPagamento = {
     tipo: 'vp', nome_forma: 'Venda Programada',
     entrada_valor: entrada,
-    entrada_data: document.getElementById('vp-data-contrato')?.value || '',
+    entrada_data: document.getElementById('vp-entrada-data')?.value || document.getElementById('vp-data-contrato')?.value || '',
     entrada_forma: _formaEntrada,
     total_cliente: d.total_cliente, texto_cartao: '',
     parcelas: (d.parcelas || [])
@@ -4047,6 +4063,8 @@ function tfMostrarPainel(mostrar) {
     const hoje = new Date().toISOString().split('T')[0];
     const dc = document.getElementById('tf-data-contrato');
     if (!dc.value) dc.value = hoje;
+    const _ed = document.getElementById('tf-entrada-data');
+    if (_ed && !_ed.value) _ed.value = hoje;
     const prazo = document.getElementById('tf-prazo');
     if (!prazo.value) prazo.value = '12';
     _tfValores = []; _tfDatas = [];
@@ -4279,7 +4297,7 @@ async function atualizarTF() {
   window._planoPagamento = {
     tipo: 'tf', nome_forma: 'Total Flex',
     entrada_valor: entrada,
-    entrada_data: document.getElementById('tf-data-contrato')?.value || '',
+    entrada_data: document.getElementById('tf-entrada-data')?.value || document.getElementById('tf-data-contrato')?.value || '',
     entrada_forma: _formaEntrada,
     total_cliente: totalCliente, texto_cartao: '',
     parcelas: (d.parcelas || [])
