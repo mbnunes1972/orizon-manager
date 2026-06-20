@@ -32,6 +32,8 @@ class Usuario(Base):
     telefone      = Column(String(20),  nullable=True)
     ativo         = Column(Integer,     default=1)
     criado_em     = Column(DateTime,    default=datetime.utcnow)
+    loja_id       = Column(Integer,     ForeignKey("lojas.id"), nullable=True)  # usuário de loja
+    rede_id       = Column(Integer,     ForeignKey("redes.id"), nullable=True)  # admin de rede (loja_id NULL)
 
     sessoes       = relationship("Sessao",          back_populates="usuario", cascade="all, delete-orphan")
     autorizacoes  = relationship("LogAutorizacao",  back_populates="autorizador", foreign_keys="LogAutorizacao.autorizador_id")
@@ -150,6 +152,7 @@ class Cliente(Base):
     omie_sync_at     = Column(DateTime,    nullable=True)
     criado_em     = Column(DateTime,    default=datetime.utcnow)
     atualizado_em = Column(DateTime,    onupdate=datetime.utcnow)
+    loja_id       = Column(Integer,     ForeignKey("lojas.id"), nullable=True)
 
 
 class Parceiro(Base):
@@ -165,6 +168,56 @@ class Parceiro(Base):
     comissao_padrao_pct = Column(Float,        default=0.0)
     observacoes         = Column(Text,         nullable=True)
     criado_em           = Column(DateTime,     default=datetime.utcnow)
+    rede_id             = Column(Integer,      ForeignKey("redes.id"), nullable=True)
+    abrangencia         = Column(String(10),   default="loja")   # loja | rede
+
+
+class Rede(Base):
+    """Rede (franquia) que agrupa lojas. Loja avulsa tem rede_id NULL."""
+    __tablename__ = "redes"
+
+    id        = Column(Integer,     primary_key=True, autoincrement=True)
+    nome      = Column(String(150), nullable=False)
+    cnpj      = Column(String(18),  nullable=True)
+    ativo     = Column(Integer,     default=1)
+    criado_em = Column(DateTime,    default=datetime.utcnow)
+
+
+class Loja(Base):
+    """Loja (tenant). Pertence a uma rede ou é avulsa (rede_id NULL)."""
+    __tablename__ = "lojas"
+
+    id          = Column(Integer,     primary_key=True, autoincrement=True)
+    rede_id     = Column(Integer,     ForeignKey("redes.id"), nullable=True)  # NULL = avulsa
+    nome        = Column(String(150), nullable=False)
+    cnpj        = Column(String(18),  nullable=True)
+    codigo      = Column(String(8),   nullable=True, unique=True)   # 3 letras p/ num contrato
+    telefone    = Column(String(20),  nullable=True)
+    email       = Column(String(120), nullable=True)
+    cep         = Column(String(9),   nullable=True)
+    logradouro  = Column(String(200), nullable=True)
+    numero      = Column(String(20),  nullable=True)
+    complemento = Column(String(100), nullable=True)
+    bairro      = Column(String(100), nullable=True)
+    cidade      = Column(String(80),  nullable=True)
+    estado      = Column(String(2),   nullable=True)
+    testemunha1_nome = Column(String(120), nullable=True)
+    testemunha1_cpf  = Column(String(14),  nullable=True)
+    testemunha2_nome = Column(String(120), nullable=True)
+    testemunha2_cpf  = Column(String(14),  nullable=True)
+    ativo       = Column(Integer,  default=1)
+    criado_em   = Column(DateTime, default=datetime.utcnow)
+
+
+class ParceiroLoja(Base):
+    """Vínculo M:N parceiro × loja, com comissão própria por loja."""
+    __tablename__ = "parceiro_lojas"
+
+    id                  = Column(Integer, primary_key=True, autoincrement=True)
+    parceiro_id         = Column(Integer, ForeignKey("parceiros.id"), nullable=False)
+    loja_id             = Column(Integer, ForeignKey("lojas.id"),     nullable=False)
+    comissao_padrao_pct = Column(Float,   default=0.0)
+    ativo               = Column(Integer, default=1)
 
 
 class Projeto(Base):
@@ -177,6 +230,7 @@ class Projeto(Base):
     status_at  = Column(DateTime,   nullable=True)
     perdido_em     = Column(DateTime,   nullable=True)
     parametros_json = Column(Text, nullable=True)   # parâmetros estruturais da negociação (JSON, projeto-wide)
+    loja_id        = Column(Integer,    ForeignKey("lojas.id"), nullable=True)
 
 
 class Briefing(Base):
@@ -266,6 +320,7 @@ class Orcamento(Base):
     created_by      = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, nullable=True)
+    loja_id         = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
 
     criador   = relationship("Usuario", foreign_keys=[created_by])
     ambientes = relationship("OrcamentoAmbiente", back_populates="orcamento",
@@ -324,6 +379,7 @@ class Contrato(Base):
     gerado_em            = Column(DateTime, nullable=True)
     gerado_por_id        = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     d4sign_uuid          = Column(Text,     nullable=True)   # fase futura D4Sign
+    loja_id              = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
 
     gerado_por   = relationship("Usuario",  foreign_keys=[gerado_por_id])
     orcamento    = relationship("Orcamento", foreign_keys=[orcamento_id])
@@ -380,6 +436,7 @@ def _migrar_colunas():
             ("inst_cidade",            "VARCHAR(80)"),
             ("inst_cep",               "VARCHAR(9)"),
             ("inst_uf",                "VARCHAR(2)"),
+            ("loja_id",                "INTEGER"),
         ]:
             if col not in cli_cols:
                 cur.execute(f"ALTER TABLE clientes ADD COLUMN {col} {tipo}")
@@ -389,6 +446,9 @@ def _migrar_colunas():
         usr_cols = {row[1] for row in cur.fetchall()}
         if "telefone" not in usr_cols:
             cur.execute("ALTER TABLE usuarios ADD COLUMN telefone VARCHAR(20)")
+        for col in ("loja_id", "rede_id"):
+            if col not in usr_cols:
+                cur.execute(f"ALTER TABLE usuarios ADD COLUMN {col} INTEGER")
 
         # ── projetos_meta ─────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(projetos_meta)")
@@ -397,6 +457,8 @@ def _migrar_colunas():
             cur.execute("ALTER TABLE projetos_meta ADD COLUMN cliente_id INTEGER")
         if "parametros_json" not in prj_cols:
             cur.execute("ALTER TABLE projetos_meta ADD COLUMN parametros_json TEXT")
+        if "loja_id" not in prj_cols:
+            cur.execute("ALTER TABLE projetos_meta ADD COLUMN loja_id INTEGER")
 
         # ── contratos ─────────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(contratos)")
@@ -408,6 +470,7 @@ def _migrar_colunas():
             ("d4sign_uuid",     "TEXT"),
             ("gerado_por_id",   "INTEGER"),
             ("num_contrato",    "VARCHAR(30)"),
+            ("loja_id",         "INTEGER"),
         ]:
             if col not in con_cols:
                 cur.execute(f"ALTER TABLE contratos ADD COLUMN {col} {tipo}")
@@ -420,6 +483,7 @@ def _migrar_colunas():
             ("forma_pagamento", "TEXT"),
             ("updated_at",      "DATETIME"),
             ("negociacao_json", "TEXT"),
+            ("loja_id",         "INTEGER"),
         ]:
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")
@@ -437,11 +501,32 @@ def _migrar_colunas():
         if "projeto_nome" not in bf_cols:
             cur.execute("ALTER TABLE briefings ADD COLUMN projeto_nome TEXT")
 
+        # ── parceiros (tenant) ────────────────────────────────────────────────
+        cur.execute("PRAGMA table_info(parceiros)")
+        par_cols = {row[1] for row in cur.fetchall()}
+        if "rede_id" not in par_cols:
+            cur.execute("ALTER TABLE parceiros ADD COLUMN rede_id INTEGER")
+        if "abrangencia" not in par_cols:
+            cur.execute("ALTER TABLE parceiros ADD COLUMN abrangencia VARCHAR(10) DEFAULT 'loja'")
+
         conn.commit()
     except Exception:
         pass
     finally:
         conn.close()
+
+# ── Loja seed (F1 multi-tenant) ───────────────────────────────────────────────
+# Espelha as constantes de mod_contrato.py (evita import circular database<->mod_contrato).
+# Os CPFs das testemunhas são placeholders — corrigidos no configurador de lojas (F2).
+_SEED_LOJA_NOME   = "INSPIRIUM MOVEIS PLANEJADOS E DECORACAO LTDA"
+_SEED_LOJA_CNPJ   = "19.152.134/0001-56"
+_SEED_LOJA_CODIGO = "INS"
+_SEED_LOJA_TEL    = "(12) 3341-8777"
+_SEED_LOJA_EMAIL  = "sac@dalmobilesjc.com.br"
+_SEED_TEST1_NOME  = "Jaime Perinazzo"
+_SEED_TEST1_CPF   = "xxx.xxx.xxx-xx"
+_SEED_TEST2_NOME  = "Felipe Guizalberte"
+_SEED_TEST2_CPF   = "yyy.yyy.yyy-yy"
 
 def _tabela_existe(cur, nome):
     """True se a tabela existe (migração de tabela ausente é no-op — robusto a DBs parciais)."""
@@ -472,6 +557,44 @@ def _run_migracoes(conn):
         cur.execute("UPDATE usuarios SET nivel='gerente_vendas' WHERE nivel='gerente'")
         cur.execute("UPDATE usuarios SET nivel='diretor'        WHERE nivel='admin'")
         cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v2_2026')")
+
+    # 2026-06-20: F1 multi-tenant — loja seed (das constantes do contrato) + backfill.
+    if "tenancy_v1_2026" not in aplicadas and _tabela_existe(cur, "lojas"):
+        cur.execute("SELECT id FROM lojas ORDER BY id LIMIT 1")
+        row = cur.fetchone()
+        if row is None:
+            cur.execute(
+                """INSERT INTO lojas
+                   (nome, cnpj, codigo, telefone, email,
+                    testemunha1_nome, testemunha1_cpf,
+                    testemunha2_nome, testemunha2_cpf, ativo)
+                   VALUES (?,?,?,?,?,?,?,?,?,1)""",
+                (_SEED_LOJA_NOME, _SEED_LOJA_CNPJ, _SEED_LOJA_CODIGO,
+                 _SEED_LOJA_TEL, _SEED_LOJA_EMAIL,
+                 _SEED_TEST1_NOME, _SEED_TEST1_CPF,
+                 _SEED_TEST2_NOME, _SEED_TEST2_CPF))
+            loja_id = cur.lastrowid
+        else:
+            loja_id = row[0]
+
+        for tbl in ("usuarios", "clientes", "projetos_meta", "orcamentos", "contratos"):
+            if _tabela_existe(cur, tbl):
+                cur.execute(f"UPDATE {tbl} SET loja_id=? WHERE loja_id IS NULL", (loja_id,))
+
+        if _tabela_existe(cur, "parceiros") and _tabela_existe(cur, "parceiro_lojas"):
+            cur.execute("UPDATE parceiros SET abrangencia='loja' WHERE abrangencia IS NULL")
+            cur.execute("SELECT id, comissao_padrao_pct FROM parceiros")
+            for pid, com in cur.fetchall():
+                cur.execute("SELECT 1 FROM parceiro_lojas WHERE parceiro_id=? AND loja_id=?",
+                            (pid, loja_id))
+                if cur.fetchone() is None:
+                    cur.execute(
+                        """INSERT INTO parceiro_lojas
+                           (parceiro_id, loja_id, comissao_padrao_pct, ativo)
+                           VALUES (?,?,?,1)""",
+                        (pid, loja_id, com or 0.0))
+
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('tenancy_v1_2026')")
 
     conn.commit()
 
@@ -544,6 +667,12 @@ def _migrar_dados():
 
 def get_session():
     return Session()
+
+
+def loja_seed_id(db):
+    """Id da loja seed (a 1ª loja por id), ou None se ainda não houver loja."""
+    loja = db.query(Loja).order_by(Loja.id).first()
+    return loja.id if loja else None
 
 
 def upsert_projeto_status(nome_safe: str, status: str, perdido_em=None):
