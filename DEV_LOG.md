@@ -44,6 +44,10 @@
 - **Workflow de Medição (etapas 9 e 10):** etapa 9 = upload da solicitação + senha do medidor; etapa 10 "Medição" = parecer (Aprovado/Reprovado/Parcial+ambientes) + planta promob; **Reprovado em 2 passos** (medidor registra → fica em andamento; Gerente Vendas/Adm-Fin/Diretor anexa doc do cliente + senha → libera). Modelo `Medicao`; arquivos em `PROJETOS/<nome>/medicao/`; guard impede fechar 9/10 pelo toggle genérico
 - **Auto-load projetos** ao iniciar app (`DOMContentLoaded → projCarregar()`)
 - **LibreOffice gracioso:** `LibreOfficeIndisponivel` salva `.docx` e avança status sem travar o fluxo
+- **Parâmetros de negociação por orçamento (banco):** `orcamentos.margens` (JSON) + `orcamento_ambientes.desconto_individual_pct` — margens/descontos por orçamento, restaurados ao reabrir; migração automática do `projeto.json` (sessão 16)
+- **Snapshot completo da negociação (`orcamentos.negociacao_json`):** modalidade, formas, nº de parcelas, entrada e **datas manuais do Total Flex** salvas e reproduzidas ao reabrir; **salvamento garantido ao aprovar** (aprovação bloqueada se falhar; total 0 não sobrescreve) (sessão 17)
+- **Trava total pós-assinatura:** a partir da 1ª assinatura, UI esconde Salvar/Parâmetros/Ambientes/Novo Orçamento/Rever (mantém "Assinar Contrato" só enquanto falta a 2ª parte) e backend recusa **403** as mutações (`_contrato_assinado`); na 2ª assinatura, status terminal **"🔒 Fechado"** (sessão 19)
+- **Contrato alinhado ao template reestruturado:** `[NOME_EMPRESA]`/`[CNPJ_EMPRESA]` (valores reais), CPFs separados (cliente + 2 testemunhas), cabeçalho robusto a marcadores fragmentados em runs (inclui text-boxes com nº/data) (sessão 18)
 
 ### [EP-07] Estado atual do versionamento de orçamentos
 
@@ -80,13 +84,14 @@
   - Bloqueia save de parâmetros; reverte desconto individual em tempo real
 
 ### [PENDENTE]
-- `salvarOrcamento()` no frontend é stub (só mostra toast) — não persiste nada além do que já é auto-salvo nos endpoints de ambiente/margem
+- **Sub-projeto 3 — Versionamento de documentos:** novos documentos criam versão; nunca sobrescrevem nem permitem apagar versões anteriores (último item do pedido das sessões 17–19)
+- **Configurador de lojas:** nome/CNPJ/testemunhas/telefone/email da loja hoje em constantes (`mod_contrato.py`: `_NOME_EMPRESA`, `_CNPJ_EMPRESA`, `_TESTEMUNHAS` com CPF placeholder) — mover para painel de configuração
 - Módulo Clientes e Parceiros vinculados a orçamentos (planejado)
 - **Trocar as senhas de exemplo do `seed.py`** (10 usuários) antes de produção — pelo Painel Admin → Usuários (perfil técnico `admin` foi aposentado)
 - Refinar espaçamento visual do bloco de assinaturas no PDF (validado por estrutura, não por render — LibreOffice ausente no dev local)
-- **Template do contrato:** ajustes nas variáveis (backlog anotado no último commit — ver `docs/` ou `CONTRATOS/`)
 - **LibreOffice no VPS:** verificar disponibilidade; app funciona sem ele (fallback .docx), mas PDF é o ideal
-- Etapa 6 do ciclo: marcada ao gerar contrato — testar fluxo completo no VPS
+- **Deploy:** projetos já totalmente assinados em produção podem ficar sem o status "fechado" (o backfill foi feito só no DEV DB) — reassinar não é necessário; setar via banco se quiser consistência
+- (Resolvido na sessão 17) `salvarOrcamento()` agora persiste o snapshot completo da negociação
 
 ### [DECIDIDO]
 - Pool de ambientes permanente por projeto (XMLs nunca deletados)
