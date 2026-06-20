@@ -191,6 +191,8 @@
 
 **Verificação:** pytest **155** verde (coluna, módulo puro, migração). API real: **11/11** — salvar parâmetros reflete em todos os orçamentos; desconto isolado por orçamento; estruturais não vazam para o orçamento. Playwright: estruturais compartilhados / desconto isolado entre 2 orçamentos, 0 erros de console.
 
+**Fix de follow-up (mesmo dia):** os parâmetros estruturais sumiam ao reabrir o modal. Causa: `salvarDescontoAutomatico` fazia `projetoAtivo.margens = d.margens` e o endpoint `/margens` (pós-refactor) devolve só `desconto_pct` — apagando os estruturais da memória; e o save do modal não atualizava `projetoAtivo.margens` com os estruturais recém-salvos. Correção: `salvarDescontoAutomatico` passa a atualizar **só** `desconto_pct` (preserva os estruturais); o save do modal atualiza `projetoAtivo.margens` com os `parametros` salvos. Verificado por Playwright (reabrir modal e blur do desconto preservam os estruturais).
+
 ### Sessão 2026-06-19 (sessão 19 — trava total pós-assinatura + status "Fechado")
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação API real + Playwright → merge). Segundo de 3 sub-projetos. Spec/plano em `docs/superpowers/`.
 

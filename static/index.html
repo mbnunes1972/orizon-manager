@@ -4934,9 +4934,10 @@ async function salvarDescontoAutomatico(){
     });
     const d = await r.json();
     if(d.ok){
-      projetoAtivo.margens = d.margens;
-      // Restaura _incluirCustos: o servidor pode retornar valor desatualizado em race conditions
-      projetoAtivo.margens.incluir_custos = _incluirCustos;
+      // Atualiza SÓ o desconto; preserva os parâmetros estruturais (vêm do projeto).
+      // (O endpoint /margens devolve apenas desconto_pct; sobrescrever tudo apagaria os estruturais.)
+      const desc = (d.margens && d.margens.desconto_pct != null) ? d.margens.desconto_pct : desconto;
+      projetoAtivo.margens = Object.assign({}, projetoAtivo.margens || {}, {desconto_pct: desc});
     }
   }catch(e){}
 }
@@ -5485,6 +5486,9 @@ async function fecharModalParams(salvar){
       await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/margens',{
         method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({desconto_pct: desconto}),
       });
+      // Atualiza a memória com os estruturais recém-salvos + o desconto deste orçamento,
+      // para refletir imediatamente ao reabrir o modal (sem precisar trocar de orçamento).
+      projetoAtivo.margens = Object.assign({}, projetoAtivo.margens || {}, dp.parametros || {}, {desconto_pct: desconto});
       showToast('Parametros salvos!');
       const elDesc = document.getElementById('neg-desconto');
       if(elDesc) elDesc.value = desconto;
