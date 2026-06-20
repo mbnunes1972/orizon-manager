@@ -47,6 +47,37 @@ def merge_margens(atual: dict, req: dict) -> dict:
     return base
 
 
+PARAMETROS_DEFAULT = {
+    "incluir_custos":     False,
+    "comissao_arq_pct":   0.0,
+    "comissao_arq_ativa": False,
+    "fidelidade_pct":     0.0,
+    "fidelidade_ativa":   False,
+    "fora_da_sede":       False,
+    "custo_viagem":       0.0,
+    "brinde":             0.0,
+    "brinde_ativo":       False,
+    "carga_trib":         8.0,
+}
+
+_PARAM_FLOAT_KEYS = ("comissao_arq_pct", "fidelidade_pct", "custo_viagem", "brinde", "carga_trib")
+_PARAM_BOOL_KEYS  = ("incluir_custos", "comissao_arq_ativa", "fidelidade_ativa",
+                     "fora_da_sede", "brinde_ativo")
+
+
+def merge_parametros(atual: dict, req: dict) -> dict:
+    base = dict(PARAMETROS_DEFAULT)
+    if atual:
+        base.update({k: atual[k] for k in PARAMETROS_DEFAULT if k in atual})
+    for k in _PARAM_FLOAT_KEYS:
+        if k in req:
+            base[k] = float(req[k])
+    for k in _PARAM_BOOL_KEYS:
+        if k in req:
+            base[k] = _coerce_bool(req[k])
+    return base
+
+
 def sanear_descontos(pares, ids_validos) -> dict:
     ids_validos = set(ids_validos)
     out = {}
