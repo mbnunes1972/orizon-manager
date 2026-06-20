@@ -2519,7 +2519,7 @@ async function _aplicarFiltroOrcamento(id){
     const d = await r.json();
     if(!d.ok) return;
     _orcAmbientesAtivos = d.ambientes || [];  // null → legado; array → EP-07
-    if(projetoAtivo) projetoAtivo.margens = d.margens || {};
+    if(projetoAtivo) projetoAtivo.margens = Object.assign({}, d.margens || {}, d.parametros || {});
     _negociacaoPendente = d.negociacao || null;
     carregarMargensSalvas();
     _descIndividual = {};
@@ -5462,10 +5462,9 @@ async function fecharModalParams(salvar){
     if(!_orcamentoAtivoId){ showToast('Crie ou selecione um orçamento antes de salvar parâmetros.', true); return; }
     const id = s => document.getElementById(s);
     const novoIncluirCustos = document.getElementById('mp-incluir-custos')?.checked || false;
-    _incluirCustos = novoIncluirCustos;  // atualiza fonte de verdade ao salvar
-    const mg = {
-      desconto_pct:          parseFloat(id('mp-desconto').value)||0,
-      comissao_arq_ativa:    id('mp-arq-ativa').checked,
+    _incluirCustos = novoIncluirCustos;
+    const parametros = {
+      comissao_arq_ativa: id('mp-arq-ativa').checked,
       comissao_arq_pct:   parseFloat(id('mp-arq-pct').value)||0,
       fidelidade_ativa:   id('mp-fid-ativa').checked,
       fidelidade_pct:     parseFloat(id('mp-fid-pct').value)||0,
@@ -5476,22 +5475,20 @@ async function fecharModalParams(salvar){
       incluir_custos:     novoIncluirCustos,
       carga_trib:         parseFloat(id('mp-carga-trib').value)||0,
     };
+    const desconto = parseFloat(id('mp-desconto').value)||0;
     try{
-      const r = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/margens',{
-        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(mg),
+      const rp = await fetch('/api/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/parametros',{
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(parametros),
       });
-      const d = await r.json();
-      if(d.ok){
-        // Garante que incluir_custos foi salvo corretamente
-        if(novoIncluirCustos !== undefined) d.margens.incluir_custos = novoIncluirCustos;
-        projetoAtivo.margens = d.margens;
-        showToast('Parametros salvos!');
-        // Sincroniza desconto
-        const elDesc = document.getElementById('neg-desconto');
-        if(elDesc) elDesc.value = d.margens.desconto_pct || 0;
-        // Recarrega negociação para recalcular valor bruto (incluir_custos pode ter mudado)
-        await carregarMargensSalvas();
-      }
+      const dp = await rp.json();
+      if(!dp.ok){ showToast('Erro ao salvar parametros: '+(dp.erro||''), true); return; }
+      await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/margens',{
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({desconto_pct: desconto}),
+      });
+      showToast('Parametros salvos!');
+      const elDesc = document.getElementById('neg-desconto');
+      if(elDesc) elDesc.value = desconto;
+      await carregarMargensSalvas();
     }catch(e){ showToast('Erro ao salvar parametros', true); }
   }
   // Prossegue para page-02 se veio do fluxo de criacao
