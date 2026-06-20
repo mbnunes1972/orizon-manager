@@ -536,18 +536,45 @@ def test_preencher_grade_valores_datas_e_tracos():
     assert len(t3.rows) == 11
 
 
-def test_preencher_grade_cartao_primeiro_campo():
+def test_preencher_grade_cartao_valores_sem_data():
     from docx import Document
-    from mod_contrato import _MODELO, _preencher_grade, _TRACO
+    from mod_contrato import _MODELO, _preencher_grade, _TRACO, _unique_cells
     d = Document(_MODELO)
-    _preencher_grade(d, {"tipo": "cartao", "num_parcelas_int": 0,
-                         "valores": [""] * 24, "datas": [""] * 24,
-                         "texto_cartao": "12x R$ 10.000,00"})
+    _preencher_grade(d, {"tipo": "cartao", "num_parcelas_int": 3,
+                         "valores": ["R$ 100,00", "R$ 100,00", "R$ 100,00"] + [""] * 21,
+                         "datas": [""] * 24, "texto_cartao": "12x R$ 300,00"})
     t3 = d.tables[3]
-    c0 = t3.rows[3].cells[0].text
+    # primeira linha da grade: 3 pares (valor, data) — parcelas 1,2,3
+    cells = _unique_cells(t3.rows[3])
+    # parcelas 1-3: valor preenchido, data EM BRANCO (não _TRACO, não data)
+    for vcol, dcol in [(0, 1), (2, 3), (4, 5)]:
+        assert cells[vcol].text == "R$ 100,00"
+        assert cells[dcol].text == ""        # cartão: parcela sem data
+    # slot 4 em diante (linha 4 da grade): traço
+    cells2 = _unique_cells(t3.rows[4])
+    assert cells2[0].text == _TRACO
+    # texto_cartao NÃO é mais despejado na grade
     blob = " ".join(c.text for row in t3.rows for c in row.cells)
-    assert "12x R$ 10.000,00" in c0
-    assert _TRACO in blob
+    assert "12x R$ 300,00" not in blob
+
+
+def test_parse_pagamento_cartao_avista_num_parcelas():
+    import json
+    from mod_contrato import _parse_pagamento
+    d = _parse_pagamento(json.dumps({"tipo": "cartao", "nome_forma": "Cartão de Crédito",
+        "total_cliente": 5000, "parcelas": [{"num": 1, "valor": 5000, "data": ""}]}))
+    assert d["num_parcelas"] == "à vista"
+    assert d["num_parcelas_int"] == 1
+
+
+def test_parse_pagamento_cartao_parcelado_num_parcelas_e_datas_vazias():
+    import json
+    from mod_contrato import _parse_pagamento
+    d = _parse_pagamento(json.dumps({"tipo": "cartao", "nome_forma": "Cartão de Crédito",
+        "total_cliente": 12000, "parcelas": [{"num": i+1, "valor": 1000, "data": ""} for i in range(12)]}))
+    assert d["num_parcelas"] == "12"
+    assert d["num_parcelas_int"] == 12
+    assert all(x == "" for x in d["datas"][:12])   # cartão: parcelas sem data
 
 
 def test_protegido_tem_documentprotection_e_regioes():

@@ -234,8 +234,12 @@ def _preencher_grade(doc, pag, coletor=None):
                 break
             p = gi * 3 + j + 1
             if tipo == "cartao":
-                _set_cell_text(cells[vcol], texto if p == 1 else _TRACO, coletor)
-                _set_cell_text(cells[dcol], "" if p == 1 else _TRACO, coletor)
+                if p <= num and valores[p-1]:
+                    _set_cell_text(cells[vcol], valores[p-1], coletor)
+                    _set_cell_text(cells[dcol], "", coletor)   # cartão: parcela sem data
+                else:
+                    _set_cell_text(cells[vcol], _TRACO, coletor)
+                    _set_cell_text(cells[dcol], _TRACO, coletor)
             elif p <= num and valores[p-1]:
                 _set_cell_text(cells[vcol], valores[p-1], coletor)
                 _set_cell_text(cells[dcol], datas[p-1] or _TRACO, coletor)
@@ -326,10 +330,20 @@ def _parse_pagamento(pag_json_str: str) -> dict:
     # Grade p01..p24 — datas e valores diretamente das parcelas reais capturadas
     datas, valores = [], []
     for p in parcelas:
-        datas.append(_formatar_data_br(p.get("data") or ""))
+        if tipo == "cartao":
+            datas.append("")   # cartão: parcelas não têm data na grade
+        else:
+            datas.append(_formatar_data_br(p.get("data") or ""))
         valores.append(_formatar_valor_str(p.get("valor")))
     datas   = (datas   + [""] * 24)[:24]
     valores = (valores + [""] * 24)[:24]
+
+    if tipo == "cartao" and num_parcelas == 1:
+        num_parcelas_disp = "à vista"
+    elif num_parcelas:
+        num_parcelas_disp = str(num_parcelas)
+    else:
+        num_parcelas_disp = "—"
 
     total_cliente = pag.get("total_cliente") or 0
     return {
@@ -339,7 +353,7 @@ def _parse_pagamento(pag_json_str: str) -> dict:
         "entrada_tipo":     entrada_tipo,
         "entrada_data":     entrada_data,
         "modalidade":       nome_forma,
-        "num_parcelas":     str(num_parcelas) if num_parcelas else "—",
+        "num_parcelas":     num_parcelas_disp,
         "num_parcelas_int": num_parcelas,
         "data_primeira":    (datas[0] if datas and datas[0] else ""),
         "datas":            datas,          # lista de 24 strings (data ou "")
