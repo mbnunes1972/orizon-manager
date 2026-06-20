@@ -32,6 +32,8 @@ class Usuario(Base):
     telefone      = Column(String(20),  nullable=True)
     ativo         = Column(Integer,     default=1)
     criado_em     = Column(DateTime,    default=datetime.utcnow)
+    loja_id       = Column(Integer,     ForeignKey("lojas.id"), nullable=True)  # usuário de loja
+    rede_id       = Column(Integer,     ForeignKey("redes.id"), nullable=True)  # admin de rede (loja_id NULL)
 
     sessoes       = relationship("Sessao",          back_populates="usuario", cascade="all, delete-orphan")
     autorizacoes  = relationship("LogAutorizacao",  back_populates="autorizador", foreign_keys="LogAutorizacao.autorizador_id")
@@ -150,6 +152,7 @@ class Cliente(Base):
     omie_sync_at     = Column(DateTime,    nullable=True)
     criado_em     = Column(DateTime,    default=datetime.utcnow)
     atualizado_em = Column(DateTime,    onupdate=datetime.utcnow)
+    loja_id       = Column(Integer,     ForeignKey("lojas.id"), nullable=True)
 
 
 class Parceiro(Base):
@@ -165,6 +168,56 @@ class Parceiro(Base):
     comissao_padrao_pct = Column(Float,        default=0.0)
     observacoes         = Column(Text,         nullable=True)
     criado_em           = Column(DateTime,     default=datetime.utcnow)
+    rede_id             = Column(Integer,      ForeignKey("redes.id"), nullable=True)
+    abrangencia         = Column(String(10),   default="loja")   # loja | rede
+
+
+class Rede(Base):
+    """Rede (franquia) que agrupa lojas. Loja avulsa tem rede_id NULL."""
+    __tablename__ = "redes"
+
+    id        = Column(Integer,     primary_key=True, autoincrement=True)
+    nome      = Column(String(150), nullable=False)
+    cnpj      = Column(String(18),  nullable=True)
+    ativo     = Column(Integer,     default=1)
+    criado_em = Column(DateTime,    default=datetime.utcnow)
+
+
+class Loja(Base):
+    """Loja (tenant). Pertence a uma rede ou é avulsa (rede_id NULL)."""
+    __tablename__ = "lojas"
+
+    id          = Column(Integer,     primary_key=True, autoincrement=True)
+    rede_id     = Column(Integer,     ForeignKey("redes.id"), nullable=True)  # NULL = avulsa
+    nome        = Column(String(150), nullable=False)
+    cnpj        = Column(String(18),  nullable=True)
+    codigo      = Column(String(8),   nullable=True, unique=True)   # 3 letras p/ num contrato
+    telefone    = Column(String(20),  nullable=True)
+    email       = Column(String(120), nullable=True)
+    cep         = Column(String(9),   nullable=True)
+    logradouro  = Column(String(200), nullable=True)
+    numero      = Column(String(20),  nullable=True)
+    complemento = Column(String(100), nullable=True)
+    bairro      = Column(String(100), nullable=True)
+    cidade      = Column(String(80),  nullable=True)
+    estado      = Column(String(2),   nullable=True)
+    testemunha1_nome = Column(String(120), nullable=True)
+    testemunha1_cpf  = Column(String(14),  nullable=True)
+    testemunha2_nome = Column(String(120), nullable=True)
+    testemunha2_cpf  = Column(String(14),  nullable=True)
+    ativo       = Column(Integer,  default=1)
+    criado_em   = Column(DateTime, default=datetime.utcnow)
+
+
+class ParceiroLoja(Base):
+    """Vínculo M:N parceiro × loja, com comissão própria por loja."""
+    __tablename__ = "parceiro_lojas"
+
+    id                  = Column(Integer, primary_key=True, autoincrement=True)
+    parceiro_id         = Column(Integer, ForeignKey("parceiros.id"), nullable=False)
+    loja_id             = Column(Integer, ForeignKey("lojas.id"),     nullable=False)
+    comissao_padrao_pct = Column(Float,   default=0.0)
+    ativo               = Column(Integer, default=1)
 
 
 class Projeto(Base):
@@ -177,6 +230,7 @@ class Projeto(Base):
     status_at  = Column(DateTime,   nullable=True)
     perdido_em     = Column(DateTime,   nullable=True)
     parametros_json = Column(Text, nullable=True)   # parâmetros estruturais da negociação (JSON, projeto-wide)
+    loja_id        = Column(Integer,    ForeignKey("lojas.id"), nullable=True)
 
 
 class Briefing(Base):
@@ -266,6 +320,7 @@ class Orcamento(Base):
     created_by      = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, nullable=True)
+    loja_id         = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
 
     criador   = relationship("Usuario", foreign_keys=[created_by])
     ambientes = relationship("OrcamentoAmbiente", back_populates="orcamento",
@@ -324,6 +379,7 @@ class Contrato(Base):
     gerado_em            = Column(DateTime, nullable=True)
     gerado_por_id        = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     d4sign_uuid          = Column(Text,     nullable=True)   # fase futura D4Sign
+    loja_id              = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
 
     gerado_por   = relationship("Usuario",  foreign_keys=[gerado_por_id])
     orcamento    = relationship("Orcamento", foreign_keys=[orcamento_id])
