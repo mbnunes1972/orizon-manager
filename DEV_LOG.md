@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-19 (sessão 19 — trava total pós-assinatura: após a 1ª assinatura, UI esconde edição + backend recusa (403) mutações; novo status terminal "Fechado" na 2ª assinatura. Sub-projeto 2 de 3. Antes: sessão 18 — alinhamento do contrato ao template)
+> Atualizado em: 2026-06-20 (sessão 20 — parâmetros estruturais por projeto: incluir custos/comissão arquiteto/fidelidade/custo viagem/brinde/carga tributária valem para TODOS os orçamentos; desconto e pagamento seguem por orçamento. Antes: sessão 19 — trava pós-assinatura + status Fechado)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -44,7 +44,7 @@
 - **Workflow de Medição (etapas 9 e 10):** etapa 9 = upload da solicitação + senha do medidor; etapa 10 "Medição" = parecer (Aprovado/Reprovado/Parcial+ambientes) + planta promob; **Reprovado em 2 passos** (medidor registra → fica em andamento; Gerente Vendas/Adm-Fin/Diretor anexa doc do cliente + senha → libera). Modelo `Medicao`; arquivos em `PROJETOS/<nome>/medicao/`; guard impede fechar 9/10 pelo toggle genérico
 - **Auto-load projetos** ao iniciar app (`DOMContentLoaded → projCarregar()`)
 - **LibreOffice gracioso:** `LibreOfficeIndisponivel` salva `.docx` e avança status sem travar o fluxo
-- **Parâmetros de negociação por orçamento (banco):** `orcamentos.margens` (JSON) + `orcamento_ambientes.desconto_individual_pct` — margens/descontos por orçamento, restaurados ao reabrir; migração automática do `projeto.json` (sessão 16)
+- **Parâmetros de negociação — dois escopos (sessões 16 + 20):** os **estruturais** (incluir custos, comissão do arquiteto, fidelidade, custo viagem, brinde, carga tributária) valem para o **projeto inteiro** (`projetos_meta.parametros_json`, compartilhados por todos os orçamentos); **desconto** (global em `orcamentos.margens` + por ambiente em `orcamento_ambientes.desconto_individual_pct`) e **pagamento** são **por orçamento**. Migrações automáticas (`projeto.json`→orçamento e estruturais→projeto)
 - **Snapshot completo da negociação (`orcamentos.negociacao_json`):** modalidade, formas, nº de parcelas, entrada e **datas manuais do Total Flex** salvas e reproduzidas ao reabrir; **salvamento garantido ao aprovar** (aprovação bloqueada se falhar; total 0 não sobrescreve) (sessão 17)
 - **Trava total pós-assinatura:** a partir da 1ª assinatura, UI esconde Salvar/Parâmetros/Ambientes/Novo Orçamento/Rever (mantém "Assinar Contrato" só enquanto falta a 2ª parte) e backend recusa **403** as mutações (`_contrato_assinado`); na 2ª assinatura, status terminal **"🔒 Fechado"** (sessão 19)
 - **Contrato alinhado ao template reestruturado:** `[NOME_EMPRESA]`/`[CNPJ_EMPRESA]` (valores reais), CPFs separados (cliente + 2 testemunhas), cabeçalho robusto a marcadores fragmentados em runs (inclui text-boxes com nº/data) (sessão 18)
@@ -175,6 +175,21 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-20 (sessão 20 — parâmetros estruturais por projeto)
+**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação API real + Playwright → merge). Spec/plano em `docs/superpowers/`. Refina a sessão 16 (que deixara TODAS as margens por orçamento).
+
+**Correção pedida:** os parâmetros **estruturais** da negociação valem para o projeto inteiro — mexeu num orçamento, vale para todos. Só desconto e pagamento são por orçamento.
+
+**Modelo:**
+- **Por projeto** → **`projetos_meta.parametros_json`** (JSON, 10 chaves): `incluir_custos`, `comissao_arq_pct`/`ativa`, `fidelidade_pct`/`ativa`, `fora_da_sede`/`custo_viagem`, `brinde`/`brinde_ativo`, `carga_trib`.
+- **Por orçamento** → `orcamentos.margens` (só `desconto_pct` + `custo_financeiro_pct` derivado), `orcamento_ambientes.desconto_individual_pct`, e `orcamentos.negociacao_json` (pagamento).
+
+**Backend:** `PARAMETROS_DEFAULT` + `merge_parametros` (em `mod_orcamento_params.py`); `GET`/`POST /api/projetos/<nome>/parametros` (com gate bloqueio/assinatura); `GET /orcamentos/<id>/ambientes` passou a devolver `parametros` do projeto; `POST /api/orcamentos/<id>/margens` grava **só** `desconto_pct` (ignora estruturais); migração idempotente `migrar_parametros_para_projeto` (copia estruturais de um orçamento → projeto) no startup. `merge_margens` deixou de ser usado em `main.py`.
+
+**Frontend:** ao ativar orçamento, `projetoAtivo.margens` é montado como `parâmetros do projeto + desconto do orçamento` (`Object.assign`); o modal de parâmetros salva estruturais no projeto e desconto no orçamento.
+
+**Verificação:** pytest **155** verde (coluna, módulo puro, migração). API real: **11/11** — salvar parâmetros reflete em todos os orçamentos; desconto isolado por orçamento; estruturais não vazam para o orçamento. Playwright: estruturais compartilhados / desconto isolado entre 2 orçamentos, 0 erros de console.
 
 ### Sessão 2026-06-19 (sessão 19 — trava total pós-assinatura + status "Fechado")
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação API real + Playwright → merge). Segundo de 3 sub-projetos. Spec/plano em `docs/superpowers/`.
