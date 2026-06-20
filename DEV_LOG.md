@@ -197,6 +197,8 @@
 
 **Correção pontual (mesmo dia):** **"Data da entrada" em todas as modalidades com entrada** — adicionado também a **Aymoré** (`ay-entrada-data`), **Venda Programada** (`vp-entrada-data`) e **Total Flex** (`tf-entrada-data`); antes essas usavam a *Data do Contrato* como data de entrada. Cada `_planoPagamento.entrada_data` lê o campo novo com fallback para a data do contrato; pré-preenchido com hoje ao abrir o painel; incluído no `negociacao_json`. (Cartão e À vista já tinham.) Tudo reflete no contrato (valor/data/forma da entrada + grade do resíduo). Verificado por Playwright (3/3 modalidades).
 
+**Correção pontual (mesmo dia):** **contrato do cartão** — a grade passa a mostrar **cada parcela na sua posição com o valor e SEM data** (antes despejava o `texto_cartao` na 1ª célula); o campo `[NUM_PARCELAS]` mostra o **número de parcelas** quando parcelado e **"à vista"** quando 1x. Frontend: `_planoPagamento.parcelas` do cartão passa a conter as N parcelas (`{valor, data:''}`). Backend: `_preencher_grade` (ramo cartão) e `_parse_pagamento` (display "à vista"/número; datas vazias do cartão). Verificado: geração de contrato 12x (valores sem data, "12") e 1x ("à vista") + Playwright. pytest **157**.
+
 ### Sessão 2026-06-19 (sessão 19 — trava total pós-assinatura + status "Fechado")
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação API real + Playwright → merge). Segundo de 3 sub-projetos. Spec/plano em `docs/superpowers/`.
 
