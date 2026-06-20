@@ -219,7 +219,8 @@ def _preencher_grade(doc, pag, coletor=None):
       - parcela p (1-based) válida (p <= num e valores[p-1] não vazio):
         valor na célula de valor; data (ou _TRACO se vazia) na célula de data.
       - slot vazio: _TRACO em ambas as células.
-      - cartão: 1ª célula de valor = texto_cartao, sua data = ""; resto = _TRACO.
+      - cartão: cada parcela p <= num → valor[p-1] na célula de valor e data = "" (sem
+        data); slots vazios → _TRACO em ambas as células.
     """
     tipo    = pag.get("tipo", "")
     num     = pag.get("num_parcelas_int", 0)
