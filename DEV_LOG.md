@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-20 (sessão 20 — parâmetros estruturais por projeto: incluir custos/comissão arquiteto/fidelidade/custo viagem/brinde/carga tributária valem para TODOS os orçamentos; desconto e pagamento seguem por orçamento. Antes: sessão 19 — trava pós-assinatura + status Fechado)
+> Atualizado em: 2026-06-20 (sessão 20 + correções — parâmetros estruturais por projeto (todos os orçamentos) com desconto/pagamento por orçamento; data da entrada em todas as modalidades; contrato do cartão com parcelas sem data e campo parcelas "à vista"/número; fix de persistência dos parâmetros no modal. Specs de negociação e contratos atualizadas. Antes: sessão 19 — trava pós-assinatura + status Fechado)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
