@@ -192,6 +192,8 @@
 
 **Fixes em revisão:** guard `_tabela_existe("parceiro_lojas")` na migração (robustez a DBs parciais); restaurado o contador "já existia(m)" no resumo do `seed.py`.
 
+**Infra de desenvolvimento (mesmo dia):** configurado **acesso remoto pelo celular** (Termius/SSH) para tocar/testar as próximas fases com sessão persistente — **Tailscale** (PC `legion-marcelo` = `100.95.134.72`) + **OpenSSH do Windows** (user `mbn19`, porta 22) + **WSL2 Ubuntu** + **tmux**. Fluxo: `ssh mbn19@100.95.134.72` → `wsl` → `tmux attach`. Detalhes na memória `trabalho-mobile-termius`. **Próximo passo de produto:** F2 (perfis `super_admin`/`admin_rede` + CRUD de redes/lojas + UX de abrangência de parceiro).
+
 ### Sessão 2026-06-20 (sessão 20 — parâmetros estruturais por projeto)
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação API real + Playwright → merge). Spec/plano em `docs/superpowers/`. Refina a sessão 16 (que deixara TODAS as margens por orçamento).
 
