@@ -33,3 +33,35 @@ def test_parametros_json_default_none():
     db.add(p); db.commit()
     assert db.get(Projeto, "Proj_P2").parametros_json is None
     db.close()
+
+
+def test_migracao_copia_estruturais_do_orcamento():
+    import json
+    from database import get_session, Orcamento, Projeto, migrar_parametros_para_projeto
+    db = get_session()
+    db.add(Projeto(nome_safe="Proj_M", status="quente"))
+    db.add(Orcamento(projeto_id="Proj_M", nome="Orçamento 1", ordem=1,
+                     margens=json.dumps({"desconto_pct": 5.0, "carga_trib": 8.0,
+                                         "comissao_arq_pct": 10.0, "brinde": 200})))
+    db.commit()
+    n = migrar_parametros_para_projeto(db)
+    assert n == 1
+    p = db.get(Projeto, "Proj_M")
+    par = json.loads(p.parametros_json)
+    assert par["comissao_arq_pct"] == 10.0 and par["brinde"] == 200
+    assert "desconto_pct" not in par
+    db.close()
+
+
+def test_migracao_parametros_idempotente():
+    import json
+    from database import get_session, Orcamento, Projeto, migrar_parametros_para_projeto
+    db = get_session()
+    db.add(Projeto(nome_safe="Proj_I", status="quente",
+                   parametros_json=json.dumps({"comissao_arq_pct": 99.0})))
+    db.add(Orcamento(projeto_id="Proj_I", nome="Orçamento 1", ordem=1,
+                     margens=json.dumps({"comissao_arq_pct": 10.0})))
+    db.commit()
+    assert migrar_parametros_para_projeto(db) == 0     # já tem parametros → não toca
+    assert json.loads(db.get(Projeto, "Proj_I").parametros_json)["comissao_arq_pct"] == 99.0
+    db.close()

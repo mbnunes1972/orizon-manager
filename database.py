@@ -500,6 +500,37 @@ def migrar_margens_para_orcamentos(session, projetos_dir):
     return atualizados
 
 
+def migrar_parametros_para_projeto(session):
+    """Copia os parâmetros estruturais de um orçamento existente para
+    projetos_meta.parametros_json, para projetos que ainda não têm. Idempotente.
+    Retorna o nº de projetos atualizados."""
+    import json
+    from mod_orcamento_params import PARAMETROS_DEFAULT
+    atualizados = 0
+    projetos = session.query(Projeto).filter(
+        (Projeto.parametros_json.is_(None)) | (Projeto.parametros_json == "")
+    ).all()
+    for p in projetos:
+        orc = (session.query(Orcamento)
+                      .filter_by(projeto_id=p.nome_safe)
+                      .order_by(Orcamento.id.desc())
+                      .first())
+        if not orc or not orc.margens:
+            continue
+        try:
+            m = json.loads(orc.margens)
+        except Exception:
+            continue
+        par = {k: m[k] for k in PARAMETROS_DEFAULT if k in m}
+        if not par:
+            continue
+        p.parametros_json = json.dumps({**PARAMETROS_DEFAULT, **par}, ensure_ascii=False)
+        atualizados += 1
+    if atualizados:
+        session.commit()
+    return atualizados
+
+
 def _migrar_dados():
     """Abre a conexão real e roda as migrações de dados idempotentes."""
     import sqlite3

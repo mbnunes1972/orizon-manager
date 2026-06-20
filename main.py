@@ -3303,6 +3303,15 @@ def main():
             _db_mig.close()
     except Exception as _e:
         print("[MIGRACAO] margens->orcamento:", _e)
+    try:
+        _db_par = get_session()
+        try:
+            from database import migrar_parametros_para_projeto
+            migrar_parametros_para_projeto(_db_par)
+        finally:
+            _db_par.close()
+    except Exception as _e:
+        print("[MIGRACAO] parametros->projeto:", _e)
     port   = 8765
     # Host de bind configurável: padrão 127.0.0.1 (dev local seguro);
     # em produção defina OMIE_HOST=0.0.0.0 para aceitar acesso externo.
