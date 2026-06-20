@@ -887,8 +887,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             <option value="Mastercard">Mastercard</option>
           </select>
         </div>
-        <div style="display:none">
-          <input type="date" id="cc-data-contrato" oninput="atualizarCartao()">
+        <div>
+          <label>Data da entrada</label>
+          <input type="date" id="cc-entrada-data" oninput="atualizarCartao()">
+          <input type="date" id="cc-data-contrato" style="display:none" oninput="atualizarCartao()">
         </div>
       </div>
       <div id="cc-resumo" style="display:none">
@@ -3121,7 +3123,7 @@ const _NEG_CAMPOS_POR_MODALIDADE = {
   total_flex:       ['tf-entrada','tf-prazo','tf-data-contrato'],
   venda_programada: ['vp-entrada','vp-data-contrato'],
   aymore:           ['ay-entrada','ay-data-contrato','ay-carencia'],
-  cartao_credito:   ['cc-entrada','cc-data-contrato','cc-bandeira'],
+  cartao_credito:   ['cc-entrada','cc-entrada-data','cc-data-contrato','cc-bandeira'],
   a_vista:          ['av-entrada-valor','av-entrada-data','av-entrada-forma','av-liq-data','av-liq-forma'],
 };
 
@@ -3654,7 +3656,7 @@ async function atualizarCartao() {
   if (n > 1 && d.valor_parcela > 0) _ccTexto += ' e ' + n + 'x R$ ' + fmt(d.valor_parcela);
   window._planoPagamento = {
     tipo: 'cartao', nome_forma: 'Cartão de Crédito',
-    entrada_valor: entrada, entrada_data: '', entrada_forma: _formaEntrada,
+    entrada_valor: entrada, entrada_data: document.getElementById('cc-entrada-data')?.value || '', entrada_forma: _formaEntrada,
     total_cliente: d.total_cliente,
     texto_cartao: _ccTexto,
     parcelas: [],
