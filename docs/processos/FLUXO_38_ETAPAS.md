@@ -127,7 +127,7 @@ como referencia conceitual do processo comercial.
 
 | Codigo | Etapa |
 |---|---|
-| 1 | Captacao do cliente |
+| 1 | Cadastro do Cliente |
 | 2 | Criacao do projeto |
 | 3 | Briefing |
 | 4 | Primeiro orcamento |
@@ -165,13 +165,13 @@ principal imediatamente anterior estiver concluida.
   desabilitadas; so a "etapa corrente" (primeira principal nao concluida) tem
   acoes ativas.
 - Sub-etapas (`11a-11e`, `17a`) sao LIVRES dentro do pai (nao entram no gating).
-- Etapa 1 (Captacao) nao tem anterior — sempre liberada.
+- Etapa 1 (Cadastro do Cliente) nao tem anterior — sempre liberada.
 - Status que contam como "concluida": `concluido`, `aprovado`, `assinado`,
   `vigente`, `implantado`, `realizado`, `entregue`, `emitida`.
 
 ### Marcacao automatica e conclusoes
 
-- Ao CRIAR o projeto: etapas 1 (Captacao) e 2 (Criacao) ficam concluidas; a
+- Ao CRIAR o projeto: etapas 1 (Cadastro do Cliente) e 2 (Criacao) ficam concluidas; a
   3 (Briefing) fica PENDENTE e vira a etapa corrente (o Briefing e obrigatorio
   por projeto — nao nasce concluido).
 - Etapa 4 (Primeiro orcamento): concluida ao salvar um orcamento com >=1
