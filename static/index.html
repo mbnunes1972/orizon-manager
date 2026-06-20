@@ -3673,7 +3673,7 @@ async function atualizarCartao() {
     entrada_valor: entrada, entrada_data: document.getElementById('cc-entrada-data')?.value || '', entrada_forma: _formaEntrada,
     total_cliente: d.total_cliente,
     texto_cartao: _ccTexto,
-    parcelas: [],
+    parcelas: Array.from({length: (n || 1)}, (_, i) => ({num: i+1, valor: n === 1 ? (d.valor_parcela || d.total_cliente) : d.valor_parcela, data: '', forma: 'cartao_credito'})),
   };
   _atualizarImpostos('cc', d.total_cliente);
   atualizarResumoParcelas(entrada, d.n_parcelas, d.valor_parcela, d.total_cliente);
