@@ -515,6 +515,19 @@ def _migrar_colunas():
     finally:
         conn.close()
 
+# ── Loja seed (F1 multi-tenant) ───────────────────────────────────────────────
+# Espelha as constantes de mod_contrato.py (evita import circular database<->mod_contrato).
+# Os CPFs das testemunhas são placeholders — corrigidos no configurador de lojas (F2).
+_SEED_LOJA_NOME   = "INSPIRIUM MOVEIS PLANEJADOS E DECORACAO LTDA"
+_SEED_LOJA_CNPJ   = "19.152.134/0001-56"
+_SEED_LOJA_CODIGO = "INS"
+_SEED_LOJA_TEL    = "(12) 3341-8777"
+_SEED_LOJA_EMAIL  = "sac@dalmobilesjc.com.br"
+_SEED_TEST1_NOME  = "Jaime Perinazzo"
+_SEED_TEST1_CPF   = "xxx.xxx.xxx-xx"
+_SEED_TEST2_NOME  = "Felipe Guizalberte"
+_SEED_TEST2_CPF   = "yyy.yyy.yyy-yy"
+
 def _tabela_existe(cur, nome):
     """True se a tabela existe (migração de tabela ausente é no-op — robusto a DBs parciais)."""
     cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (nome,))
@@ -544,6 +557,44 @@ def _run_migracoes(conn):
         cur.execute("UPDATE usuarios SET nivel='gerente_vendas' WHERE nivel='gerente'")
         cur.execute("UPDATE usuarios SET nivel='diretor'        WHERE nivel='admin'")
         cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v2_2026')")
+
+    # 2026-06-20: F1 multi-tenant — loja seed (das constantes do contrato) + backfill.
+    if "tenancy_v1_2026" not in aplicadas and _tabela_existe(cur, "lojas"):
+        cur.execute("SELECT id FROM lojas ORDER BY id LIMIT 1")
+        row = cur.fetchone()
+        if row is None:
+            cur.execute(
+                """INSERT INTO lojas
+                   (nome, cnpj, codigo, telefone, email,
+                    testemunha1_nome, testemunha1_cpf,
+                    testemunha2_nome, testemunha2_cpf, ativo)
+                   VALUES (?,?,?,?,?,?,?,?,?,1)""",
+                (_SEED_LOJA_NOME, _SEED_LOJA_CNPJ, _SEED_LOJA_CODIGO,
+                 _SEED_LOJA_TEL, _SEED_LOJA_EMAIL,
+                 _SEED_TEST1_NOME, _SEED_TEST1_CPF,
+                 _SEED_TEST2_NOME, _SEED_TEST2_CPF))
+            loja_id = cur.lastrowid
+        else:
+            loja_id = row[0]
+
+        for tbl in ("usuarios", "clientes", "projetos_meta", "orcamentos", "contratos"):
+            if _tabela_existe(cur, tbl):
+                cur.execute(f"UPDATE {tbl} SET loja_id=? WHERE loja_id IS NULL", (loja_id,))
+
+        if _tabela_existe(cur, "parceiros") and _tabela_existe(cur, "parceiro_lojas"):
+            cur.execute("UPDATE parceiros SET abrangencia='loja' WHERE abrangencia IS NULL")
+            cur.execute("SELECT id, comissao_padrao_pct FROM parceiros")
+            for pid, com in cur.fetchall():
+                cur.execute("SELECT 1 FROM parceiro_lojas WHERE parceiro_id=? AND loja_id=?",
+                            (pid, loja_id))
+                if cur.fetchone() is None:
+                    cur.execute(
+                        """INSERT INTO parceiro_lojas
+                           (parceiro_id, loja_id, comissao_padrao_pct, ativo)
+                           VALUES (?,?,?,1)""",
+                        (pid, loja_id, com or 0.0))
+
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('tenancy_v1_2026')")
 
     conn.commit()
 
