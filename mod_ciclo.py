@@ -14,7 +14,7 @@ ETAPAS_PRINCIPAIS = [
 ]
 
 ETAPA_NOME = {
-    "1": "Captação do cliente",
+    "1": "Cadastro do Cliente",
     "2": "Criação do projeto",
     "3": "Briefing",
     "4": "Primeiro orçamento",
