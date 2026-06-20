@@ -175,7 +175,8 @@ class Projeto(Base):
     cliente_id = Column(Integer,  ForeignKey("clientes.id"), nullable=True)
     status     = Column(String(20), nullable=True)   # quente | morno | frio | convertido | perdido
     status_at  = Column(DateTime,   nullable=True)
-    perdido_em = Column(DateTime,   nullable=True)
+    perdido_em     = Column(DateTime,   nullable=True)
+    parametros_json = Column(Text, nullable=True)   # parâmetros estruturais da negociação (JSON, projeto-wide)
 
 
 class Briefing(Base):
@@ -394,6 +395,8 @@ def _migrar_colunas():
         prj_cols = {row[1] for row in cur.fetchall()}
         if "cliente_id" not in prj_cols:
             cur.execute("ALTER TABLE projetos_meta ADD COLUMN cliente_id INTEGER")
+        if "parametros_json" not in prj_cols:
+            cur.execute("ALTER TABLE projetos_meta ADD COLUMN parametros_json TEXT")
 
         # ── contratos ─────────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(contratos)")
@@ -492,6 +495,37 @@ def migrar_margens_para_orcamentos(session, projetos_dir):
             if not o.margens:
                 o.margens = json.dumps(margens, ensure_ascii=False)
                 atualizados += 1
+    if atualizados:
+        session.commit()
+    return atualizados
+
+
+def migrar_parametros_para_projeto(session):
+    """Copia os parâmetros estruturais de um orçamento existente para
+    projetos_meta.parametros_json, para projetos que ainda não têm. Idempotente.
+    Retorna o nº de projetos atualizados."""
+    import json
+    from mod_orcamento_params import PARAMETROS_DEFAULT
+    atualizados = 0
+    projetos = session.query(Projeto).filter(
+        (Projeto.parametros_json.is_(None)) | (Projeto.parametros_json == "")
+    ).all()
+    for p in projetos:
+        orc = (session.query(Orcamento)
+                      .filter_by(projeto_id=p.nome_safe)
+                      .order_by(Orcamento.id.desc())
+                      .first())
+        if not orc or not orc.margens:
+            continue
+        try:
+            m = json.loads(orc.margens)
+        except Exception:
+            continue
+        par = {k: m[k] for k in PARAMETROS_DEFAULT if k in m}
+        if not par:
+            continue
+        p.parametros_json = json.dumps({**PARAMETROS_DEFAULT, **par}, ensure_ascii=False)
+        atualizados += 1
     if atualizados:
         session.commit()
     return atualizados

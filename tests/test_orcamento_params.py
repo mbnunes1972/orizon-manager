@@ -55,3 +55,23 @@ def test_sanear_descontos_rejeita_nan():
     import math
     with pytest.raises(ValueError):
         sanear_descontos({"1": math.nan}, ids_validos={1})
+
+
+def test_parametros_default_tem_10_chaves_estruturais():
+    from mod_orcamento_params import PARAMETROS_DEFAULT
+    assert set(PARAMETROS_DEFAULT) == {
+        "incluir_custos", "comissao_arq_pct", "comissao_arq_ativa",
+        "fidelidade_pct", "fidelidade_ativa", "fora_da_sede", "custo_viagem",
+        "brinde", "brinde_ativo", "carga_trib"}
+    assert "desconto_pct" not in PARAMETROS_DEFAULT
+    assert PARAMETROS_DEFAULT["carga_trib"] == 8.0
+
+
+def test_merge_parametros_coage_e_preserva():
+    from mod_orcamento_params import merge_parametros, PARAMETROS_DEFAULT
+    atual = dict(PARAMETROS_DEFAULT, comissao_arq_pct=10.0)
+    out = merge_parametros(atual, {"brinde": "300", "fora_da_sede": "true"})
+    assert out["brinde"] == 300.0
+    assert out["fora_da_sede"] is True
+    assert out["comissao_arq_pct"] == 10.0      # preservado
+    assert "desconto_pct" not in out            # estruturais não incluem desconto

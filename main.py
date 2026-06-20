@@ -537,9 +537,14 @@ class Handler(BaseHTTPRequestHandler):
                     orc = db.get(Orcamento, oid)
                     margens = json.loads(orc.margens) if (orc and orc.margens) else {}
                     negociacao = json.loads(orc.negociacao_json) if (orc and orc.negociacao_json) else None
+                    parametros = {}
+                    if orc:
+                        from mod_orcamento_params import PARAMETROS_DEFAULT
+                        _p = db.get(Projeto, orc.projeto_id)
+                        parametros = json.loads(_p.parametros_json) if (_p and _p.parametros_json) else dict(PARAMETROS_DEFAULT)
                     self.send_json({"ok": True, "orcamento_id": oid,
                                     "margens": margens, "negociacao": negociacao,
-                                    "ambientes": ambientes})
+                                    "parametros": parametros, "ambientes": ambientes})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
@@ -623,6 +628,21 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": True, "projetos": projetos, "cliente": _cliente_dict(c)})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)})
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/parametros$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                from mod_orcamento_params import PARAMETROS_DEFAULT
+                db = get_session()
+                try:
+                    p = db.get(Projeto, nome_safe)
+                    par = json.loads(p.parametros_json) if (p and p.parametros_json) else dict(PARAMETROS_DEFAULT)
+                    self.send_json({"ok": True, "parametros": par})
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
                     db.close()
                 return
@@ -1501,13 +1521,39 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif re.match(r"^/api/projetos/([^/]+)/parametros$", path):
+            m_par = re.match(r"^/api/projetos/([^/]+)/parametros$", path)
+            nome_safe = unquote(m_par.group(1))
+            db = get_session()
+            try:
+                from mod_orcamento_params import merge_parametros
+                req = json.loads(body.decode("utf-8", "replace")) if body else {}
+                if _projeto_esta_bloqueado(nome_safe):
+                    self.send_json({"ok": False, "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."}, code=400)
+                    return
+                if _contrato_assinado(nome_safe, db):
+                    self.send_json({"ok": False, "erro": "Contrato assinado — alterações não permitidas."}, code=403)
+                    return
+                p = db.get(Projeto, nome_safe)
+                if not p:
+                    p = Projeto(nome_safe=nome_safe); db.add(p)
+                atual = json.loads(p.parametros_json) if p.parametros_json else {}
+                novos = merge_parametros(atual, req)
+                p.parametros_json = json.dumps(novos, ensure_ascii=False)
+                db.commit()
+                self.send_json({"ok": True, "parametros": novos})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+
         elif re.match(r"^/api/orcamentos/(\d+)/margens$", path):
             # ── POST /api/orcamentos/<id>/margens — salva margens do orçamento ─────
             m_orc_mar = re.match(r"^/api/orcamentos/(\d+)/margens$", path)
             oid = int(m_orc_mar.group(1))
             db = get_session()
             try:
-                from mod_orcamento_params import merge_margens
                 req = json.loads(body.decode("utf-8", "replace")) if body else {}
                 orc = db.get(Orcamento, oid)
                 if not orc:
@@ -1524,12 +1570,12 @@ class Handler(BaseHTTPRequestHandler):
                                    code=403)
                     return
                 atual = json.loads(orc.margens) if orc.margens else {}
-                novas = merge_margens(atual, req)
-                orc.margens = json.dumps(novas, ensure_ascii=False)
                 if "desconto_pct" in req:
+                    atual["desconto_pct"] = float(req["desconto_pct"])
                     orc.desconto_pct = float(req["desconto_pct"])
+                orc.margens = json.dumps(atual, ensure_ascii=False)
                 db.commit()
-                self.send_json({"ok": True, "margens": novas})
+                self.send_json({"ok": True, "margens": atual})
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -3303,6 +3349,15 @@ def main():
             _db_mig.close()
     except Exception as _e:
         print("[MIGRACAO] margens->orcamento:", _e)
+    try:
+        _db_par = get_session()
+        try:
+            from database import migrar_parametros_para_projeto
+            migrar_parametros_para_projeto(_db_par)
+        finally:
+            _db_par.close()
+    except Exception as _e:
+        print("[MIGRACAO] parametros->projeto:", _e)
     port   = 8765
     # Host de bind configurável: padrão 127.0.0.1 (dev local seguro);
     # em produção defina OMIE_HOST=0.0.0.0 para aceitar acesso externo.
