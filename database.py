@@ -175,7 +175,8 @@ class Projeto(Base):
     cliente_id = Column(Integer,  ForeignKey("clientes.id"), nullable=True)
     status     = Column(String(20), nullable=True)   # quente | morno | frio | convertido | perdido
     status_at  = Column(DateTime,   nullable=True)
-    perdido_em = Column(DateTime,   nullable=True)
+    perdido_em     = Column(DateTime,   nullable=True)
+    parametros_json = Column(Text, nullable=True)   # parâmetros estruturais da negociação (JSON, projeto-wide)
 
 
 class Briefing(Base):
@@ -394,6 +395,8 @@ def _migrar_colunas():
         prj_cols = {row[1] for row in cur.fetchall()}
         if "cliente_id" not in prj_cols:
             cur.execute("ALTER TABLE projetos_meta ADD COLUMN cliente_id INTEGER")
+        if "parametros_json" not in prj_cols:
+            cur.execute("ALTER TABLE projetos_meta ADD COLUMN parametros_json TEXT")
 
         # ── contratos ─────────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(contratos)")
