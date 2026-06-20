@@ -436,6 +436,7 @@ def _migrar_colunas():
             ("inst_cidade",            "VARCHAR(80)"),
             ("inst_cep",               "VARCHAR(9)"),
             ("inst_uf",                "VARCHAR(2)"),
+            ("loja_id",                "INTEGER"),
         ]:
             if col not in cli_cols:
                 cur.execute(f"ALTER TABLE clientes ADD COLUMN {col} {tipo}")
@@ -445,6 +446,9 @@ def _migrar_colunas():
         usr_cols = {row[1] for row in cur.fetchall()}
         if "telefone" not in usr_cols:
             cur.execute("ALTER TABLE usuarios ADD COLUMN telefone VARCHAR(20)")
+        for col in ("loja_id", "rede_id"):
+            if col not in usr_cols:
+                cur.execute(f"ALTER TABLE usuarios ADD COLUMN {col} INTEGER")
 
         # ── projetos_meta ─────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(projetos_meta)")
@@ -453,6 +457,8 @@ def _migrar_colunas():
             cur.execute("ALTER TABLE projetos_meta ADD COLUMN cliente_id INTEGER")
         if "parametros_json" not in prj_cols:
             cur.execute("ALTER TABLE projetos_meta ADD COLUMN parametros_json TEXT")
+        if "loja_id" not in prj_cols:
+            cur.execute("ALTER TABLE projetos_meta ADD COLUMN loja_id INTEGER")
 
         # ── contratos ─────────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(contratos)")
@@ -464,6 +470,7 @@ def _migrar_colunas():
             ("d4sign_uuid",     "TEXT"),
             ("gerado_por_id",   "INTEGER"),
             ("num_contrato",    "VARCHAR(30)"),
+            ("loja_id",         "INTEGER"),
         ]:
             if col not in con_cols:
                 cur.execute(f"ALTER TABLE contratos ADD COLUMN {col} {tipo}")
@@ -476,6 +483,7 @@ def _migrar_colunas():
             ("forma_pagamento", "TEXT"),
             ("updated_at",      "DATETIME"),
             ("negociacao_json", "TEXT"),
+            ("loja_id",         "INTEGER"),
         ]:
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")
@@ -492,6 +500,14 @@ def _migrar_colunas():
         bf_cols = {row[1] for row in cur.fetchall()}
         if "projeto_nome" not in bf_cols:
             cur.execute("ALTER TABLE briefings ADD COLUMN projeto_nome TEXT")
+
+        # ── parceiros (tenant) ────────────────────────────────────────────────
+        cur.execute("PRAGMA table_info(parceiros)")
+        par_cols = {row[1] for row in cur.fetchall()}
+        if "rede_id" not in par_cols:
+            cur.execute("ALTER TABLE parceiros ADD COLUMN rede_id INTEGER")
+        if "abrangencia" not in par_cols:
+            cur.execute("ALTER TABLE parceiros ADD COLUMN abrangencia VARCHAR(10) DEFAULT 'loja'")
 
         conn.commit()
     except Exception:
