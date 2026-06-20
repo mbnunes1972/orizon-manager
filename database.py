@@ -669,6 +669,12 @@ def get_session():
     return Session()
 
 
+def loja_seed_id(db):
+    """Id da loja seed (a 1ª loja por id), ou None se ainda não houver loja."""
+    loja = db.query(Loja).order_by(Loja.id).first()
+    return loja.id if loja else None
+
+
 def upsert_projeto_status(nome_safe: str, status: str, perdido_em=None):
     """Cria ou atualiza o registro de status do projeto. Thread-safe via sessão própria."""
     db = get_session()
