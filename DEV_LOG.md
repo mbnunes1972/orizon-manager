@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-20 (sessão 20 + correções — parâmetros estruturais por projeto (todos os orçamentos) com desconto/pagamento por orçamento; data da entrada em todas as modalidades; contrato do cartão com parcelas sem data e campo parcelas "à vista"/número; fix de persistência dos parâmetros no modal. Specs de negociação e contratos atualizadas. Antes: sessão 19 — trava pós-assinatura + status Fechado)
+> Atualizado em: 2026-06-20 (sessão 21 — **F1 da plataforma multi-tenant**: fundação de dados (tabelas `redes`/`lojas`/`parceiro_lojas`, colunas de tenant `loja_id`/`rede_id`/`abrangencia`, migração `tenancy_v1_2026` + loja seed, `seed.py` vinculado). Puramente aditiva: zero mudança de comportamento. Antes: sessão 20 — parâmetros estruturais por projeto; data da entrada em todas as modalidades; contrato do cartão com parcelas sem data)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -85,7 +85,7 @@
 
 ### [PENDENTE]
 - **Sub-projeto 3 — Versionamento de documentos:** novos documentos criam versão; nunca sobrescrevem nem permitem apagar versões anteriores (último item do pedido das sessões 17–19)
-- **Configurador de lojas:** nome/CNPJ/testemunhas/telefone/email da loja hoje em constantes (`mod_contrato.py`: `_NOME_EMPRESA`, `_CNPJ_EMPRESA`, `_TESTEMUNHAS` com CPF placeholder) — mover para painel de configuração
+- **Plataforma multi-tenant (programa de 4 fases):** o "configurador de lojas" virou um programa `Plataforma → Rede → Loja` com isolamento total. **F1 (fundação de dados) CONCLUÍDA na sessão 21** (tabelas `redes`/`lojas`/`parceiro_lojas`, colunas de tenant, migração `tenancy_v1_2026` + loja seed). **Pendentes:** F2 (perfis `super_admin`/`admin_rede` + CRUD de redes/lojas + UX de abrangência de parceiro); F3 (`mod_contrato.py` puxa dados da loja em vez das constantes `_NOME_EMPRESA`/`_CNPJ_EMPRESA`/`_TESTEMUNHAS` com CPF placeholder + numeração por loja); F4 (isolamento — escopo por loja/rede em todas as queries). Spec/plano em `docs/superpowers/`.
 - Módulo Clientes e Parceiros vinculados a orçamentos (planejado)
 - **Trocar as senhas de exemplo do `seed.py`** (10 usuários) antes de produção — pelo Painel Admin → Usuários (perfil técnico `admin` foi aposentado)
 - Refinar espaçamento visual do bloco de assinaturas no PDF (validado por estrutura, não por render — LibreOffice ausente no dev local)
@@ -175,6 +175,22 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-20 (sessão 21 — F1: fundação da plataforma multi-tenant)
+**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação → merge). Spec/plano em `docs/superpowers/specs/2026-06-20-multitenant-f1-fundacao-design.md` e `docs/superpowers/plans/2026-06-20-multitenant-f1-fundacao.md`.
+
+**Origem:** o pedido "configurador de lojas" (tirar nome/CNPJ/testemunhas das constantes de `mod_contrato.py`) foi explorado e revelou a intenção de uma **plataforma multi-tenant com isolamento total** — `Plataforma → Rede → Loja`, com lojas independentes (avulsas) e escalável para muitas redes/lojas; cada loja tem seus usuários. Decomposto em **4 fases**, cada uma com seu ciclo: **F1 fundação de dados** (esta) · F2 perfis + CRUD de redes/lojas · F3 contrato puxa da loja · F4 isolamento (escopo por loja em todas as queries).
+
+**F1 — puramente aditiva (zero mudança de comportamento):**
+- **Models novos (`database.py`):** `Rede` (`redes`), `Loja` (`lojas`, com `rede_id` nullable = avulsa, `codigo` 3-letras UNIQUE p/ numeração do contrato, endereço, 2 testemunhas), `ParceiroLoja` (`parceiro_lojas` — vínculo M:N parceiro×loja com `comissao_padrao_pct` por loja).
+- **Modelo de parceiros M:N:** parceiro pertence a uma **rede** (ou loja avulsa); `abrangencia` `'loja'`|`'rede'`; mesma pessoa pode ser parceira de 2 lojas (1 cadastro, N vínculos); parceiro "global da rede" via `abrangencia='rede'`. Fronteira de isolamento = rede/loja-avulsa.
+- **Colunas de tenant:** `loja_id` em `usuarios`/`clientes`/`projetos_meta`/`orcamentos`/`contratos`; `rede_id` em `usuarios`; `rede_id`+`abrangencia` em `parceiros`. Tabelas-filhas (briefings/medicoes/pool/etc.) herdam pelo pai — não recebem `loja_id`.
+- **Migração:** colunas via `_migrar_colunas` (DBs existentes); dados via `_run_migracoes` → `tenancy_v1_2026` (idempotente, em `schema_migrations`): cria a **loja seed** a partir das constantes do contrato (INSPIRIUM, `codigo=INS`; CPFs de testemunha ainda placeholder → corrigir na F2) e faz backfill de `loja_id` em todos os registros + um vínculo `parceiro_lojas` por parceiro.
+- **`seed.py`:** `criar_usuarios_seed(db, usuarios, loja_id)` (puro/testável) vincula os 10 usuários-exemplo à loja seed; helper `loja_seed_id(db)`.
+
+**Verificação:** pytest **167** verde (10 novos: schema, colunas, migração+idempotência+não-sobrescreve-abrangência, seed). Smoke do `init_db()` completo sobre uma **cópia do `omie.db` real**: loja seed criada e **0 registros com `loja_id` NULL** (11 usuários, 6 clientes, 14 projetos, 20 orçamentos, 13 contratos). Sem mudança de UI/rotas/contrato (confirmado por revisão de spec em cada task) — regressão por construção. **Pendente:** regressão Playwright ao vivo não rodada (evitar mutar o DEV DB antes do merge; F1 não tem superfície de UI).
+
+**Fixes em revisão:** guard `_tabela_existe("parceiro_lojas")` na migração (robustez a DBs parciais); restaurado o contador "já existia(m)" no resumo do `seed.py`.
 
 ### Sessão 2026-06-20 (sessão 20 — parâmetros estruturais por projeto)
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação API real + Playwright → merge). Spec/plano em `docs/superpowers/`. Refina a sessão 16 (que deixara TODAS as margens por orçamento).
