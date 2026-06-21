@@ -323,9 +323,22 @@ class Handler(BaseHTTPRequestHandler):
 
         m = re.match(r"^/api/clientes/(\d+)/briefing$", path)
         if m:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             db = get_session()
             try:
-                b = db.query(Briefing).filter_by(cliente_id=int(m.group(1)))\
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                c = _obj_da_loja(db, Cliente, int(m.group(1)), loja_id)
+                if c is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                    return
+                b = db.query(Briefing).filter_by(cliente_id=c.id)\
                       .order_by(Briefing.id.desc()).first()
                 if not b:
                     self.send_json({"ok": True, "briefing": None})
@@ -355,11 +368,20 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         elif path == "/api/clientes":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             from urllib.parse import parse_qs
             q  = (parse_qs(urlparse(self.path).query).get('q') or [''])[0].strip().lower()
             db = get_session()
             try:
-                query = db.query(Cliente).order_by(Cliente.nome)
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                query = db.query(Cliente).filter(Cliente.loja_id == loja_id).order_by(Cliente.nome)
                 if q:
                     query = query.filter(
                         (Cliente.nome.ilike(f"%{q}%")) |
@@ -638,13 +660,22 @@ class Handler(BaseHTTPRequestHandler):
 
             m = _re.match(r"^/api/clientes/(\d+)$", path)
             if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 db = get_session()
                 try:
-                    c = db.get(Cliente, int(m.group(1)))
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    c = _obj_da_loja(db, Cliente, int(m.group(1)), loja_id)
                     if c:
                         self.send_json({"ok": True, "cliente": _cliente_dict(c)})
                     else:
-                        self.send_json({"ok": False, "erro": "Cliente não encontrado"}, code=404)
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
@@ -668,11 +699,20 @@ class Handler(BaseHTTPRequestHandler):
 
             m = _re.match(r"^/api/clientes/(\d+)/projetos$", path)
             if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 db = get_session()
                 try:
-                    c = db.get(Cliente, int(m.group(1)))
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    c = _obj_da_loja(db, Cliente, int(m.group(1)), loja_id)
                     if not c:
-                        self.send_json({"ok": False, "erro": "Cliente não encontrado"}, code=404)
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
                     nome_lower = c.nome.lower()
                     projetos = [
@@ -1311,6 +1351,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({'ok': False, 'erro': str(e)})
 
         elif path == "/api/clientes":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             req  = json.loads(body) if body else {}
             faltando = validar_cadastro_minimo(req)
             if faltando:
@@ -1321,6 +1365,11 @@ class Handler(BaseHTTPRequestHandler):
             cpf = (req.get("cpf") or "").strip() or None
             db  = get_session()
             try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
                 if cpf:
                     existente = db.query(Cliente).filter_by(cpf=cpf).first()
                     if existente:
@@ -1329,6 +1378,7 @@ class Handler(BaseHTTPRequestHandler):
                         return
                 c = Cliente(
                     nome       =nome, cpf=cpf,
+                    loja_id    =loja_id,
                     email      =(req.get("email")       or "").strip() or None,
                     telefone   =(req.get("telefone")    or "").strip() or None,
                     whatsapp   =(req.get("whatsapp")    or "").strip() or None,
@@ -1492,12 +1542,21 @@ class Handler(BaseHTTPRequestHandler):
 
         elif re.match(r"^/api/clientes/(\d+)/editar$", path):
             m_cli = re.match(r"^/api/clientes/(\d+)/editar$", path)
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             req   = json.loads(body) if body else {}
             db    = get_session()
             try:
-                c = db.get(Cliente, int(m_cli.group(1)))
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                c = _obj_da_loja(db, Cliente, int(m_cli.group(1)), loja_id)
                 if not c:
-                    self.send_json({"ok": False, "erro": "Cliente não encontrado"})
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
                 campos = ["nome","cpf","email","telefone","whatsapp",
                           "cep","logradouro","numero","complemento",
