@@ -1009,6 +1009,10 @@ Em `main.py`, substituir o corpo do `elif path == "/api/admin/usuarios":` em `do
             try:
                 ator = _ator_dict(db, usuario)
                 us = db.query(Usuario).order_by(Usuario.nome).all()
+                # pré-carrega rede_id de cada loja referenciada (evita N+1 no loop de escopo)
+                loja_ids = {u.loja_id for u in us if u.loja_id is not None}
+                rede_de_loja = {l.id: l.rede_id for l in
+                                db.query(Loja).filter(Loja.id.in_(loja_ids)).all()} if loja_ids else {}
                 visiveis = []
                 for u in us:
                     if mod_tenancy._eh_super_admin(ator):
@@ -1017,7 +1021,7 @@ Em `main.py`, substituir o corpo do `elif path == "/api/admin/usuarios":` em `do
                         # usuários da rede do ator: por loja da rede, ou admin_rede da mesma rede
                         ok = (u.rede_id == ator["rede_id"]) or (
                             u.loja_id is not None and mod_tenancy.pode_ver_loja(
-                                ator, {"id": u.loja_id, "rede_id": _rede_da_loja(db, u.loja_id)}))
+                                ator, {"id": u.loja_id, "rede_id": rede_de_loja.get(u.loja_id)}))
                     else:
                         ok = (u.loja_id is not None and u.loja_id == ator.get("loja_id"))
                     if ok:
@@ -1029,17 +1033,6 @@ Em `main.py`, substituir o corpo do `elif path == "/api/admin/usuarios":` em `do
                      "ativo": bool(u.ativo)} for u in visiveis]})
             finally:
                 db.close()
-```
-
-E adicionar o helper `_rede_da_loja` junto aos serializadores em `main.py`:
-
-```python
-def _rede_da_loja(db, loja_id):
-    """rede_id da loja (ou None se avulsa/inexistente). Usado no escopo de listagem."""
-    if loja_id is None:
-        return None
-    l = db.get(Loja, loja_id)
-    return l.rede_id if l else None
 ```
 
 - [ ] **Step 2: Apply tenant attribution on user creation (`POST /api/admin/usuarios`)**
@@ -1210,14 +1203,17 @@ Em `main.py`, no bloco `elif path == "/api/parceiros":` do `do_POST` (≈ 1470-1
                     comissao_padrao_pct =float(req.get("comissao_padrao_pct") or 0),
                     observacoes         =(req.get("observacoes")         or "").strip() or None,
                 )
-                db.add(p); db.commit(); db.refresh(p)
-                ator = _ator_dict(db, usuario) if usuario else {"nivel": "", "loja_id": None, "rede_id": None}
-                erros = _aplicar_abrangencia_parceiro(db, p, req, ator)
-                if erros:
-                    db.rollback()
-                    self.send_json({"ok": False, "erro": " ".join(erros)})
-                    return
+                db.add(p)
+                db.flush()        # atribui p.id sem efetivar — transação única e atômica
+                if "abrangencia" in req:
+                    ator = _ator_dict(db, usuario) if usuario else {"nivel": "", "loja_id": None, "rede_id": None}
+                    erros = _aplicar_abrangencia_parceiro(db, p, req, ator)
+                    if erros:
+                        db.rollback()    # desfaz tudo, inclusive o INSERT do parceiro
+                        self.send_json({"ok": False, "erro": " ".join(erros)})
+                        return
                 db.commit()
+                db.refresh(p)
                 self.send_json({"ok": True, "parceiro": _parceiro_dict(p, db)})
             except Exception as e:
                 db.rollback()
