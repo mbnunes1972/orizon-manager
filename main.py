@@ -304,22 +304,54 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"ok": True, "modalidades": mods})
 
         elif path == "/projetos":
-            projetos = _listar_projetos()
-            _enriquecer_projetos_com_pool(projetos)
-            _enriquecer_projetos_com_status(projetos)
-            self.send_json({"ok": True, "projetos": projetos})
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                projetos = _listar_projetos()
+                projetos = _filtrar_projetos_por_loja(projetos, db, loja_id)
+                _enriquecer_projetos_com_pool(projetos)
+                _enriquecer_projetos_com_status(projetos)
+                self.send_json({"ok": True, "projetos": projetos})
+            except Exception as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
 
         elif path == "/projetos/buscar":
-            from urllib.parse import parse_qs
-            q = (parse_qs(urlparse(self.path).query).get('q') or [''])[0].strip()
-            locais = _buscar_projetos(q)
-            for p in locais: p['origem'] = 'local'
-            _enriquecer_projetos_com_pool(locais)
-            _enriquecer_projetos_com_status(locais)
-            omie_res = _buscar_projetos_omie(q)
-            nomes_locais = {p['nome_projeto'].lower() for p in locais}
-            omie_unicos = [p for p in omie_res if p['nome_projeto'].lower() not in nomes_locais]
-            self.send_json({'ok': True, 'projetos': locais + omie_unicos})
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                from urllib.parse import parse_qs
+                q = (parse_qs(urlparse(self.path).query).get('q') or [''])[0].strip()
+                locais = _buscar_projetos(q)
+                locais = _filtrar_projetos_por_loja(locais, db, loja_id)
+                for p in locais: p['origem'] = 'local'
+                _enriquecer_projetos_com_pool(locais)
+                _enriquecer_projetos_com_status(locais)
+                omie_res = _buscar_projetos_omie(q)
+                nomes_locais = {p['nome_projeto'].lower() for p in locais}
+                omie_unicos = [p for p in omie_res if p['nome_projeto'].lower() not in nomes_locais]
+                self.send_json({'ok': True, 'projetos': locais + omie_unicos})
+            except Exception as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
 
         m = re.match(r"^/api/clientes/(\d+)/briefing$", path)
         if m:
@@ -632,9 +664,21 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r"^/projetos/([^/]+)/orcamentos$", path)
             if m:
                 nome_safe = m.group(1)
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 print("[ORC] GET orcamentos para projeto_id=%r" % nome_safe)
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     orcs = (db.query(Orcamento)
                               .filter_by(projeto_id=nome_safe)
                               .order_by(Orcamento.ordem)
@@ -650,6 +694,22 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r"^/projetos/([^/]+)$", path)
             if m:
                 nome_safe = m.group(1)
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                finally:
+                    db.close()
                 proj = _carregar_projeto(nome_safe)
                 if proj:
                     session_set("projeto_ativo", nome_safe)
@@ -731,11 +791,23 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r'^/api/projetos/([^/]+)/parametros$', path)
             if m:
                 nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 from mod_orcamento_params import PARAMETROS_DEFAULT
                 db = get_session()
                 try:
-                    p = db.get(Projeto, nome_safe)
-                    par = json.loads(p.parametros_json) if (p and p.parametros_json) else dict(PARAMETROS_DEFAULT)
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    p = _projeto_da_loja(db, nome_safe, loja_id)
+                    if p is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    par = json.loads(p.parametros_json) if p.parametros_json else dict(PARAMETROS_DEFAULT)
                     self.send_json({"ok": True, "parametros": par})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -746,8 +818,20 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r'^/api/projetos/([^/]+)/ciclo$', path)
             if m:
                 nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     etapas = db.query(CicloEtapa)\
                                .filter_by(projeto_nome=nome_safe)\
                                .all()
@@ -1220,6 +1304,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"ok": True, "resultado": resultado})
 
         elif path == "/projetos/novo":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             req = json.loads(body)
             nome_proj   = req.get('nome_projeto', '').strip()
             cliente_id  = req.get('cliente_id')
@@ -1230,12 +1318,17 @@ class Handler(BaseHTTPRequestHandler):
             if not cliente_id:
                 self.send_json({'ok': False, 'erro': 'cliente_id é obrigatório — selecione ou cadastre um cliente'})
                 return
-            # Carrega dados do cliente do banco para garantir consistência
+            # Carrega dados do cliente do banco para garantir consistência + escopo de loja
             db = get_session()
             try:
-                c = db.get(Cliente, int(cliente_id))
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                c = _obj_da_loja(db, Cliente, int(cliente_id), loja_id)
                 if not c:
-                    self.send_json({'ok': False, 'erro': 'Cliente não encontrado'})
+                    self.send_json({'ok': False, 'erro': 'Cliente não encontrado'}, code=404)
                     return
                 cli_nome     = c.nome
                 cli_cpf      = c.cpf      or ''
@@ -1283,6 +1376,7 @@ class Handler(BaseHTTPRequestHandler):
                         p_meta = Projeto(nome_safe=proj['nome_safe'])
                         _db_ciclo.add(p_meta)
                     p_meta.cliente_id = int(cliente_id)
+                    p_meta.loja_id = loja_id
                     _db_ciclo.commit()
 
                     agora = datetime.utcnow()
@@ -1668,8 +1762,17 @@ class Handler(BaseHTTPRequestHandler):
         elif re.match(r"^/api/projetos/([^/]+)/parametros$", path):
             m_par = re.match(r"^/api/projetos/([^/]+)/parametros$", path)
             nome_safe = unquote(m_par.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             db = get_session()
             try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
                 from mod_orcamento_params import merge_parametros
                 req = json.loads(body.decode("utf-8", "replace")) if body else {}
                 if _projeto_esta_bloqueado(nome_safe):
@@ -1678,9 +1781,10 @@ class Handler(BaseHTTPRequestHandler):
                 if _contrato_assinado(nome_safe, db):
                     self.send_json({"ok": False, "erro": "Contrato assinado — alterações não permitidas."}, code=403)
                     return
-                p = db.get(Projeto, nome_safe)
-                if not p:
-                    p = Projeto(nome_safe=nome_safe); db.add(p)
+                p = _projeto_da_loja(db, nome_safe, loja_id)
+                if p is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                    return
                 atual = json.loads(p.parametros_json) if p.parametros_json else {}
                 novos = merge_parametros(atual, req)
                 p.parametros_json = json.dumps(novos, ensure_ascii=False)
@@ -3763,6 +3867,16 @@ def _projeto_da_loja(db, nome_safe, loja_id):
     Ponto de escopo das entidades 'por projeto' (pool/medição/ciclo/contrato).
     Delega em _obj_da_loja para manter uma única fonte da regra de escopo."""
     return _obj_da_loja(db, Projeto, nome_safe, loja_id)
+
+
+def _filtrar_projetos_por_loja(projetos, db, loja_id):
+    """Mantém só os projetos cujo projetos_meta.loja_id == loja_id (a lista vem do storage)."""
+    nomes = [p.get("nome_safe") for p in projetos if p.get("nome_safe")]
+    if not nomes:
+        return projetos
+    permitidos = {r[0] for r in db.query(Projeto.nome_safe)
+                  .filter(Projeto.nome_safe.in_(nomes), Projeto.loja_id == loja_id).all()}
+    return [p for p in projetos if p.get("nome_safe") in permitidos]
 
 
 def _loja_dict_para_contrato(db, loja_id):
