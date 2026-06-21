@@ -1599,9 +1599,20 @@ class Handler(BaseHTTPRequestHandler):
         if m_bp:
             nome_safe = unquote(m_bp.group(1))
             usuario   = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             req       = json.loads(body) if body else {}
             db        = get_session()
             try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                    return
                 p_meta = db.query(Projeto).filter_by(nome_safe=nome_safe).first()
                 cliente_id = p_meta.cliente_id if p_meta else None
                 if not cliente_id:
@@ -2626,6 +2637,23 @@ class Handler(BaseHTTPRequestHandler):
             if m:
                 nome_safe = m.group(1)
                 acao = m.group(2)
+
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                _db_scope = get_session()
+                try:
+                    ator = _ator_dict(_db_scope, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(_db_scope, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                finally:
+                    _db_scope.close()
 
                 # Rotas de escrita bloqueadas após aprovação
                 if acao in ("adicionar", "remover", "atualizar"):
