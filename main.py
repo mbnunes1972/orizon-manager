@@ -611,11 +611,23 @@ class Handler(BaseHTTPRequestHandler):
             if m:
                 from urllib.parse import parse_qs
                 nome_safe    = m.group(1)
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 qs           = parse_qs(urlparse(self.path).query)
                 orcamento_id = qs.get("orcamento_id", [None])[0]
                 orcamento_id = int(orcamento_id) if orcamento_id else None
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     ambientes = (db.query(PoolAmbiente)
                                    .filter_by(projeto_id=nome_safe)
                                    .order_by(PoolAmbiente.nome, PoolAmbiente.versao)
@@ -906,10 +918,19 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r'^/api/projetos/([^/]+)/medicao/arquivo/(solicitacao|planta|doc_cliente)$', path)
             if m:
                 nome_safe = unquote(m.group(1)); tipo = m.group(2)
-                if not get_usuario_sessao(self):
+                usuario = get_usuario_sessao(self)
+                if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     md = db.query(Medicao).filter_by(projeto_nome=nome_safe).first()
                     fname = md and getattr(md, tipo + "_arquivo", None)
                 finally:
@@ -932,11 +953,20 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r'^/api/projetos/([^/]+)/medicao$', path)
             if m:
                 nome_safe = unquote(m.group(1))
-                if not get_usuario_sessao(self):
+                usuario = get_usuario_sessao(self)
+                if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
                     return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     md = db.query(Medicao).filter_by(projeto_nome=nome_safe).first()
                     if not md:
                         self.send_json({"ok": True, "medicao": None})
@@ -1971,8 +2001,20 @@ class Handler(BaseHTTPRequestHandler):
             m_pool = _re.match(r"^/projetos/([^/]+)/pool$", path)
             if m_pool:
                 nome_safe = m_pool.group(1)
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 _db_bf = get_session()
                 try:
+                    ator = _ator_dict(_db_bf, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(_db_bf, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     _bf_ok = _briefing_projeto_completo(unquote(nome_safe), _db_bf)
                 finally:
                     _db_bf.close()
@@ -2127,18 +2169,29 @@ class Handler(BaseHTTPRequestHandler):
             if m_sobr:
                 nome_safe = m_sobr.group(1)
                 pid       = int(m_sobr.group(2))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 temp      = session_get("pool_xml_temp")
                 if not temp or temp.get("nome_safe") != nome_safe:
                     self.send_json({"ok": False, "erro": "Nenhum XML pendente para sobrescrita"})
                     return
                 db = get_session()
-                if _contrato_assinado(nome_safe, db):
-                    db.close()
-                    self.send_json({"ok": False,
-                                    "erro": "Contrato assinado — alterações não permitidas."},
-                                   code=403)
-                    return
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    if _contrato_assinado(nome_safe, db):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato assinado — alterações não permitidas."},
+                                       code=403)
+                        return
                     pa = db.get(PoolAmbiente, pid)
                     if not pa or pa.projeto_id != nome_safe:
                         self.send_json({"ok": False, "erro": "Ambiente não encontrado"})
@@ -2187,18 +2240,29 @@ class Handler(BaseHTTPRequestHandler):
             if m_nova:
                 nome_safe = m_nova.group(1)
                 pid       = int(m_nova.group(2))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 temp      = session_get("pool_xml_temp")
                 if not temp or temp.get("nome_safe") != nome_safe:
                     self.send_json({"ok": False, "erro": "Nenhum XML pendente para nova versão"})
                     return
                 db = get_session()
-                if _contrato_assinado(nome_safe, db):
-                    db.close()
-                    self.send_json({"ok": False,
-                                    "erro": "Contrato assinado — alterações não permitidas."},
-                                   code=403)
-                    return
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    if _contrato_assinado(nome_safe, db):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato assinado — alterações não permitidas."},
+                                       code=403)
+                        return
                     pa_orig = db.get(PoolAmbiente, pid)
                     if not pa_orig or pa_orig.projeto_id != nome_safe:
                         self.send_json({"ok": False, "erro": "Ambiente não encontrado"})
@@ -2207,7 +2271,7 @@ class Handler(BaseHTTPRequestHandler):
                     # versao=2 → "_v1", versao=3 → "_v2" ...
                     nome_exib_novo   = "%s_v%d" % (pa_orig.nome, nova_versao - 1)
                     arq_nome_novo    = "%s.xml" % nome_exib_novo
-                    _usuario = get_usuario_sessao(self)
+                    _usuario = usuario
                     pa_novo = PoolAmbiente(
                         projeto_id=    nome_safe,
                         nome=          pa_orig.nome,
@@ -2242,6 +2306,10 @@ class Handler(BaseHTTPRequestHandler):
             if m_ren:
                 nome_safe = m_ren.group(1)
                 pid       = int(m_ren.group(2))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 try:
                     req = json.loads(body)
                 except Exception:
@@ -2253,6 +2321,14 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     pa = db.get(PoolAmbiente, pid)
                     if not pa or pa.projeto_id != nome_safe:
                         self.send_json({"ok": False, "erro": "Ambiente não encontrado"})
@@ -2281,19 +2357,29 @@ class Handler(BaseHTTPRequestHandler):
             m_forc = _re.match(r"^/projetos/([^/]+)/pool/criar_forcado$", path)
             if m_forc:
                 nome_safe = m_forc.group(1)
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 temp      = session_get("pool_xml_temp")
                 if not temp or temp.get("nome_safe") != nome_safe:
                     self.send_json({"ok": False, "erro": "Nenhum XML pendente"})
                     return
                 db = get_session()
-                if _contrato_assinado(nome_safe, db):
-                    db.close()
-                    self.send_json({"ok": False,
-                                    "erro": "Contrato assinado — alterações não permitidas."},
-                                   code=403)
-                    return
                 try:
-                    _usuario = get_usuario_sessao(self)
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    if _contrato_assinado(nome_safe, db):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato assinado — alterações não permitidas."},
+                                       code=403)
+                        return
                     pa = PoolAmbiente(
                         projeto_id=    nome_safe,
                         nome=          temp["nome_base"],
@@ -2303,7 +2389,7 @@ class Handler(BaseHTTPRequestHandler):
                         ambientes_json=json.dumps(temp["amb"]),
                         budget_total=  temp["budget_total"],
                         order_total=   temp["order_total"],
-                        created_by=    _usuario['id'] if _usuario else None,
+                        created_by=    usuario['id'] if usuario else None,
                     )
                     db.add(pa)
                     db.commit()
@@ -2621,8 +2707,20 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r'^/api/projetos/([^/]+)/ciclo/desfazer_aprovacao$', path)
             if m:
                 nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     req   = json.loads(body or b'{}')
                     login = (req.get("login") or "").strip()
                     senha = (req.get("senha") or "").strip()
@@ -2670,6 +2768,14 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, solicitante)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     req   = json.loads(body or b'{}')
                     login = (req.get("login") or "").strip()
                     senha = (req.get("senha") or "").strip()
@@ -3068,11 +3174,20 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r'^/api/projetos/([^/]+)/medicao/solicitacao$', path)
             if m:
                 nome_safe = unquote(m.group(1))
-                if not get_usuario_sessao(self):
+                usuario = get_usuario_sessao(self)
+                if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
                 arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     u = _usuario_com_capacidade(db, campos.get("login",""), campos.get("senha",""), "registrar_medicao")
                     if not u:
                         self.send_json({"ok": False, "erro": "Confirmação exige login+senha do Medidor (ou Diretor)."}, code=403); return
@@ -3097,7 +3212,8 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r'^/api/projetos/([^/]+)/medicao/parecer$', path)
             if m:
                 nome_safe = unquote(m.group(1))
-                if not get_usuario_sessao(self):
+                usuario = get_usuario_sessao(self)
+                if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
                 arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
                 parecer = (campos.get("parecer","") or "").strip().lower()
@@ -3107,6 +3223,14 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": " ".join(erros)}); return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     u = _usuario_com_capacidade(db, campos.get("login",""), campos.get("senha",""), "registrar_medicao")
                     if not u:
                         self.send_json({"ok": False, "erro": "Registro exige login+senha do Medidor (ou Diretor)."}, code=403); return
@@ -3142,6 +3266,14 @@ class Handler(BaseHTTPRequestHandler):
                 arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, solicitante)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     md = db.query(Medicao).filter_by(projeto_nome=nome_safe).first()
                     if not md or md.parecer != "reprovado":
                         self.send_json({"ok": False, "erro": "Só aplicável a uma medição com parecer Reprovado."}); return
@@ -3360,6 +3492,14 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     etapa = db.query(CicloEtapa).filter_by(
                         projeto_nome=nome_safe, etapa_codigo=etapa_cod
                     ).first()
