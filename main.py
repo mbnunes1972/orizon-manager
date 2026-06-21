@@ -1381,6 +1381,7 @@ class Handler(BaseHTTPRequestHandler):
                         projeto_id=_pid,
                         nome="Orçamento 1",
                         ordem=1,
+                        loja_id=loja_id,
                         created_by=_usuario['id'] if _usuario else None,
                     )
                     _db_orc.add(_orc)
@@ -1915,7 +1916,7 @@ class Handler(BaseHTTPRequestHandler):
                     _origem_id = req.get("origem_id")
                     _margens_novo = None
                     if _origem_id:
-                        _origem = db.get(Orcamento, int(_origem_id))
+                        _origem = _obj_da_loja(db, Orcamento, int(_origem_id), loja_id)
                         if _origem and _origem.margens:
                             _margens_novo = _origem.margens
                     orc = Orcamento(
@@ -3175,14 +3176,23 @@ class Handler(BaseHTTPRequestHandler):
         m_desc = re.match(r"^/api/orcamentos/(\d+)/descontos$", path)
         if m_desc:
             oid = int(m_desc.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             db = get_session()
             try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
                 from mod_orcamento_params import sanear_descontos
                 req = json.loads(body.decode("utf-8", "replace")) if body else {}
                 pares = req.get("descontos", req)   # aceita {"descontos":{...}} ou {...}
-                orc = db.get(Orcamento, oid)
-                if not orc:
-                    self.send_json({"ok": False, "erro": "Orçamento não encontrado"}, code=404)
+                orc = _obj_da_loja(db, Orcamento, oid, loja_id)
+                if orc is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
                 if _projeto_esta_bloqueado(orc.projeto_id):
                     self.send_json({"ok": False,
@@ -3224,12 +3234,21 @@ class Handler(BaseHTTPRequestHandler):
             m = re.match(r'^/orcamentos/(\d+)/valor$', path)
             if m:
                 oid = int(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 req = json.loads(body)
                 db = get_session()
                 try:
-                    orc = db.get(Orcamento, oid)
-                    if not orc:
-                        self.send_json({"ok": False, "erro": "Orçamento não encontrado"}, code=404)
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    orc = _obj_da_loja(db, Orcamento, oid, loja_id)
+                    if orc is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
                     if orc and _contrato_assinado(orc.projeto_id, db):
                         self.send_json({"ok": False,
