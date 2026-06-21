@@ -63,9 +63,11 @@ no próprio contrato a foto dos dados usados. Ao fim da F3:
 
 - **Sem isolamento operacional.** A loja usada é a do **consultor** (`usuario.loja_id`).
   Nenhuma query de clientes/projetos/orçamentos/contratos passa a filtrar por loja — isso é a F4.
-- **Sem novos marcadores no modelo.** O endereço da loja **não** entra no contrato (o
-  `modelo_contrato_mapeado.docx` não tem esses marcadores hoje). Só migram para a loja os
-  campos que o modelo já usa.
+- **Sem novos marcadores no modelo.** O endereço da loja é **obrigatório no cadastro**
+  (validação — ver seção 3), mas **não** é renderizado no contrato: o
+  `modelo_contrato_mapeado.docx` não tem marcadores de endereço de loja, e criá-los fica fora
+  do escopo da F3. Telefone/e-mail também são obrigatórios no cadastro (e seguem servindo de
+  fallback do consultor no documento).
 - **Sem fallback para as constantes antigas** (decisão 3). Loja ausente → campos em branco + aviso.
 
 ---
@@ -106,12 +108,12 @@ O módulo **continua sem I/O de banco**. Mudanças:
   obrigatório** (remove o default `_CODIGO_LOJA`). A sequência contínua por código não muda.
   Código vazio (loja sem `codigo`) gera prefixo vazio — caso coberto pelo aviso da decisão 2.
 - **Novo validador puro** `validar_loja_para_contrato(loja) -> list[str]`:
-  - Obrigatórios: `nome`, `cnpj`, `codigo`, `testemunha1_nome`, `testemunha1_cpf`,
-    `testemunha2_nome`, `testemunha2_cpf`.
+  - Obrigatórios: `nome`, `cnpj`, `codigo`, `telefone`, `email`,
+    `testemunha1_nome`, `testemunha1_cpf`, `testemunha2_nome`, `testemunha2_cpf`,
+    e o **endereço**: `cep`, `logradouro`, `numero`, `bairro`, `cidade`, `estado`
+    (`complemento` é opcional, espelhando a regra do cadastro do cliente).
   - **CPF placeholder** conta como faltando (regex de dígitos não-numéricos do tipo
     `xxx.xxx.xxx-xx` / `yyy…`; um CPF sem dígitos reais é "faltando").
-  - `telefone`/`email`/endereço **não** são exigidos (telefone/email são só fallback do
-    consultor; endereço não vai pro modelo).
   - Lista vazia → loja completa.
 
 ## 4. `main.py` — I/O, snapshot e aviso
@@ -165,7 +167,8 @@ resposta `precisa_confirmar_loja`:
 
 **pytest (novos/puros):**
 - `validar_loja_para_contrato`: loja completa → `[]`; CPF placeholder (`xxx…`) conta como
-  faltando; faltam nome/cnpj/codigo/testemunhas conforme o caso.
+  faltando; faltam nome/cnpj/codigo/telefone/email/endereço/testemunhas conforme o caso
+  (`complemento` opcional não acusa).
 - `gerar_num_contrato`: usa o código da loja no prefixo; sequência contínua por código.
 - `construir_contexto`: injeta nome/CNPJ/testemunhas da loja nos marcadores; fallback de
   telefone/e-mail do consultor usa a loja.
