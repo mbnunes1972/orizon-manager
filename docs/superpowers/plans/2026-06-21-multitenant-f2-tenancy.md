@@ -1074,7 +1074,7 @@ Em `main.py`, substituir o corpo do `if path == "/api/admin/usuarios":` em `do_P
             return
 ```
 
-> O `PATCH /api/admin/usuarios/{id}` (≈ 3006-3031) **não muda** nesta F2: edição de nível/telefone/ativo/senha segue como está. Mudança de loja/rede de um usuário existente fica fora do escopo F2 (a atribuição acontece na criação).
+> **Segurança (achado no review final):** o `PATCH /api/admin/usuarios/{id}` **precisa** carregar escopo + anti-escalonamento, senão um diretor pode promover qualquer usuário a `super_admin`/`admin_rede` (takeover) ou editar usuários de outras lojas/redes. O handler agora: (1) re-consulta o alvo e exige que o ator o enxergue (mesma regra da listagem — `_eh_super_admin`/`_eh_admin_rede`/`loja_id`); (2) rejeita atribuir `nivel ∈ {super_admin, admin_rede}` para quem não é super_admin. Atribuição de loja/rede de um usuário existente segue fora do escopo F2 (a atribuição acontece na criação).
 
 - [ ] **Step 3: Verify with the real API (curl)**
 
