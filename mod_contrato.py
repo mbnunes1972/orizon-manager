@@ -42,6 +42,7 @@ def gerar_num_contrato(existing_nums, loja_codigo: str, data=None) -> str:
                 maxseq = max(maxseq, int(tail))
     return f"{cod}-{data:%Y-%m-%d}-{maxseq + 1:03d}"
 
+
 def calcular_hash_assinatura(nome: str, cpf: str, contrato_id: int, timestamp: str) -> str:
     dados = f"{nome}|{cpf}|{contrato_id}|{timestamp}"
     return hashlib.sha256(dados.encode("utf-8")).hexdigest()
