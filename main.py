@@ -3153,6 +3153,26 @@ class Handler(BaseHTTPRequestHandler):
                     if not u:
                         self.send_json({"ok": False, "erro": "Usuário não encontrado"})
                         return
+                    ator = _ator_dict(db, usuario)
+                    # escopo: o ator precisa enxergar o usuário-alvo (mesma regra da listagem)
+                    if mod_tenancy._eh_super_admin(ator):
+                        visivel = True
+                    elif mod_tenancy._eh_admin_rede(ator):
+                        rede_alvo = u.rede_id
+                        if rede_alvo is None and u.loja_id is not None:
+                            la = db.get(Loja, u.loja_id)
+                            rede_alvo = la.rede_id if la else None
+                        visivel = (rede_alvo == ator.get("rede_id"))
+                    else:
+                        visivel = (u.loja_id is not None and u.loja_id == ator.get("loja_id"))
+                    if not visivel:
+                        self.send_json({"ok": False, "erro": "Usuário fora do seu escopo."}, code=403)
+                        return
+                    # anti-escalonamento: só super_admin atribui perfis administrativos
+                    if "nivel" in req and req["nivel"].strip() in ("super_admin", "admin_rede") \
+                            and not mod_tenancy._eh_super_admin(ator):
+                        self.send_json({"ok": False, "erro": "Sem permissão para atribuir esse perfil."}, code=403)
+                        return
                     if "nivel" in req:    u.nivel    = req["nivel"].strip()
                     if "telefone" in req: u.telefone = (req.get("telefone") or "").strip()
                     if "ativo" in req:    u.ativo    = 1 if req["ativo"] else 0
