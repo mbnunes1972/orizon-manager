@@ -955,8 +955,20 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r'^/api/projetos/([^/]+)/contrato/pdf$', path)
             if m:
                 nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     contrato = db.query(Contrato)\
                                  .filter_by(projeto_nome=nome_safe)\
                                  .order_by(Contrato.id.desc())\
@@ -987,8 +999,20 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r'^/api/projetos/([^/]+)/contrato$', path)
             if m:
                 nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     contrato = db.query(Contrato)\
                                  .filter_by(projeto_nome=nome_safe)\
                                  .order_by(Contrato.id.desc())\
@@ -2716,6 +2740,14 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
                                  .order_by(Contrato.id.desc()).first()
                     if not contrato:
@@ -2792,6 +2824,14 @@ class Handler(BaseHTTPRequestHandler):
                     autorizador, erro = validar_gerencial(db, login, senha)
                     if erro:
                         self.send_json({"ok": False, "erro": erro}, code=403)
+                        return
+                    ator_ed = {"nivel": autorizador.nivel, "loja_id": autorizador.loja_id, "rede_id": autorizador.rede_id}
+                    loja_id_ed, _err_ed = mod_tenancy.escopo_operacional(ator_ed)
+                    if _err_ed:
+                        self.send_json({"ok": False, "erro": _err_ed}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id_ed) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
                     contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
                                  .order_by(Contrato.id.desc()).first()
@@ -2878,6 +2918,14 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     projeto_dict, cliente_dict, orcamento_dict = \
                         _montar_dados_projeto_para_contrato(nome_safe, orcamento_id, db)
                     # Gate: orçamento precisa ter ao menos um ambiente (1º orçamento concluído).
@@ -3378,6 +3426,14 @@ class Handler(BaseHTTPRequestHandler):
                 adendo = req.get("adendo") or ""
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
                     contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
                                  .order_by(Contrato.id.desc()).first()
                     if not contrato:
