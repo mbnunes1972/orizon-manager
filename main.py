@@ -1373,8 +1373,12 @@ class Handler(BaseHTTPRequestHandler):
                 if cpf:
                     existente = db.query(Cliente).filter_by(cpf=cpf).first()
                     if existente:
-                        self.send_json({"ok": False, "erro": "CPF já cadastrado",
-                                        "cliente": _cliente_dict(existente)})
+                        if getattr(existente, "loja_id", None) == loja_id:
+                            self.send_json({"ok": False, "erro": "CPF já cadastrado",
+                                            "cliente": _cliente_dict(existente)}, code=409)
+                        else:
+                            self.send_json({"ok": False,
+                                            "erro": "CPF já cadastrado em outra unidade."}, code=409)
                         return
                 c = Cliente(
                     nome       =nome, cpf=cpf,
