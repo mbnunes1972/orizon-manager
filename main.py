@@ -2659,6 +2659,18 @@ class Handler(BaseHTTPRequestHandler):
                             "campos_faltando": faltando,
                         }, code=400)
                         return
+                    from mod_contrato import validar_loja_para_contrato
+                    ator = _ator_dict(db, usuario)
+                    loja_dict = _loja_dict_para_contrato(db, ator.get("loja_id"))
+                    faltando_loja = validar_loja_para_contrato(loja_dict)
+                    if faltando_loja and not req.get("confirmar_loja_incompleta"):
+                        self.send_json({
+                            "ok": False,
+                            "precisa_confirmar_loja": True,
+                            "campos_loja_faltando": faltando_loja,
+                            "erro": "Dados da loja incompletos.",
+                        }, code=400)
+                        return
                     usuario_ctx = {
                         "nome":     usuario.get("nome", ""),
                         "telefone": _get_usuario_telefone(usuario["id"], db),
@@ -2671,6 +2683,7 @@ class Handler(BaseHTTPRequestHandler):
                         cliente_dict,
                         usuario_ctx,
                         pag_json,
+                        loja_dict,
                     )
                     variaveis.update({
                         "projeto_nome":    projeto_dict.get("nome_projeto", ""),
@@ -2695,12 +2708,15 @@ class Handler(BaseHTTPRequestHandler):
                     contrato.gerado_em           = datetime.utcnow()
                     contrato.gerado_por_id       = usuario["id"]
                     contrato.status              = "rascunho"
+                    if not contrato.loja_id:
+                        contrato.loja_id = ator.get("loja_id")
+                    contrato.loja_snapshot_json = json.dumps(loja_dict, ensure_ascii=False)
                     # Número do contrato (gerado uma vez; mantido em regerações).
                     if not contrato.num_contrato:
                         from mod_contrato import gerar_num_contrato
                         _existing = [c.num_contrato for c in db.query(Contrato)
                                      .filter(Contrato.num_contrato.isnot(None)).all()]
-                        contrato.num_contrato = gerar_num_contrato(_existing)
+                        contrato.num_contrato = gerar_num_contrato(_existing, loja_dict.get("codigo", ""))
                     variaveis["num_contrato"] = contrato.num_contrato
                     db.commit()
                     aviso = None
@@ -3103,6 +3119,18 @@ class Handler(BaseHTTPRequestHandler):
                         _montar_dados_projeto_para_contrato(nome_safe, contrato.orcamento_id, db)
                     from mod_contrato import construir_contexto
                     from mod_contrato import _formatar_valor
+                    from mod_contrato import validar_loja_para_contrato
+                    ator = _ator_dict(db, usuario)
+                    loja_dict = _loja_dict_para_contrato(db, contrato.loja_id or ator.get("loja_id"))
+                    faltando_loja = validar_loja_para_contrato(loja_dict)
+                    if faltando_loja and not req.get("confirmar_loja_incompleta"):
+                        self.send_json({
+                            "ok": False,
+                            "precisa_confirmar_loja": True,
+                            "campos_loja_faltando": faltando_loja,
+                            "erro": "Dados da loja incompletos.",
+                        }, code=400)
+                        return
                     usuario_ctx = {
                         "nome":     usuario.get("nome", ""),
                         "telefone": _get_usuario_telefone(usuario["id"], db),
@@ -3113,6 +3141,7 @@ class Handler(BaseHTTPRequestHandler):
                         cliente_dict,
                         usuario_ctx,
                         pag_json,
+                        loja_dict,
                     )
                     variaveis.update({
                         "projeto_nome":    projeto_dict.get("nome_projeto", ""),
@@ -3127,6 +3156,9 @@ class Handler(BaseHTTPRequestHandler):
                     })
                     pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
                     contrato.pdf_path = pdf_path
+                    if not contrato.loja_id:
+                        contrato.loja_id = ator.get("loja_id")
+                    contrato.loja_snapshot_json = json.dumps(loja_dict, ensure_ascii=False)
                     db.commit()
                     self.send_json({"ok": True, "status": contrato.status})
                 except Exception as e:
@@ -3642,6 +3674,26 @@ def _ator_dict(db, usuario_sessao):
     if not u:
         return {"nivel": usuario_sessao.get("nivel"), "loja_id": None, "rede_id": None}
     return {"nivel": u.nivel, "loja_id": u.loja_id, "rede_id": u.rede_id}
+
+
+def _loja_dict_para_contrato(db, loja_id):
+    """Dict plano dos dados da loja para alimentar/snapshotar o contrato (F3).
+    Retorna {} se não houver loja resolvível."""
+    if not loja_id:
+        return {}
+    loja = db.get(Loja, loja_id)
+    if not loja:
+        return {}
+    return {
+        "id": loja.id,
+        "nome": loja.nome or "", "cnpj": loja.cnpj or "", "codigo": loja.codigo or "",
+        "telefone": loja.telefone or "", "email": loja.email or "",
+        "cep": loja.cep or "", "logradouro": loja.logradouro or "",
+        "numero": loja.numero or "", "complemento": loja.complemento or "",
+        "bairro": loja.bairro or "", "cidade": loja.cidade or "", "estado": loja.estado or "",
+        "testemunha1_nome": loja.testemunha1_nome or "", "testemunha1_cpf": loja.testemunha1_cpf or "",
+        "testemunha2_nome": loja.testemunha2_nome or "", "testemunha2_cpf": loja.testemunha2_cpf or "",
+    }
 
 
 # == MAIN ==

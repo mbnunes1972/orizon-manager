@@ -103,7 +103,7 @@ def test_construir_contexto_aymore():
             {"num": 3, "data": "15/10/2026", "valor": 1000.0},
         ]
     })
-    ctx = construir_contexto(cliente, usuario, forma)
+    ctx = construir_contexto(cliente, usuario, forma, {"telefone": "(12) 3341-8777", "email": "sac@dalmobilesjc.com.br"})
     assert ctx["consultor_nome"] == "Pedro"
     assert ctx["consultor_tel"] == "(12) 3341-8777"   # fallback
     assert ctx["consultor_email"] == "pedro@loja.com"
@@ -136,7 +136,7 @@ def test_construir_contexto_cartao():
         "entrada_valor": 0, "entrada_data": "", "parcelas": [],
         "texto_cartao": "12x R$ 10.000,00", "total_cliente": 120000,
     })
-    ctx = construir_contexto(cliente, usuario, forma)
+    ctx = construir_contexto(cliente, usuario, forma, {"telefone": "(12) 3341-8777", "email": "sac@dalmobilesjc.com.br"})
     assert ctx["consultor_tel"] == "12988880000"
     assert ctx["consultor_email"] == "sac@dalmobilesjc.com.br"   # fallback email
     pag = ctx["_pag"]
@@ -167,7 +167,7 @@ def test_construir_contexto_total_flex():
             for i in range(1, 6)
         ]
     })
-    ctx = construir_contexto(cliente, usuario, forma)
+    ctx = construir_contexto(cliente, usuario, forma, {"telefone": "(12) 3341-8777", "email": "sac@dalmobilesjc.com.br"})
     assert ctx["consultor_tel"] == "(12) 3341-8777"
     assert ctx["inst_logradouro"] == "Rua C"
     assert ctx["res_logradouro"] == "Av B"
@@ -249,7 +249,8 @@ def test_email_fallback_consultor():
                "inst_mesmo_residencial": True,
                "inst_logradouro": "", "inst_numero": "", "inst_complemento": "",
                "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": ""}
-    ctx = construir_contexto(cliente, {"nome": "X", "telefone": "", "email": ""}, "")
+    loja = {"telefone": "(12) 3341-8777", "email": "sac@dalmobilesjc.com.br"}
+    ctx = construir_contexto(cliente, {"nome": "X", "telefone": "", "email": ""}, "", loja)
     assert ctx["consultor_email"] == "sac@dalmobilesjc.com.br"
     assert ctx["consultor_tel"]   == "(12) 3341-8777"
 
@@ -260,6 +261,9 @@ def test_preencher_signatario_e_testemunhas(tmp_path):
     if not os.path.exists(_MODELO):
         return
     from docx import Document
+    loja = {"nome": "INSPIRIUM MOVEIS LTDA", "cnpj": "19.152.134/0001-56",
+            "testemunha1_nome": "Jaime Perinazzo", "testemunha1_cpf": "123.456.789-00",
+            "testemunha2_nome": "Felipe Guizalberte", "testemunha2_cpf": "987.654.321-00"}
     ctx = construir_contexto(
         cliente={"nome": "Ana Cliente", "cpf": "111.222.333-44", "email": "a@x.com",
                  "telefone": "(12) 9", "logradouro": "Rua A", "numero": "1", "complemento": "",
@@ -268,6 +272,7 @@ def test_preencher_signatario_e_testemunhas(tmp_path):
                  "inst_complemento": "", "inst_bairro": "", "inst_cidade": "", "inst_cep": "", "inst_uf": ""},
         usuario={"nome": "Consultor Z", "telefone": "", "email": ""},
         forma_pagamento_json="",
+        loja=loja,
     )
     path = preencher_contrato(91001, ctx)
     full = "\n".join(p.text for p in Document(path).paragraphs)
@@ -291,6 +296,9 @@ def test_geracao_completa_sem_marcadores_remanescentes():
     from docx import Document
     from docx.oxml.ns import qn
     from mod_contrato import preencher_contrato, construir_contexto
+    loja = {"nome": "INSPIRIUM MOVEIS LTDA", "cnpj": "19.152.134/0001-56",
+            "testemunha1_nome": "Jaime Perinazzo", "testemunha1_cpf": "123.456.789-00",
+            "testemunha2_nome": "Felipe Guizalberte", "testemunha2_cpf": "987.654.321-00"}
     ctx = construir_contexto(
         cliente={"nome": "Ana Cliente", "cpf": "111.222.333-44", "email": "a@x.com",
                  "telefone": "(12) 90000-0000", "logradouro": "Rua A", "numero": "10",
@@ -303,7 +311,8 @@ def test_geracao_completa_sem_marcadores_remanescentes():
             "tipo": "aymore", "nome_forma": "Financiamento Aymoré",
             "entrada_valor": 20000, "entrada_data": "2026-06-18", "entrada_forma": "pix",
             "total_cliente": 129572.01, "texto_cartao": "",
-            "parcelas": [{"num": i+1, "data": f"18/{7+i:02d}/2026", "valor": 4820.0} for i in range(3)]}))
+            "parcelas": [{"num": i+1, "data": f"18/{7+i:02d}/2026", "valor": 4820.0} for i in range(3)]}),
+        loja=loja)
     ctx["num_contrato"]  = "INS-2026-06-17-009"
     ctx["data_contrato"] = "17/06/2026"
     path = preencher_contrato(92001, ctx)
@@ -331,7 +340,7 @@ def test_geracao_completa_sem_marcadores_remanescentes():
 def test_gerar_num_contrato_formato():
     from datetime import datetime
     from mod_contrato import gerar_num_contrato
-    n = gerar_num_contrato([], data=datetime(2026, 6, 17))
+    n = gerar_num_contrato([], "INS", data=datetime(2026, 6, 17))
     assert n == "INS-2026-06-17-001"
 
 
@@ -339,15 +348,14 @@ def test_gerar_num_contrato_sequencia_continua():
     from datetime import datetime
     from mod_contrato import gerar_num_contrato
     existentes = ["INS-2026-06-15-001", "INS-2026-06-16-002", "ORZ-2026-06-16-009"]
-    # máximo da loja INS é 002 → próximo 003 (sequência contínua, ignora outra loja)
-    n = gerar_num_contrato(existentes, data=datetime(2026, 6, 17))
+    n = gerar_num_contrato(existentes, "INS", data=datetime(2026, 6, 17))
     assert n == "INS-2026-06-17-003"
 
 
 def test_gerar_num_contrato_loja_customizada():
     from datetime import datetime
     from mod_contrato import gerar_num_contrato
-    n = gerar_num_contrato([], loja="ORZ", data=datetime(2026, 1, 5))
+    n = gerar_num_contrato([], "ORZ", data=datetime(2026, 1, 5))
     assert n == "ORZ-2026-01-05-001"
 
 
@@ -582,6 +590,9 @@ def test_protegido_tem_documentprotection_e_regioes():
     from docx import Document
     from docx.oxml.ns import qn
     from mod_contrato import preencher_contrato, construir_contexto
+    loja = {"nome": "LOJA TESTE", "cnpj": "00.000.000/0001-00",
+            "testemunha1_nome": "T1", "testemunha1_cpf": "111.111.111-11",
+            "testemunha2_nome": "T2", "testemunha2_cpf": "222.222.222-22"}
     ctx = construir_contexto(
         cliente={"nome":"Ana","cpf":"111","email":"a@x.com","telefone":"(12)9","logradouro":"R",
                  "numero":"1","complemento":"","bairro":"C","cidade":"SJC","cep":"1","estado":"SP",
@@ -589,7 +600,8 @@ def test_protegido_tem_documentprotection_e_regioes():
                  "inst_bairro":"","inst_cidade":"","inst_cep":"","inst_uf":""},
         usuario={"nome":"Z","telefone":"","email":""},
         forma_pagamento_json=json.dumps({"tipo":"aymore","nome_forma":"Aymoré","total_cliente":1000,
-            "texto_cartao":"","parcelas":[{"num":1,"data":"18/07/2026","valor":500.0}]}))
+            "texto_cartao":"","parcelas":[{"num":1,"data":"18/07/2026","valor":500.0}]}),
+        loja=loja)
     ctx["num_contrato"]="INS-1"; ctx["data_contrato"]="18/06/2026"
     p = preencher_contrato(97001, ctx, protegido=True)
     d = Document(p)
@@ -605,6 +617,9 @@ def test_nao_protegido_sem_documentprotection():
     from docx import Document
     from docx.oxml.ns import qn
     from mod_contrato import preencher_contrato, construir_contexto
+    loja = {"nome": "LOJA TESTE", "cnpj": "00.000.000/0001-00",
+            "testemunha1_nome": "T1", "testemunha1_cpf": "111.111.111-11",
+            "testemunha2_nome": "T2", "testemunha2_cpf": "222.222.222-22"}
     ctx = construir_contexto(
         cliente={"nome":"Ana","cpf":"1","email":"","telefone":"","logradouro":"","numero":"",
                  "complemento":"","bairro":"","cidade":"","cep":"","estado":"","inst_mesmo_residencial":True,
@@ -612,7 +627,8 @@ def test_nao_protegido_sem_documentprotection():
                  "inst_cidade":"","inst_cep":"","inst_uf":""},
         usuario={"nome":"Z","telefone":"","email":""},
         forma_pagamento_json=json.dumps({"tipo":"aymore","nome_forma":"Aymoré","total_cliente":0,
-            "texto_cartao":"","parcelas":[]}))
+            "texto_cartao":"","parcelas":[]}),
+        loja=loja)
     p = preencher_contrato(97002, ctx, protegido=False)
     d = Document(p)
     has = d.settings.element.find(qn('w:documentProtection')) is not None
@@ -627,6 +643,9 @@ def test_protegido_mantem_texto_e_valores():
     from docx import Document
     from docx.oxml.ns import qn
     from mod_contrato import preencher_contrato, construir_contexto
+    _loja = {"nome": "LOJA TESTE", "cnpj": "00.000.000/0001-00",
+             "testemunha1_nome": "T1", "testemunha1_cpf": "111.111.111-11",
+             "testemunha2_nome": "T2", "testemunha2_cpf": "222.222.222-22"}
     def gen(protegido):
         ctx = construir_contexto(
             cliente={"nome":"Ana Cliente","cpf":"111.222.333-44","email":"a@x.com","telefone":"(12)9",
@@ -635,7 +654,8 @@ def test_protegido_mantem_texto_e_valores():
                      "inst_numero":"","inst_complemento":"","inst_bairro":"","inst_cidade":"","inst_cep":"","inst_uf":""},
             usuario={"nome":"Z","telefone":"(12)9","email":"z@x.com"},
             forma_pagamento_json=json.dumps({"tipo":"aymore","nome_forma":"Aymoré","total_cliente":129572.01,
-                "texto_cartao":"","parcelas":[{"num":i+1,"data":f"18/{7+i:02d}/2026","valor":4820.0} for i in range(3)]}))
+                "texto_cartao":"","parcelas":[{"num":i+1,"data":f"18/{7+i:02d}/2026","valor":4820.0} for i in range(3)]}),
+            loja=_loja)
         ctx["num_contrato"]="INS-9"; ctx["data_contrato"]="18/06/2026"
         p = preencher_contrato(97003, ctx, protegido=protegido)
         d = Document(p)
@@ -735,6 +755,9 @@ def test_geracao_completa_com_forma_parcela():
     import os, json, re
     from docx import Document
     from mod_contrato import preencher_contrato, construir_contexto
+    loja = {"nome": "LOJA TESTE", "cnpj": "00.000.000/0001-00",
+            "testemunha1_nome": "T1", "testemunha1_cpf": "111.111.111-11",
+            "testemunha2_nome": "T2", "testemunha2_cpf": "222.222.222-22"}
     ctx = construir_contexto(
         cliente={"nome": "Ana", "cpf": "1", "email": "a@x.com", "telefone": "(12)9",
                  "logradouro": "Rua A", "numero": "10", "complemento": "", "bairro": "Centro",
@@ -747,7 +770,8 @@ def test_geracao_completa_com_forma_parcela():
             "entrada_valor": 1000, "entrada_data": "2026-06-18", "entrada_forma": "pix",
             "total_cliente": 5000.0, "texto_cartao": "",
             "parcelas": [{"num": i+1, "data": f"18/{7+i:02d}/2026", "valor": 2000.0,
-                          "forma": "cheque"} for i in range(2)]}))
+                          "forma": "cheque"} for i in range(2)]}),
+        loja=loja)
     ctx["num_contrato"] = "INS-2026-06-18-001"; ctx["data_contrato"] = "18/06/2026"
     path = preencher_contrato(93001, ctx)
     doc = Document(path)
@@ -783,6 +807,9 @@ def test_assinatura_cliente_mesmo_estilo_da_empresa():
     import os
     from docx import Document
     from mod_contrato import preencher_contrato, construir_contexto
+    loja = {"nome": "INSPIRIUM MOVEIS PLANEJADOS E DECORACAO LTDA", "cnpj": "19.152.134/0001-56",
+            "testemunha1_nome": "Jaime", "testemunha1_cpf": "123.456.789-00",
+            "testemunha2_nome": "Felipe", "testemunha2_cpf": "987.654.321-00"}
     ctx = construir_contexto(
         cliente={"nome": "Ana Cliente", "cpf": "111.222.333-44", "email": "a@x.com",
                  "telefone": "(12)9", "logradouro": "Rua A", "numero": "10",
@@ -791,7 +818,8 @@ def test_assinatura_cliente_mesmo_estilo_da_empresa():
                  "inst_numero": "", "inst_complemento": "", "inst_bairro": "",
                  "inst_cidade": "", "inst_cep": "", "inst_uf": ""},
         usuario={"nome": "Z", "telefone": "", "email": ""},
-        forma_pagamento_json="")
+        forma_pagamento_json="",
+        loja=loja)
     path = preencher_contrato(94001, ctx)
     d = Document(path)
     estilo_cliente = estilo_empresa = None
@@ -833,14 +861,19 @@ def test_assinaturas_nome_e_cpf_em_linhas_separadas():
 
 
 def test_montar_mapping_inclui_empresa_e_cpfs():
-    from mod_contrato import _montar_mapping, _NOME_EMPRESA, _CNPJ_EMPRESA, _TESTEMUNHAS
-    ctx = {"cliente_cpf": "111.222.333-44"}
+    from mod_contrato import _montar_mapping
+    loja = {"nome": "INSPIRIUM MOVEIS LTDA", "cnpj": "19.152.134/0001-56",
+            "testemunha1_nome": "Jaime", "testemunha1_cpf": "123.456.789-00",
+            "testemunha2_nome": "Felipe", "testemunha2_cpf": "987.654.321-00"}
+    ctx = {"cliente_cpf": "111.222.333-44", "loja": loja}
     m = _montar_mapping(ctx, {})
-    assert m["NOME_EMPRESA"] == _NOME_EMPRESA
-    assert m["CNPJ_EMPRESA"] == _CNPJ_EMPRESA
+    assert m["NOME_EMPRESA"] == "INSPIRIUM MOVEIS LTDA"
+    assert m["CNPJ_EMPRESA"] == "19.152.134/0001-56"
     assert m["CPF_CLIENTE"] == "111.222.333-44"
-    assert m["CPF_TESTEMUNHA_1"] == _TESTEMUNHAS[0][1]
-    assert m["CPF_TESTEMUNHA_2"] == _TESTEMUNHAS[1][1]
+    assert m["CPF_TESTEMUNHA_1"] == "123.456.789-00"
+    assert m["CPF_TESTEMUNHA_2"] == "987.654.321-00"
+    assert m["NOME_TESTEMUNHA_1"] == "Jaime"
+    assert m["NOME_TESTEMUNHA_2"] == "Felipe"
 
 
 def test_substituir_marcadores_cabecalho_fragmentado():

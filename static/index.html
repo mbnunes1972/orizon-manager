@@ -8016,7 +8016,7 @@ function _capturarPagamento(formaEntrada, formaParcelas) {
   };
 }
 
-async function gerarContrato() {
+async function gerarContrato(confirmarLojaIncompleta = false, signatarioPre = undefined) {
   const adendo        = (document.getElementById('apr-adendo')?.value || '').trim();
   const entrada       = parseMoeda(document.getElementById('apr-entrada')?.value);
   const parcelas      = (document.getElementById('apr-parcelas')?.value || '').trim();
@@ -8033,15 +8033,19 @@ async function gerarContrato() {
 
   const pagamento = _capturarPagamento(formaEntrada, formaParcelas);
 
-  // É o próprio cliente cadastrado que vai assinar?
-  let signatarioOverride = null;
-  const ehCliente = await confirmarPopup('O signatário do contrato é o próprio cliente cadastrado?',
-    {titulo:'Signatário do contrato', okLabel:'Sim, é o cliente', cancelLabel:'Não'});
-  if (!ehCliente) {
-    signatarioOverride = await coletarSignatarioOverride();
-    if (!signatarioOverride) {  // cancelou
-      if (btn) { btn.disabled = false; btn.textContent = 'Gerar Contrato'; }
-      return;
+  // É o próprio cliente cadastrado que vai assinar? (não repergunta numa reconfirmação)
+  let signatarioOverride = signatarioPre;
+  if (signatarioPre === undefined) {
+    const ehCliente = await confirmarPopup('O signatário do contrato é o próprio cliente cadastrado?',
+      {titulo:'Signatário do contrato', okLabel:'Sim, é o cliente', cancelLabel:'Não'});
+    if (!ehCliente) {
+      signatarioOverride = await coletarSignatarioOverride();
+      if (!signatarioOverride) {  // cancelou
+        if (btn) { btn.disabled = false; btn.textContent = 'Gerar Contrato'; }
+        return;
+      }
+    } else {
+      signatarioOverride = null;
     }
   }
 
@@ -8058,11 +8062,20 @@ async function gerarContrato() {
         forma_parcelas:     formaParcelas,
         pagamento_json:     JSON.stringify(pagamento),
         signatario_override: signatarioOverride,
+        confirmar_loja_incompleta: confirmarLojaIncompleta,
       }),
     });
     const d = await r.json();
     if (!d.ok) {
       if (btn) { btn.disabled = false; btn.textContent = 'Gerar Contrato'; }
+      if (d.precisa_confirmar_loja) {
+        const ok = await confirmarPopup(
+          'Dados da loja incompletos:\n\n• ' + (d.campos_loja_faltando || []).join('\n• ') +
+          '\n\nGerar o contrato assim mesmo?',
+          {titulo:'Loja incompleta', okLabel:'Gerar assim', cancelLabel:'Cancelar'});
+        if (ok) return gerarContrato(true, signatarioOverride ?? null);
+        return;
+      }
       if (Array.isArray(d.campos_faltando) && d.campos_faltando.length) {
         const cliId = projetoAtivo?.cliente_id;
         mostrarErroComAcao(
@@ -8211,19 +8224,33 @@ function abrirModalAdendo() {
     });
 }
 
-async function salvarAdendo() {
+async function salvarAdendo(confirmarLojaIncompleta = false) {
   const adendo = document.getElementById('adendo-texto')?.value || '';
   try {
     const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato`, {
       method: 'PATCH',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adendo }),
+      body: JSON.stringify({ adendo, confirmar_loja_incompleta: confirmarLojaIncompleta }),
     });
     const d = await r.json();
+    if (d.ok) {
+      document.getElementById('modal-adendo-overlay')?.remove();
+      showToast('Adendo salvo e PDF regenerado.', false);
+      carregarDadosContrato();
+      return;
+    }
+    // Loja incompleta: avisa e deixa regenerar assim mesmo (mantém o modal aberto p/ a re-chamada)
+    if (d.precisa_confirmar_loja) {
+      const ok = await confirmarPopup(
+        'Dados da loja incompletos:\n\n• ' + (d.campos_loja_faltando || []).join('\n• ') +
+        '\n\nSalvar e regenerar assim mesmo?',
+        {titulo:'Loja incompleta', okLabel:'Gerar assim', cancelLabel:'Cancelar'});
+      if (ok) return salvarAdendo(true);
+      return;
+    }
     document.getElementById('modal-adendo-overlay')?.remove();
-    if (d.ok) { showToast('Adendo salvo e PDF regenerado.', false); carregarDadosContrato(); }
-    else showToast('Erro: ' + d.erro, true);
+    showToast('Erro: ' + d.erro, true);
   } catch(e) { showToast('Erro de rede: ' + e.message, true); }
 }
 

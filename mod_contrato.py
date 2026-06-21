@@ -18,39 +18,30 @@ CONTRATOS_DIR = os.path.join(_THIS_DIR, "CONTRATOS")
 
 _MODELO = os.path.join(_THIS_DIR, "modelo_contrato_mapeado.docx")
 
-_TELEFONE_LOJA = "(12) 3341-8777"
-_EMAIL_LOJA    = "sac@dalmobilesjc.com.br"
-_NOME_EMPRESA  = "INSPIRIUM MOVEIS PLANEJADOS E DECORACAO LTDA"  # TODO: configurador de lojas
-_CNPJ_EMPRESA  = "19.152.134/0001-56"                            # TODO: configurador de lojas
-
-# Testemunhas provisórias — TODO: vir do painel de configuração de loja.
-_TESTEMUNHAS = [
-    ("Jaime Perinazzo",     "xxx.xxx.xxx-xx"),
-    ("Felipe Guizalberte",  "yyy.yyy.yyy-yy"),
-]
-
-_CODIGO_LOJA = "INS"       # 3 letras da loja — TODO: vir do painel de configuração de loja
-_TRACO       = "--------"  # preenche slots de parcela inexistentes
+_TRACO = "--------"  # preenche slots de parcela inexistentes
 
 
 # ── Utilitários ───────────────────────────────────────────────────────────────
 
 
-def gerar_num_contrato(existing_nums, loja: str = _CODIGO_LOJA, data=None) -> str:
+def gerar_num_contrato(existing_nums, loja_codigo: str, data=None) -> str:
     """Próximo número de contrato no formato 'LOJA-AAAA-MM-DD-SEQ'.
 
     `existing_nums`: iterável com os num_contrato já existentes (qualquer loja).
-    A sequência (SEQ) é CONTÍNUA por loja (máximo existente + 1), não reinicia por dia.
+    `loja_codigo`: código (3 letras) da loja — vem da tabela `lojas` (F3).
+    A sequência (SEQ) é CONTÍNUA por código (máximo existente + 1).
     """
     data = data or datetime.now()
-    pref = f"{loja}-"
+    cod = (loja_codigo or "").strip()
+    pref = f"{cod}-"
     maxseq = 0
     for n in (existing_nums or []):
         if n and n.startswith(pref):
             tail = n.rsplit("-", 1)[-1]
             if tail.isdigit():
                 maxseq = max(maxseq, int(tail))
-    return f"{loja}-{data:%Y-%m-%d}-{maxseq + 1:03d}"
+    return f"{cod}-{data:%Y-%m-%d}-{maxseq + 1:03d}"
+
 
 def calcular_hash_assinatura(nome: str, cpf: str, contrato_id: int, timestamp: str) -> str:
     dados = f"{nome}|{cpf}|{contrato_id}|{timestamp}"
@@ -411,6 +402,46 @@ def validar_cliente_para_contrato(cliente: dict) -> list:
     return faltando
 
 
+# ── Validação de dados da loja ────────────────────────────────────────────────
+
+_TEM_DIGITO = _re_mark.compile(r"\d")   # CPF real tem ao menos um dígito
+
+
+def validar_loja_para_contrato(loja: dict) -> list:
+    """Rótulos dos campos obrigatórios da loja que estão vazios para gerar o contrato.
+
+    Lista vazia → loja completa. O CPF de testemunha sem nenhum dígito
+    (placeholder 'xxx.xxx.xxx-xx') conta como faltando. `complemento` é opcional.
+    """
+    loja = loja or {}
+    obrigatorios = [
+        ("nome",             "Nome da empresa"),
+        ("cnpj",             "CNPJ"),
+        ("codigo",           "Código da loja"),
+        ("telefone",         "Telefone"),
+        ("email",            "E-mail"),
+        ("cep",              "CEP"),
+        ("logradouro",       "Logradouro"),
+        ("numero",           "Número"),
+        ("bairro",           "Bairro"),
+        ("cidade",           "Cidade"),
+        ("estado",           "Estado/UF"),
+        ("testemunha1_nome", "Nome da Testemunha 1"),
+        ("testemunha2_nome", "Nome da Testemunha 2"),
+    ]
+    faltando = []
+    for campo, rotulo in obrigatorios:
+        v = loja.get(campo)
+        if not (v and str(v).strip()):
+            faltando.append(rotulo)
+    for campo, rotulo in [("testemunha1_cpf", "CPF da Testemunha 1"),
+                          ("testemunha2_cpf", "CPF da Testemunha 2")]:
+        v = (loja.get(campo) or "").strip()
+        if not _TEM_DIGITO.search(v):
+            faltando.append(rotulo)
+    return faltando
+
+
 # ── Preenchimento dinâmico do modelo ─────────────────────────────────────────
 
 def _montar_mapping(ctx, pag):
@@ -419,7 +450,13 @@ def _montar_mapping(ctx, pag):
     Chaves em MAIÚSCULAS sem colchetes, casando com os marcadores do modelo
     modelo_contrato_mapeado.docx. A grade de parcelas é preenchida à parte por
     _preencher_grade(); aqui só entram os campos de cabeçalho/identificação.
+    Os dados da loja vêm de ctx['loja'] (F3).
     """
+    loja = ctx.get("loja") or {}
+    t1n = loja.get("testemunha1_nome", "") or ""
+    t1c = loja.get("testemunha1_cpf", "") or ""
+    t2n = loja.get("testemunha2_nome", "") or ""
+    t2c = loja.get("testemunha2_cpf", "") or ""
     return {
         "NUM_CONTRATO":     str(ctx.get("num_contrato", "") or ""),
         "DATA_CONTRATO":    str(ctx.get("data_contrato", "") or ""),
@@ -450,18 +487,18 @@ def _montar_mapping(ctx, pag):
         "TOTAL_CONTRATO":   pag.get("valor_contrato", "") or "",
         "CONSULTOR_NOME":     ctx.get("consultor_nome", "") or "",
         "CONSULTOR_TELEFONE": ctx.get("consultor_tel", "") or "",
-        "TESTEMUNHA_1_NOME": _TESTEMUNHAS[0][0],
-        "TESTEMUNHA_1_DOC":  _TESTEMUNHAS[0][1],
-        "TESTEMUNHA_2_NOME": _TESTEMUNHAS[1][0],
-        "TESTEMUNHA_2_DOC":  _TESTEMUNHAS[1][1],
-        "NOME_TESTEMUNHA_1": _TESTEMUNHAS[0][0],
-        "NOME_TESTEMUNHA2":  _TESTEMUNHAS[1][0],
-        "NOME_TESTEMUNHA_2": _TESTEMUNHAS[1][0],
-        "NOME_EMPRESA":      _NOME_EMPRESA,
-        "CNPJ_EMPRESA":      _CNPJ_EMPRESA,
+        "TESTEMUNHA_1_NOME": t1n,
+        "TESTEMUNHA_1_DOC":  t1c,
+        "TESTEMUNHA_2_NOME": t2n,
+        "TESTEMUNHA_2_DOC":  t2c,
+        "NOME_TESTEMUNHA_1": t1n,
+        "NOME_TESTEMUNHA2":  t2n,
+        "NOME_TESTEMUNHA_2": t2n,
+        "NOME_EMPRESA":      loja.get("nome", "") or "",
+        "CNPJ_EMPRESA":      loja.get("cnpj", "") or "",
         "CPF_CLIENTE":       ctx.get("cliente_cpf", "") or "",
-        "CPF_TESTEMUNHA_1":  _TESTEMUNHAS[0][1],
-        "CPF_TESTEMUNHA_2":  _TESTEMUNHAS[1][1],
+        "CPF_TESTEMUNHA_1":  t1c,
+        "CPF_TESTEMUNHA_2":  t2c,
     }
 
 
@@ -497,8 +534,14 @@ def preencher_contrato(contrato_id: int, ctx: dict, protegido: bool = True) -> s
     return docx_path
 
 
-def construir_contexto(cliente: dict, usuario: dict, forma_pagamento_json: str) -> dict:
-    """Monta o dicionário completo para preencher o contrato."""
+def construir_contexto(cliente: dict, usuario: dict, forma_pagamento_json: str, loja: dict = None) -> dict:
+    """Monta o dicionário completo para preencher o contrato.
+
+    `loja`: dict com dados da loja (F3) — usado como fallback de telefone/email do
+    consultor e injetado em ctx['loja'] para _montar_mapping(). Opcional; se None,
+    os campos de empresa/testemunhas ficarão em branco no contrato.
+    """
+    loja = loja or {}
     inst_mesmo = cliente.get("inst_mesmo_residencial", True)
     if inst_mesmo:
         inst = {k: cliente.get(r, "") for k, r in [
@@ -522,8 +565,8 @@ def construir_contexto(cliente: dict, usuario: dict, forma_pagamento_json: str) 
 
     ctx = {
         "consultor_nome":  usuario.get("nome",     "") or "",
-        "consultor_tel":   (usuario.get("telefone") or "").strip() or _TELEFONE_LOJA,
-        "consultor_email": (usuario.get("email")    or "").strip() or _EMAIL_LOJA,
+        "consultor_tel":   (usuario.get("telefone") or "").strip() or (loja.get("telefone") or ""),
+        "consultor_email": (usuario.get("email")    or "").strip() or (loja.get("email")    or ""),
         "cliente_nome":    cliente.get("nome",     "") or "",
         "cliente_cpf":     cliente.get("cpf",      "") or "",
         "cliente_email":   cliente.get("email",    "") or "",
@@ -551,6 +594,7 @@ def construir_contexto(cliente: dict, usuario: dict, forma_pagamento_json: str) 
         "pgto_data_primeira":  pag["data_primeira"],
         "data_contrato":       datetime.now().strftime("%d/%m/%Y"),
         "_pag":                pag,   # dict normalizado para preencher_contrato()
+        "loja":                loja,
     }
     # Grade de datas p01..p24
     for i in range(24):

@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-21 (sessão 22 — **F2 da plataforma multi-tenant**: perfis `super_admin`/`admin_rede` (administrativos, sem operacional), super_admin de bootstrap (`tenancy_v2_2026`), `mod_tenancy.py` (validadores + escopo puros), endpoints `/api/admin/redes`/`/lojas`/`usuarios` escopados + parceiros com abrangência loja/rede (M:N), e console de 3 níveis (Plataforma → Rede → Loja) com edição dos dados da loja. Não toca queries operacionais (isolamento = F4). Antes: sessão 21 — F1 fundação de dados multi-tenant (puramente aditiva))
+> Atualizado em: 2026-06-21 (sessão 23 — **F3 da plataforma multi-tenant**: o **contrato puxa da loja**. `mod_contrato.py` largou as constantes de loja (nome/CNPJ/código/telefone/email/testemunhas) e passou a receber um dict `loja`; `main.py` resolve a loja do consultor, **valida (avisa mas deixa gerar)**, grava `contratos.loja_snapshot_json` a cada geração e usa o **código da loja** no número do contrato; front confirma "loja incompleta". Não toca queries operacionais (isolamento = F4). Antes: sessão 22 — F2 perfis + CRUD de tenancy + console de 3 níveis)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -31,7 +31,7 @@
 - **Total Flex (US-14) completo:** `mod_fin/total_flex.py` — juros compostos por dias reais
 - **Último orçamento ativo** persistido por projeto em localStorage; ao abrir projeto vai direto para o orçamento que estava ativo na última visita
 - **Módulo Ciclo (EP-10):** aba "Ciclo" na page-02 com 20 etapas em 2 colunas; etapas 1-5 auto-completas para projetos com negociação ativa
-- **Módulo Contrato (EP-10):** `mod_contrato.py` gera o `.docx` a partir do template por marcadores `modelo_contrato_mapeado.docx` (`_substituir_marcadores` + `_preencher_grade`) → PDF via LibreOffice; **número do contrato** `INS-AAAA-MM-DD-SEQ` no cabeçalho + data; grade de parcelas valor+data (sem ordinal, traços nos vazios); `[TOTAL_CONTRATO]`; 2º signatário = cliente; testemunhas provisórias; hash SHA-256 de assinatura
+- **Módulo Contrato (EP-10):** `mod_contrato.py` gera o `.docx` a partir do template por marcadores `modelo_contrato_mapeado.docx` (`_substituir_marcadores` + `_preencher_grade`) → PDF via LibreOffice; **número do contrato** `INS-AAAA-MM-DD-SEQ` no cabeçalho + data; grade de parcelas valor+data (sem ordinal, traços nos vazios); `[TOTAL_CONTRATO]`; 2º signatário = cliente; **empresa/CNPJ, código do número e testemunhas vêm da loja (F3)**, com snapshot por contrato; hash SHA-256 de assinatura
 - **Contrato editável protegido:** `.docx` sai somente-leitura com regiões editáveis só nos valores (`permStart/permEnd` + `documentProtection`); botão "Editar contrato" (gate gerencial auditado) abre no Word/LibreOffice e regera o PDF a cada salvamento (watcher `contrato_editar.py`)
 - **Status contrato:** `rascunho` → `para_assinatura` → `assinado`; badges CSS dedicados
 - **Aprovar Orçamento reformulado:** modal exibe dados do cliente, CPF/endereço de instalação obrigatórios se vazios, condições de pagamento pré-carregadas; salva `valor_negociado` e `forma_pagamento` no orçamento antes de gerar contrato
@@ -175,6 +175,23 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-21 (sessão 23 — F3: contrato puxa da loja)
+**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação). Spec/plano em `docs/superpowers/specs/2026-06-21-multitenant-f3-contrato-loja-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f3-contrato-loja.md`. Branch `feat/multitenant-f3-contrato-loja`.
+
+**Origem:** 3ª das 4 fases do multi-tenant. A F2 (sessão 22) tornou os dados da loja editáveis (incl. testemunhas/CPF); a F3 faz o contrato **consumir** esses dados em vez das constantes hard-coded. Não toca isolamento operacional (F4).
+
+**Decisões do brainstorm:** (1) **snapshot** dos dados da loja no contrato; (2) loja incompleta → **avisar mas deixar gerar** (não bloqueia, ao contrário do cadastro do cliente); (3) **remover as constantes** — loja vira fonte única (sem fallback); (4) **refoto a cada geração**, congela na assinatura (pela trava pós-assinatura existente). Telefone/email/endereço da loja viraram **obrigatórios no cadastro** (validação).
+
+**Entregue:**
+- **`mod_contrato.py` (puro):** removidas as constantes `_NOME_EMPRESA`/`_CNPJ_EMPRESA`/`_CODIGO_LOJA`/`_TELEFONE_LOJA`/`_EMAIL_LOJA`/`_TESTEMUNHAS`. `construir_contexto(cliente, usuario, forma, loja=None)` injeta a loja no `ctx`; `_montar_mapping` lê empresa/testemunhas de `ctx["loja"]`; `gerar_num_contrato(existing, loja_codigo, …)` com código **obrigatório**. Novo validador puro `validar_loja_para_contrato` (campos obrigatórios; CPF placeholder sem dígito conta como faltando; `complemento` opcional).
+- **`database.py`:** coluna `contratos.loja_snapshot_json` (TEXT, nullable) no model + `_migrar_colunas` (idempotente).
+- **`main.py`:** helper `_loja_dict_para_contrato(db, loja_id)`; nos **2 pontos de geração** (aprovação + regeração) resolve a loja do consultor (`_ator_dict`), valida → responde `precisa_confirmar_loja`/`campos_loja_faltando` (HTTP 400) quando incompleta e sem `confirmar_loja_incompleta`, grava `loja_snapshot_json`, fixa `contrato.loja_id` na 1ª geração e passa a loja para `construir_contexto`/`gerar_num_contrato`.
+- **Frontend (`static/index.html`):** **ambos** os fluxos que geram/regeneram o contrato tratam `precisa_confirmar_loja` com diálogo "Gerar assim? / Cancelar" e re-chamam com a flag — `gerarContrato()` (aprovação, reaproveitando o signatário já coletado) e `salvarAdendo()` (PATCH de regeração; achado na revisão final e corrigido).
+
+**Verificação:** pytest **195** verde (novos: `tests/test_contrato_loja.py` — validador da loja, helper `_loja_dict_para_contrato` com db stub, migração da coluna idempotente; + `tests/test_contrato.py` atualizado para a loja como fonte). Cada task passou por revisão de **spec** + **qualidade** (subagentes). **Pendente:** smoke de API/Playwright no ambiente do usuário (loja seed com CPF de testemunha placeholder → deve disparar o diálogo "Gerar assim?"); preencher os CPFs reais em "Dados da loja" e revalidar.
+
+**Edge conhecido (registrado p/ revisão final):** loja **sem código** + geração confirmada → `num_contrato` sai com prefixo vazio (`-AAAA-…`); ocorre só se a loja não tiver código (validação avisa). Mantido o comportamento leniente por coerência com a Decisão 2.
 
 ### Sessão 2026-06-21 (sessão 22 — F2: perfis e CRUD de tenancy)
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação → merge). Spec/plano em `docs/superpowers/specs/2026-06-21-multitenant-f2-tenancy-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f2-tenancy.md`.
