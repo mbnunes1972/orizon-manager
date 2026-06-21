@@ -84,3 +84,33 @@ def test_migracao_loja_snapshot_idempotente(tmp_path, monkeypatch):
     cols = [r[1] for r in conn.execute("PRAGMA table_info(contratos)")]
     conn.close()
     assert cols.count("loja_snapshot_json") == 1
+
+
+def test_loja_dict_para_contrato_mapeia_campos():
+    import main
+
+    class _FakeLoja:
+        id = 1; nome = "INSPIRIUM"; cnpj = "19.152.134/0001-56"; codigo = "INS"
+        telefone = "(12) 3341-8777"; email = "sac@x.com"; cep = "12200-000"
+        logradouro = "Rua A"; numero = "100"; complemento = ""; bairro = "Centro"
+        cidade = "SJC"; estado = "SP"
+        testemunha1_nome = "Jaime"; testemunha1_cpf = "123.456.789-00"
+        testemunha2_nome = "Felipe"; testemunha2_cpf = "987.654.321-00"
+
+    class _FakeDB:
+        def get(self, model, pk):
+            return _FakeLoja() if pk == 1 else None
+
+    d = main._loja_dict_para_contrato(_FakeDB(), 1)
+    assert d["codigo"] == "INS"
+    assert d["nome"] == "INSPIRIUM"
+    assert d["testemunha1_cpf"] == "123.456.789-00"
+    assert d["cidade"] == "SJC"
+
+
+def test_loja_dict_para_contrato_sem_loja():
+    import main
+    class _FakeDB:
+        def get(self, model, pk): return None
+    assert main._loja_dict_para_contrato(_FakeDB(), None) == {}
+    assert main._loja_dict_para_contrato(_FakeDB(), 999) == {}
