@@ -406,7 +406,7 @@ class Handler(BaseHTTPRequestHandler):
                         (Parceiro.nome.ilike(f"%{q}%")) |
                         (Parceiro.cpf_cnpj.ilike(f"%{q}%"))
                     )
-                parceiros = [_parceiro_dict(p) for p in query.all()]
+                parceiros = [_parceiro_dict(p, db) for p in query.all()]
                 self.send_json({"ok": True, "parceiros": parceiros})
             except Exception as e:
                 self.send_json({"ok": False, "erro": str(e), "parceiros": []})
@@ -438,11 +438,25 @@ class Handler(BaseHTTPRequestHandler):
                 return
             db = get_session()
             try:
+                ator = _ator_dict(db, usuario)
                 us = db.query(Usuario).order_by(Usuario.nome).all()
+                visiveis = []
+                for u in us:
+                    if mod_tenancy._eh_super_admin(ator):
+                        ok = True
+                    elif mod_tenancy._eh_admin_rede(ator):
+                        ok = (u.rede_id == ator["rede_id"]) or (
+                            u.loja_id is not None and mod_tenancy.pode_ver_loja(
+                                ator, {"id": u.loja_id, "rede_id": _rede_da_loja(db, u.loja_id)}))
+                    else:
+                        ok = (u.loja_id is not None and u.loja_id == ator.get("loja_id"))
+                    if ok:
+                        visiveis.append(u)
                 self.send_json({"ok": True, "usuarios": [
                     {"id": u.id, "nome": u.nome, "login": u.login, "nivel": u.nivel,
                      "rotulo": perfis.rotulo(u.nivel), "telefone": u.telefone or "",
-                     "ativo": bool(u.ativo)} for u in us]})
+                     "loja_id": u.loja_id, "rede_id": u.rede_id,
+                     "ativo": bool(u.ativo)} for u in visiveis]})
             finally:
                 db.close()
 
@@ -639,7 +653,7 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     p = db.get(Parceiro, int(m.group(1)))
                     if p:
-                        self.send_json({"ok": True, "parceiro": _parceiro_dict(p)})
+                        self.send_json({"ok": True, "parceiro": _parceiro_dict(p, db)})
                     else:
                         self.send_json({"ok": False, "erro": "Parceiro não encontrado"}, code=404)
                 except Exception as e:
@@ -1506,6 +1520,7 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
 
         elif path == "/api/parceiros":
+            usuario = get_usuario_sessao(self)
             req  = json.loads(body) if body else {}
             nome = (req.get("nome") or "").strip()
             if not nome:
@@ -1526,7 +1541,15 @@ class Handler(BaseHTTPRequestHandler):
                 db.add(p)
                 db.commit()
                 db.refresh(p)
-                self.send_json({"ok": True, "parceiro": _parceiro_dict(p)})
+                if "abrangencia" in req:
+                    ator = _ator_dict(db, usuario) if usuario else {"nivel": "", "loja_id": None, "rede_id": None}
+                    erros = _aplicar_abrangencia_parceiro(db, p, req, ator)
+                    if erros:
+                        db.rollback()
+                        self.send_json({"ok": False, "erro": " ".join(erros)})
+                        return
+                    db.commit()
+                self.send_json({"ok": True, "parceiro": _parceiro_dict(p, db)})
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)})
@@ -1535,6 +1558,7 @@ class Handler(BaseHTTPRequestHandler):
 
         elif re.match(r"^/api/parceiros/(\d+)/editar$", path):
             m_par = re.match(r"^/api/parceiros/(\d+)/editar$", path)
+            usuario = get_usuario_sessao(self)
             req   = json.loads(body) if body else {}
             db    = get_session()
             try:
@@ -1550,9 +1574,16 @@ class Handler(BaseHTTPRequestHandler):
                 if "nome" in req and not p.nome:
                     self.send_json({"ok": False, "erro": "Nome é obrigatório"})
                     return
+                if "abrangencia" in req:
+                    ator = _ator_dict(db, usuario) if usuario else {"nivel": "", "loja_id": None, "rede_id": None}
+                    erros = _aplicar_abrangencia_parceiro(db, p, req, ator)
+                    if erros:
+                        db.rollback()
+                        self.send_json({"ok": False, "erro": " ".join(erros)})
+                        return
                 db.commit()
                 db.refresh(p)
-                self.send_json({"ok": True, "parceiro": _parceiro_dict(p)})
+                self.send_json({"ok": True, "parceiro": _parceiro_dict(p, db)})
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)})
@@ -2139,12 +2170,21 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     logins = [u.login for u in db.query(Usuario.login).all()]
                     erros  = mod_usuarios.validar_novo_usuario(req, logins)
+                    ator   = _ator_dict(db, usuario)
+                    loja_id, rede_id, erros_tenant = mod_tenancy.atribuir_tenant_usuario(ator, req)
+                    erros = erros + erros_tenant
+                    if not erros and loja_id is not None and not mod_tenancy._eh_super_admin(ator):
+                        loja = db.get(Loja, loja_id)
+                        if not loja or not mod_tenancy.pode_ver_loja(
+                                ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                            erros = erros + ["Loja fora do seu escopo."]
                     if erros:
                         self.send_json({"ok": False, "erro": " ".join(erros)})
                         return
                     u = Usuario(nome=req["nome"].strip(), login=req["login"].strip(),
                                 nivel=req["nivel"].strip(),
-                                telefone=(req.get("telefone") or "").strip())
+                                telefone=(req.get("telefone") or "").strip(),
+                                loja_id=loja_id, rede_id=rede_id)
                     u.set_senha(req["senha"])
                     db.add(u); db.commit()
                     self.send_json({"ok": True, "id": u.id})
@@ -3477,8 +3517,8 @@ def _montar_dados_projeto_para_contrato(nome_safe: str, orcamento_id: int, db) -
     return projeto_dict, cliente_dict, orcamento_dict
 
 
-def _parceiro_dict(p) -> dict:
-    return {
+def _parceiro_dict(p, db=None) -> dict:
+    d = {
         "id":                  p.id,
         "nome":                p.nome,
         "cpf_cnpj":            p.cpf_cnpj            or "",
@@ -3488,8 +3528,53 @@ def _parceiro_dict(p) -> dict:
         "whatsapp":            p.whatsapp             or "",
         "comissao_padrao_pct": p.comissao_padrao_pct  if p.comissao_padrao_pct is not None else 0.0,
         "observacoes":         p.observacoes          or "",
+        "abrangencia":         p.abrangencia          or "loja",
+        "rede_id":             p.rede_id,
         "criado_em":           p.criado_em.strftime("%Y-%m-%d") if p.criado_em else "",
+        "lojas":               [],
     }
+    if db is not None:
+        vincs = db.query(ParceiroLoja).filter_by(parceiro_id=p.id).all()
+        d["lojas"] = [{"loja_id": v.loja_id,
+                       "comissao_padrao_pct": v.comissao_padrao_pct or 0.0}
+                      for v in vincs]
+    return d
+
+
+def _aplicar_abrangencia_parceiro(db, p, req, ator):
+    """Grava abrangencia/rede_id no parceiro e sincroniza os vínculos parceiro_lojas.
+    Retorna lista de erros (vazia se ok). Só vincula lojas visíveis ao ator."""
+    erros = mod_tenancy.validar_abrangencia_parceiro(req)
+    if erros:
+        return erros
+    abr = (req.get("abrangencia") or "loja").strip()
+    p.abrangencia = abr
+    if abr == "rede":
+        rede_id = req.get("rede_id")
+        p.rede_id = rede_id
+        # super_admin/admin_rede via política pura; diretor pode a rede da PRÓPRIA loja
+        # (spec: o diretor também cria parceiro de abrangência 'rede').
+        permitido = mod_tenancy.pode_ver_rede(ator, rede_id)
+        if not permitido and ator.get("loja_id") is not None and rede_id is not None:
+            loja_ator = db.get(Loja, ator.get("loja_id"))
+            permitido = bool(loja_ator and loja_ator.rede_id == rede_id)
+        if not permitido:
+            return ["Rede fora do seu escopo."]
+        db.query(ParceiroLoja).filter_by(parceiro_id=p.id).delete()
+        return []
+    p.rede_id = None
+    lojas_req = req.get("lojas") or []
+    db.query(ParceiroLoja).filter_by(parceiro_id=p.id).delete()
+    for item in lojas_req:
+        lid = item.get("loja_id")
+        loja = db.get(Loja, lid) if lid else None
+        if not loja or not mod_tenancy.pode_ver_loja(
+                ator, {"id": loja.id, "rede_id": loja.rede_id}):
+            return [f"Loja {lid} fora do seu escopo."]
+        db.add(ParceiroLoja(parceiro_id=p.id, loja_id=lid,
+                            comissao_padrao_pct=float(item.get("comissao_padrao_pct") or 0),
+                            ativo=1))
+    return []
 
 
 def _rede_dict(r) -> dict:
@@ -3525,6 +3610,14 @@ def _loja_dict(l) -> dict:
         "ativo":       bool(l.ativo),
         "criado_em":   l.criado_em.strftime("%Y-%m-%d") if l.criado_em else "",
     }
+
+
+def _rede_da_loja(db, loja_id):
+    """rede_id da loja (ou None se avulsa/inexistente). Usado no escopo de listagem."""
+    if loja_id is None:
+        return None
+    l = db.get(Loja, loja_id)
+    return l.rede_id if l else None
 
 
 def _ator_dict(db, usuario_sessao):
