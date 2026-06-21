@@ -385,6 +385,7 @@ class Contrato(Base):
     gerado_por_id        = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     d4sign_uuid          = Column(Text,     nullable=True)   # fase futura D4Sign
     loja_id              = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
+    loja_snapshot_json   = Column(Text,     nullable=True)   # snapshot dos dados da loja (F3)
 
     gerado_por   = relationship("Usuario",  foreign_keys=[gerado_por_id])
     orcamento    = relationship("Orcamento", foreign_keys=[orcamento_id])
@@ -476,6 +477,7 @@ def _migrar_colunas():
             ("gerado_por_id",   "INTEGER"),
             ("num_contrato",    "VARCHAR(30)"),
             ("loja_id",         "INTEGER"),
+            ("loja_snapshot_json", "TEXT"),
         ]:
             if col not in con_cols:
                 cur.execute(f"ALTER TABLE contratos ADD COLUMN {col} {tipo}")

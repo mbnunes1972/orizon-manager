@@ -1,6 +1,8 @@
 # tests/test_contrato_loja.py
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import sqlite3
+import database
 
 
 def _loja_completa():
@@ -48,3 +50,37 @@ def test_validar_loja_telefone_email_endereco_obrigatorios():
 def test_validar_loja_vazia_acusa_tudo():
     from mod_contrato import validar_loja_para_contrato
     assert len(validar_loja_para_contrato({})) >= 13
+
+
+_TABELAS_LEGADO = ["clientes", "usuarios", "projetos_meta", "contratos",
+                   "orcamentos", "orcamento_ambientes", "briefings", "parceiros"]
+
+
+def _db_legado(path):
+    conn = sqlite3.connect(path)
+    for t in _TABELAS_LEGADO:
+        conn.execute(f"CREATE TABLE {t} (id INTEGER PRIMARY KEY)")
+    conn.commit(); conn.close()
+
+
+def test_migracao_cria_loja_snapshot_json(tmp_path, monkeypatch):
+    db = str(tmp_path / "legado.db")
+    _db_legado(db)
+    monkeypatch.setattr(database, "DB_PATH", db)
+    database._migrar_colunas()
+    conn = sqlite3.connect(db)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(contratos)")}
+    conn.close()
+    assert "loja_snapshot_json" in cols
+
+
+def test_migracao_loja_snapshot_idempotente(tmp_path, monkeypatch):
+    db = str(tmp_path / "legado.db")
+    _db_legado(db)
+    monkeypatch.setattr(database, "DB_PATH", db)
+    database._migrar_colunas()
+    database._migrar_colunas()   # 2ª vez não quebra
+    conn = sqlite3.connect(db)
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(contratos)")]
+    conn.close()
+    assert cols.count("loja_snapshot_json") == 1
