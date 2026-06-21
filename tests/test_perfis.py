@@ -1,11 +1,12 @@
 import perfis
 
 
-def test_slugs_sao_os_dez_perfis():
+def test_slugs_sao_os_doze_perfis():
     esperado = {
         "diretor", "gerente_vendas", "consultor", "gerente_adm_fin",
         "assistente_logistico", "conferente", "supervisor_montagem",
         "assistente_administrativo", "projetista_executivo", "medidor",
+        "super_admin", "admin_rede",
     }
     assert set(perfis.slugs()) == esperado
 

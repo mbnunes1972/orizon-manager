@@ -5,6 +5,7 @@ Omie_V3 | Dalmóbile
 Uso: python3 seed.py
 """
 
+import database
 from database import init_db, get_session, Usuario, loja_seed_id
 
 USUARIOS = [
@@ -40,9 +41,16 @@ def criar_usuarios_seed(db, usuarios, loja_id):
 
 
 def seed():
-    init_db()                         # cria schema + roda tenancy_v1_2026 (cria a loja seed)
+    init_db()                         # cria schema + tenancy_v1 (loja seed) + tenancy_v2 (super_admin)
     db = get_session()
     try:
+        if not db.query(Usuario).filter_by(nivel="super_admin").first():
+            sa = Usuario(nome=database._SEED_SA_NOME, login=database._SEED_SA_LOGIN,
+                         nivel="super_admin", loja_id=None, rede_id=None)
+            sa.set_senha(database._SEED_SA_SENHA)
+            db.add(sa); db.commit()
+            print(f"  [criado]    {database._SEED_SA_LOGIN} (super_admin)")
+
         loja_id = loja_seed_id(db)    # a loja seed já existe pela migração
         if loja_id is None:
             print("  [aviso] loja seed nao encontrada; usuarios serao criados sem loja_id.")

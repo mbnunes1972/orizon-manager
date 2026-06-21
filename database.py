@@ -10,6 +10,11 @@ import hashlib
 import os
 import perfis
 
+def _hash_senha(senha: str) -> str:
+    """SHA-256 hex de uma senha. Fonte única de hashing (Usuario + bootstrap/seed)."""
+    return hashlib.sha256(senha.encode()).hexdigest()
+
+
 # ── Conexão ──────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH  = os.path.join(BASE_DIR, "omie.db")
@@ -39,10 +44,10 @@ class Usuario(Base):
     autorizacoes  = relationship("LogAutorizacao",  back_populates="autorizador", foreign_keys="LogAutorizacao.autorizador_id")
 
     def set_senha(self, senha: str):
-        self.senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+        self.senha_hash = _hash_senha(senha)
 
     def check_senha(self, senha: str) -> bool:
-        return self.senha_hash == hashlib.sha256(senha.encode()).hexdigest()
+        return self.senha_hash == _hash_senha(senha)
 
     @property
     def limite_desconto(self) -> float:
@@ -528,6 +533,13 @@ _SEED_TEST1_CPF   = "xxx.xxx.xxx-xx"
 _SEED_TEST2_NOME  = "Felipe Guizalberte"
 _SEED_TEST2_CPF   = "yyy.yyy.yyy-yy"
 
+# ── super_admin de bootstrap (F2 multi-tenant) ────────────────────────────────
+# Hash SHA-256 igual ao Usuario.set_senha. Senha de exemplo ("trocar123") —
+# TROCAR antes de produção. loja_id/rede_id NULL = plataforma.
+_SEED_SA_NOME  = "Administrador da Plataforma"
+_SEED_SA_LOGIN = "sad2026"
+_SEED_SA_SENHA = "trocar123"
+
 def _tabela_existe(cur, nome):
     """True se a tabela existe (migração de tabela ausente é no-op — robusto a DBs parciais)."""
     cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (nome,))
@@ -595,6 +607,22 @@ def _run_migracoes(conn):
                         (pid, loja_id, com or 0.0))
 
         cur.execute("INSERT INTO schema_migrations(id) VALUES('tenancy_v1_2026')")
+
+    # 2026-06-21: F2 multi-tenant — super_admin de bootstrap (plataforma).
+    # Só insere se a tabela usuarios tiver as colunas reais (pula schemas parciais de teste
+    # sem mascarar erros reais: em produção a tabela vem completa do ORM).
+    if "tenancy_v2_2026" not in aplicadas and _tabela_existe(cur, "usuarios"):
+        cur.execute("PRAGMA table_info(usuarios)")
+        _ucols = {r[1] for r in cur.fetchall()}
+        if {"nome", "login", "senha_hash", "ativo"} <= _ucols:
+            cur.execute("SELECT COUNT(*) FROM usuarios WHERE nivel='super_admin'")
+            if cur.fetchone()[0] == 0:
+                cur.execute(
+                    """INSERT INTO usuarios (nome, login, senha_hash, nivel, ativo, loja_id, rede_id)
+                       VALUES (?,?,?, 'super_admin', 1, NULL, NULL)""",
+                    (_SEED_SA_NOME, _SEED_SA_LOGIN, _hash_senha(_SEED_SA_SENHA)))
+            # marca aplicada só quando o schema real permitiu agir (não em schemas parciais de teste)
+            cur.execute("INSERT INTO schema_migrations(id) VALUES('tenancy_v2_2026')")
 
     conn.commit()
 

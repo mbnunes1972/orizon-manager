@@ -4,18 +4,18 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-20 (sessão 21 — **F1 da plataforma multi-tenant**: fundação de dados (tabelas `redes`/`lojas`/`parceiro_lojas`, colunas de tenant `loja_id`/`rede_id`/`abrangencia`, migração `tenancy_v1_2026` + loja seed, `seed.py` vinculado). Puramente aditiva: zero mudança de comportamento. Antes: sessão 20 — parâmetros estruturais por projeto; data da entrada em todas as modalidades; contrato do cartão com parcelas sem data)
+> Atualizado em: 2026-06-21 (sessão 22 — **F2 da plataforma multi-tenant**: perfis `super_admin`/`admin_rede` (administrativos, sem operacional), super_admin de bootstrap (`tenancy_v2_2026`), `mod_tenancy.py` (validadores + escopo puros), endpoints `/api/admin/redes`/`/lojas`/`usuarios` escopados + parceiros com abrangência loja/rede (M:N), e console de 3 níveis (Plataforma → Rede → Loja) com edição dos dados da loja. Não toca queries operacionais (isolamento = F4). Antes: sessão 21 — F1 fundação de dados multi-tenant (puramente aditiva))
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
 - Sistema de autenticação completo: login, logout, sessões via cookie
-- **10 perfis (`perfis.py`, fonte única):** Diretor (50%), Gerente de Vendas (20%), Consultor (10%), Gerente Administrativo/Financeiro, Assistente Logístico, Conferente, Supervisor de Montagem, Assistente Administrativo, Projetista Executivo, Medidor. Permissões centralizadas: `desconto_max`, `ver_parametros`, `autorizar` (desconto), `gerir_usuarios`, `aprovar_financeiro`, `registrar_medicao`, `aprovar_medicao_reprovada`. Perfil técnico `admin` **aposentado** (migrado para `diretor` via `perfis_v2_2026`). Detalhes em `docs/USUARIOS.md`.
+- **12 perfis (`perfis.py`, fonte única):** 10 operacionais — Diretor (50%), Gerente de Vendas (20%), Consultor (10%), Gerente Administrativo/Financeiro, Assistente Logístico, Conferente, Supervisor de Montagem, Assistente Administrativo, Projetista Executivo, Medidor — + 2 **administrativos de tenancy** (F2): `super_admin` e `admin_rede` (gerenciam estrutura, sem capacidade operacional). Permissões centralizadas: `desconto_max`, `ver_parametros`, `autorizar`, `gerir_usuarios`, `aprovar_financeiro`, `registrar_medicao`, `aprovar_medicao_reprovada` + tenancy (`gerir_redes`/`gerir_lojas`/`editar_dados_loja`). Perfil técnico `admin` **aposentado** (via `perfis_v2_2026`). Detalhes em `docs/USUARIOS.md`.
 - **Usuários-exemplo (`seed.py`, 1 por perfil):** `pdm2026` (Diretor), `lds2026` (Ger. Vendas), `mds2026` (Consultor), `gaf2026` (Ger. Adm/Fin), `med2026` (Medidor) + demais — **senhas de exemplo, trocar antes de produção**.
 - **Painel Admin → Usuários:** CRUD (criar/editar perfil/telefone/ativar-desativar/resetar senha), acesso para Diretor ou Gerente Adm/Financeiro; `nav-07` gateado por `pode_gerir_usuarios`.
 - Módulo Clientes completo com ViaCEP, máscaras, CRUD, unicidade
 - **Auto-sync Omie:** ao criar cliente, tenta registrar no Omie em background thread; grava `omie_sync_status` (`ok`/`pendente`/`erro`) + `omie_sync_erro` na tabela `clientes`
 - Módulo Parceiros completo com tipos, comissão padrão, CRUD
-- **Painel Admin (page-07):** fila de clientes com sync pendente/erro, botão "Tentar" por cliente
+- **Área administrativa (page-07) — console de 3 níveis (F2):** Plataforma (redes + lojas avulsas + admins de rede) → Rede (lojas + diretores) → Loja (dados da loja editáveis incl. testemunhas/CPF · usuários da loja · parceiros), com breadcrumb + drill-down e aterrissagem por perfil. Mantém a fila de sync Omie (clientes pendente/erro, botão "Tentar").
 - Projeto vinculado a cliente obrigatório
 - **Lista de projetos redesenhada:** tabela com Status | Data | Projeto | Cliente | Último Orçamento
   - Duplo clique ou botão "Abrir →" entra no projeto
@@ -175,6 +175,22 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-21 (sessão 22 — F2: perfis e CRUD de tenancy)
+**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação → merge). Spec/plano em `docs/superpowers/specs/2026-06-21-multitenant-f2-tenancy-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f2-tenancy.md`.
+
+**Origem:** 2ª das 4 fases do programa multi-tenant. A F1 (sessão 21) criou o schema; a F2 **expõe a tenancy na UI/API**, sem tocar nenhuma query operacional (isolamento real é a F4).
+
+**Entregue:**
+- **Perfis novos (`perfis.py`) — puramente administrativos (operacional 0/False):** `super_admin` ("Administrador da Plataforma", escopo tudo) e `admin_rede` ("Administrador de Rede", escopo sua rede). Capacidades `gerir_redes` (só super_admin), `gerir_lojas` (super_admin+admin_rede), `editar_dados_loja` (+ **Diretor**, só a própria loja). Sessão (`auth._usuario_dict`) passa a expor `loja_id`/`rede_id` + flags `pode_gerir_redes`/`pode_gerir_lojas`/`pode_editar_dados_loja`.
+- **`mod_tenancy.py` (novo, puro/testável):** validadores (`validar_rede`, `validar_loja` código 3-letras único, `validar_abrangencia_parceiro`) + política de escopo/atribuição (`pode_ver_rede`, `pode_ver_loja`, `pode_editar_dados_loja`, `atribuir_tenant_usuario`, `_eh_super_admin`/`_eh_admin_rede`). As rotas em `main.py` ficam finas: validam, chamam as funções puras, aplicam `WHERE` por tenant e serializam.
+- **Bootstrap:** migração de dados `tenancy_v2_2026` (idempotente, `schema_migrations`) cria o super_admin `sad2026` quando nenhum existe; `seed.py` também o cria via ORM. Hashing de senha unificado em `database._hash_senha`.
+- **Endpoints (`main.py`, todos sob `/api/admin/`, com gate + escopo):** `redes` (GET/POST/PATCH, gate `gerir_redes`); `lojas` (GET/POST/PATCH, escopo por rede/loja, `?rede_id=avulsas|N`, edição dos **dados da loja** incl. testemunhas/CPF — destrava a F3); `usuarios` estendido (atribuição de `loja_id`/`rede_id` conforme quem cria + escopo na listagem); parceiros com **abrangência** `'loja'`(M:N em `parceiro_lojas`, comissão por loja) / `'rede'` — **Diretor cria ambos** (rede = a da própria loja).
+- **Frontend (`static/index.html`):** page-07 virou **console de 3 níveis** (Plataforma → Rede → Loja) com breadcrumb + drill-down; aterrissagem por perfil; aba "Dados da loja" (form que faz PATCH) e "Usuários da loja" (CRUD de sempre, preservado); UX de abrangência no modal de parceiro (com pré-preenchimento ao editar, p/ não resetar 'rede'→'loja').
+
+**Verificação:** pytest **186** verde (19 novos: perfis, validadores, escopo/atribuição, bootstrap+idempotência). **Smoke de API ao vivo (servidor real, super_admin+diretor):** 19 checagens — atribuição de tenant, escopo do diretor (lista/cria só na própria loja; 403 em `/api/admin/redes`), abrangência loja+rede, cadastro legado intacto, e **parceiro órfão não persiste** quando a abrangência falha (create atômico via `flush`). **Smoke de runtime do frontend via jsdom** (DOM real + backend ao vivo): 16 checagens, **0 erros de JS** — super_admin aterrissa no Nível 1, diretor no Nível 3 (form da loja preenchido + lista de usuários), modal de abrangência e edit-prefill OK. **Pendente:** Playwright em Chromium não rodou (faltam libs de sistema `libnspr4`/`libnss3` no WSL, sem sudo) — coberto funcionalmente pelo jsdom; rodar o pass visual no ambiente do usuário.
+
+**Fixes em revisão (achados e corrigidos durante o ciclo):** import local `urlparse` sombreava o do módulo e quebrava **todo** o `do_GET` (corrigido p/ `parse_qs` só); guard `.isdigit()` no `?rede_id=` (evita 500 por `int()` em input livre); marcador da migração `tenancy_v2` movido p/ dentro do guard de colunas (não marcar aplicada sem agir); **create de parceiro atômico** (`flush`+commit único) p/ não deixar órfão; prefetch das lojas no escopo de usuários (evita N+1); diretor pode parceiro de abrangência rede da própria loja.
 
 ### Sessão 2026-06-20 (sessão 21 — F1: fundação da plataforma multi-tenant)
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação → merge). Spec/plano em `docs/superpowers/specs/2026-06-20-multitenant-f1-fundacao-design.md` e `docs/superpowers/plans/2026-06-20-multitenant-f1-fundacao.md`.

@@ -1217,24 +1217,22 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   <!-- PAGE 07: Admin -->
   <div class="page" id="page-07">
-    <div class="page-title">&#x2699;&#xFE0F; Painel Admin</div>
-    <div style="border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:18px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <strong style="color:var(--dalm-gold,#c8a84b)">&#x1F465; Usu&aacute;rios</strong>
-        <button class="btn btn-ghost btn-sm" onclick="adminUsuariosNovo()" style="font-size:11px">+ Novo usu&aacute;rio</button>
-        <button class="btn btn-ghost btn-sm" onclick="adminUsuariosCarregar()" style="font-size:11px;margin-left:auto">&#x21BA; Atualizar</button>
-      </div>
-      <div id="admin-usuarios-lista"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
-    </div>
-    <div class="page-sub">Monitoramento e sincronização Omie</div>
-
-    <div class="card" style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-        <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px">Fila Omie — Clientes pendentes / com erro</div>
-        <button class="btn btn-ghost btn-sm" onclick="adminCarregar()" style="font-size:11px">&#x21BA; Atualizar</button>
-      </div>
-      <div id="admin-sync-lista">
-        <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">Carregando...</div>
+    <div class="page-title">&#x2699;&#xFE0F; Administra&ccedil;&atilde;o</div>
+    <!-- breadcrumb: preenchido por adminRender() conforme o nível atual -->
+    <div id="admin-breadcrumb" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
+    <!-- container único; adminRender() injeta o nível N1/N2/N3 -->
+    <div id="admin-console"><em style="color:var(--muted);font-size:12px">Carregando&hellip;</em></div>
+    <!-- mantém a fila Omie existente (não mexer) -->
+    <div class="page-sub" style="margin-top:24px">Monitoramento e sincroniza&ccedil;&atilde;o Omie</div>
+    <div id="admin-omie-fila">
+      <div class="card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px">Fila Omie &mdash; Clientes pendentes / com erro</div>
+          <button class="btn btn-ghost btn-sm" onclick="adminCarregar()" style="font-size:11px">&#x21BA; Atualizar</button>
+        </div>
+        <div id="admin-sync-lista">
+          <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">Carregando...</div>
+        </div>
       </div>
     </div>
   </div>
@@ -1295,6 +1293,22 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <label class="field-label">Comissão padrão (%)</label>
           <input type="number" id="par-comissao" min="0" max="30" step="0.5" value="0"
                  style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px;outline:none">
+        </div>
+        <div>
+          <label class="field-label">Abrangência</label>
+          <select id="par-abrangencia" onchange="parAbrangenciaMudou()"
+                  style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px">
+            <option value="loja">Por loja (vincula a lojas específicas)</option>
+            <option value="rede">Por rede (toda a rede)</option>
+          </select>
+        </div>
+        <div id="par-rede-wrap" style="display:none">
+          <label class="field-label">Rede</label>
+          <select id="par-rede" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></select>
+        </div>
+        <div id="par-lojas-wrap" style="grid-column:1/-1">
+          <label class="field-label">Lojas vinculadas</label>
+          <div id="par-lojas-lista" style="font-size:12px;color:var(--muted)">Carregando…</div>
         </div>
         <div style="grid-column:1/-1">
           <label class="field-label">Observações</label>
@@ -1881,7 +1895,9 @@ async function carregarUsuarioAutenticado(){
     if(!d.ok){ window.location.href = '/login'; return; }
     _usuarioAtual = d.usuario;
     const _navAdmin = document.getElementById('nav-07');
-    if (_navAdmin) _navAdmin.style.display = (_usuarioAtual && _usuarioAtual.pode_gerir_usuarios) ? '' : 'none';
+    if (_navAdmin) _navAdmin.style.display =
+      (_usuarioAtual && (_usuarioAtual.pode_gerir_usuarios
+        || _usuarioAtual.pode_gerir_redes || _usuarioAtual.pode_gerir_lojas)) ? '' : 'none';
     _atualizarUIUsuario();
     _carregarDadosExtrasUsuario();
   } catch(e){ console.warn('[AUTH] Erro ao carregar usuário:', e); }
@@ -2138,7 +2154,7 @@ function goPage(n){
   if(n===0) projCarregar();
   if(n===5) cliCarregar();
   if(n===6) parCarregar();
-  if(n===7){ adminCarregar(); adminUsuariosCarregar(); }
+  if(n===7){ adminCarregarConsole(); adminCarregar(); } // page-07: console + fila Omie
   if(n===9) cfgRenderizarPerfis();
 }
 function unlockNav(n){
@@ -6049,12 +6065,13 @@ async function parAbrirModal(id){
   if(tipoEl) tipoEl.value = '';
   const comEl = document.getElementById('par-comissao');
   if(comEl) comEl.value = 0;
+  let pData = null;
   if(id){
     try {
       const r = await fetch('/api/parceiros/'+id);
       const d = await r.json();
       if(d.ok){
-        const p = d.parceiro;
+        const p = d.parceiro; pData = p;
         document.getElementById('par-nome').value    = p.nome           || '';
         document.getElementById('par-tipo').value    = p.tipo           || '';
         document.getElementById('par-cpf').value     = p.cpf_cnpj       || '';
@@ -6068,6 +6085,24 @@ async function parAbrirModal(id){
       }
     } catch(e){ showToast('Erro ao carregar parceiro', true); return; }
   }
+  await parCarregarOpcoesTenant();
+  // ao editar, pré-preenche a abrangência (senão salvar resetaria 'rede' -> 'loja')
+  if(pData){
+    const abrSel = document.getElementById('par-abrangencia');
+    if(abrSel) abrSel.value = pData.abrangencia || 'loja';
+    if((pData.abrangencia || 'loja') === 'rede'){
+      const rsel = document.getElementById('par-rede');
+      if(rsel && pData.rede_id != null) rsel.value = String(pData.rede_id);
+    } else {
+      (pData.lojas || []).forEach(v => {
+        const chk = document.querySelector('.par-loja-chk[value="'+v.loja_id+'"]');
+        if(chk) chk.checked = true;
+        const com = document.querySelector('.par-loja-com[data-loja="'+v.loja_id+'"]');
+        if(com) com.value = v.comissao_padrao_pct;
+      });
+    }
+  }
+  parAbrangenciaMudou();
   document.getElementById('modal-parceiro').style.display = 'flex';
   setTimeout(() => document.getElementById('par-nome').focus(), 80);
 }
@@ -6141,6 +6176,20 @@ async function parSalvar(){
     observacoes:          document.getElementById('par-obs').value.trim(),
   };
 
+  const abrangencia = document.getElementById('par-abrangencia').value;
+  payload.abrangencia = abrangencia;
+  if (abrangencia === 'rede') {
+    payload.rede_id = parseInt(document.getElementById('par-rede').value) || null;
+  } else {
+    const lojas = [];
+    document.querySelectorAll('.par-loja-chk:checked').forEach(chk => {
+      const lid = parseInt(chk.value);
+      const com = document.querySelector(`.par-loja-com[data-loja="${lid}"]`);
+      lojas.push({ loja_id: lid, comissao_padrao_pct: parseFloat(com?.value) || 0 });
+    });
+    payload.lojas = lojas;
+  }
+
   const url = id ? `/api/parceiros/${id}/editar` : '/api/parceiros';
   try {
     const r = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'},
@@ -6161,7 +6210,211 @@ async function parSalvar(){
   } catch(e){ erro.textContent = 'Erro de conexão.'; }
 }
 
+function parAbrangenciaMudou(){
+  const abr = document.getElementById('par-abrangencia').value;
+  document.getElementById('par-rede-wrap').style.display  = abr==='rede' ? '' : 'none';
+  document.getElementById('par-lojas-wrap').style.display = abr==='loja' ? '' : 'none';
+}
+
+async function parCarregarOpcoesTenant(){
+  // popula select de redes (se houver) e checkboxes de lojas visíveis ao usuário
+  try {
+    const lojas = await fetch('/api/admin/lojas', {credentials:'same-origin'}).then(r=>r.json());
+    const box = document.getElementById('par-lojas-lista');
+    box.innerHTML = (lojas.lojas||[]).map(l=>`
+      <label style="display:flex;gap:8px;align-items:center;margin:4px 0">
+        <input type="checkbox" class="par-loja-chk" value="${l.id}">
+        <span>${esc(l.nome)} (${esc(l.codigo||'—')})</span>
+        <input type="number" class="par-loja-com" data-loja="${l.id}" min="0" max="30" step="0.5" value="0"
+               style="width:64px;margin-left:auto;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 6px;color:var(--text);font-size:11px"> %
+      </label>`).join('') || '<em>Nenhuma loja disponível.</em>';
+  } catch(e){ document.getElementById('par-lojas-lista').innerHTML = '<em>Erro ao carregar lojas.</em>'; }
+  // redes (opcional; só super_admin/admin_rede enxergam)
+  try {
+    const redes = await fetch('/api/admin/redes', {credentials:'same-origin'}).then(r=>r.json());
+    const sel = document.getElementById('par-rede');
+    sel.innerHTML = (redes.redes||[]).map(r=>`<option value="${r.id}">${esc(r.nome)}</option>`).join('');
+  } catch(e){ /* diretor não tem /api/admin/redes — ok, fica vazio */ }
+}
+
 // ── Admin Panel ───────────────────────────────────────────────────────────────
+
+// ── Console administrativo (F2 multi-tenant) ──────────────────────────────────
+let _adminNav = { nivel: 1, rede: null, loja: null };   // rede/loja = {id, nome}
+
+function adminCarregarConsole(){
+  // aterrissagem por perfil
+  const u = _usuarioAtual || {};
+  if (u.pode_gerir_redes)            _adminNav = { nivel: 1, rede: null, loja: null };
+  else if (u.pode_gerir_lojas && u.rede_id)
+                                     _adminNav = { nivel: 2, rede: { id: u.rede_id, nome: '' }, loja: null };
+  else if (u.loja_id)               _adminNav = { nivel: 3, rede: null, loja: { id: u.loja_id, nome: '' } };
+  else                              _adminNav = { nivel: 3, rede: null, loja: null };
+  adminRender();
+}
+
+function adminBreadcrumb(){
+  const parts = ['<span onclick="adminIrNivel(1)" style="cursor:pointer">Plataforma</span>'];
+  if (_adminNav.rede) parts.push(`<span onclick="adminIrNivel(2)" style="cursor:pointer">Rede ${esc(_adminNav.rede.nome||_adminNav.rede.id)}</span>`);
+  if (_adminNav.loja) parts.push(`<span>Loja ${esc(_adminNav.loja.nome||_adminNav.loja.id)}</span>`);
+  document.getElementById('admin-breadcrumb').innerHTML = parts.join(' › ');
+}
+
+function adminIrNivel(n){
+  if (n === 1) { _adminNav.rede = null; _adminNav.loja = null; }
+  if (n === 2) { _adminNav.loja = null; }
+  _adminNav.nivel = n;
+  adminRender();
+}
+
+function adminEntrarRede(id, nome){ _adminNav.rede = { id, nome }; _adminNav.nivel = 2; _adminNav.loja = null; adminRender(); }
+function adminEntrarLoja(id, nome){ _adminNav.loja = { id, nome }; _adminNav.nivel = 3; adminRender(); }
+
+function adminRender(){
+  adminBreadcrumb();
+  const box = document.getElementById('admin-console');
+  if (_adminNav.nivel === 1)      adminRenderPlataforma(box);
+  else if (_adminNav.nivel === 2) adminRenderRede(box);
+  else                            adminRenderLoja(box);
+}
+
+async function adminRenderPlataforma(box){
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const [redes, avulsas] = await Promise.all([
+    fetch('/api/admin/redes', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({redes:[]})),
+    fetch('/api/admin/lojas?rede_id=avulsas', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({lojas:[]})),
+  ]);
+  box.innerHTML = `
+    <div class="card" style="padding:14px 16px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+        <strong style="color:var(--dalm-gold,#c8a84b)">🏢 Redes</strong>
+        <button class="btn btn-ghost btn-sm" onclick="adminRedeNova()" style="font-size:11px">+ Nova rede</button>
+      </div>
+      <table class="cli-table"><thead><tr><th>Nome</th><th>CNPJ</th><th></th></tr></thead><tbody>
+      ${(redes.redes||[]).map(r=>`<tr>
+        <td>${esc(r.nome)}</td><td style="color:var(--muted)">${esc(r.cnpj||'—')}</td>
+        <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
+          onclick="adminEntrarRede(${r.id}, ${JSON.stringify(r.nome)})">Entrar ›</button></td></tr>`).join('')
+        || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma rede.</td></tr>'}
+      </tbody></table>
+    </div>
+    <div class="card" style="padding:14px 16px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+        <strong style="color:var(--dalm-gold,#c8a84b)">🏪 Lojas avulsas</strong>
+        <button class="btn btn-ghost btn-sm" onclick="adminLojaNova(null)" style="font-size:11px">+ Nova loja avulsa</button>
+      </div>
+      <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th></th></tr></thead><tbody>
+      ${(avulsas.lojas||[]).map(l=>`<tr>
+        <td>${esc(l.nome)}</td><td style="color:var(--muted)">${esc(l.codigo||'—')}</td>
+        <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
+          onclick="adminEntrarLoja(${l.id}, ${JSON.stringify(l.nome)})">Entrar ›</button></td></tr>`).join('')
+        || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma loja avulsa.</td></tr>'}
+      </tbody></table>
+    </div>`;
+}
+
+async function adminRedeNova(){
+  const nome = prompt('Nome da rede:'); if(!nome) return;
+  const cnpj = prompt('CNPJ (opcional):') || '';
+  const r = await fetch('/api/admin/redes', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({nome, cnpj})});
+  const d = await r.json();
+  if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Redes'}); return; }
+  showToast('Rede criada.', false); adminRender();
+}
+
+async function adminRenderRede(box){
+  const rid = _adminNav.rede?.id;
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const lojas = await fetch('/api/admin/lojas?rede_id='+rid, {credentials:'same-origin'})
+    .then(r=>r.json()).catch(()=>({lojas:[]}));
+  box.innerHTML = `
+    <div class="card" style="padding:14px 16px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+        <strong style="color:var(--dalm-gold,#c8a84b)">🏪 Lojas da rede</strong>
+        <button class="btn btn-ghost btn-sm" onclick="adminLojaNova(${rid})" style="font-size:11px">+ Nova loja</button>
+      </div>
+      <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th></th></tr></thead><tbody>
+      ${(lojas.lojas||[]).map(l=>`<tr>
+        <td>${esc(l.nome)}</td><td style="color:var(--muted)">${esc(l.codigo||'—')}</td>
+        <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
+          onclick="adminEntrarLoja(${l.id}, ${JSON.stringify(l.nome)})">Entrar ›</button></td></tr>`).join('')
+        || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma loja nesta rede.</td></tr>'}
+      </tbody></table>
+    </div>`;
+}
+
+async function adminLojaNova(redeId){
+  const nome   = prompt('Nome da loja:'); if(!nome) return;
+  const codigo = prompt('Código (3 letras, único — usado na numeração do contrato):'); if(!codigo) return;
+  const body = { nome, codigo };
+  if (redeId) body.rede_id = redeId;
+  const r = await fetch('/api/admin/lojas', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const d = await r.json();
+  if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Lojas'}); return; }
+  showToast('Loja criada.', false); adminRender();
+}
+
+async function adminRenderLoja(box){
+  const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  box.innerHTML = `
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin-bottom:12px">
+      <button class="home-tab ativo" id="loja-tab-dados" onclick="adminLojaTab('dados')">Dados da loja</button>
+      <button class="home-tab" id="loja-tab-usuarios" onclick="adminLojaTab('usuarios')">Usuários da loja</button>
+    </div>
+    <div id="loja-panel-dados"></div>
+    <div id="loja-panel-usuarios" style="display:none">
+      <button class="btn btn-ghost btn-sm" onclick="adminUsuariosNovo()" style="font-size:11px">+ Novo usuário</button>
+      <div id="admin-usuarios-lista" style="margin-top:10px"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+    </div>`;
+  adminLojaCarregarDados(lid);
+  adminUsuariosCarregar();   // popula #admin-usuarios-lista (função já existente)
+}
+
+function adminLojaTab(qual){
+  document.getElementById('loja-tab-dados').classList.toggle('ativo', qual==='dados');
+  document.getElementById('loja-tab-usuarios').classList.toggle('ativo', qual==='usuarios');
+  document.getElementById('loja-panel-dados').style.display    = qual==='dados' ? '' : 'none';
+  document.getElementById('loja-panel-usuarios').style.display = qual==='usuarios' ? '' : 'none';
+}
+
+async function adminLojaCarregarDados(lid){
+  const panel = document.getElementById('loja-panel-dados');
+  if (!lid){ panel.innerHTML = '<em style="color:var(--muted)">Loja não identificada.</em>'; return; }
+  const d = await fetch('/api/admin/lojas?'+ '', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({lojas:[]}));
+  const loja = (d.lojas||[]).find(l=>l.id===lid) || {id:lid};
+  const f = (id,label,val)=>`<div><label class="field-label">${label}</label>
+    <input id="${id}" value="${esc(val||'')}" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></div>`;
+  panel.innerHTML = `
+    <div class="grid2" style="gap:14px;margin-bottom:14px">
+      ${f('loja-nome','Nome',loja.nome)}
+      ${f('loja-codigo','Código (3 letras)',loja.codigo)}
+      ${f('loja-cnpj','CNPJ',loja.cnpj)}
+      ${f('loja-tel','Telefone',loja.telefone)}
+      ${f('loja-email','E-mail',loja.email)}
+      ${f('loja-t1n','Testemunha 1 — nome',loja.testemunha1_nome)}
+      ${f('loja-t1c','Testemunha 1 — CPF',loja.testemunha1_cpf)}
+      ${f('loja-t2n','Testemunha 2 — nome',loja.testemunha2_nome)}
+      ${f('loja-t2c','Testemunha 2 — CPF',loja.testemunha2_cpf)}
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="adminLojaSalvar(${lid})">Salvar dados da loja</button>`;
+}
+
+async function adminLojaSalvar(lid){
+  const v = id => document.getElementById(id).value.trim();
+  const payload = {
+    nome: v('loja-nome'), codigo: v('loja-codigo'), cnpj: v('loja-cnpj'),
+    telefone: v('loja-tel'), email: v('loja-email'),
+    testemunha1_nome: v('loja-t1n'), testemunha1_cpf: v('loja-t1c'),
+    testemunha2_nome: v('loja-t2n'), testemunha2_cpf: v('loja-t2c'),
+  };
+  const r = await fetch('/api/admin/lojas/'+lid, {method:'PATCH', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const d = await r.json();
+  if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Dados da loja'}); return; }
+  showToast('Dados da loja salvos.', false);
+}
 
 async function adminCarregar() {
   const lista = document.getElementById('admin-sync-lista');

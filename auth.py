@@ -170,8 +170,13 @@ def _usuario_dict(u: Usuario) -> dict:
         "nome":              u.nome,
         "login":             u.login,
         "nivel":             u.nivel,
+        "loja_id":           u.loja_id,
+        "rede_id":           u.rede_id,
         "limite_desconto":   u.limite_desconto,
         "pode_ver_parametros": u.pode_ver_parametros,
         "rotulo":              perfis.rotulo(u.nivel),
         "pode_gerir_usuarios": perfis.pode(u.nivel, "gerir_usuarios"),
+        "pode_gerir_redes":    perfis.pode(u.nivel, "gerir_redes"),
+        "pode_gerir_lojas":    perfis.pode(u.nivel, "gerir_lojas"),
+        "pode_editar_dados_loja": perfis.pode(u.nivel, "editar_dados_loja"),
     }
