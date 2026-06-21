@@ -411,6 +411,46 @@ def validar_cliente_para_contrato(cliente: dict) -> list:
     return faltando
 
 
+# ── Validação de dados da loja ────────────────────────────────────────────────
+
+_TEM_DIGITO = _re_mark.compile(r"\d")   # CPF real tem ao menos um dígito
+
+
+def validar_loja_para_contrato(loja: dict) -> list:
+    """Rótulos dos campos obrigatórios da loja que estão vazios para gerar o contrato.
+
+    Lista vazia → loja completa. O CPF de testemunha sem nenhum dígito
+    (placeholder 'xxx.xxx.xxx-xx') conta como faltando. `complemento` é opcional.
+    """
+    loja = loja or {}
+    obrigatorios = [
+        ("nome",             "Nome da empresa"),
+        ("cnpj",             "CNPJ"),
+        ("codigo",           "Código da loja"),
+        ("telefone",         "Telefone"),
+        ("email",            "E-mail"),
+        ("cep",              "CEP"),
+        ("logradouro",       "Logradouro"),
+        ("numero",           "Número"),
+        ("bairro",           "Bairro"),
+        ("cidade",           "Cidade"),
+        ("estado",           "Estado/UF"),
+        ("testemunha1_nome", "Nome da Testemunha 1"),
+        ("testemunha2_nome", "Nome da Testemunha 2"),
+    ]
+    faltando = []
+    for campo, rotulo in obrigatorios:
+        v = loja.get(campo)
+        if not (v and str(v).strip()):
+            faltando.append(rotulo)
+    for campo, rotulo in [("testemunha1_cpf", "CPF da Testemunha 1"),
+                          ("testemunha2_cpf", "CPF da Testemunha 2")]:
+        v = (loja.get(campo) or "").strip()
+        if not _TEM_DIGITO.search(v):
+            faltando.append(rotulo)
+    return faltando
+
+
 # ── Preenchimento dinâmico do modelo ─────────────────────────────────────────
 
 def _montar_mapping(ctx, pag):
