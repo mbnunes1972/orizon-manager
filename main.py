@@ -385,8 +385,20 @@ class Handler(BaseHTTPRequestHandler):
         m = re.match(r"^/api/projetos/([^/]+)/briefing$", path)
         if m:
             nome_safe = unquote(m.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             db = get_session()
             try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                    return
                 b = db.query(Briefing).filter_by(projeto_nome=nome_safe)\
                       .order_by(Briefing.id.desc()).first()
                 if not b:
@@ -708,6 +720,9 @@ class Handler(BaseHTTPRequestHandler):
                     if _projeto_da_loja(db, nome_safe, loja_id) is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                    return
                 finally:
                     db.close()
                 proj = _carregar_projeto(nome_safe)
@@ -1775,15 +1790,15 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 from mod_orcamento_params import merge_parametros
                 req = json.loads(body.decode("utf-8", "replace")) if body else {}
+                p = _projeto_da_loja(db, nome_safe, loja_id)
+                if p is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                    return
                 if _projeto_esta_bloqueado(nome_safe):
                     self.send_json({"ok": False, "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."}, code=400)
                     return
                 if _contrato_assinado(nome_safe, db):
                     self.send_json({"ok": False, "erro": "Contrato assinado — alterações não permitidas."}, code=403)
-                    return
-                p = _projeto_da_loja(db, nome_safe, loja_id)
-                if p is None:
-                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
                 atual = json.loads(p.parametros_json) if p.parametros_json else {}
                 novos = merge_parametros(atual, req)
@@ -3854,7 +3869,7 @@ def _ator_dict(db, usuario_sessao):
 def _obj_da_loja(db, Model, pk, loja_id):
     """Retorna o objeto se existir E pertencer à loja `loja_id`; senão None.
     None cobre 'sem id', 'não existe' e 'é de outra loja'."""
-    if not pk:
+    if not pk or loja_id is None:
         return None
     obj = db.get(Model, pk)
     if obj is None or getattr(obj, "loja_id", None) != loja_id:
@@ -3873,7 +3888,7 @@ def _filtrar_projetos_por_loja(projetos, db, loja_id):
     """Mantém só os projetos cujo projetos_meta.loja_id == loja_id (a lista vem do storage)."""
     nomes = [p.get("nome_safe") for p in projetos if p.get("nome_safe")]
     if not nomes:
-        return projetos
+        return []
     permitidos = {r[0] for r in db.query(Projeto.nome_safe)
                   .filter(Projeto.nome_safe.in_(nomes), Projeto.loja_id == loja_id).all()}
     return [p for p in projetos if p.get("nome_safe") in permitidos]

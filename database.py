@@ -728,6 +728,7 @@ def upsert_projeto_status(nome_safe: str, status: str, perdido_em=None):
         p = db.get(Projeto, nome_safe)
         if not p:
             p = Projeto(nome_safe=nome_safe)
+            p.loja_id = loja_seed_id(db)   # F4: nunca criar projeto sem loja (evita 404 fantasma)
             db.add(p)
         antigo_status = p.status
         p.status    = status
