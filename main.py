@@ -462,17 +462,28 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
 
         elif path == "/api/parceiros":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             from urllib.parse import parse_qs
             q  = (parse_qs(urlparse(self.path).query).get('q') or [''])[0].strip().lower()
             db = get_session()
             try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
                 query = db.query(Parceiro).order_by(Parceiro.nome)
                 if q:
                     query = query.filter(
                         (Parceiro.nome.ilike(f"%{q}%")) |
                         (Parceiro.cpf_cnpj.ilike(f"%{q}%"))
                     )
-                parceiros = [_parceiro_dict(p, db) for p in query.all()]
+                todos = query.all()
+                todos = [p for p in todos if _parceiro_visivel_loja(db, p, loja_id)]
+                parceiros = [_parceiro_dict(p, db) for p in todos]
                 self.send_json({"ok": True, "parceiros": parceiros})
             except Exception as e:
                 self.send_json({"ok": False, "erro": str(e), "parceiros": []})
@@ -783,13 +794,22 @@ class Handler(BaseHTTPRequestHandler):
 
             m = _re.match(r"^/api/parceiros/(\d+)$", path)
             if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
                 db = get_session()
                 try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
                     p = db.get(Parceiro, int(m.group(1)))
-                    if p:
-                        self.send_json({"ok": True, "parceiro": _parceiro_dict(p, db)})
-                    else:
-                        self.send_json({"ok": False, "erro": "Parceiro não encontrado"}, code=404)
+                    if p is None or not _parceiro_visivel_loja(db, p, loja_id):
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    self.send_json({"ok": True, "parceiro": _parceiro_dict(p, db)})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
@@ -4190,6 +4210,23 @@ def _projeto_da_loja(db, nome_safe, loja_id):
     Ponto de escopo das entidades 'por projeto' (pool/medição/ciclo/contrato).
     Delega em _obj_da_loja para manter uma única fonte da regra de escopo."""
     return _obj_da_loja(db, Projeto, nome_safe, loja_id)
+
+
+def _parceiro_visivel_loja(db, parceiro, loja_id):
+    """True se o parceiro é visível à loja `loja_id` (abrangência 'loja' com vínculo,
+    ou 'rede' com a rede da loja)."""
+    if parceiro is None or loja_id is None:
+        return False
+    abr = (getattr(parceiro, "abrangencia", None) or "loja")
+    if abr == "loja":
+        vin = db.query(ParceiroLoja).filter(
+            ParceiroLoja.parceiro_id == parceiro.id,
+            ParceiroLoja.loja_id == loja_id).first()
+        return vin is not None
+    if abr == "rede":
+        loja = db.get(Loja, loja_id)
+        return loja is not None and loja.rede_id is not None and parceiro.rede_id == loja.rede_id
+    return False
 
 
 def _filtrar_projetos_por_loja(projetos, db, loja_id):
