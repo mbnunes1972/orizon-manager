@@ -47,3 +47,24 @@ def test_projeto_da_loja():
     assert main._projeto_da_loja(_DB(_Proj(2)), "casa_a", 1) is None
     assert main._projeto_da_loja(_DB(None), "casa_a", 1) is None
     assert main._projeto_da_loja(_DB(_Proj(1)), "", 1) is None           # nome_safe vazio
+
+
+import sqlite3
+import database
+
+
+def test_backfill_loja_id_operacional(tmp_path, monkeypatch):
+    db = str(tmp_path / "f4.db")
+    conn = sqlite3.connect(db)
+    for t in ("clientes", "projetos_meta", "orcamentos", "contratos"):
+        conn.execute(f"CREATE TABLE {t} (id INTEGER PRIMARY KEY, loja_id INTEGER)")
+        conn.execute(f"INSERT INTO {t}(loja_id) VALUES (NULL)")
+    conn.commit(); conn.close()
+    monkeypatch.setattr(database, "DB_PATH", db)
+    database._backfill_loja_operacional()      # função nova, idempotente
+    database._backfill_loja_operacional()      # 2ª vez não muda nada
+    conn = sqlite3.connect(db)
+    for t in ("clientes", "projetos_meta", "orcamentos", "contratos"):
+        nul = conn.execute(f"SELECT COUNT(*) FROM {t} WHERE loja_id IS NULL").fetchone()[0]
+        assert nul == 0
+    conn.close()
