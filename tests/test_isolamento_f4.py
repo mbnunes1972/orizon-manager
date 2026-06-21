@@ -32,6 +32,8 @@ def test_obj_da_loja():
     assert main._obj_da_loja(_DB(_Obj(2)), object, 5, 1) is None        # outra loja
     assert main._obj_da_loja(_DB(None), object, 5, 1) is None           # inexistente
     assert main._obj_da_loja(_DB(_Obj(1)), object, None, 1) is None     # pk vazio
+    assert main._obj_da_loja(_DB(_Obj(1)), object, 0, 1) is None        # pk falsy (0)
+    assert main._obj_da_loja(_DB(_Obj(1)), object, "", 1) is None       # pk falsy ("")
 
 
 def test_projeto_da_loja():
@@ -44,3 +46,4 @@ def test_projeto_da_loja():
     assert main._projeto_da_loja(_DB(_Proj(1)), "casa_a", 1).loja_id == 1
     assert main._projeto_da_loja(_DB(_Proj(2)), "casa_a", 1) is None
     assert main._projeto_da_loja(_DB(None), "casa_a", 1) is None
+    assert main._projeto_da_loja(_DB(_Proj(1)), "", 1) is None           # nome_safe vazio

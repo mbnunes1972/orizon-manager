@@ -3678,8 +3678,8 @@ def _ator_dict(db, usuario_sessao):
 
 def _obj_da_loja(db, Model, pk, loja_id):
     """Retorna o objeto se existir E pertencer à loja `loja_id`; senão None.
-    None cobre 'não existe' e 'é de outra loja' (o handler responde 404 nos dois)."""
-    if pk is None:
+    None cobre 'sem id', 'não existe' e 'é de outra loja'."""
+    if not pk:
         return None
     obj = db.get(Model, pk)
     if obj is None or getattr(obj, "loja_id", None) != loja_id:
@@ -3688,14 +3688,10 @@ def _obj_da_loja(db, Model, pk, loja_id):
 
 
 def _projeto_da_loja(db, nome_safe, loja_id):
-    """Retorna o projetos_meta (PK = nome_safe) se pertencer à loja; senão None (=> 404).
-    É o ponto de escopo das entidades 'por projeto' (pool/medição/ciclo/contrato)."""
-    if not nome_safe:
-        return None
-    p = db.get(Projeto, nome_safe)
-    if p is None or getattr(p, "loja_id", None) != loja_id:
-        return None
-    return p
+    """Retorna o projetos_meta (PK = nome_safe) se pertencer à loja; senão None.
+    Ponto de escopo das entidades 'por projeto' (pool/medição/ciclo/contrato).
+    Delega em _obj_da_loja para manter uma única fonte da regra de escopo."""
+    return _obj_da_loja(db, Projeto, nome_safe, loja_id)
 
 
 def _loja_dict_para_contrato(db, loja_id):
