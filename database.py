@@ -710,6 +710,7 @@ def _migrar_dados():
         conn.close()
     _backfill_loja_operacional()
 
+
 def get_session():
     return Session()
 
