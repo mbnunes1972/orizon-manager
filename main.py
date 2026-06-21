@@ -1803,6 +1803,9 @@ class Handler(BaseHTTPRequestHandler):
 
         elif path == "/api/parceiros":
             usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             req  = json.loads(body) if body else {}
             nome = (req.get("nome") or "").strip()
             if not nome:
@@ -1841,12 +1844,20 @@ class Handler(BaseHTTPRequestHandler):
         elif re.match(r"^/api/parceiros/(\d+)/editar$", path):
             m_par = re.match(r"^/api/parceiros/(\d+)/editar$", path)
             usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             req   = json.loads(body) if body else {}
             db    = get_session()
             try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
                 p = db.get(Parceiro, int(m_par.group(1)))
-                if not p:
-                    self.send_json({"ok": False, "erro": "Parceiro não encontrado"})
+                if p is None or not _parceiro_visivel_loja(db, p, loja_id):
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
                 for f in ["nome","cpf_cnpj","tipo","email","telefone","whatsapp","observacoes"]:
                     if f in req:
@@ -1857,7 +1868,6 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Nome é obrigatório"})
                     return
                 if "abrangencia" in req:
-                    ator = _ator_dict(db, usuario) if usuario else {"nivel": "", "loja_id": None, "rede_id": None}
                     erros = _aplicar_abrangencia_parceiro(db, p, req, ator)
                     if erros:
                         db.rollback()
@@ -3510,11 +3520,23 @@ class Handler(BaseHTTPRequestHandler):
                 if novo_status not in VALIDOS:
                     self.send_json({"ok": False, "erro": f"Status inválido. Use: {', '.join(sorted(VALIDOS))}"})
                     return
-                _dbck = get_session()
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                _db_scope = get_session()
                 try:
-                    _assinado = _contrato_assinado(nome_safe, _dbck)
+                    ator = _ator_dict(_db_scope, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(_db_scope, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    _assinado = _contrato_assinado(nome_safe, _db_scope)
                 finally:
-                    _dbck.close()
+                    _db_scope.close()
                 if _assinado:
                     self.send_json({"ok": False,
                                     "erro": "Contrato assinado — alterações não permitidas."},
