@@ -8224,19 +8224,33 @@ function abrirModalAdendo() {
     });
 }
 
-async function salvarAdendo() {
+async function salvarAdendo(confirmarLojaIncompleta = false) {
   const adendo = document.getElementById('adendo-texto')?.value || '';
   try {
     const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato`, {
       method: 'PATCH',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ adendo }),
+      body: JSON.stringify({ adendo, confirmar_loja_incompleta: confirmarLojaIncompleta }),
     });
     const d = await r.json();
+    if (d.ok) {
+      document.getElementById('modal-adendo-overlay')?.remove();
+      showToast('Adendo salvo e PDF regenerado.', false);
+      carregarDadosContrato();
+      return;
+    }
+    // Loja incompleta: avisa e deixa regenerar assim mesmo (mantém o modal aberto p/ a re-chamada)
+    if (d.precisa_confirmar_loja) {
+      const ok = await confirmarPopup(
+        'Dados da loja incompletos:\n\n• ' + (d.campos_loja_faltando || []).join('\n• ') +
+        '\n\nSalvar e regenerar assim mesmo?',
+        {titulo:'Loja incompleta', okLabel:'Gerar assim', cancelLabel:'Cancelar'});
+      if (ok) return salvarAdendo(true);
+      return;
+    }
     document.getElementById('modal-adendo-overlay')?.remove();
-    if (d.ok) { showToast('Adendo salvo e PDF regenerado.', false); carregarDadosContrato(); }
-    else showToast('Erro: ' + d.erro, true);
+    showToast('Erro: ' + d.erro, true);
   } catch(e) { showToast('Erro de rede: ' + e.message, true); }
 }
 
