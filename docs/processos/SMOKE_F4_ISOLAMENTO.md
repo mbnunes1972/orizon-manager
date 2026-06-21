@@ -78,6 +78,9 @@ A revisão de segurança por task pegou e **corrigiu** estes (todos já fechados
 - `_origem` (cópia de margens de orçamento-modelo) lia cross-loja.
 - `POST /projetos/<nome>/ambientes/...` (**sem auth**) e `POST /api/projetos/<nome>/briefing`
   (sem checagem de sessão).
+- **(revisão final do conjunto)** `PATCH /api/projetos/<nome>/status` (**sem auth** — qualquer um
+  mudava o funil de qualquer projeto), `POST /api/parceiros` (sem auth) e
+  `POST /api/parceiros/<id>/editar` (sem auth + edição cross-loja de parceiro).
 
 ## 7. Achado pré-existente (FORA do escopo da F4 — decisão sua)
 
