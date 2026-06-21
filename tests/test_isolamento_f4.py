@@ -19,3 +19,28 @@ def test_escopo_operacional_admin_rede_sem_acesso():
     import mod_tenancy as mt
     loja_id, err = mt.escopo_operacional({"nivel": "admin_rede", "loja_id": None, "rede_id": 3})
     assert loja_id is None and err
+
+
+def test_obj_da_loja():
+    import main
+    class _Obj:
+        def __init__(self, loja_id): self.loja_id = loja_id
+    class _DB:
+        def __init__(self, obj): self._obj = obj
+        def get(self, model, pk): return self._obj
+    assert main._obj_da_loja(_DB(_Obj(1)), object, 5, 1).loja_id == 1   # mesma loja
+    assert main._obj_da_loja(_DB(_Obj(2)), object, 5, 1) is None        # outra loja
+    assert main._obj_da_loja(_DB(None), object, 5, 1) is None           # inexistente
+    assert main._obj_da_loja(_DB(_Obj(1)), object, None, 1) is None     # pk vazio
+
+
+def test_projeto_da_loja():
+    import main
+    class _Proj:
+        def __init__(self, loja_id): self.loja_id = loja_id
+    class _DB:
+        def __init__(self, p): self._p = p
+        def get(self, model, pk): return self._p
+    assert main._projeto_da_loja(_DB(_Proj(1)), "casa_a", 1).loja_id == 1
+    assert main._projeto_da_loja(_DB(_Proj(2)), "casa_a", 1) is None
+    assert main._projeto_da_loja(_DB(None), "casa_a", 1) is None

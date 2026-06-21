@@ -3676,6 +3676,28 @@ def _ator_dict(db, usuario_sessao):
     return {"nivel": u.nivel, "loja_id": u.loja_id, "rede_id": u.rede_id}
 
 
+def _obj_da_loja(db, Model, pk, loja_id):
+    """Retorna o objeto se existir E pertencer à loja `loja_id`; senão None.
+    None cobre 'não existe' e 'é de outra loja' (o handler responde 404 nos dois)."""
+    if pk is None:
+        return None
+    obj = db.get(Model, pk)
+    if obj is None or getattr(obj, "loja_id", None) != loja_id:
+        return None
+    return obj
+
+
+def _projeto_da_loja(db, nome_safe, loja_id):
+    """Retorna o projetos_meta (PK = nome_safe) se pertencer à loja; senão None (=> 404).
+    É o ponto de escopo das entidades 'por projeto' (pool/medição/ciclo/contrato)."""
+    if not nome_safe:
+        return None
+    p = db.get(Projeto, nome_safe)
+    if p is None or getattr(p, "loja_id", None) != loja_id:
+        return None
+    return p
+
+
 def _loja_dict_para_contrato(db, loja_id):
     """Dict plano dos dados da loja para alimentar/snapshotar o contrato (F3).
     Retorna {} se não houver loja resolvível."""
