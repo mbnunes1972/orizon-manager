@@ -23,6 +23,33 @@
 `assistente_logistico`, `conferente`, `supervisor_montagem`,
 `assistente_administrativo`, `projetista_executivo`, `medidor`.)
 
+## Perfis administrativos de tenancy (F2 multi-tenant)
+
+Dois perfis **puramente administrativos**: gerenciam a estrutura (redes, lojas, usuários)
+e **não operam** dentro das lojas — todas as capacidades operacionais (desconto, autorizar,
+aprovar financeiro, medição, ver parâmetros) são **0/False**.
+
+| Perfil | Slug | Escopo | Gere |
+|---|---|---|---|
+| Administrador da Plataforma | `super_admin` | `loja_id`/`rede_id` NULL — tudo | redes, lojas (qualquer), usuários (qualquer), dados de qualquer loja |
+| Administrador de Rede | `admin_rede` | `rede_id` setado, `loja_id` NULL — sua rede | lojas e diretores **da sua rede**, dados das lojas da rede |
+
+Capacidades de tenancy (em `perfis.py`): `gerir_redes` (só super_admin), `gerir_lojas`
+(super_admin e admin_rede), `editar_dados_loja` (super_admin, admin_rede e **também o
+Diretor** — só a própria loja). O escopo concreto (rede/loja) quem aplica é o `main.py`.
+
+A área administrativa (page-07) é um console de 3 níveis espelhando a hierarquia:
+**Plataforma → Rede → Loja**. Cada perfil aterrissa no seu nível (super_admin→Plataforma,
+admin_rede→sua Rede, diretor/adm-fin→sua Loja) e os perfis altos descem por drill-down +
+breadcrumb. A aba "Usuários da loja" do Nível 3 é o CRUD de usuários de sempre.
+
+### super_admin de bootstrap
+
+A migração `tenancy_v2_2026` (em `database.py`) cria, em banco sem nenhum super_admin, um
+usuário dedicado de bootstrap (`sad2026`, "Administrador da Plataforma", `loja_id`/`rede_id`
+NULL). É idempotente e respeita um super_admin pré-existente. **Senha de exemplo — trocar
+antes de produção.**
+
 ## Capacidades adicionais (sub-projetos 3 e 4)
 
 Além das colunas acima, `perfis.py` define capacidades específicas de fluxo:
