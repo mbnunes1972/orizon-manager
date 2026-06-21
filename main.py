@@ -12,7 +12,7 @@ from auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
 from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
-                       LogAcaoGerencial, Medicao)
+                       LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -46,6 +46,7 @@ import mod_ciclo
 import mod_medicao
 import perfis
 import mod_usuarios
+import mod_tenancy
 
 def _enriquecer_projetos_com_status(projetos):
     """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
@@ -442,6 +443,43 @@ class Handler(BaseHTTPRequestHandler):
                     {"id": u.id, "nome": u.nome, "login": u.login, "nivel": u.nivel,
                      "rotulo": perfis.rotulo(u.nivel), "telefone": u.telefone or "",
                      "ativo": bool(u.ativo)} for u in us]})
+            finally:
+                db.close()
+
+        elif path == "/api/admin/redes":
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_redes"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                return
+            db = get_session()
+            try:
+                redes = db.query(Rede).order_by(Rede.nome).all()
+                self.send_json({"ok": True, "redes": [_rede_dict(r) for r in redes]})
+            finally:
+                db.close()
+        elif path == "/api/admin/lojas":
+            usuario = get_usuario_sessao(self)
+            if not usuario or not (perfis.pode(usuario.get("nivel"), "gerir_lojas")
+                                   or perfis.pode(usuario.get("nivel"), "editar_dados_loja")):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                return
+            from urllib.parse import parse_qs
+            rede_q = (parse_qs(urlparse(self.path).query).get("rede_id") or [""])[0].strip()
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                q = db.query(Loja)
+                if rede_q == "avulsas":
+                    q = q.filter(Loja.rede_id.is_(None))
+                elif rede_q:
+                    if not rede_q.isdigit():
+                        self.send_json({"ok": False, "erro": "rede_id inválido"}, code=400)
+                        return
+                    q = q.filter(Loja.rede_id == int(rede_q))
+                lojas = [l for l in q.order_by(Loja.nome).all()
+                         if mod_tenancy.pode_ver_loja(
+                             ator, {"id": l.id, "rede_id": l.rede_id})]
+                self.send_json({"ok": True, "lojas": [_loja_dict(l) for l in lojas]})
             finally:
                 db.close()
 
@@ -2114,6 +2152,57 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            if path == "/api/admin/redes":
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_redes"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                    return
+                req = json.loads(body) if body else {}
+                erros = mod_tenancy.validar_rede(req)
+                if erros:
+                    self.send_json({"ok": False, "erro": " ".join(erros)})
+                    return
+                db = get_session()
+                try:
+                    r = Rede(nome=req["nome"].strip(),
+                             cnpj=(req.get("cnpj") or "").strip() or None)
+                    db.add(r); db.commit()
+                    self.send_json({"ok": True, "rede": _rede_dict(r)})
+                finally:
+                    db.close()
+                return
+
+            if path == "/api/admin/lojas":
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_lojas"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                    return
+                req = json.loads(body) if body else {}
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    codigos = [c for (c,) in db.query(Loja.codigo).all() if c]
+                    erros = mod_tenancy.validar_loja(req, codigos)
+                    rede_id = req.get("rede_id")
+                    if not mod_tenancy._eh_super_admin(ator):
+                        rede_id = ator.get("rede_id")
+                    if erros:
+                        self.send_json({"ok": False, "erro": " ".join(erros)})
+                        return
+                    l = Loja(
+                        nome=req["nome"].strip(),
+                        codigo=req["codigo"].strip().upper(),
+                        rede_id=rede_id,
+                        cnpj=(req.get("cnpj") or "").strip() or None,
+                        telefone=(req.get("telefone") or "").strip() or None,
+                        email=(req.get("email") or "").strip() or None,
+                    )
+                    db.add(l); db.commit()
+                    self.send_json({"ok": True, "loja": _loja_dict(l)})
+                finally:
+                    db.close()
+                return
+
             m_sync = _re.match(r"^/api/admin/omie-sync/(\d+)/retry$", path)
             if m_sync:
                 usuario = get_usuario_sessao(self)
@@ -3030,6 +3119,80 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            m_rede = re.match(r"^/api/admin/redes/(\d+)$", path)
+            if m_rede:
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_redes"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                    return
+                req = json.loads(body) if body else {}
+                db = get_session()
+                try:
+                    r = db.get(Rede, int(m_rede.group(1)))
+                    if not r:
+                        self.send_json({"ok": False, "erro": "Rede não encontrada"}, code=404)
+                        return
+                    if "nome" in req:
+                        nome = (req["nome"] or "").strip()
+                        if not nome:
+                            self.send_json({"ok": False, "erro": "Nome da rede é obrigatório."})
+                            return
+                        r.nome = nome
+                    if "cnpj" in req:  r.cnpj  = (req["cnpj"] or "").strip() or None
+                    if "ativo" in req: r.ativo = 1 if req["ativo"] else 0
+                    db.commit()
+                    self.send_json({"ok": True, "rede": _rede_dict(r)})
+                finally:
+                    db.close()
+                return
+
+            m_loja = re.match(r"^/api/admin/lojas/(\d+)$", path)
+            if m_loja:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                    return
+                req = json.loads(body) if body else {}
+                db = get_session()
+                try:
+                    l = db.get(Loja, int(m_loja.group(1)))
+                    if not l:
+                        self.send_json({"ok": False, "erro": "Loja não encontrada"}, code=404)
+                        return
+                    ator = _ator_dict(db, usuario)
+                    loja_d = {"id": l.id, "rede_id": l.rede_id}
+                    if not mod_tenancy.pode_editar_dados_loja(ator, loja_d):
+                        self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                        return
+                    if "codigo" in req:
+                        outros = [c for (c,) in db.query(Loja.codigo)
+                                                .filter(Loja.id != l.id).all() if c]
+                        erros = mod_tenancy.validar_loja(
+                            {"nome": req.get("nome", l.nome), "codigo": req["codigo"]}, outros)
+                        if erros:
+                            self.send_json({"ok": False, "erro": " ".join(erros)})
+                            return
+                        l.codigo = req["codigo"].strip().upper()
+                    for campo in ("nome", "cnpj", "telefone", "email", "cep", "logradouro",
+                                  "numero", "complemento", "bairro", "cidade", "estado",
+                                  "testemunha1_nome", "testemunha1_cpf",
+                                  "testemunha2_nome", "testemunha2_cpf"):
+                        if campo in req:
+                            val = (req[campo] or "").strip() or None
+                            if campo == "nome" and not val:
+                                self.send_json({"ok": False, "erro": "Nome da loja é obrigatório."})
+                                return
+                            setattr(l, campo, val)
+                    if perfis.pode(ator.get("nivel"), "gerir_lojas"):
+                        if "ativo" in req:   l.ativo = 1 if req["ativo"] else 0
+                        if "rede_id" in req and mod_tenancy._eh_super_admin(ator):
+                            l.rede_id = req["rede_id"]
+                    db.commit()
+                    self.send_json({"ok": True, "loja": _loja_dict(l)})
+                finally:
+                    db.close()
+                return
+
             self.send_json({"ok": False, "erro": "Rota não encontrada"})
         except Exception as e:
             self.send_json({"ok": False, "erro": str(e)})
@@ -3327,6 +3490,49 @@ def _parceiro_dict(p) -> dict:
         "observacoes":         p.observacoes          or "",
         "criado_em":           p.criado_em.strftime("%Y-%m-%d") if p.criado_em else "",
     }
+
+
+def _rede_dict(r) -> dict:
+    return {
+        "id":        r.id,
+        "nome":      r.nome,
+        "cnpj":      r.cnpj or "",
+        "ativo":     bool(r.ativo),
+        "criado_em": r.criado_em.strftime("%Y-%m-%d") if r.criado_em else "",
+    }
+
+
+def _loja_dict(l) -> dict:
+    return {
+        "id":          l.id,
+        "rede_id":     l.rede_id,
+        "nome":        l.nome,
+        "cnpj":        l.cnpj        or "",
+        "codigo":      l.codigo      or "",
+        "telefone":    l.telefone    or "",
+        "email":       l.email       or "",
+        "cep":         l.cep         or "",
+        "logradouro":  l.logradouro  or "",
+        "numero":      l.numero      or "",
+        "complemento": l.complemento or "",
+        "bairro":      l.bairro      or "",
+        "cidade":      l.cidade      or "",
+        "estado":      l.estado      or "",
+        "testemunha1_nome": l.testemunha1_nome or "",
+        "testemunha1_cpf":  l.testemunha1_cpf  or "",
+        "testemunha2_nome": l.testemunha2_nome or "",
+        "testemunha2_cpf":  l.testemunha2_cpf  or "",
+        "ativo":       bool(l.ativo),
+        "criado_em":   l.criado_em.strftime("%Y-%m-%d") if l.criado_em else "",
+    }
+
+
+def _ator_dict(db, usuario_sessao):
+    """Re-consulta o usuário logado no banco para obter nivel/loja_id/rede_id frescos."""
+    u = db.get(Usuario, usuario_sessao.get("id"))
+    if not u:
+        return {"nivel": usuario_sessao.get("nivel"), "loja_id": None, "rede_id": None}
+    return {"nivel": u.nivel, "loja_id": u.loja_id, "rede_id": u.rede_id}
 
 
 # == MAIN ==
