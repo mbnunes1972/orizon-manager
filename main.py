@@ -1488,12 +1488,20 @@ class Handler(BaseHTTPRequestHandler):
         if m_bf:
             cliente_id = int(m_bf.group(1))
             usuario    = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
             req        = json.loads(body) if body else {}
             db         = get_session()
             try:
-                c = db.get(Cliente, cliente_id)
-                if not c:
-                    self.send_json({"ok": False, "erro": "Cliente não encontrado"})
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                c = _obj_da_loja(db, Cliente, cliente_id, loja_id)
+                if c is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
                 b = db.query(Briefing).filter_by(cliente_id=cliente_id)\
                       .order_by(Briefing.id.desc()).first()
