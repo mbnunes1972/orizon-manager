@@ -68,7 +68,11 @@ def _eh_admin_rede(ator):
 
 
 def pode_ver_rede(ator, rede_id):
-    """super_admin vê qualquer rede; admin_rede só a própria; demais, nenhuma."""
+    """super_admin vê qualquer rede; admin_rede só a própria; demais, nenhuma.
+
+    NOTA: o diretor NÃO é coberto aqui (não tem rede_id próprio). O caso de o diretor
+    poder agir sobre a rede da PRÓPRIA loja (ex.: parceiro de abrangência 'rede') é
+    resolvido no call site, que consulta loja.rede_id no banco (esta função é pura)."""
     if _eh_super_admin(ator):
         return True
     if _eh_admin_rede(ator):

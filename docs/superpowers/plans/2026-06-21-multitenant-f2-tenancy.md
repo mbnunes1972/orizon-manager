@@ -1157,8 +1157,15 @@ def _aplicar_abrangencia_parceiro(db, p, req, ator):
     abr = (req.get("abrangencia") or "loja").strip()
     p.abrangencia = abr
     if abr == "rede":
-        p.rede_id = req.get("rede_id")
-        if not mod_tenancy.pode_ver_rede(ator, p.rede_id):
+        rede_id = req.get("rede_id")
+        p.rede_id = rede_id
+        # super_admin/admin_rede via política pura; o diretor pode a rede da PRÓPRIA loja
+        # (spec decisão #4: o diretor também cria parceiro de abrangência 'rede').
+        permitido = mod_tenancy.pode_ver_rede(ator, rede_id)
+        if not permitido and ator.get("loja_id") is not None and rede_id is not None:
+            loja_ator = db.get(Loja, ator.get("loja_id"))
+            permitido = bool(loja_ator and loja_ator.rede_id == rede_id)
+        if not permitido:
             return ["Rede fora do seu escopo."]
         # abrangência de rede não usa vínculos por loja: limpa os antigos
         db.query(ParceiroLoja).filter_by(parceiro_id=p.id).delete()

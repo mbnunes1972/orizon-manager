@@ -440,6 +440,10 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 ator = _ator_dict(db, usuario)
                 us = db.query(Usuario).order_by(Usuario.nome).all()
+                # pré-carrega rede_id de cada loja referenciada (evita N+1 no loop de escopo)
+                loja_ids = {u.loja_id for u in us if u.loja_id is not None}
+                rede_de_loja = {l.id: l.rede_id for l in
+                                db.query(Loja).filter(Loja.id.in_(loja_ids)).all()} if loja_ids else {}
                 visiveis = []
                 for u in us:
                     if mod_tenancy._eh_super_admin(ator):
@@ -447,7 +451,7 @@ class Handler(BaseHTTPRequestHandler):
                     elif mod_tenancy._eh_admin_rede(ator):
                         ok = (u.rede_id == ator["rede_id"]) or (
                             u.loja_id is not None and mod_tenancy.pode_ver_loja(
-                                ator, {"id": u.loja_id, "rede_id": _rede_da_loja(db, u.loja_id)}))
+                                ator, {"id": u.loja_id, "rede_id": rede_de_loja.get(u.loja_id)}))
                     else:
                         ok = (u.loja_id is not None and u.loja_id == ator.get("loja_id"))
                     if ok:
@@ -1539,16 +1543,16 @@ class Handler(BaseHTTPRequestHandler):
                     observacoes         =(req.get("observacoes")          or "").strip() or None,
                 )
                 db.add(p)
-                db.commit()
-                db.refresh(p)
+                db.flush()        # atribui p.id sem efetivar — transação única e atômica
                 if "abrangencia" in req:
                     ator = _ator_dict(db, usuario) if usuario else {"nivel": "", "loja_id": None, "rede_id": None}
                     erros = _aplicar_abrangencia_parceiro(db, p, req, ator)
                     if erros:
-                        db.rollback()
+                        db.rollback()    # desfaz tudo, inclusive o INSERT do parceiro
                         self.send_json({"ok": False, "erro": " ".join(erros)})
                         return
-                    db.commit()
+                db.commit()
+                db.refresh(p)
                 self.send_json({"ok": True, "parceiro": _parceiro_dict(p, db)})
             except Exception as e:
                 db.rollback()
@@ -3610,14 +3614,6 @@ def _loja_dict(l) -> dict:
         "ativo":       bool(l.ativo),
         "criado_em":   l.criado_em.strftime("%Y-%m-%d") if l.criado_em else "",
     }
-
-
-def _rede_da_loja(db, loja_id):
-    """rede_id da loja (ou None se avulsa/inexistente). Usado no escopo de listagem."""
-    if loja_id is None:
-        return None
-    l = db.get(Loja, loja_id)
-    return l.rede_id if l else None
 
 
 def _ator_dict(db, usuario_sessao):
