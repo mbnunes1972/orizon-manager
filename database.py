@@ -684,6 +684,20 @@ def migrar_parametros_para_projeto(session):
     return atualizados
 
 
+def _backfill_loja_operacional():
+    """F4: nenhuma linha operacional pode ficar sem loja (senão some no filtro de escopo).
+    Backfill defensivo NULL -> loja-semente (id=1). Idempotente."""
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cur = conn.cursor()
+        for tbl in ("clientes", "projetos_meta", "orcamentos", "contratos"):
+            cur.execute(f"UPDATE {tbl} SET loja_id=1 WHERE loja_id IS NULL")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def _migrar_dados():
     """Abre a conexão real e roda as migrações de dados idempotentes."""
     import sqlite3
@@ -694,6 +708,8 @@ def _migrar_dados():
         pass
     finally:
         conn.close()
+    _backfill_loja_operacional()
+
 
 def get_session():
     return Session()
@@ -712,6 +728,7 @@ def upsert_projeto_status(nome_safe: str, status: str, perdido_em=None):
         p = db.get(Projeto, nome_safe)
         if not p:
             p = Projeto(nome_safe=nome_safe)
+            p.loja_id = loja_seed_id(db)   # F4: nunca criar projeto sem loja (evita 404 fantasma)
             db.add(p)
         antigo_status = p.status
         p.status    = status

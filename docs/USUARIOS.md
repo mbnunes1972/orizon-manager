@@ -99,3 +99,14 @@ aposentado).
 | med2026 | Medidor |
 
 > Senhas de exemplo definidas em `seed.py` — **trocar antes de produção**.
+
+---
+
+## Isolamento operacional por loja (F4)
+
+A partir da F4, os dados **operacionais** (clientes, projetos, orçamentos, contratos, pool,
+medição, ciclo, parceiros) são **isolados por loja**: cada usuário operacional só enxerga e
+opera os da **própria loja**. Acesso a um registro de outra loja por id/link direto retorna
+**404**. **super_admin** e **admin_rede** não têm acesso operacional (recebem **403** nesses
+endpoints) — administram a estrutura pelo console de 3 níveis (F2), não operam dentro das lojas.
+Detalhes e roteiro de verificação em `docs/processos/SMOKE_F4_ISOLAMENTO.md`.

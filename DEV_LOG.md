@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-21 (sessão 23 — **F3 da plataforma multi-tenant**: o **contrato puxa da loja**. `mod_contrato.py` largou as constantes de loja (nome/CNPJ/código/telefone/email/testemunhas) e passou a receber um dict `loja`; `main.py` resolve a loja do consultor, **valida (avisa mas deixa gerar)**, grava `contratos.loja_snapshot_json` a cada geração e usa o **código da loja** no número do contrato; front confirma "loja incompleta". Não toca queries operacionais (isolamento = F4). Antes: sessão 22 — F2 perfis + CRUD de tenancy + console de 3 níveis)
+> Atualizado em: 2026-06-21 (sessão 24 — **F4 da plataforma multi-tenant: ISOLAMENTO OPERACIONAL** (fecha o programa multi-tenant). Cada usuário operacional só vê/opera a **própria loja**; super_admin/admin_rede sem acesso operacional (**403**); acesso a registro de outra loja por id/link → **404**. ~30 endpoints escopados via `mod_tenancy.escopo_operacional` + helpers `_obj_da_loja`/`_projeto_da_loja` (+ `_filtrar_projetos_por_loja`, `_parceiro_visivel_loja`); criação carimba `loja_id`; backfill defensivo. A revisão por subagentes pegou e corrigiu **vários IDORs reais** (2 endpoints sem auth nenhuma). Smoke com 2 lojas pendente → `docs/processos/SMOKE_F4_ISOLAMENTO.md`. Branch `feat/multitenant-f4-isolamento`. Antes: sessão 23 — F3 contrato puxa da loja)
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -175,6 +175,26 @@
 ---
 
 ## HISTÓRICO
+
+### Sessão 2026-06-21 (sessão 24 — F4: isolamento operacional) — **fecha o multi-tenant**
+**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão de **segurança** + qualidade por task → verificação). Spec/plano em `docs/superpowers/specs/2026-06-21-multitenant-f4-isolamento-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f4-isolamento.md`. Branch `feat/multitenant-f4-isolamento` (16 commits).
+
+**Origem:** 4ª e última fase. F1 (schema) → F2 (UI/API de tenancy, escopo só nas telas admin) → F3 (contrato puxa da loja) → **F4 aplica escopo por loja em TODAS as queries operacionais**, que eram globais.
+
+**Decisões do brainstorm:** (1) cada loja vê só o seu; super_admin/admin_rede **sem acesso operacional**; (2) **tudo numa fase** (carimbo na criação + filtro nas listagens + checagem de dono anti-IDOR); (3) registro de outra loja por id/link → **404** (não vaza existência).
+
+**Entregue:**
+- **`mod_tenancy.escopo_operacional(ator)` (puro):** `(loja_id, None)` p/ usuário de loja; `(None, motivo)` p/ perfil administrativo → rota traduz em **403**.
+- **Helpers em `main.py` (testáveis por stub):** `_obj_da_loja(db, Model, pk, loja_id)` e `_projeto_da_loja(db, nome_safe, loja_id)` (delega no primeiro) → objeto se for da loja, senão `None` (→ 404); `_filtrar_projetos_por_loja` (lista de projetos vem do storage → cruza com `projetos_meta.loja_id`); `_parceiro_visivel_loja` (abrangência loja/rede).
+- **~30 endpoints escopados** (clientes, projetos, orçamentos, contratos, pool, medição, ciclo, parceiros): guard 401+403 + checagem de dono (`_obj_da_loja`/`_projeto_da_loja`) **antes** de qualquer query que revele estado; **criação carimba** `loja_id` (cliente/projeto/orçamento; contrato já vinha da F3).
+- **`database.py`:** `_backfill_loja_operacional` (idempotente, NULL→loja 1) chamado no `_migrar_dados`; `upsert_projeto_status` passa a carimbar `loja_seed_id` ao criar projeto.
+- **Contrato/editar (gate gerencial):** escopo via `autorizador.loja_id` (não a sessão).
+
+**Segurança — IDORs achados e corrigidos na revisão por subagentes** (todos fechados na branch): `POST /clientes/<id>/briefing` (escrita cross-loja) + vazamento de cliente na colisão de CPF; ordem do `POST /parametros` (loja antes do estado); `GET /projetos/<nome>/briefing` (sem auth); **`PUT /orcamentos/<id>/descontos` e `PATCH /orcamentos/<id>/valor` (sem auth nenhuma)**; "Orçamento 1" auto-criado com `loja_id` NULL (quebra funcional); `_origem` (cópia de margens) cross-loja; **`POST /projetos/<nome>/ambientes/...` (sem auth)** e `POST /projetos/<nome>/briefing` (sem checagem de sessão).
+
+**Verificação:** pytest **201** verde (novos em `tests/test_isolamento_f4.py`: `escopo_operacional`, `_obj_da_loja`/`_projeto_da_loja` com stub, backfill idempotente). Cada task passou por revisão de **segurança** + qualidade (subagentes). **Pendente:** smoke com **2 lojas** no ambiente do usuário — checklist + mapa de triagem em `docs/processos/SMOKE_F4_ISOLAMENTO.md`. Com uma única loja (hoje), o comportamento visível é idêntico ao de antes.
+
+**Achado pré-existente (fora da F4, decisão do usuário):** `contrato_editar.py:validar_gerencial` usa nomes de perfil antigos (`"gerente"`/`"admin"`) → hoje só `diretor` edita contrato. Política a definir.
 
 ### Sessão 2026-06-21 (sessão 23 — F3: contrato puxa da loja)
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação). Spec/plano em `docs/superpowers/specs/2026-06-21-multitenant-f3-contrato-loja-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f3-contrato-loja.md`. Branch `feat/multitenant-f3-contrato-loja`.
