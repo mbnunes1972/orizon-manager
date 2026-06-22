@@ -35,6 +35,9 @@ class Usuario(Base):
     senha_hash    = Column(String(64),  nullable=False)
     nivel         = Column(String(20),  nullable=False)   # diretor | gerente | consultor
     telefone      = Column(String(20),  nullable=True)
+    email         = Column(String(120), nullable=True)
+    cpf           = Column(String(20),  nullable=True)
+    whatsapp      = Column(String(20),  nullable=True)
     ativo         = Column(Integer,     default=1)
     criado_em     = Column(DateTime,    default=datetime.utcnow)
     loja_id       = Column(Integer,     ForeignKey("lojas.id"), nullable=True)  # usuário de loja
@@ -455,6 +458,10 @@ def _migrar_colunas():
         for col in ("loja_id", "rede_id"):
             if col not in usr_cols:
                 cur.execute(f"ALTER TABLE usuarios ADD COLUMN {col} INTEGER")
+        for col, tipo in [("email", "VARCHAR(120)"), ("cpf", "VARCHAR(20)"),
+                          ("whatsapp", "VARCHAR(20)")]:
+            if col not in usr_cols:
+                cur.execute(f"ALTER TABLE usuarios ADD COLUMN {col} {tipo}")
 
         # ── projetos_meta ─────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(projetos_meta)")
