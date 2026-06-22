@@ -22,3 +22,68 @@ def test_canary_login_via_http(http_client_factory):
     assert c.cookie and c.cookie.startswith("omie_session=")
     status, _ = c.get("/api/clientes")
     assert status == 200
+
+
+# ── TASK 4: Leitura cross-loja → 404 ─────────────────────────────────────────
+
+def _login(factory, who):
+    c = factory()
+    c.login(who, "senha123")
+    return c
+
+
+def test_cliente_de_outra_loja_da_404(http_client_factory, seed):
+    c = _login(http_client_factory, "dir_l2")
+    status, _ = c.get(f"/api/clientes/{seed['cliente_l1_id']}")
+    assert status == 404
+
+
+def test_projeto_de_outra_loja_da_404(http_client_factory, seed):
+    c = _login(http_client_factory, "dir_l2")
+    status, _ = c.get(f"/projetos/{seed['projeto_l1']}")
+    assert status == 404
+
+
+def test_cliente_da_propria_loja_abre(http_client_factory, seed):
+    c = _login(http_client_factory, "dir_l2")
+    status, _ = c.get(f"/api/clientes/{seed['cliente_l2_id']}")
+    assert status == 200
+
+
+def test_projeto_da_propria_loja_abre(http_client_factory, seed):
+    # GET /projetos/<nome_safe> loads projeto.json from disk; create the file so
+    # the endpoint can return 200 (the DB entry alone, created by the seed, is not
+    # sufficient — _carregar_projeto reads from the filesystem).
+    import json, os
+    from storage import PROJETOS_DIR
+    nome = seed["projeto_l2"]
+    pasta = os.path.join(PROJETOS_DIR, nome)
+    os.makedirs(pasta, exist_ok=True)
+    proj_path = os.path.join(pasta, "projeto.json")
+    if not os.path.exists(proj_path):
+        with open(proj_path, "w", encoding="utf-8") as fh:
+            json.dump({"nome_safe": nome, "nome_projeto": nome, "ambientes": []}, fh)
+    c = _login(http_client_factory, "dir_l2")
+    status, _ = c.get(f"/projetos/{nome}")
+    assert status == 200
+
+
+# ── TASK 5: Escopo das listagens ──────────────────────────────────────────────
+
+def test_lista_clientes_so_da_propria_loja(http_client_factory, seed):
+    c = _login(http_client_factory, "dir_l2")
+    status, body = c.get("/api/clientes")
+    assert status == 200
+    clientes = body["clientes"] if isinstance(body, dict) and "clientes" in body else body
+    ids = {item.get("id") for item in clientes}
+    assert seed["cliente_l2_id"] in ids
+    assert seed["cliente_l1_id"] not in ids
+
+
+def test_lista_projetos_so_da_propria_loja(http_client_factory, seed):
+    c = _login(http_client_factory, "dir_l2")
+    status, body = c.get("/projetos")
+    assert status == 200
+    projetos = body["projetos"] if isinstance(body, dict) and "projetos" in body else body
+    nomes = {p.get("nome_safe") for p in projetos}
+    assert seed["projeto_l1"] not in nomes
