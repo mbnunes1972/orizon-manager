@@ -119,3 +119,21 @@ def test_diretor_nao_promove_para_admin_rede(http_client_factory, seed, app_db):
     db.close()
     st, body = c.patch(f"/api/admin/usuarios/{alvo}", {"nivel": "admin_rede"})
     assert body["ok"] is False
+
+
+def test_admin_rede_nao_promove_para_super(http_client_factory, seed, app_db):
+    c = _login(http_client_factory, "adm_rede")
+    db = app_db.get_session()
+    id_dir_l1 = db.query(app_db.Usuario).filter_by(login="dir_l1").first().id
+    db.close()
+    st, body = c.patch(f"/api/admin/usuarios/{id_dir_l1}", {"nivel": "super_admin"})
+    assert body["ok"] is False
+
+
+def test_edita_proprio_contato_permitido(http_client_factory, seed, app_db):
+    c = _login(http_client_factory, "dir_l1")
+    db = app_db.get_session()
+    meu_id = db.query(app_db.Usuario).filter_by(login="dir_l1").first().id
+    db.close()
+    st, body = c.patch(f"/api/admin/usuarios/{meu_id}", {"telefone": "1199", "email": "eu@loja.com"})
+    assert body["ok"] is True
