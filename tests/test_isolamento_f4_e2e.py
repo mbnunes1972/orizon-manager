@@ -170,6 +170,8 @@ def test_briefing_cliente_cross_loja_bloqueado(http_client_factory, seed):
 
 
 # ── TASK 9: Criação carimba loja_id do autor ─────────────────────────────────
+# Response shape: {"ok": True, "cliente": {...}} — id at body["cliente"]["id"]
+# Required fields: nome, email, telefone (validar_cadastro_minimo)
 
 def test_criacao_de_cliente_carimba_loja_do_autor(http_client_factory, seed, app_db):
     c = _login(http_client_factory, "dir_l2")
