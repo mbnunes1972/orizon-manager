@@ -13,12 +13,20 @@ def app_db(tmp_path_factory):
     from sqlalchemy.orm import sessionmaker
     import database
 
+    # guarda os globais originais para restaurar no teardown — assim este módulo
+    # não deixa `database` apontando para um banco temp (já deletado) e quebrando
+    # um futuro teste que use get_session() sem isolamento próprio.
+    orig = (database.DB_PATH, database.ENGINE, database.Session)
+
     db_file = str(tmp_path_factory.mktemp("f4db") / "test.db")
     database.DB_PATH = db_file
     database.ENGINE = create_engine(f"sqlite:///{db_file}", echo=False)
     database.Session = sessionmaker(bind=database.ENGINE)
     database.init_db()
-    return database
+    yield database
+
+    database.ENGINE.dispose()
+    database.DB_PATH, database.ENGINE, database.Session = orig
 
 
 @pytest.fixture(scope="module")
