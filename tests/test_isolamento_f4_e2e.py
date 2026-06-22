@@ -191,7 +191,7 @@ def test_criacao_de_cliente_carimba_loja_do_autor(http_client_factory, seed, app
 # ── TASK 10: Sem regressão (loja legítima) + colisão de CPF isolada ──────────
 # CPF-collision contract: same-loja → 409 + {"cliente":...}; cross-loja → 409 no data
 
-def test_diretor_l1_opera_normalmente(http_client_factory, seed):
+def test_diretor_l1_opera_normalmente(http_client_factory, seed, projetos_dir):
     c = _login(http_client_factory, "dir_l1")
     s1, _ = c.get(f"/api/clientes/{seed['cliente_l1_id']}")
     s2, _ = c.get(f"/projetos/{seed['projeto_l1']}")
@@ -226,3 +226,18 @@ def test_colisao_cpf_nao_vaza_cliente_de_outra_loja(http_client_factory, seed, a
     loja_orig = original.loja_id
     db.close()
     assert loja_orig == seed["loja1_id"]
+
+
+# ── Regressão: guard contra shadowing de `threading` em do_POST ───────────────
+# Um `import threading` (ou `threading = ...`) dentro de do_POST torna `threading`
+# uma variável LOCAL em toda a função, quebrando os usos anteriores com
+# UnboundLocalError (ex.: o sync Omie em background no POST /api/clientes).
+# Exposto pela suíte E2E e corrigido removendo o import redundante (main.py).
+
+def test_do_post_nao_faz_shadowing_de_threading():
+    import main
+    assert "threading" not in main.Handler.do_POST.__code__.co_varnames, (
+        "do_POST tem `threading` como variável local (import/atribuição interna) — "
+        "isso causa UnboundLocalError nos usos de threading antes dessa linha. "
+        "Use o threading importado no nível do módulo."
+    )

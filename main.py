@@ -3024,7 +3024,6 @@ class Handler(BaseHTTPRequestHandler):
                 finally:
                     db.close()
                 # abrir o app + iniciar watcher (fora da sessão db)
-                import threading
                 from contrato_editar import abrir_no_app, watcher_regerar_pdf
                 import mod_contrato
                 def _on_save(p):
