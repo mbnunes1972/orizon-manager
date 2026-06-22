@@ -1,7 +1,11 @@
 # F4 — Suíte de regressão E2E de isolamento (multi-tenant)
 
-> **Status:** Spec aprovado (desenho). 2026-06-21.
-> Branch: `feat/multitenant-f4-isolamento`. Pré-requisito: F4 já implementada (16 commits, 201 testes verdes).
+> **Status:** IMPLEMENTADO e mergeado na `main` (2026-06-22). Matriz completa coberta por
+> `tests/test_isolamento_f4_e2e.py` (33 testes; 234 no total). Harness real adotado (Plano B não
+> foi necessário — canário passou). Achado extra corrigido: `UnboundLocalError` por `import
+> threading` redundante em `do_POST`. Plano: `docs/superpowers/plans/2026-06-21-f4-isolamento-regressao-e2e.md`.
+> _Histórico:_ spec aprovado (desenho) em 2026-06-21; branch `feat/multitenant-f4-isolamento`
+> (já deletada após o merge); pré-requisito era a F4 implementada (201 testes verdes na época).
 
 ## 1. Problema
 
