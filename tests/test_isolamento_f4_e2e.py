@@ -244,19 +244,9 @@ def test_do_post_nao_faz_shadowing_de_threading():
 
 
 # ── TASK 11: Orçamento cross-loja read → 404 ─────────────────────────────────
-# GET /projetos/<nome>/orcamentos usa _projeto_da_loja → 404 para loja errada.
-# PUT /projetos/<nome>/orcamentos/<id> usa _obj_da_loja → 404 para loja errada.
-# Ambos exercitam o isolamento de orçamento por loja.
-
-def test_orcamento_de_outra_loja_lista_da_404(http_client_factory, seed):
-    """GET list de orçamentos de Proj_L1 como dir_l2 → 404 (projeto fora do escopo)."""
-    c = _login(http_client_factory, "dir_l2")
-    status, body = c.get(f"/projetos/{seed['projeto_l1']}/orcamentos")
-    assert status == 404, (
-        f"SECURITY FINDING: dir_l2 leu lista de orçamentos de loja 1 e recebeu {status} "
-        f"em vez de 404 — resposta: {body}"
-    )
-
+# Não há GET de um orçamento isolado (a rota ~3368 é PUT de rename). O isolamento
+# de leitura é exercitado pela lista (TASK 13) via _projeto_da_loja; aqui cobrimos
+# a escrita cross-loja: PUT /projetos/<nome>/orcamentos/<id> usa _obj_da_loja → 404.
 
 def test_orcamento_rename_cross_loja_da_404(http_client_factory, seed):
     """PUT renomear orçamento de Proj_L1 como dir_l2 → 404 (_obj_da_loja filtra por loja)."""
