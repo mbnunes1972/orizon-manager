@@ -79,3 +79,43 @@ def test_diretor_nao_cria_super(http_client_factory, seed):
         "nome": "X", "login": "x9", "senha": "s", "nivel": "super_admin",
         "loja_id": seed["loja1_id"]})
     assert body["ok"] is False
+
+
+# Task 7 — PATCH: contato, escalonamento admin_rede e anti-lockout
+
+def test_admin_rede_edita_par(http_client_factory, seed, app_db):
+    # cria um par admin_rede para editar
+    c = _login(http_client_factory, "adm_rede")
+    c.post("/api/admin/usuarios", {"nome": "Par", "login": "par1", "senha": "s", "nivel": "admin_rede"})
+    db = app_db.get_session()
+    pid = db.query(app_db.Usuario).filter_by(login="par1").first().id
+    db.close()
+    st, body = c.patch(f"/api/admin/usuarios/{pid}", {"telefone": "55", "email": "p@p.com"})
+    assert st == 200 and body["ok"]
+
+
+def test_nao_inativa_a_si_mesmo(http_client_factory, seed, app_db):
+    c = _login(http_client_factory, "dir_l1")
+    db = app_db.get_session()
+    meu_id = db.query(app_db.Usuario).filter_by(login="dir_l1").first().id
+    db.close()
+    st, body = c.patch(f"/api/admin/usuarios/{meu_id}", {"ativo": False})
+    assert body["ok"] is False
+
+
+def test_nao_rebaixa_proprio_perfil(http_client_factory, seed, app_db):
+    c = _login(http_client_factory, "dir_l1")
+    db = app_db.get_session()
+    meu_id = db.query(app_db.Usuario).filter_by(login="dir_l1").first().id
+    db.close()
+    st, body = c.patch(f"/api/admin/usuarios/{meu_id}", {"nivel": "consultor"})
+    assert body["ok"] is False
+
+
+def test_diretor_nao_promove_para_admin_rede(http_client_factory, seed, app_db):
+    c = _login(http_client_factory, "dir_l1")
+    db = app_db.get_session()
+    alvo = db.query(app_db.Usuario).filter_by(login="dir_l2").first().id
+    db.close()
+    st, body = c.patch(f"/api/admin/usuarios/{alvo}", {"nivel": "admin_rede"})
+    assert body["ok"] is False

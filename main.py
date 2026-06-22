@@ -3775,13 +3775,34 @@ class Handler(BaseHTTPRequestHandler):
                     if not visivel:
                         self.send_json({"ok": False, "erro": "Usuário fora do seu escopo."}, code=403)
                         return
-                    # anti-escalonamento: só super_admin atribui perfis administrativos
-                    if "nivel" in req and req["nivel"].strip() in ("super_admin", "admin_rede") \
-                            and not mod_tenancy._eh_super_admin(ator):
-                        self.send_json({"ok": False, "erro": "Sem permissão para atribuir esse perfil."}, code=403)
+                    # anti-lockout: o ator não altera o próprio perfil nem se inativa
+                    eh_proprio = (u.id == usuario.get("id"))
+                    if eh_proprio and "nivel" in req and req["nivel"].strip() != u.nivel:
+                        self.send_json({"ok": False,
+                            "erro": "Não é possível alterar o próprio perfil."}, code=403)
                         return
+                    if eh_proprio and "ativo" in req and not req["ativo"]:
+                        self.send_json({"ok": False,
+                            "erro": "Não é possível inativar a si mesmo."}, code=403)
+                        return
+                    # anti-escalonamento: super_admin só por super_admin;
+                    # admin_rede por super_admin ou admin_rede
+                    novo_nivel = req["nivel"].strip() if "nivel" in req else None
+                    if novo_nivel == "super_admin" and not mod_tenancy._eh_super_admin(ator):
+                        self.send_json({"ok": False,
+                            "erro": "Sem permissão para atribuir esse perfil."}, code=403)
+                        return
+                    if novo_nivel == "admin_rede" and not (
+                            mod_tenancy._eh_super_admin(ator) or mod_tenancy._eh_admin_rede(ator)):
+                        self.send_json({"ok": False,
+                            "erro": "Sem permissão para atribuir esse perfil."}, code=403)
+                        return
+                    if "nome" in req:     u.nome     = req["nome"].strip()
                     if "nivel" in req:    u.nivel    = req["nivel"].strip()
                     if "telefone" in req: u.telefone = (req.get("telefone") or "").strip()
+                    if "whatsapp" in req: u.whatsapp = (req.get("whatsapp") or "").strip()
+                    if "email" in req:    u.email    = (req.get("email") or "").strip()
+                    if "cpf" in req:      u.cpf      = (req.get("cpf") or "").strip()
                     if "ativo" in req:    u.ativo    = 1 if req["ativo"] else 0
                     if req.get("senha"):  u.set_senha(req["senha"])
                     db.commit()
