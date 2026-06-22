@@ -6359,7 +6359,7 @@ async function adminRenderPlataforma(box){
         ${(g.usuarios||[]).map(u=>`<tr>
           <td>${esc(u.nome)}</td><td style="color:var(--muted)">${esc(u.login)}</td>
           <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
-            onclick='abrirModalUsuarioEditar(${JSON.stringify(u)}, adminRender)'>Editar</button></td></tr>`).join('')
+            onclick='abrirModalUsuarioEditar(${_attrJson(u)}, adminRender)'>Editar</button></td></tr>`).join('')
           || '<tr><td colspan="3" style="color:var(--muted)">Nenhum gestor geral.</td></tr>'}
         </tbody></table>
       </div>`);
@@ -6411,7 +6411,7 @@ async function adminRenderRede(box){
         ${(a.usuarios||[]).map(u=>`<tr>
           <td>${esc(u.nome)}</td><td style="color:var(--muted)">${esc(u.login)}</td>
           <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
-            onclick='abrirModalUsuarioEditar(${JSON.stringify(u)}, adminRender)'>Editar</button></td></tr>`).join('')
+            onclick='abrirModalUsuarioEditar(${_attrJson(u)}, adminRender)'>Editar</button></td></tr>`).join('')
           || '<tr><td colspan="3" style="color:var(--muted)">Nenhum administrador.</td></tr>'}
         </tbody></table>
       </div>`);
@@ -6542,7 +6542,7 @@ async function adminUsuariosCarregar() {
             <td>${u.ativo ? '✓' : '—'}</td>
             <td style="text-align:right">
               <button class="btn btn-ghost btn-sm" style="font-size:10px"
-                onclick='abrirModalUsuarioEditar(${JSON.stringify(u)})'>Editar</button>
+                onclick='abrirModalUsuarioEditar(${_attrJson(u)})'>Editar</button>
             </td></tr>`).join('')}</tbody></table>`;
   } catch(e) { box.innerHTML = '<em style="color:var(--err)">Erro de rede</em>'; }
 }
@@ -6584,6 +6584,8 @@ async function abrirModalUsuario(ctx){
   document.getElementById('musr-self-nota').style.display = ehProprio ? '' : 'none';
   document.getElementById('modal-usuario').style.display = 'flex';
 }
+
+function _attrJson(o){ return JSON.stringify(o).replace(/'/g, '&#39;'); }
 
 function abrirModalUsuarioEditar(u, onSaved){
   abrirModalUsuario({ modo: 'editar', id: u.id, nome: u.nome, login: u.login,
