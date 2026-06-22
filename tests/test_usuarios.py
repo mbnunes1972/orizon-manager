@@ -35,3 +35,18 @@ def test_validar_edicao_usuario():
     assert mu.validar_edicao_usuario({}) == []                 # nada a validar
     erros = mu.validar_edicao_usuario({"nivel": "rei"})
     assert any("perfil" in e.lower() for e in erros)
+
+
+def test_email_invalido_acusa():
+    erros = mu.validar_novo_usuario(
+        {"nome": "Ana", "login": "ana", "senha": "1", "nivel": "consultor", "email": "errado"},
+        logins_existentes=[])
+    assert any("mail" in e.lower() for e in erros)
+
+def test_email_valido_ou_vazio_passa():
+    base = {"nome": "Ana", "login": "ana", "senha": "1", "nivel": "consultor"}
+    assert mu.validar_novo_usuario({**base, "email": "a@b.com"}, []) == []
+    assert mu.validar_novo_usuario({**base, "email": ""}, []) == []
+
+def test_edicao_email_invalido_acusa():
+    assert any("mail" in e.lower() for e in mu.validar_edicao_usuario({"email": "x"}))
