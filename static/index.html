@@ -6345,6 +6345,25 @@ async function adminRenderPlataforma(box){
         || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma loja avulsa.</td></tr>'}
       </tbody></table>
     </div>`;
+  if (_usuarioAtual && _usuarioAtual.pode_gerir_redes) {
+    const g = await fetch('/api/admin/usuarios?escopo=plataforma', {credentials:'same-origin'})
+      .then(r=>r.json()).catch(()=>({usuarios:[]}));
+    box.insertAdjacentHTML('beforeend', `
+      <div class="card" style="padding:14px 16px">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+          <strong style="color:var(--dalm-gold,#c8a84b)">👤 Gestores gerais</strong>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px"
+            onclick="abrirModalUsuario({modo:'novo', escopo:'plataforma', onSaved:adminRender})">+ Novo gestor</button>
+        </div>
+        <table class="cli-table"><thead><tr><th>Nome</th><th>Login</th><th></th></tr></thead><tbody>
+        ${(g.usuarios||[]).map(u=>`<tr>
+          <td>${esc(u.nome)}</td><td style="color:var(--muted)">${esc(u.login)}</td>
+          <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
+            onclick='abrirModalUsuarioEditar(${JSON.stringify(u)}, adminRender)'>Editar</button></td></tr>`).join('')
+          || '<tr><td colspan="3" style="color:var(--muted)">Nenhum gestor geral.</td></tr>'}
+        </tbody></table>
+      </div>`);
+  }
 }
 
 async function adminRedeNova(){
@@ -6376,6 +6395,27 @@ async function adminRenderRede(box){
         || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma loja nesta rede.</td></tr>'}
       </tbody></table>
     </div>`;
+  const podeAdmins = _usuarioAtual && (_usuarioAtual.pode_gerir_redes
+    || (_usuarioAtual.nivel === 'admin_rede'));
+  if (podeAdmins) {
+    const a = await fetch('/api/admin/usuarios?escopo=rede&rede_id='+rid, {credentials:'same-origin'})
+      .then(r=>r.json()).catch(()=>({usuarios:[]}));
+    box.insertAdjacentHTML('beforeend', `
+      <div class="card" style="padding:14px 16px">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+          <strong style="color:var(--dalm-gold,#c8a84b)">👤 Administradores da rede</strong>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px"
+            onclick="abrirModalUsuario({modo:'novo', escopo:'rede', rede_id:${rid}, onSaved:adminRender})">+ Novo administrador</button>
+        </div>
+        <table class="cli-table"><thead><tr><th>Nome</th><th>Login</th><th></th></tr></thead><tbody>
+        ${(a.usuarios||[]).map(u=>`<tr>
+          <td>${esc(u.nome)}</td><td style="color:var(--muted)">${esc(u.login)}</td>
+          <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
+            onclick='abrirModalUsuarioEditar(${JSON.stringify(u)}, adminRender)'>Editar</button></td></tr>`).join('')
+          || '<tr><td colspan="3" style="color:var(--muted)">Nenhum administrador.</td></tr>'}
+        </tbody></table>
+      </div>`);
+  }
 }
 
 async function adminLojaNova(redeId){
@@ -6545,10 +6585,11 @@ async function abrirModalUsuario(ctx){
   document.getElementById('modal-usuario').style.display = 'flex';
 }
 
-function abrirModalUsuarioEditar(u){
+function abrirModalUsuarioEditar(u, onSaved){
   abrirModalUsuario({ modo: 'editar', id: u.id, nome: u.nome, login: u.login,
     telefone: u.telefone, whatsapp: u.whatsapp, email: u.email, cpf: u.cpf,
-    nivel: u.nivel, ativo: u.ativo, ..._escopoDeUsuario(u), onSaved: adminUsuariosCarregar });
+    nivel: u.nivel, ativo: u.ativo, ..._escopoDeUsuario(u),
+    onSaved: onSaved || adminUsuariosCarregar });
 }
 
 function fecharModalUsuario(){
