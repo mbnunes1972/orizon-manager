@@ -2619,6 +2619,9 @@ class Handler(BaseHTTPRequestHandler):
                     u = Usuario(nome=req["nome"].strip(), login=req["login"].strip(),
                                 nivel=req["nivel"].strip(),
                                 telefone=(req.get("telefone") or "").strip(),
+                                whatsapp=(req.get("whatsapp") or "").strip(),
+                                email=(req.get("email") or "").strip(),
+                                cpf=(req.get("cpf") or "").strip(),
                                 loja_id=loja_id, rede_id=rede_id)
                     u.set_senha(req["senha"])
                     db.add(u); db.commit()

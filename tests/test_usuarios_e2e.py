@@ -50,3 +50,32 @@ def test_lista_inclui_campos_contato(http_client_factory, seed):
     st, body = c.get(f"/api/admin/usuarios?escopo=loja&loja_id={seed['loja1_id']}")
     u = body["usuarios"][0]
     assert "email" in u and "cpf" in u and "whatsapp" in u
+
+
+# Task 6 — POST /api/admin/usuarios grava contato e admin_rede cria par
+
+def test_diretor_cria_usuario_loja_com_contato(http_client_factory, seed):
+    c = _login(http_client_factory, "dir_l1")
+    st, body = c.post("/api/admin/usuarios", {
+        "nome": "Nova Pessoa", "login": "nova1", "senha": "s1", "nivel": "consultor",
+        "telefone": "1", "whatsapp": "2", "email": "n@p.com", "cpf": "000",
+        "loja_id": seed["loja1_id"]})
+    assert st == 200 and body["ok"]
+    st2, lst = c.get(f"/api/admin/usuarios?escopo=loja&loja_id={seed['loja1_id']}")
+    novo = next(u for u in lst["usuarios"] if u["login"] == "nova1")
+    assert novo["email"] == "n@p.com" and novo["whatsapp"] == "2"
+
+
+def test_admin_rede_cria_par(http_client_factory, seed):
+    c = _login(http_client_factory, "adm_rede")
+    st, body = c.post("/api/admin/usuarios", {
+        "nome": "Outro Adm", "login": "adm2", "senha": "s1", "nivel": "admin_rede"})
+    assert st == 200 and body["ok"]
+
+
+def test_diretor_nao_cria_super(http_client_factory, seed):
+    c = _login(http_client_factory, "dir_l1")
+    st, body = c.post("/api/admin/usuarios", {
+        "nome": "X", "login": "x9", "senha": "s", "nivel": "super_admin",
+        "loja_id": seed["loja1_id"]})
+    assert body["ok"] is False
