@@ -58,13 +58,36 @@ def seed(app_db):
 
     p1 = app_db.Projeto(nome_safe="Proj_L1", cliente_id=c1.id, status="quente", loja_id=l1.id)
     p2 = app_db.Projeto(nome_safe="Proj_L2", cliente_id=c2.id, status="quente", loja_id=l2.id)
-    db.add_all([p1, p2])
+    db.add_all([p1, p2]); db.flush()
+
+    o1 = app_db.Orcamento(projeto_id=p1.nome_safe, nome="Orçamento 1", ordem=1, loja_id=l1.id)
+    o2 = app_db.Orcamento(projeto_id=p2.nome_safe, nome="Orçamento 1", ordem=1, loja_id=l2.id)
+    db.add_all([o1, o2]); db.flush()
+    ct1 = app_db.Contrato(projeto_nome=p1.nome_safe, orcamento_id=o1.id, loja_id=l1.id)
+    ct2 = app_db.Contrato(projeto_nome=p2.nome_safe, orcamento_id=o2.id, loja_id=l2.id)
+    db.add_all([ct1, ct2]); db.flush()
+
+    # Briefing completo para Proj_L2 (necessário para criar orçamentos via POST)
+    from datetime import datetime as _dt
+    bf2 = app_db.Briefing(
+        cliente_id=c2.id,
+        projeto_nome=p2.nome_safe,
+        data_atendimento=_dt(2026, 1, 1),
+        tipo_imovel="apartamento",
+        budget_declarado=50000.0,
+        categoria_proposta="completo",
+        data_entrega_desejada="2026-12-01",
+        flexibilidade_prazo="sim",
+    )
+    db.add(bf2)
     db.commit()
 
     ctx = {
         "loja1_id": l1.id, "loja2_id": l2.id,
         "cliente_l1_id": c1.id, "cliente_l2_id": c2.id,
         "projeto_l1": "Proj_L1", "projeto_l2": "Proj_L2",
+        "orcamento_l1_id": o1.id, "orcamento_l2_id": o2.id,
+        "contrato_l1_id": ct1.id,
     }
     db.close()
     return ctx
