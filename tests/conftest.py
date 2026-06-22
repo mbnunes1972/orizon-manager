@@ -106,14 +106,24 @@ class HttpClient:
 
 
 @pytest.fixture(scope="module")
-def projetos_dir(app_db, tmp_path_factory):
+def projetos_dir(app_db, seed, tmp_path_factory):
     """Redireciona PROJETOS_DIR (em storage/main/mod_omie) para um diretório temporário,
-    deixando o harness hermético quanto a disco — espelha o isolamento do banco."""
+    deixando o harness hermético quanto a disco — espelha o isolamento do banco.
+    Também cria no disco os projetos do seed: a lista de `/projetos` vem do disco e é
+    cruzada com `projetos_meta.loja_id`, então o filtro por loja só é exercitável de fato
+    se os dois projetos existirem em disco (o de loja 1 deve ser filtrado para a loja 2).
+    Depende de `app_db` para garantir que `import main` ocorra após o rebind do banco."""
+    import json as _json2
     import storage, main, mod_omie
     tmp = str(tmp_path_factory.mktemp("projetos"))
     for mod in (storage, main, mod_omie):
         if hasattr(mod, "PROJETOS_DIR"):
             mod.PROJETOS_DIR = tmp
+    for nome in (seed["projeto_l1"], seed["projeto_l2"]):
+        pasta = os.path.join(tmp, nome)
+        os.makedirs(pasta, exist_ok=True)
+        with open(os.path.join(pasta, "projeto.json"), "w", encoding="utf-8") as f:
+            _json2.dump({"nome_safe": nome, "ambientes": []}, f)
     return tmp
 
 

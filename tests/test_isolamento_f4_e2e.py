@@ -29,6 +29,7 @@ def test_canary_login_via_http(http_client_factory):
 def _login(factory, who):
     c = factory()
     c.login(who, "senha123")
+    assert c.cookie, f"login falhou para {who} (sem cookie de sessão)"
     return c
 
 
@@ -51,17 +52,11 @@ def test_cliente_da_propria_loja_abre(http_client_factory, seed):
 
 
 def test_projeto_da_propria_loja_abre(http_client_factory, seed, projetos_dir):
-    # GET /projetos/<nome_safe> loads projeto.json from disk via _carregar_projeto;
-    # write the file into the isolated temp dir (projetos_dir) so the endpoint can
-    # return 200 without polluting the real PROJETOS directory.
-    import json, os
-    nome = seed["projeto_l2"]
-    pasta = os.path.join(projetos_dir, nome)
-    os.makedirs(pasta, exist_ok=True)
-    with open(os.path.join(pasta, "projeto.json"), "w", encoding="utf-8") as f:
-        json.dump({"nome_safe": nome, "ambientes": []}, f)
+    # GET /projetos/<nome_safe> carrega projeto.json do disco via _carregar_projeto;
+    # a fixture projetos_dir já escreveu o arquivo no diretório temporário isolado
+    # (sem poluir o PROJETOS real).
     c = _login(http_client_factory, "dir_l2")
-    status, _ = c.get(f"/projetos/{nome}")
+    status, _ = c.get(f"/projetos/{seed['projeto_l2']}")
     assert status == 200
 
 
@@ -77,10 +72,12 @@ def test_lista_clientes_so_da_propria_loja(http_client_factory, seed):
     assert seed["cliente_l1_id"] not in ids
 
 
-def test_lista_projetos_so_da_propria_loja(http_client_factory, seed):
+def test_lista_projetos_so_da_propria_loja(http_client_factory, seed, projetos_dir):
     c = _login(http_client_factory, "dir_l2")
     status, body = c.get("/projetos")
     assert status == 200
     projetos = body["projetos"] if isinstance(body, dict) and "projetos" in body else body
     nomes = {p.get("nome_safe") for p in projetos}
+    # ambos existem em disco; o filtro por loja deve manter só o da loja 2
+    assert seed["projeto_l2"] in nomes
     assert seed["projeto_l1"] not in nomes
