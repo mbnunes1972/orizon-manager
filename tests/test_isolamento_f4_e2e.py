@@ -148,3 +148,78 @@ def test_briefing_projeto_post_sem_auth_401(http_client_factory, seed):
     c = http_client_factory()
     status, _ = c.post(f"/api/projetos/{seed['projeto_l1']}/briefing", {})
     assert status == 401
+
+
+# ── TASK 8: Escrita cross-loja → 404/403 e estado intacto ────────────────────
+
+def test_status_cross_loja_nao_altera(http_client_factory, seed, app_db):
+    c = _login(http_client_factory, "dir_l2")
+    status, _ = c.patch(f"/api/projetos/{seed['projeto_l1']}/status", {"status": "perdido"})
+    assert status in (403, 404)
+    db = app_db.get_session()
+    proj = db.get(app_db.Projeto, seed["projeto_l1"])
+    estado = proj.status
+    db.close()
+    assert estado == "quente"
+
+
+def test_briefing_cliente_cross_loja_bloqueado(http_client_factory, seed):
+    c = _login(http_client_factory, "dir_l2")
+    status, _ = c.post(f"/api/clientes/{seed['cliente_l1_id']}/briefing", {})
+    assert status in (403, 404)
+
+
+# ── TASK 9: Criação carimba loja_id do autor ─────────────────────────────────
+
+def test_criacao_de_cliente_carimba_loja_do_autor(http_client_factory, seed, app_db):
+    c = _login(http_client_factory, "dir_l2")
+    # Required fields: nome, email, telefone (validar_cadastro_minimo); CPF optional
+    novo = {"nome": "Cliente Novo L2", "cpf": "333.333.333-33",
+            "email": "novol2@example.com", "telefone": "(12) 90000-0000"}
+    status, body = c.post("/api/clientes", novo)
+    assert status in (200, 201)
+    db = app_db.get_session()
+    cli = db.query(app_db.Cliente).filter_by(cpf="333.333.333-33").first()
+    loja = cli.loja_id if cli else None
+    db.close()
+    assert cli is not None
+    assert loja == seed["loja2_id"]
+
+
+# ── TASK 10: Sem regressão (loja legítima) + colisão de CPF isolada ───────────
+
+def test_diretor_l1_opera_normalmente(http_client_factory, seed):
+    c = _login(http_client_factory, "dir_l1")
+    s1, _ = c.get(f"/api/clientes/{seed['cliente_l1_id']}")
+    s2, _ = c.get(f"/projetos/{seed['projeto_l1']}")
+    assert s1 == 200 and s2 == 200
+
+
+def test_colisao_cpf_nao_vaza_cliente_de_outra_loja(http_client_factory, seed, app_db):
+    c = _login(http_client_factory, "dir_l2")
+    # CPF "111.111.111-11" belongs to cliente_l1 (Loja 1).
+    # Handler contract (F4 fix): cross-loja CPF collision → 409 with
+    # {"ok": False, "erro": "CPF já cadastrado em outra unidade."} — no cliente data.
+    status, body = c.post("/api/clientes",
+                          {"nome": "Homonimo", "cpf": "111.111.111-11",
+                           "email": "homonimo@example.com", "telefone": "(11) 90000-0000"})
+    # Must be a rejection (409); NEVER a success that leaks Loja-1 data
+    assert status == 409, (
+        f"SECURITY FINDING: CPF collision with another loja's cliente returned {status} "
+        f"instead of 409 — response: {body}"
+    )
+    # Body must NOT contain any cliente object (would expose Loja-1 data)
+    if isinstance(body, dict):
+        retornado_id = body.get("id") or (body.get("cliente") or {}).get("id")
+        assert retornado_id != seed["cliente_l1_id"], (
+            "SECURITY FINDING: cross-loja CPF collision returned the other loja's cliente id"
+        )
+        assert "cliente" not in body, (
+            "SECURITY FINDING: cross-loja CPF collision body contains 'cliente' key — data leak"
+        )
+    # Invariant: the Loja-1 cliente still belongs to Loja 1
+    db = app_db.get_session()
+    original = db.get(app_db.Cliente, seed["cliente_l1_id"])
+    loja_orig = original.loja_id
+    db.close()
+    assert loja_orig == seed["loja1_id"]
