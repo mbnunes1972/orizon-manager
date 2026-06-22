@@ -1,10 +1,23 @@
 # Smoke / Verificação — F4: Isolamento operacional
 
-> **Status:** PENDENTE de smoke com 2 lojas no ambiente do usuário (2026-06-21).
-> A F4 está implementada na branch `feat/multitenant-f4-isolamento` (16 commits), com **201
-> testes verdes** e **revisão de segurança por subagentes em cada task** (que pegou e corrigiu
-> **vários IDORs reais** — ver histórico abaixo). Falta o smoke funcional com **uma 2ª loja**,
-> que não pôde ser rodado na sessão (o banco só tem a loja 1). Este documento existe para
+> **Status:** COBERTO por **suíte de regressão E2E automatizada** (2026-06-22).
+> A F4 está implementada na branch `feat/multitenant-f4-isolamento`, com **revisão de segurança
+> por subagentes em cada task** (que pegou e corrigiu **vários IDORs reais** — ver histórico
+> abaixo). O isolamento agora tem `tests/test_isolamento_f4_e2e.py`: sobe o **servidor real numa
+> thread** com **2 lojas** semeadas num **banco/diretório temporários** (sem depender do ambiente
+> do usuário) e exercita a matriz de isolamento por HTTP com login real. **227 testes verdes**
+> no total. O smoke manual com 2 lojas em produção fica como **sanity final opcional**.
+>
+> **Achado da suíte E2E (corrigido):** `POST /api/clientes` tinha um `import threading` redundante
+> dentro de `do_POST` que tornava `threading` local à função inteira, quebrando os usos anteriores
+> (sync Omie em background; threads do fluxo de negociação) com `UnboundLocalError`. Removido o
+> import redundante (commit de fix). Guard de regressão em `test_do_post_nao_faz_shadowing_de_threading`.
+>
+> Cobertura E2E (cada item é um teste): leitura cross-loja → 404; listagens escopadas por loja;
+> super_admin/admin_rede → 403 no operacional; endpoints sensíveis → 401 anônimo
+> (status/descontos/valor/parceiros/briefings); escrita cross-loja bloqueada com estado da outra
+> loja intacto; criação carimba `loja_id` do autor; sem-regressão na loja legítima; colisão de CPF
+> cross-loja não vaza o cliente da outra loja (409 sem dados). Este documento segue útil para
 > acelerar o diagnóstico se algum bug aparecer.
 
 Spec/plano: `docs/superpowers/specs/2026-06-21-multitenant-f4-isolamento-design.md` e
