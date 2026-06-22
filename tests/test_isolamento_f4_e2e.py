@@ -241,3 +241,138 @@ def test_do_post_nao_faz_shadowing_de_threading():
         "isso causa UnboundLocalError nos usos de threading antes dessa linha. "
         "Use o threading importado no nível do módulo."
     )
+
+
+# ── TASK 11: Orçamento cross-loja read → 404 ─────────────────────────────────
+# GET /projetos/<nome>/orcamentos usa _projeto_da_loja → 404 para loja errada.
+# PUT /projetos/<nome>/orcamentos/<id> usa _obj_da_loja → 404 para loja errada.
+# Ambos exercitam o isolamento de orçamento por loja.
+
+def test_orcamento_de_outra_loja_lista_da_404(http_client_factory, seed):
+    """GET list de orçamentos de Proj_L1 como dir_l2 → 404 (projeto fora do escopo)."""
+    c = _login(http_client_factory, "dir_l2")
+    status, body = c.get(f"/projetos/{seed['projeto_l1']}/orcamentos")
+    assert status == 404, (
+        f"SECURITY FINDING: dir_l2 leu lista de orçamentos de loja 1 e recebeu {status} "
+        f"em vez de 404 — resposta: {body}"
+    )
+
+
+def test_orcamento_rename_cross_loja_da_404(http_client_factory, seed):
+    """PUT renomear orçamento de Proj_L1 como dir_l2 → 404 (_obj_da_loja filtra por loja)."""
+    c = _login(http_client_factory, "dir_l2")
+    oid = seed["orcamento_l1_id"]
+    status, body = c.put(f"/projetos/{seed['projeto_l1']}/orcamentos/{oid}", {"nome": "Hack"})
+    assert status == 404, (
+        f"SECURITY FINDING: dir_l2 conseguiu renomear orçamento de loja 1 — "
+        f"status {status}, resposta: {body}"
+    )
+
+
+# ── TASK 12: Contrato cross-loja read → 404 ──────────────────────────────────
+
+def test_contrato_de_outra_loja_da_404(http_client_factory, seed):
+    """GET /api/projetos/Proj_L1/contrato como dir_l2 → 404."""
+    c = _login(http_client_factory, "dir_l2")
+    status, body = c.get(f"/api/projetos/{seed['projeto_l1']}/contrato")
+    assert status == 404, (
+        f"SECURITY FINDING: dir_l2 leu contrato de loja 1 e recebeu {status} "
+        f"em vez de 404 — resposta: {body}"
+    )
+
+
+# ── TASK 13: Escopo da listagem de orçamentos ─────────────────────────────────
+
+def test_orcamentos_lista_scope_negativo_404(http_client_factory, seed):
+    """dir_l2 não pode listar orçamentos de um projeto de outra loja (→ 404)."""
+    c = _login(http_client_factory, "dir_l2")
+    status, body = c.get(f"/projetos/{seed['projeto_l1']}/orcamentos")
+    assert status == 404, (
+        f"SECURITY FINDING: dir_l2 listou orçamentos do projeto de loja 1 — "
+        f"status {status}, resposta: {body}"
+    )
+
+
+def test_orcamentos_lista_scope_positivo_200(http_client_factory, seed):
+    """dir_l2 lista orçamentos de Proj_L2 → 200 e o orçamento seedado está presente."""
+    c = _login(http_client_factory, "dir_l2")
+    status, body = c.get(f"/projetos/{seed['projeto_l2']}/orcamentos")
+    assert status == 200, (
+        f"dir_l2 não conseguiu listar orçamentos do próprio projeto — "
+        f"status {status}, resposta: {body}"
+    )
+    orcamentos = body.get("orcamentos", []) if isinstance(body, dict) else []
+    ids = {o.get("id") for o in orcamentos}
+    assert seed["orcamento_l2_id"] in ids, (
+        f"Orçamento seedado (id={seed['orcamento_l2_id']}) não apareceu na lista de "
+        f"Proj_L2 para dir_l2 — ids retornados: {ids}"
+    )
+
+
+# ── TASK 14: Ambientes exige autenticação (401) ───────────────────────────────
+
+def test_ambientes_atualizar_sem_auth_401(http_client_factory, seed):
+    """POST /projetos/<nome>/ambientes/atualizar sem login → 401."""
+    c = http_client_factory()   # sem login
+    status, body = c.post(f"/projetos/{seed['projeto_l1']}/ambientes/atualizar", {})
+    assert status == 401, (
+        f"SECURITY FINDING: endpoint de ambientes aceitou requisição anônima — "
+        f"status {status}, resposta: {body}"
+    )
+
+
+# ── TASK 15: Projeto create carimba loja_id do autor ─────────────────────────
+
+def test_projeto_create_carimba_loja_id(http_client_factory, seed, app_db, projetos_dir):
+    """POST /projetos/novo como dir_l2 → projeto criado tem loja_id = loja2."""
+    c = _login(http_client_factory, "dir_l2")
+    body_req = {"nome_projeto": "Proj_Stamp_L2", "cliente_id": seed["cliente_l2_id"]}
+    status, body = c.post("/projetos/novo", body_req)
+    assert status == 200, (
+        f"Criação de projeto falhou — status {status}, resposta: {body}"
+    )
+    assert isinstance(body, dict) and body.get("ok") is True, (
+        f"Resposta inesperada ao criar projeto: {body}"
+    )
+    nome_safe = body.get("projeto", {}).get("nome_safe")
+    assert nome_safe, f"Resposta não contém nome_safe: {body}"
+
+    db = app_db.get_session()
+    proj = db.get(app_db.Projeto, nome_safe)
+    loja = proj.loja_id if proj else None
+    db.close()
+    assert proj is not None, f"Projeto '{nome_safe}' não encontrado no banco"
+    assert loja == seed["loja2_id"], (
+        f"SECURITY FINDING: projeto criado por dir_l2 tem loja_id={loja!r} "
+        f"em vez de {seed['loja2_id']!r}"
+    )
+
+
+# ── TASK 16: Orçamento create carimba loja_id do autor ───────────────────────
+# Pré-condição: briefing completo para Proj_L2 já seedado em conftest.py.
+# O endpoint POST /projetos/<nome>/orcamentos exige {"nome": "..."} e rejeita
+# body sem "nome" com 400. Também exige _briefing_projeto_completo (→ 400 se ausente).
+
+def test_orcamento_create_carimba_loja_id(http_client_factory, seed, app_db):
+    """POST /projetos/Proj_L2/orcamentos como dir_l2 → orçamento criado tem loja_id = loja2."""
+    c = _login(http_client_factory, "dir_l2")
+    status, body = c.post(f"/projetos/{seed['projeto_l2']}/orcamentos",
+                          {"nome": "Orc Stamp L2"})
+    assert status == 200, (
+        f"Criação de orçamento falhou — status {status}, resposta: {body}"
+    )
+    assert isinstance(body, dict) and body.get("ok") is True, (
+        f"Resposta inesperada ao criar orçamento: {body}"
+    )
+    orc_id = body.get("orcamento", {}).get("id")
+    assert orc_id, f"Resposta não contém orcamento.id: {body}"
+
+    db = app_db.get_session()
+    orc = db.get(app_db.Orcamento, orc_id)
+    loja = orc.loja_id if orc else None
+    db.close()
+    assert orc is not None, f"Orçamento id={orc_id} não encontrado no banco"
+    assert loja == seed["loja2_id"], (
+        f"SECURITY FINDING: orçamento criado por dir_l2 tem loja_id={loja!r} "
+        f"em vez de {seed['loja2_id']!r}"
+    )
