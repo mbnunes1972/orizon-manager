@@ -188,7 +188,8 @@ def test_criacao_de_cliente_carimba_loja_do_autor(http_client_factory, seed, app
     assert loja == seed["loja2_id"]
 
 
-# ── TASK 10: Sem regressão (loja legítima) + colisão de CPF isolada ───────────
+# ── TASK 10: Sem regressão (loja legítima) + colisão de CPF isolada ──────────
+# CPF-collision contract: same-loja → 409 + {"cliente":...}; cross-loja → 409 no data
 
 def test_diretor_l1_opera_normalmente(http_client_factory, seed):
     c = _login(http_client_factory, "dir_l1")
