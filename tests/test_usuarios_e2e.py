@@ -25,3 +25,28 @@ def test_perfis_permitidos_plataforma_so_super(http_client_factory, seed):
     c2 = _login(http_client_factory, "dir_l1")
     st2, body2 = c2.get("/api/admin/usuarios/perfis-permitidos?escopo=plataforma")
     assert st2 == 200 and body2["perfis"] == []
+
+
+# Task 5 — filtros de escopo + campos de contato na lista de usuários
+
+def test_lista_escopo_loja_so_da_loja(http_client_factory, seed):
+    c = _login(http_client_factory, "super")
+    st, body = c.get(f"/api/admin/usuarios?escopo=loja&loja_id={seed['loja1_id']}")
+    assert st == 200
+    logins = {u["login"] for u in body["usuarios"]}
+    assert "dir_l1" in logins and "dir_l2" not in logins and "super" not in logins
+
+
+def test_lista_escopo_plataforma_so_super(http_client_factory, seed):
+    c = _login(http_client_factory, "super")
+    st, body = c.get("/api/admin/usuarios?escopo=plataforma")
+    assert st == 200
+    niveis = {u["nivel"] for u in body["usuarios"]}
+    assert niveis == {"super_admin"}
+
+
+def test_lista_inclui_campos_contato(http_client_factory, seed):
+    c = _login(http_client_factory, "super")
+    st, body = c.get(f"/api/admin/usuarios?escopo=loja&loja_id={seed['loja1_id']}")
+    u = body["usuarios"][0]
+    assert "email" in u and "cpf" in u and "whatsapp" in u

@@ -533,9 +533,25 @@ class Handler(BaseHTTPRequestHandler):
                         ok = (u.loja_id is not None and u.loja_id == ator.get("loja_id"))
                     if ok:
                         visiveis.append(u)
+                from urllib.parse import parse_qs
+                qs = parse_qs(urlparse(self.path).query)
+                escopo = (qs.get("escopo") or [""])[0].strip()
+                if escopo == "loja":
+                    fl = (qs.get("loja_id") or [""])[0]
+                    visiveis = [u for u in visiveis
+                                if u.loja_id is not None and str(u.loja_id) == fl]
+                elif escopo == "rede":
+                    fr = (qs.get("rede_id") or [""])[0]
+                    visiveis = [u for u in visiveis
+                                if u.nivel == "admin_rede" and str(u.rede_id) == fr]
+                elif escopo == "plataforma":
+                    visiveis = [u for u in visiveis
+                                if u.nivel == "super_admin"
+                                and u.loja_id is None and u.rede_id is None]
                 self.send_json({"ok": True, "usuarios": [
                     {"id": u.id, "nome": u.nome, "login": u.login, "nivel": u.nivel,
                      "rotulo": perfis.rotulo(u.nivel), "telefone": u.telefone or "",
+                     "whatsapp": u.whatsapp or "", "email": u.email or "", "cpf": u.cpf or "",
                      "loja_id": u.loja_id, "rede_id": u.rede_id,
                      "ativo": bool(u.ativo)} for u in visiveis]})
             finally:
