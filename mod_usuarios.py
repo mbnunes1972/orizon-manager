@@ -1,7 +1,17 @@
 # -*- coding: utf-8 -*-
 """mod_usuarios.py — Validações (puras) para o CRUD de usuários do painel admin."""
 
+import re
 import perfis
+
+_RE_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _validar_contato(dados, erros):
+    email = (dados.get("email") or "").strip()
+    if email and not _RE_EMAIL.match(email):
+        erros.append("E-mail inválido.")
+    # CPF: opcional, sem dígito verificador obrigatório nesta fase.
 
 
 def validar_novo_usuario(dados, logins_existentes):
@@ -22,6 +32,7 @@ def validar_novo_usuario(dados, logins_existentes):
     existentes = {l.strip().lower() for l in (logins_existentes or [])}
     if login and login.lower() in existentes:
         erros.append("Login já existe.")
+    _validar_contato(dados, erros)
     return erros
 
 
@@ -30,4 +41,5 @@ def validar_edicao_usuario(dados):
     erros = []
     if "nivel" in dados and not perfis.existe((dados.get("nivel") or "").strip()):
         erros.append("Perfil inválido.")
+    _validar_contato(dados, erros)
     return erros

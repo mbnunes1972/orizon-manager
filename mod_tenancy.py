@@ -120,9 +120,11 @@ def atribuir_tenant_usuario(ator, dados):
         return (loja_id, None, erros)
 
     if _eh_admin_rede(ator):
-        if nivel_novo in ("super_admin", "admin_rede"):
+        if nivel_novo == "super_admin":
             erros.append("Sem permissão para criar esse perfil.")
             return (None, None, erros)
+        if nivel_novo == "admin_rede":
+            return (None, ator.get("rede_id"), erros)   # par na mesma rede
         loja_id = dados.get("loja_id")
         if not loja_id:
             erros.append("Loja é obrigatória.")
@@ -137,6 +139,23 @@ def atribuir_tenant_usuario(ator, dados):
 
     erros.append("Sem permissão.")
     return (None, None, erros)
+
+
+def perfis_atribuiveis(ator, escopo):
+    """Slugs que `ator` pode atribuir em `escopo` ∈ {loja, rede, plataforma}.
+    Fonte única do dropdown de perfil no modal de usuário. A checagem de que a
+    loja/rede concreta está no escopo do ator é feita na rota (precisa do banco)."""
+    if not perfis.pode(ator.get("nivel"), "gerir_usuarios"):
+        return []
+    if escopo == "plataforma":
+        return ["super_admin"] if _eh_super_admin(ator) else []
+    if escopo == "rede":
+        if _eh_super_admin(ator) or _eh_admin_rede(ator):
+            return ["admin_rede"]
+        return []
+    if escopo == "loja":
+        return [s for s in perfis.slugs() if s not in ("super_admin", "admin_rede")]
+    return []
 
 
 def escopo_operacional(ator):

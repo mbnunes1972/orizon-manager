@@ -533,11 +533,44 @@ class Handler(BaseHTTPRequestHandler):
                         ok = (u.loja_id is not None and u.loja_id == ator.get("loja_id"))
                     if ok:
                         visiveis.append(u)
+                from urllib.parse import parse_qs
+                qs = parse_qs(urlparse(self.path).query)
+                escopo = (qs.get("escopo") or [""])[0].strip()
+                if escopo == "loja":
+                    fl = (qs.get("loja_id") or [""])[0]
+                    visiveis = [u for u in visiveis
+                                if u.loja_id is not None and str(u.loja_id) == fl]
+                elif escopo == "rede":
+                    fr = (qs.get("rede_id") or [""])[0]
+                    visiveis = [u for u in visiveis
+                                if u.nivel == "admin_rede" and str(u.rede_id) == fr]
+                elif escopo == "plataforma":
+                    visiveis = [u for u in visiveis
+                                if u.nivel == "super_admin"
+                                and u.loja_id is None and u.rede_id is None]
                 self.send_json({"ok": True, "usuarios": [
                     {"id": u.id, "nome": u.nome, "login": u.login, "nivel": u.nivel,
                      "rotulo": perfis.rotulo(u.nivel), "telefone": u.telefone or "",
+                     "whatsapp": u.whatsapp or "", "email": u.email or "", "cpf": u.cpf or "",
                      "loja_id": u.loja_id, "rede_id": u.rede_id,
                      "ativo": bool(u.ativo)} for u in visiveis]})
+            finally:
+                db.close()
+
+        elif path == "/api/admin/usuarios/perfis-permitidos":
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                return
+            from urllib.parse import parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            escopo = (qs.get("escopo") or [""])[0].strip()
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                slugs = mod_tenancy.perfis_atribuiveis(ator, escopo)
+                self.send_json({"ok": True, "perfis": [
+                    {"slug": s, "rotulo": perfis.rotulo(s)} for s in slugs]})
             finally:
                 db.close()
 
@@ -2586,6 +2619,9 @@ class Handler(BaseHTTPRequestHandler):
                     u = Usuario(nome=req["nome"].strip(), login=req["login"].strip(),
                                 nivel=req["nivel"].strip(),
                                 telefone=(req.get("telefone") or "").strip(),
+                                whatsapp=(req.get("whatsapp") or "").strip(),
+                                email=(req.get("email") or "").strip(),
+                                cpf=(req.get("cpf") or "").strip(),
                                 loja_id=loja_id, rede_id=rede_id)
                     u.set_senha(req["senha"])
                     db.add(u); db.commit()
@@ -3739,13 +3775,34 @@ class Handler(BaseHTTPRequestHandler):
                     if not visivel:
                         self.send_json({"ok": False, "erro": "Usuário fora do seu escopo."}, code=403)
                         return
-                    # anti-escalonamento: só super_admin atribui perfis administrativos
-                    if "nivel" in req and req["nivel"].strip() in ("super_admin", "admin_rede") \
-                            and not mod_tenancy._eh_super_admin(ator):
-                        self.send_json({"ok": False, "erro": "Sem permissão para atribuir esse perfil."}, code=403)
+                    # anti-lockout: o ator não altera o próprio perfil nem se inativa
+                    eh_proprio = (u.id == usuario.get("id"))
+                    if eh_proprio and "nivel" in req and req["nivel"].strip() != u.nivel:
+                        self.send_json({"ok": False,
+                            "erro": "Não é possível alterar o próprio perfil."}, code=403)
                         return
+                    if eh_proprio and "ativo" in req and not req["ativo"]:
+                        self.send_json({"ok": False,
+                            "erro": "Não é possível inativar a si mesmo."}, code=403)
+                        return
+                    # anti-escalonamento: super_admin só por super_admin;
+                    # admin_rede por super_admin ou admin_rede
+                    novo_nivel = req["nivel"].strip() if "nivel" in req else None
+                    if novo_nivel == "super_admin" and not mod_tenancy._eh_super_admin(ator):
+                        self.send_json({"ok": False,
+                            "erro": "Sem permissão para atribuir esse perfil."}, code=403)
+                        return
+                    if novo_nivel == "admin_rede" and not (
+                            mod_tenancy._eh_super_admin(ator) or mod_tenancy._eh_admin_rede(ator)):
+                        self.send_json({"ok": False,
+                            "erro": "Sem permissão para atribuir esse perfil."}, code=403)
+                        return
+                    if "nome" in req:     u.nome     = req["nome"].strip()
                     if "nivel" in req:    u.nivel    = req["nivel"].strip()
                     if "telefone" in req: u.telefone = (req.get("telefone") or "").strip()
+                    if "whatsapp" in req: u.whatsapp = (req.get("whatsapp") or "").strip()
+                    if "email" in req:    u.email    = (req.get("email") or "").strip()
+                    if "cpf" in req:      u.cpf      = (req.get("cpf") or "").strip()
                     if "ativo" in req:    u.ativo    = 1 if req["ativo"] else 0
                     if req.get("senha"):  u.set_senha(req["senha"])
                     db.commit()

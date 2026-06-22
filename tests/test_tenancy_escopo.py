@@ -48,9 +48,10 @@ def test_atribuir_tenant_super_admin():
 
 def test_atribuir_tenant_admin_rede():
     assert mt.atribuir_tenant_usuario(ADMR, {"nivel": "diretor", "loja_id": 10}) == (10, None, [])
-    _, _, e1 = mt.atribuir_tenant_usuario(ADMR, {"nivel": "admin_rede", "rede_id": 1})
-    _, _, e2 = mt.atribuir_tenant_usuario(ADMR, {"nivel": "super_admin"})
-    assert e1 and e2
+    # admin_rede agora cria PAR admin_rede (herda a própria rede); super_admin segue bloqueado
+    assert mt.atribuir_tenant_usuario(ADMR, {"nivel": "admin_rede"}) == (None, 1, [])
+    _, _, e_super = mt.atribuir_tenant_usuario(ADMR, {"nivel": "super_admin"})
+    assert e_super
 
 
 def test_atribuir_tenant_diretor_herda_propria_loja():
