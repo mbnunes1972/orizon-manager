@@ -1,5 +1,6 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import pytest
 
 
 def test_canary_banco_isolado(app_db):
@@ -81,3 +82,69 @@ def test_lista_projetos_so_da_propria_loja(http_client_factory, seed, projetos_d
     # ambos existem em disco; o filtro por loja deve manter só o da loja 2
     assert seed["projeto_l2"] in nomes
     assert seed["projeto_l1"] not in nomes
+
+
+# ── TASK 6: Perfis administrativos → 403 no operacional ──────────────────────
+
+@pytest.mark.parametrize("who", ["super", "adm_rede"])
+def test_admin_sem_acesso_operacional_lista_projetos(http_client_factory, who):
+    c = _login(http_client_factory, who)
+    status, _ = c.get("/projetos")
+    assert status == 403
+
+
+@pytest.mark.parametrize("who", ["super", "adm_rede"])
+def test_admin_sem_acesso_operacional_lista_clientes(http_client_factory, who):
+    c = _login(http_client_factory, who)
+    status, _ = c.get("/api/clientes")
+    assert status == 403
+
+
+# ── TASK 7: Endpoints sem-auth corrigidos → 401 para anônimo ─────────────────
+
+def test_status_sem_auth_401(http_client_factory, seed):
+    c = http_client_factory()
+    status, _ = c.patch(f"/api/projetos/{seed['projeto_l1']}/status", {"status": "morno"})
+    assert status == 401
+
+
+def test_descontos_sem_auth_401(http_client_factory):
+    c = http_client_factory()
+    status, _ = c.put("/api/orcamentos/999/descontos", {"descontos": []})
+    assert status == 401
+
+
+def test_valor_sem_auth_401(http_client_factory):
+    c = http_client_factory()
+    status, _ = c.patch("/orcamentos/999/valor", {"valor": 1000})
+    assert status == 401
+
+
+def test_parceiros_create_sem_auth_401(http_client_factory):
+    c = http_client_factory()
+    status, _ = c.post("/api/parceiros", {"nome": "X"})
+    assert status == 401
+
+
+def test_parceiros_editar_sem_auth_401(http_client_factory):
+    c = http_client_factory()
+    status, _ = c.post("/api/parceiros/999/editar", {"nome": "X"})
+    assert status == 401
+
+
+def test_briefing_projeto_get_sem_auth_401(http_client_factory, seed):
+    c = http_client_factory()
+    status, _ = c.get(f"/api/projetos/{seed['projeto_l1']}/briefing")
+    assert status == 401
+
+
+def test_briefing_cliente_post_sem_auth_401(http_client_factory, seed):
+    c = http_client_factory()
+    status, _ = c.post(f"/api/clientes/{seed['cliente_l1_id']}/briefing", {})
+    assert status == 401
+
+
+def test_briefing_projeto_post_sem_auth_401(http_client_factory, seed):
+    c = http_client_factory()
+    status, _ = c.post(f"/api/projetos/{seed['projeto_l1']}/briefing", {})
+    assert status == 401
