@@ -50,19 +50,16 @@ def test_cliente_da_propria_loja_abre(http_client_factory, seed):
     assert status == 200
 
 
-def test_projeto_da_propria_loja_abre(http_client_factory, seed):
-    # GET /projetos/<nome_safe> loads projeto.json from disk; create the file so
-    # the endpoint can return 200 (the DB entry alone, created by the seed, is not
-    # sufficient — _carregar_projeto reads from the filesystem).
+def test_projeto_da_propria_loja_abre(http_client_factory, seed, projetos_dir):
+    # GET /projetos/<nome_safe> loads projeto.json from disk via _carregar_projeto;
+    # write the file into the isolated temp dir (projetos_dir) so the endpoint can
+    # return 200 without polluting the real PROJETOS directory.
     import json, os
-    from storage import PROJETOS_DIR
     nome = seed["projeto_l2"]
-    pasta = os.path.join(PROJETOS_DIR, nome)
+    pasta = os.path.join(projetos_dir, nome)
     os.makedirs(pasta, exist_ok=True)
-    proj_path = os.path.join(pasta, "projeto.json")
-    if not os.path.exists(proj_path):
-        with open(proj_path, "w", encoding="utf-8") as fh:
-            json.dump({"nome_safe": nome, "nome_projeto": nome, "ambientes": []}, fh)
+    with open(os.path.join(pasta, "projeto.json"), "w", encoding="utf-8") as f:
+        json.dump({"nome_safe": nome, "ambientes": []}, f)
     c = _login(http_client_factory, "dir_l2")
     status, _ = c.get(f"/projetos/{nome}")
     assert status == 200

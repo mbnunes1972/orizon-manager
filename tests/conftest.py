@@ -106,7 +106,19 @@ class HttpClient:
 
 
 @pytest.fixture(scope="module")
-def servidor(app_db, seed):
+def projetos_dir(app_db, tmp_path_factory):
+    """Redireciona PROJETOS_DIR (em storage/main/mod_omie) para um diretório temporário,
+    deixando o harness hermético quanto a disco — espelha o isolamento do banco."""
+    import storage, main, mod_omie
+    tmp = str(tmp_path_factory.mktemp("projetos"))
+    for mod in (storage, main, mod_omie):
+        if hasattr(mod, "PROJETOS_DIR"):
+            mod.PROJETOS_DIR = tmp
+    return tmp
+
+
+@pytest.fixture(scope="module")
+def servidor(app_db, seed, projetos_dir):
     """Sobe main.Handler numa thread, porta efêmera, usando o banco isolado+seed."""
     import main
     from http.server import HTTPServer
