@@ -541,6 +541,23 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif path == "/api/admin/usuarios/perfis-permitidos":
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                return
+            from urllib.parse import parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            escopo = (qs.get("escopo") or [""])[0].strip()
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                slugs = mod_tenancy.perfis_atribuiveis(ator, escopo)
+                self.send_json({"ok": True, "perfis": [
+                    {"slug": s, "rotulo": perfis.rotulo(s)} for s in slugs]})
+            finally:
+                db.close()
+
         elif path == "/api/admin/redes":
             usuario = get_usuario_sessao(self)
             if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_redes"):
