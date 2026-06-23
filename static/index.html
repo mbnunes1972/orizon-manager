@@ -423,7 +423,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
       <input type="number" id="neg-desconto" min="0" max="100" step="0.5" value="0"
              onfocus="this._prev=this.value"
-             oninput="negValidarLimiteDesconto(this.value); negSyncModal(this.value); agendarCalculo(); agendarSalvarDesconto()"
+             oninput="negValidarLimiteDesconto(this.value); agendarSalvarDesconto()"
              onkeydown="negDescontoKeydown(event,this)"
              onblur="salvarDescontoAutomatico()"
              class="sb-input-sm" style="width:60px;text-align:right">
@@ -1711,9 +1711,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div class="toggle-row">
       <span class="toggle-label" style="flex:1">Desconto de venda</span>
       <input type="number" class="toggle-input" id="mp-desconto" min="0" max="100" step="0.5" value="0"
-             onfocus="this._prev=this.value"
-             oninput="mpDescontoValidar(this); negSyncSidebar(this.value); agendarDiscriminacao()"
-             onkeydown="mpDescontoKeydown(event,this)">
+             readonly title="O desconto é editado na tela de negociação (fonte única)"
+             style="opacity:.7;cursor:not-allowed">
       <div id="mp-desc-hint" style="display:none;font-size:10px;color:var(--err);margin-top:4px;grid-column:1/-1"></div>
       <span class="toggle-unit">%</span>
     </div>
@@ -1844,8 +1843,10 @@ let _removerAmbPending  = null; // { pid } aguardando confirmação
 let _orcSombra         = null; // derivados sombra do orçamento ativo (Task 7 — modo sombra)
 
 // ---- Limite de desconto total (35%) ----------------------------------------
-function _verificarLimiteDescTotal(){
-  if(_margemAtual > _LIMITE_DESC_TOTAL){
+async function _verificarLimiteDescTotal(){
+  await negPreview();   // garante o %Desc_Tot FRESCO do motor (não o legado)
+  const margem = _previewNeg ? (Number(_previewNeg.Desc_Tot) || 0) * 100 : _margemAtual;
+  if(margem > _LIMITE_DESC_TOTAL){
     showToast('Desconto total excede o limite máximo de descontos.', true);
     return false;
   }
@@ -1860,15 +1861,16 @@ async function _persistirDescontosOrc(){
     if(k.startsWith('ep07_')) lote[k.slice(5)] = _descIndividual[k];
   });
   try{
-    await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/descontos',{
+    const r = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/descontos',{
       method:'PUT', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({descontos: lote}),
     });
+    aplicarBreakdownResposta(await r.json());   // exibe o breakdown do motor (fonte única)
   }catch(e){ console.error('Falha ao persistir descontos do orcamento:', e); }
 }
 
 // Blur do desconto individual: reverte se ultrapassar o limite total
-function _onDescIndBlur(el, key, isEP07){
+async function _onDescIndBlur(el, key, isEP07){
   if(el._esc) return;
   if(isEP07){
     renderTabelaNeg(_orcAmbientesAtivos);
@@ -1877,7 +1879,9 @@ function _onDescIndBlur(el, key, isEP07){
     negAtualizarDescontoEfetivo();
   }
   mpAtualizarApoio();
-  if(_margemAtual > _LIMITE_DESC_TOTAL){
+  await negPreview();   // %Desc_Tot fresco do motor
+  const _margem = _previewNeg ? (Number(_previewNeg.Desc_Tot) || 0) * 100 : _margemAtual;
+  if(_margem > _LIMITE_DESC_TOTAL){
     const prev = parseFloat(el._prev) || 0;
     _descIndividual[key] = prev;
     el.value = prev;
@@ -4723,7 +4727,7 @@ function renderTabelaNeg(ambientes = null){
                  onkeydown="diDescKeydown(event,this,'ep07_${pa.id}')"
                  onblur="_onDescIndBlur(this,'ep07_${pa.id}',true)">
         </td>
-        <td data-ep07-avista="${avista}" style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:var(--ok)">
+        <td data-ep07-avista="${avista}" data-ep07-id="${pa.id}" style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:var(--ok)">
           R$ ${fmt(final_)}
         </td>
       </tr>`;
@@ -4731,12 +4735,10 @@ function renderTabelaNeg(ambientes = null){
     totalBruto =Math.round(totalBruto*100)/100;
     totalAvista=Math.round(totalAvista*100)/100;
     totalFinal =Math.round(totalFinal*100)/100;
-    const descVal=Math.round((totalBruto-totalAvista)*100)/100;
-    const upd={'neg-total':'R$ '+fmt(totalFinal),'neg-subtotal':'R$ '+fmt(totalBruto),
-               'neg-desc-val':'- R$ '+fmt(descVal),'neg-avista':'R$ '+fmt(totalAvista)};
-    Object.entries(upd).forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=v;});
-    const elF=document.getElementById('neg-total-final'); if(elF&&!elF._editando) elF.value=fmt(totalFinal);
+    // Os totais (neg-total/subtotal/desc/avista) e as células são escritos SÓ pelo MOTOR
+    // (via _aplicarPreviewNaTela). Aqui só montamos a estrutura das linhas.
     const cbAll=document.getElementById('neg-sel-all'); if(cbAll) cbAll.checked=!!ambientes.length;
+    agendarPreview();   // motor preenche Valor Bruto/à Vista/totais e células (fonte única)
     return;
   }
   // ── PATH LEGADO — comportamento EXATAMENTE igual ao anterior ─────────────
@@ -5012,9 +5014,9 @@ async function salvarDescontoAutomatico(){
     const d = await r.json();
     if(d.ok){
       // Atualiza SÓ o desconto; preserva os parâmetros estruturais (vêm do projeto).
-      // (O endpoint /margens devolve apenas desconto_pct; sobrescrever tudo apagaria os estruturais.)
       const desc = (d.margens && d.margens.desconto_pct != null) ? d.margens.desconto_pct : desconto;
       projetoAtivo.margens = Object.assign({}, projetoAtivo.margens || {}, {desconto_pct: desc});
+      aplicarBreakdownResposta(d);   // exibe o breakdown do motor (fonte única)
     }
   }catch(e){}
 }
@@ -5229,7 +5231,45 @@ let _discrTimer = null;
 function agendarDiscriminacao(){
   clearTimeout(_discrTimer);
   _discrTimer = setTimeout(atualizarDiscriminacao, 400);
-  mpAtualizarApoio();  // atualiza painel de apoio em tempo real
+  mpAtualizarApoio();          // mostra o painel de apoio
+  agendarSalvarParametros();   // fonte única: edição de param no modal → auto-save → exibe
+}
+
+// Auto-save dos PARÂMETROS do modal (debounced). Backend recalcula e devolve o breakdown.
+let _mpSalvarTimer = null;
+function agendarSalvarParametros(){
+  clearTimeout(_mpSalvarTimer);
+  _mpSalvarTimer = setTimeout(salvarParametrosAuto, 500);
+}
+async function salvarParametrosAuto(){
+  if(!projetoAtivo || !_orcamentoAtivoId) return;
+  const id = s => document.getElementById(s);
+  const inc = id('mp-incluir-custos')?.checked || false;
+  _incluirCustos = inc;
+  const parametros = {
+    comissao_arq_ativa: id('mp-arq-ativa').checked,
+    comissao_arq_pct:   parseFloat(id('mp-arq-pct').value)||0,
+    fidelidade_ativa:   id('mp-fid-ativa').checked,
+    fidelidade_pct:     parseFloat(id('mp-fid-pct').value)||0,
+    fora_da_sede:       id('mp-fora-sede').checked,
+    custo_viagem:       parseFloat(id('mp-viagem').value)||0,
+    brinde_ativo:       id('mp-brinde-ativo').checked,
+    brinde:             parseFloat(id('mp-brinde').value)||0,
+    incluir_custos:     inc,
+    carga_trib:         parseFloat(id('mp-carga-trib').value)||0,
+  };
+  try{
+    const r = await fetch('/api/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/parametros',{
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(parametros),
+    });
+    const d = await r.json();
+    if(d.ok){
+      projetoAtivo.margens = Object.assign({}, projetoAtivo.margens||{}, parametros);
+      // /parametros recalcula TODOS os orçamentos do projeto; exibe o do ATIVO via preview
+      // (a 'sombra' de /parametros é de um orçamento arbitrário do projeto, não o ativo).
+      await negPreview();
+    }
+  }catch(e){ console.warn('salvarParametrosAuto:', e); }
 }
 async function mpSalvarComValidacao(){
   const desc = parseFloat(document.getElementById('mp-desconto').value) || 0;
@@ -5238,9 +5278,8 @@ async function mpSalvarComValidacao(){
     const ok = await abrirModalAutorizacao(desc, max);
     if(!ok) return;
   }
-  // Bloqueia se o desconto total (bruto_original - liquido) / bruto_original > 35%
-  // _margemAtual é atualizado por mpAtualizarApoio() a cada mudança no modal
-  if(!_verificarLimiteDescTotal()) return;
+  // Bloqueia se o %Desc_Tot do MOTOR (preview fresco) exceder o limite de 35%
+  if(!(await _verificarLimiteDescTotal())) return;
   fecharModalParams(true);
 }
 
@@ -5334,61 +5373,19 @@ function mpAtualizarApoio(){
   if(_orcamentoAtivoId !== null){
     const orcAmbs = _orcAmbientesAtivos || [];
     const id = s => document.getElementById(s);
-    const incluirCustos = id('mp-incluir-custos')?.checked || false;
-    const arqAtiva  = id('mp-arq-ativa').checked;
-    const arqPct    = arqAtiva  ? (parseFloat(id('mp-arq-pct').value)||0)  : 0;
-    const fidAtiva  = id('mp-fid-ativa').checked;
-    const fidPct    = fidAtiva  ? (parseFloat(id('mp-fid-pct').value)||0)  : 0;
+    // EP-07: o MOTOR (preview) é a FONTE ÚNICA de bruto/desconto/à vista/arq/fid/líquido/
+    // margem/impostos. NÃO recalcular aqui (senão o legado sobrescreve o preview no apoio).
+    if(!orcAmbs.length){ id('mp-apoio').style.display='none'; return; }
+    id('mp-apoio').style.display='block';
+    // viagem/brinde: ecos dos inputs (o motor os inclui em Cust_Ad); desconto %: eco do input
     const viagAtiva = id('mp-fora-sede').checked;
-    const viagVal   = viagAtiva ? (parseFloat(id('mp-viagem').value)||0)   : 0;
+    const viagVal   = viagAtiva ? (parseFloat(id('mp-viagem').value)||0) : 0;
     const brdAtivo  = id('mp-brinde-ativo').checked;
-    const brdVal    = brdAtivo  ? (parseFloat(id('mp-brinde').value)||0)   : 0;
-    const descPct   = parseFloat(id('mp-desconto').value)||0;
-    // Gross-up e desconto individual por ambiente (igual a renderTabelaNeg EP-07)
-    const n_ambs  = orcAmbs.length || 1;
-    const viag_por = viagAtiva && viagVal > 0 ? viagVal/n_ambs : 0;
-    const brd_por  = brdAtivo  && brdVal  > 0 ? brdVal/n_ambs  : 0;
-    let totalBruto = 0, totalAvista = 0;
-    orcAmbs.forEach(pa => {
-      let b = pa.budget_total || 0;
-      if(incluirCustos){
-        if(arqAtiva && arqPct > 0) b = b / (1 - arqPct/100);
-        if(fidAtiva && fidPct > 0) b = b / (1 - fidPct/100);
-        b += viag_por + brd_por;
-      }
-      b = rnd(b);
-      totalBruto += b;
-      const disc_i = parseFloat(_descIndividual['ep07_'+pa.id]) || 0;
-      totalAvista += rnd(b * (1-descPct/100) * (1-disc_i/100));
-    });
-    const bruto  = rnd(totalBruto);
-    const avista = rnd(totalAvista);
-    if(!bruto){ document.getElementById('mp-apoio').style.display='none'; return; }
-    document.getElementById('mp-apoio').style.display='block';
-    const descVal  = rnd(bruto-avista);
-    let saldo = avista;
-    const vViag = rnd(viagVal); saldo = rnd(saldo-vViag);
-    const vBrd  = rnd(brdVal);  saldo = rnd(saldo-vBrd);
-    const vArq  = rnd(saldo*arqPct/100); saldo = rnd(saldo-vArq);
-    const vFid  = rnd(saldo*fidPct/100);
-    const liquido = rnd(saldo-vFid);
-    const bruto0  = orcAmbs.reduce((s,pa)=>s+(pa.budget_total||0), 0);
-    const margem  = bruto0 > 0 ? rnd((bruto0-liquido)/bruto0*100) : 0;
-    _margemAtual  = margem;
-    id('mp-a-bruto').textContent    = 'R$ '+fmt(bruto);
-    id('mp-a-desc-pct').textContent = descPct.toLocaleString('pt-BR');
-    id('mp-a-desc').textContent     = '− R$ '+fmt(descVal);
-    id('mp-a-avista').textContent   = 'R$ '+fmt(avista);
-    id('mp-a-arq').textContent      = arqAtiva  ? '− R$ '+fmt(vArq)  : 'R$ 0,00';
-    id('mp-a-fid').textContent      = fidAtiva  ? '− R$ '+fmt(vFid)  : 'R$ 0,00';
-    id('mp-a-viagem').textContent   = viagAtiva ? '− R$ '+fmt(vViag) : 'R$ 0,00';
-    id('mp-a-brinde').textContent   = brdAtivo  ? '− R$ '+fmt(vBrd)  : 'R$ 0,00';
-    id('mp-a-liq').textContent      = 'R$ '+fmt(liquido);
-    id('mp-a-margem').textContent   = margem.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
-    _atualizarImpostos('ay',avista); _atualizarImpostos('cc',avista);
-    _atualizarImpostos('vp',avista); _atualizarImpostos('tf',avista);
-    // ── modo sombra: HOJE × NOVO (Task 7 — validação visual) ──
-    _mpRenderSombra(liquido, margem);
+    const brdVal    = brdAtivo  ? (parseFloat(id('mp-brinde').value)||0) : 0;
+    id('mp-a-viagem').textContent   = viagAtiva ? '− R$ '+fmt(viagVal) : 'R$ 0,00';
+    id('mp-a-brinde').textContent   = brdAtivo  ? '− R$ '+fmt(brdVal)  : 'R$ 0,00';
+    id('mp-a-desc-pct').textContent = (parseFloat(id('mp-desconto').value)||0).toLocaleString('pt-BR');
+    agendarPreview();   // motor preenche os demais campos do apoio (e os totais da tela)
     return;
   }
   const ambs = (projetoAtivo && projetoAtivo.ambientes) || [];
@@ -5505,6 +5502,74 @@ function _mpRenderSombra(liquidoHoje, margemHoje) {
     </div>`;
 }
 
+// ── Cutover Fase B: preview do MOTOR ao vivo (substitui o cálculo legado) ──────
+let _previewNeg   = null;     // último resultado do motor (chaves-sigla)
+let _previewTimer = null;
+// Leitura pura: o backend é a fonte única (lê os insumos SALVOS). Sem corpo/overrides.
+async function negPreview() {
+  if (!_orcamentoAtivoId) return null;
+  try {
+    const r = await fetch(`/api/orcamentos/${_orcamentoAtivoId}/negociacao-preview`, {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'}, body: '{}',
+    });
+    const d = await r.json();
+    _previewNeg = d.ok ? d.sombra : null;
+    if (_previewNeg) _aplicarPreviewNaTela(_previewNeg);
+    return _previewNeg;
+  } catch (e) { console.warn('preview:', e); return null; }
+}
+function agendarPreview() { clearTimeout(_previewTimer); _previewTimer = setTimeout(negPreview, 250); }
+
+// Aplica o breakdown vindo da RESPOSTA de um save (edição → save → exibe). Fonte única.
+function aplicarBreakdownResposta(d) {
+  if (d && d.ok && d.sombra) { _previewNeg = d.sombra; _aplicarPreviewNaTela(d.sombra); }
+}
+
+// Sobrepõe TODOS os displays do modal/tela com os valores do MOTOR (fonte única).
+// Cadeia consistente: VBNO − desconto = VAVO; VAVO − Com_Arq − Pro_Fid − viagem − brinde = Val_Liq.
+function _aplicarPreviewNaTela(s) {
+  if (!s) return;
+  const id = x => document.getElementById(x);
+  const setR = (el, v, pre = '') => { const e = id(el); if (e) e.textContent = pre + 'R$ ' + fmt(Number(v) || 0); };
+  const vbno = Number(s.VBNO) || 0, vavo = Number(s.VAVO) || 0;
+  const desc = Math.round((vbno - vavo) * 100) / 100;
+  const arq  = Number(s.Com_Arq) || 0, fid = Number(s.Pro_Fid) || 0;
+  // ── painel de apoio (modal de parâmetros) ──
+  setR('mp-a-bruto',  vbno);
+  setR('mp-a-desc',   desc, '− ');                 // desconto = VBNO − VAVO (consistente)
+  setR('mp-a-avista', vavo);
+  setR('mp-a-arq', arq, arq > 0 ? '− ' : '');
+  setR('mp-a-fid', fid, fid > 0 ? '− ' : '');
+  const via = Number(s.Cust_Via) || 0, bri = Number(s.Bri) || 0;
+  setR('mp-a-viagem', via, via > 0 ? '− ' : '');     // viagem total do motor (Cust_Via)
+  setR('mp-a-brinde', bri, bri > 0 ? '− ' : '');     // brinde total do motor (Bri)
+  setR('mp-a-liq', s.Val_Liq);
+  const margem = (Number(s.Desc_Tot) || 0) * 100;
+  _margemAtual = margem;   // usado pelo limite de 35%
+  if (id('mp-a-margem')) id('mp-a-margem').textContent =
+    margem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+  // provisão de impostos: NÃO escrever aqui com base fixa. Cada painel de pagamento
+  // recalcula com o SEU total_cliente (= VAVO + Cust_Fin da modalidade = Val_Cont),
+  // setando base/impostos corretos via _atualizarImpostos(prefix, total_cliente).
+  if (typeof _atualizarPaineisAbertos === 'function') _atualizarPaineisAbertos();
+  // ── tela de negociação (totais) ──
+  setR('neg-subtotal', vbno);                       // Valor Bruto
+  setR('neg-desc-val', desc, '− ');                 // Desconto
+  setR('neg-avista',   vavo);                        // Valor à Vista (alimenta o pagamento)
+  setR('neg-total',    s.Val_Cont);                  // Total (à vista sem financiamento na prévia)
+  const elTF = id('neg-total-final');                // input editável do total de contrato
+  if (elTF && !elTF._editando) elTF.value = fmt(Number(s.Val_Cont) || 0);
+  // ── células por ambiente: VAVA do motor, casadas pelo id do pool ──
+  if (Array.isArray(s.ambientes)) {
+    s.ambientes.forEach(a => {
+      if (a.id == null) return;
+      const cell = document.querySelector('[data-ep07-id="' + a.id + '"]');
+      if (cell) cell.textContent = 'R$ ' + fmt(Number(a.VAVA) || 0);
+    });
+  }
+}
+
 function abrirModalParams(){
   const m  = (projetoAtivo && projetoAtivo.margens) || {};
   // Total dos ambientes incluidos na negociacao
@@ -5609,11 +5674,12 @@ async function fecharModalParams(salvar){
       const dmg = await (await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/margens',{
         method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({desconto_pct: desconto}),
       })).json();
-      // modo sombra: captura derivados recém-materializados (Task 7)
+      // breakdown do motor (fonte única): captura e EXIBE
       if (dmg.sombra) {
         _orcSombra = dmg.sombra;
         const _orcAtualizado = _orcamentos.find(o => o.id === _orcamentoAtivoId);
         if (_orcAtualizado) _orcAtualizado.sombra = dmg.sombra;
+        aplicarBreakdownResposta(dmg);
       }
       // Atualiza a memória com os estruturais recém-salvos + o desconto deste orçamento,
       // para refletir imediatamente ao reabrir o modal (sem precisar trocar de orçamento).
@@ -7961,8 +8027,7 @@ async function salvarValorNegociado() {
       method: 'PATCH', credentials: 'same-origin',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        valor_total:     valor,
-        valor_liquido:   valorLiquido,
+        // cutover Fase B: valor_total/valor_liquido vêm do MOTOR no backend (não enviados)
         forma_pagamento: (typeof _capturarPagamento === 'function' && window._planoPagamento)
           ? JSON.stringify(_capturarPagamento(_formaEntrada, _formaParcela))
           : (elPag?.value || null),

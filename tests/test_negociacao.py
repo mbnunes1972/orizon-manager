@@ -72,3 +72,20 @@ def test_desc_amb_por_ambiente():
 def test_orcamento_vazio_nao_quebra():
     r = mn.calcular_orcamento([], {"incluir_custos": False}, 0.0)
     assert r["VBVO"] == 0 and r["Markup"] == 0 and r["Val_Liq"] == 0
+
+def test_retorna_cust_via_e_bri():
+    amb = [{"VBVA": 10000, "CFA": 4000, "desc_amb_pct": 0}]
+    p = {"incluir_custos": True, "fora_da_sede": True, "custo_viagem": 300,
+         "brinde_ativo": True, "brinde": 200}
+    d = __import__("mod_negociacao").calcular_orcamento(amb, p, 0)
+    assert d["Cust_Via"] == 300.0
+    assert d["Bri"] == 200.0
+    # cadeia fecha: VAVO − Com_Arq − Pro_Fid − Cust_Via − Bri == Val_Liq
+    assert abs((d["VAVO"] - d["Com_Arq"] - d["Pro_Fid"] - d["Cust_Via"] - d["Bri"]) - d["Val_Liq"]) < 0.05
+
+def test_cust_via_bri_zerados_quando_toggle_off():
+    amb = [{"VBVA": 10000, "CFA": 4000, "desc_amb_pct": 0}]
+    p = {"incluir_custos": True, "fora_da_sede": False, "custo_viagem": 300,
+         "brinde_ativo": False, "brinde": 200}
+    d = __import__("mod_negociacao").calcular_orcamento(amb, p, 0)
+    assert d["Cust_Via"] == 0.0 and d["Bri"] == 0.0

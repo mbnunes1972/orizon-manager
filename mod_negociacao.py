@@ -75,7 +75,10 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0):
     return {
         "VBVO": round(VBVO, 2), "CFO": round(CFO, 2), "VBNO": round(VBNO, 2),
         "VAVO": round(VAVO, 2), "Num_Amb": num_amb,
-        "Com_Arq": round(com_arq, 2), "Pro_Fid": round(pro_fid, 2), "Cust_Ad": round(cust_ad, 2),
+        "Com_Arq": round(com_arq, 2), "Pro_Fid": round(pro_fid, 2),
+        "Cust_Via": round(cust_via if tog_cvia else 0.0, 2),
+        "Bri": round(bri if tog_bri else 0.0, 2),
+        "Cust_Ad": round(cust_ad, 2),
         "Val_Liq": round(val_liq, 2), "Desc_Tot": round(desc_tot, 4), "Markup": round(markup, 3),
         "Cust_Fin": round(_f(cust_fin), 2), "Val_Cont": round(val_cont, 2), "Prov_Imp": round(prov_imp, 2),
         "ambientes": out_ambs,
