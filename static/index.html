@@ -1862,10 +1862,11 @@ async function _persistirDescontosOrc(){
     if(k.startsWith('ep07_')) lote[k.slice(5)] = _descIndividual[k];
   });
   try{
-    await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/descontos',{
+    const r = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/descontos',{
       method:'PUT', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({descontos: lote}),
     });
+    aplicarBreakdownResposta(await r.json());   // exibe o breakdown do motor (fonte única)
   }catch(e){ console.error('Falha ao persistir descontos do orcamento:', e); }
 }
 
@@ -5017,9 +5018,9 @@ async function salvarDescontoAutomatico(){
     const d = await r.json();
     if(d.ok){
       // Atualiza SÓ o desconto; preserva os parâmetros estruturais (vêm do projeto).
-      // (O endpoint /margens devolve apenas desconto_pct; sobrescrever tudo apagaria os estruturais.)
       const desc = (d.margens && d.margens.desconto_pct != null) ? d.margens.desconto_pct : desconto;
       projetoAtivo.margens = Object.assign({}, projetoAtivo.margens || {}, {desconto_pct: desc});
+      aplicarBreakdownResposta(d);   // exibe o breakdown do motor (fonte única)
     }
   }catch(e){}
 }
@@ -5470,39 +5471,13 @@ function _mpRenderSombra(liquidoHoje, margemHoje) {
 // ── Cutover Fase B: preview do MOTOR ao vivo (substitui o cálculo legado) ──────
 let _previewNeg   = null;     // último resultado do motor (chaves-sigla)
 let _previewTimer = null;
+// Leitura pura: o backend é a fonte única (lê os insumos SALVOS). Sem corpo/overrides.
 async function negPreview() {
   if (!_orcamentoAtivoId) return null;
-  const id = x => document.getElementById(x);
-  // FONTE ÚNICA do desconto/params: o mesmo que a tela usa.
-  //  - modal ABERTO  (setup pré-negociação) → lerMargensModal() lê os inputs mp-* (mp-desconto)
-  //  - modal FECHADO (negociação ao vivo)   → lerMargensNegociacao() lê o neg-desconto + salvos
-  const modalAberto = id('modal-params')?.style.display === 'flex';
-  const m = modalAberto ? lerMargensModal() : lerMargensNegociacao();
-  const incluir = modalAberto ? (id('mp-incluir-custos')?.checked || false) : !!m.incluir_custos;
-  // descontos por ambiente: _descIndividual usa chave 'ep07_<pool_id>' → manda <pool_id>
-  const descAmb = {};
-  Object.keys(_descIndividual || {}).forEach(k => {
-    if (k.startsWith('ep07_')) descAmb[k.slice(5)] = _descIndividual[k];
-  });
-  const body = {
-    params: {
-      incluir_custos:     incluir,
-      comissao_arq_ativa: !!m.comissao_arq_ativa,
-      comissao_arq_pct:   m.comissao_arq_pct || 0,
-      fidelidade_ativa:   !!m.fidelidade_ativa,
-      fidelidade_pct:     m.fidelidade_pct || 0,
-      fora_da_sede:       !!m.fora_da_sede,
-      custo_viagem:       m.custo_viagem || 0,
-      brinde_ativo:       !!m.brinde_ativo,
-      brinde:             m.brinde || 0,
-    },
-    desc_orc: m.desconto_pct || 0,
-    descontos_amb: descAmb,
-  };
   try {
     const r = await fetch(`/api/orcamentos/${_orcamentoAtivoId}/negociacao-preview`, {
       method: 'POST', credentials: 'same-origin',
-      headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+      headers: {'Content-Type': 'application/json'}, body: '{}',
     });
     const d = await r.json();
     _previewNeg = d.ok ? d.sombra : null;
@@ -5511,6 +5486,11 @@ async function negPreview() {
   } catch (e) { console.warn('preview:', e); return null; }
 }
 function agendarPreview() { clearTimeout(_previewTimer); _previewTimer = setTimeout(negPreview, 250); }
+
+// Aplica o breakdown vindo da RESPOSTA de um save (edição → save → exibe). Fonte única.
+function aplicarBreakdownResposta(d) {
+  if (d && d.ok && d.sombra) { _previewNeg = d.sombra; _aplicarPreviewNaTela(d.sombra); }
+}
 
 // Sobrepõe TODOS os displays do modal/tela com os valores do MOTOR (fonte única).
 // Cadeia consistente: VBNO − desconto = VAVO; VAVO − Com_Arq − Pro_Fid − viagem − brinde = Val_Liq.
@@ -5527,6 +5507,9 @@ function _aplicarPreviewNaTela(s) {
   setR('mp-a-avista', vavo);
   setR('mp-a-arq', arq, arq > 0 ? '− ' : '');
   setR('mp-a-fid', fid, fid > 0 ? '− ' : '');
+  const via = Number(s.Cust_Via) || 0, bri = Number(s.Bri) || 0;
+  setR('mp-a-viagem', via, via > 0 ? '− ' : '');     // viagem total do motor (Cust_Via)
+  setR('mp-a-brinde', bri, bri > 0 ? '− ' : '');     // brinde total do motor (Bri)
   setR('mp-a-liq', s.Val_Liq);
   const margem = (Number(s.Desc_Tot) || 0) * 100;
   _margemAtual = margem;   // usado pelo limite de 35%
@@ -5654,11 +5637,12 @@ async function fecharModalParams(salvar){
       const dmg = await (await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/margens',{
         method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({desconto_pct: desconto}),
       })).json();
-      // modo sombra: captura derivados recém-materializados (Task 7)
+      // breakdown do motor (fonte única): captura e EXIBE
       if (dmg.sombra) {
         _orcSombra = dmg.sombra;
         const _orcAtualizado = _orcamentos.find(o => o.id === _orcamentoAtivoId);
         if (_orcAtualizado) _orcAtualizado.sombra = dmg.sombra;
+        aplicarBreakdownResposta(dmg);
       }
       // Atualiza a memória com os estruturais recém-salvos + o desconto deste orçamento,
       // para refletir imediatamente ao reabrir o modal (sem precisar trocar de orçamento).
