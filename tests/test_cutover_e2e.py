@@ -75,3 +75,25 @@ def test_patch_nao_aceita_valor_total_do_frontend(http_client_factory, seed, app
     db = app_db.get_session(); o = db.get(app_db.Orcamento, oid)
     assert (o.valor_total or 0) != 999999.0      # ignorado/recalculado
     db.close()
+
+def test_preview_ambientes_tem_id_e_vava(http_client_factory, seed, app_db):
+    """O preview devolve, por ambiente, o pool_ambiente_id (para o frontend casar as
+    células) e o VAVA (à vista por ambiente)."""
+    oid = seed["orcamento_l1_id"]
+    db = app_db.get_session()
+    projeto_id = db.get(app_db.Orcamento, oid).projeto_id
+    pa = app_db.PoolAmbiente(nome="Sala", nome_exibicao="Sala", xml_path="x.xml",
+                             ambientes_json="{}", projeto_id=projeto_id,
+                             budget_total=8000.0, order_total=3000.0)
+    db.add(pa); db.flush()
+    pid = pa.id
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pid, ordem=1))
+    db.commit(); db.close()
+
+    c = _login(http_client_factory, "dir_l1")
+    st, body = c.post(f"/api/orcamentos/{oid}/negociacao-preview", {})
+    assert st == 200 and body["ok"]
+    # robusto a poluição de seed entre testes: localiza O MEU ambiente pelo id
+    mine = [a for a in body["ambientes"] if a.get("id") == pid]
+    assert len(mine) == 1, f"ambiente {pid} não encontrado em {body['ambientes']}"
+    assert abs(mine[0]["VAVA"] - 8000.0) < 0.5      # desconto 0 ⇒ VAVA = budget

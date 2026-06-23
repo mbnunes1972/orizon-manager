@@ -4727,7 +4727,7 @@ function renderTabelaNeg(ambientes = null){
                  onkeydown="diDescKeydown(event,this,'ep07_${pa.id}')"
                  onblur="_onDescIndBlur(this,'ep07_${pa.id}',true)">
         </td>
-        <td data-ep07-avista="${avista}" style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:var(--ok)">
+        <td data-ep07-avista="${avista}" data-ep07-id="${pa.id}" style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:var(--ok)">
           R$ ${fmt(final_)}
         </td>
       </tr>`;
@@ -5550,23 +5550,42 @@ async function negPreview() {
 }
 function agendarPreview() { clearTimeout(_previewTimer); _previewTimer = setTimeout(negPreview, 250); }
 
-// Sobrepõe os displays do modal/tela com os valores do MOTOR (fonte única).
+// Sobrepõe TODOS os displays do modal/tela com os valores do MOTOR (fonte única).
+// Cadeia consistente: VBNO − desconto = VAVO; VAVO − Com_Arq − Pro_Fid − viagem − brinde = Val_Liq.
 function _aplicarPreviewNaTela(s) {
   if (!s) return;
   const id = x => document.getElementById(x);
   const setR = (el, v, pre = '') => { const e = id(el); if (e) e.textContent = pre + 'R$ ' + fmt(Number(v) || 0); };
-  setR('mp-a-bruto',  s.VBNO);
-  setR('mp-a-avista', s.VAVO);
-  setR('mp-a-arq', s.Com_Arq, '− ');
-  setR('mp-a-fid', s.Pro_Fid, '− ');
+  const vbno = Number(s.VBNO) || 0, vavo = Number(s.VAVO) || 0;
+  const desc = Math.round((vbno - vavo) * 100) / 100;
+  const arq  = Number(s.Com_Arq) || 0, fid = Number(s.Pro_Fid) || 0;
+  // ── painel de apoio (modal de parâmetros) ──
+  setR('mp-a-bruto',  vbno);
+  setR('mp-a-desc',   desc, '− ');                 // desconto = VBNO − VAVO (consistente)
+  setR('mp-a-avista', vavo);
+  setR('mp-a-arq', arq, arq > 0 ? '− ' : '');
+  setR('mp-a-fid', fid, fid > 0 ? '− ' : '');
   setR('mp-a-liq', s.Val_Liq);
   const margem = (Number(s.Desc_Tot) || 0) * 100;
   _margemAtual = margem;   // usado pelo limite de 35%
   if (id('mp-a-margem')) id('mp-a-margem').textContent =
     margem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
-  // tela de negociação: Valor Bruto (neg-subtotal) e Valor à Vista (neg-avista) do motor
-  if (id('neg-subtotal')) id('neg-subtotal').textContent = 'R$ ' + fmt(Number(s.VBNO) || 0);
-  if (id('neg-avista'))   id('neg-avista').textContent   = 'R$ ' + fmt(Number(s.VAVO) || 0);
+  // impostos/retenção do apoio: base = VAVO do motor (não o à vista legado)
+  if (typeof _atualizarImpostos === 'function')
+    ['ay', 'cc', 'vp', 'tf'].forEach(p => _atualizarImpostos(p, vavo));
+  // ── tela de negociação (totais) ──
+  setR('neg-subtotal', vbno);                       // Valor Bruto
+  setR('neg-desc-val', desc, '− ');                 // Desconto
+  setR('neg-avista',   vavo);                        // Valor à Vista (alimenta o pagamento)
+  setR('neg-total',    s.Val_Cont);                  // Total (à vista sem financiamento na prévia)
+  // ── células por ambiente: VAVA do motor, casadas pelo id do pool ──
+  if (Array.isArray(s.ambientes)) {
+    s.ambientes.forEach(a => {
+      if (a.id == null) return;
+      const cell = document.querySelector('[data-ep07-id="' + a.id + '"]');
+      if (cell) cell.textContent = 'R$ ' + fmt(Number(a.VAVA) || 0);
+    });
+  }
 }
 
 function abrirModalParams(){

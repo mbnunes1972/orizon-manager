@@ -4229,6 +4229,7 @@ def _negociacao_breakdown(orc, db, params=None, desc_orc=None, descontos_amb=Non
         desc_orc = orc.desconto_pct or 0.0
     descontos_amb = descontos_amb or {}
     ambs = []
+    ids = []
     for lk in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all():
         pa = db.get(PoolAmbiente, lk.pool_ambiente_id)
         if pa:
@@ -4237,12 +4238,16 @@ def _negociacao_breakdown(orc, db, params=None, desc_orc=None, descontos_amb=Non
                                                         lk.desconto_individual_pct or 0.0))
             ambs.append({"VBVA": pa.budget_total or 0.0, "CFA": pa.order_total or 0.0,
                          "desc_amb_pct": float(d_amb or 0.0)})
+            ids.append(lk.pool_ambiente_id)
     d0 = mod_negociacao.calcular_orcamento(ambs, params, desc_orc)
     if total_cliente is None:
         cust_fin = 0.0
     else:
         cust_fin = max(0.0, float(total_cliente) - d0["VAVO"])
     d = mod_negociacao.calcular_orcamento(ambs, params, desc_orc, cust_fin=cust_fin)
+    # anexa o pool_ambiente_id a cada ambiente (frontend casa as células por ambiente)
+    for i, amb in enumerate(d.get("ambientes", [])):
+        amb["id"] = ids[i] if i < len(ids) else None
     return d
 
 
