@@ -120,11 +120,11 @@ VBVO = Σ VBVA          CFO = Σ CFA          Num_Amb = nº ambientes
 (VBVO precisa existir antes do rateio de viagem em cada VBNA)
 VBNO = Σ VBNA          VAVO = Σ VAVA
 
-# comissão EM CADEIA, por ambiente (arq não ganha sobre fid; ambos excluem os
-# custos viagem/brinde que estão dentro do VAVA quando repassados — Tog_Cadi):
-#   custo_em_vava = (Tog_Cadi ? Cust_Via·(VBVA/VBVO) + Bri/Num_Amb : 0)   [cada parcela gated pelo seu toggle]
-#   Pro_Fid_Amb = (Tog_Fid  ? %Pro_Fid · (VAVA − custo_em_vava) : 0)
-#   Com_Arq_Amb = (Tog_Carq ? %Com_Arq · (VAVA − Pro_Fid_Amb − custo_em_vava) : 0)
+# comissão EM CADEIA, por ambiente (arq não ganha sobre fid; e nem arq nem fid
+# ganham sobre viagem/brinde — a base SEMPRE exclui esses custos, repassados ou absorvidos):
+#   base_custos = (Tog_Cvia ? Cust_Via·(VBVA/VBVO) : 0) + (Tog_Bri ? Bri/Num_Amb : 0)
+#   Pro_Fid_Amb = (Tog_Fid  ? %Pro_Fid · (VAVA − base_custos) : 0)
+#   Com_Arq_Amb = (Tog_Carq ? %Com_Arq · (VAVA − Pro_Fid_Amb − base_custos) : 0)
 Com_Arq_Orc = Σ Com_Arq_Amb
 Pro_Fid_Orc = Σ Pro_Fid_Amb
 Cust_Ad = Com_Arq_Orc + Pro_Fid_Orc + (Tog_Cvia ? Cust_Via : 0) + (Tog_Bri ? Bri : 0)
