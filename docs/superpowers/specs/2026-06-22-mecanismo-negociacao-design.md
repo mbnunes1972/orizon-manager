@@ -102,8 +102,9 @@ Por ambiente:
 ```
 Se Tog_Cadi (repassa ao cliente):
    VBNA = VBVA / [ (Tog_Carq ? 1−%Com_Arq : 1) · (Tog_Fid ? 1−%Pro_Fid : 1) ]
-        + (Tog_Cvia ? Cust_Via · (VBVA/VBVO) / [ (1−%Desc_Orc)·(1−%Desc_Amb) ] : 0)
-        + (Tog_Bri  ? Bri / Num_Amb : 0)
+        + [ (Tog_Cvia ? Cust_Via · (VBVA/VBVO) : 0) + (Tog_Bri ? Bri/Num_Amb : 0) ]
+          / [ (1−%Desc_Orc)·(1−%Desc_Amb) ]
+   # viagem E brinde dentro do colchete /[(1-desc)] → blindados do desconto (recuperados 100%)
 Senão (absorve):
    VBNA = VBVA
 
@@ -232,15 +233,18 @@ Entrada: 2 ambientes — Área Gourmet (`VBVA` 22.830,99 / `CFA` 22.830,99) e Ba
 
 | Saída | Valor esperado |
 |---|---|
-| Área Gourmet — `VBNA` / `VAVA` | 28.375,43 / 22.700,35 |
-| Banheiro Social — `VBNA` / `VAVA` | 3.515,14 / 2.812,11 |
+| Área Gourmet — `VBNA` / `VAVA` | 28.437,93 / 22.750,34 |
+| Banheiro Social — `VBNA` / `VAVA` | 3.577,64 / 2.862,11 |
 | `VBVO` / `CFO` | 25.481,49 / 23.784,39 |
-| `VBNO` / `VAVO` | 31.890,58 / 25.512,46 |
-| `Cust_Ad` (Com_Arq 2.551,25 + Pro_Fid 510,25 + Cust_Via 2.000 + Bri 500) | 5.561,50 |
-| `Val_Liq` | 19.950,97 |
-| `%Desc_Tot` | 21,70% |
-| `Markup` | 0,839 |
-| `Cust_Fin` / `Val_Cont` | 1.413,44 / **26.925,90** (= `valor_total` armazenado ✅) |
+| `VBNO` / `VAVO` | 32.015,58 / 25.612,46 |
+| `Cust_Ad` (Com_Arq 2.561,25 + Pro_Fid 512,25 + Cust_Via 2.000 + Bri 500) | 5.573,50 |
+| `Val_Liq` | 20.038,97 |
+| `%Desc_Tot` | 21,36% |
+| `Markup` | 0,843 |
+| `Cust_Fin` / `Val_Cont` | no fluxo real `Cust_Fin = valor_total − VAVO` ⇒ `Val_Cont = valor_total` armazenado (**26.925,90**) |
+
+> Brinde blindado do desconto (correção): `Bri/Num_Amb` entra **dentro** do colchete
+> `/[(1−%Desc_Orc)·(1−%Desc_Amb)]`, junto da viagem — recuperado 100% após o desconto.
 
 Este caso vira o teste unitário-âncora do `mod_negociacao`.
 

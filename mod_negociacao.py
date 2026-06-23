@@ -42,10 +42,12 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0):
         if tog_cadi:
             fator_com = (1 - pct_arq if tog_carq else 1.0) * (1 - pct_fid if tog_fid else 1.0)
             termo_arqfid = (vbva / fator_com) if fator_com > 0 else vbva
-            termo_via = ((cust_via * (vbva / VBVO)) / fator_desc) \
-                if (tog_cvia and VBVO > 0 and fator_desc > 0) else 0.0
-            termo_bri = (bri / num_amb) if (tog_bri and num_amb) else 0.0
-            vbna = termo_arqfid + termo_via + termo_bri
+            # viagem (rateada) + brinde (igual/amb), AMBOS blindados do desconto
+            # pelo /fator_desc — para serem recuperados 100% após o desconto.
+            num_via = (cust_via * (vbva / VBVO)) if (tog_cvia and VBVO > 0) else 0.0
+            num_bri = (bri / num_amb) if (tog_bri and num_amb) else 0.0
+            termo_via_bri = ((num_via + num_bri) / fator_desc) if fator_desc > 0 else 0.0
+            vbna = termo_arqfid + termo_via_bri
         else:
             vbna = vbva
         vava = vbna * fator_desc

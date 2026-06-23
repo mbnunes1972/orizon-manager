@@ -11,14 +11,23 @@ AMBS = [{"VBVA": 22830.99, "CFA": 22830.99, "desc_amb_pct": 0.0},
 def _ap(a, b, tol=0.02): assert abs(a - b) <= tol, f"{a} != {b}"
 
 def test_leleu_ancora():
+    # brinde blindado do desconto (dentro do colchete /[(1-desc)] junto da viagem)
     r = mn.calcular_orcamento(AMBS, PARAMS, 20.0, cust_fin=1413.44)
     _ap(r["VBVO"], 25481.49); _ap(r["CFO"], 23784.39)
-    _ap(r["VBNO"], 31890.58); _ap(r["VAVO"], 25512.46)
-    _ap(r["Cust_Ad"], 5561.50); _ap(r["Val_Liq"], 19950.97)
-    _ap(r["Desc_Tot"] * 100, 21.70, tol=0.05); _ap(r["Markup"], 0.839, tol=0.002)
-    _ap(r["Val_Cont"], 26925.90); _ap(r["Prov_Imp"], 0.08 * r["Val_Cont"], tol=0.05)
+    _ap(r["VBNO"], 32015.58); _ap(r["VAVO"], 25612.46)
+    _ap(r["Cust_Ad"], 5573.50); _ap(r["Val_Liq"], 20038.97)
+    _ap(r["Desc_Tot"] * 100, 21.36, tol=0.05); _ap(r["Markup"], 0.843, tol=0.002)
+    _ap(r["Val_Cont"], r["VAVO"] + 1413.44); _ap(r["Prov_Imp"], 0.08 * r["Val_Cont"], tol=0.05)
     ag = r["ambientes"][0]
-    _ap(ag["VBNA"], 28375.43); _ap(ag["VAVA"], 22700.35)
+    _ap(ag["VBNA"], 28437.93); _ap(ag["VAVA"], 22750.34)
+
+def test_brinde_blindado_do_desconto():
+    # brinde repassado (Tog_Cadi) deve ser recuperado 100% mesmo com desconto:
+    # o líquido com só brinde deve igualar o líquido sem custo nenhum.
+    ambs = [{"VBVA": 1000.0, "CFA": 400.0, "desc_amb_pct": 0.0}]
+    so_brinde = {"incluir_custos": True, "brinde": 100.0, "brinde_ativo": True}
+    r = mn.calcular_orcamento(ambs, so_brinde, 20.0)
+    _ap(r["Val_Liq"], 800.0)            # 1000*(1-0.20) — brinde totalmente recuperado
 
 def test_tog_cadi_off_absorve():
     # sem gross-up: VBNA = VBVA; custos ainda abatem o líquido
