@@ -5338,62 +5338,19 @@ function mpAtualizarApoio(){
   if(_orcamentoAtivoId !== null){
     const orcAmbs = _orcAmbientesAtivos || [];
     const id = s => document.getElementById(s);
-    const incluirCustos = id('mp-incluir-custos')?.checked || false;
-    const arqAtiva  = id('mp-arq-ativa').checked;
-    const arqPct    = arqAtiva  ? (parseFloat(id('mp-arq-pct').value)||0)  : 0;
-    const fidAtiva  = id('mp-fid-ativa').checked;
-    const fidPct    = fidAtiva  ? (parseFloat(id('mp-fid-pct').value)||0)  : 0;
+    // EP-07: o MOTOR (preview) é a FONTE ÚNICA de bruto/desconto/à vista/arq/fid/líquido/
+    // margem/impostos. NÃO recalcular aqui (senão o legado sobrescreve o preview no apoio).
+    if(!orcAmbs.length){ id('mp-apoio').style.display='none'; return; }
+    id('mp-apoio').style.display='block';
+    // viagem/brinde: ecos dos inputs (o motor os inclui em Cust_Ad); desconto %: eco do input
     const viagAtiva = id('mp-fora-sede').checked;
-    const viagVal   = viagAtiva ? (parseFloat(id('mp-viagem').value)||0)   : 0;
+    const viagVal   = viagAtiva ? (parseFloat(id('mp-viagem').value)||0) : 0;
     const brdAtivo  = id('mp-brinde-ativo').checked;
-    const brdVal    = brdAtivo  ? (parseFloat(id('mp-brinde').value)||0)   : 0;
-    const descPct   = parseFloat(id('mp-desconto').value)||0;
-    // Gross-up e desconto individual por ambiente (igual a renderTabelaNeg EP-07)
-    const n_ambs  = orcAmbs.length || 1;
-    const viag_por = viagAtiva && viagVal > 0 ? viagVal/n_ambs : 0;
-    const brd_por  = brdAtivo  && brdVal  > 0 ? brdVal/n_ambs  : 0;
-    let totalBruto = 0, totalAvista = 0;
-    orcAmbs.forEach(pa => {
-      let b = pa.budget_total || 0;
-      if(incluirCustos){
-        if(arqAtiva && arqPct > 0) b = b / (1 - arqPct/100);
-        if(fidAtiva && fidPct > 0) b = b / (1 - fidPct/100);
-        b += viag_por + brd_por;
-      }
-      b = rnd(b);
-      totalBruto += b;
-      const disc_i = parseFloat(_descIndividual['ep07_'+pa.id]) || 0;
-      totalAvista += rnd(b * (1-descPct/100) * (1-disc_i/100));
-    });
-    const bruto  = rnd(totalBruto);
-    const avista = rnd(totalAvista);
-    if(!bruto){ document.getElementById('mp-apoio').style.display='none'; return; }
-    document.getElementById('mp-apoio').style.display='block';
-    const descVal  = rnd(bruto-avista);
-    let saldo = avista;
-    const vViag = rnd(viagVal); saldo = rnd(saldo-vViag);
-    const vBrd  = rnd(brdVal);  saldo = rnd(saldo-vBrd);
-    const vArq  = rnd(saldo*arqPct/100); saldo = rnd(saldo-vArq);
-    const vFid  = rnd(saldo*fidPct/100);
-    const liquido = rnd(saldo-vFid);
-    const bruto0  = orcAmbs.reduce((s,pa)=>s+(pa.budget_total||0), 0);
-    const margem  = bruto0 > 0 ? rnd((bruto0-liquido)/bruto0*100) : 0;
-    _margemAtual  = margem;
-    id('mp-a-bruto').textContent    = 'R$ '+fmt(bruto);
-    id('mp-a-desc-pct').textContent = descPct.toLocaleString('pt-BR');
-    id('mp-a-desc').textContent     = '− R$ '+fmt(descVal);
-    id('mp-a-avista').textContent   = 'R$ '+fmt(avista);
-    id('mp-a-arq').textContent      = arqAtiva  ? '− R$ '+fmt(vArq)  : 'R$ 0,00';
-    id('mp-a-fid').textContent      = fidAtiva  ? '− R$ '+fmt(vFid)  : 'R$ 0,00';
-    id('mp-a-viagem').textContent   = viagAtiva ? '− R$ '+fmt(vViag) : 'R$ 0,00';
-    id('mp-a-brinde').textContent   = brdAtivo  ? '− R$ '+fmt(vBrd)  : 'R$ 0,00';
-    id('mp-a-liq').textContent      = 'R$ '+fmt(liquido);
-    id('mp-a-margem').textContent   = margem.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
-    _atualizarImpostos('ay',avista); _atualizarImpostos('cc',avista);
-    _atualizarImpostos('vp',avista); _atualizarImpostos('tf',avista);
-    // ── cutover Fase B: o MOTOR é a fonte única — sobrepõe os displays acima ──
-    // (o cálculo legado acima fica como feedback instantâneo até o preview chegar)
-    agendarPreview();
+    const brdVal    = brdAtivo  ? (parseFloat(id('mp-brinde').value)||0) : 0;
+    id('mp-a-viagem').textContent   = viagAtiva ? '− R$ '+fmt(viagVal) : 'R$ 0,00';
+    id('mp-a-brinde').textContent   = brdAtivo  ? '− R$ '+fmt(brdVal)  : 'R$ 0,00';
+    id('mp-a-desc-pct').textContent = (parseFloat(id('mp-desconto').value)||0).toLocaleString('pt-BR');
+    agendarPreview();   // motor preenche os demais campos do apoio (e os totais da tela)
     return;
   }
   const ambs = (projetoAtivo && projetoAtivo.ambientes) || [];
