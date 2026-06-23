@@ -423,7 +423,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
       <input type="number" id="neg-desconto" min="0" max="100" step="0.5" value="0"
              onfocus="this._prev=this.value"
-             oninput="negValidarLimiteDesconto(this.value); negSyncModal(this.value); agendarCalculo(); agendarSalvarDesconto(); agendarPreview()"
+             oninput="negValidarLimiteDesconto(this.value); agendarSalvarDesconto()"
              onkeydown="negDescontoKeydown(event,this)"
              onblur="salvarDescontoAutomatico()"
              class="sb-input-sm" style="width:60px;text-align:right">
@@ -1711,9 +1711,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div class="toggle-row">
       <span class="toggle-label" style="flex:1">Desconto de venda</span>
       <input type="number" class="toggle-input" id="mp-desconto" min="0" max="100" step="0.5" value="0"
-             onfocus="this._prev=this.value"
-             oninput="mpDescontoValidar(this); negSyncSidebar(this.value); agendarDiscriminacao()"
-             onkeydown="mpDescontoKeydown(event,this)">
+             readonly title="O desconto é editado na tela de negociação (fonte única)"
+             style="opacity:.7;cursor:not-allowed">
       <div id="mp-desc-hint" style="display:none;font-size:10px;color:var(--err);margin-top:4px;grid-column:1/-1"></div>
       <span class="toggle-unit">%</span>
     </div>
@@ -4736,13 +4735,10 @@ function renderTabelaNeg(ambientes = null){
     totalBruto =Math.round(totalBruto*100)/100;
     totalAvista=Math.round(totalAvista*100)/100;
     totalFinal =Math.round(totalFinal*100)/100;
-    const descVal=Math.round((totalBruto-totalAvista)*100)/100;
-    const upd={'neg-total':'R$ '+fmt(totalFinal),'neg-subtotal':'R$ '+fmt(totalBruto),
-               'neg-desc-val':'- R$ '+fmt(descVal),'neg-avista':'R$ '+fmt(totalAvista)};
-    Object.entries(upd).forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=v;});
-    const elF=document.getElementById('neg-total-final'); if(elF&&!elF._editando) elF.value=fmt(totalFinal);
+    // Os totais (neg-total/subtotal/desc/avista) e as células são escritos SÓ pelo MOTOR
+    // (via _aplicarPreviewNaTela). Aqui só montamos a estrutura das linhas.
     const cbAll=document.getElementById('neg-sel-all'); if(cbAll) cbAll.checked=!!ambientes.length;
-    agendarPreview();   // motor sobrepõe Valor Bruto/à Vista (fonte única) após o legado
+    agendarPreview();   // motor preenche Valor Bruto/à Vista/totais e células (fonte única)
     return;
   }
   // ── PATH LEGADO — comportamento EXATAMENTE igual ao anterior ─────────────
@@ -5235,7 +5231,43 @@ let _discrTimer = null;
 function agendarDiscriminacao(){
   clearTimeout(_discrTimer);
   _discrTimer = setTimeout(atualizarDiscriminacao, 400);
-  mpAtualizarApoio();  // atualiza painel de apoio em tempo real
+  mpAtualizarApoio();          // mostra o painel de apoio
+  agendarSalvarParametros();   // fonte única: edição de param no modal → auto-save → exibe
+}
+
+// Auto-save dos PARÂMETROS do modal (debounced). Backend recalcula e devolve o breakdown.
+let _mpSalvarTimer = null;
+function agendarSalvarParametros(){
+  clearTimeout(_mpSalvarTimer);
+  _mpSalvarTimer = setTimeout(salvarParametrosAuto, 500);
+}
+async function salvarParametrosAuto(){
+  if(!projetoAtivo || !_orcamentoAtivoId) return;
+  const id = s => document.getElementById(s);
+  const inc = id('mp-incluir-custos')?.checked || false;
+  _incluirCustos = inc;
+  const parametros = {
+    comissao_arq_ativa: id('mp-arq-ativa').checked,
+    comissao_arq_pct:   parseFloat(id('mp-arq-pct').value)||0,
+    fidelidade_ativa:   id('mp-fid-ativa').checked,
+    fidelidade_pct:     parseFloat(id('mp-fid-pct').value)||0,
+    fora_da_sede:       id('mp-fora-sede').checked,
+    custo_viagem:       parseFloat(id('mp-viagem').value)||0,
+    brinde_ativo:       id('mp-brinde-ativo').checked,
+    brinde:             parseFloat(id('mp-brinde').value)||0,
+    incluir_custos:     inc,
+    carga_trib:         parseFloat(id('mp-carga-trib').value)||0,
+  };
+  try{
+    const r = await fetch('/api/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/parametros',{
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(parametros),
+    });
+    const d = await r.json();
+    if(d.ok){
+      projetoAtivo.margens = Object.assign({}, projetoAtivo.margens||{}, parametros);
+      aplicarBreakdownResposta(d);   // exibe o breakdown do motor (fonte única)
+    }
+  }catch(e){ console.warn('salvarParametrosAuto:', e); }
 }
 async function mpSalvarComValidacao(){
   const desc = parseFloat(document.getElementById('mp-desconto').value) || 0;
@@ -5523,6 +5555,8 @@ function _aplicarPreviewNaTela(s) {
   setR('neg-desc-val', desc, '− ');                 // Desconto
   setR('neg-avista',   vavo);                        // Valor à Vista (alimenta o pagamento)
   setR('neg-total',    s.Val_Cont);                  // Total (à vista sem financiamento na prévia)
+  const elTF = id('neg-total-final');                // input editável do total de contrato
+  if (elTF && !elTF._editando) elTF.value = fmt(Number(s.Val_Cont) || 0);
   // ── células por ambiente: VAVA do motor, casadas pelo id do pool ──
   if (Array.isArray(s.ambientes)) {
     s.ambientes.forEach(a => {
