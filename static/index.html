@@ -5547,9 +5547,10 @@ function _aplicarPreviewNaTela(s) {
   _margemAtual = margem;   // usado pelo limite de 35%
   if (id('mp-a-margem')) id('mp-a-margem').textContent =
     margem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
-  // impostos/retenção do apoio: base = VAVO do motor (não o à vista legado)
+  // provisão de impostos: base = VALOR DE CONTRATO do motor (Val_Cont = VAVO + Cust_Fin)
+  const valCont = Number(s.Val_Cont) || vavo;
   if (typeof _atualizarImpostos === 'function')
-    ['ay', 'cc', 'vp', 'tf'].forEach(p => _atualizarImpostos(p, vavo));
+    ['ay', 'cc', 'vp', 'tf'].forEach(p => _atualizarImpostos(p, valCont));
   // ── tela de negociação (totais) ──
   setR('neg-subtotal', vbno);                       // Valor Bruto
   setR('neg-desc-val', desc, '− ');                 // Desconto
