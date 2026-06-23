@@ -4741,6 +4741,7 @@ function renderTabelaNeg(ambientes = null){
     Object.entries(upd).forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=v;});
     const elF=document.getElementById('neg-total-final'); if(elF&&!elF._editando) elF.value=fmt(totalFinal);
     const cbAll=document.getElementById('neg-sel-all'); if(cbAll) cbAll.checked=!!ambientes.length;
+    agendarPreview();   // motor sobrepõe Valor Bruto/à Vista (fonte única) após o legado
     return;
   }
   // ── PATH LEGADO — comportamento EXATAMENTE igual ao anterior ─────────────
@@ -5563,8 +5564,9 @@ function _aplicarPreviewNaTela(s) {
   _margemAtual = margem;   // usado pelo limite de 35%
   if (id('mp-a-margem')) id('mp-a-margem').textContent =
     margem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
-  // à vista que alimenta o cálculo de pagamento (mod_fin) = VAVO do motor
-  if (id('neg-avista')) id('neg-avista').textContent = 'R$ ' + fmt(Number(s.VAVO) || 0);
+  // tela de negociação: Valor Bruto (neg-subtotal) e Valor à Vista (neg-avista) do motor
+  if (id('neg-subtotal')) id('neg-subtotal').textContent = 'R$ ' + fmt(Number(s.VBNO) || 0);
+  if (id('neg-avista'))   id('neg-avista').textContent   = 'R$ ' + fmt(Number(s.VAVO) || 0);
 }
 
 function abrirModalParams(){
