@@ -1,7 +1,7 @@
 # Mecanismo de Negociação — Nomenclatura Fechada e Refatoração do Cálculo
 
 **Data:** 2026-06-22
-**Status:** Em revisão (design)
+**Status:** Aprovado — pronto para plano de implementação
 **Escopo:** Reorganizar o cálculo do **modal de parâmetros / negociação** sobre uma
 nomenclatura fechada, com cálculo **por ambiente** (depois agregado por orçamento), um
 único dono por parâmetro e os valores derivados canônicos persistidos. **Próxima fase:**
@@ -72,7 +72,7 @@ comissão (fases seguintes).
 | Forma de Entrada | texto | Pix / Cheque / Boleto / Cartão |
 | Valor / Data de Entrada | `Val_Ent` / Data | editável |
 | Datas / Valor de cada Parcela | Data / `Val_Parc` | conforme parcelamento |
-| Provisão de Impostos | `Prov_Imp` | informativo — **proposta:** `Prov_Imp = %Car_Trib × Val_Cont` (confirmar §11) |
+| Provisão de Impostos | `Prov_Imp` | informativo — `Prov_Imp = %Car_Trib × Val_Cont` |
 | Valor Bruto de Venda Orçamento | `VBVO` | `Σ VBVA` |
 | Custo Fábrica Orçamento | `CFO` | `Σ CFA` |
 | Valor Bruto Negociado Orçamento | `VBNO` | `Σ VBNA` |
@@ -126,7 +126,7 @@ Val_Liq  = VAVO − Cust_Ad
 Markup    = Val_Liq / CFO
 Cust_Fin  = (custo da modalidade de pagamento via mod_fin)
 Val_Cont  = VAVO + Cust_Fin
-Prov_Imp  = %Car_Trib × Val_Cont        # informativo (proposta — confirmar)
+Prov_Imp  = %Car_Trib × Val_Cont        # informativo
 ```
 
 **Semântica dos toggles (decidida):** o toggle individual diz "este custo existe?" (sempre
@@ -145,7 +145,7 @@ antes dos `VBNA`. Não há circularidade (o rateio usa valores de XML, não os n
 | **Orçamento (entrada)** | `orcamentos` (colunas) | `%Desc_Orc` (= `desconto_pct`), forma de pagamento (`forma_pagamento`/`negociacao_json`) |
 | **Orçamento (derivados materializados)** | `orcamentos` (colunas novas) | `VBVO, CFO, VBNO, VAVO, Cust_Ad, Val_Liq, %Desc_Tot, Markup, Cust_Fin, Val_Cont, Prov_Imp` |
 | **Ambiente (entrada)** | `pool_ambientes` (`budget_total`→`VBVA`, `order_total`→`CFA`) + `orcamento_ambientes.desconto_individual_pct` (→`%Desc_Amb`) | já existem |
-| **Ambiente (qualidade — §8)** | `pool_ambientes` (colunas novas) | `qa_selo` (ok/alerta/bloqueado), `qa_pct_sem_acrescimo`, `qa_markup_xml`, `qa_custo_sem_venda`, `qa_override_por_id`, `qa_override_motivo` |
+| **Ambiente (qualidade — §8)** | `pool_ambientes` (colunas novas) | `qa_selo` (ok/bloqueado), `qa_pct_sem_acrescimo`, `qa_markup_xml`, `qa_custo_sem_venda`, `qa_override_por_id`, `qa_override_motivo` |
 
 **Decisões de migração:**
 1. **Eliminar a duplicação:** os custos adicionais e toggles passam a viver **só** em
