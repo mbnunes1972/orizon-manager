@@ -5265,7 +5265,9 @@ async function salvarParametrosAuto(){
     const d = await r.json();
     if(d.ok){
       projetoAtivo.margens = Object.assign({}, projetoAtivo.margens||{}, parametros);
-      aplicarBreakdownResposta(d);   // exibe o breakdown do motor (fonte única)
+      // /parametros recalcula TODOS os orçamentos do projeto; exibe o do ATIVO via preview
+      // (a 'sombra' de /parametros é de um orçamento arbitrário do projeto, não o ativo).
+      await negPreview();
     }
   }catch(e){ console.warn('salvarParametrosAuto:', e); }
 }
