@@ -2564,6 +2564,36 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # ── POST /api/pool/<pid>/qa-override — liberar ambiente bloqueado ──────
+            m_qaov = _re.match(r"^/api/pool/(\d+)/qa-override$", path)
+            if m_qaov:
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "aprovar_financeiro"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                    return
+                req = json.loads(body) if body else {}
+                motivo = (req.get("motivo") or "").strip()
+                if not motivo:
+                    self.send_json({"ok": False, "erro": "Justificativa é obrigatória."})
+                    return
+                db = get_session()
+                try:
+                    pa = db.get(PoolAmbiente, int(m_qaov.group(1)))
+                    if not pa:
+                        self.send_json({"ok": False, "erro": "Ambiente não encontrado"}, code=404)
+                        return
+                    pa.qa_override_por_id = usuario["id"]
+                    pa.qa_override_motivo = motivo
+                    db.add(LogAcaoGerencial(
+                        autorizador_id=usuario["id"], acao="qa_override",
+                        projeto_nome=pa.projeto_id,
+                        contexto=json.dumps({"pool_ambiente_id": pa.id, "motivo": motivo})))
+                    db.commit()
+                    self.send_json({"ok": True})
+                finally:
+                    db.close()
+                return
+
             # ── POST /orcamentos/<oid>/ambientes/<pid> — adicionar ambiente ──────────
             m_add = _re.match(r"^/orcamentos/(\d+)/ambientes/(\d+)$", path)
             if m_add:

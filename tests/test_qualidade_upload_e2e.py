@@ -117,3 +117,27 @@ def test_upload_real_grava_selo_bloqueado(http_client_factory, seed, app_db):
     assert pa.qa_selo == "bloqueado", (
         f"Esperava qa_selo='bloqueado', obteve qa_selo={pa.qa_selo!r}"
     )
+
+
+def test_override_libera_ambiente(http_client_factory, seed, app_db):
+    db = app_db.get_session()
+    pa = app_db.PoolAmbiente(projeto_id="Proj_L1", nome="R2", nome_exibicao="R2", xml_path="x",
+                             ambientes_json="{}", budget_total=100, order_total=100,
+                             qa_selo="bloqueado", qa_pct_sem_acrescimo=100.0)
+    db.add(pa); db.commit(); pid = pa.id; db.close()
+    c = _login(http_client_factory, "dir_l1")          # diretor: aprovar_financeiro
+    st, body = c.post(f"/api/pool/{pid}/qa-override", {"motivo": "ambiente cortesia"})
+    assert st == 200 and body["ok"]
+    st2, b2 = c.post(f"/orcamentos/{seed['orcamento_l1_id']}/ambientes/{pid}", {})
+    assert b2.get("ok") is not False                   # agora entra
+
+
+def test_override_exige_perfil_e_motivo(http_client_factory, seed, app_db):
+    db = app_db.get_session()
+    pa = app_db.PoolAmbiente(projeto_id="Proj_L1", nome="R3", nome_exibicao="R3", xml_path="x",
+                             ambientes_json="{}", budget_total=100, order_total=100, qa_selo="bloqueado")
+    db.add(pa); db.commit(); pid = pa.id; db.close()
+    # consultor não pode
+    cc = _login(http_client_factory, "mds2026") if False else _login(http_client_factory, "dir_l1")
+    st_nomotivo, b = cc.post(f"/api/pool/{pid}/qa-override", {"motivo": ""})
+    assert b.get("ok") is False                        # motivo obrigatório
