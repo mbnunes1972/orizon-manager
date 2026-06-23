@@ -51,8 +51,6 @@ comissão (fases seguintes).
 |---|---|---|
 | Percentual de Comissão Arquiteto | `%Com_Arq` | percentual editável no modal |
 | Percentual Programa Fidelidade | `%Pro_Fid` | percentual editável no modal |
-| Comissão Arquiteto (valor) | `Com_Arq` | `Com_Arq = %Com_Arq × VAVA` |
-| Programa Fidelidade (valor) | `Pro_Fid` | `Pro_Fid = %Pro_Fid × VAVA` |
 | Custo Viagem | `Cust_Via` | valor editável no modal |
 | Brinde | `Bri` | valor editável no modal |
 | Toggle Custos Adicionais (master) | `Tog_Cadi` | true: repassa custos ao cliente (gross-up no VBNA); false: `VBNA = VBVA` (loja absorve) |
@@ -61,7 +59,6 @@ comissão (fases seguintes).
 | Toggle Custo Viagem | `Tog_Cvia` | idem (rateado proporcionalmente por `VBVA/VBVO`) |
 | Toggle Brinde | `Tog_Bri` | idem (dividido **igualmente** por ambiente: `Bri/Num_Amb`) |
 | Percentual Carga Tributária | `%Car_Trib` | percentual editável — **meramente informativo** na negociação |
-| Custos Adicionais | `Cust_Ad` | `Cust_Ad = Com_Arq + Pro_Fid + Cust_Via + Bri` (cada parcela só se seu toggle = true) |
 
 ### 3.2 Variáveis do Orçamento
 | Variável | Sigla | Definição |
@@ -83,6 +80,9 @@ comissão (fases seguintes).
 | Valor Líquido de Contrato | `Val_Liq` | `Val_Liq = VAVO − Cust_Ad` |
 | Desconto Total | `%Desc_Tot` | `%Desc_Tot = (VBVO − Val_Liq) / VBVO` |
 | Markup | `Markup` | `Markup = Val_Liq / CFO` |
+| Comissão Arquiteto (orçamento) | `Com_Arq_Orc` | `Σ Com_Arq_Amb` |
+| Programa Fidelidade (orçamento) | `Pro_Fid_Orc` | `Σ Pro_Fid_Amb` |
+| Custos Adicionais | `Cust_Ad` | `Cust_Ad = Com_Arq_Orc + Pro_Fid_Orc + Cust_Via + Bri` (cada parcela só se seu toggle = true) |
 
 ### 3.3 Variáveis do Ambiente
 | Variável | Sigla | Definição |
@@ -92,6 +92,8 @@ comissão (fases seguintes).
 | Custo Fábrica Ambiente | `CFA` | Σ custos de fábrica c/ frete do XML (`pool_ambientes.order_total`) |
 | Valor Bruto Negociado Ambiente | `VBNA` | fórmula condicional — §4 |
 | Valor à Vista Ambiente | `VAVA` | `VAVA = VBNA × (1−%Desc_Orc) × (1−%Desc_Amb)` |
+| Programa Fidelidade (ambiente) | `Pro_Fid_Amb` | `%Pro_Fid × [ VAVA − Cust_Via·(VBVA/VBVO) − Bri/Num_Amb ]` |
+| Comissão Arquiteto (ambiente) | `Com_Arq_Amb` | `%Com_Arq × [ VAVA − Pro_Fid_Amb − Cust_Via·(VBVA/VBVO) − Bri/Num_Amb ]` — em cadeia: arq **não** ganha sobre a fidelidade |
 
 ---
 
@@ -118,9 +120,14 @@ VBVO = Σ VBVA          CFO = Σ CFA          Num_Amb = nº ambientes
 (VBVO precisa existir antes do rateio de viagem em cada VBNA)
 VBNO = Σ VBNA          VAVO = Σ VAVA
 
-Com_Arq = (Tog_Carq ? %Com_Arq × VAVO : 0)     # comissão sobre o à vista
-Pro_Fid = (Tog_Fid  ? %Pro_Fid × VAVO : 0)
-Cust_Ad = Com_Arq + Pro_Fid + (Tog_Cvia ? Cust_Via : 0) + (Tog_Bri ? Bri : 0)
+# comissão EM CADEIA, por ambiente (arq não ganha sobre fid; ambos excluem os
+# custos viagem/brinde que estão dentro do VAVA quando repassados — Tog_Cadi):
+#   custo_em_vava = (Tog_Cadi ? Cust_Via·(VBVA/VBVO) + Bri/Num_Amb : 0)   [cada parcela gated pelo seu toggle]
+#   Pro_Fid_Amb = (Tog_Fid  ? %Pro_Fid · (VAVA − custo_em_vava) : 0)
+#   Com_Arq_Amb = (Tog_Carq ? %Com_Arq · (VAVA − Pro_Fid_Amb − custo_em_vava) : 0)
+Com_Arq_Orc = Σ Com_Arq_Amb
+Pro_Fid_Orc = Σ Pro_Fid_Amb
+Cust_Ad = Com_Arq_Orc + Pro_Fid_Orc + (Tog_Cvia ? Cust_Via : 0) + (Tog_Bri ? Bri : 0)
 
 Val_Liq  = VAVO − Cust_Ad
 %Desc_Tot = (VBVO − Val_Liq) / VBVO
@@ -233,18 +240,21 @@ Entrada: 2 ambientes — Área Gourmet (`VBVA` 22.830,99 / `CFA` 22.830,99) e Ba
 
 | Saída | Valor esperado |
 |---|---|
-| Área Gourmet — `VBNA` / `VAVA` | 28.437,93 / 22.750,34 |
+| Área Gourmet — `VBNA` / `VAVA` | 28.437,93 / 22.750,35 |
 | Banheiro Social — `VBNA` / `VAVA` | 3.577,64 / 2.862,11 |
 | `VBVO` / `CFO` | 25.481,49 / 23.784,39 |
 | `VBNO` / `VAVO` | 32.015,58 / 25.612,46 |
-| `Cust_Ad` (Com_Arq 2.561,25 + Pro_Fid 512,25 + Cust_Via 2.000 + Bri 500) | 5.573,50 |
-| `Val_Liq` | 20.038,97 |
-| `%Desc_Tot` | 21,36% |
-| `Markup` | 0,843 |
+| `Com_Arq_Orc` / `Pro_Fid_Orc` | 2.265,02 / 462,25 |
+| `Cust_Ad` (Com_Arq_Orc 2.265,02 + Pro_Fid_Orc 462,25 + Cust_Via 2.000 + Bri 500) | 5.227,27 |
+| `Val_Liq` | **20.385,19** (= líquido sem custo, VBVO×0,80 — proteção total) |
+| `%Desc_Tot` | **20,00%** (= `%Desc_Orc` — todos os custos repassados ao cliente) |
+| `Markup` | 0,857 |
 | `Cust_Fin` / `Val_Cont` | no fluxo real `Cust_Fin = valor_total − VAVO` ⇒ `Val_Cont = valor_total` armazenado (**26.925,90**) |
 
-> Brinde blindado do desconto (correção): `Bri/Num_Amb` entra **dentro** do colchete
-> `/[(1−%Desc_Orc)·(1−%Desc_Amb)]`, junto da viagem — recuperado 100% após o desconto.
+> **Blindagem + comissão em cadeia:** viagem e brinde entram **dentro** do colchete
+> `/[(1−%Desc_Orc)·(1−%Desc_Amb)]` (blindados do desconto); a comissão é por ambiente e em
+> cadeia (arq não ganha sobre fid; ambos excluem viagem/brinde). Resultado: com tudo
+> repassado, `Val_Liq` = líquido sem custo e `%Desc_Tot` = `%Desc_Orc`.
 
 Este caso vira o teste unitário-âncora do `mod_negociacao`.
 
