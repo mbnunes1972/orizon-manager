@@ -176,6 +176,32 @@
 
 ## HISTÓRICO
 
+### Sessão 2026-06-23 (sessão 26 — Motor de Negociação em MODO SOMBRA — Task 8: golden-master)
+**Processo:** Task 8 (última) do plano de refatoração do motor de negociação (`feat/motor-negociacao-sombra`). Golden-master: fotografia dos valores HOJE × NOVO para baseline de validação.
+
+**Motor e trava:**
+- **`mod_negociacao`** em **MODO SOMBRA**: motor de negociação calcula os derivados (`vavo`, `val_liq`, `markup`, `val_cont`, `desc_tot_pct`) e os grava nas colunas sombra — sem alterar `valor_total`/`valor_liquido` (legado intacto).
+- **`mod_qualidade_xml`** — trava de qualidade em modo sombra: bloqueia upload de XML com itens sem acréscimo/markup abaixo do limiar, com mecanismo de override gerencial (Tasks 2/4/5).
+- Colunas aditivas (Tasks 3/6): `vbvo`, `cfo`, `vbno`, `vavo`, `cust_ad`, `val_liq`, `desc_tot_pct`, `markup`, `cust_fin`, `val_cont`, `prov_imp` — adicionadas via `_migrar_colunas()`, sem remover nada.
+- **Tag de rollback:** `pre-refator-negociacao` — restaura estado anterior a qualquer mudança destrutiva.
+
+**Golden-master:**
+- Script: `scripts/snapshot_negociacao.py` — lê todos os `Orcamento` e grava `tests/golden/negociacao_baseline.json` com `{id, projeto, ordem, hoje:{valor_total, valor_liquido}, novo:{vavo, val_liq, markup, val_cont, desc_tot_pct}}`.
+- Baseline gerado: **20 orçamentos** — campos `novo` zerados (motor sombra ainda não rodou o `save` de validação nos dados reais; será re-gerado após o primeiro save na interface).
+- Arquivo commitado em `tests/golden/negociacao_baseline.json` para servir de referência na fase de validação.
+
+**O que fica fora desta fase (após validação na interface):**
+- **Fase B (cutover):** contrato/UI passam a usar os valores novos; integração plena `Cust_Fin` via `mod_fin.calcular(...)`; mover params duplicados de `orcamentos.margens` para o projeto.
+- **Fase C (limpeza):** aposentar `orcamentos.valor_liquido`/bloco `margens`; remover `custo_financeiro_pct` duplicado de `mod_margens`.
+- Comportamento atual (legado) permanece intacto durante toda a Fase A.
+
+**Arquivos criados/modificados nesta sessão:**
+- `scripts/snapshot_negociacao.py` (novo)
+- `tests/golden/negociacao_baseline.json` (novo — baseline de 20 orçamentos)
+- `DEV_LOG.md` (esta entrada)
+
+---
+
 ### Sessão 2026-06-21 (sessão 24 — F4: isolamento operacional) — **fecha o multi-tenant**
 **Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão de **segurança** + qualidade por task → verificação). Spec/plano em `docs/superpowers/specs/2026-06-21-multitenant-f4-isolamento-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f4-isolamento.md`. Branch `feat/multitenant-f4-isolamento` (16 commits).
 
