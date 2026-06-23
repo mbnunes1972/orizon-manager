@@ -22,7 +22,7 @@ def avaliar_qualidade_xml(itens, limiar_pct=5.0):
             continue
         sum_b += b
         sum_o += o
-        if b <= o * 1.0001:                     # vendido no custo ou abaixo
+        if b <= o * 1.0001:                     # tolerância de arredondamento de float (~0,01%) para "vendido no custo"
             sum_b_sem_acr += b
     markup = (sum_b / sum_o) if sum_o > 0 else 0.0
     pct_sem = (sum_b_sem_acr / sum_b * 100.0) if sum_b > 0 else 0.0

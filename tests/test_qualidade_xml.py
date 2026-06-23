@@ -1,6 +1,10 @@
 # tests/test_qualidade_xml.py
-import os, xml.etree.ElementTree as ET
+import os
+import pytest
 import mod_qualidade_xml as q
+
+_LELEU_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "PROJETOS", "LELEU", "xmls")
+_skip_leleu = pytest.mark.skipif(not os.path.isdir(_LELEU_DIR), reason="XMLs LELEU nao versionados (PROJETOS/ no .gitignore)")
 
 def test_acrescimo_zerado_bloqueia():
     itens = [{"order_total": 100.0, "budget_total": 100.0},   # markup 1.0
@@ -32,10 +36,12 @@ def _itens_do_xml(nome):
     amb = ler_xml(os.path.join("PROJETOS", "LELEU", "xmls", nome))
     return [it for g in amb.get("grupos", []) for it in g.get("itens", [])]
 
+@_skip_leleu
 def test_leleu_area_gourmet_bloqueia():
     r = q.avaliar_qualidade_xml(_itens_do_xml("Area Gourmet.xml"))
     assert r["qa_selo"] == "bloqueado"
 
+@_skip_leleu
 def test_leleu_banheiro_ok():
     r = q.avaliar_qualidade_xml(_itens_do_xml("Banheiro Social.xml"))
     assert r["qa_selo"] == "ok"
