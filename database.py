@@ -303,6 +303,13 @@ class PoolAmbiente(Base):
     ambientes_json = Column(Text,     nullable=False)
     budget_total   = Column(Float,    nullable=False, default=0.0)
     order_total    = Column(Float,    nullable=False, default=0.0)
+    # ── qualidade do XML (spec §8) ──
+    qa_selo               = Column(String,  nullable=True)
+    qa_pct_sem_acrescimo  = Column(Float,   nullable=True)
+    qa_markup_xml         = Column(Float,   nullable=True)
+    qa_custo_sem_venda    = Column(Integer, nullable=True)
+    qa_override_por_id    = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    qa_override_motivo    = Column(String,  nullable=True)
     created_by     = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     created_at     = Column(DateTime, default=datetime.utcnow)
 
@@ -325,6 +332,18 @@ class Orcamento(Base):
     negociacao_json = Column(Text,     nullable=True)   # snapshot das entradas da negociação (JSON)
     valor_total     = Column(Float,    default=0.0)
     valor_liquido   = Column(Float,    default=0.0)
+    # ── derivados do motor de negociação (modo sombra — spec §5) ──
+    vbvo         = Column(Float, default=0.0)
+    cfo          = Column(Float, default=0.0)
+    vbno         = Column(Float, default=0.0)
+    vavo         = Column(Float, default=0.0)
+    cust_ad      = Column(Float, default=0.0)
+    val_liq      = Column(Float, default=0.0)
+    desc_tot_pct = Column(Float, default=0.0)
+    markup       = Column(Float, default=0.0)
+    cust_fin     = Column(Float, default=0.0)
+    val_cont     = Column(Float, default=0.0)
+    prov_imp     = Column(Float, default=0.0)
     created_by      = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, nullable=True)
@@ -501,6 +520,25 @@ def _migrar_colunas():
         ]:
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")
+
+        # ── orcamentos: derivados do motor de negociação (modo sombra) ──
+        cur.execute("PRAGMA table_info(orcamentos)")
+        orc_cols = {row[1] for row in cur.fetchall()}
+        for col in ("vbvo", "cfo", "vbno", "vavo", "cust_ad", "val_liq",
+                    "desc_tot_pct", "markup", "cust_fin", "val_cont", "prov_imp"):
+            if col not in orc_cols:
+                cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} REAL DEFAULT 0")
+
+        # ── pool_ambientes: qualidade do XML ──
+        cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pool_ambientes'")
+        if cur.fetchone() is not None:
+            cur.execute("PRAGMA table_info(pool_ambientes)")
+            pa_cols = {row[1] for row in cur.fetchall()}
+            for col, tipo in [("qa_selo", "VARCHAR(20)"), ("qa_pct_sem_acrescimo", "REAL"),
+                              ("qa_markup_xml", "REAL"), ("qa_custo_sem_venda", "INTEGER"),
+                              ("qa_override_por_id", "INTEGER"), ("qa_override_motivo", "TEXT")]:
+                if col not in pa_cols:
+                    cur.execute(f"ALTER TABLE pool_ambientes ADD COLUMN {col} {tipo}")
 
         # ── orcamento_ambientes ───────────────────────────────────────────────
         cur.execute("PRAGMA table_info(orcamento_ambientes)")
