@@ -1989,35 +1989,12 @@ class Handler(BaseHTTPRequestHandler):
                     orc.desconto_pct = float(req["desconto_pct"])
                 orc.margens = json.dumps(atual, ensure_ascii=False)
                 db.commit()
-                # ── modo sombra: materializa derivados do motor de negociação ──
-                # Bloco NÃO-INTRUSIVO: falhas aqui não afetam o save legado nem a resposta.
-                # Roda ANTES do send_json — quando a resposta chega ao cliente os derivados
-                # já estão gravados (o servidor é single-thread).
                 try:
-                    import mod_negociacao
-                    proj = db.query(Projeto).filter_by(nome_safe=orc.projeto_id).first()
-                    params = json.loads(proj.parametros_json) if (proj and proj.parametros_json) else {}
-                    ambs = []
-                    for lk in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all():
-                        pa = db.get(PoolAmbiente, lk.pool_ambiente_id)
-                        if pa:
-                            ambs.append({"VBVA": pa.budget_total or 0.0, "CFA": pa.order_total or 0.0,
-                                         "desc_amb_pct": lk.desconto_individual_pct or 0.0})
-                    # Padrão de duas chamadas: 1ª para obter VAVO, 2ª com cust_fin real
-                    d0 = mod_negociacao.calcular_orcamento(ambs, params, orc.desconto_pct or 0.0)
-                    cust_fin = max(0.0, (orc.valor_total or 0.0) - d0["VAVO"])
-                    d = mod_negociacao.calcular_orcamento(ambs, params, orc.desconto_pct or 0.0, cust_fin=cust_fin)
-                    orc.vbvo, orc.cfo, orc.vbno, orc.vavo = d["VBVO"], d["CFO"], d["VBNO"], d["VAVO"]
-                    orc.cust_ad, orc.val_liq = d["Cust_Ad"], d["Val_Liq"]
-                    orc.com_arq_orc, orc.pro_fid_orc = d["Com_Arq"], d["Pro_Fid"]
-                    orc.desc_tot_pct, orc.markup = d["Desc_Tot"], d["Markup"]
-                    orc.prov_imp = d["Prov_Imp"]
-                    orc.cust_fin = d["Cust_Fin"]
-                    orc.val_cont = d["Val_Cont"]
+                    _recalcular_orcamento(orc, db)
                     db.commit()
                 except Exception as _e:
                     db.rollback()
-                    print("[SOMBRA] falha ao materializar derivados:", _e)
+                    print("[CUTOVER] falha ao recalcular orçamento:", _e)
                 self.send_json({"ok": True, "margens": atual,
                                 "sombra": _sombra_dict(orc)})
             except Exception as e:
@@ -3649,15 +3626,17 @@ class Handler(BaseHTTPRequestHandler):
                                         "erro": "Contrato assinado — alterações não permitidas."},
                                        code=403)
                         return
-                    if "valor_total" in req:
-                        orc.valor_total = float(req["valor_total"] or 0)
-                    if "valor_liquido" in req:
-                        orc.valor_liquido = float(req["valor_liquido"] or 0)
+                    # backend autoritativo: NÃO aceita valor_total/valor_liquido do frontend
                     if "forma_pagamento" in req:
                         orc.forma_pagamento = req["forma_pagamento"] or None
                     if "negociacao_json" in req:
                         orc.negociacao_json = req["negociacao_json"] or None
                     orc.updated_at = datetime.utcnow()
+                    db.flush()                      # forma_pagamento disponível para o recálculo
+                    try:
+                        _recalcular_orcamento(orc, db)
+                    except Exception as _e:
+                        print("[CUTOVER] recalculo no PATCH falhou:", _e)
                     db.commit()
                     self.send_json({"ok": True})
                 except Exception as e:
@@ -4265,6 +4244,28 @@ def _negociacao_breakdown(orc, db, params=None, desc_orc=None, descontos_amb=Non
         cust_fin = max(0.0, float(total_cliente) - d0["VAVO"])
     d = mod_negociacao.calcular_orcamento(ambs, params, desc_orc, cust_fin=cust_fin)
     return d
+
+
+def _recalcular_orcamento(orc, db):
+    """Recalcula a negociação pelo motor e GRAVA: colunas sombra + valor_total/valor_liquido.
+    `valor_total` vem da modalidade (forma_pagamento.total_cliente, já calculada com o VAVO);
+    à vista ⇒ valor_total = VAVO. NÃO grava se contrato assinado (chamador já checa)."""
+    total_cliente = None
+    try:
+        fp = json.loads(orc.forma_pagamento) if orc.forma_pagamento else None
+        if isinstance(fp, dict) and fp.get("total_cliente"):
+            total_cliente = float(fp["total_cliente"])
+    except Exception:
+        total_cliente = None
+    d = _negociacao_breakdown(orc, db, total_cliente=total_cliente)
+    orc.vbvo, orc.cfo, orc.vbno, orc.vavo = d["VBVO"], d["CFO"], d["VBNO"], d["VAVO"]
+    orc.cust_ad, orc.val_liq = d["Cust_Ad"], d["Val_Liq"]
+    orc.com_arq_orc, orc.pro_fid_orc = d["Com_Arq"], d["Pro_Fid"]
+    orc.desc_tot_pct, orc.markup, orc.prov_imp = d["Desc_Tot"], d["Markup"], d["Prov_Imp"]
+    orc.cust_fin, orc.val_cont = d["Cust_Fin"], d["Val_Cont"]
+    # persistência autoritativa (cutover):
+    orc.valor_total = d["Val_Cont"]
+    orc.valor_liquido = d["Val_Liq"]
 
 
 def _get_usuario_telefone(usuario_id: int, db) -> str:
