@@ -137,7 +137,26 @@ def test_override_exige_perfil_e_motivo(http_client_factory, seed, app_db):
     pa = app_db.PoolAmbiente(projeto_id="Proj_L1", nome="R3", nome_exibicao="R3", xml_path="x",
                              ambientes_json="{}", budget_total=100, order_total=100, qa_selo="bloqueado")
     db.add(pa); db.commit(); pid = pa.id; db.close()
-    # consultor não pode
-    cc = _login(http_client_factory, "mds2026") if False else _login(http_client_factory, "dir_l1")
+    # dir_l1 tem aprovar_financeiro — valida que motivo vazio é rejeitado
+    cc = _login(http_client_factory, "dir_l1")
     st_nomotivo, b = cc.post(f"/api/pool/{pid}/qa-override", {"motivo": ""})
     assert b.get("ok") is False                        # motivo obrigatório
+
+
+def test_override_negado_sem_permissao(http_client_factory, seed, app_db):
+    """super_admin sem aprovar_financeiro recebe 403 ao tentar qa-override."""
+    db = app_db.get_session()
+    pa = app_db.PoolAmbiente(projeto_id="Proj_L1", nome="R4", nome_exibicao="R4", xml_path="x",
+                             ambientes_json="{}", budget_total=100, order_total=100,
+                             qa_selo="bloqueado", qa_pct_sem_acrescimo=100.0)
+    db.add(pa); db.commit(); pid = pa.id; db.close()
+    # super não tem aprovar_financeiro
+    c = _login(http_client_factory, "super")
+    st, body = c.post(f"/api/pool/{pid}/qa-override", {"motivo": "tentativa"})
+    assert body.get("ok") is False
+    assert st == 403
+    # confirma que o campo não foi preenchido
+    db2 = app_db.get_session()
+    pa2 = db2.query(app_db.PoolAmbiente).filter_by(id=pid).first()
+    db2.close()
+    assert pa2.qa_override_por_id is None
