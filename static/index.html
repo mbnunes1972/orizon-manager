@@ -1844,8 +1844,10 @@ let _removerAmbPending  = null; // { pid } aguardando confirmação
 let _orcSombra         = null; // derivados sombra do orçamento ativo (Task 7 — modo sombra)
 
 // ---- Limite de desconto total (35%) ----------------------------------------
-function _verificarLimiteDescTotal(){
-  if(_margemAtual > _LIMITE_DESC_TOTAL){
+async function _verificarLimiteDescTotal(){
+  await negPreview();   // garante o %Desc_Tot FRESCO do motor (não o legado)
+  const margem = _previewNeg ? (Number(_previewNeg.Desc_Tot) || 0) * 100 : _margemAtual;
+  if(margem > _LIMITE_DESC_TOTAL){
     showToast('Desconto total excede o limite máximo de descontos.', true);
     return false;
   }
@@ -1868,7 +1870,7 @@ async function _persistirDescontosOrc(){
 }
 
 // Blur do desconto individual: reverte se ultrapassar o limite total
-function _onDescIndBlur(el, key, isEP07){
+async function _onDescIndBlur(el, key, isEP07){
   if(el._esc) return;
   if(isEP07){
     renderTabelaNeg(_orcAmbientesAtivos);
@@ -1877,7 +1879,9 @@ function _onDescIndBlur(el, key, isEP07){
     negAtualizarDescontoEfetivo();
   }
   mpAtualizarApoio();
-  if(_margemAtual > _LIMITE_DESC_TOTAL){
+  await negPreview();   // %Desc_Tot fresco do motor
+  const _margem = _previewNeg ? (Number(_previewNeg.Desc_Tot) || 0) * 100 : _margemAtual;
+  if(_margem > _LIMITE_DESC_TOTAL){
     const prev = parseFloat(el._prev) || 0;
     _descIndividual[key] = prev;
     el.value = prev;
@@ -5238,9 +5242,8 @@ async function mpSalvarComValidacao(){
     const ok = await abrirModalAutorizacao(desc, max);
     if(!ok) return;
   }
-  // Bloqueia se o desconto total (bruto_original - liquido) / bruto_original > 35%
-  // _margemAtual é atualizado por mpAtualizarApoio() a cada mudança no modal
-  if(!_verificarLimiteDescTotal()) return;
+  // Bloqueia se o %Desc_Tot do MOTOR (preview fresco) exceder o limite de 35%
+  if(!(await _verificarLimiteDescTotal())) return;
   fecharModalParams(true);
 }
 
