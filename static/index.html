@@ -423,7 +423,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px">
       <input type="number" id="neg-desconto" min="0" max="100" step="0.5" value="0"
              onfocus="this._prev=this.value"
-             oninput="negValidarLimiteDesconto(this.value); negSyncModal(this.value); agendarCalculo(); agendarSalvarDesconto()"
+             oninput="negValidarLimiteDesconto(this.value); negSyncModal(this.value); agendarCalculo(); agendarSalvarDesconto(); agendarPreview()"
              onkeydown="negDescontoKeydown(event,this)"
              onblur="salvarDescontoAutomatico()"
              class="sb-input-sm" style="width:60px;text-align:right">
@@ -5516,7 +5516,12 @@ let _previewTimer = null;
 async function negPreview() {
   if (!_orcamentoAtivoId) return null;
   const id = x => document.getElementById(x);
-  const num = x => parseFloat(id(x)?.value) || 0;
+  // FONTE ÚNICA do desconto/params: o mesmo que a tela usa.
+  //  - modal ABERTO  (setup pré-negociação) → lerMargensModal() lê os inputs mp-* (mp-desconto)
+  //  - modal FECHADO (negociação ao vivo)   → lerMargensNegociacao() lê o neg-desconto + salvos
+  const modalAberto = id('modal-params')?.style.display === 'flex';
+  const m = modalAberto ? lerMargensModal() : lerMargensNegociacao();
+  const incluir = modalAberto ? (id('mp-incluir-custos')?.checked || false) : !!m.incluir_custos;
   // descontos por ambiente: _descIndividual usa chave 'ep07_<pool_id>' → manda <pool_id>
   const descAmb = {};
   Object.keys(_descIndividual || {}).forEach(k => {
@@ -5524,17 +5529,17 @@ async function negPreview() {
   });
   const body = {
     params: {
-      incluir_custos:     id('mp-incluir-custos')?.checked || false,
-      comissao_arq_ativa: id('mp-arq-ativa')?.checked || false,
-      comissao_arq_pct:   num('mp-arq-pct'),
-      fidelidade_ativa:   id('mp-fid-ativa')?.checked || false,
-      fidelidade_pct:     num('mp-fid-pct'),
-      fora_da_sede:       id('mp-fora-sede')?.checked || false,
-      custo_viagem:       num('mp-viagem'),
-      brinde_ativo:       id('mp-brinde-ativo')?.checked || false,
-      brinde:             num('mp-brinde'),
+      incluir_custos:     incluir,
+      comissao_arq_ativa: !!m.comissao_arq_ativa,
+      comissao_arq_pct:   m.comissao_arq_pct || 0,
+      fidelidade_ativa:   !!m.fidelidade_ativa,
+      fidelidade_pct:     m.fidelidade_pct || 0,
+      fora_da_sede:       !!m.fora_da_sede,
+      custo_viagem:       m.custo_viagem || 0,
+      brinde_ativo:       !!m.brinde_ativo,
+      brinde:             m.brinde || 0,
     },
-    desc_orc: num('mp-desconto'),
+    desc_orc: m.desconto_pct || 0,
     descontos_amb: descAmb,
   };
   try {
