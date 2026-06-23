@@ -35,6 +35,7 @@ def main():
             d = mod_negociacao.calcular_orcamento(ambs, params, o.desconto_pct or 0.0, cust_fin=cust_fin)
             o.vbvo, o.cfo, o.vbno, o.vavo = d["VBVO"], d["CFO"], d["VBNO"], d["VAVO"]
             o.cust_ad, o.val_liq = d["Cust_Ad"], d["Val_Liq"]
+            o.com_arq_orc, o.pro_fid_orc = d["Com_Arq"], d["Pro_Fid"]
             o.desc_tot_pct, o.markup, o.prov_imp = d["Desc_Tot"], d["Markup"], d["Prov_Imp"]
             o.cust_fin, o.val_cont = d["Cust_Fin"], d["Val_Cont"]
             n += 1

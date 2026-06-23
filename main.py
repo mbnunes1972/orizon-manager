@@ -2009,6 +2009,7 @@ class Handler(BaseHTTPRequestHandler):
                     d = mod_negociacao.calcular_orcamento(ambs, params, orc.desconto_pct or 0.0, cust_fin=cust_fin)
                     orc.vbvo, orc.cfo, orc.vbno, orc.vavo = d["VBVO"], d["CFO"], d["VBNO"], d["VAVO"]
                     orc.cust_ad, orc.val_liq = d["Cust_Ad"], d["Val_Liq"]
+                    orc.com_arq_orc, orc.pro_fid_orc = d["Com_Arq"], d["Pro_Fid"]
                     orc.desc_tot_pct, orc.markup = d["Desc_Tot"], d["Markup"]
                     orc.prov_imp = d["Prov_Imp"]
                     orc.cust_fin = d["Cust_Fin"]
@@ -2018,15 +2019,7 @@ class Handler(BaseHTTPRequestHandler):
                     db.rollback()
                     print("[SOMBRA] falha ao materializar derivados:", _e)
                 self.send_json({"ok": True, "margens": atual,
-                                "sombra": {
-                                    "vavo":         orc.vavo         or 0.0,
-                                    "val_liq":      orc.val_liq      or 0.0,
-                                    "markup":       orc.markup       or 0.0,
-                                    "desc_tot_pct": orc.desc_tot_pct or 0.0,
-                                    "vbvo":         orc.vbvo         or 0.0,
-                                    "cfo":          orc.cfo          or 0.0,
-                                    "val_cont":     orc.val_cont     or 0.0,
-                                }})
+                                "sombra": _sombra_dict(orc)})
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -4193,15 +4186,25 @@ def _orcamento_dict(o) -> dict:
         "updated_at":      o.updated_at.strftime("%Y-%m-%d %H:%M") if o.updated_at else "",
         "ambientes":       [],  # preenchido por rotas específicas
         # ── modo sombra: derivados do motor de negociação (Task 7) ──
-        "sombra": {
-            "vavo":         o.vavo         or 0.0,
-            "val_liq":      o.val_liq      or 0.0,
-            "markup":       o.markup       or 0.0,
-            "desc_tot_pct": o.desc_tot_pct or 0.0,
-            "vbvo":         o.vbvo         or 0.0,
-            "cfo":          o.cfo          or 0.0,
-            "val_cont":     o.val_cont     or 0.0,
-        },
+        "sombra": _sombra_dict(o),
+    }
+
+
+def _sombra_dict(o) -> dict:
+    """Sub-objeto com os derivados sombra de um orçamento — cadeia completa do motor
+    (modo sombra), para o bloco de validação HOJE × NOVO do modal."""
+    return {
+        "vbvo":         o.vbvo         or 0.0,
+        "cfo":          o.cfo          or 0.0,
+        "vbno":         o.vbno         or 0.0,
+        "vavo":         o.vavo         or 0.0,
+        "com_arq_orc":  o.com_arq_orc  or 0.0,
+        "pro_fid_orc":  o.pro_fid_orc  or 0.0,
+        "cust_ad":      o.cust_ad      or 0.0,
+        "val_liq":      o.val_liq      or 0.0,
+        "desc_tot_pct": o.desc_tot_pct or 0.0,
+        "markup":       o.markup       or 0.0,
+        "val_cont":     o.val_cont     or 0.0,
     }
 
 

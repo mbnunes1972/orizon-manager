@@ -5468,7 +5468,7 @@ function _mpRenderSombra(liquidoHoje, margemHoje) {
   const box = document.getElementById('mp-sombra');
   if (!box) return;
   const s = _orcSombra || {};
-  const temSombra = s && (s.val_liq || s.desc_tot_pct || s.markup);
+  const temSombra = s && (s.val_liq || s.desc_tot_pct || s.markup || s.vbno || s.vavo);
   if (!temSombra) {
     // sem dados sombra: limpa o bloco (orçamento ainda não foi salvo com o motor)
     box.innerHTML = '';
@@ -5476,38 +5476,30 @@ function _mpRenderSombra(liquidoHoje, margemHoje) {
   }
   const fmtR = v => (Number(v) || 0).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
   const fmtP = v => (Number(v) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
-  const liqNovo    = s.val_liq      || 0;
-  const descNovo   = (s.desc_tot_pct || 0) * 100;  // motor guarda como decimal 0..1
-  const mkpNovo    = s.markup       || 0;
-  const liqHoje    = Number(liquidoHoje) || 0;
-  const descHoje   = Number(margemHoje)  || 0;      // _margemAtual já é em %
+  const txt  = id => { const el = document.getElementById(id); return el ? el.textContent.trim() : '—'; };
+  const gold = 'var(--dalm-gold,#f5c842)';
+  const linha = (rot, hoje, novo) =>
+    `<tr><td style="color:var(--muted)">${rot}</td>` +
+    `<td style="text-align:right">${hoje}</td>` +
+    `<td style="text-align:right;color:${gold}">${novo}</td></tr>`;
   box.innerHTML = `
     <div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:8px;font-size:11px">
       <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Validação — HOJE × NOVO (sombra)</div>
       <table style="width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace">
-        <thead>
-          <tr>
-            <td style="color:var(--muted);padding-bottom:4px"></td>
-            <td style="text-align:right;color:var(--muted);padding-bottom:4px">HOJE</td>
-            <td style="text-align:right;color:var(--dalm-gold,#f5c842);padding-bottom:4px">NOVO</td>
-          </tr>
-        </thead>
+        <thead><tr>
+          <td style="color:var(--muted);padding-bottom:4px"></td>
+          <td style="text-align:right;color:var(--muted);padding-bottom:4px">HOJE</td>
+          <td style="text-align:right;color:${gold};padding-bottom:4px">NOVO</td>
+        </tr></thead>
         <tbody>
-          <tr>
-            <td style="color:var(--muted)">Valor líquido</td>
-            <td style="text-align:right">${fmtR(liqHoje)}</td>
-            <td style="text-align:right;color:var(--dalm-gold,#f5c842)">${fmtR(liqNovo)}</td>
-          </tr>
-          <tr>
-            <td style="color:var(--muted)">Desconto total</td>
-            <td style="text-align:right">${fmtP(descHoje)}</td>
-            <td style="text-align:right;color:var(--dalm-gold,#f5c842)">${fmtP(descNovo)}</td>
-          </tr>
-          <tr>
-            <td style="color:var(--muted)">Markup (Liq/CFO)</td>
-            <td style="text-align:right">—</td>
-            <td style="text-align:right;color:var(--dalm-gold,#f5c842)">${(Number(mkpNovo)||0).toFixed(3)}</td>
-          </tr>
+          ${linha('Valor bruto negociado', '—', fmtR(s.vbno))}
+          ${linha('Valor à vista',         '—', fmtR(s.vavo))}
+          ${linha('− Comissão arquiteto',  txt('mp-a-arq'), fmtR(s.com_arq_orc))}
+          ${linha('− Programa fidelidade', txt('mp-a-fid'), fmtR(s.pro_fid_orc))}
+          ${linha('Custos adicionais',     '—', fmtR(s.cust_ad))}
+          ${linha('Valor líquido',  fmtR(Number(liquidoHoje) || 0), fmtR(s.val_liq))}
+          ${linha('Desconto total', fmtP(Number(margemHoje) || 0), fmtP((s.desc_tot_pct || 0) * 100))}
+          ${linha('Markup (Liq/CFO)', '—', (Number(s.markup) || 0).toFixed(3))}
         </tbody>
       </table>
     </div>`;

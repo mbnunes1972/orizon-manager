@@ -2,8 +2,8 @@ import sqlite3
 
 def test_orcamentos_tem_colunas_sombra(app_db):
     cols = {r[1] for r in sqlite3.connect(app_db.DB_PATH).execute("PRAGMA table_info(orcamentos)")}
-    assert {"vbvo", "cfo", "vbno", "vavo", "cust_ad", "val_liq", "desc_tot_pct",
-            "markup", "cust_fin", "val_cont", "prov_imp"} <= cols
+    assert {"vbvo", "cfo", "vbno", "vavo", "cust_ad", "com_arq_orc", "pro_fid_orc",
+            "val_liq", "desc_tot_pct", "markup", "cust_fin", "val_cont", "prov_imp"} <= cols
 
 def test_pool_ambientes_tem_colunas_qa(app_db):
     cols = {r[1] for r in sqlite3.connect(app_db.DB_PATH).execute("PRAGMA table_info(pool_ambientes)")}

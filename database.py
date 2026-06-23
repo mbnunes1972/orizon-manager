@@ -338,6 +338,8 @@ class Orcamento(Base):
     vbno         = Column(Float, default=0.0)
     vavo         = Column(Float, default=0.0)
     cust_ad      = Column(Float, default=0.0)
+    com_arq_orc  = Column(Float, default=0.0)
+    pro_fid_orc  = Column(Float, default=0.0)
     val_liq      = Column(Float, default=0.0)
     desc_tot_pct = Column(Float, default=0.0)
     markup       = Column(Float, default=0.0)
@@ -524,8 +526,8 @@ def _migrar_colunas():
         # ── orcamentos: derivados do motor de negociação (modo sombra) ──
         cur.execute("PRAGMA table_info(orcamentos)")
         orc_cols = {row[1] for row in cur.fetchall()}
-        for col in ("vbvo", "cfo", "vbno", "vavo", "cust_ad", "val_liq",
-                    "desc_tot_pct", "markup", "cust_fin", "val_cont", "prov_imp"):
+        for col in ("vbvo", "cfo", "vbno", "vavo", "cust_ad", "com_arq_orc", "pro_fid_orc",
+                    "val_liq", "desc_tot_pct", "markup", "cust_fin", "val_cont", "prov_imp"):
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} REAL DEFAULT 0")
 
