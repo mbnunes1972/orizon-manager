@@ -47,6 +47,7 @@ import mod_medicao
 import perfis
 import mod_usuarios
 import mod_tenancy
+from mod_qualidade_xml import avaliar_qualidade_xml
 
 def _enriquecer_projetos_com_status(projetos):
     """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
@@ -2118,6 +2119,8 @@ class Handler(BaseHTTPRequestHandler):
                     for grupo in amb.get("grupos", [])
                     for item in grupo.get("itens", [])
                 )
+                _qa = avaliar_qualidade_xml(
+                    [it for g in amb.get("grupos", []) for it in g.get("itens", [])])
 
                 # Hash do conteúdo (ignora campos derivados do nome do arquivo)
                 def _content_hash(a):
@@ -2159,6 +2162,7 @@ class Handler(BaseHTTPRequestHandler):
                         "amb":          amb,
                         "budget_total": budget_total,
                         "order_total":  order_total,
+                        "qa":           _qa,
                     }
 
                     if por_nome and por_hash and por_nome.id == por_hash.id:
@@ -2219,8 +2223,12 @@ class Handler(BaseHTTPRequestHandler):
                             nome_exibicao= nome_base,
                             xml_path=      os.path.join("xmls", arq_nome),
                             ambientes_json=json.dumps(amb),
-                            budget_total=  budget_total,
-                            order_total=   order_total,
+                            budget_total=              budget_total,
+                            order_total=               order_total,
+                            qa_selo=                   _qa["qa_selo"],
+                            qa_pct_sem_acrescimo=      _qa["qa_pct_sem_acrescimo"],
+                            qa_markup_xml=             _qa["qa_markup_xml"],
+                            qa_custo_sem_venda=        _qa["qa_custo_sem_venda"],
                             created_by=    _usuario['id'] if _usuario else None,
                         )
                         db.add(pa)
@@ -2271,10 +2279,16 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Ambiente não encontrado"})
                         return
                     # Atualiza o registro no pool
-                    pa.xml_path      = os.path.join("xmls", temp["arq_nome"])
-                    pa.ambientes_json = json.dumps(temp["amb"])
-                    pa.budget_total  = temp["budget_total"]
-                    pa.order_total   = temp["order_total"]
+                    pa.xml_path               = os.path.join("xmls", temp["arq_nome"])
+                    pa.ambientes_json          = json.dumps(temp["amb"])
+                    pa.budget_total            = temp["budget_total"]
+                    pa.order_total             = temp["order_total"]
+                    _qa_s = temp.get("qa") or avaliar_qualidade_xml(
+                        [it for g in temp["amb"].get("grupos", []) for it in g.get("itens", [])])
+                    pa.qa_selo                 = _qa_s["qa_selo"]
+                    pa.qa_pct_sem_acrescimo    = _qa_s["qa_pct_sem_acrescimo"]
+                    pa.qa_markup_xml           = _qa_s["qa_markup_xml"]
+                    pa.qa_custo_sem_venda      = _qa_s["qa_custo_sem_venda"]
                     # Passo 12: recalcula todos os orçamentos que referenciam este ambiente
                     links_afetados = db.query(OrcamentoAmbiente).filter_by(pool_ambiente_id=pid).all()
                     recalculados = []
@@ -2346,6 +2360,8 @@ class Handler(BaseHTTPRequestHandler):
                     nome_exib_novo   = "%s_v%d" % (pa_orig.nome, nova_versao - 1)
                     arq_nome_novo    = "%s.xml" % nome_exib_novo
                     _usuario = usuario
+                    _qa_nv = temp.get("qa") or avaliar_qualidade_xml(
+                        [it for g in temp["amb"].get("grupos", []) for it in g.get("itens", [])])
                     pa_novo = PoolAmbiente(
                         projeto_id=    nome_safe,
                         nome=          pa_orig.nome,
@@ -2353,8 +2369,12 @@ class Handler(BaseHTTPRequestHandler):
                         nome_exibicao= nome_exib_novo,
                         xml_path=      os.path.join("xmls", arq_nome_novo),
                         ambientes_json=json.dumps(temp["amb"]),
-                        budget_total=  temp["budget_total"],
-                        order_total=   temp["order_total"],
+                        budget_total=              temp["budget_total"],
+                        order_total=               temp["order_total"],
+                        qa_selo=                   _qa_nv["qa_selo"],
+                        qa_pct_sem_acrescimo=      _qa_nv["qa_pct_sem_acrescimo"],
+                        qa_markup_xml=             _qa_nv["qa_markup_xml"],
+                        qa_custo_sem_venda=        _qa_nv["qa_custo_sem_venda"],
                         created_by=    _usuario['id'] if _usuario else None,
                     )
                     db.add(pa_novo)
@@ -2454,6 +2474,8 @@ class Handler(BaseHTTPRequestHandler):
                                         "erro": "Contrato assinado — alterações não permitidas."},
                                        code=403)
                         return
+                    _qa_cf = temp.get("qa") or avaliar_qualidade_xml(
+                        [it for g in temp["amb"].get("grupos", []) for it in g.get("itens", [])])
                     pa = PoolAmbiente(
                         projeto_id=    nome_safe,
                         nome=          temp["nome_base"],
@@ -2461,8 +2483,12 @@ class Handler(BaseHTTPRequestHandler):
                         nome_exibicao= temp["nome_base"],
                         xml_path=      os.path.join("xmls", temp["arq_nome"]),
                         ambientes_json=json.dumps(temp["amb"]),
-                        budget_total=  temp["budget_total"],
-                        order_total=   temp["order_total"],
+                        budget_total=              temp["budget_total"],
+                        order_total=               temp["order_total"],
+                        qa_selo=                   _qa_cf["qa_selo"],
+                        qa_pct_sem_acrescimo=      _qa_cf["qa_pct_sem_acrescimo"],
+                        qa_markup_xml=             _qa_cf["qa_markup_xml"],
+                        qa_custo_sem_venda=        _qa_cf["qa_custo_sem_venda"],
                         created_by=    usuario['id'] if usuario else None,
                     )
                     db.add(pa)
@@ -2566,6 +2592,11 @@ class Handler(BaseHTTPRequestHandler):
                     pa = db.get(PoolAmbiente, pid)
                     if pa is None or pa.projeto_id != orc.projeto_id:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    if pa.qa_selo == "bloqueado" and pa.qa_override_por_id is None:
+                        self.send_json({"ok": False, "erro":
+                            "Ambiente bloqueado por qualidade do XML (acréscimo zerado). "
+                            "Re-exporte o XML ou solicite liberação ao Diretor/Gerente."}, code=409)
                         return
                     ja_existe = db.query(OrcamentoAmbiente).filter_by(
                         orcamento_id=oid, pool_ambiente_id=pid
