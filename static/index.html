@@ -5387,8 +5387,9 @@ function mpAtualizarApoio(){
     id('mp-a-margem').textContent   = margem.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
     _atualizarImpostos('ay',avista); _atualizarImpostos('cc',avista);
     _atualizarImpostos('vp',avista); _atualizarImpostos('tf',avista);
-    // ── modo sombra: HOJE × NOVO (Task 7 — validação visual) ──
-    _mpRenderSombra(liquido, margem);
+    // ── cutover Fase B: o MOTOR é a fonte única — sobrepõe os displays acima ──
+    // (o cálculo legado acima fica como feedback instantâneo até o preview chegar)
+    agendarPreview();
     return;
   }
   const ambs = (projetoAtivo && projetoAtivo.ambientes) || [];
@@ -5503,6 +5504,64 @@ function _mpRenderSombra(liquidoHoje, margemHoje) {
         </tbody>
       </table>
     </div>`;
+}
+
+// ── Cutover Fase B: preview do MOTOR ao vivo (substitui o cálculo legado) ──────
+let _previewNeg   = null;     // último resultado do motor (chaves-sigla)
+let _previewTimer = null;
+async function negPreview() {
+  if (!_orcamentoAtivoId) return null;
+  const id = x => document.getElementById(x);
+  const num = x => parseFloat(id(x)?.value) || 0;
+  // descontos por ambiente: _descIndividual usa chave 'ep07_<pool_id>' → manda <pool_id>
+  const descAmb = {};
+  Object.keys(_descIndividual || {}).forEach(k => {
+    if (k.startsWith('ep07_')) descAmb[k.slice(5)] = _descIndividual[k];
+  });
+  const body = {
+    params: {
+      incluir_custos:     id('mp-incluir-custos')?.checked || false,
+      comissao_arq_ativa: id('mp-arq-ativa')?.checked || false,
+      comissao_arq_pct:   num('mp-arq-pct'),
+      fidelidade_ativa:   id('mp-fid-ativa')?.checked || false,
+      fidelidade_pct:     num('mp-fid-pct'),
+      fora_da_sede:       id('mp-fora-sede')?.checked || false,
+      custo_viagem:       num('mp-viagem'),
+      brinde_ativo:       id('mp-brinde-ativo')?.checked || false,
+      brinde:             num('mp-brinde'),
+    },
+    desc_orc: num('mp-desconto'),
+    descontos_amb: descAmb,
+  };
+  try {
+    const r = await fetch(`/api/orcamentos/${_orcamentoAtivoId}/negociacao-preview`, {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    _previewNeg = d.ok ? d.sombra : null;
+    if (_previewNeg) _aplicarPreviewNaTela(_previewNeg);
+    return _previewNeg;
+  } catch (e) { console.warn('preview:', e); return null; }
+}
+function agendarPreview() { clearTimeout(_previewTimer); _previewTimer = setTimeout(negPreview, 250); }
+
+// Sobrepõe os displays do modal/tela com os valores do MOTOR (fonte única).
+function _aplicarPreviewNaTela(s) {
+  if (!s) return;
+  const id = x => document.getElementById(x);
+  const setR = (el, v, pre = '') => { const e = id(el); if (e) e.textContent = pre + 'R$ ' + fmt(Number(v) || 0); };
+  setR('mp-a-bruto',  s.VBNO);
+  setR('mp-a-avista', s.VAVO);
+  setR('mp-a-arq', s.Com_Arq, '− ');
+  setR('mp-a-fid', s.Pro_Fid, '− ');
+  setR('mp-a-liq', s.Val_Liq);
+  const margem = (Number(s.Desc_Tot) || 0) * 100;
+  _margemAtual = margem;   // usado pelo limite de 35%
+  if (id('mp-a-margem')) id('mp-a-margem').textContent =
+    margem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+  // à vista que alimenta o cálculo de pagamento (mod_fin) = VAVO do motor
+  if (id('neg-avista')) id('neg-avista').textContent = 'R$ ' + fmt(Number(s.VAVO) || 0);
 }
 
 function abrirModalParams(){
@@ -7961,8 +8020,7 @@ async function salvarValorNegociado() {
       method: 'PATCH', credentials: 'same-origin',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        valor_total:     valor,
-        valor_liquido:   valorLiquido,
+        // cutover Fase B: valor_total/valor_liquido vêm do MOTOR no backend (não enviados)
         forma_pagamento: (typeof _capturarPagamento === 'function' && window._planoPagamento)
           ? JSON.stringify(_capturarPagamento(_formaEntrada, _formaParcela))
           : (elPag?.value || null),
