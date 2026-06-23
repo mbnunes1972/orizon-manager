@@ -113,3 +113,31 @@ def test_preview_ignora_overrides_do_corpo(http_client_factory, seed, app_db):
     st2, comov = c.post(f"/api/orcamentos/{oid}/negociacao-preview", {"desc_orc": 50, "params": {"comissao_arq_ativa": True, "comissao_arq_pct": 99}})
     assert st == 200 and st2 == 200
     assert base["sombra"]["VAVO"] == comov["sombra"]["VAVO"]   # overrides ignorados
+
+
+# ── Task 4 (task-3-brief): saves recalculam e devolvem o breakdown maiúsculo ──
+
+def _seed_amb(app_db, oid, budget=10000.0):
+    db = app_db.get_session()
+    pj = db.get(app_db.Orcamento, oid).projeto_id
+    pa = app_db.PoolAmbiente(nome="Z", nome_exibicao="Z", xml_path="z.xml", ambientes_json="{}",
+                             projeto_id=pj, budget_total=budget, order_total=budget*0.4)
+    db.add(pa); db.flush(); pid = pa.id
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pid, ordem=1))
+    db.commit(); db.close(); return pid
+
+def test_save_margens_retorna_breakdown_maiusculo(http_client_factory, seed, app_db):
+    oid = seed["orcamento_l1_id"]; _seed_amb(app_db, oid)
+    c = _login(http_client_factory, "dir_l1")
+    st, body = c.post(f"/api/orcamentos/{oid}/margens", {"desconto_pct": 10})
+    assert st == 200
+    s = body["sombra"]
+    for k in ("VBNO", "VAVO", "Cust_Via", "Bri", "Val_Liq", "ambientes"):
+        assert k in s, f"falta {k} no breakdown: {list(s)}"
+    assert s["ambientes"][0]["id"] is not None
+
+def test_save_descontos_retorna_breakdown(http_client_factory, seed, app_db):
+    oid = seed["orcamento_l1_id"]; pid = _seed_amb(app_db, oid)
+    c = _login(http_client_factory, "dir_l1")
+    st, body = c.put(f"/api/orcamentos/{oid}/descontos", {"descontos": {str(pid): 5}})
+    assert st == 200 and "VAVO" in body["sombra"]

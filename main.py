@@ -1946,7 +1946,13 @@ class Handler(BaseHTTPRequestHandler):
                 novos = merge_parametros(atual, req)
                 p.parametros_json = json.dumps(novos, ensure_ascii=False)
                 db.commit()
-                self.send_json({"ok": True, "parametros": novos})
+                proj_orcs = db.query(Orcamento).filter_by(projeto_id=nome_safe).all()
+                for o in proj_orcs:
+                    try: _recalcular_orcamento(o, db)
+                    except Exception as _e: print("[FAXINA] recalc parametros:", _e)
+                db.commit()
+                brk = _negociacao_breakdown(proj_orcs[0], db) if proj_orcs else None
+                self.send_json({"ok": True, "parametros": novos, "sombra": brk})
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -1992,11 +1998,13 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     _recalcular_orcamento(orc, db)
                     db.commit()
+                    self.send_json({"ok": True, "margens": atual,
+                                    "sombra": _negociacao_breakdown(orc, db)})
                 except Exception as _e:
                     db.rollback()
                     print("[CUTOVER] falha ao recalcular orçamento:", _e)
-                self.send_json({"ok": True, "margens": atual,
-                                "sombra": _sombra_dict(orc)})
+                    self.send_json({"ok": True, "margens": atual,
+                                    "sombra": None, "erro_sombra": str(_e)})
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -3577,7 +3585,13 @@ class Handler(BaseHTTPRequestHandler):
                 for pid, pct in limpos.items():
                     by_id[pid].desconto_individual_pct = pct
                 db.commit()
-                self.send_json({"ok": True, "descontos": {str(k): v for k, v in limpos.items()}})
+                try:
+                    _recalcular_orcamento(orc, db); db.commit()
+                    self.send_json({"ok": True, "sombra": _negociacao_breakdown(orc, db)})
+                except Exception as _e:
+                    db.rollback()
+                    self.send_json({"ok": True, "sombra": None, "erro_sombra": str(_e)})
+                return
             except ValueError as ve:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(ve)}, code=400)
