@@ -610,3 +610,22 @@ Primeiro de 4 sub-projetos decompostos de uma leva de pedidos (perfis, aprovaç�
 - Sistema de autenticação completo
 - Módulo Parceiros
 - Toggle custos adicionais
+
+## Sessão 27 — Cutover do motor de negociação (Fase B)
+
+A tela de negociação e o modal passam a usar o motor `mod_negociacao` (não mais o cálculo
+legado do frontend):
+- **Preview endpoint** `POST /api/orcamentos/<id>/negociacao-preview` (puro, sem gravar):
+  display ao vivo da cadeia do motor; helper compartilhado `_negociacao_breakdown`.
+- **Persistência autoritativa**: `_recalcular_orcamento` grava `valor_total = Val_Cont` e
+  `valor_liquido = Val_Liq` no save de margens e no PATCH; o frontend deixa de enviá-los e o
+  PATCH não os aceita mais. O contrato reflete automaticamente (lê `valor_total`/`valor_liquido`).
+- **UI**: `negPreview()`/`_aplicarPreviewNaTela()` sobrepõem bruto negociado / à vista / comissão
+  arquiteto / fidelidade / líquido / %desc total e o `neg-avista` (que alimenta o pagamento via
+  `mod_fin`); limite de 35% sobre o `%Desc_Tot` do motor. `mod_fin` reusado como está.
+- **Segurança**: golden-master `scripts/snapshot_cutover.py` (baseline) + `scripts/diff_cutover.py`
+  (old×new); rollback na tag `pre-refator-negociacao`.
+- **Pós-cutover**: `scripts/reset_para_teste.py` (DESTRUTIVO — cancela contratos, volta o ciclo à
+  fase de orçamento, recalcula tudo) para testar o fluxo inteiro + transições de fase. Backup antes.
+- **Fase C** (limpeza do legado: `margens` duplicado, `custo_financeiro_pct` do `mod_margens`)
+  fica para depois.
