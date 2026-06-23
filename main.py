@@ -2017,7 +2017,16 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as _e:
                     db.rollback()
                     print("[SOMBRA] falha ao materializar derivados:", _e)
-                self.send_json({"ok": True, "margens": atual})
+                self.send_json({"ok": True, "margens": atual,
+                                "sombra": {
+                                    "vavo":         orc.vavo         or 0.0,
+                                    "val_liq":      orc.val_liq      or 0.0,
+                                    "markup":       orc.markup       or 0.0,
+                                    "desc_tot_pct": orc.desc_tot_pct or 0.0,
+                                    "vbvo":         orc.vbvo         or 0.0,
+                                    "cfo":          orc.cfo          or 0.0,
+                                    "val_cont":     orc.val_cont     or 0.0,
+                                }})
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -4183,6 +4192,16 @@ def _orcamento_dict(o) -> dict:
         "created_at":      o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else "",
         "updated_at":      o.updated_at.strftime("%Y-%m-%d %H:%M") if o.updated_at else "",
         "ambientes":       [],  # preenchido por rotas específicas
+        # ── modo sombra: derivados do motor de negociação (Task 7) ──
+        "sombra": {
+            "vavo":         o.vavo         or 0.0,
+            "val_liq":      o.val_liq      or 0.0,
+            "markup":       o.markup       or 0.0,
+            "desc_tot_pct": o.desc_tot_pct or 0.0,
+            "vbvo":         o.vbvo         or 0.0,
+            "cfo":          o.cfo          or 0.0,
+            "val_cont":     o.val_cont     or 0.0,
+        },
     }
 
 
