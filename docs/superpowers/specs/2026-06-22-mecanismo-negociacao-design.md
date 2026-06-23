@@ -1,7 +1,7 @@
 # Mecanismo de Negociação — Nomenclatura Fechada e Refatoração do Cálculo
 
 **Data:** 2026-06-22
-**Status:** Em revisão (design)
+**Status:** Aprovado — pronto para plano de implementação
 **Escopo:** Reorganizar o cálculo do **modal de parâmetros / negociação** sobre uma
 nomenclatura fechada, com cálculo **por ambiente** (depois agregado por orçamento), um
 único dono por parâmetro e os valores derivados canônicos persistidos. **Próxima fase:**
@@ -72,7 +72,7 @@ comissão (fases seguintes).
 | Forma de Entrada | texto | Pix / Cheque / Boleto / Cartão |
 | Valor / Data de Entrada | `Val_Ent` / Data | editável |
 | Datas / Valor de cada Parcela | Data / `Val_Parc` | conforme parcelamento |
-| Provisão de Impostos | `Prov_Imp` | informativo — **proposta:** `Prov_Imp = %Car_Trib × Val_Cont` (confirmar §11) |
+| Provisão de Impostos | `Prov_Imp` | informativo — `Prov_Imp = %Car_Trib × Val_Cont` |
 | Valor Bruto de Venda Orçamento | `VBVO` | `Σ VBVA` |
 | Custo Fábrica Orçamento | `CFO` | `Σ CFA` |
 | Valor Bruto Negociado Orçamento | `VBNO` | `Σ VBNA` |
@@ -126,7 +126,7 @@ Val_Liq  = VAVO − Cust_Ad
 Markup    = Val_Liq / CFO
 Cust_Fin  = (custo da modalidade de pagamento via mod_fin)
 Val_Cont  = VAVO + Cust_Fin
-Prov_Imp  = %Car_Trib × Val_Cont        # informativo (proposta — confirmar)
+Prov_Imp  = %Car_Trib × Val_Cont        # informativo
 ```
 
 **Semântica dos toggles (decidida):** o toggle individual diz "este custo existe?" (sempre
@@ -145,7 +145,7 @@ antes dos `VBNA`. Não há circularidade (o rateio usa valores de XML, não os n
 | **Orçamento (entrada)** | `orcamentos` (colunas) | `%Desc_Orc` (= `desconto_pct`), forma de pagamento (`forma_pagamento`/`negociacao_json`) |
 | **Orçamento (derivados materializados)** | `orcamentos` (colunas novas) | `VBVO, CFO, VBNO, VAVO, Cust_Ad, Val_Liq, %Desc_Tot, Markup, Cust_Fin, Val_Cont, Prov_Imp` |
 | **Ambiente (entrada)** | `pool_ambientes` (`budget_total`→`VBVA`, `order_total`→`CFA`) + `orcamento_ambientes.desconto_individual_pct` (→`%Desc_Amb`) | já existem |
-| **Ambiente (qualidade — §8)** | `pool_ambientes` (colunas novas) | `qa_selo` (ok/alerta/bloqueado), `qa_pct_sem_acrescimo`, `qa_markup_xml`, `qa_custo_sem_venda`, `qa_override_por_id`, `qa_override_motivo` |
+| **Ambiente (qualidade — §8)** | `pool_ambientes` (colunas novas) | `qa_selo` (ok/bloqueado), `qa_pct_sem_acrescimo`, `qa_markup_xml`, `qa_custo_sem_venda`, `qa_override_por_id`, `qa_override_motivo` |
 
 **Decisões de migração:**
 1. **Eliminar a duplicação:** os custos adicionais e toggles passam a viver **só** em
@@ -255,18 +255,43 @@ Este caso vira o teste unitário-âncora do `mod_negociacao`.
   fica em quarentena e não entra em orçamento; override por Diretor/Gerente Adm-Fin libera e loga.
 - **Validação manual (fase seguinte):** modal de parâmetros exibindo os canônicos.
 
-## 11. Decisões pendentes (confirmar na revisão)
-1. **Base do `Prov_Imp`:** proposto `%Car_Trib × Val_Cont` (impostos sobre o contrato).
-   Confirmar (ou `× VAVO`?).
-2. **`Cust_Fin`:** confirmar que a integração reusa as tabelas `mod_fin` existentes
-   (modalidade de pagamento) sem recalcular nada novo nesta fase.
-
-> **Resolvido:** trava de qualidade do dado de XML → bloqueio em quarentena no upload,
-> sinais limpos (acréscimo zerado / custo sem venda), override Diretor+Gerente Adm-Fin. Ver §8.
+## 11. Decisões (todas resolvidas)
+1. **Base do `Prov_Imp`:** ✅ `Prov_Imp = %Car_Trib × Val_Cont` (impostos sobre o valor de contrato).
+2. **`Cust_Fin`:** ✅ vem do `mod_fin` existente — o motor calcula até `VAVO` e delega:
+   `Val_Cont = mod_fin.calcular(VAVO, entrada, n_parcelas, data, modalidade).total_cliente`;
+   `Cust_Fin = Val_Cont − VAVO`. A loja sempre recebe `VAVO`; `Cust_Fin` é pago pelo cliente,
+   entra no `Val_Cont` e **não** toca `Val_Liq`/`Markup`. Remove-se o `custo_financeiro_pct`
+   duplicado do `mod_margens`; `mod_fin` permanece como fonte única do financeiro.
+3. **Qualidade do dado de XML:** ✅ bloqueio em quarentena no upload, sinais limpos
+   (acréscimo zerado / custo sem venda), override Diretor+Gerente Adm-Fin. Ver §8.
 
 ---
 
-## 12. Próxima fase
-Validar o mecanismo **na interface** (modal de parâmetros) — exibir os valores canônicos
-por orçamento e conferir contra casos reais — antes de construir as rubricas do item 6, as
-aprovações financeiras e a comissão de vendas, que consomem `Val_Liq`, `CFO` e `Markup`.
+## 12. Estratégia de implementação segura (modo sombra + rollback)
+
+Refatorar o motor financeiro é arriscado porque os números viram contrato. **Parte da
+dissonância é esperada e correta** (gross-up aditivo→divisivo; agregado→por ambiente;
+`valor_liquido` legado que guardava o bruto). Logo, o objetivo da estratégia não é "não
+mudar número" — é **distinguir diferença correta de regressão** e poder voltar.
+
+1. **Ponto de retorno (git):** tag `pre-refator-negociacao` no `main` (commit `5b8524c`).
+   Todo o trabalho em **branch**. Reverter = `git reset --hard pre-refator-negociacao`.
+2. **Modo sombra:** o `mod_negociacao` novo roda **em paralelo** ao cálculo atual e grava os
+   derivados em **colunas novas** (não sobrescreve nada). O modal de parâmetros mostra
+   **valor de hoje × valor novo, lado a lado**, por orçamento. Validação visual antes de
+   qualquer corte — esta é a "validação na interface".
+3. **Golden-master:** antes de mexer, fotografar os valores calculados hoje de um conjunto
+   de orçamentos reais (LELEU + outros). Os testes do motor novo comparam contra a foto e
+   **exigem que cada diferença seja explicada**; diferença não-explicada barra o merge.
+4. **Migração aditiva e reversível:** apenas **adicionar** colunas; `valor_liquido` e o bloco
+   `margens` antigos ficam intactos (só param de ser lidos). A remoção real é uma fase de
+   limpeza posterior, após validação.
+5. **Corte em fases (cada uma revertível):** A) motor novo em sombra + UI lado a lado →
+   validação; B) contrato/UI passam a usar os valores novos; C) limpeza do código/colunas
+   antigos.
+
+## 13. Próxima fase
+Validar o mecanismo **na interface** (modal de parâmetros, modo sombra §12) — exibir os
+valores canônicos por orçamento e conferir contra casos reais — antes de construir as
+rubricas do item 6, as aprovações financeiras e a comissão de vendas, que consomem
+`Val_Liq`, `CFO` e `Markup`.
