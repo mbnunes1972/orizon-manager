@@ -72,7 +72,7 @@ comissão (fases seguintes).
 | Forma de Entrada | texto | Pix / Cheque / Boleto / Cartão |
 | Valor / Data de Entrada | `Val_Ent` / Data | editável |
 | Datas / Valor de cada Parcela | Data / `Val_Parc` | conforme parcelamento |
-| Provisão de Impostos | `Prov_Imp` | informativo — **proposta:** `Prov_Imp = %Car_Trib × Val_Cont` (confirmar §10) |
+| Provisão de Impostos | `Prov_Imp` | informativo — **proposta:** `Prov_Imp = %Car_Trib × Val_Cont` (confirmar §11) |
 | Valor Bruto de Venda Orçamento | `VBVO` | `Σ VBVA` |
 | Custo Fábrica Orçamento | `CFO` | `Σ CFA` |
 | Valor Bruto Negociado Orçamento | `VBNO` | `Σ VBNA` |
@@ -145,6 +145,7 @@ antes dos `VBNA`. Não há circularidade (o rateio usa valores de XML, não os n
 | **Orçamento (entrada)** | `orcamentos` (colunas) | `%Desc_Orc` (= `desconto_pct`), forma de pagamento (`forma_pagamento`/`negociacao_json`) |
 | **Orçamento (derivados materializados)** | `orcamentos` (colunas novas) | `VBVO, CFO, VBNO, VAVO, Cust_Ad, Val_Liq, %Desc_Tot, Markup, Cust_Fin, Val_Cont, Prov_Imp` |
 | **Ambiente (entrada)** | `pool_ambientes` (`budget_total`→`VBVA`, `order_total`→`CFA`) + `orcamento_ambientes.desconto_individual_pct` (→`%Desc_Amb`) | já existem |
+| **Ambiente (qualidade — §8)** | `pool_ambientes` (colunas novas) | `qa_selo` (ok/alerta/bloqueado), `qa_pct_sem_acrescimo`, `qa_markup_xml`, `qa_custo_sem_venda`, `qa_override_por_id`, `qa_override_motivo` |
 
 **Decisões de migração:**
 1. **Eliminar a duplicação:** os custos adicionais e toggles passam a viver **só** em
@@ -172,18 +173,58 @@ antes dos `VBNA`. Não há circularidade (o rateio usa valores de XML, não os n
 
 1. **`mod_negociacao.py` (puro):** `calcular_orcamento(ambientes, params, desc_orc) → dict`
    com todas as siglas. Sem I/O. **É onde mora toda a aritmética** — testes unitários
-   exaustivos (incl. LELEU §8 e os 4 toggles em ON/OFF). Substitui `calcular_margens`.
-2. **Migração de schema/dados:** colunas derivadas em `orcamentos`; mover params para o
-   projeto; aposentar `valor_liquido`/bloco duplicado em `margens`.
-3. **Endpoints:** ao salvar negociação, chamar `mod_negociacao` e gravar os derivados.
-   `Cust_Fin` vem das tabelas `mod_fin` já existentes (modalidade de pagamento).
-4. **UI (fase de validação):** o modal de parâmetros exibe os valores canônicos por
+   exaustivos (incl. LELEU §9 e os 4 toggles em ON/OFF). Substitui `calcular_margens`.
+2. **Validação de qualidade do XML (§8):** função pura no parser que calcula
+   `qa_markup_xml`/`qa_pct_sem_acrescimo`/`qa_custo_sem_venda` e o `qa_selo`; o upload grava
+   o selo e coloca 🔴 em quarentena. Testável isolada (Área Gourmet → 🔴, bons → 🟢).
+3. **Migração de schema/dados:** colunas derivadas em `orcamentos` + colunas `qa_*` em
+   `pool_ambientes`; mover params para o projeto; aposentar `valor_liquido`/bloco duplicado
+   em `margens`.
+4. **Endpoints:** ao salvar negociação, chamar `mod_negociacao` e gravar os derivados;
+   no upload, recusar entrada de ambiente 🔴 em orçamento; endpoint de override
+   (Diretor/Gerente Adm-Fin) com justificativa + log. `Cust_Fin` vem das tabelas `mod_fin`.
+5. **UI (fase de validação):** o modal de parâmetros exibe os valores canônicos por
    orçamento, refletindo os ambientes marcados — para conferência visual contra casos
    conhecidos antes de seguir para as rubricas/AF.
 
 ---
 
-## 8. Caso de regressão — LELEU Orçamento 1 (id=19)
+## 8. Qualidade do dado de XML (trava de importação)
+
+Validação por ambiente executada **no upload do XML**, para impedir que dado de fábrica
+quebrado contamine a negociação e o financeiro. A trava só dispara em sinais que dão **0 em
+dado bom** (sem falso-positivo nos ~16–20% de acessórios de valor zero normais).
+
+### 8.1 Métricas (por ambiente, calculadas no parser e persistidas)
+- `qa_markup_xml = ΣBUDGET / ΣORDER` (acréscimo médio do XML).
+- `qa_pct_sem_acrescimo` = % do ΣBUDGET em itens com `BUDGET ≤ ORDER` (vendidos no custo ou abaixo).
+- `qa_custo_sem_venda` = nº de itens com `ORDER>0 e BUDGET=0` (paga à fábrica, não cobra).
+
+### 8.2 Selo de qualidade (`qa_selo`)
+- 🔴 **Bloqueado** se qualquer: `qa_pct_sem_acrescimo ≥ limiar` (default **5%**) **ou**
+  `qa_custo_sem_venda > 0`.
+- 🟢 **OK** caso contrário.
+- (Sem nível 🟡 nesta fase — os sinais ruidosos foram descartados: "itens sem preço" cru e
+  "desconto de fábrica zerado" via `TABLE` disparam em orçamento bom e **não** entram na trava.)
+
+### 8.3 Comportamento
+- No **upload**, o ambiente é importado em **quarentena** quando 🔴: visível e inspecionável,
+  mas **não pode entrar em nenhum orçamento**. A mensagem expõe o motivo (ex.: "100% do
+  valor sem acréscimo — markup 1,00").
+- **Override:** **Diretor** ou **Gerente Administrativo/Financeiro** libera o ambiente com
+  **justificativa obrigatória** (ex.: cortesia). Grava `qa_override_por_id`/`qa_override_motivo`
+  e registra em auditoria (`log_acoes_gerenciais`). Alternativa: re-exportar o XML correto.
+- O **limiar** (default 5%) é **configurável por loja** no painel admin (junto das % `a–i`).
+
+### 8.4 Caso de teste
+- **Área Gourmet** (LELEU): `qa_markup_xml` 1,00; `qa_pct_sem_acrescimo` 100%;
+  `qa_custo_sem_venda` 0 → **🔴 bloqueado**.
+- **Banheiro / Sala Íntima / Suíte Master:** markup 2,78; `qa_pct_sem_acrescimo` 0%;
+  `qa_custo_sem_venda` 0 → **🟢 OK** (passam limpos).
+
+---
+
+## 9. Caso de regressão — LELEU Orçamento 1 (id=19)
 
 Entrada: 2 ambientes — Área Gourmet (`VBVA` 22.830,99 / `CFA` 22.830,99) e Banheiro Social
 (`VBVA` 2.650,50 / `CFA` 953,40). Projeto: `%Com_Arq` 10%, `%Pro_Fid` 2%, `Cust_Via` 2.000,
@@ -203,26 +244,29 @@ Entrada: 2 ambientes — Área Gourmet (`VBVA` 22.830,99 / `CFA` 22.830,99) e Ba
 
 Este caso vira o teste unitário-âncora do `mod_negociacao`.
 
-## 9. Testes
-- **Unitário (puro, `mod_negociacao`):** caso LELEU §8; matriz de toggles (cada um ON/OFF,
+## 10. Testes
+- **Unitário (puro, `mod_negociacao`):** caso LELEU §9; matriz de toggles (cada um ON/OFF,
   `Tog_Cadi` ON/OFF — repassa vs absorve); `%Desc_Amb` por ambiente; orçamento de 1 e de N
   ambientes; rateio da viagem; ordem de cálculo (VBVO antes dos VBNA).
+- **Unitário (qualidade XML §8):** Área Gourmet → 🔴 (markup 1,00 / 100% sem acréscimo);
+  os 3 ambientes bons → 🟢; item `ORDER>0 e BUDGET=0` → 🔴; acessório de valor zero não acusa.
 - **E2E:** salvar negociação grava os derivados corretos; troca de params do projeto
-  reflete em todos os orçamentos; remover/incluir ambiente recalcula VBVO/CFO.
+  reflete em todos os orçamentos; remover/incluir ambiente recalcula VBVO/CFO; upload 🔴
+  fica em quarentena e não entra em orçamento; override por Diretor/Gerente Adm-Fin libera e loga.
 - **Validação manual (fase seguinte):** modal de parâmetros exibindo os canônicos.
 
-## 10. Decisões pendentes (confirmar na revisão)
+## 11. Decisões pendentes (confirmar na revisão)
 1. **Base do `Prov_Imp`:** proposto `%Car_Trib × Val_Cont` (impostos sobre o contrato).
    Confirmar (ou `× VAVO`?).
-2. **Validação de dado de XML:** quando `CFA == VBVA` (sem margem de fábrica — caso da Área
-   Gourmet, que produz `Markup` 0,839), o sistema deve **sinalizar** o orçamento como
-   "custo de fábrica suspeito". Confirmar como tratar (alerta visual? bloqueio?).
-3. **`Cust_Fin`:** confirmar que a integração reusa as tabelas `mod_fin` existentes
+2. **`Cust_Fin`:** confirmar que a integração reusa as tabelas `mod_fin` existentes
    (modalidade de pagamento) sem recalcular nada novo nesta fase.
+
+> **Resolvido:** trava de qualidade do dado de XML → bloqueio em quarentena no upload,
+> sinais limpos (acréscimo zerado / custo sem venda), override Diretor+Gerente Adm-Fin. Ver §8.
 
 ---
 
-## 11. Próxima fase
+## 12. Próxima fase
 Validar o mecanismo **na interface** (modal de parâmetros) — exibir os valores canônicos
 por orçamento e conferir contra casos reais — antes de construir as rubricas do item 6, as
 aprovações financeiras e a comissão de vendas, que consomem `Val_Liq`, `CFO` e `Markup`.
