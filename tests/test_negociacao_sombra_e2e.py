@@ -2,8 +2,8 @@
 """E2E: ao salvar a negociação de um orçamento, os derivados do motor novo
 são materializados nas colunas sombra. O comportamento legado não é alterado.
 
-Nota: o bloco sombra é não-intrusivo e roda APÓS o send_json (resposta já enviada).
-Por isso aguardamos brevemente antes de verificar as colunas no banco."""
+Nota: o bloco sombra roda ANTES do send_json (servidor é single-thread),
+portanto quando a resposta chega ao cliente os derivados já estão gravados."""
 
 
 def _login(f, who):
@@ -14,7 +14,6 @@ def _login(f, who):
 
 
 def test_salvar_margens_materializa_derivados(http_client_factory, seed, app_db):
-    import time
     c = _login(http_client_factory, "dir_l1")
     oid = seed["orcamento_l1_id"]
 
@@ -29,10 +28,6 @@ def test_salvar_margens_materializa_derivados(http_client_factory, seed, app_db)
 
     st, body = c.post(f"/api/orcamentos/{oid}/margens", {"desconto_pct": 10})
     assert st == 200
-
-    # O bloco sombra é não-intrusivo e corre APÓS a resposta ser enviada;
-    # aguardamos para garantir que o commit sombra seja visível.
-    time.sleep(0.2)
 
     db = app_db.get_session()
     o = db.get(app_db.Orcamento, oid)

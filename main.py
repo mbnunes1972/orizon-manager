@@ -1989,9 +1989,10 @@ class Handler(BaseHTTPRequestHandler):
                     orc.desconto_pct = float(req["desconto_pct"])
                 orc.margens = json.dumps(atual, ensure_ascii=False)
                 db.commit()
-                self.send_json({"ok": True, "margens": atual})
                 # ── modo sombra: materializa derivados do motor de negociação ──
                 # Bloco NÃO-INTRUSIVO: falhas aqui não afetam o save legado nem a resposta.
+                # Roda ANTES do send_json — quando a resposta chega ao cliente os derivados
+                # já estão gravados (o servidor é single-thread).
                 try:
                     import mod_negociacao
                     proj = db.query(Projeto).filter_by(nome_safe=orc.projeto_id).first()
@@ -2016,6 +2017,7 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as _e:
                     db.rollback()
                     print("[SOMBRA] falha ao materializar derivados:", _e)
+                self.send_json({"ok": True, "margens": atual})
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
