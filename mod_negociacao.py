@@ -36,26 +36,34 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0):
 
     out_ambs = []
     VBNO = VAVO = 0.0
+    com_arq = pro_fid = 0.0
     for a in ambs:
         vbva, d_amb = a["VBVA"], a["d_amb"]
         fator_desc = (1 - d_orc) * (1 - d_amb)
+        # parcelas de viagem (rateada) e brinde (igual/amb) deste ambiente
+        num_via = (cust_via * (vbva / VBVO)) if (tog_cvia and VBVO > 0) else 0.0
+        num_bri = (bri / num_amb) if (tog_bri and num_amb) else 0.0
         if tog_cadi:
             fator_com = (1 - pct_arq if tog_carq else 1.0) * (1 - pct_fid if tog_fid else 1.0)
             termo_arqfid = (vbva / fator_com) if fator_com > 0 else vbva
-            termo_via = ((cust_via * (vbva / VBVO)) / fator_desc) \
-                if (tog_cvia and VBVO > 0 and fator_desc > 0) else 0.0
-            termo_bri = (bri / num_amb) if (tog_bri and num_amb) else 0.0
-            vbna = termo_arqfid + termo_via + termo_bri
+            # viagem + brinde blindados do desconto (/fator_desc) → recuperados 100%
+            termo_via_bri = ((num_via + num_bri) / fator_desc) if fator_desc > 0 else 0.0
+            vbna = termo_arqfid + termo_via_bri
         else:
             vbna = vbva
         vava = vbna * fator_desc
+        # comissão em cadeia, por ambiente: arq NÃO ganha sobre fid; ambos excluem os
+        # custos (viagem/brinde) que estão DENTRO do VAVA — só quando repassados (Tog_Cadi).
+        custo_em_vava = (num_via + num_bri) if tog_cadi else 0.0
+        pro_amb = (pct_fid * (vava - custo_em_vava)) if tog_fid else 0.0
+        com_amb = (pct_arq * (vava - pro_amb - custo_em_vava)) if tog_carq else 0.0
+        pro_fid += pro_amb
+        com_arq += com_amb
         VBNO += vbna
         VAVO += vava
         out_ambs.append({"VBVA": round(vbva, 2), "CFA": round(a["CFA"], 2),
                          "VBNA": round(vbna, 2), "VAVA": round(vava, 2)})
 
-    com_arq = (pct_arq * VAVO) if tog_carq else 0.0
-    pro_fid = (pct_fid * VAVO) if tog_fid else 0.0
     cust_ad = com_arq + pro_fid + (cust_via if tog_cvia else 0.0) + (bri if tog_bri else 0.0)
     val_liq = VAVO - cust_ad
     desc_tot = ((VBVO - val_liq) / VBVO) if VBVO > 0 else 0.0
