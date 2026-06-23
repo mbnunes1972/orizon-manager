@@ -1989,25 +1989,33 @@ class Handler(BaseHTTPRequestHandler):
                     orc.desconto_pct = float(req["desconto_pct"])
                 orc.margens = json.dumps(atual, ensure_ascii=False)
                 db.commit()
-                # ── modo sombra: materializa derivados do motor de negociação ──
-                import mod_negociacao
-                proj = db.query(Projeto).filter_by(nome_safe=orc.projeto_id).first()
-                params = json.loads(proj.parametros_json) if (proj and proj.parametros_json) else {}
-                ambs = []
-                for lk in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all():
-                    pa = db.get(PoolAmbiente, lk.pool_ambiente_id)
-                    if pa:
-                        ambs.append({"VBVA": pa.budget_total or 0.0, "CFA": pa.order_total or 0.0,
-                                     "desc_amb_pct": lk.desconto_individual_pct or 0.0})
-                d = mod_negociacao.calcular_orcamento(ambs, params, orc.desconto_pct or 0.0)
-                orc.vbvo, orc.cfo, orc.vbno, orc.vavo = d["VBVO"], d["CFO"], d["VBNO"], d["VAVO"]
-                orc.cust_ad, orc.val_liq = d["Cust_Ad"], d["Val_Liq"]
-                orc.desc_tot_pct, orc.markup = d["Desc_Tot"], d["Markup"]
-                orc.prov_imp = d["Prov_Imp"]
-                orc.cust_fin = round(max(0.0, (orc.valor_total or 0.0) - d["VAVO"]), 2)
-                orc.val_cont = round(d["VAVO"] + orc.cust_fin, 2)
-                db.commit()
                 self.send_json({"ok": True, "margens": atual})
+                # ── modo sombra: materializa derivados do motor de negociação ──
+                # Bloco NÃO-INTRUSIVO: falhas aqui não afetam o save legado nem a resposta.
+                try:
+                    import mod_negociacao
+                    proj = db.query(Projeto).filter_by(nome_safe=orc.projeto_id).first()
+                    params = json.loads(proj.parametros_json) if (proj and proj.parametros_json) else {}
+                    ambs = []
+                    for lk in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all():
+                        pa = db.get(PoolAmbiente, lk.pool_ambiente_id)
+                        if pa:
+                            ambs.append({"VBVA": pa.budget_total or 0.0, "CFA": pa.order_total or 0.0,
+                                         "desc_amb_pct": lk.desconto_individual_pct or 0.0})
+                    # Padrão de duas chamadas: 1ª para obter VAVO, 2ª com cust_fin real
+                    d0 = mod_negociacao.calcular_orcamento(ambs, params, orc.desconto_pct or 0.0)
+                    cust_fin = max(0.0, (orc.valor_total or 0.0) - d0["VAVO"])
+                    d = mod_negociacao.calcular_orcamento(ambs, params, orc.desconto_pct or 0.0, cust_fin=cust_fin)
+                    orc.vbvo, orc.cfo, orc.vbno, orc.vavo = d["VBVO"], d["CFO"], d["VBNO"], d["VAVO"]
+                    orc.cust_ad, orc.val_liq = d["Cust_Ad"], d["Val_Liq"]
+                    orc.desc_tot_pct, orc.markup = d["Desc_Tot"], d["Markup"]
+                    orc.prov_imp = d["Prov_Imp"]
+                    orc.cust_fin = d["Cust_Fin"]
+                    orc.val_cont = d["Val_Cont"]
+                    db.commit()
+                except Exception as _e:
+                    db.rollback()
+                    print("[SOMBRA] falha ao materializar derivados:", _e)
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
