@@ -29,6 +29,18 @@ def test_protecao_total_com_cadeia():
     _ap(r["Val_Liq"], r["VBVO"] * 0.80)            # 20385.19 — proteção total
     _ap(r["Desc_Tot"] * 100, 20.00, tol=0.02)      # desconto total == desconto do orçamento
 
+def test_comissao_exclui_custos_no_absorve():
+    # absorve (Tog_Cadi false): a comissão NÃO incide sobre viagem/brinde — a base é
+    # VAVA − viagem − brinde mesmo a loja absorvendo os custos (fórmula sem condição de toggle).
+    p = {"incluir_custos": False, "fidelidade_pct": 2.0, "fidelidade_ativa": True,
+         "fora_da_sede": True, "custo_viagem": 2000.0, "brinde": 500.0, "brinde_ativo": True,
+         "comissao_arq_ativa": False}
+    r = mn.calcular_orcamento(AMBS, p, 20.0)
+    vavo = r["VBVO"] * 0.80                          # 20385.19 (absorve, só desconto)
+    pro_esperado = 0.02 * (vavo - 2000 - 500)        # 357.70 — exclui viagem+brinde
+    _ap(r["Pro_Fid"], pro_esperado)
+    _ap(r["Val_Liq"], vavo - (pro_esperado + 2000 + 500))   # 17527.49
+
 def test_brinde_blindado_do_desconto():
     # brinde repassado (Tog_Cadi) deve ser recuperado 100% mesmo com desconto:
     # o líquido com só brinde deve igualar o líquido sem custo nenhum.

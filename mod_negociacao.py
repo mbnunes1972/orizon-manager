@@ -52,11 +52,12 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0):
         else:
             vbna = vbva
         vava = vbna * fator_desc
-        # comissão em cadeia, por ambiente: arq NÃO ganha sobre fid; ambos excluem os
-        # custos (viagem/brinde) que estão DENTRO do VAVA — só quando repassados (Tog_Cadi).
-        custo_em_vava = (num_via + num_bri) if tog_cadi else 0.0
-        pro_amb = (pct_fid * (vava - custo_em_vava)) if tog_fid else 0.0
-        com_amb = (pct_arq * (vava - pro_amb - custo_em_vava)) if tog_carq else 0.0
+        # comissão em cadeia, por ambiente: arq NÃO ganha sobre fid; e nem arq nem fid
+        # ganham sobre viagem/brinde — a base exclui esses custos SEMPRE (repassados ou
+        # absorvidos), conforme a fórmula `VAVA − viagem − brinde`.
+        base_custos = num_via + num_bri
+        pro_amb = (pct_fid * (vava - base_custos)) if tog_fid else 0.0
+        com_amb = (pct_arq * (vava - pro_amb - base_custos)) if tog_carq else 0.0
         pro_fid += pro_amb
         com_arq += com_amb
         VBNO += vbna
