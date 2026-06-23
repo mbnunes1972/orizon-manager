@@ -2022,12 +2022,7 @@ class Handler(BaseHTTPRequestHandler):
                 if orc is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
-                pag = req.get("pagamento") or {}
-                d = _negociacao_breakdown(
-                    orc, db,
-                    params=req.get("params"), desc_orc=req.get("desc_orc"),
-                    descontos_amb=req.get("descontos_amb"),
-                    total_cliente=pag.get("total_cliente"))
+                d = _negociacao_breakdown(orc, db)
                 self.send_json({"ok": True, "sombra": d, "ambientes": d.get("ambientes", [])})
             finally:
                 db.close()
@@ -4217,35 +4212,30 @@ def _sombra_dict(o) -> dict:
     }
 
 
-def _negociacao_breakdown(orc, db, params=None, desc_orc=None, descontos_amb=None, total_cliente=None):
-    """Calcula a cadeia do motor para um orçamento, SEM gravar. `params`/`desc_orc`/
-    `descontos_amb` opcionais sobrepõem o salvo (estado em edição do modal). `total_cliente`
-    (da modalidade via mod_fin) define o Cust_Fin; None ⇒ à vista (Cust_Fin=0)."""
+def _negociacao_breakdown(orc, db):
+    """Calcula a cadeia do motor lendo SÓ os insumos salvos (parametros_json, desconto do
+    orçamento, descontos por ambiente, forma_pagamento). Sem overrides do frontend. NÃO grava."""
     import mod_negociacao
     proj = db.query(Projeto).filter_by(nome_safe=orc.projeto_id).first()
-    if params is None:
-        params = json.loads(proj.parametros_json) if (proj and proj.parametros_json) else {}
-    if desc_orc is None:
-        desc_orc = orc.desconto_pct or 0.0
-    descontos_amb = descontos_amb or {}
-    ambs = []
-    ids = []
+    params = json.loads(proj.parametros_json) if (proj and proj.parametros_json) else {}
+    desc_orc = orc.desconto_pct or 0.0
+    ambs, ids = [], []
     for lk in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all():
         pa = db.get(PoolAmbiente, lk.pool_ambiente_id)
         if pa:
-            d_amb = descontos_amb.get(str(lk.pool_ambiente_id),
-                                      descontos_amb.get(lk.pool_ambiente_id,
-                                                        lk.desconto_individual_pct or 0.0))
             ambs.append({"VBVA": pa.budget_total or 0.0, "CFA": pa.order_total or 0.0,
-                         "desc_amb_pct": float(d_amb or 0.0)})
+                         "desc_amb_pct": float(lk.desconto_individual_pct or 0.0)})
             ids.append(lk.pool_ambiente_id)
+    total_cliente = None
+    try:
+        fp = json.loads(orc.forma_pagamento) if orc.forma_pagamento else None
+        if isinstance(fp, dict) and fp.get("total_cliente"):
+            total_cliente = float(fp["total_cliente"])
+    except Exception:
+        total_cliente = None
     d0 = mod_negociacao.calcular_orcamento(ambs, params, desc_orc)
-    if total_cliente is None:
-        cust_fin = 0.0
-    else:
-        cust_fin = max(0.0, float(total_cliente) - d0["VAVO"])
+    cust_fin = 0.0 if total_cliente is None else max(0.0, total_cliente - d0["VAVO"])
     d = mod_negociacao.calcular_orcamento(ambs, params, desc_orc, cust_fin=cust_fin)
-    # anexa o pool_ambiente_id a cada ambiente (frontend casa as células por ambiente)
     for i, amb in enumerate(d.get("ambientes", [])):
         amb["id"] = ids[i] if i < len(ids) else None
     return d
@@ -4255,14 +4245,7 @@ def _recalcular_orcamento(orc, db):
     """Recalcula a negociação pelo motor e GRAVA: colunas sombra + valor_total/valor_liquido.
     `valor_total` vem da modalidade (forma_pagamento.total_cliente, já calculada com o VAVO);
     à vista ⇒ valor_total = VAVO. NÃO grava se contrato assinado (chamador já checa)."""
-    total_cliente = None
-    try:
-        fp = json.loads(orc.forma_pagamento) if orc.forma_pagamento else None
-        if isinstance(fp, dict) and fp.get("total_cliente"):
-            total_cliente = float(fp["total_cliente"])
-    except Exception:
-        total_cliente = None
-    d = _negociacao_breakdown(orc, db, total_cliente=total_cliente)
+    d = _negociacao_breakdown(orc, db)
     orc.vbvo, orc.cfo, orc.vbno, orc.vavo = d["VBVO"], d["CFO"], d["VBNO"], d["VAVO"]
     orc.cust_ad, orc.val_liq = d["Cust_Ad"], d["Val_Liq"]
     orc.com_arq_orc, orc.pro_fid_orc = d["Com_Arq"], d["Pro_Fid"]

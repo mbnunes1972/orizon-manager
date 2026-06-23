@@ -97,3 +97,19 @@ def test_preview_ambientes_tem_id_e_vava(http_client_factory, seed, app_db):
     mine = [a for a in body["ambientes"] if a.get("id") == pid]
     assert len(mine) == 1, f"ambiente {pid} não encontrado em {body['ambientes']}"
     assert abs(mine[0]["VAVA"] - 8000.0) < 0.5      # desconto 0 ⇒ VAVA = budget
+
+
+def test_preview_ignora_overrides_do_corpo(http_client_factory, seed, app_db):
+    """O preview lê só dos salvos: enviar params/desc_orc no corpo NÃO altera o resultado."""
+    oid = seed["orcamento_l1_id"]
+    db = app_db.get_session()
+    pj = db.get(app_db.Orcamento, oid).projeto_id
+    pa = app_db.PoolAmbiente(nome="A", nome_exibicao="A", xml_path="a.xml",
+                             ambientes_json="{}", projeto_id=pj, budget_total=10000.0, order_total=4000.0)
+    db.add(pa); db.flush(); db.add(app_db.OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pa.id, ordem=1))
+    db.commit(); db.close()
+    c = _login(http_client_factory, "dir_l1")
+    st, base = c.post(f"/api/orcamentos/{oid}/negociacao-preview", {})
+    st2, comov = c.post(f"/api/orcamentos/{oid}/negociacao-preview", {"desc_orc": 50, "params": {"comissao_arq_ativa": True, "comissao_arq_pct": 99}})
+    assert st == 200 and st2 == 200
+    assert base["sombra"]["VAVO"] == comov["sombra"]["VAVO"]   # overrides ignorados
