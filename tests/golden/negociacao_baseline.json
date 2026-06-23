@@ -1,0 +1,322 @@
+[
+  {
+    "id": 1,
+    "projeto": "Projeto_1_2",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 0.0,
+      "valor_liquido": 0.0
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 2,
+    "projeto": "Projeto_1_3",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 0.0,
+      "valor_liquido": 0.0
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 3,
+    "projeto": "Projeto_1",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 0.0,
+      "valor_liquido": 0.0
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 4,
+    "projeto": "Projeto_2",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 66983.4,
+      "valor_liquido": 0.0
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 5,
+    "projeto": "Projeto_2",
+    "ordem": 2,
+    "hoje": {
+      "valor_total": 182028.24,
+      "valor_liquido": 0.0
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 6,
+    "projeto": "Projeto_1",
+    "ordem": 2,
+    "hoje": {
+      "valor_total": 131978.9,
+      "valor_liquido": 0.0
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 7,
+    "projeto": "Projeto_3",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 126051.07,
+      "valor_liquido": 116395.56
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 8,
+    "projeto": "Projeto_Teste",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 129328.4,
+      "valor_liquido": 129328.4
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 9,
+    "projeto": "Projeto_10",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 50049.34,
+      "valor_liquido": 50049.34
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 10,
+    "projeto": "Projeto_Marcelo",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 129572.01,
+      "valor_liquido": 116395.56
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 11,
+    "projeto": "Projeto_Luiz",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 137389.03,
+      "valor_liquido": 116395.56
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 12,
+    "projeto": "Projeto_12",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 65592.3,
+      "valor_liquido": 65592.3
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 13,
+    "projeto": "Projeto_15",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 124806.76,
+      "valor_liquido": 116395.56
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 14,
+    "projeto": "Felipe_Guizao",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 154374.29,
+      "valor_liquido": 0.0
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 15,
+    "projeto": "Felipe_Guizao",
+    "ordem": 2,
+    "hoje": {
+      "valor_total": 181846.43,
+      "valor_liquido": 169065.99
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 16,
+    "projeto": "Projeto_13",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 119727.11,
+      "valor_liquido": 105329.47
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 17,
+    "projeto": "Projeto_11",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 185700.46,
+      "valor_liquido": 163369.28
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 18,
+    "projeto": "Projeto_11",
+    "ordem": 2,
+    "hoje": {
+      "valor_total": 232838.74,
+      "valor_liquido": 209182.32
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 19,
+    "projeto": "LELEU",
+    "ordem": 1,
+    "hoje": {
+      "valor_total": 27455.42,
+      "valor_liquido": 25112.46
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  },
+  {
+    "id": 20,
+    "projeto": "LELEU",
+    "ordem": 2,
+    "hoje": {
+      "valor_total": 106534.8,
+      "valor_liquido": 98374.23
+    },
+    "novo": {
+      "vavo": 0.0,
+      "val_liq": 0.0,
+      "markup": 0.0,
+      "val_cont": 0.0,
+      "desc_tot_pct": 0.0
+    }
+  }
+]

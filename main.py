@@ -47,6 +47,7 @@ import mod_medicao
 import perfis
 import mod_usuarios
 import mod_tenancy
+from mod_qualidade_xml import avaliar_qualidade_xml
 
 def _enriquecer_projetos_com_status(projetos):
     """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
@@ -1988,7 +1989,44 @@ class Handler(BaseHTTPRequestHandler):
                     orc.desconto_pct = float(req["desconto_pct"])
                 orc.margens = json.dumps(atual, ensure_ascii=False)
                 db.commit()
-                self.send_json({"ok": True, "margens": atual})
+                # ── modo sombra: materializa derivados do motor de negociação ──
+                # Bloco NÃO-INTRUSIVO: falhas aqui não afetam o save legado nem a resposta.
+                # Roda ANTES do send_json — quando a resposta chega ao cliente os derivados
+                # já estão gravados (o servidor é single-thread).
+                try:
+                    import mod_negociacao
+                    proj = db.query(Projeto).filter_by(nome_safe=orc.projeto_id).first()
+                    params = json.loads(proj.parametros_json) if (proj and proj.parametros_json) else {}
+                    ambs = []
+                    for lk in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all():
+                        pa = db.get(PoolAmbiente, lk.pool_ambiente_id)
+                        if pa:
+                            ambs.append({"VBVA": pa.budget_total or 0.0, "CFA": pa.order_total or 0.0,
+                                         "desc_amb_pct": lk.desconto_individual_pct or 0.0})
+                    # Padrão de duas chamadas: 1ª para obter VAVO, 2ª com cust_fin real
+                    d0 = mod_negociacao.calcular_orcamento(ambs, params, orc.desconto_pct or 0.0)
+                    cust_fin = max(0.0, (orc.valor_total or 0.0) - d0["VAVO"])
+                    d = mod_negociacao.calcular_orcamento(ambs, params, orc.desconto_pct or 0.0, cust_fin=cust_fin)
+                    orc.vbvo, orc.cfo, orc.vbno, orc.vavo = d["VBVO"], d["CFO"], d["VBNO"], d["VAVO"]
+                    orc.cust_ad, orc.val_liq = d["Cust_Ad"], d["Val_Liq"]
+                    orc.desc_tot_pct, orc.markup = d["Desc_Tot"], d["Markup"]
+                    orc.prov_imp = d["Prov_Imp"]
+                    orc.cust_fin = d["Cust_Fin"]
+                    orc.val_cont = d["Val_Cont"]
+                    db.commit()
+                except Exception as _e:
+                    db.rollback()
+                    print("[SOMBRA] falha ao materializar derivados:", _e)
+                self.send_json({"ok": True, "margens": atual,
+                                "sombra": {
+                                    "vavo":         orc.vavo         or 0.0,
+                                    "val_liq":      orc.val_liq      or 0.0,
+                                    "markup":       orc.markup       or 0.0,
+                                    "desc_tot_pct": orc.desc_tot_pct or 0.0,
+                                    "vbvo":         orc.vbvo         or 0.0,
+                                    "cfo":          orc.cfo          or 0.0,
+                                    "val_cont":     orc.val_cont     or 0.0,
+                                }})
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -2118,6 +2156,8 @@ class Handler(BaseHTTPRequestHandler):
                     for grupo in amb.get("grupos", [])
                     for item in grupo.get("itens", [])
                 )
+                _qa = avaliar_qualidade_xml(
+                    [it for g in amb.get("grupos", []) for it in g.get("itens", [])])
 
                 # Hash do conteúdo (ignora campos derivados do nome do arquivo)
                 def _content_hash(a):
@@ -2159,6 +2199,7 @@ class Handler(BaseHTTPRequestHandler):
                         "amb":          amb,
                         "budget_total": budget_total,
                         "order_total":  order_total,
+                        "qa":           _qa,
                     }
 
                     if por_nome and por_hash and por_nome.id == por_hash.id:
@@ -2219,8 +2260,12 @@ class Handler(BaseHTTPRequestHandler):
                             nome_exibicao= nome_base,
                             xml_path=      os.path.join("xmls", arq_nome),
                             ambientes_json=json.dumps(amb),
-                            budget_total=  budget_total,
-                            order_total=   order_total,
+                            budget_total=              budget_total,
+                            order_total=               order_total,
+                            qa_selo=                   _qa["qa_selo"],
+                            qa_pct_sem_acrescimo=      _qa["qa_pct_sem_acrescimo"],
+                            qa_markup_xml=             _qa["qa_markup_xml"],
+                            qa_custo_sem_venda=        _qa["qa_custo_sem_venda"],
                             created_by=    _usuario['id'] if _usuario else None,
                         )
                         db.add(pa)
@@ -2271,10 +2316,16 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Ambiente não encontrado"})
                         return
                     # Atualiza o registro no pool
-                    pa.xml_path      = os.path.join("xmls", temp["arq_nome"])
-                    pa.ambientes_json = json.dumps(temp["amb"])
-                    pa.budget_total  = temp["budget_total"]
-                    pa.order_total   = temp["order_total"]
+                    pa.xml_path               = os.path.join("xmls", temp["arq_nome"])
+                    pa.ambientes_json          = json.dumps(temp["amb"])
+                    pa.budget_total            = temp["budget_total"]
+                    pa.order_total             = temp["order_total"]
+                    _qa_s = temp.get("qa") or avaliar_qualidade_xml(
+                        [it for g in temp["amb"].get("grupos", []) for it in g.get("itens", [])])
+                    pa.qa_selo                 = _qa_s["qa_selo"]
+                    pa.qa_pct_sem_acrescimo    = _qa_s["qa_pct_sem_acrescimo"]
+                    pa.qa_markup_xml           = _qa_s["qa_markup_xml"]
+                    pa.qa_custo_sem_venda      = _qa_s["qa_custo_sem_venda"]
                     # Passo 12: recalcula todos os orçamentos que referenciam este ambiente
                     links_afetados = db.query(OrcamentoAmbiente).filter_by(pool_ambiente_id=pid).all()
                     recalculados = []
@@ -2346,6 +2397,8 @@ class Handler(BaseHTTPRequestHandler):
                     nome_exib_novo   = "%s_v%d" % (pa_orig.nome, nova_versao - 1)
                     arq_nome_novo    = "%s.xml" % nome_exib_novo
                     _usuario = usuario
+                    _qa_nv = temp.get("qa") or avaliar_qualidade_xml(
+                        [it for g in temp["amb"].get("grupos", []) for it in g.get("itens", [])])
                     pa_novo = PoolAmbiente(
                         projeto_id=    nome_safe,
                         nome=          pa_orig.nome,
@@ -2353,8 +2406,12 @@ class Handler(BaseHTTPRequestHandler):
                         nome_exibicao= nome_exib_novo,
                         xml_path=      os.path.join("xmls", arq_nome_novo),
                         ambientes_json=json.dumps(temp["amb"]),
-                        budget_total=  temp["budget_total"],
-                        order_total=   temp["order_total"],
+                        budget_total=              temp["budget_total"],
+                        order_total=               temp["order_total"],
+                        qa_selo=                   _qa_nv["qa_selo"],
+                        qa_pct_sem_acrescimo=      _qa_nv["qa_pct_sem_acrescimo"],
+                        qa_markup_xml=             _qa_nv["qa_markup_xml"],
+                        qa_custo_sem_venda=        _qa_nv["qa_custo_sem_venda"],
                         created_by=    _usuario['id'] if _usuario else None,
                     )
                     db.add(pa_novo)
@@ -2454,6 +2511,8 @@ class Handler(BaseHTTPRequestHandler):
                                         "erro": "Contrato assinado — alterações não permitidas."},
                                        code=403)
                         return
+                    _qa_cf = temp.get("qa") or avaliar_qualidade_xml(
+                        [it for g in temp["amb"].get("grupos", []) for it in g.get("itens", [])])
                     pa = PoolAmbiente(
                         projeto_id=    nome_safe,
                         nome=          temp["nome_base"],
@@ -2461,8 +2520,12 @@ class Handler(BaseHTTPRequestHandler):
                         nome_exibicao= temp["nome_base"],
                         xml_path=      os.path.join("xmls", temp["arq_nome"]),
                         ambientes_json=json.dumps(temp["amb"]),
-                        budget_total=  temp["budget_total"],
-                        order_total=   temp["order_total"],
+                        budget_total=              temp["budget_total"],
+                        order_total=               temp["order_total"],
+                        qa_selo=                   _qa_cf["qa_selo"],
+                        qa_pct_sem_acrescimo=      _qa_cf["qa_pct_sem_acrescimo"],
+                        qa_markup_xml=             _qa_cf["qa_markup_xml"],
+                        qa_custo_sem_venda=        _qa_cf["qa_custo_sem_venda"],
                         created_by=    usuario['id'] if usuario else None,
                     )
                     db.add(pa)
@@ -2538,6 +2601,36 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # ── POST /api/pool/<pid>/qa-override — liberar ambiente bloqueado ──────
+            m_qaov = _re.match(r"^/api/pool/(\d+)/qa-override$", path)
+            if m_qaov:
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "aprovar_financeiro"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                    return
+                req = json.loads(body) if body else {}
+                motivo = (req.get("motivo") or "").strip()
+                if not motivo:
+                    self.send_json({"ok": False, "erro": "Justificativa é obrigatória."})
+                    return
+                db = get_session()
+                try:
+                    pa = db.get(PoolAmbiente, int(m_qaov.group(1)))
+                    if not pa:
+                        self.send_json({"ok": False, "erro": "Ambiente não encontrado"}, code=404)
+                        return
+                    pa.qa_override_por_id = usuario["id"]
+                    pa.qa_override_motivo = motivo
+                    db.add(LogAcaoGerencial(
+                        autorizador_id=usuario["id"], acao="qa_override",
+                        projeto_nome=pa.projeto_id,
+                        contexto=json.dumps({"pool_ambiente_id": pa.id, "motivo": motivo})))
+                    db.commit()
+                    self.send_json({"ok": True})
+                finally:
+                    db.close()
+                return
+
             # ── POST /orcamentos/<oid>/ambientes/<pid> — adicionar ambiente ──────────
             m_add = _re.match(r"^/orcamentos/(\d+)/ambientes/(\d+)$", path)
             if m_add:
@@ -2566,6 +2659,11 @@ class Handler(BaseHTTPRequestHandler):
                     pa = db.get(PoolAmbiente, pid)
                     if pa is None or pa.projeto_id != orc.projeto_id:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    if pa.qa_selo == "bloqueado" and pa.qa_override_por_id is None:
+                        self.send_json({"ok": False, "erro":
+                            "Ambiente bloqueado por qualidade do XML (acréscimo zerado). "
+                            "Re-exporte o XML ou solicite liberação ao Diretor/Gerente."}, code=409)
                         return
                     ja_existe = db.query(OrcamentoAmbiente).filter_by(
                         orcamento_id=oid, pool_ambiente_id=pid
@@ -4094,6 +4192,16 @@ def _orcamento_dict(o) -> dict:
         "created_at":      o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else "",
         "updated_at":      o.updated_at.strftime("%Y-%m-%d %H:%M") if o.updated_at else "",
         "ambientes":       [],  # preenchido por rotas específicas
+        # ── modo sombra: derivados do motor de negociação (Task 7) ──
+        "sombra": {
+            "vavo":         o.vavo         or 0.0,
+            "val_liq":      o.val_liq      or 0.0,
+            "markup":       o.markup       or 0.0,
+            "desc_tot_pct": o.desc_tot_pct or 0.0,
+            "vbvo":         o.vbvo         or 0.0,
+            "cfo":          o.cfo          or 0.0,
+            "val_cont":     o.val_cont     or 0.0,
+        },
     }
 
 

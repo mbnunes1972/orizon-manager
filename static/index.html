@@ -1780,6 +1780,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       </div>
     </div>
 
+    <!-- modo sombra: bloco HOJE × NOVO (Task 7) -->
+    <div id="mp-sombra"></div>
+
     <div style="display:flex;gap:10px;margin-top:20px">
       <button class="btn btn-ghost btn-sm" onclick="fecharModalParams(false)" style="flex:1;justify-content:center">Voltar</button>
       <button class="btn btn-primary btn-sm" onclick="mpSalvarComValidacao()" style="flex:1;justify-content:center">Salvar e continuar</button>
@@ -1838,6 +1841,7 @@ let _orcamentos        = [];   // lista de orçamentos do projeto ativo
 let _orcamentoAtivoId  = null; // id do orçamento selecionado
 let _orcAmbientesAtivos = null; // pool_ambientes do orçamento ativo — null = modo legado (comportamento original)
 let _removerAmbPending  = null; // { pid } aguardando confirmação
+let _orcSombra         = null; // derivados sombra do orçamento ativo (Task 7 — modo sombra)
 
 // ---- Limite de desconto total (35%) ----------------------------------------
 function _verificarLimiteDescTotal(){
@@ -2599,6 +2603,9 @@ async function _aplicarFiltroOrcamento(id){
 async function ativarOrcamento(id){
   _orcamentoAtivoId = id;
   if(projetoAtivo) localStorage.setItem('lastOrc_'+projetoAtivo.nome_safe, id);
+  // modo sombra: captura derivados do orçamento ativo (Task 7)
+  const _orcAtivo = _orcamentos.find(o => o.id === id);
+  _orcSombra = (_orcAtivo && _orcAtivo.sombra) || null;
   renderOrcamentosBar();
   await _aplicarFiltroOrcamento(id);
 }
@@ -5380,6 +5387,8 @@ function mpAtualizarApoio(){
     id('mp-a-margem').textContent   = margem.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
     _atualizarImpostos('ay',avista); _atualizarImpostos('cc',avista);
     _atualizarImpostos('vp',avista); _atualizarImpostos('tf',avista);
+    // ── modo sombra: HOJE × NOVO (Task 7 — validação visual) ──
+    _mpRenderSombra(liquido, margem);
     return;
   }
   const ambs = (projetoAtivo && projetoAtivo.ambientes) || [];
@@ -5450,6 +5459,58 @@ function mpAtualizarApoio(){
   id('mp-a-brinde').textContent    = brinde_ativo ? '− R$ '+fmt(v_brinde) : 'R$ 0,00';
   id('mp-a-liq').textContent       = 'R$ '+fmt(liquido);
   id('mp-a-margem').textContent    = margem.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
+  // ── modo sombra: HOJE × NOVO (Task 7 — validação visual) ──
+  _mpRenderSombra(liquido, margem);
+}
+
+// ── modo sombra Task 7: renderiza bloco HOJE × NOVO no modal de parâmetros ──
+function _mpRenderSombra(liquidoHoje, margemHoje) {
+  const box = document.getElementById('mp-sombra');
+  if (!box) return;
+  const s = _orcSombra || {};
+  const temSombra = s && (s.val_liq || s.desc_tot_pct || s.markup);
+  if (!temSombra) {
+    // sem dados sombra: limpa o bloco (orçamento ainda não foi salvo com o motor)
+    box.innerHTML = '';
+    return;
+  }
+  const fmtR = v => (Number(v) || 0).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
+  const fmtP = v => (Number(v) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
+  const liqNovo    = s.val_liq      || 0;
+  const descNovo   = (s.desc_tot_pct || 0) * 100;  // motor guarda como decimal 0..1
+  const mkpNovo    = s.markup       || 0;
+  const liqHoje    = Number(liquidoHoje) || 0;
+  const descHoje   = Number(margemHoje)  || 0;      // _margemAtual já é em %
+  box.innerHTML = `
+    <div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:8px;font-size:11px">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Validação — HOJE × NOVO (sombra)</div>
+      <table style="width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace">
+        <thead>
+          <tr>
+            <td style="color:var(--muted);padding-bottom:4px"></td>
+            <td style="text-align:right;color:var(--muted);padding-bottom:4px">HOJE</td>
+            <td style="text-align:right;color:var(--dalm-gold,#f5c842);padding-bottom:4px">NOVO</td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="color:var(--muted)">Valor líquido</td>
+            <td style="text-align:right">${fmtR(liqHoje)}</td>
+            <td style="text-align:right;color:var(--dalm-gold,#f5c842)">${fmtR(liqNovo)}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--muted)">Desconto total</td>
+            <td style="text-align:right">${fmtP(descHoje)}</td>
+            <td style="text-align:right;color:var(--dalm-gold,#f5c842)">${fmtP(descNovo)}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--muted)">Markup (Liq/CFO)</td>
+            <td style="text-align:right">—</td>
+            <td style="text-align:right;color:var(--dalm-gold,#f5c842)">${(Number(mkpNovo)||0).toFixed(3)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
 }
 
 function abrirModalParams(){
@@ -5553,9 +5614,15 @@ async function fecharModalParams(salvar){
       });
       const dp = await rp.json();
       if(!dp.ok){ showToast('Erro ao salvar parametros: '+(dp.erro||''), true); return; }
-      await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/margens',{
+      const dmg = await (await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/margens',{
         method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({desconto_pct: desconto}),
-      });
+      })).json();
+      // modo sombra: captura derivados recém-materializados (Task 7)
+      if (dmg.sombra) {
+        _orcSombra = dmg.sombra;
+        const _orcAtualizado = _orcamentos.find(o => o.id === _orcamentoAtivoId);
+        if (_orcAtualizado) _orcAtualizado.sombra = dmg.sombra;
+      }
       // Atualiza a memória com os estruturais recém-salvos + o desconto deste orçamento,
       // para refletir imediatamente ao reabrir o modal (sem precisar trocar de orçamento).
       projetoAtivo.margens = Object.assign({}, projetoAtivo.margens || {}, dp.parametros || {}, {desconto_pct: desconto});
