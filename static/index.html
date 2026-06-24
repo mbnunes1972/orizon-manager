@@ -5212,6 +5212,13 @@ async function carregarMargensSalvas(){
   (projetoAtivo.ambientes||[]).filter(a=>a.selecionado).forEach(a=>{ _negSelLocal[a.arquivo] = true; });
   const el = document.getElementById('neg-desconto');
   if(el) el.value = (projetoAtivo.margens||{}).desconto_pct || 0;
+  // Re-trigger (navegação p/ pág. 2, add-ambiente, save-params): há orçamento ativo mas NENHUMA
+  // restauração pendente. carregarModalidades→onPagamentoChange(default) ZERA o parcelamento. Para
+  // não perder o pagamento da tela (e o auto-save salvar vazio), captura a negociação ATUAL e a
+  // re-restaura. Na carga fresca (_aplicarFiltroOrcamento) _negociacaoPendente já vem do banco.
+  if (_orcamentoAtivoId && !_negociacaoPendente && _codigoPagAtivo) {
+    try { _negociacaoPendente = _capturarNegociacao(); } catch(e){}
+  }
   await carregarModalidades();  // popula dropdowns e dispara calculo
   if (_negociacaoPendente) { await _restaurarNegociacao(_negociacaoPendente); _negociacaoPendente = null; }
   await carregarPerfil();
