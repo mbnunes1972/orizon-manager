@@ -3304,8 +3304,7 @@ class Handler(BaseHTTPRequestHandler):
                         }, code=400)
                         return
                     from mod_contrato import validar_loja_para_contrato
-                    ator = _ator_dict(db, usuario)
-                    loja_dict = _loja_dict_para_contrato(db, ator.get("loja_id"))
+                    loja_dict = _loja_dict_para_contrato(db, loja_id)
                     faltando_loja = validar_loja_para_contrato(loja_dict)
                     if faltando_loja and not req.get("confirmar_loja_incompleta"):
                         self.send_json({
@@ -3353,7 +3352,7 @@ class Handler(BaseHTTPRequestHandler):
                     contrato.gerado_por_id       = usuario["id"]
                     contrato.status              = "rascunho"
                     if not contrato.loja_id:
-                        contrato.loja_id = ator.get("loja_id")
+                        contrato.loja_id = loja_id
                     contrato.loja_snapshot_json = json.dumps(loja_dict, ensure_ascii=False)
                     # Número do contrato (gerado uma vez; mantido em regerações).
                     if not contrato.num_contrato:
@@ -3857,8 +3856,7 @@ class Handler(BaseHTTPRequestHandler):
                     from mod_contrato import construir_contexto
                     from mod_contrato import _formatar_valor
                     from mod_contrato import validar_loja_para_contrato
-                    ator = _ator_dict(db, usuario)
-                    loja_dict = _loja_dict_para_contrato(db, contrato.loja_id or ator.get("loja_id"))
+                    loja_dict = _loja_dict_para_contrato(db, contrato.loja_id or loja_id)
                     faltando_loja = validar_loja_para_contrato(loja_dict)
                     if faltando_loja and not req.get("confirmar_loja_incompleta"):
                         self.send_json({
@@ -3894,7 +3892,7 @@ class Handler(BaseHTTPRequestHandler):
                     pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
                     contrato.pdf_path = pdf_path
                     if not contrato.loja_id:
-                        contrato.loja_id = ator.get("loja_id")
+                        contrato.loja_id = loja_id
                     contrato.loja_snapshot_json = json.dumps(loja_dict, ensure_ascii=False)
                     db.commit()
                     self.send_json({"ok": True, "status": contrato.status})
