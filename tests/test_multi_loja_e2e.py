@@ -37,6 +37,27 @@ def dir_l1_multiloja(app_db, seed):
     return seed
 
 
+def _put_h(client, path, body, headers=None):
+    """PUT com cookie do HttpClient, corpo JSON e headers extras (ex.: X-Loja-Ativa)."""
+    data = _json.dumps(body).encode()
+    req = urllib.request.Request(client.base + path, data=data, method="PUT")
+    req.add_header("Content-Type", "application/json")
+    if client.cookie:
+        req.add_header("Cookie", client.cookie)
+    for k, v in (headers or {}).items():
+        req.add_header(k, v)
+    try:
+        resp = urllib.request.urlopen(req, timeout=5)
+        status, raw = resp.status, resp.read()
+    except urllib.error.HTTPError as e:
+        status, raw = e.code, e.read()
+    try:
+        out = _json.loads(raw) if raw else None
+    except Exception:
+        out = raw
+    return status, out
+
+
 def _clientes_nomes(body):
     return {c["nome"] for c in (body.get("clientes") or [])}
 
@@ -63,3 +84,31 @@ def test_header_loja_nao_membro_da_403(http_client_factory, seed):
     c = http_client_factory(); c.login("dir_l2", "senha123")
     st, _ = _get_h(c, "/api/clientes?q=", {"X-Loja-Ativa": str(seed["loja1_id"])})
     assert st == 403
+
+
+def test_put_orcamento_loja_ativa_nao_usa_contexto_obsoleto(
+        http_client_factory, dir_l1_multiloja, seed):
+    """Reproduz o bug de staleness em do_PUT.
+
+    Sequência:
+    1. GET com X-Loja-Ativa=loja2  → seta global do servidor para loja2.
+    2. PUT renomear orçamento de loja1 com X-Loja-Ativa=loja1.
+       Antes do fix: global ainda é loja2 → _obj_da_loja não acha o orçamento → 404.
+       Depois do fix: do_PUT lê o header → loja1 → encontra o orçamento → 200.
+    """
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+
+    # Passo 1: contamina o global do servidor com loja2
+    _get_h(c, "/api/clientes?q=", {"X-Loja-Ativa": str(seed["loja2_id"])})
+
+    # Passo 2: PUT na loja1 — deve funcionar
+    oid  = seed["orcamento_l1_id"]
+    nome = seed["projeto_l1"]
+    st, body = _put_h(
+        c,
+        f"/projetos/{nome}/orcamentos/{oid}",
+        {"nome": "Renomeado ML"},
+        {"X-Loja-Ativa": str(seed["loja1_id"])},
+    )
+    assert st == 200, f"Esperado 200, obtido {st}: {body}"
+    assert body and body.get("ok"), f"Resposta não-ok: {body}"

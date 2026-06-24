@@ -3532,6 +3532,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
 
     def do_PUT(self):
+        global _REQ_LOJA_ATIVA
+        _REQ_LOJA_ATIVA = _ler_loja_ativa_header(self)
         path   = urlparse(self.path).path
         length = int(self.headers.get("Content-Length", 0))
         body   = self.rfile.read(length)
