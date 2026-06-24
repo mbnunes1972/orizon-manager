@@ -1872,6 +1872,7 @@ async function _persistirDescontosOrc(){
 // Blur do desconto individual: reverte se ultrapassar o limite total
 async function _onDescIndBlur(el, key, isEP07){
   if(el._esc) return;
+  const _orcNoBlur = _orcamentoAtivoId;   // orçamento no momento do blur
   if(isEP07){
     renderTabelaNeg(_orcAmbientesAtivos);
   } else {
@@ -1880,6 +1881,9 @@ async function _onDescIndBlur(el, key, isEP07){
   }
   mpAtualizarApoio();
   await negPreview();   // %Desc_Tot fresco do motor
+  // Se o usuário trocou de orçamento durante o await, ativarOrcamento já salvou os descontos
+  // deste orçamento — abortar para não gravar _descIndividual já do OUTRO orçamento aqui.
+  if(_orcamentoAtivoId !== _orcNoBlur) return;
   const _margem = _previewNeg ? (Number(_previewNeg.Desc_Tot) || 0) * 100 : _margemAtual;
   if(_margem > _LIMITE_DESC_TOTAL){
     const prev = parseFloat(el._prev) || 0;
@@ -1889,7 +1893,7 @@ async function _onDescIndBlur(el, key, isEP07){
     mpAtualizarApoio();
     showToast('Desconto total excede o limite máximo de descontos.', true);
   } else {
-    if(isEP07) _persistirDescontosOrc();
+    if(isEP07) await _persistirDescontosOrc();
   }
 }
 
@@ -2615,8 +2619,12 @@ async function _aplicarFiltroOrcamento(id){
 
 // Change 5: remove agendarCalculo() — renderTabelaNeg já é chamado por _aplicarFiltroOrcamento
 async function ativarOrcamento(id){
-  // auto-save incremental: "trava" o orçamento atual antes de trocar (evento de saída in-app)
+  // auto-save incremental: "trava" o orçamento atual antes de trocar (evento de saída in-app).
+  // Salva DESCONTOS por ambiente (await — antes era só no blur, fire-and-forget, e corria com a
+  // troca: o _orcamentoAtivoId mudava antes do save commitar → desconto não ficava guardado) E o
+  // pagamento. Ambos do orçamento ATUAL, antes de trocar o _orcamentoAtivoId.
   if (_orcamentoAtivoId && _orcamentoAtivoId !== id) {
+    try { await _persistirDescontosOrc(); } catch (e) { console.warn('auto-save descontos ao trocar:', e); }
     try { await salvarValorNegociado(); } catch (e) { console.warn('auto-save ao trocar de orçamento:', e); }
   }
   _orcamentoAtivoId = id;
