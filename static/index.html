@@ -2618,6 +2618,10 @@ async function _aplicarFiltroOrcamento(id){
 
 // Change 5: remove agendarCalculo() — renderTabelaNeg já é chamado por _aplicarFiltroOrcamento
 async function ativarOrcamento(id){
+  // auto-save incremental: "trava" o orçamento atual antes de trocar (evento de saída in-app)
+  if (_orcamentoAtivoId && _orcamentoAtivoId !== id) {
+    try { await salvarValorNegociado(); } catch (e) { /* não bloqueia a troca */ }
+  }
   _orcamentoAtivoId = id;
   if(projetoAtivo) localStorage.setItem('lastOrc_'+projetoAtivo.nome_safe, id);
   // modo sombra: captura derivados do orçamento ativo (Task 7)
@@ -6888,6 +6892,12 @@ async function salvarOrcamento(){
 }
 
 // Event listeners drag-drop para o modal de novo ambiente
+// auto-save incremental: "trava" a negociação ao fechar a aba / encerrar a reunião.
+// keepalive (no fetch de salvarValorNegociado) faz a request sobreviver ao unload.
+window.addEventListener('beforeunload', function(){
+  try { if (_orcamentoAtivoId) salvarValorNegociado(); } catch (e) {}
+});
+
 document.addEventListener('DOMContentLoaded', function(){
   const dz2 = document.getElementById('drop-zone-amb');
   if(dz2 && !dz2._hasDrop){
@@ -8093,7 +8103,7 @@ async function salvarValorNegociado() {
   if (!valor) return { ok: false, erro: 'Informe o valor total antes de salvar' };
   try {
     const r = await fetch(`/orcamentos/${_orcamentoAtivoId}/valor`, {
-      method: 'PATCH', credentials: 'same-origin',
+      method: 'PATCH', credentials: 'same-origin', keepalive: true,  // sobrevive ao unload
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         // cutover Fase B: valor_total/valor_liquido vêm do MOTOR no backend (não enviados)
