@@ -112,3 +112,14 @@ def test_put_orcamento_loja_ativa_nao_usa_contexto_obsoleto(
     )
     assert st == 200, f"Esperado 200, obtido {st}: {body}"
     assert body and body.get("ok"), f"Resposta não-ok: {body}"
+
+
+def test_auth_me_expoe_lojas_acessiveis(http_client_factory, dir_l1_multiloja, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, body = c.get("/api/auth/me")
+    assert st == 200
+    u = body["usuario"]
+    ids = {l["id"] for l in u["lojas"]}
+    assert ids == {seed["loja1_id"], seed["loja2_id"]}
+    assert u["loja_ativa_id"] == seed["loja1_id"]
+    assert all("nome" in l and "codigo" in l for l in u["lojas"])

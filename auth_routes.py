@@ -28,7 +28,7 @@ from auth import (
     verificar_desconto, autorizar_desconto,
     get_token_from_cookie, COOKIE_NAME
 )
-from database import get_session, Usuario
+from database import get_session, Usuario, Loja, membership_loja_ids
 import perfis
 
 # ── Caminho do login.html ─────────────────────────────────────────────────────
@@ -67,6 +67,17 @@ def handle_auth_get(handler, path: str) -> bool:
         if not usuario:
             _send_json(handler, {"ok": False, "erro": "Não autenticado."}, 401)
         else:
+            db = get_session()
+            try:
+                ids = membership_loja_ids(db, usuario["id"])
+                if usuario.get("loja_id") and usuario["loja_id"] not in ids:
+                    ids = ids + [usuario["loja_id"]]
+                lojas = [{"id": l.id, "nome": l.nome, "codigo": l.codigo}
+                         for l in db.query(Loja).filter(Loja.id.in_(ids)).all()] if ids else []
+                usuario["lojas"] = lojas
+                usuario["loja_ativa_id"] = usuario.get("loja_id")
+            finally:
+                db.close()
             _send_json(handler, {"ok": True, "usuario": usuario})
         return True
 
