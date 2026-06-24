@@ -629,3 +629,19 @@ legado do frontend):
   fase de orçamento, recalcula tudo) para testar o fluxo inteiro + transições de fase. Backup antes.
 - **Fase C** (limpeza do legado: `margens` duplicado, `custo_financeiro_pct` do `mod_margens`)
   fica para depois.
+
+## Sessão 28 — Bloqueio dos campos de impostos
+
+Base tributária e provisão de impostos passam a ficar **ocultas (🔒)** por padrão na tela; o
+sistema continua calculando, mas só revela mediante senha de **Diretor ou Gerente
+Administrativo-Financeiro** (capacidade `aprovar_financeiro`).
+- **Backend:** `POST /api/auth/liberar_impostos` (auth_routes.py) — valida usuário+senha e
+  `perfis.pode(nivel, "aprovar_financeiro")`; 401 (credencial inválida) × 403 (sem capacidade).
+- **Frontend:** `_atualizarImpostos` cacheia em `_impostosValores` e delega a `_renderImpostosLock`
+  (único exibidor): valor real se `_impostosLiberados`, senão cadeado clicável. Modal
+  `modal-liberar-impostos`. Valor liberado é clicável para re-bloquear. Estado **não persistido**
+  (recarregar re-bloqueia — escopo de sessão/timer é tratamento futuro).
+- **Cobertura:** os IDs `-r-base-trib`/`-r-impostos` são compartilhados pelos 4 painéis de
+  pagamento → a tela do projeto fechado fica coberta automaticamente.
+- **Honesto:** é bloqueio de **apresentação** (valores calculados no cliente), não sigilo
+  criptográfico.
