@@ -3250,6 +3250,7 @@ function _capturarNegociacao(){
     snap.tf_valores = Array.isArray(_tfValores) ? _tfValores.slice() : [];
   }
   if (codigo === 'venda_programada') snap.vp_datas = Array.isArray(_vpDatas) ? _vpDatas.slice() : [];
+  console.log('[NEG-SAVE] codigo=', snap.codigo, '| n_parcelas=', snap.n_parcelas);
   return snap;
 }
 
@@ -3270,7 +3271,11 @@ async function _restaurarNegociacao(snap){
   const parc = document.getElementById('neg-parcelas');
   if (parc && snap.n_parcelas) {
     parc.value = String(snap.n_parcelas);
+    console.log('[NEG-RESTORE] n_parcelas pedido=', snap.n_parcelas, '| value apos set=', parc.value,
+                '| opcoes=', Array.from(parc.options).map(o=>o.value).join(','));
     if (typeof onParcelasChange === 'function') onParcelasChange();
+  } else {
+    console.log('[NEG-RESTORE] SEM n_parcelas no snap:', JSON.stringify(snap));
   }
   // formas
   if (snap.forma_entrada) _formaEntrada = snap.forma_entrada;
