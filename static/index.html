@@ -2599,7 +2599,7 @@ async function _aplicarFiltroOrcamento(id){
     const d = await r.json();
     if(!d.ok) return;
     _orcAmbientesAtivos = d.ambientes || [];  // null → legado; array → EP-07
-    if(projetoAtivo) projetoAtivo.margens = Object.assign({}, d.margens || {}, d.parametros || {});
+    if(projetoAtivo) projetoAtivo.margens = Object.assign({}, d.parametros || {}, {desconto_pct: d.desconto_pct || 0});
     _negociacaoPendente = d.negociacao || null;
     // await: a cauda async de carregarMargensSalvas (que reseta _descIndividual e dispara
     // re-render via carregarModalidades) termina ANTES de popular o desconto e renderizar —
@@ -5041,7 +5041,7 @@ async function salvarDescontoAutomatico(){
     const d = await r.json();
     if(d.ok){
       // Atualiza SÓ o desconto; preserva os parâmetros estruturais (vêm do projeto).
-      const desc = (d.margens && d.margens.desconto_pct != null) ? d.margens.desconto_pct : desconto;
+      const desc = (d.desconto_pct != null) ? d.desconto_pct : desconto;
       projetoAtivo.margens = Object.assign({}, projetoAtivo.margens || {}, {desconto_pct: desc});
       aplicarBreakdownResposta(d);   // exibe o breakdown do motor (fonte única)
     }

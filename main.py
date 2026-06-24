@@ -726,7 +726,7 @@ class Handler(BaseHTTPRequestHandler):
                             d["ordem"] = lk.ordem
                             d["desconto_individual_pct"] = lk.desconto_individual_pct or 0.0
                             ambientes.append(d)
-                    margens = json.loads(orc.margens) if (orc and orc.margens) else {}
+                    desconto_pct = (orc.desconto_pct or 0.0) if orc else 0.0
                     negociacao = json.loads(orc.negociacao_json) if (orc and orc.negociacao_json) else None
                     parametros = {}
                     if orc:
@@ -734,7 +734,7 @@ class Handler(BaseHTTPRequestHandler):
                         _p = db.get(Projeto, orc.projeto_id)
                         parametros = json.loads(_p.parametros_json) if (_p and _p.parametros_json) else dict(PARAMETROS_DEFAULT)
                     self.send_json({"ok": True, "orcamento_id": oid,
-                                    "margens": margens, "negociacao": negociacao,
+                                    "desconto_pct": desconto_pct, "negociacao": negociacao,
                                     "parametros": parametros, "ambientes": ambientes})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -1965,21 +1965,18 @@ class Handler(BaseHTTPRequestHandler):
                                     "erro": "Contrato assinado — alterações não permitidas."},
                                    code=403)
                     return
-                atual = json.loads(orc.margens) if orc.margens else {}
                 if "desconto_pct" in req:
-                    atual["desconto_pct"] = float(req["desconto_pct"])
                     orc.desconto_pct = float(req["desconto_pct"])
-                orc.margens = json.dumps(atual, ensure_ascii=False)
                 db.commit()
                 try:
                     _recalcular_orcamento(orc, db)
                     db.commit()
-                    self.send_json({"ok": True, "margens": atual,
+                    self.send_json({"ok": True, "desconto_pct": orc.desconto_pct or 0.0,
                                     "sombra": _negociacao_breakdown(orc, db)})
                 except Exception as _e:
                     db.rollback()
                     print("[CUTOVER] falha ao recalcular orçamento:", _e)
-                    self.send_json({"ok": True, "margens": atual,
+                    self.send_json({"ok": True, "desconto_pct": orc.desconto_pct or 0.0,
                                     "sombra": None, "erro_sombra": str(_e)})
             except Exception as e:
                 db.rollback()
@@ -2059,16 +2056,16 @@ class Handler(BaseHTTPRequestHandler):
                                 .first())
                     proxima_ordem = (ultimo.ordem + 1) if ultimo else 1
                     _origem_id = req.get("origem_id")
-                    _margens_novo = None
+                    _desconto_novo = 0.0
                     if _origem_id:
                         _origem = _obj_da_loja(db, Orcamento, int(_origem_id), loja_id)
-                        if _origem and _origem.margens:
-                            _margens_novo = _origem.margens
+                        if _origem:
+                            _desconto_novo = _origem.desconto_pct or 0.0
                     orc = Orcamento(
                         projeto_id=nome_safe,
                         nome=      nome_orc,
                         ordem=     proxima_ordem,
-                        margens=   _margens_novo,
+                        desconto_pct= _desconto_novo,
                         loja_id=   loja_id,
                         created_by=usuario['id'] if usuario else None,
                     )
