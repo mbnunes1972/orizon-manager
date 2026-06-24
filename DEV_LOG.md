@@ -714,3 +714,19 @@ Branch `faxina/schema-fase2`. Objetivo (do usuário): **nomenclatura bem definid
   desconto não ficava guardado / aparecia stale (intermitente). **Fix:** `ativarOrcamento` aguarda
   `_persistirDescontosOrc` antes de trocar; `_onDescIndBlur` captura o orçamento do blur e aborta se
   trocou durante o `await`. (Race pré-existente, não da faxina.)
+
+## Sessão 31 — Drop da coluna `Orcamento.margens` (fecha a faxina de schema)
+
+Branch `faxina/drop-orcamento-margens`. Usuário autorizou (base é teste; backup feito:
+`omie.db.bak-2026-06-24-pre-drop-margens`). A coluna era **duplicação legada** — o motor lê
+`Projeto.parametros_json` + `Orcamento.desconto_pct`.
+
+- **Código para de usar `orc.margens`:** `GET /ambientes` e `POST /margens` passam a devolver
+  `desconto_pct` (coluna canônica) em vez de um objeto `margens`; criação de orçamento copia
+  `desconto_pct` da origem; frontend lê `d.desconto_pct` (não `d.margens.desconto_pct`).
+- **Schema:** coluna `margens` removida do modelo `Orcamento`; funções de migração obsoletas
+  (`migrar_margens_para_orcamentos`, `migrar_parametros_para_projeto`) e seus call-sites/testes
+  removidos; `test_legado_intacto` passa a exigir que `margens` **não** exista.
+- **Migração idempotente** `_drop_coluna_margens_orcamentos` (startup, sqlite≥3.35) dropa a coluna
+  em DBs existentes; DBs novos já nascem sem ela. **Aplicada ao `omie.db`** (dados preservados:
+  21 orçamentos / 13 contratos). **291 testes verdes** (caíram os 4 testes das migrações obsoletas).

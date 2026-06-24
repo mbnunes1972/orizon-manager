@@ -96,8 +96,10 @@ removidos. **Não** voltar a usar estes nomes (eles competiam com as siglas e ge
 - endpoint `POST /calcular_margens` (removido)
 - painel "discriminação por ambiente" (removido; se refeito no futuro, usar o breakdown do motor)
 
-**Pendente (passo futuro, irreversível — exige backup + aprovação):** remover a coluna duplicada
-`Orcamento.margens` (legada; o motor lê `parametros_json` + `desconto_pct`, não `orc.margens`).
+**Coluna `Orcamento.margens` REMOVIDA** (faxina): era duplicação legada; o motor lê
+`Projeto.parametros_json` + `Orcamento.desconto_pct`. Migração idempotente
+`_drop_coluna_margens_orcamentos` (startup) limpa DBs existentes; o desconto do orçamento trafega
+como `desconto_pct` (GET/POST), não mais dentro de um objeto `margens`.
 
 ## 7. Mantido (não confundir com o legado)
 
