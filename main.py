@@ -4499,24 +4499,9 @@ def main():
         print("  Aviso: omie_config.json sem credenciais. Configure na sidebar.")
 
     init_db()
-    try:
-        _db_mig = get_session()
-        try:
-            from database import migrar_margens_para_orcamentos
-            migrar_margens_para_orcamentos(_db_mig, PROJETOS_DIR)
-        finally:
-            _db_mig.close()
-    except Exception as _e:
-        print("[MIGRACAO] margens->orcamento:", _e)
-    try:
-        _db_par = get_session()
-        try:
-            from database import migrar_parametros_para_projeto
-            migrar_parametros_para_projeto(_db_par)
-        finally:
-            _db_par.close()
-    except Exception as _e:
-        print("[MIGRACAO] parametros->projeto:", _e)
+    # (migrações margens->orcamento e margens->parametros removidas na faxina: a coluna
+    #  Orcamento.margens foi removida; parâmetros vêm de Projeto.parametros_json e o desconto
+    #  de Orcamento.desconto_pct.)
     port   = 8765
     # Host de bind configurável: padrão 127.0.0.1 (dev local seguro);
     # em produção defina OMIE_HOST=0.0.0.0 para aceitar acesso externo.

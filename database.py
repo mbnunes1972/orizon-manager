@@ -326,7 +326,6 @@ class Orcamento(Base):
     projeto_id      = Column(String,   nullable=False)
     nome            = Column(String,   nullable=False, default="Orçamento 1")
     ordem           = Column(Integer,  nullable=False, default=1)
-    margens         = Column(Text,     nullable=True)   # JSON
     desconto_pct    = Column(Float,    default=0.0)
     forma_pagamento = Column(String,   nullable=True)
     negociacao_json = Column(Text,     nullable=True)   # snapshot das entradas da negociação (JSON)
@@ -674,61 +673,6 @@ def _run_migracoes(conn):
             cur.execute("INSERT INTO schema_migrations(id) VALUES('tenancy_v2_2026')")
 
     conn.commit()
-
-
-def migrar_margens_para_orcamentos(session, projetos_dir):
-    """Copia margens de cada PROJETOS/<nome>/projeto.json para os Orcamentos do projeto
-    que ainda estão sem margens. Idempotente: só preenche margens vazias/nulas.
-    Retorna o nº de orçamentos atualizados."""
-    import glob, json, os
-    atualizados = 0
-    for pj in glob.glob(os.path.join(projetos_dir, "*", "projeto.json")):
-        try:
-            data = json.loads(open(pj, encoding="utf-8").read())
-        except Exception:
-            continue
-        margens = data.get("margens")
-        if not margens:
-            continue
-        nome_safe = data.get("nome_safe") or os.path.basename(os.path.dirname(pj))
-        for o in session.query(Orcamento).filter_by(projeto_id=nome_safe).all():
-            if not o.margens:
-                o.margens = json.dumps(margens, ensure_ascii=False)
-                atualizados += 1
-    if atualizados:
-        session.commit()
-    return atualizados
-
-
-def migrar_parametros_para_projeto(session):
-    """Copia os parâmetros estruturais de um orçamento existente para
-    projetos_meta.parametros_json, para projetos que ainda não têm. Idempotente.
-    Retorna o nº de projetos atualizados."""
-    import json
-    from mod_orcamento_params import PARAMETROS_DEFAULT
-    atualizados = 0
-    projetos = session.query(Projeto).filter(
-        (Projeto.parametros_json.is_(None)) | (Projeto.parametros_json == "")
-    ).all()
-    for p in projetos:
-        orc = (session.query(Orcamento)
-                      .filter_by(projeto_id=p.nome_safe)
-                      .order_by(Orcamento.id.desc())
-                      .first())
-        if not orc or not orc.margens:
-            continue
-        try:
-            m = json.loads(orc.margens)
-        except Exception:
-            continue
-        par = {k: m[k] for k in PARAMETROS_DEFAULT if k in m}
-        if not par:
-            continue
-        p.parametros_json = json.dumps({**PARAMETROS_DEFAULT, **par}, ensure_ascii=False)
-        atualizados += 1
-    if atualizados:
-        session.commit()
-    return atualizados
 
 
 def _backfill_loja_operacional():

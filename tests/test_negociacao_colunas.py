@@ -12,4 +12,5 @@ def test_pool_ambientes_tem_colunas_qa(app_db):
 
 def test_legado_intacto(app_db):
     cols = {r[1] for r in sqlite3.connect(app_db.DB_PATH).execute("PRAGMA table_info(orcamentos)")}
-    assert {"valor_total", "valor_liquido", "margens"} <= cols   # modo sombra: nada removido
+    assert {"valor_total", "valor_liquido"} <= cols   # colunas autoritativas do motor permanecem
+    assert "margens" not in cols   # faxina: coluna legada duplicada Orcamento.margens removida
