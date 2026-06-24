@@ -56,7 +56,7 @@ Além das colunas acima, `perfis.py` define capacidades específicas de fluxo:
 
 | Capacidade | Perfis que têm | Usada em |
 |---|---|---|
-| `aprovar_financeiro` | Diretor, Gerente Adm/Financeiro | Concluir as etapas 8 e 11d (Aprovação financeira) — exige login+senha |
+| `aprovar_financeiro` | Diretor, Gerente Adm/Financeiro | Concluir as etapas 8 e 11d (Aprovação financeira); **liberar a exibição dos campos de imposto** (base tributária e provisão) na tela de negociação — exige login+senha (`POST /api/auth/liberar_impostos`) |
 | `registrar_medicao` | Medidor, Diretor | Confirmar a etapa 9 (Solicitação) e registrar o parecer da etapa 10 (Medição) |
 | `aprovar_medicao_reprovada` | Gerente de Vendas, Gerente Adm/Financeiro, Diretor | Liberar a Medição quando o parecer é "Reprovado" (decisão comercial, 2º passo) |
 

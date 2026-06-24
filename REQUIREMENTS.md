@@ -183,6 +183,25 @@ Baseado no documento `1_FLUXO_DE_PROCESSOS.docx`. O sistema deve suportar e even
 - Campos internos da loja: `comissao_arq_pct`, `comissao_arq_ativa`, `fidelidade_pct`, `fidelidade_ativa`, `custo_viagem`, `fora_da_sede`, `brinde`, `brinde_ativo`
 - Campos internos nunca devem ser incluídos no valor exibido ao cliente
 
+**Motor de negociação (`mod_negociacao`) — fonte única (cutover + faxina, jun/2026):**
+- Todo o cálculo da negociação vive no **backend** (`mod_negociacao` + `mod_fin`); o frontend
+  **não calcula** — só edita os insumos (auto-save) e **exibe** a saída do motor.
+- Nomenclatura fechada (siglas): por orçamento `VBVO, CFO, VBNO, VAVO, Com_Arq, Pro_Fid, Cust_Via,
+  Bri, Cust_Ad, Val_Liq, Desc_Tot, Markup, Cust_Fin, Val_Cont, Prov_Imp`; por ambiente
+  `VBVA, CFA, VBNA, VAVA`. Definição completa em `docs/superpowers/specs/2026-06-22-mecanismo-negociacao-design.md`.
+- Insumos salvos = fonte de verdade: `parametros_json` (projeto), `orc.desconto_pct`, descontos
+  por ambiente, `forma_pagamento`. O preview (`POST /api/orcamentos/<id>/negociacao-preview`) e os
+  saves devolvem o **breakdown** do motor; `_aplicarPreviewNaTela` é o único exibidor no frontend.
+- Persistência autoritativa: `valor_total = Val_Cont` e `valor_liquido = Val_Liq` são gravados pelo
+  backend; o frontend não os envia. `Prov_Imp = %Carga_Trib × Val_Cont` (Val_Cont = VAVO + Cust_Fin).
+- O desconto é único (editado só na tela de negociação; no modal de parâmetros é read-only).
+
+**Bloqueio dos campos de imposto (apresentação):**
+- Base tributária e provisão de impostos ficam **ocultas (🔒)** por padrão; o sistema calcula mas
+  só revela mediante senha de **Diretor ou Gerente Administrativo-Financeiro** (capacidade
+  `aprovar_financeiro`, via `POST /api/auth/liberar_impostos`). Liberação **não persistida** (recarregar
+  re-bloqueia). É bloqueio de **apresentação** (esconder da vista do cliente), não sigilo criptográfico.
+
 ### 5.5 Documentos
 - Sistema deve cobrar confirmação de documentos conforme fase avança
 - Documentos mais importantes devem ser anexados obrigatoriamente
