@@ -56,3 +56,45 @@ def test_projeto_inexistente_404(http_client_factory, com_etapas_http):
     c.login("super", "senha123")
     st, _ = c.get("/api/admin/projetos/NaoExiste/etapas")
     assert st == 404
+
+
+# ---------------------------------------------------------------------------
+# Isolamento cross-rede (I1): admin_rede da Rede A não enxerga recursos da Rede B
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def rede_b(app_db, seed):
+    """Cria uma segunda rede com sua própria loja e projeto, isolados da Rede Teste."""
+    db = app_db.get_session()
+    try:
+        rede = app_db.Rede(nome="Rede B")
+        db.add(rede)
+        db.flush()
+
+        loja = app_db.Loja(nome="Loja B", rede_id=rede.id, codigo="LJB")
+        db.add(loja)
+        db.flush()
+
+        projeto = app_db.Projeto(nome_safe="Proj_RedeB", status="quente", loja_id=loja.id)
+        db.add(projeto)
+        db.commit()
+
+        return {"loja_b_id": loja.id, "projeto_b": "Proj_RedeB"}
+    finally:
+        db.close()
+
+
+def test_admin_rede_nao_ve_loja_de_outra_rede(http_client_factory, seed, rede_b):
+    """admin_rede da Rede A deve receber 403 ao acessar lojas da Rede B."""
+    c = http_client_factory()
+    c.login("adm_rede", "senha123")
+    st, _ = c.get("/api/admin/lojas/%d/projetos" % rede_b["loja_b_id"])
+    assert st == 403
+
+
+def test_admin_rede_nao_ve_projeto_de_outra_rede(http_client_factory, seed, rede_b):
+    """admin_rede da Rede A deve receber 403 ao acessar projetos da Rede B."""
+    c = http_client_factory()
+    c.login("adm_rede", "senha123")
+    st, _ = c.get("/api/admin/projetos/%s/etapas" % rede_b["projeto_b"])
+    assert st == 403
