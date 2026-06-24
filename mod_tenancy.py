@@ -170,3 +170,21 @@ def escopo_operacional(ator):
     if loja_id is None:
         return (None, "Sem acesso operacional (perfil administrativo ou sem loja).")
     return (loja_id, None)
+
+
+def resolver_loja_ativa(memberships, header_loja_id, default_loja_id):
+    """Decide a loja ativa de uma requisição operacional.
+
+    acessíveis = memberships ∪ {default}. header presente → só vale se acessível
+    (senão None → 403). Sem header → default se acessível; senão membership única; senão None.
+    """
+    acessiveis = set(memberships or [])
+    if default_loja_id is not None:
+        acessiveis.add(default_loja_id)
+    if header_loja_id is not None:
+        return header_loja_id if header_loja_id in acessiveis else None
+    if default_loja_id is not None and default_loja_id in acessiveis:
+        return default_loja_id
+    if len(acessiveis) == 1:
+        return next(iter(acessiveis))
+    return None

@@ -1,5 +1,6 @@
 import pytest
 import database
+import mod_tenancy
 
 
 def test_membership_vazio_para_usuario_sem_vinculo(app_db, seed):
@@ -62,3 +63,29 @@ def test_backfill_cria_uma_membership_por_loja_id(app_db, seed):
         assert database.membership_loja_ids(db, uid) == [seed["loja1_id"]]
     finally:
         db.close()
+
+
+def test_resolver_header_valido():
+    assert mod_tenancy.resolver_loja_ativa([1, 2], 2, 1) == 2
+
+
+def test_resolver_header_default_incluso_mesmo_sem_membership():
+    # default sempre acessível mesmo se não estiver em memberships
+    assert mod_tenancy.resolver_loja_ativa([], None, 5) == 5
+
+
+def test_resolver_header_invalido_retorna_none():
+    assert mod_tenancy.resolver_loja_ativa([1, 2], 9, 1) is None
+
+
+def test_resolver_sem_header_usa_default():
+    assert mod_tenancy.resolver_loja_ativa([1, 2], None, 1) == 1
+
+
+def test_resolver_sem_header_sem_default_membership_unica():
+    assert mod_tenancy.resolver_loja_ativa([7], None, None) == 7
+
+
+def test_resolver_nada_resolvivel():
+    assert mod_tenancy.resolver_loja_ativa([], None, None) is None
+    assert mod_tenancy.resolver_loja_ativa([1, 2], None, None) is None
