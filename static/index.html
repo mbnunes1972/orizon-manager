@@ -1953,6 +1953,7 @@ async function carregarUsuarioAutenticado(){
         || _usuarioAtual.pode_gerir_redes || _usuarioAtual.pode_gerir_lojas)) ? '' : 'none';
     _atualizarUIUsuario();
     _carregarDadosExtrasUsuario();
+    _aterrissarPorPapel();
   } catch(e){ console.warn('[AUTH] Erro ao carregar usuário:', e); }
 }
 
@@ -1979,6 +1980,22 @@ function _atualizarUIUsuario(){
   if(mpNivel) mpNivel.textContent = nivel;
   if(mpLim)   mpLim.textContent   = `Limite de desconto: ${(_usuarioAtual?.limite_desconto ?? 10)}%`;
   if(mpIni)   mpIni.textContent   = inicial;
+}
+
+function _aterrissarPorPapel(){
+  const u = _usuarioAtual || {};
+  // super_admin: esconde o menu operacional (Projetos/Clientes/Parceiros)
+  if (u.pode_gerir_redes && !u.loja_id) {
+    ['nav-00','nav-05','nav-06'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+  }
+  // super_admin e admin_rede aterrissam no Painel Admin (page 7);
+  // goPage(7) já dispara adminCarregarConsole(), que aterrissa no nível certo por papel.
+  if (u.pode_gerir_redes || u.nivel === 'admin_rede') {
+    goPage(7);
+  }
 }
 
 function _carregarDadosExtrasUsuario(){
