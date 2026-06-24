@@ -560,11 +560,18 @@ class Handler(BaseHTTPRequestHandler):
                     visiveis = [u for u in visiveis
                                 if u.nivel == "super_admin"
                                 and u.loja_id is None and u.rede_id is None]
+                vis_ids = [u.id for u in visiveis]
+                memb = {}
+                if vis_ids:
+                    for uid, lid in db.query(UsuarioLoja.usuario_id, UsuarioLoja.loja_id).filter(
+                            UsuarioLoja.usuario_id.in_(vis_ids)).all():
+                        memb.setdefault(uid, []).append(lid)
                 self.send_json({"ok": True, "usuarios": [
                     {"id": u.id, "nome": u.nome, "login": u.login, "nivel": u.nivel,
                      "rotulo": perfis.rotulo(u.nivel), "telefone": u.telefone or "",
                      "whatsapp": u.whatsapp or "", "email": u.email or "", "cpf": u.cpf or "",
                      "loja_id": u.loja_id, "rede_id": u.rede_id,
+                     "loja_ids": memb.get(u.id, []),
                      "ativo": bool(u.ativo)} for u in visiveis]})
             finally:
                 db.close()

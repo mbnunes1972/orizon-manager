@@ -6831,7 +6831,7 @@ function _attrJson(o){ return JSON.stringify(o).replace(/'/g, '&#39;'); }
 function abrirModalUsuarioEditar(u, onSaved){
   abrirModalUsuario({ modo: 'editar', id: u.id, nome: u.nome, login: u.login,
     telefone: u.telefone, whatsapp: u.whatsapp, email: u.email, cpf: u.cpf,
-    nivel: u.nivel, ativo: u.ativo, ..._escopoDeUsuario(u),
+    nivel: u.nivel, ativo: u.ativo, loja_ids: u.loja_ids, ..._escopoDeUsuario(u),
     onSaved: onSaved || adminUsuariosCarregar });
 }
 
