@@ -6448,7 +6448,7 @@ async function adminRenderPlataforma(box){
       ${(redes.redes||[]).map(r=>`<tr>
         <td>${esc(r.nome)}</td><td style="color:var(--muted)">${esc(r.cnpj||'—')}</td>
         <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
-          onclick="adminEntrarRede(${r.id}, ${JSON.stringify(r.nome)})">Entrar ›</button></td></tr>`).join('')
+          onclick='adminEntrarRede(${r.id}, ${_attrJson(r.nome)})'>Entrar ›</button></td></tr>`).join('')
         || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma rede.</td></tr>'}
       </tbody></table>
     </div>
@@ -6461,7 +6461,7 @@ async function adminRenderPlataforma(box){
       ${(avulsas.lojas||[]).map(l=>`<tr>
         <td>${esc(l.nome)}</td><td style="color:var(--muted)">${esc(l.codigo||'—')}</td>
         <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
-          onclick="adminEntrarLoja(${l.id}, ${JSON.stringify(l.nome)})">Entrar ›</button></td></tr>`).join('')
+          onclick='adminEntrarLoja(${l.id}, ${_attrJson(l.nome)})'>Entrar ›</button></td></tr>`).join('')
         || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma loja avulsa.</td></tr>'}
       </tbody></table>
     </div>`;
@@ -6511,7 +6511,7 @@ async function adminRenderRede(box){
       ${(lojas.lojas||[]).map(l=>`<tr>
         <td>${esc(l.nome)}</td><td style="color:var(--muted)">${esc(l.codigo||'—')}</td>
         <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
-          onclick="adminEntrarLoja(${l.id}, ${JSON.stringify(l.nome)})">Entrar ›</button></td></tr>`).join('')
+          onclick='adminEntrarLoja(${l.id}, ${_attrJson(l.nome)})'>Entrar ›</button></td></tr>`).join('')
         || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma loja nesta rede.</td></tr>'}
       </tbody></table>
     </div>`;
