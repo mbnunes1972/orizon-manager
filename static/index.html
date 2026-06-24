@@ -1679,6 +1679,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <input id="musr-email" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></div>
       <div><label class="field-label">CPF</label>
         <input id="musr-cpf" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></div>
+      <div id="musr-lojas-wrap" style="display:none;grid-column:1/-1">
+        <label class="field-label">Lojas que pode acessar</label>
+        <div id="musr-lojas" style="max-height:140px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:8px"></div>
+      </div>
     </div>
     <div id="musr-ativo-wrap" style="display:none;margin-top:10px;font-size:12px">
       <label><input type="checkbox" id="musr-ativo"> Ativo</label>
@@ -6773,6 +6777,24 @@ function _escopoDeUsuario(u){
   return { escopo: 'loja', loja_id: u.loja_id };
 }
 
+async function _carregarLojasModalUsuario(ctx){
+  const box = document.getElementById('musr-lojas-wrap');
+  if (!box) return;
+  let lojas = [];
+  if (ctx.rede_id) {
+    const d = await fetch('/api/admin/lojas?rede_id=' + ctx.rede_id, {credentials:'same-origin'})
+      .then(r=>r.json()).catch(()=>({lojas:[]}));
+    lojas = d.lojas || [];
+  } else if (ctx.loja_id) {
+    lojas = [{ id: ctx.loja_id, nome: '(loja atual)' }];
+  }
+  const sel = new Set(ctx.loja_ids || (ctx.loja_id ? [ctx.loja_id] : []));
+  box.style.display = lojas.length ? '' : 'none';
+  document.getElementById('musr-lojas').innerHTML = lojas.map(l =>
+    `<label style="display:block;font-size:12px"><input type="checkbox" class="musr-loja-cb" `
+    + `value="${l.id}" ${sel.has(l.id)?'checked':''}> ${esc(l.nome)}</label>`).join('');
+}
+
 async function abrirModalUsuario(ctx){
   _modalUserCtx = ctx;
   const q = new URLSearchParams({ escopo: ctx.escopo });
@@ -6800,6 +6822,7 @@ async function abrirModalUsuario(ctx){
   sel.disabled = ehProprio;
   document.getElementById('musr-ativo').disabled = ehProprio;
   document.getElementById('musr-self-nota').style.display = ehProprio ? '' : 'none';
+  await _carregarLojasModalUsuario(ctx);
   document.getElementById('modal-usuario').style.display = 'flex';
 }
 
@@ -6828,6 +6851,9 @@ async function salvarModalUsuario(){
   };
   const senha = document.getElementById('musr-senha').value;
   if (senha) payload.senha = senha;
+  const lojaIds = Array.from(document.querySelectorAll('.musr-loja-cb:checked'))
+    .map(cb => parseInt(cb.value, 10));
+  if (lojaIds.length) payload.loja_ids = lojaIds;
   let url, method;
   if (ctx.modo === 'editar'){
     url = '/api/admin/usuarios/' + ctx.id; method = 'PATCH';
