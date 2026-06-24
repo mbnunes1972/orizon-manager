@@ -47,6 +47,7 @@ import mod_medicao
 import perfis
 import mod_usuarios
 import mod_tenancy
+import mod_arvore
 from mod_qualidade_xml import avaliar_qualidade_xml
 
 def _enriquecer_projetos_com_status(projetos):
@@ -609,6 +610,56 @@ class Handler(BaseHTTPRequestHandler):
                          if mod_tenancy.pode_ver_loja(
                              ator, {"id": l.id, "rede_id": l.rede_id})]
                 self.send_json({"ok": True, "lojas": [_loja_dict(l) for l in lojas]})
+            finally:
+                db.close()
+
+        elif path.startswith("/api/admin/lojas/") and path.endswith("/projetos"):
+            usuario = get_usuario_sessao(self)
+            if not usuario or not (perfis.pode(usuario.get("nivel"), "gerir_redes")
+                                   or perfis.pode(usuario.get("nivel"), "gerir_lojas")):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                return
+            import re as _re
+            m = _re.match(r"^/api/admin/lojas/(\d+)/projetos$", path)
+            if not m:
+                self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                projetos = mod_arvore.projetos_estruturais(db, ator, int(m.group(1)))
+                self.send_json({"ok": True, "projetos": projetos})
+            except PermissionError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=403)
+            except LookupError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=404)
+            except Exception as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+
+        elif path.startswith("/api/admin/projetos/") and path.endswith("/etapas"):
+            usuario = get_usuario_sessao(self)
+            if not usuario or not (perfis.pode(usuario.get("nivel"), "gerir_redes")
+                                   or perfis.pode(usuario.get("nivel"), "gerir_lojas")):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                return
+            import re as _re
+            m = _re.match(r"^/api/admin/projetos/(.+)/etapas$", path)
+            if not m:
+                self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                etapas = mod_arvore.etapas_do_projeto(db, ator, unquote(m.group(1)))
+                self.send_json({"ok": True, "etapas": etapas})
+            except PermissionError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=403)
+            except LookupError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=404)
+            except Exception as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
             finally:
                 db.close()
 
