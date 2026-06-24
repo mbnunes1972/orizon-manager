@@ -228,6 +228,17 @@ class ParceiroLoja(Base):
     ativo               = Column(Integer, default=1)
 
 
+class UsuarioLoja(Base):
+    """Vínculo M:N usuário × loja (lojas acessíveis). loja_id em usuarios = loja primária/default."""
+    __tablename__ = "usuario_lojas"
+
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    loja_id    = Column(Integer, ForeignKey("lojas.id"),    nullable=False)
+
+    __table_args__ = (UniqueConstraint("usuario_id", "loja_id", name="uq_usuario_loja"),)
+
+
 class Projeto(Base):
     """Metadados de pipeline por projeto. nome_safe é a chave natural (nome da pasta)."""
     __tablename__ = "projetos_meta"
@@ -672,6 +683,11 @@ def _run_migracoes(conn):
             # marca aplicada só quando o schema real permitiu agir (não em schemas parciais de teste)
             cur.execute("INSERT INTO schema_migrations(id) VALUES('tenancy_v2_2026')")
 
+    # 2026-06-24: backfill de usuario_lojas a partir de usuarios.loja_id (multi-loja)
+    if "usuario_lojas_backfill_2026" not in aplicadas and _tabela_existe(cur, "usuario_lojas"):
+        _backfill_usuario_lojas(cur)
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('usuario_lojas_backfill_2026')")
+
     conn.commit()
 
 
@@ -753,3 +769,21 @@ def upsert_projeto_status(nome_safe: str, status: str, perdido_em=None):
         raise
     finally:
         db.close()
+
+
+def membership_loja_ids(db, usuario_id):
+    """IDs das lojas acessíveis do usuário (via usuario_lojas)."""
+    rows = (db.query(UsuarioLoja.loja_id)
+              .filter(UsuarioLoja.usuario_id == usuario_id).all())
+    return [r[0] for r in rows]
+
+
+def _backfill_usuario_lojas(cur):
+    """Idempotente: cria 1 membership para cada usuário com loja_id e sem vínculo ainda."""
+    cur.execute("""
+        INSERT INTO usuario_lojas (usuario_id, loja_id)
+        SELECT u.id, u.loja_id FROM usuarios u
+        WHERE u.loja_id IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM usuario_lojas ul
+                          WHERE ul.usuario_id = u.id AND ul.loja_id = u.loja_id)
+    """)
