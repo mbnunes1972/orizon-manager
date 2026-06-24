@@ -497,6 +497,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div id="sb-user-nivel" style="font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">—</div>
       </div>
     </div>
+    <div id="seletor-loja-wrap" style="display:none;align-items:center;margin:8px 0"></div>
   </div>
 </aside>
 
@@ -1823,6 +1824,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fmt = n => Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 
+// ── Multi-loja: loja ativa + interceptor de fetch ─────────────────
+let _lojaAtiva = null;   // loja ativa atual (multi-loja); null = usa default do backend
+(function _instalarFetchLojaAtiva(){
+  const _origFetch = window.fetch.bind(window);
+  window.fetch = function(input, init){
+    init = init || {};
+    try {
+      const url = (typeof input === 'string') ? input : (input && input.url) || '';
+      if (_lojaAtiva && url.indexOf('/api/') !== -1 && url.indexOf('//') === -1) {
+        const h = new Headers(init.headers || (typeof input!=='string' && input.headers) || {});
+        h.set('X-Loja-Ativa', String(_lojaAtiva));
+        init.headers = h;
+      }
+    } catch(e){ /* não bloquear a requisição por erro do interceptor */ }
+    return _origFetch(input, init);
+  };
+})();
+
 let projetoAtivo    = null;
 // Fonte de verdade para o toggle "Incluir custos adicionais?" — sobrevive a qualquer
 // sobrescrita de projetoAtivo.margens (race condition com salvarDescontoAutomatico).
@@ -1947,6 +1966,11 @@ async function carregarUsuarioAutenticado(){
     const d = await r.json();
     if(!d.ok){ window.location.href = '/login'; return; }
     _usuarioAtual = d.usuario;
+    const _lojas = _usuarioAtual.lojas || [];
+    const _salva = parseInt(localStorage.getItem('loja_ativa') || '', 10);
+    const _idsValidos = _lojas.map(l => l.id);
+    _lojaAtiva = (_salva && _idsValidos.indexOf(_salva) !== -1)
+      ? _salva : (_usuarioAtual.loja_ativa_id || null);
     const _navAdmin = document.getElementById('nav-07');
     if (_navAdmin) _navAdmin.style.display =
       (_usuarioAtual && (_usuarioAtual.pode_gerir_usuarios
@@ -1980,6 +2004,26 @@ function _atualizarUIUsuario(){
   if(mpNivel) mpNivel.textContent = nivel;
   if(mpLim)   mpLim.textContent   = `Limite de desconto: ${(_usuarioAtual?.limite_desconto ?? 10)}%`;
   if(mpIni)   mpIni.textContent   = inicial;
+  _renderSeletorLoja();
+}
+
+function _renderSeletorLoja(){
+  const lojas = (_usuarioAtual && _usuarioAtual.lojas) || [];
+  let host = document.getElementById('seletor-loja-wrap');
+  if (!host) return;                       // host fixo no HTML (ver Step 4)
+  if (lojas.length <= 1){ host.style.display = 'none'; return; }
+  host.style.display = '';
+  host.innerHTML = '<label class="field-label" style="margin:0 6px 0 0">Loja</label>' +
+    '<select id="seletor-loja" style="background:var(--surface);border:1px solid var(--border);'
+    + 'border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px"></select>';
+  const sel = document.getElementById('seletor-loja');
+  sel.innerHTML = lojas.map(l => `<option value="${l.id}">${esc(l.nome)}</option>`).join('');
+  if (_lojaAtiva) sel.value = String(_lojaAtiva);
+  sel.onchange = function(){
+    _lojaAtiva = parseInt(sel.value, 10);
+    localStorage.setItem('loja_ativa', String(_lojaAtiva));
+    location.reload();                      // recarrega as views no contexto da nova loja
+  };
 }
 
 function _aterrissarPorPapel(){
