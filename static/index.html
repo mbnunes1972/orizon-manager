@@ -796,14 +796,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           </th>
           <th>Ambiente</th>
           <th style="text-align:center;width:80px;font-size:9px;letter-spacing:.5px">Desc. %</th>
-          <th style="text-align:right;width:160px">Valor</th>
+          <th style="text-align:right;width:130px">À vista</th>
+          <th style="text-align:right;width:130px">Com financiamento</th>
         </tr></thead>
         <tbody id="neg-tbody">
-          <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:28px 14px">Nenhum ambiente selecionado.</td></tr>
+          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:28px 14px">Nenhum ambiente selecionado.</td></tr>
         </tbody>
         <tfoot>
           <tr style="border-top:2px solid var(--border2)">
             <td colspan="3" style="padding:12px 14px;font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px">Total</td>
+            <td id="neg-total-avista" style="padding:12px 14px;text-align:right;font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px;color:var(--muted);white-space:nowrap">—</td>
             <td id="neg-total" style="padding:12px 14px;text-align:right;font-family:'Epilogue',sans-serif;font-weight:900;font-size:18px;color:var(--ok);white-space:nowrap">—</td>
           </tr>
         </tfoot>
@@ -4805,9 +4807,8 @@ function renderTabelaNeg(ambientes = null){
                  onkeydown="diDescKeydown(event,this,'ep07_${pa.id}')"
                  onblur="_onDescIndBlur(this,'ep07_${pa.id}',true)">
         </td>
-        <td data-ep07-avista="${avista}" data-ep07-id="${pa.id}" style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:var(--ok)">
-          R$ ${fmt(final_)}
-        </td>
+        <td data-ep07-id="${pa.id}" data-col="avista" style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:var(--muted)">R$ —</td>
+        <td data-ep07-id="${pa.id}" data-col="fin" style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:var(--ok)">R$ —</td>
       </tr>`;
     }).join('');
     totalBruto =Math.round(totalBruto*100)/100;
@@ -5638,14 +5639,21 @@ function _aplicarPreviewNaTela(s) {
   setR('neg-total',    s.Val_Cont);                  // Total (à vista sem financiamento na prévia)
   const elTF = id('neg-total-final');                // input editável do total de contrato
   if (elTF && !elTF._editando) elTF.value = fmt(Number(s.Val_Cont) || 0);
-  // ── células por ambiente: VAVA do motor, casadas pelo id do pool ──
+  // ── células por ambiente: à vista (VAVA) e financiada (VAVA × Val_Cont/VAVO) ──
+  const _vavo = Number(s.VAVO) || 0;
+  const _finFactor = _vavo > 0 ? ((Number(s.Val_Cont) || _vavo) / _vavo) : 1;
   if (Array.isArray(s.ambientes)) {
     s.ambientes.forEach(a => {
       if (a.id == null) return;
-      const cell = document.querySelector('[data-ep07-id="' + a.id + '"]');
-      if (cell) cell.textContent = 'R$ ' + fmt(Number(a.VAVA) || 0);
+      const vava = Number(a.VAVA) || 0;
+      const cAv = document.querySelector('[data-ep07-id="' + a.id + '"][data-col="avista"]');
+      const cFn = document.querySelector('[data-ep07-id="' + a.id + '"][data-col="fin"]');
+      if (cAv) cAv.textContent = 'R$ ' + fmt(vava);
+      if (cFn) cFn.textContent = 'R$ ' + fmt(Math.round(vava * _finFactor * 100) / 100);
     });
   }
+  const _elTAv = id('neg-total-avista');
+  if (_elTAv) _elTAv.textContent = 'R$ ' + fmt(_vavo);   // total à vista (VAVO)
 }
 
 function abrirModalParams(){
