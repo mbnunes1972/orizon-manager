@@ -1720,26 +1720,26 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     </div>
     <div class="toggle-row">
       <span class="toggle-label" style="flex:1">Comissao do arquiteto</span>
-      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-arq-ativa" onchange="mpToggleArq();agendarDiscriminacao()"><span class="sw-slider"></span></label>
-      <input type="number" class="toggle-input" id="mp-arq-pct" min="0" max="30" step="0.5" value="0" disabled style="opacity:.35" oninput="agendarDiscriminacao()">
+      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-arq-ativa" onchange="mpToggleArq();agendarParametros()"><span class="sw-slider"></span></label>
+      <input type="number" class="toggle-input" id="mp-arq-pct" min="0" max="30" step="0.5" value="0" disabled style="opacity:.35" oninput="agendarParametros()">
       <span class="toggle-unit">%</span>
     </div>
     <div class="toggle-row">
       <span class="toggle-label" style="flex:1">Programa de fidelidade</span>
-      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-fid-ativa" onchange="mpToggleFid();agendarDiscriminacao()"><span class="sw-slider"></span></label>
-      <input type="number" class="toggle-input" id="mp-fid-pct" min="0" max="10" step="0.5" value="0" disabled style="opacity:.35" oninput="agendarDiscriminacao()">
+      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-fid-ativa" onchange="mpToggleFid();agendarParametros()"><span class="sw-slider"></span></label>
+      <input type="number" class="toggle-input" id="mp-fid-pct" min="0" max="10" step="0.5" value="0" disabled style="opacity:.35" oninput="agendarParametros()">
       <span class="toggle-unit">%</span>
     </div>
     <div class="toggle-row">
       <span class="toggle-label" style="flex:1">Custo Viagem</span>
-      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-fora-sede" onchange="mpToggleViagem();agendarDiscriminacao()"><span class="sw-slider"></span></label>
-      <input type="number" class="toggle-input" id="mp-viagem" min="0" step="50" value="0" disabled style="opacity:.35" oninput="agendarDiscriminacao()">
+      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-fora-sede" onchange="mpToggleViagem();agendarParametros()"><span class="sw-slider"></span></label>
+      <input type="number" class="toggle-input" id="mp-viagem" min="0" step="50" value="0" disabled style="opacity:.35" oninput="agendarParametros()">
       <span class="toggle-unit" style="font-size:9px">R$</span>
     </div>
     <div class="toggle-row">
       <span class="toggle-label" style="flex:1">Brinde</span>
-      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-brinde-ativo" onchange="mpToggleBrinde();mpToggleBrindeRecalc();agendarDiscriminacao()"><span class="sw-slider"></span></label>
-      <input type="number" class="toggle-input" id="mp-brinde" min="0" step="10" value="0" disabled style="opacity:.35" oninput="agendarDiscriminacao()">
+      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-brinde-ativo" onchange="mpToggleBrinde();mpToggleBrindeRecalc();agendarParametros()"><span class="sw-slider"></span></label>
+      <input type="number" class="toggle-input" id="mp-brinde" min="0" step="10" value="0" disabled style="opacity:.35" oninput="agendarParametros()">
       <span class="toggle-unit" style="font-size:9px">R$</span>
     </div>
     <div class="toggle-row">
@@ -1749,21 +1749,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <span class="toggle-unit">%</span>
     </div>
 
-    <!-- Painel de discriminacao interno (uso do consultor) -->
-    <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
-      <button class="btn btn-ghost btn-sm" onclick="toggleDiscriminacao()" id="btn-discr">&#x1F4CA; Ver discriminacao por ambiente</button>
-      <div id="discriminacao-panel" style="display:none;margin-top:12px;max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
-        <table class="sim-table" style="font-size:11px;width:100%">
-          <thead>
-            <tr>
-              <th>Ambiente</th><th>Bruto</th><th>+ Embutido</th><th>&#x2212; Desc</th>
-              <th>&#x2212; Arq</th><th>&#x2212; Fid</th><th>&#x2212; Viagem</th><th>&#x2212; Brinde</th><th>Líquido</th>
-            </tr>
-          </thead>
-          <tbody id="discriminacao-tbody"><tr><td colspan="9" style="text-align:center;padding:12px;color:var(--muted)">Calcule para ver...</td></tr></tbody>
-        </table>
-      </div>
-    </div>
 
     <!-- Painel de apoio à negociação -->
     <div id="mp-apoio" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;display:none">
@@ -5067,7 +5052,7 @@ function mpDescontoKeydown(e, el){
     const prev = el._prev != null ? el._prev : el.value;
     el.value = prev;
     negSyncSidebar(prev);
-    agendarDiscriminacao();
+    agendarParametros();
     el.blur();
   }
 }
@@ -5117,67 +5102,7 @@ async function salvarDescontoAutomatico(){
   }catch(e){}
 }
 
-// Painel de discriminacao detalhada (uso interno do consultor, dentro do modal)
-async function toggleDiscriminacao(){
-  const panel  = document.getElementById('discriminacao-panel');
-  const modal  = document.getElementById('modal-params').querySelector('div');
-  const open   = panel.style.display === 'block';
-  panel.style.display  = open ? 'none' : 'block';
-  modal.style.maxWidth = open ? '598px' : '900px';
-  document.getElementById('btn-discr').innerHTML =
-    open ? '&#x1F4CA; Ver discriminacao por ambiente' : '&#x1F4CA; Ocultar discriminacao';
-  if(!open) await atualizarDiscriminacao();
-}
-async function atualizarDiscriminacao(){
-  if(!projetoAtivo) return;
-  const tbody = document.getElementById('discriminacao-tbody');
-  if(!tbody) return;
-  if(_orcamentoAtivoId === null){
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:12px;color:var(--muted)">Abra um orçamento para ver a discriminação.</td></tr>';
-    return;
-  }
-  // FONTE ÚNICA: a discriminação vem do MOTOR (breakdown por ambiente), não mais do legado.
-  await negPreview();                       // breakdown fresco do motor (dos parâmetros salvos)
-  const aa = (_previewNeg && _previewNeg.ambientes) || [];
-  if(!aa.length){
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:12px;color:var(--muted)">Sem ambientes.</td></tr>';
-    return;
-  }
-  const nomePorId = {};
-  (_orcAmbientesAtivos||[]).forEach(pa => { nomePorId[pa.id] = pa.nome_exibicao||pa.nome||''; });
-  const warn = 'var(--warn)';
-  tbody.innerHTML = aa.map(a => {
-    const vbva=+a.VBVA||0, vbna=+a.VBNA||0, vava=+a.VAVA||0;
-    const arq=+a.Com_Arq||0, fid=+a.Pro_Fid||0, via=+a.Cust_Via||0, bri=+a.Bri||0, liq=+a.Val_Liq||0;
-    const embut = vbna - vbva;              // custos embutidos (gross-up p/ repasse)
-    const desc  = vbna - vava;              // desconto do cliente
-    const sb_arq = vava - arq, sb_fid = sb_arq - fid, sb_via = sb_fid - via;
-    const nome = esc(nomePorId[a.id] || '');
-    const embC = embut > 0.005 ? 'var(--ok)' : 'var(--muted)';
-    return `
-    <tr style="font-size:11px">
-      <td rowspan="2" style="font-weight:700;border-right:1px solid var(--border);padding:6px 10px;vertical-align:middle">${nome}</td>
-      <td class="td-bruto">${fmt(vbva)}</td>
-      <td style="color:${embC}">${embut>0.005?'+ ':''}${fmt(embut)}</td>
-      <td style="color:${warn}">&#x2212; ${fmt(desc)}</td>
-      <td style="color:${warn}">&#x2212; ${fmt(arq)}</td>
-      <td style="color:${warn}">&#x2212; ${fmt(fid)}</td>
-      <td style="color:${warn}">&#x2212; ${fmt(via)}</td>
-      <td style="color:${warn}">&#x2212; ${fmt(bri)}</td>
-      <td class="td-final">${fmt(liq)}</td>
-    </tr>
-    <tr style="font-size:10px;color:var(--muted);border-bottom:2px solid var(--border2)">
-      <td>${fmt(vbva)}</td>
-      <td>${fmt(vbna)}</td>
-      <td>${fmt(vava)}</td>
-      <td>${fmt(sb_arq)}</td>
-      <td>${fmt(sb_fid)}</td>
-      <td>${fmt(sb_via)}</td>
-      <td>${fmt(liq)}</td>
-      <td class="td-final">${fmt(liq)}</td>
-    </tr>`;
-  }).join('');
-}
+// (discriminação por ambiente removida na faxina — ver DEV_LOG Sessão 30; futuro: refazer pelo motor)
 
 // Sincroniza campo de desconto ao entrar na Pagina 02 e carrega modalidades
 async function carregarMargensSalvas(){
@@ -5212,7 +5137,7 @@ async function carregarMargensSalvas(){
 // ---- Modal de Parametros da Negociacao ---------------------------------------
 function mpToggleIncluirCustos(){
   mpRecalcularEstruturalModal();
-  agendarDiscriminacao();
+  agendarParametros();
 }
 
 function calcularValorBrutoCliente(mg){
@@ -5302,30 +5227,10 @@ function mpRecalcularEstruturalModal(){
   });
   mpAtualizarApoio();
 }
-// Lê os valores actuais dos campos do modal (não os salvos em projetoAtivo.margens)
-function lerMargensModal(){
-  const id    = s => document.getElementById(s);
-  const n_tot = (projetoAtivo && projetoAtivo.ambientes||[]).length;
-  const brinde_total = id('mp-brinde-ativo').checked ? (parseFloat(id('mp-brinde').value)||0) : 0;
-  const brinde_por_amb = n_tot > 0 ? brinde_total / n_tot : 0;
-  return {
-    desconto_pct:         parseFloat(id('mp-desconto').value)||0,
-    fora_da_sede:         id('mp-fora-sede').checked,
-    custo_viagem:         parseFloat(id('mp-viagem').value)||0,
-    brinde:               brinde_por_amb,
-    brinde_ativo:         brinde_por_amb > 0,
-    comissao_arq_ativa:   id('mp-arq-ativa').checked,
-    comissao_arq_pct:     parseFloat(id('mp-arq-pct').value)||0,
-    fidelidade_ativa:     id('mp-fid-ativa').checked,
-    fidelidade_pct:       parseFloat(id('mp-fid-pct').value)||0,
-  };
-}
-let _discrTimer = null;
-function agendarDiscriminacao(){
-  clearTimeout(_discrTimer);
-  _discrTimer = setTimeout(atualizarDiscriminacao, 400);
+// Handler dos inputs de parâmetro do modal: atualiza o apoio e dispara o auto-save (fonte única).
+function agendarParametros(){
   mpAtualizarApoio();          // mostra o painel de apoio
-  agendarSalvarParametros();   // fonte única: edição de param no modal → auto-save → exibe
+  agendarSalvarParametros();   // edição de param no modal → auto-save → motor reexibe
 }
 
 // Auto-save dos PARÂMETROS do modal (debounced). Backend recalcula e devolve o breakdown.
