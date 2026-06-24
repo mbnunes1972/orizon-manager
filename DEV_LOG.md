@@ -730,3 +730,13 @@ Branch `faxina/drop-orcamento-margens`. Usuário autorizou (base é teste; backu
 - **Migração idempotente** `_drop_coluna_margens_orcamentos` (startup, sqlite≥3.35) dropa a coluna
   em DBs existentes; DBs novos já nascem sem ela. **Aplicada ao `omie.db`** (dados preservados:
   21 orçamentos / 13 contratos). **291 testes verdes** (caíram os 4 testes das migrações obsoletas).
+- **Desconto por ambiente — alinhado ao padrão dos campos que funcionam:** era o único campo que
+  salvava **só no blur** (`_persistirDescontosOrc`, frágil). Agora:
+  - **auto-save debounced no `oninput`** (`agendarSalvarDescontos`, 500ms — espelho do
+    `agendarSalvarParametros`); o **`beforeunload`** também persiste (keepalive); a troca de orçamento
+    (`ativarOrcamento`) aguarda o save; o limite continua no blur.
+  - **Causa-raiz do "input volta ao valor antigo, mas a conta fica certa":** `_persistirDescontosOrc`
+    gravava no banco mas **não atualizava `_orcAmbientesAtivos` em memória**; quando `_descIndividual`
+    era zerado (`carregarMargensSalvas`) e `renderTabelaNeg` rodava, o input lia o
+    `pa.desconto_individual_pct` antigo (o motor lia do banco → conta certa). **Fix:** o save
+    sincroniza `pa.desconto_individual_pct` em memória com o valor digitado.

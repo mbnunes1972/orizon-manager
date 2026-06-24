@@ -1,9 +1,11 @@
 # Faxina de Schema/Legado (Fase 2 — item 3) — Design
 
 **Data:** 2026-06-24
-**Status:** ✅ Implementado (Sessão 30), com uma mudança de rumo: a discriminação por ambiente foi
-**REMOVIDA** (decisão do usuário — tinha falhas, não é necessária agora), em vez de migrada ao motor.
-Pendente: drop da coluna `Orcamento.margens` (irreversível — backup + aprovação). Ver `NOMENCLATURA.md` e DEV_LOG Sessão 30.
+**Status:** ✅ Implementado e CONCLUÍDO. Mudança de rumo (Sessão 30): a discriminação por ambiente foi
+**REMOVIDA** (decisão do usuário — tinha falhas), em vez de migrada ao motor. Drop da coluna
+`Orcamento.margens` **FEITO** (Sessão 31): código para de usá-la (desconto trafega como `desconto_pct`),
+coluna removida do modelo + migração idempotente `_drop_coluna_margens_orcamentos` (aplicada ao
+`omie.db`, backup `omie.db.bak-2026-06-24-pre-drop-margens`). Ver `NOMENCLATURA.md` e DEV_LOG Sessões 30–31.
 **Base:** faxina single-source (Fase 1) + tela fonte única (Sessão 29). **Branch:** `faxina/schema-fase2`.
 **Rollback:** tag `pre-refator-negociacao`.
 
