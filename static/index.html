@@ -4543,74 +4543,12 @@ function lerMargensNegociacao(){
 
 // Rateio proporcional: custo_viagem_total * (total_amb / total_selecionados)
 // Residuo de arredondamento e adicionado ao ambiente de maior peso.
-function ratearViagem(custo_total, ambSel){
-  if(!custo_total || !ambSel.length) return ambSel.map(()=>0);
-  const totalBruto = ambSel.reduce((s,a)=>s+(a.total||0),0);
-  if(!totalBruto) return ambSel.map(()=> custo_total / ambSel.length);
-  let somaRateada = 0;
-  const rateado = ambSel.map(a=>{
-    const v = Math.round(custo_total * (a.total / totalBruto) * 100) / 100;
-    somaRateada += v;
-    return v;
-  });
-  // Adiciona residuo ao ambiente de maior peso
-  const residuo = Math.round((custo_total - somaRateada) * 100) / 100;
-  if(residuo !== 0){
-    const idxMaior = ambSel.reduce((mi,a,i,arr)=>a.total > arr[mi].total ? i : mi, 0);
-    rateado[idxMaior] = Math.round((rateado[idxMaior] + residuo) * 100) / 100;
-  }
-  return rateado;
-}
 
 async function executarCalculo(){
   if(!projetoAtivo) return;
-  // EP-07: base de cálculo = ambientes do orçamento ativo (parâmetros do projeto)
-  if(_orcAmbientesAtivos !== null){ renderTabelaNeg(_orcAmbientesAtivos); _atualizarPaineisAbertos(); return; }
-  // Legacy: ambientes selecionados na Fase 01
-  const allAmbs = (projetoAtivo.ambientes||[]).filter(a => a.selecionado);
-  const tbody   = document.getElementById('neg-tbody');
-  const vazio   = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">Sem ambientes selecionados na Fase 01.</td></tr>';
-  if(!allAmbs.length){ tbody.innerHTML=vazio; document.getElementById('neg-total').value='—'; _limparResumo(); return; }
-
-  const mg           = lerMargensNegociacao();
-  const desconto_pct = mg.desconto_pct;
-  const custoFin     = mg.custo_financeiro_pct;
-  const divisorFin   = custoFin < 100 ? (1 - custoFin / 100) : 1;
-  const viagemRateada= mg.fora_da_sede ? ratearViagem(mg.custo_viagem, allAmbs) : allAmbs.map(()=>0);
-  const n_total_proj = (projetoAtivo.ambientes||[]).length;
-  const brinde_por_amb = (mg.brinde_ativo && n_total_proj > 0) ? (mg.brinde||0) / n_total_proj : 0;
-
-  // Base estrutural para TODOS os ambientes (sem desconto e sem custo financeiro)
-  const baseResults = await Promise.all(allAmbs.map(async (amb, i) => {
-    const r = await fetch('/calcular_margens',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({...mg, desconto_pct:0, custo_financeiro_pct:0,
-                           brinde: brinde_por_amb, brinde_ativo: brinde_por_amb > 0,
-                           valor_bruto:amb.total, custo_viagem:viagemRateada[i]})});
-    return (await r.json()).resultado;
-  }));
-
-  const rnd = v => Math.round(v * 100) / 100;
-
-  // Popula _negBaseValues com TODOS os ambientes + base estrutural
-  // Calcula valor bruto do cliente (com ou sem custos adicionais)
-  const brutosCliente = calcularValorBrutoCliente(mg);
-  window._negBaseValues = _negBaseValues = baseResults.map((res, i) => ({
-    arquivo:    allAmbs[i].arquivo,
-    nome:       allAmbs[i].ambiente||allAmbs[i].projeto||allAmbs[i].arquivo,
-    val_bruto:  allAmbs[i].total,
-    estrutural: brutosCliente[allAmbs[i].arquivo] || allAmbs[i].total,
-    margem_interna: rnd(res.valor_liquido_avista),  // valor líquido da loja (uso interno)
-  }));
-
-  renderTabelaNeg();  // legacy: renderiza com _negBaseValues
-  // Atualiza cards do resumo (path legado — intocado)
-  const subtotal_r = Math.round(_negBaseValues
-    .filter(b => _negSelLocal[b.arquivo] !== false)
-    .reduce((s,b) => s + (b.estrutural||0), 0) * 100) / 100;
-  const elSub = document.getElementById('neg-subtotal');
-  if (elSub) elSub.textContent = 'R$ '+fmt(subtotal_r);
-
-  _atualizarPaineisAbertos();
+  // EP-07: base de cálculo = ambientes do orçamento ativo (motor é a fonte única).
+  // O fluxo legado Fase 01 (cálculo via /calcular_margens) foi removido na faxina.
+  if(_orcAmbientesAtivos !== null){ renderTabelaNeg(_orcAmbientesAtivos); _atualizarPaineisAbertos(); }
 }
 // EP-07: distribui o total financiado proporcionalmente entre os ambientes da tabela
 function _ep07DistribuirFinanciado(totalCliente, totalAvista){

@@ -9,7 +9,6 @@
 
 MARGENS_DEFAULT = {
     "desconto_pct":         0.0,
-    "custo_financeiro_pct": 0.0,
     "custo_viagem":         0.0,
     "fora_da_sede":         False,
     "brinde":               0.0,
@@ -22,7 +21,7 @@ MARGENS_DEFAULT = {
     "carga_trib":           8.0,
 }
 
-_FLOAT_KEYS = ("desconto_pct", "custo_financeiro_pct", "custo_viagem", "brinde",
+_FLOAT_KEYS = ("desconto_pct", "custo_viagem", "brinde",
                "comissao_arq_pct", "fidelidade_pct", "carga_trib")
 _BOOL_KEYS  = ("fora_da_sede", "brinde_ativo", "comissao_arq_ativa",
                "fidelidade_ativa", "incluir_custos")

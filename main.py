@@ -37,7 +37,7 @@ from mod_omie import (
     _buscar_projetos_omie, _projeto_path, carregar_xmls,
     bloquear_projeto, verificar_integridade_xmls
 )
-from mod_margens import calcular_margens, _normalizar_faixas
+from mod_margens import _normalizar_faixas
 from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada, calcular_total_flex
 from mod_contrato import (calcular_hash_assinatura, montar_variaveis_contrato,
                           gerar_pdf_contrato, LibreOfficeIndisponivel,
@@ -1413,30 +1413,6 @@ class Handler(BaseHTTPRequestHandler):
                 datas_parcelas   = req.get("datas_parcelas",   []),
             )
             self.send_json(resultado)
-
-        elif path == "/calcular_margens":
-            req = json.loads(body)
-            fin_pct = req.get("custo_financeiro_pct", 0)
-            bruto   = req.get("valor_bruto", 0)
-            desc    = req.get("desconto_pct", 0)
-            print("[CALC] bruto=%.2f desc=%.2f fin_pct=%.4f" % (bruto, desc, fin_pct))
-            resultado = calcular_margens(
-                valor_bruto              = bruto,
-                desconto_pct             = desc,
-                fora_da_sede             = req.get("fora_da_sede", False),
-                custo_viagem             = req.get("custo_viagem", 0),
-                comissao_arq_pct         = req.get("comissao_arq_pct", 0),
-                comissao_arq_ativa       = req.get("comissao_arq_ativa", False),
-                fidelidade_pct           = req.get("fidelidade_pct", 0),
-                fidelidade_ativa         = req.get("fidelidade_ativa", False),
-                custo_financeiro_pct     = fin_pct,
-                brinde                   = req.get("brinde", 0),
-                brinde_ativo             = req.get("brinde_ativo", False),
-            )
-            print("[CALC] saldo_desc=%.2f saldo_fin=%.2f acrescimo=%.2f final=%.2f" % (
-                resultado["saldo_apos_desconto"], resultado["saldo_apos_financeiro"],
-                resultado["acrescimo_financeiro"], resultado["valor_final"]))
-            self.send_json({"ok": True, "resultado": resultado})
 
         elif path == "/projetos/novo":
             usuario = get_usuario_sessao(self)

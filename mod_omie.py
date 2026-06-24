@@ -111,7 +111,7 @@ def _criar_projeto(nome_projeto, cliente_nome, cliente_cpf='', cliente_email='',
         'atualizado_em': '',
         'codigo_projeto_omie': None,  # preenchido se criação no Omie der certo
         'margens': {
-            'desconto_pct': 0.0, 'custo_financeiro_pct': 0.0,
+            'desconto_pct': 0.0,
             'custo_viagem': 0.0, 'fora_da_sede': False,
             'brinde': 0.0, 'brinde_ativo': False,
             'comissao_arq_pct': 0.0, 'comissao_arq_ativa': False,
