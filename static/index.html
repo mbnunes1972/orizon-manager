@@ -4060,7 +4060,7 @@ async function confirmarLiberarImpostos() {
       body: JSON.stringify({ login_autorizador: login, senha_autorizador: senha }),
     });
     const d = await r.json();
-    if (d.ok) {
+    if (r.ok && d.ok) {   // só revela em HTTP 200 + ok (defense-in-depth)
       _impostosLiberados = true; _renderImpostosLock();
       fecharModalLiberarImpostos();
       showToast('Impostos liberados por ' + d.autorizador.nome);

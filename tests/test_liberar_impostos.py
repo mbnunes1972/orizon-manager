@@ -34,3 +34,8 @@ def test_gerente_vendas_403(http_client_factory, seed, app_db):
 def test_senha_errada_401(http_client_factory, seed):
     st, body = _post(http_client_factory, "dir_l1", "errada")
     assert st == 401 and body["ok"] is False
+
+
+def test_login_inexistente_401(http_client_factory, seed):
+    st, body = _post(http_client_factory, "ninguem", "senha123")
+    assert st == 401 and body["ok"] is False
