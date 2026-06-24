@@ -1,7 +1,9 @@
 # Faxina de Schema/Legado (Fase 2 — item 3) — Design
 
 **Data:** 2026-06-24
-**Status:** Em revisão (design) — **NÃO implementado** (precisa de validação no navegador e aprovação para passos irreversíveis).
+**Status:** ✅ Implementado (Sessão 30), com uma mudança de rumo: a discriminação por ambiente foi
+**REMOVIDA** (decisão do usuário — tinha falhas, não é necessária agora), em vez de migrada ao motor.
+Pendente: drop da coluna `Orcamento.margens` (irreversível — backup + aprovação). Ver `NOMENCLATURA.md` e DEV_LOG Sessão 30.
 **Base:** faxina single-source (Fase 1) + tela fonte única (Sessão 29). **Branch:** `faxina/schema-fase2`.
 **Rollback:** tag `pre-refator-negociacao`.
 

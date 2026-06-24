@@ -685,3 +685,27 @@ Branch `feat/fase2-autosave-negociacao`. Continuação da faxina single-source.
 - **Pendente (Fase 2, futuro):** seletor de ambientes para brinde/viagem; faxina de schema
   (`custo_financeiro_pct`, `margens` duplicado, `valor_liquido` legado); duplicidade de
   armazenamento `total_cliente` × `Val_Cont`. 301 testes verdes.
+
+## Sessão 30 — Faxina de legado de margem + glossário de nomenclatura
+
+Branch `faxina/schema-fase2`. Objetivo (do usuário): **nomenclatura bem definida** + um
+**mecanismo para sempre falarmos a mesma língua**, eliminando legado sem trazer falhas.
+
+- **`NOMENCLATURA.md` (raiz)** — glossário **canônico** das siglas fechadas (VBVA/VBNA/VAVA,
+  VBVO/VBNO/VAVO, Com_Arq/Pro_Fid/Cust_Via/Bri/Cust_Ad/Val_Liq/Desc_Tot/Markup/Cust_Fin/Val_Cont/
+  Prov_Imp), contexto do pool (`n_total_proj`/`vbvo_proj`), onde cada parâmetro fica salvo, a
+  nomenclatura **removida** (não reusar) e o **mecanismo**: o motor `mod_negociacao` é a fonte única;
+  todo número vem dele.
+- **Discriminação por ambiente removida** (decisão do usuário — tinha falhas, não é necessária; no
+  futuro refazer pelo motor). Saíram: HTML do painel, `toggleDiscriminacao`/`atualizarDiscriminacao`/
+  `lerMargensModal`. `agendarDiscriminacao` → **`agendarParametros`** (só apoio + auto-save).
+- **Legado de margem removido:** `mod_margens.calcular_margens` + endpoint `POST /calcular_margens`
+  + `ratearViagem` + o path legado Fase 01 de `executarCalculo` (só o EP-07 sobrou) + `test_margens.py`
+  + `custo_financeiro_pct` dos defaults de params. **Mantido `mod_margens._normalizar_faixas`/`_pmt`**
+  (vivos, servem o endpoint de faixas).
+- **Motor** ganhou (aditivo, TDD) o waterfall por ambiente (`Com_Arq/Pro_Fid/Cust_Via/Bri/Val_Liq`,
+  Σ por ambiente = agregados) — disponível para uso futuro pelo motor.
+- **Vestígios Fase 01 em caminhos mortos** (`lerMargensNegociacao`, `_negBaseValues`, branch legado de
+  `renderTabelaNeg`) ficam sinalizados para uma passada futura (entrelaçados com funções vivas).
+- **Não-feito (irreversível):** drop da coluna `Orcamento.margens` — exige backup do `omie.db` +
+  aprovação. **295 testes verdes** (caíram 7 do `test_margens` removido).
