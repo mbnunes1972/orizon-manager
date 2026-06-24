@@ -1,0 +1,55 @@
+# -*- coding: utf-8 -*-
+"""mod_arvore.py — Visão estrutural (árvore) para papéis administrativos.
+
+Leitura SEM PII: recebe (db, ator, ...) e devolve listas de dicts com
+estrutura/indicadores (nunca cliente/cpf/contato/valores). Escopo validado via
+mod_tenancy.pode_ver_loja. Erros viram exceções que a rota traduz em HTTP:
+  PermissionError -> 403   |   LookupError -> 404
+"""
+
+import mod_ciclo
+import mod_tenancy
+from database import Loja, Projeto, CicloEtapa
+
+
+def _loja_no_escopo(db, ator, loja_id):
+    loja = db.get(Loja, loja_id)
+    if loja is None:
+        raise LookupError("Loja não encontrada.")
+    if not mod_tenancy.pode_ver_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+        raise PermissionError("Sem acesso a esta loja.")
+    return loja
+
+
+def projetos_estruturais(db, ator, loja_id):
+    """Lista estrutural dos projetos de uma loja (sem PII)."""
+    _loja_no_escopo(db, ator, loja_id)
+    projetos = (db.query(Projeto)
+                  .filter(Projeto.loja_id == loja_id)
+                  .order_by(Projeto.nome_safe)
+                  .all())
+    nomes = [p.nome_safe for p in projetos]
+    etapas = (db.query(CicloEtapa)
+                .filter(CicloEtapa.projeto_nome.in_(nomes)).all()) if nomes else []
+    status_por_projeto = {}
+    for e in etapas:
+        status_por_projeto.setdefault(e.projeto_nome, {})[e.etapa_codigo] = e.status
+
+    out = []
+    for p in projetos:
+        por_codigo = status_por_projeto.get(p.nome_safe, {})
+        concluidas = sum(
+            1 for cod in mod_ciclo.ETAPAS_PRINCIPAIS
+            if por_codigo.get(cod) in mod_ciclo.STATUS_CONCLUSIVOS)
+        atual = next(
+            (cod for cod in mod_ciclo.ETAPAS_PRINCIPAIS
+             if por_codigo.get(cod) not in mod_ciclo.STATUS_CONCLUSIVOS), None)
+        out.append({
+            "nome_safe": p.nome_safe,
+            "status": p.status,
+            "etapa_atual_codigo": atual,
+            "etapa_atual_nome": mod_ciclo.ETAPA_NOME.get(atual) if atual else None,
+            "total_etapas": len(mod_ciclo.ETAPAS_PRINCIPAIS),
+            "etapas_concluidas": concluidas,
+        })
+    return out
