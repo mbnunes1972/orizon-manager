@@ -1860,6 +1860,13 @@ async function _persistirDescontosOrc(){
   Object.keys(_descIndividual).forEach(k => {
     if(k.startsWith('ep07_')) lote[k.slice(5)] = _descIndividual[k];
   });
+  // Sincroniza o valor salvo no pa EM MEMÓRIA: senão, se _descIndividual for zerado (ex.:
+  // carregarMargensSalvas) e renderTabelaNeg rodar, o input volta a ler o pa antigo (o save
+  // grava no banco, mas o _orcAmbientesAtivos em memória ficava defasado).
+  (_orcAmbientesAtivos || []).forEach(pa => {
+    const k = 'ep07_' + pa.id;
+    if (k in _descIndividual) pa.desconto_individual_pct = _descIndividual[k];
+  });
   try{
     const r = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/descontos',{
       method:'PUT', headers:{'Content-Type':'application/json'},
