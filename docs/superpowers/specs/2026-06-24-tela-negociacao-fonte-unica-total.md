@@ -1,8 +1,18 @@
 # Tela de Negociação — Fonte Única do Total e Colunas (Fase 2) — Design
 
 **Data:** 2026-06-24
-**Status:** Em revisão (design)
+**Status:** ✅ Implementado e validado no navegador (2026-06-24).
 **Base:** faxina single-source (cutover/Fase 1). **Branch:** `feat/fase2-autosave-negociacao`. **Rollback:** tag `pre-refator-negociacao`.
+
+> **Nota de implementação (validação):** a validação no navegador revelou um bug de **persistência
+> do plano de pagamento** não previsto neste design: ao dar *hard refresh*, o orçamento ativo
+> **perdia o parcelamento** (mantinha a modalidade). Causa-raiz (confirmada por log): `carregarMargensSalvas`
+> é re-disparado na navegação p/ a página 2 (e em add-ambiente/save-params) **sem `_negociacaoPendente`**;
+> `carregarModalidades → onPagamentoChange(default)` zerava `neg-parcelas` e o auto-save salvava
+> `n_parcelas=1`. Fix single-point: quando há orçamento ativo e nenhuma restauração pendente,
+> `carregarMargensSalvas` captura a negociação atual da tela e a re-restaura após o reset. Também
+> corrigidos: data da 1ª parcela do Aymoré (`ay-data-primeira`) na captura, e supressão do auto-save
+> durante a carga (`_carregandoOrcamento`). Ver DEV_LOG Sessão 29.
 
 ## 1. Problema
 

@@ -645,3 +645,43 @@ Administrativo-Financeiro** (capacidade `aprovar_financeiro`).
   pagamento → a tela do projeto fechado fica coberta automaticamente.
 - **Honesto:** é bloqueio de **apresentação** (valores calculados no cliente), não sigilo
   criptográfico.
+
+## Sessão 29 — Fase 2: distribuição brinde/viagem + fonte única da tela + persistência do pagamento
+
+Branch `feat/fase2-autosave-negociacao`. Continuação da faxina single-source.
+
+- **Auto-save incremental da negociação:** "trava" o orçamento ao sair (troca in-app via
+  `ativarOrcamento` com `await salvarValorNegociado()`; `beforeunload` com `keepalive`). O front
+  não persiste estado — o backend é a fonte.
+- **Brinde/viagem distribuídos pelo POOL do projeto** (`mod_negociacao`): brinde **igual** por
+  ambiente (`bri/n_total_proj`), viagem **proporcional** ao valor (`cust_via × vbva/vbvo_proj`).
+  Um orçamento subconjunto (3 de 7) recupera a sua fração. `_negociacao_breakdown` calcula
+  `n_total_proj`/`vbvo_proj` do pool e passa ao motor (preview e `_recalcular_orcamento`).
+  Fallback ao comportamento atual quando os args são `None` (âncora LELEU inalterada).
+- **Tela de negociação — fonte única (Opção B):** o motor é a única fonte de todos os números da
+  tabela por ambiente.
+  - **Desconto por ambiente robusto:** `renderTabelaNeg` lê de `pa.desconto_individual_pct`
+    (`_descIndividual` só como override de edição) → aparece já na 1ª entrada, sem timing.
+  - **Duas colunas por ambiente:** **À vista** (`VAVA`) e **Com financiamento**
+    (`VAVA × Val_Cont/VAVO`), ambas escritas por `_aplicarPreviewNaTela`; total à vista (`VAVO`) +
+    total de contrato (`Val_Cont`) no rodapé. `_ep07DistribuirFinanciado` aposentado (no-op).
+  - **Total único (fim da corrida):** só `_aplicarPreviewNaTela` escreve `neg-total`/
+    `neg-total-final` = `Val_Cont`. O fluxo de pagamento parou de escrevê-los; ao trocar a
+    modalidade, **auto-salva** `forma_pagamento` (`agendarSalvarPagamento`, debounced) → o motor
+    recalcula `Val_Cont` → `negPreview` reexibe. **Guard de assinatura** (dentro do timer) quebra
+    o loop preview↔pagamento (só salva se o plano mudou).
+- **Persistência do plano de pagamento (3 bugs corrigidos):**
+  - **Aymoré:** passou a salvar a **data da 1ª parcela** (`ay-data-primeira` faltava em
+    `_NEG_CAMPOS_POR_MODALIDADE`).
+  - **Auto-save na carga:** `_carregandoOrcamento` suprime o auto-save do pagamento durante a
+    carga do orçamento (defesa contra salvar o estado default antes do restore).
+  - **Causa-raiz "perde o parcelamento no hard refresh" (mantinha a modalidade):** confirmada por
+    log de console — `carregarMargensSalvas` é re-disparado na **navegação p/ a página 2**
+    (e em add-ambiente/save-params) **sem `_negociacaoPendente`**; `carregarModalidades →
+    onPagamentoChange(default)` **zerava `neg-parcelas`** (volta a 1) e um auto-save salvava
+    `n_parcelas=1`, sobrescrevendo o plano. Só o orçamento ativo (o único recarregado) era afetado.
+    **Fix single-point:** se há orçamento ativo e nenhuma restauração pendente, `carregarMargensSalvas`
+    **captura a negociação atual da tela e a re-restaura** após o reset — cobre os 3 re-triggers.
+- **Pendente (Fase 2, futuro):** seletor de ambientes para brinde/viagem; faxina de schema
+  (`custo_financeiro_pct`, `margens` duplicado, `valor_liquido` legado); duplicidade de
+  armazenamento `total_cliente` × `Val_Cont`. 301 testes verdes.
