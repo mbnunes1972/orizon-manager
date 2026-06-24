@@ -2620,7 +2620,7 @@ async function _aplicarFiltroOrcamento(id){
 async function ativarOrcamento(id){
   // auto-save incremental: "trava" o orçamento atual antes de trocar (evento de saída in-app)
   if (_orcamentoAtivoId && _orcamentoAtivoId !== id) {
-    try { await salvarValorNegociado(); } catch (e) { /* não bloqueia a troca */ }
+    try { await salvarValorNegociado(); } catch (e) { console.warn('auto-save ao trocar de orçamento:', e); }
   }
   _orcamentoAtivoId = id;
   if(projetoAtivo) localStorage.setItem('lastOrc_'+projetoAtivo.nome_safe, id);
