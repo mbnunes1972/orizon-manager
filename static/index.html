@@ -4783,7 +4783,9 @@ function renderTabelaNeg(ambientes = null){
       }
       bruto=Math.round(bruto*100)/100;
       const diKey='ep07_'+pa.id;
-      const disc_i=parseFloat(_descIndividual[diKey])||0;
+      // robusto: valor salvo vem do dado do ambiente; _descIndividual só como override em edição
+      const disc_i = (diKey in _descIndividual) ? (parseFloat(_descIndividual[diKey])||0)
+                                                : (parseFloat(pa.desconto_individual_pct)||0);
       // avista = bruto × (1-desc_global%) × (1-desc_individual%)
       const avista=Math.round(bruto*(1-descPct/100)*(1-disc_i/100)*100)/100;
       const final_=Math.round(avista/divisorFin*100)/100;
