@@ -709,3 +709,8 @@ Branch `faxina/schema-fase2`. Objetivo (do usuário): **nomenclatura bem definid
   `renderTabelaNeg`) ficam sinalizados para uma passada futura (entrelaçados com funções vivas).
 - **Não-feito (irreversível):** drop da coluna `Orcamento.margens` — exige backup do `omie.db` +
   aprovação. **295 testes verdes** (caíram 7 do `test_margens` removido).
+- **Fix (race do desconto por ambiente):** o desconto só era salvo no blur (`_persistirDescontosOrc`,
+  fire-and-forget) e corria com a troca de orçamento (o `_orcamentoAtivoId` mudava antes do commit) →
+  desconto não ficava guardado / aparecia stale (intermitente). **Fix:** `ativarOrcamento` aguarda
+  `_persistirDescontosOrc` antes de trocar; `_onDescIndBlur` captura o orçamento do blur e aborta se
+  trocou durante o `await`. (Race pré-existente, não da faxina.)
