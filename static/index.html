@@ -1756,8 +1756,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <table class="sim-table" style="font-size:11px;width:100%">
           <thead>
             <tr>
-              <th>Ambiente</th><th>Bruto</th><th>&#x2212; Desc</th><th>+ Fin.</th>
-              <th>&#x2212; Viagem</th><th>&#x2212; Brinde</th><th>&#x2212; Arq</th><th>&#x2212; Fid</th><th>Valor Final</th>
+              <th>Ambiente</th><th>Bruto</th><th>+ Embutido</th><th>&#x2212; Desc</th>
+              <th>&#x2212; Arq</th><th>&#x2212; Fid</th><th>&#x2212; Viagem</th><th>&#x2212; Brinde</th><th>Líquido</th>
             </tr>
           </thead>
           <tbody id="discriminacao-tbody"><tr><td colspan="9" style="text-align:center;padding:12px;color:var(--muted)">Calcule para ver...</td></tr></tbody>
@@ -5130,61 +5130,51 @@ async function toggleDiscriminacao(){
 }
 async function atualizarDiscriminacao(){
   if(!projetoAtivo) return;
-  const isEP07 = _orcamentoAtivoId !== null && _orcAmbientesAtivos !== null;
-  const ambSel = isEP07
-    ? _orcAmbientesAtivos
-    : (projetoAtivo.ambientes||[]).filter(a=>a.selecionado);
-  if(!ambSel.length) return;
-  const mg = lerMargensModal();
-  // ratearViagem espera objetos com {total}; no EP-07 o campo é budget_total
-  const ambsViagem = isEP07 ? ambSel.map(pa=>({total: pa.budget_total||0})) : ambSel;
-  const viagemRateada = mg.fora_da_sede ? ratearViagem(mg.custo_viagem, ambsViagem) : ambSel.map(()=>0);
-  const resultados = await Promise.all(ambSel.map(async (amb,i)=>{
-    const valorBruto = isEP07 ? (amb.budget_total||0) : (amb.total||0);
-    // Desconto efetivo = combinação do global e individual por ambiente
-    let descEfetivo = mg.desconto_pct;
-    if(isEP07){
-      const disc_i = parseFloat(_descIndividual['ep07_'+amb.id]) || 0;
-      descEfetivo = Math.round(1e4*(1-(1-mg.desconto_pct/100)*(1-disc_i/100)))/100;
-    }
-    const r = await fetch('/calcular_margens',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({...mg, desconto_pct: descEfetivo, valor_bruto: valorBruto, custo_viagem:viagemRateada[i]})});
-    return (await r.json()).resultado;
-  }));
-  document.getElementById('discriminacao-tbody').innerHTML = resultados.map((res,i)=>{
-    const nome = isEP07
-      ? esc(ambSel[i].nome_exibicao||ambSel[i].nome||'')
-      : esc(ambSel[i].ambiente||ambSel[i].projeto||ambSel[i].arquivo);
-    const op_desc   = fmt(res.valor_bruto - res.saldo_apos_desconto);
-    const op_fin    = fmt(res.saldo_apos_financeiro - res.saldo_apos_desconto);
-    const op_viagem = fmt(res.saldo_apos_financeiro - res.saldo_apos_viagem);
-    const op_brinde = fmt(res.saldo_apos_viagem - res.saldo_apos_brinde);
-    const op_arq    = fmt(res.saldo_apos_brinde - res.saldo_apos_arq);
-    const op_fid    = fmt(res.saldo_apos_arq - res.saldo_apos_fidelidade);
-    const fin_pos   = res.custo_financeiro > 0;
-    const finC      = fin_pos ? 'var(--ok)' : 'var(--muted)';
-    const warn      = 'var(--warn)';
+  const tbody = document.getElementById('discriminacao-tbody');
+  if(!tbody) return;
+  if(_orcamentoAtivoId === null){
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:12px;color:var(--muted)">Abra um orçamento para ver a discriminação.</td></tr>';
+    return;
+  }
+  // FONTE ÚNICA: a discriminação vem do MOTOR (breakdown por ambiente), não mais do legado.
+  await negPreview();                       // breakdown fresco do motor (dos parâmetros salvos)
+  const aa = (_previewNeg && _previewNeg.ambientes) || [];
+  if(!aa.length){
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:12px;color:var(--muted)">Sem ambientes.</td></tr>';
+    return;
+  }
+  const nomePorId = {};
+  (_orcAmbientesAtivos||[]).forEach(pa => { nomePorId[pa.id] = pa.nome_exibicao||pa.nome||''; });
+  const warn = 'var(--warn)';
+  tbody.innerHTML = aa.map(a => {
+    const vbva=+a.VBVA||0, vbna=+a.VBNA||0, vava=+a.VAVA||0;
+    const arq=+a.Com_Arq||0, fid=+a.Pro_Fid||0, via=+a.Cust_Via||0, bri=+a.Bri||0, liq=+a.Val_Liq||0;
+    const embut = vbna - vbva;              // custos embutidos (gross-up p/ repasse)
+    const desc  = vbna - vava;              // desconto do cliente
+    const sb_arq = vava - arq, sb_fid = sb_arq - fid, sb_via = sb_fid - via;
+    const nome = esc(nomePorId[a.id] || '');
+    const embC = embut > 0.005 ? 'var(--ok)' : 'var(--muted)';
     return `
     <tr style="font-size:11px">
       <td rowspan="2" style="font-weight:700;border-right:1px solid var(--border);padding:6px 10px;vertical-align:middle">${nome}</td>
-      <td class="td-bruto">${fmt(res.valor_bruto)}</td>
-      <td style="color:${warn}">&#x2212; ${op_desc}</td>
-      <td style="color:${finC}">${fin_pos?'+ ':''}${op_fin}</td>
-      <td style="color:${warn}">&#x2212; ${op_viagem}</td>
-      <td style="color:${warn}">&#x2212; ${op_brinde}</td>
-      <td style="color:${warn}">&#x2212; ${op_arq}</td>
-      <td style="color:${warn}">&#x2212; ${op_fid}</td>
-      <td class="td-final">${fmt(res.valor_final)}</td>
+      <td class="td-bruto">${fmt(vbva)}</td>
+      <td style="color:${embC}">${embut>0.005?'+ ':''}${fmt(embut)}</td>
+      <td style="color:${warn}">&#x2212; ${fmt(desc)}</td>
+      <td style="color:${warn}">&#x2212; ${fmt(arq)}</td>
+      <td style="color:${warn}">&#x2212; ${fmt(fid)}</td>
+      <td style="color:${warn}">&#x2212; ${fmt(via)}</td>
+      <td style="color:${warn}">&#x2212; ${fmt(bri)}</td>
+      <td class="td-final">${fmt(liq)}</td>
     </tr>
     <tr style="font-size:10px;color:var(--muted);border-bottom:2px solid var(--border2)">
-      <td>${fmt(res.valor_bruto)}</td>
-      <td>${fmt(res.saldo_apos_desconto)}</td>
-      <td style="color:${finC}">${fmt(res.saldo_apos_financeiro)}</td>
-      <td>${fmt(res.saldo_apos_viagem)}</td>
-      <td>${fmt(res.saldo_apos_brinde)}</td>
-      <td>${fmt(res.saldo_apos_arq)}</td>
-      <td>${fmt(res.saldo_apos_fidelidade)}</td>
-      <td class="td-final">${fmt(res.valor_final)}</td>
+      <td>${fmt(vbva)}</td>
+      <td>${fmt(vbna)}</td>
+      <td>${fmt(vava)}</td>
+      <td>${fmt(sb_arq)}</td>
+      <td>${fmt(sb_fid)}</td>
+      <td>${fmt(sb_via)}</td>
+      <td>${fmt(liq)}</td>
+      <td class="td-final">${fmt(liq)}</td>
     </tr>`;
   }).join('');
 }
