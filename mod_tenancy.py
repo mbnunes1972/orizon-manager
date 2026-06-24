@@ -159,16 +159,14 @@ def perfis_atribuiveis(ator, escopo):
 
 
 def escopo_operacional(ator):
-    """Decide o escopo de uma operação NA LOJA.
+    """Escopo de uma operação NA LOJA: usa a loja ATIVA resolvida.
 
-    Retorna (loja_id, None) quando o ator é usuário de loja (opera nela).
-    Retorna (None, motivo) quando o ator NÃO tem acesso operacional —
-    super_admin/admin_rede têm loja_id None (administram a estrutura, não operam).
-    Puro: a rota traduz o motivo em 403.
+    (loja_id, None) quando há loja ativa; (None, motivo) quando não há
+    (perfil administrativo, sem loja, ou header de loja inválido).
     """
-    loja_id = ator.get("loja_id")
+    loja_id = ator.get("active_loja_id")
     if loja_id is None:
-        return (None, "Sem acesso operacional (perfil administrativo ou sem loja).")
+        return (None, "Sem acesso operacional (perfil administrativo, sem loja, ou loja inválida).")
     return (loja_id, None)
 
 

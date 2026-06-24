@@ -12,7 +12,8 @@ from auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
 from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
-                       LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja)
+                       LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
+                       membership_loja_ids)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -240,6 +241,13 @@ def _aprovador_financeiro(db, login, senha):
         return None
     return u
 
+_REQ_LOJA_ATIVA = None   # header X-Loja-Ativa da requisição atual (HTTPServer single-thread)
+
+def _ler_loja_ativa_header(handler):
+    raw = (handler.headers.get("X-Loja-Ativa") or "").strip()
+    return int(raw) if raw.isdigit() else None
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -253,6 +261,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        global _REQ_LOJA_ATIVA
+        _REQ_LOJA_ATIVA = _ler_loja_ativa_header(self)
         path = urlparse(self.path).path
         if handle_auth_get(self, path): return
         if path == "/":
@@ -1184,6 +1194,8 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
+        global _REQ_LOJA_ATIVA
+        _REQ_LOJA_ATIVA = _ler_loja_ativa_header(self)
         path   = urlparse(self.path).path
         length = int(self.headers.get("Content-Length", 0))
         body   = self.rfile.read(length) if length else b'{}'
@@ -3630,6 +3642,8 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_PATCH(self):
+        global _REQ_LOJA_ATIVA
+        _REQ_LOJA_ATIVA = _ler_loja_ativa_header(self)
         try:
             path = urlparse(self.path).path
             length = int(self.headers.get('Content-Length', 0))
@@ -4466,12 +4480,18 @@ def _loja_dict(l) -> dict:
     }
 
 
-def _ator_dict(db, usuario_sessao):
-    """Re-consulta o usuário logado no banco para obter nivel/loja_id/rede_id frescos."""
+def _ator_dict(db, usuario_sessao, header_loja_id=None):
+    """Re-consulta o usuário logado e resolve a loja ativa (multi-loja)."""
+    if header_loja_id is None:
+        header_loja_id = _REQ_LOJA_ATIVA
     u = db.get(Usuario, usuario_sessao.get("id"))
     if not u:
-        return {"nivel": usuario_sessao.get("nivel"), "loja_id": None, "rede_id": None}
-    return {"nivel": u.nivel, "loja_id": u.loja_id, "rede_id": u.rede_id}
+        return {"nivel": usuario_sessao.get("nivel"), "loja_id": None,
+                "rede_id": None, "active_loja_id": None, "lojas_ids": []}
+    membership = membership_loja_ids(db, u.id)
+    active = mod_tenancy.resolver_loja_ativa(membership, header_loja_id, u.loja_id)
+    return {"nivel": u.nivel, "loja_id": u.loja_id, "rede_id": u.rede_id,
+            "active_loja_id": active, "lojas_ids": membership}
 
 
 def _obj_da_loja(db, Model, pk, loja_id):
