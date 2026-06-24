@@ -6380,7 +6380,7 @@ async function parCarregarOpcoesTenant(){
 // ── Admin Panel ───────────────────────────────────────────────────────────────
 
 // ── Console administrativo (F2 multi-tenant) ──────────────────────────────────
-let _adminNav = { nivel: 1, rede: null, loja: null };   // rede/loja = {id, nome}
+let _adminNav = { nivel: 1, rede: null, loja: null, projeto: null };   // rede/loja={id,nome}; projeto={nome,status}
 
 function adminCarregarConsole(){
   // aterrissagem por perfil
@@ -6396,13 +6396,20 @@ function adminCarregarConsole(){
 function adminBreadcrumb(){
   const parts = ['<span onclick="adminIrNivel(1)" style="cursor:pointer">Plataforma</span>'];
   if (_adminNav.rede) parts.push(`<span onclick="adminIrNivel(2)" style="cursor:pointer">Rede ${esc(_adminNav.rede.nome||_adminNav.rede.id)}</span>`);
-  if (_adminNav.loja) parts.push(`<span>Loja ${esc(_adminNav.loja.nome||_adminNav.loja.id)}</span>`);
+  if (_adminNav.loja) {
+    const lojaTxt = `Loja ${esc(_adminNav.loja.nome||_adminNav.loja.id)}`;
+    parts.push(_adminNav.projeto
+      ? `<span onclick="adminIrNivel(3)" style="cursor:pointer">${lojaTxt}</span>`
+      : `<span>${lojaTxt}</span>`);
+  }
+  if (_adminNav.projeto) parts.push(`<span>Projeto ${esc(_adminNav.projeto.nome)}</span>`);
   document.getElementById('admin-breadcrumb').innerHTML = parts.join(' › ');
 }
 
 function adminIrNivel(n){
-  if (n === 1) { _adminNav.rede = null; _adminNav.loja = null; }
-  if (n === 2) { _adminNav.loja = null; }
+  if (n === 1) { _adminNav.rede = null; _adminNav.loja = null; _adminNav.projeto = null; }
+  if (n === 2) { _adminNav.loja = null; _adminNav.projeto = null; }
+  if (n === 3) { _adminNav.projeto = null; }
   _adminNav.nivel = n;
   adminRender();
 }
@@ -6415,7 +6422,14 @@ function adminRender(){
   const box = document.getElementById('admin-console');
   if (_adminNav.nivel === 1)      adminRenderPlataforma(box);
   else if (_adminNav.nivel === 2) adminRenderRede(box);
+  else if (_adminNav.nivel === 4) adminRenderProjeto(box);
   else                            adminRenderLoja(box);
+}
+
+function adminEntrarProjeto(nome, status){
+  _adminNav.projeto = { nome, status };
+  _adminNav.nivel = 4;
+  adminRender();
 }
 
 async function adminRenderPlataforma(box){
@@ -6542,21 +6556,75 @@ async function adminRenderLoja(box){
     <div style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin-bottom:12px">
       <button class="home-tab ativo" id="loja-tab-dados" onclick="adminLojaTab('dados')">Dados da loja</button>
       <button class="home-tab" id="loja-tab-usuarios" onclick="adminLojaTab('usuarios')">Usuários da loja</button>
+      <button class="home-tab" id="loja-tab-projetos" onclick="adminLojaTab('projetos')">Projetos</button>
     </div>
     <div id="loja-panel-dados"></div>
     <div id="loja-panel-usuarios" style="display:none">
       <button class="btn btn-ghost btn-sm" onclick="abrirModalUsuario({modo:'novo', escopo:'loja', loja_id:(_adminNav.loja&&_adminNav.loja.id)||(_usuarioAtual&&_usuarioAtual.loja_id), onSaved:adminUsuariosCarregar})" style="font-size:11px">+ Novo usuário</button>
       <div id="admin-usuarios-lista" style="margin-top:10px"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
-    </div>`;
+    </div>
+    <div id="loja-panel-projetos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>`;
   adminLojaCarregarDados(lid);
   adminUsuariosCarregar();   // popula #admin-usuarios-lista (função já existente)
 }
 
 function adminLojaTab(qual){
-  document.getElementById('loja-tab-dados').classList.toggle('ativo', qual==='dados');
-  document.getElementById('loja-tab-usuarios').classList.toggle('ativo', qual==='usuarios');
-  document.getElementById('loja-panel-dados').style.display    = qual==='dados' ? '' : 'none';
-  document.getElementById('loja-panel-usuarios').style.display = qual==='usuarios' ? '' : 'none';
+  ['dados','usuarios','projetos'].forEach(q => {
+    const tab   = document.getElementById('loja-tab-'+q);
+    const panel = document.getElementById('loja-panel-'+q);
+    if (tab)   tab.classList.toggle('ativo', q===qual);
+    if (panel) panel.style.display = q===qual ? '' : 'none';
+  });
+  if (qual==='projetos') adminLojaProjetosCarregar();
+}
+
+async function adminLojaProjetosCarregar(){
+  const panel = document.getElementById('loja-panel-projetos');
+  if (!panel) return;
+  const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  if (!lid){ panel.innerHTML = '<em style="color:var(--muted)">Loja não identificada.</em>'; return; }
+  const r = await fetch('/api/admin/lojas/'+lid+'/projetos', {credentials:'same-origin'});
+  if (r.status === 403){ panel.innerHTML = '<em style="color:var(--muted)">Sem acesso a esta loja.</em>'; return; }
+  if (r.status === 404){ panel.innerHTML = '<em style="color:var(--muted)">Não encontrado.</em>'; return; }
+  const d = await r.json().catch(()=>({projetos:[]}));
+  const ps = d.projetos || [];
+  panel.innerHTML = `
+    <table class="cli-table"><thead><tr>
+      <th>Projeto</th><th>Status</th><th>Etapa atual</th><th>Progresso</th><th></th>
+    </tr></thead><tbody>
+    ${ps.map(p=>`<tr>
+      <td>${esc(p.nome_safe)}</td>
+      <td style="color:var(--muted)">${esc(p.status||'—')}</td>
+      <td style="color:var(--muted)">${esc(p.etapa_atual_nome||'—')}</td>
+      <td style="color:var(--muted)">${p.etapas_concluidas}/${p.total_etapas}</td>
+      <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
+        onclick='adminEntrarProjeto(${JSON.stringify(p.nome_safe)}, ${JSON.stringify(p.status||"")})'>Abrir ›</button></td>
+    </tr>`).join('') || '<tr><td colspan="5" style="color:var(--muted)">Nenhum projeto nesta loja.</td></tr>'}
+    </tbody></table>`;
+}
+
+async function adminRenderProjeto(box){
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const nome = _adminNav.projeto?.nome;
+  const r = await fetch('/api/admin/projetos/'+encodeURIComponent(nome)+'/etapas', {credentials:'same-origin'});
+  if (r.status === 403){ box.innerHTML = '<em style="color:var(--muted)">Sem acesso a este projeto.</em>'; return; }
+  if (r.status === 404){ box.innerHTML = '<em style="color:var(--muted)">Não encontrado.</em>'; return; }
+  const d = await r.json().catch(()=>({etapas:[]}));
+  const es = d.etapas || [];
+  box.innerHTML = `
+    <div class="card" style="padding:14px 16px">
+      <strong style="color:var(--dalm-gold,#c8a84b)">&#x1F4CB; Etapas do projeto ${esc(nome)}</strong>
+      <table class="cli-table" style="margin-top:10px"><thead><tr>
+        <th>#</th><th>Etapa</th><th>Status</th><th>Concluída em</th>
+      </tr></thead><tbody>
+      ${es.map(e=>`<tr>
+        <td style="color:var(--muted)">${esc(e.etapa_codigo)}</td>
+        <td>${esc(e.etapa_nome)}</td>
+        <td>${esc(e.status)}</td>
+        <td style="color:var(--muted)">${e.concluido_em ? esc(e.concluido_em.substring(0,10)) : '—'}</td>
+      </tr>`).join('') || '<tr><td colspan="4" style="color:var(--muted)">Nenhuma etapa registrada.</td></tr>'}
+      </tbody></table>
+    </div>`;
 }
 
 async function adminLojaCarregarDados(lid){
