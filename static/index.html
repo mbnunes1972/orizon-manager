@@ -3612,8 +3612,8 @@ async function atualizarAymore() {
   if (elCPar) elCPar.textContent = 'R$ '+fmt(d.total_cliente);
   if (elCParSub) elCParSub.textContent = n+'x R$ '+fmt(d.valor_parcela)+(entrada>0?' | entrada R$ '+fmt(entrada):'');
 
-  const elTot = document.getElementById('neg-total-final');
-  if (elTot && !elTot._editando) elTot.value = fmt(d.total_cliente);
+  // Total de contrato vem SÓ do motor (_aplicarPreviewNaTela = Val_Cont); pagamento não escreve.
+  agendarSalvarPagamento();   // auto-save da modalidade → motor recalcula Val_Cont
 
   const tbody = document.getElementById('ay-parc-body');
   const BADGE = {
@@ -3725,8 +3725,8 @@ async function atualizarCartao() {
   if (elCPar) elCPar.textContent = 'R$ '+fmt(d.total_cliente);
   if (elCParSub) elCParSub.textContent = n+'x R$ '+fmt(d.valor_parcela)+(entrada>0?' | entrada R$ '+fmt(entrada):'');
 
-  const elTot = document.getElementById('neg-total-final');
-  if (elTot && !elTot._editando) elTot.value = fmt(d.total_cliente);
+  // Total de contrato vem SÓ do motor (_aplicarPreviewNaTela = Val_Cont); pagamento não escreve.
+  agendarSalvarPagamento();   // auto-save da modalidade → motor recalcula Val_Cont
 
   const tbody = document.getElementById('cc-parc-body');
   tbody.innerHTML = d.parcelas.map(p => {
@@ -3892,8 +3892,8 @@ async function atualizarVP() {
     n + 'x R$ ' + fmt(d.valor_parcela) + (entrada > 0 ? ' | entrada R$ ' + fmt(entrada) : '');
 
   // Total final
-  const elTot = document.getElementById('neg-total-final');
-  if (elTot && !elTot._editando) elTot.value = fmt(d.total_cliente);
+  // Total de contrato vem SÓ do motor (_aplicarPreviewNaTela = Val_Cont); pagamento não escreve.
+  agendarSalvarPagamento();   // auto-save da modalidade → motor recalcula Val_Cont
 
   vpRenderTabela(d);
   window._planoPagamento = {
@@ -4425,9 +4425,8 @@ async function atualizarTF() {
     n_parc + 'x — juros R$ ' + fmt(res.total_juros) +
     (entrada > 0 ? ' | entrada R$ ' + fmt(entrada) : '');
 
-  // Total final
-  const elTot = document.getElementById('neg-total-final');
-  if (elTot && !elTot._editando) elTot.value = fmt(totalCliente);
+  // Total de contrato vem SÓ do motor (Val_Cont); pagamento auto-salva → motor reexibe.
+  agendarSalvarPagamento();
 
   // Provisao de impostos (apenas referencia)
   _atualizarImpostos('tf', totalCliente);
@@ -4623,16 +4622,25 @@ async function executarCalculo(){
 }
 // EP-07: distribui o total financiado proporcionalmente entre os ambientes da tabela
 function _ep07DistribuirFinanciado(totalCliente, totalAvista){
-  if(_orcamentoAtivoId === null || !totalAvista) return;
-  const factor = totalCliente / totalAvista;
-  document.querySelectorAll('#neg-tbody td[data-ep07-avista]').forEach(td => {
-    const av = parseFloat(td.dataset.ep07Avista) || 0;
-    td.textContent = 'R$ ' + fmt(Math.round(av * factor * 100) / 100);
-  });
-  const elTot = document.getElementById('neg-total');
-  if(elTot) elTot.textContent = 'R$ ' + fmt(Math.round(totalCliente * 100) / 100);
-  const elFin = document.getElementById('neg-total-final');
-  if(elFin && !elFin._editando) elFin.value = fmt(Math.round(totalCliente * 100) / 100);
+  // APOSENTADO (Fase 2, Opção B): as células (à vista/financiada) e o Total agora vêm SÓ do
+  // motor (_aplicarPreviewNaTela). Mantido como no-op para não quebrar chamadores legados.
+}
+// Auto-save da modalidade de pagamento (debounced): persiste forma_pagamento → o motor recalcula
+// Val_Cont (= total_cliente salvo) → negPreview reexibe o Total e a coluna financiada. Fonte única.
+let _pagSalvarTimer = null;
+let _ultimoPagSig = null;
+function agendarSalvarPagamento(){
+  clearTimeout(_pagSalvarTimer);
+  _pagSalvarTimer = setTimeout(async () => {
+    // Guard anti-loop (DENTRO do timer → lê o plano JÁ final): atualizar* roda tanto por mudança
+    // do usuário quanto pelo recálculo do preview (_atualizarPaineisAbertos). Só salva se o plano
+    // mudou de verdade — senão o ciclo preview→painel→save→preview salvaria em loop.
+    const sig = window._planoPagamento ? JSON.stringify(window._planoPagamento) : '';
+    if (sig === _ultimoPagSig) return;
+    _ultimoPagSig = sig;
+    const sv = await salvarValorNegociado();
+    if (sv && sv.ok) { try { await negPreview(); } catch(e){} }
+  }, 500);
 }
 function _atualizarPaineisAbertos(){
   if (document.getElementById('painel-aymore').style.display !== 'none') {
