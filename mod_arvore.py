@@ -53,3 +53,23 @@ def projetos_estruturais(db, ator, loja_id):
             "etapas_concluidas": concluidas,
         })
     return out
+
+
+def etapas_do_projeto(db, ator, nome_safe):
+    """Etapas do ciclo de um projeto (sem PII)."""
+    proj = db.get(Projeto, nome_safe)
+    if proj is None:
+        raise LookupError("Projeto não encontrado.")
+    loja = db.get(Loja, proj.loja_id) if proj.loja_id is not None else None
+    rede_id = loja.rede_id if loja is not None else None
+    if not mod_tenancy.pode_ver_loja(ator, {"id": proj.loja_id, "rede_id": rede_id}):
+        raise PermissionError("Sem acesso a este projeto.")
+    etapas = (db.query(CicloEtapa)
+                .filter(CicloEtapa.projeto_nome == nome_safe).all())
+    etapas.sort(key=lambda e: mod_ciclo.chave_ordenacao(e.etapa_codigo))
+    return [{
+        "etapa_codigo": e.etapa_codigo,
+        "etapa_nome": mod_ciclo.ETAPA_NOME.get(e.etapa_codigo, e.etapa_codigo),
+        "status": e.status,
+        "concluido_em": e.concluido_em.isoformat() if e.concluido_em else None,
+    } for e in etapas]

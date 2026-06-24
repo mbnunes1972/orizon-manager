@@ -92,3 +92,44 @@ def test_fora_de_escopo_levanta_permissionerror(app_db, seed, rede_id):
             mod_arvore.projetos_estruturais(db, ator, seed["loja1_id"])
     finally:
         db.close()
+
+
+def test_etapas_super_ordenadas_com_nome(app_db, seed, com_etapas, ator_super):
+    db = app_db.get_session()
+    try:
+        out = mod_arvore.etapas_do_projeto(db, ator_super, "Proj_L1")
+    finally:
+        db.close()
+    assert [e["etapa_codigo"] for e in out] == ["1", "2", "3", "4"]
+    assert out[0]["etapa_nome"] == "Cadastro do Cliente"
+    assert out[3]["status"] == "pendente"
+    assert out[0]["concluido_em"].startswith("2026-01-01")
+
+
+def test_etapas_sem_pii(app_db, seed, com_etapas, ator_super):
+    db = app_db.get_session()
+    try:
+        out = mod_arvore.etapas_do_projeto(db, ator_super, "Proj_L1")
+    finally:
+        db.close()
+    assert out, "esperava etapas"
+    assert set(out[0].keys()) == {"etapa_codigo", "etapa_nome", "status", "concluido_em"}
+
+
+def test_etapas_projeto_inexistente(app_db, ator_super):
+    db = app_db.get_session()
+    try:
+        with pytest.raises(LookupError):
+            mod_arvore.etapas_do_projeto(db, ator_super, "NaoExiste")
+    finally:
+        db.close()
+
+
+def test_etapas_fora_de_escopo(app_db, seed, rede_id):
+    ator = {"nivel": "admin_rede", "loja_id": None, "rede_id": rede_id + 999}
+    db = app_db.get_session()
+    try:
+        with pytest.raises(PermissionError):
+            mod_arvore.etapas_do_projeto(db, ator, "Proj_L1")
+    finally:
+        db.close()
