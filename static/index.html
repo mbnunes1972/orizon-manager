@@ -2012,7 +2012,7 @@ function _renderSeletorLoja(){
   let host = document.getElementById('seletor-loja-wrap');
   if (!host) return;                       // host fixo no HTML (ver Step 4)
   if (lojas.length <= 1){ host.style.display = 'none'; return; }
-  host.style.display = '';
+  host.style.display = 'flex';
   host.innerHTML = '<label class="field-label" style="margin:0 6px 0 0">Loja</label>' +
     '<select id="seletor-loja" style="background:var(--surface);border:1px solid var(--border);'
     + 'border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px"></select>';
