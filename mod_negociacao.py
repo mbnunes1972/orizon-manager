@@ -67,8 +67,12 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
         total_bri += num_bri
         VBNO += vbna
         VAVO += vava
+        liq_amb = vava - com_amb - pro_amb - num_via - num_bri
         out_ambs.append({"VBVA": round(vbva, 2), "CFA": round(a["CFA"], 2),
-                         "VBNA": round(vbna, 2), "VAVA": round(vava, 2)})
+                         "VBNA": round(vbna, 2), "VAVA": round(vava, 2),
+                         "Com_Arq": round(com_amb, 2), "Pro_Fid": round(pro_amb, 2),
+                         "Cust_Via": round(num_via, 2), "Bri": round(num_bri, 2),
+                         "Val_Liq": round(liq_amb, 2)})
 
     cust_ad = com_arq + pro_fid + (total_via if tog_cvia else 0.0) + (total_bri if tog_bri else 0.0)
     val_liq = VAVO - cust_ad

@@ -106,6 +106,27 @@ def test_distribuicao_3_de_7():
     assert abs(d["Cust_Via"] - 300.0) < 0.01
 
 
+def test_ambiente_expoe_waterfall_e_soma_bate():
+    """Cada ambiente expõe Com_Arq/Pro_Fid/Cust_Via/Bri/Val_Liq; a soma bate com os agregados."""
+    ambs = [{"VBVA": 10000, "CFA": 4000, "desc_amb_pct": 0},
+            {"VBVA": 20000, "CFA": 8000, "desc_amb_pct": 0}]
+    p = {"incluir_custos": True, "comissao_arq_ativa": True, "comissao_arq_pct": 10,
+         "fidelidade_ativa": True, "fidelidade_pct": 5, "fora_da_sede": True,
+         "custo_viagem": 600, "brinde_ativo": True, "brinde": 400}
+    d = mn.calcular_orcamento(ambs, p, 5)
+    aa = d["ambientes"]
+    for a in aa:
+        for k in ("Com_Arq", "Pro_Fid", "Cust_Via", "Bri", "Val_Liq"):
+            assert k in a
+        assert abs(a["Val_Liq"] - (a["VAVA"] - a["Com_Arq"] - a["Pro_Fid"]
+                                   - a["Cust_Via"] - a["Bri"])) < 0.01
+    assert abs(sum(a["Com_Arq"]  for a in aa) - d["Com_Arq"])  < 0.02
+    assert abs(sum(a["Pro_Fid"]  for a in aa) - d["Pro_Fid"])  < 0.02
+    assert abs(sum(a["Cust_Via"] for a in aa) - d["Cust_Via"]) < 0.02
+    assert abs(sum(a["Bri"]      for a in aa) - d["Bri"])      < 0.02
+    assert abs(sum(a["Val_Liq"]  for a in aa) - d["Val_Liq"])  < 0.02
+
+
 def test_fallback_sem_contexto_inalterado():
     """Sem n_total_proj/vbvo_proj → comportamento atual (orçamento recebe o valor cheio)."""
     ambs = [{"VBVA": 10000, "CFA": 4000, "desc_amb_pct": 0} for _ in range(3)]
