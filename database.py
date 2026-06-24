@@ -689,6 +689,24 @@ def _backfill_loja_operacional():
         conn.close()
 
 
+def _drop_coluna_margens_orcamentos():
+    """Faxina: remove a coluna legada/duplicada Orcamento.margens (dados já em
+    Projeto.parametros_json + Orcamento.desconto_pct). Idempotente — só dropa se existir
+    (sqlite >= 3.35)."""
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cur = conn.cursor()
+        cols = {r[1] for r in cur.execute("PRAGMA table_info(orcamentos)")}
+        if "margens" in cols:
+            cur.execute("ALTER TABLE orcamentos DROP COLUMN margens")
+            conn.commit()
+    except Exception as e:
+        print("[FAXINA] drop coluna margens:", e)
+    finally:
+        conn.close()
+
+
 def _migrar_dados():
     """Abre a conexão real e roda as migrações de dados idempotentes."""
     import sqlite3
@@ -700,6 +718,7 @@ def _migrar_dados():
     finally:
         conn.close()
     _backfill_loja_operacional()
+    _drop_coluna_margens_orcamentos()
 
 
 def get_session():
