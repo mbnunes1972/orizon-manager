@@ -1789,6 +1789,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 
+<div id="modal-liberar-impostos" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9600;align-items:center;justify-content:center">
+  <div style="background:#111d11;border:1px solid #1e2e1e;border-radius:14px;padding:28px;width:100%;max-width:380px">
+    <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Liberar impostos</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">Senha de Diretor ou Gerente Administrativo-Financeiro.</div>
+    <input id="li-login" placeholder="Usuário" autocomplete="off" style="width:100%;margin-bottom:8px;padding:9px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);box-sizing:border-box">
+    <input id="li-senha" type="password" placeholder="Senha" autocomplete="off" onkeydown="if(event.key==='Enter')confirmarLiberarImpostos()" style="width:100%;margin-bottom:8px;padding:9px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);box-sizing:border-box">
+    <div id="li-erro" style="font-size:11px;color:var(--err);min-height:14px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="fecharModalLiberarImpostos()" style="padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer">Cancelar</button>
+      <button onclick="confirmarLiberarImpostos()" style="padding:8px 14px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-weight:700;cursor:pointer">Confirmar</button>
+    </div>
+  </div>
+</div>
 <div id="modal-autorizacao" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9500;align-items:center;justify-content:center">
   <div style="background:#111d11;border:1px solid #1e2e1e;border-radius:14px;padding:28px;width:100%;max-width:380px">
     <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Autorização Necessária</div>
@@ -3992,13 +4005,69 @@ function atualizarUIBloqueio() {
 }
 
 // ---- Provisao de Impostos (todas as modalidades) -----------------------------
+// ── Bloqueio dos impostos (cadeado + liberação por senha) ─────────────────────
+let _impostosLiberados = false;          // não persistido: recarregar re-bloqueia
+const _impostosValores = {};             // { prefix: { base, imp } }
+const _IMPOSTOS_PREFIXOS = ['ay', 'cc', 'vp', 'tf'];
+
 function _atualizarImpostos(prefixo, valorBase) {
   const cargaPct = parseFloat(document.getElementById('mp-carga-trib')?.value) || 0;
   const impostos = Math.round(valorBase * cargaPct / 100 * 100) / 100;
-  const elBase = document.getElementById(prefixo + '-r-base-trib');
-  const elImp  = document.getElementById(prefixo + '-r-impostos');
-  if (elBase) elBase.textContent = 'R$ ' + fmt(valorBase);
-  if (elImp)  elImp.textContent  = 'R$ ' + fmt(impostos);
+  _impostosValores[prefixo] = { base: valorBase, imp: impostos };
+  _renderImpostosLock();
+}
+
+// Único exibidor dos campos de imposto: valor real (liberado) ou cadeado 🔒.
+function _renderImpostosLock() {
+  _IMPOSTOS_PREFIXOS.forEach(p => {
+    const v = _impostosValores[p];
+    const elBase = document.getElementById(p + '-r-base-trib');
+    const elImp  = document.getElementById(p + '-r-impostos');
+    if (!v) return;
+    if (_impostosLiberados) {
+      const rel = (txt) => '<span style="cursor:pointer" title="Clique para ocultar (🔓)" onclick="_reBloquearImpostos()">' + txt + '</span>';
+      if (elBase) elBase.innerHTML = rel('R$ ' + fmt(v.base));
+      if (elImp)  elImp.innerHTML  = rel('R$ ' + fmt(v.imp));
+    } else {
+      const lock = '<span style="cursor:pointer" title="Liberar com senha de diretor/gerente adm-fin" onclick="abrirModalLiberarImpostos()">🔒</span>';
+      if (elBase) elBase.innerHTML = lock;
+      if (elImp)  elImp.innerHTML  = lock;
+    }
+  });
+}
+function _reBloquearImpostos() { _impostosLiberados = false; _renderImpostosLock(); }
+
+function abrirModalLiberarImpostos() {
+  document.getElementById('li-login').value = '';
+  document.getElementById('li-senha').value = '';
+  document.getElementById('li-erro').textContent = '';
+  document.getElementById('modal-liberar-impostos').style.display = 'flex';
+  setTimeout(() => document.getElementById('li-login').focus(), 80);
+}
+function fecharModalLiberarImpostos() {
+  document.getElementById('modal-liberar-impostos').style.display = 'none';
+}
+async function confirmarLiberarImpostos() {
+  const login = document.getElementById('li-login').value.trim();
+  const senha = document.getElementById('li-senha').value;
+  const erro  = document.getElementById('li-erro');
+  erro.textContent = '';
+  if (!login || !senha) { erro.textContent = 'Preencha usuário e senha.'; return; }
+  try {
+    const r = await fetch('/api/auth/liberar_impostos', {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ login_autorizador: login, senha_autorizador: senha }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      _impostosLiberados = true; _renderImpostosLock();
+      fecharModalLiberarImpostos();
+      showToast('Impostos liberados por ' + d.autorizador.nome);
+    } else {
+      erro.textContent = d.erro || 'Não autorizado.';
+    }
+  } catch (e) { erro.textContent = 'Falha na liberação.'; }
 }
 
 // ---- Gerente — cadeados de liberacao pontual ---------------------------------
