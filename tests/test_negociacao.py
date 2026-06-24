@@ -89,3 +89,28 @@ def test_cust_via_bri_zerados_quando_toggle_off():
          "brinde_ativo": False, "brinde": 200}
     d = __import__("mod_negociacao").calcular_orcamento(amb, p, 0)
     assert d["Cust_Via"] == 0.0 and d["Bri"] == 0.0
+
+
+def test_distribuicao_3_de_7():
+    """Projeto com 7 ambientes (pool), orçamento com 3 → brinde 3/7; viagem proporcional."""
+    # orçamento = 3 ambientes (valores 10000, 10000, 10000); projeto = 7 ambientes
+    ambs = [{"VBVA": 10000, "CFA": 4000, "desc_amb_pct": 0} for _ in range(3)]
+    n_total_proj = 7
+    vbvo_proj = 70000.0                      # 7 × 10000 (todos iguais p/ simplificar)
+    p = {"incluir_custos": False, "fora_da_sede": True, "custo_viagem": 700,
+         "brinde_ativo": True, "brinde": 700}
+    d = mn.calcular_orcamento(ambs, p, 0, n_total_proj=n_total_proj, vbvo_proj=vbvo_proj)
+    # brinde recuperado = 3 × (700/7) = 300
+    assert abs(d["Bri"] - 300.0) < 0.01
+    # viagem recuperada = 700 × (30000/70000) = 300
+    assert abs(d["Cust_Via"] - 300.0) < 0.01
+
+
+def test_fallback_sem_contexto_inalterado():
+    """Sem n_total_proj/vbvo_proj → comportamento atual (orçamento recebe o valor cheio)."""
+    ambs = [{"VBVA": 10000, "CFA": 4000, "desc_amb_pct": 0} for _ in range(3)]
+    p = {"incluir_custos": False, "fora_da_sede": True, "custo_viagem": 700,
+         "brinde_ativo": True, "brinde": 700}
+    d = mn.calcular_orcamento(ambs, p, 0)    # sem contexto
+    assert abs(d["Bri"] - 700.0) < 0.01      # cheio
+    assert abs(d["Cust_Via"] - 700.0) < 0.01 # cheio
