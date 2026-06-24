@@ -154,3 +154,43 @@ def test_admin_rede_barrado_em_loja_de_outra_rede(http_client_factory, app_db, s
         "nivel": "diretor", "loja_ids": [seed["loja1_id"], loja_c],
     })
     assert body["ok"] is False  # loja_c fora do escopo da rede do adm_rede
+
+
+def test_diretor_edit_nao_revoga_memberships_fora_do_escopo(http_client_factory, seed):
+    """Regressão Finding 1: diretor que edita usuário multi-loja não pode revogar
+    memberships de lojas fora do seu escopo (loja2 não deve ser removida)."""
+    # Passo 1: adm_rede cria usuário multi-loja em loja1 e loja2
+    cadm = http_client_factory(); cadm.login("adm_rede", "senha123")
+    st, body = cadm.post("/api/admin/usuarios", {
+        "nome": "Multi Diretor 2", "login": "multidir2", "senha": "senha123",
+        "nivel": "diretor",
+        "loja_ids": [seed["loja1_id"], seed["loja2_id"]],
+    })
+    assert st == 200 and body["ok"] is True, f"Criação falhou: {body}"
+
+    # Obtém o id do novo usuário via /api/auth/me
+    cnovo = http_client_factory(); cnovo.login("multidir2", "senha123")
+    st_me, me = cnovo.get("/api/auth/me")
+    assert st_me == 200
+    novo_id = me["usuario"]["id"]
+    ids_apos_criacao = {l["id"] for l in me["usuario"]["lojas"]}
+    assert ids_apos_criacao == {seed["loja1_id"], seed["loja2_id"]}, \
+        f"Criação deveria ter atribuído loja1+loja2; obteve: {ids_apos_criacao}"
+
+    # Passo 2: dir_l1 (diretor da loja1) edita o telefone, mas envia loja_ids=[loja1]
+    # — simula o modal que só exibe a loja do próprio ator
+    cdir = http_client_factory(); cdir.login("dir_l1", "senha123")
+    st_patch, patch_body = cdir.patch(f"/api/admin/usuarios/{novo_id}", {
+        "telefone": "9999",
+        "loja_ids": [seed["loja1_id"]],
+    })
+    assert st_patch == 200 and patch_body.get("ok") is True, \
+        f"Edição pelo diretor falhou: st={st_patch} body={patch_body}"
+
+    # Passo 3: memberships devem continuar sendo {loja1, loja2}
+    cnovo2 = http_client_factory(); cnovo2.login("multidir2", "senha123")
+    st_me2, me2 = cnovo2.get("/api/auth/me")
+    assert st_me2 == 200
+    ids_apos_patch = {l["id"] for l in me2["usuario"]["lojas"]}
+    assert ids_apos_patch == {seed["loja1_id"], seed["loja2_id"]}, \
+        f"Memberships foram alteradas pelo diretor! Esperado: {{loja1, loja2}}, Obtido: {ids_apos_patch}"

@@ -3972,7 +3972,13 @@ class Handler(BaseHTTPRequestHandler):
                     if "cpf" in req:      u.cpf      = (req.get("cpf") or "").strip()
                     if "ativo" in req:    u.ativo    = 1 if req["ativo"] else 0
                     if req.get("senha"):  u.set_senha(req["senha"])
-                    if "loja_ids" in req:
+                    # Apenas super_admin e admin_rede gerenciam memberships de lojas.
+                    # Atores de loja (diretor/gerente_adm_fin) não reescrevem usuario_lojas —
+                    # o modal deles só exibe a própria loja e re-escreveria a lista incorretamente,
+                    # revogando memberships atribuídas por um admin_rede silenciosamente.
+                    if "loja_ids" in req and (
+                            mod_tenancy._eh_super_admin(ator)
+                            or mod_tenancy._eh_admin_rede(ator)):
                         novas, erros_l = mod_tenancy.lojas_do_novo_usuario(ator, req)
                         if erros_l:
                             self.send_json({"ok": False, "erro": " ".join(erros_l)}); return

@@ -167,7 +167,13 @@ def lojas_do_novo_usuario(ator, dados):
     ids = dados.get("loja_ids")
     if ids is None and dados.get("loja_id") is not None:
         ids = [dados.get("loja_id")]          # compat: aceita loja_id único
-    ids = [int(x) for x in (ids or [])]
+    limpos = []
+    for x in (ids or []):
+        try:
+            limpos.append(int(x))
+        except (TypeError, ValueError):
+            return ([], ["Loja inválida."])
+    ids = limpos
     if not ids:
         return ([], ["Selecione ao menos uma loja."])
     # se o ator é usuário de loja (diretor), só pode a própria loja
