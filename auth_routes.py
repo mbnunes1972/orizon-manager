@@ -28,6 +28,8 @@ from auth import (
     verificar_desconto, autorizar_desconto,
     get_token_from_cookie, COOKIE_NAME
 )
+from database import get_session, Usuario
+import perfis
 
 # ── Caminho do login.html ─────────────────────────────────────────────────────
 _LOGIN_HTML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "login.html")
@@ -139,6 +141,28 @@ def handle_auth_post(handler, path: str, body: bytes) -> bool:
             contexto           = dados.get("contexto", {})
         )
         _send_json(handler, resultado)
+        return True
+
+    if path == "/api/auth/liberar_impostos":
+        try:
+            req = json.loads(body) if body else {}
+        except Exception:
+            _send_json(handler, {"ok": False, "erro": "JSON inválido."}, 400)
+            return True
+        login = (req.get("login_autorizador") or "").strip()
+        senha = req.get("senha_autorizador") or ""
+        db = get_session()
+        try:
+            u = db.query(Usuario).filter_by(login=login).first()
+            if not u or not u.ativo or not u.check_senha(senha):
+                _send_json(handler, {"ok": False, "erro": "Usuário ou senha inválidos."}, 401)
+                return True
+            if not perfis.pode(u.nivel, "aprovar_financeiro"):
+                _send_json(handler, {"ok": False, "erro": "Perfil sem permissão para liberar impostos."}, 403)
+                return True
+            _send_json(handler, {"ok": True, "autorizador": {"nome": u.nome}})
+        finally:
+            db.close()
         return True
 
     return False
