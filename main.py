@@ -13,7 +13,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
-                       membership_loja_ids)
+                       membership_loja_ids, UsuarioLoja)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -2743,25 +2743,38 @@ class Handler(BaseHTTPRequestHandler):
                     logins = [u.login for u in db.query(Usuario.login).all()]
                     erros  = mod_usuarios.validar_novo_usuario(req, logins)
                     ator   = _ator_dict(db, usuario)
-                    loja_id, rede_id, erros_tenant = mod_tenancy.atribuir_tenant_usuario(ator, req)
-                    erros = erros + erros_tenant
-                    if not erros and loja_id is not None and not mod_tenancy._eh_super_admin(ator):
-                        loja = db.get(Loja, loja_id)
-                        if not loja or not mod_tenancy.pode_ver_loja(
-                                ator, {"id": loja.id, "rede_id": loja.rede_id}):
-                            erros = erros + ["Loja fora do seu escopo."]
+                    # compat: se só loja_ids vier (sem loja_id), usa o primeiro como primário
+                    req_tenant = dict(req)
+                    if "loja_ids" in req_tenant and not req_tenant.get("loja_id"):
+                        ids_raw = req_tenant["loja_ids"]
+                        if ids_raw:
+                            req_tenant["loja_id"] = int(ids_raw[0])
+                    loja_id, rede_id, erros_tenant = mod_tenancy.atribuir_tenant_usuario(ator, req_tenant)
+                    loja_ids, erros_lojas = mod_tenancy.lojas_do_novo_usuario(ator, req)
+                    erros = erros + erros_tenant + erros_lojas
+                    # valida cada loja no escopo do ator (admin_rede/diretor)
+                    if not erros and loja_ids and not mod_tenancy._eh_super_admin(ator):
+                        for lid in loja_ids:
+                            loja = db.get(Loja, lid)
+                            if not loja or not mod_tenancy.pode_ver_loja(
+                                    ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                                erros = erros + ["Loja fora do seu escopo."]; break
                     if erros:
                         self.send_json({"ok": False, "erro": " ".join(erros)})
                         return
+                    primary_loja_id = loja_ids[0] if loja_ids else None
                     u = Usuario(nome=req["nome"].strip(), login=req["login"].strip(),
                                 nivel=req["nivel"].strip(),
                                 telefone=(req.get("telefone") or "").strip(),
                                 whatsapp=(req.get("whatsapp") or "").strip(),
                                 email=(req.get("email") or "").strip(),
                                 cpf=(req.get("cpf") or "").strip(),
-                                loja_id=loja_id, rede_id=rede_id)
+                                loja_id=primary_loja_id, rede_id=rede_id)
                     u.set_senha(req["senha"])
-                    db.add(u); db.commit()
+                    db.add(u); db.flush()
+                    for lid in loja_ids:
+                        db.add(UsuarioLoja(usuario_id=u.id, loja_id=lid))
+                    db.commit()
                     self.send_json({"ok": True, "id": u.id})
                 finally:
                     db.close()
@@ -3954,6 +3967,20 @@ class Handler(BaseHTTPRequestHandler):
                     if "cpf" in req:      u.cpf      = (req.get("cpf") or "").strip()
                     if "ativo" in req:    u.ativo    = 1 if req["ativo"] else 0
                     if req.get("senha"):  u.set_senha(req["senha"])
+                    if "loja_ids" in req:
+                        novas, erros_l = mod_tenancy.lojas_do_novo_usuario(ator, req)
+                        if erros_l:
+                            self.send_json({"ok": False, "erro": " ".join(erros_l)}); return
+                        if not mod_tenancy._eh_super_admin(ator):
+                            for lid in novas:
+                                loja = db.get(Loja, lid)
+                                if not loja or not mod_tenancy.pode_ver_loja(
+                                        ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                                    self.send_json({"ok": False, "erro": "Loja fora do seu escopo."}); return
+                        db.query(UsuarioLoja).filter(UsuarioLoja.usuario_id == u.id).delete()
+                        for lid in novas:
+                            db.add(UsuarioLoja(usuario_id=u.id, loja_id=lid))
+                        u.loja_id = novas[0] if novas else u.loja_id
                     db.commit()
                     self.send_json({"ok": True})
                 finally:

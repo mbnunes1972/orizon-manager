@@ -158,6 +158,25 @@ def perfis_atribuiveis(ator, escopo):
     return []
 
 
+def lojas_do_novo_usuario(ator, dados):
+    """Lista de loja_ids para o novo usuário operacional (>=1) ou [] para papéis admin.
+    Retorna (loja_ids, erros). A checagem de que cada loja ∈ escopo do ator é feita na rota."""
+    nivel_novo = (dados.get("nivel") or "").strip()
+    if nivel_novo in ("super_admin", "admin_rede"):
+        return ([], [])
+    ids = dados.get("loja_ids")
+    if ids is None and dados.get("loja_id") is not None:
+        ids = [dados.get("loja_id")]          # compat: aceita loja_id único
+    ids = [int(x) for x in (ids or [])]
+    if not ids:
+        return ([], ["Selecione ao menos uma loja."])
+    # se o ator é usuário de loja (diretor), só pode a própria loja
+    if (not _eh_super_admin(ator) and not _eh_admin_rede(ator)
+            and ator.get("loja_id") is not None):
+        ids = [ator.get("loja_id")]
+    return (ids, [])
+
+
 def escopo_operacional(ator):
     """Escopo de uma operação NA LOJA: usa a loja ATIVA resolvida.
 

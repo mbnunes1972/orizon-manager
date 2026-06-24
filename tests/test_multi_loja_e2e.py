@@ -123,3 +123,34 @@ def test_auth_me_expoe_lojas_acessiveis(http_client_factory, dir_l1_multiloja, s
     assert ids == {seed["loja1_id"], seed["loja2_id"]}
     assert u["loja_ativa_id"] == seed["loja1_id"]
     assert all("nome" in l and "codigo" in l for l in u["lojas"])
+
+
+def test_admin_rede_cria_usuario_multiloja_na_propria_rede(http_client_factory, seed):
+    c = http_client_factory(); c.login("adm_rede", "senha123")
+    st, body = c.post("/api/admin/usuarios", {
+        "nome": "Novo Diretor", "login": "novodir", "senha": "senha123",
+        "nivel": "diretor", "loja_ids": [seed["loja1_id"], seed["loja2_id"]],
+    })
+    assert st == 200 and body["ok"] is True
+    # confere que as memberships foram gravadas via /api/auth/me do novo usuário
+    c2 = http_client_factory(); c2.login("novodir", "senha123")
+    _, me = c2.get("/api/auth/me")
+    ids = {l["id"] for l in me["usuario"]["lojas"]}
+    assert ids == {seed["loja1_id"], seed["loja2_id"]}
+
+
+def test_admin_rede_barrado_em_loja_de_outra_rede(http_client_factory, app_db, seed):
+    # cria uma loja em outra rede
+    db = app_db.get_session()
+    try:
+        rb = app_db.Rede(nome="Rede C"); db.add(rb); db.flush()
+        lb = app_db.Loja(nome="Loja C", rede_id=rb.id, codigo="LJC"); db.add(lb); db.commit()
+        loja_c = lb.id
+    finally:
+        db.close()
+    c = http_client_factory(); c.login("adm_rede", "senha123")
+    st, body = c.post("/api/admin/usuarios", {
+        "nome": "Invasor", "login": "invasor", "senha": "senha123",
+        "nivel": "diretor", "loja_ids": [seed["loja1_id"], loja_c],
+    })
+    assert body["ok"] is False  # loja_c fora do escopo da rede do adm_rede
