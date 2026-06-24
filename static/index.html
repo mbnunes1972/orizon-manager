@@ -1863,7 +1863,7 @@ async function _persistirDescontosOrc(){
   try{
     const r = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/descontos',{
       method:'PUT', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({descontos: lote}),
+      body:JSON.stringify({descontos: lote}), keepalive: true,
     });
     aplicarBreakdownResposta(await r.json());   // exibe o breakdown do motor (fonte única)
   }catch(e){ console.error('Falha ao persistir descontos do orcamento:', e); }
@@ -4751,7 +4751,7 @@ function renderTabelaNeg(ambientes = null){
           <input type="number" value="${disc_i}" min="0" max="100" step="0.5"
                  style="width:60px;text-align:right;padding:3px 6px;font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none"
                  onfocus="this._prev=this.value;this._esc=false"
-                 oninput="_descIndividual['ep07_${pa.id}']=parseFloat(this.value)||0"
+                 oninput="_descIndividual['ep07_${pa.id}']=parseFloat(this.value)||0;agendarSalvarDescontos()"
                  onkeydown="diDescKeydown(event,this,'ep07_${pa.id}')"
                  onblur="_onDescIndBlur(this,'ep07_${pa.id}',true)">
         </td>
@@ -5184,6 +5184,12 @@ let _mpSalvarTimer = null;
 function agendarSalvarParametros(){
   clearTimeout(_mpSalvarTimer);
   _mpSalvarTimer = setTimeout(salvarParametrosAuto, 500);
+}
+// Desconto por ambiente: auto-save debounced (mesmo padrão dos demais campos), além do blur.
+let _descSalvarTimer = null;
+function agendarSalvarDescontos(){
+  clearTimeout(_descSalvarTimer);
+  _descSalvarTimer = setTimeout(() => { if(_orcamentoAtivoId) _persistirDescontosOrc(); }, 500);
 }
 async function salvarParametrosAuto(){
   if(!projetoAtivo || !_orcamentoAtivoId) return;
@@ -6773,7 +6779,7 @@ async function salvarOrcamento(){
 // auto-save incremental: "trava" a negociação ao fechar a aba / encerrar a reunião.
 // keepalive (no fetch de salvarValorNegociado) faz a request sobreviver ao unload.
 window.addEventListener('beforeunload', function(){
-  try { if (_orcamentoAtivoId) salvarValorNegociado(); } catch (e) {}
+  try { if (_orcamentoAtivoId) { _persistirDescontosOrc(); salvarValorNegociado(); } } catch (e) {}
 });
 
 document.addEventListener('DOMContentLoaded', function(){
