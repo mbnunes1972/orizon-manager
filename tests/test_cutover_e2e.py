@@ -150,6 +150,7 @@ def test_breakdown_distribui_brinde_viagem_pelo_pool(http_client_factory, seed, 
     db = app_db.get_session()
     o = db.get(app_db.Orcamento, oid); pj = o.projeto_id
     proj = db.query(app_db.Projeto).filter_by(nome_safe=pj).first()
+    pj_orig = proj.parametros_json                  # captura antes de alterar
     proj.parametros_json = json.dumps({"incluir_custos": False, "fora_da_sede": True,
         "custo_viagem": 700, "brinde_ativo": True, "brinde": 700})
     # limpa PoolAmbiente + vínculos anteriores (testes anteriores do módulo usam _seed_amb)
@@ -167,9 +168,21 @@ def test_breakdown_distribui_brinde_viagem_pelo_pool(http_client_factory, seed, 
         db.add(app_db.OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pid, ordem=1))
     db.commit(); db.close()
 
-    c = _login(http_client_factory, "dir_l1")
-    st, body = c.post(f"/api/orcamentos/{oid}/negociacao-preview", {})
-    assert st == 200
-    s = body["sombra"]
-    assert abs(s["Bri"] - 300.0) < 0.5            # 3/7 × 700
-    assert abs(s["Cust_Via"] - 300.0) < 0.5       # 700 × 30000/70000
+    try:
+        c = _login(http_client_factory, "dir_l1")
+        st, body = c.post(f"/api/orcamentos/{oid}/negociacao-preview", {})
+        assert st == 200
+        s = body["sombra"]
+        assert abs(s["Bri"] - 300.0) < 0.5            # 3/7 × 700
+        assert abs(s["Cust_Via"] - 300.0) < 0.5       # 700 × 30000/70000
+    finally:
+        # teardown: remove os 7 PoolAmbiente e 3 OrcamentoAmbiente criados por este
+        # teste, e restaura parametros_json — deixa o banco como estava antes
+        db2 = app_db.get_session()
+        for lk in db2.query(app_db.OrcamentoAmbiente).filter_by(orcamento_id=oid).all():
+            db2.delete(lk)
+        for pa in db2.query(app_db.PoolAmbiente).filter_by(projeto_id=pj).all():
+            db2.delete(pa)
+        proj2 = db2.query(app_db.Projeto).filter_by(nome_safe=pj).first()
+        proj2.parametros_json = pj_orig
+        db2.commit(); db2.close()
