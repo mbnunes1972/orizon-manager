@@ -4247,9 +4247,14 @@ def _negociacao_breakdown(orc, db):
             total_cliente = float(fp["total_cliente"])
     except Exception:
         total_cliente = None
-    d0 = mod_negociacao.calcular_orcamento(ambs, params, desc_orc)
+    pool_proj = db.query(PoolAmbiente).filter_by(projeto_id=orc.projeto_id).all()
+    n_total_proj = len(pool_proj) or None
+    vbvo_proj = sum((pa.budget_total or 0.0) for pa in pool_proj) or None
+    d0 = mod_negociacao.calcular_orcamento(ambs, params, desc_orc,
+                                           n_total_proj=n_total_proj, vbvo_proj=vbvo_proj)
     cust_fin = 0.0 if total_cliente is None else max(0.0, total_cliente - d0["VAVO"])
-    d = mod_negociacao.calcular_orcamento(ambs, params, desc_orc, cust_fin=cust_fin)
+    d = mod_negociacao.calcular_orcamento(ambs, params, desc_orc, cust_fin=cust_fin,
+                                          n_total_proj=n_total_proj, vbvo_proj=vbvo_proj)
     for i, amb in enumerate(d.get("ambientes", [])):
         amb["id"] = ids[i] if i < len(ids) else None
     return d

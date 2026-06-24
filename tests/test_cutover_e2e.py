@@ -141,3 +141,35 @@ def test_save_descontos_retorna_breakdown(http_client_factory, seed, app_db):
     c = _login(http_client_factory, "dir_l1")
     st, body = c.put(f"/api/orcamentos/{oid}/descontos", {"descontos": {str(pid): 5}})
     assert st == 200 and "VAVO" in body["sombra"]
+
+
+def test_breakdown_distribui_brinde_viagem_pelo_pool(http_client_factory, seed, app_db):
+    """Projeto com 7 ambientes no pool; orçamento com 3 → Bri = 3/7 do total; viagem proporcional."""
+    import json
+    oid = seed["orcamento_l1_id"]
+    db = app_db.get_session()
+    o = db.get(app_db.Orcamento, oid); pj = o.projeto_id
+    proj = db.query(app_db.Projeto).filter_by(nome_safe=pj).first()
+    proj.parametros_json = json.dumps({"incluir_custos": False, "fora_da_sede": True,
+        "custo_viagem": 700, "brinde_ativo": True, "brinde": 700})
+    # limpa PoolAmbiente + vínculos anteriores (testes anteriores do módulo usam _seed_amb)
+    for lk in db.query(app_db.OrcamentoAmbiente).filter_by(orcamento_id=oid).all():
+        db.delete(lk)
+    for pa in db.query(app_db.PoolAmbiente).filter_by(projeto_id=pj).all():
+        db.delete(pa)
+    db.flush()
+    pool = []
+    for i in range(7):
+        pa = app_db.PoolAmbiente(nome=f"A{i}", nome_exibicao=f"A{i}", xml_path="x.xml",
+            ambientes_json="{}", projeto_id=pj, budget_total=10000.0, order_total=4000.0)
+        db.add(pa); db.flush(); pool.append(pa.id)
+    for pid in pool[:3]:                              # orçamento = 3 dos 7
+        db.add(app_db.OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pid, ordem=1))
+    db.commit(); db.close()
+
+    c = _login(http_client_factory, "dir_l1")
+    st, body = c.post(f"/api/orcamentos/{oid}/negociacao-preview", {})
+    assert st == 200
+    s = body["sombra"]
+    assert abs(s["Bri"] - 300.0) < 0.5            # 3/7 × 700
+    assert abs(s["Cust_Via"] - 300.0) < 0.5       # 700 × 30000/70000
