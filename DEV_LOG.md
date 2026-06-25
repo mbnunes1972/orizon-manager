@@ -740,3 +740,57 @@ Branch `faxina/drop-orcamento-margens`. Usuário autorizou (base é teste; backu
     era zerado (`carregarMargensSalvas`) e `renderTabelaNeg` rodava, o input lia o
     `pa.desconto_individual_pct` antigo (o motor lia do banco → conta certa). **Fix:** o save
     sincroniza `pa.desconto_individual_pct` em memória com o valor digitado.
+
+## Sessão 32 — Três frentes: super-admin/árvore, acesso multi-loja, e config financeira/provisões
+
+Três workstreams iniciados hoje (2026-06-24). As duas primeiras com código pronto (TDD +
+revisão final opus), **aguardando validação no browser** antes do merge; a terceira em spec.
+
+### Frente A — Super-admin: aterrissagem por papel + árvore estrutural (slice #1+#2)
+Branch `feat/super-admin-arvore` (de `main`). super_admin/admin_rede passam a **aterrissar no
+Painel Admin** (não em Projetos); menu operacional escondido só p/ super_admin; **árvore** estende
+o drill até `Rede › Loja › Projeto › Etapas do ciclo` (estrutural, **sem PII** — PII fica p/ painel
+LGPD futuro). Módulo puro novo `mod_arvore.py` + 2 rotas GET finas. Revisão final opus PRONTO P/
+MERGE; fix I1 (teste e2e cross-rede 403). **Bugfix pré-existente:** botões "Entrar" rede/loja
+quebravam com nome com espaço (onclick aspas duplas + JSON.stringify) → aspas simples + `_attrJson`.
+- **Arquivos:** `mod_arvore.py` (novo); `tests/test_arvore.py`, `tests/test_arvore_e2e.py` (novos);
+  `main.py` (rotas `GET /api/admin/lojas/<id>/projetos` e `/api/admin/projetos/<nome>/etapas`);
+  `static/index.html` (aterrissagem `_aterrissarPorPapel`, nível 4 da árvore, fix dos botões Entrar).
+- **Docs:** `docs/superpowers/specs/2026-06-24-super-admin-aterrissagem-arvore-design.md`;
+  `docs/superpowers/plans/2026-06-24-super-admin-aterrissagem-arvore.md`.
+
+### Frente B — Acesso multi-loja (loja ativa por requisição)
+Branch `feat/multi-loja` (empilhada sobre `feat/super-admin-arvore`). Um usuário acessa N lojas e
+opera numa **loja ativa** por vez, escolhida via header `X-Loja-Ativa` (lido só em `_ator_dict`;
+`escopo_operacional` é o funil — ~51 call sites inalterados). Tabela M:N `usuario_lojas` +
+backfill; `usuarios.loja_id` mantido como loja default. `resolver_loja_ativa` fail-closed (header
+não-membro → 403). `/api/auth/me` expõe `lojas` + `loja_ativa_id`. Criação/edição de usuário aceita
+`loja_ids`. Contrato usa a loja ativa. Frontend: interceptor de `window.fetch` + seletor + modal
+multi-loja. Revisão final opus PRONTO P/ MERGE; fixes: `do_PUT` lê o header (contexto obsoleto),
+edição não dropa memberships fora do escopo do ator de loja, coerção de `loja_ids`.
+- **Arquivos:** `database.py` (`UsuarioLoja` + backfill + `membership_loja_ids`); `mod_tenancy.py`
+  (`resolver_loja_ativa`, `escopo_operacional`, `lojas_do_novo_usuario`); `main.py` (`_ator_dict` +
+  header nos 4 dispatch, rotas de usuário, contrato); `auth_routes.py` (`/api/auth/me`);
+  `static/index.html` (interceptor + seletor + modal); `tests/test_multi_loja.py`,
+  `tests/test_multi_loja_e2e.py` (novos); `tests/test_isolamento_f4.py` (3 dicts unit ajustados).
+- **Docs:** `docs/superpowers/specs/2026-06-24-acesso-multi-loja-design.md`;
+  `docs/superpowers/plans/2026-06-24-acesso-multi-loja.md`.
+
+### Frente C — Config financeira da loja / provisões / margem real / comissões (EM SPEC)
+Retomada da especificação do painel financeiro com todas as provisões. Consolidada a **tabela
+canônica do motor** (config por loja + variáveis de projeto/orçamento/ambiente + fórmulas das
+provisões). Decisões fechadas: imposto único (`Prov_Imp`, sem dedup `Imp_Orc`); `%Car_Trib` migra do
+modal p/ config da loja (0 até a 1ª versão); margem via `Cust_Var` (inclui `CFO` + `Out_Forn`) e
+`Marg_Cont = (Val_Liq − Cust_Var)/Val_Liq`; comissões com base `Val_Liq` (frete local/assist/insumos
+sobre `VAVO`; frete fábrica sobre `CFO`). **Comissão de vendas** = rotina por consultor (2
+configuradores num modal, regra no backend): faixas por `Val_Liq` mensal acumulado + limitador de
+desconto (toggle) que reduz o **%** da venda específica por `%Desc_Orc`. **Faseamento:** v1 = config
+`%` simples + margem real (faixas/limitador entram como config); fase 2 = acumulador mensal por
+consultor + fechamento de ciclo (provisório→definitivo); fase 3 = custo financeiro absorvido em
+`Cust_Var`; futuro = condições de pagamento por loja + divisão de `Com_Adm` por função.
+- **Doc/referência (novo):** `docs/modulos/financeiro/PROVISOES_E_VARIAVEIS.md` (tabela + rotina de
+  comissão + faseamento).
+- **Material âncora:** `FUTURO_CALCULO_FINANCEIRO.md`, `NOMENCLATURA.md`,
+  `docs/modulos/financeiro/SPEC.md`, `docs/superpowers/specs/2026-06-15-ciclo-completo-projeto-design.md`
+  (§Provisões financeiras), `docs/superpowers/specs/2026-06-22-mecanismo-negociacao-design.md`.
+- **Spec/plano:** ainda **não escritos** (próximo passo do brainstorm).
