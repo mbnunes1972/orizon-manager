@@ -74,3 +74,32 @@ def resolver_comissao_venda(cfg, val_liq_mes, desc_orc_pct):
                 redutor = _f(L.get("redutor_pct"))
         pct = pct * (1 - redutor / 100.0)
     return round(pct, 4)
+
+
+def provisoes_orcamento(siglas, cfg, out_forn=0.0, com_venda_pct=0.0):
+    s = siglas or {}
+    CFO = _f(s.get("CFO")); Val_Liq = _f(s.get("Val_Liq"))
+    VAVO = _f(s.get("VAVO")); Prov_Imp = _f(s.get("Prov_Imp"))
+    prov = (cfg or {}).get("provisoes", {}) or {}
+    out_forn = _f(out_forn)
+
+    frete_fab = _f(prov.get("frete_fab_pct")) / 100.0 * CFO
+    com_adm   = _f(prov.get("com_adm_pct"))   / 100.0 * Val_Liq
+    com_venda = _f(com_venda_pct)             / 100.0 * Val_Liq
+    com_med   = _f(prov.get("com_med_pct"))   / 100.0 * Val_Liq
+    com_proj  = _f(prov.get("com_proj_exec_pct")) / 100.0 * Val_Liq
+    frete_loc = _f(prov.get("frete_loc_pct")) / 100.0 * VAVO
+    assist    = _f(prov.get("assist_pct"))    / 100.0 * VAVO
+    ins_loc   = _f(prov.get("ins_loc_pct"))   / 100.0 * VAVO
+
+    cust_var = (CFO + out_forn + frete_fab + com_adm + com_venda + com_med
+                + com_proj + frete_loc + assist + ins_loc + Prov_Imp)
+    marg_cont = ((Val_Liq - cust_var) / Val_Liq) if Val_Liq else 0.0
+    return {
+        "Frete_Fab_Orc": round(frete_fab, 2), "Com_Adm_Orc": round(com_adm, 2),
+        "Com_Venda_Orc": round(com_venda, 2), "Com_Med_Orc": round(com_med, 2),
+        "Com_Proj_Exec_Orc": round(com_proj, 2), "Frete_Loc_Orc": round(frete_loc, 2),
+        "Assist_Orc": round(assist, 2), "Ins_Loc_Orc": round(ins_loc, 2),
+        "Out_Forn": round(out_forn, 2),
+        "Cust_Var": round(cust_var, 2), "Marg_Cont": round(marg_cont, 4),
+    }
