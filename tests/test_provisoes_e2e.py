@@ -27,3 +27,22 @@ def test_breakdown_inclui_margem_real(app_db, seed, projetos_dir):
     assert d["Frete_Fab_Orc"] == round(0.10 * d["CFO"], 2)
     # Cust_Var >= CFO (custo de fábrica sempre entra)
     assert d["Cust_Var"] >= d["CFO"]
+
+
+def test_get_put_config_financeira(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")   # diretor: editar_dados_loja
+    st, body = c.get("/api/admin/lojas/%d/config-financeira" % seed["loja1_id"])
+    assert st == 200 and "config" in body
+    cfg = body["config"]; cfg["provisoes"]["com_adm_pct"] = 7.0
+    st2, body2 = c.put("/api/admin/lojas/%d/config-financeira" % seed["loja1_id"], cfg)
+    assert st2 == 200 and body2["ok"] is True
+    st3, body3 = c.get("/api/admin/lojas/%d/config-financeira" % seed["loja1_id"])
+    assert body3["config"]["provisoes"]["com_adm_pct"] == 7.0
+
+
+def test_put_config_rejeita_invalido(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    _, body = c.get("/api/admin/lojas/%d/config-financeira" % seed["loja1_id"])
+    cfg = body["config"]; cfg["provisoes"]["frete_fab_pct"] = -5.0
+    st, b = c.put("/api/admin/lojas/%d/config-financeira" % seed["loja1_id"], cfg)
+    assert b["ok"] is False

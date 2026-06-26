@@ -630,6 +630,26 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif path.startswith("/api/admin/lojas/") and path.endswith("/config-financeira"):
+            import re as _re, mod_provisoes
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+            m = _re.match(r"^/api/admin/lojas/(\d+)/config-financeira$", path)
+            if not m:
+                self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja = db.get(Loja, int(m.group(1)))
+                if not loja or not mod_tenancy.pode_ver_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                    self.send_json({"ok": False, "erro": "Loja fora do escopo"}, code=403); return
+                cfg = json.loads(loja.config_financeira_json) if loja.config_financeira_json \
+                    else mod_provisoes.config_financeira_default()
+                self.send_json({"ok": True, "config": cfg})
+            finally:
+                db.close()
+
         elif path.startswith("/api/admin/lojas/") and path.endswith("/projetos"):
             usuario = get_usuario_sessao(self)
             if not usuario or not (perfis.pode(usuario.get("nivel"), "gerir_redes")
@@ -3556,6 +3576,33 @@ class Handler(BaseHTTPRequestHandler):
         path   = urlparse(self.path).path
         length = int(self.headers.get("Content-Length", 0))
         body   = self.rfile.read(length)
+
+        # ── PUT /api/admin/lojas/<id>/config-financeira ───────────────────────
+        m_cfg = re.match(r"^/api/admin/lojas/(\d+)/config-financeira$", path)
+        if m_cfg:
+            import mod_provisoes
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+            try:
+                req = json.loads(body) if body else {}
+            except Exception:
+                self.send_json({"ok": False, "erro": "JSON inválido"}); return
+            erros = mod_provisoes.validar_config_financeira(req)
+            if erros:
+                self.send_json({"ok": False, "erro": " ".join(erros)}); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja = db.get(Loja, int(m_cfg.group(1)))
+                if not loja or not mod_tenancy.pode_ver_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                    self.send_json({"ok": False, "erro": "Loja fora do escopo"}, code=403); return
+                loja.config_financeira_json = json.dumps(req, ensure_ascii=False)
+                db.commit()
+                self.send_json({"ok": True})
+            finally:
+                db.close()
+            return
 
         # ── PUT /projetos/<nome_safe>/orcamentos/<oid> — renomear orçamento ───
         m = re.match(r"^/projetos/([^/]+)/orcamentos/(\d+)$", path)
