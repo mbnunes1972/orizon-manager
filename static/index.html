@@ -1819,6 +1819,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px"><span style="color:var(--muted)">− Brinde</span><span id="mp-a-brinde" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
         <div style="display:flex;justify-content:space-between"><span style="font-weight:700">Valor líquido final</span><span id="mp-a-liq" style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--ok)">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Desconto Total</span><span id="mp-a-margem" style="font-family:'IBM Plex Mono',monospace;color:var(--warn);font-weight:700">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Custo Variável</span><span id="mp-a-cust-var" style="font-family:'IBM Plex Mono',monospace">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Margem de Contribuição</span><span id="mp-a-marg-cont" style="font-family:'IBM Plex Mono',monospace">—</span></div>
       </div>
     </div>
 
@@ -1906,6 +1908,7 @@ let _negSelLocal    = {};   // { arquivo: bool } seletor de negociacao
 let _descIndividual = {};   // { arquivo: pct } desconto individual por ambiente
 let _descAdicional  = {};   // legado — mantido por compat
 let _margemAtual    = 0;    // % calculada por mpAtualizarApoio — usado para validar limite 35%
+let _margemRealVal  = null; // {cust_var, marg_cont} — exibido sob cadeado de impostos
 const _LIMITE_DESC_TOTAL = 35;
 let _selLocal = {};           // { arquivo: bool } estado local dos checkboxes
 
@@ -4166,6 +4169,20 @@ function _renderImpostosLock() {
       if (elImp)  elImp.innerHTML  = lock;
     }
   });
+  // ── margem real: renderiza sob o mesmo cadeado ──
+  const elCustVar  = document.getElementById('mp-a-cust-var');
+  const elMargCont = document.getElementById('mp-a-marg-cont');
+  if (_margemRealVal) {
+    if (_impostosLiberados) {
+      const rel = (txt) => '<span style="cursor:pointer" title="Clique para ocultar (🔓)" onclick="_reBloquearImpostos()">' + txt + '</span>';
+      if (elCustVar)  elCustVar.innerHTML  = rel('R$ ' + fmt(_margemRealVal.cust_var));
+      if (elMargCont) elMargCont.innerHTML = rel((_margemRealVal.marg_cont * 100).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%');
+    } else {
+      const lock = '<span style="cursor:pointer" title="Liberar com senha de diretor/gerente adm-fin" onclick="abrirModalLiberarImpostos()">🔒</span>';
+      if (elCustVar)  elCustVar.innerHTML  = lock;
+      if (elMargCont) elMargCont.innerHTML = lock;
+    }
+  }
 }
 function _reBloquearImpostos() { _impostosLiberados = false; _renderImpostosLock(); }
 
@@ -5622,6 +5639,8 @@ function _aplicarPreviewNaTela(s) {
   _margemAtual = margem;   // usado pelo limite de 35%
   if (id('mp-a-margem')) id('mp-a-margem').textContent =
     margem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
+  _margemRealVal = { cust_var: Number(s.Cust_Var) || 0, marg_cont: Number(s.Marg_Cont) || 0 };
+  _renderImpostosLock();   // aplica cadeado nos cards de margem real
   // provisão de impostos: NÃO escrever aqui com base fixa. Cada painel de pagamento
   // recalcula com o SEU total_cliente (= VAVO + Cust_Fin da modalidade = Val_Cont),
   // setando base/impostos corretos via _atualizarImpostos(prefix, total_cliente).
