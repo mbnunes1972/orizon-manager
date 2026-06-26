@@ -77,6 +77,16 @@ def merge_parametros(atual: dict, req: dict) -> dict:
     return base
 
 
+def parametros_default_loja(cfg):
+    """parametros_json inicial de um projeto, com defaults da loja sobre o PARAMETROS_DEFAULT."""
+    base = dict(PARAMETROS_DEFAULT)
+    dn = (cfg or {}).get("defaults_negociacao", {}) or {}
+    if "comissao_arq_pct" in dn: base["comissao_arq_pct"] = float(dn["comissao_arq_pct"] or 0)
+    if "fidelidade_pct" in dn:   base["fidelidade_pct"]   = float(dn["fidelidade_pct"] or 0)
+    if "carga_trib_pct" in dn:   base["carga_trib"]       = float(dn["carga_trib_pct"] or 0)
+    return base
+
+
 def sanear_descontos(pares, ids_validos) -> dict:
     ids_validos = set(ids_validos)
     out = {}

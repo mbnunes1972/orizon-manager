@@ -1,4 +1,5 @@
 import mod_provisoes
+import mod_orcamento_params
 
 
 def test_default_tem_estrutura_completa():
@@ -86,3 +87,18 @@ def test_margem_negativa_e_val_liq_zero():
     assert r["Marg_Cont"] < 0                       # Cust_Var (5000) > Val_Liq (1000)
     siglas0 = {"CFO": 0.0, "Val_Liq": 0.0, "VAVO": 0.0, "Prov_Imp": 0.0}
     assert mod_provisoes.provisoes_orcamento(siglas0, c)["Marg_Cont"] == 0.0
+
+
+def test_parametros_default_loja_usa_config():
+    cfg = {"defaults_negociacao": {"comissao_arq_pct": 12.0, "fidelidade_pct": 3.0, "carga_trib_pct": 8.0}}
+    p = mod_orcamento_params.parametros_default_loja(cfg)
+    assert p["comissao_arq_pct"] == 12.0
+    assert p["fidelidade_pct"] == 3.0
+    assert p["carga_trib"] == 8.0
+    # chaves do PARAMETROS_DEFAULT preservadas
+    assert "incluir_custos" in p
+
+
+def test_parametros_default_loja_sem_config_cai_no_default():
+    p = mod_orcamento_params.parametros_default_loja(None)
+    assert p == dict(mod_orcamento_params.PARAMETROS_DEFAULT)
