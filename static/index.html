@@ -6605,25 +6605,28 @@ async function adminRenderLoja(box){
       <button class="home-tab ativo" id="loja-tab-dados" onclick="adminLojaTab('dados')">Dados da loja</button>
       <button class="home-tab" id="loja-tab-usuarios" onclick="adminLojaTab('usuarios')">Usuários da loja</button>
       <button class="home-tab" id="loja-tab-projetos" onclick="adminLojaTab('projetos')">Projetos</button>
+      <button class="home-tab" id="loja-tab-financeiro" onclick="adminLojaTab('financeiro')">Financeiro</button>
     </div>
     <div id="loja-panel-dados"></div>
     <div id="loja-panel-usuarios" style="display:none">
       <button class="btn btn-ghost btn-sm" onclick="abrirModalUsuario({modo:'novo', escopo:'loja', loja_id:(_adminNav.loja&&_adminNav.loja.id)||(_usuarioAtual&&_usuarioAtual.loja_id), onSaved:adminUsuariosCarregar})" style="font-size:11px">+ Novo usuário</button>
       <div id="admin-usuarios-lista" style="margin-top:10px"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     </div>
-    <div id="loja-panel-projetos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>`;
+    <div id="loja-panel-projetos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+    <div id="loja-panel-financeiro" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>`;
   adminLojaCarregarDados(lid);
   adminUsuariosCarregar();   // popula #admin-usuarios-lista (função já existente)
 }
 
 function adminLojaTab(qual){
-  ['dados','usuarios','projetos'].forEach(q => {
+  ['dados','usuarios','projetos','financeiro'].forEach(q => {
     const tab   = document.getElementById('loja-tab-'+q);
     const panel = document.getElementById('loja-panel-'+q);
     if (tab)   tab.classList.toggle('ativo', q===qual);
     if (panel) panel.style.display = q===qual ? '' : 'none';
   });
   if (qual==='projetos') adminLojaProjetosCarregar();
+  if (qual==='financeiro') adminFinanceiroCarregar();
 }
 
 async function adminLojaProjetosCarregar(){
@@ -6649,6 +6652,47 @@ async function adminLojaProjetosCarregar(){
         onclick='adminEntrarProjeto(${JSON.stringify(p.nome_safe)}, ${JSON.stringify(p.status||"")})'>Abrir ›</button></td>
     </tr>`).join('') || '<tr><td colspan="5" style="color:var(--muted)">Nenhum projeto nesta loja.</td></tr>'}
     </tbody></table>`;
+}
+
+let _cfgFin = null;
+async function adminFinanceiroCarregar(){
+  const panel = document.getElementById('loja-panel-financeiro');
+  const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  if (!panel || !lid) return;
+  const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {credentials:'same-origin'});
+  if (r.status === 403){ panel.innerHTML = '<em style="color:var(--muted)">Sem acesso.</em>'; return; }
+  const d = await r.json().catch(()=>({}));
+  _cfgFin = d.config || {};
+  const prov = _cfgFin.provisoes || {};
+  const dn = _cfgFin.defaults_negociacao || {};
+  const campo = (id,lbl,val)=>`<div><label class="field-label">${lbl}</label>
+    <input id="${id}" type="number" step="0.01" value="${val||0}"
+     style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></div>`;
+  panel.innerHTML = `
+    <div class="grid2" style="gap:14px;margin-bottom:14px">
+      ${campo('fin-com-arq','% Comissão arquiteto (default)',dn.comissao_arq_pct)}
+      ${campo('fin-fid','% Fidelidade (default)',dn.fidelidade_pct)}
+      ${campo('fin-trib','% Carga tributária',dn.carga_trib_pct)}
+      ${campo('fin-frete-fab','% Frete fábrica→loja',prov.frete_fab_pct)}
+      ${campo('fin-com-adm','% Comissões administrativas',prov.com_adm_pct)}
+      ${campo('fin-com-med','% Comissão de medidor',prov.com_med_pct)}
+      ${campo('fin-com-pe','% Comissão projeto executivo',prov.com_proj_exec_pct)}
+      ${campo('fin-frete-loc','% Frete local',prov.frete_loc_pct)}
+      ${campo('fin-assist','% Assistências',prov.assist_pct)}
+      ${campo('fin-ins','% Insumos locais',prov.ins_loc_pct)}
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="adminFinanceiroSalvar(${lid})">Salvar config financeira</button>`;
+}
+async function adminFinanceiroSalvar(lid){
+  const n = id => parseFloat(document.getElementById(id).value || '0') || 0;
+  _cfgFin.defaults_negociacao = {comissao_arq_pct:n('fin-com-arq'), fidelidade_pct:n('fin-fid'), carga_trib_pct:n('fin-trib')};
+  _cfgFin.provisoes = {frete_fab_pct:n('fin-frete-fab'), com_adm_pct:n('fin-com-adm'), com_med_pct:n('fin-com-med'),
+    com_proj_exec_pct:n('fin-com-pe'), frete_loc_pct:n('fin-frete-loc'), assist_pct:n('fin-assist'), ins_loc_pct:n('fin-ins')};
+  const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {method:'PUT', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(_cfgFin)});
+  const d = await r.json();
+  if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Config financeira'}); return; }
+  showToast('Config financeira salva.', false);
 }
 
 async function adminRenderProjeto(box){
