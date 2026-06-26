@@ -215,6 +215,7 @@ class Loja(Base):
     testemunha2_cpf  = Column(String(14),  nullable=True)
     ativo       = Column(Integer,  default=1)
     criado_em   = Column(DateTime, default=datetime.utcnow)
+    config_financeira_json = Column(Text, nullable=True)   # config financeira da loja (JSON)
 
 
 class ParceiroLoja(Base):
@@ -356,6 +357,7 @@ class Orcamento(Base):
     cust_fin     = Column(Float, default=0.0)
     val_cont     = Column(Float, default=0.0)
     prov_imp     = Column(Float, default=0.0)
+    out_forn     = Column(Float, default=0.0)   # Outros Fornecedores (editável Gerente Adm/Fin)
     created_by      = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, nullable=True)
@@ -540,6 +542,17 @@ def _migrar_colunas():
                     "val_liq", "desc_tot_pct", "markup", "cust_fin", "val_cont", "prov_imp"):
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} REAL DEFAULT 0")
+
+        # 2026-06-24: config financeira da loja + Out_Forn por orçamento
+        if _tabela_existe(cur, "lojas"):
+            loja_cols = [c[1] for c in cur.execute("PRAGMA table_info(lojas)").fetchall()]
+            if "config_financeira_json" not in loja_cols:
+                cur.execute("ALTER TABLE lojas ADD COLUMN config_financeira_json TEXT")
+
+        if _tabela_existe(cur, "orcamentos"):
+            orc_cols = [c[1] for c in cur.execute("PRAGMA table_info(orcamentos)").fetchall()]
+            if "out_forn" not in orc_cols:
+                cur.execute("ALTER TABLE orcamentos ADD COLUMN out_forn REAL DEFAULT 0")
 
         # ── pool_ambientes: qualidade do XML ──
         cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pool_ambientes'")
