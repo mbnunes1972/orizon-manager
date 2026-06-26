@@ -4335,6 +4335,20 @@ def _negociacao_breakdown(orc, db):
                                           n_total_proj=n_total_proj, vbvo_proj=vbvo_proj)
     for i, amb in enumerate(d.get("ambientes", [])):
         amb["id"] = ids[i] if i < len(ids) else None
+    import mod_provisoes
+    cfg = {}
+    loja = db.get(Loja, orc.loja_id) if getattr(orc, "loja_id", None) else None
+    if loja and loja.config_financeira_json:
+        try:
+            cfg = json.loads(loja.config_financeira_json)
+        except Exception:
+            cfg = {}
+    if not cfg:
+        cfg = mod_provisoes.config_financeira_default()
+    com_venda_pct = mod_provisoes.resolver_comissao_venda(cfg, d.get("Val_Liq", 0.0), desc_orc)
+    prov = mod_provisoes.provisoes_orcamento(d, cfg, out_forn=(orc.out_forn or 0.0),
+                                             com_venda_pct=com_venda_pct)
+    d.update(prov)
     return d
 
 
