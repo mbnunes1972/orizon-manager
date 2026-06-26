@@ -53,3 +53,24 @@ def validar_config_financeira(dados):
         if _f(lim.get("redutor_pct")) < 0 or _f(lim.get("desconto_acima_de")) < 0:
             erros.append("Limite de desconto com valor negativo.")
     return erros
+
+
+def resolver_comissao_venda(cfg, val_liq_mes, desc_orc_pct):
+    cv = (cfg or {}).get("comissao_vendas", {}) or {}
+    faixas = cv.get("faixas_comissao", []) or []
+    pct = 0.0
+    for fx in faixas:
+        ate = fx.get("venda_ate")
+        if ate is None or _f(val_liq_mes) < _f(ate):
+            pct = _f(fx.get("pct"))
+            break
+    else:
+        pct = _f(faixas[-1].get("pct")) if faixas else 0.0
+    lim = cv.get("limitador_desconto", {}) or {}
+    if lim.get("ativo"):
+        redutor = 0.0
+        for L in sorted(lim.get("limites", []) or [], key=lambda x: _f(x.get("desconto_acima_de"))):
+            if _f(desc_orc_pct) > _f(L.get("desconto_acima_de")):
+                redutor = _f(L.get("redutor_pct"))
+        pct = pct * (1 - redutor / 100.0)
+    return round(pct, 4)
