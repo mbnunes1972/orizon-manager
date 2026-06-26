@@ -3587,10 +3587,10 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 req = json.loads(body) if body else {}
             except Exception:
-                self.send_json({"ok": False, "erro": "JSON inválido"}); return
+                self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
             erros = mod_provisoes.validar_config_financeira(req)
             if erros:
-                self.send_json({"ok": False, "erro": " ".join(erros)}); return
+                self.send_json({"ok": False, "erro": " ".join(erros)}, code=400); return
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -4392,6 +4392,8 @@ def _negociacao_breakdown(orc, db):
             cfg = {}
     if not cfg:
         cfg = mod_provisoes.config_financeira_default()
+    # v1: usa o Val_Liq do próprio orçamento como proxy do acumulado mensal do consultor.
+    # Fase 2 troca por um acumulador mensal por (consultor, loja, mês). Ver spec/PROVISOES_E_VARIAVEIS.md.
     com_venda_pct = mod_provisoes.resolver_comissao_venda(cfg, d.get("Val_Liq", 0.0), desc_orc)
     prov = mod_provisoes.provisoes_orcamento(d, cfg, out_forn=(orc.out_forn or 0.0),
                                              com_venda_pct=com_venda_pct)

@@ -102,3 +102,13 @@ def test_parametros_default_loja_usa_config():
 def test_parametros_default_loja_sem_config_cai_no_default():
     p = mod_orcamento_params.parametros_default_loja(None)
     assert p == dict(mod_orcamento_params.PARAMETROS_DEFAULT)
+
+
+def test_validar_rejeita_redutor_acima_de_100():
+    c = mod_provisoes.config_financeira_default()
+    c["comissao_vendas"]["limitador_desconto"] = {
+        "ativo": True, "base_desconto": "Desc_Orc",
+        "limites": [{"desconto_acima_de": 5.0, "redutor_pct": 150.0}],
+    }
+    erros = mod_provisoes.validar_config_financeira(c)
+    assert erros and any("100" in e for e in erros)

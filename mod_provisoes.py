@@ -37,9 +37,13 @@ def validar_config_financeira(dados):
     for k in _PROV_KEYS:
         if _f(prov.get(k)) < 0:
             erros.append(f"Provisão {k} não pode ser negativa.")
+        elif _f(prov.get(k)) > 100:
+            erros.append(f"Provisão {k} não pode passar de 100%.")
     for k, v in (d.get("defaults_negociacao", {}) or {}).items():
         if _f(v) < 0:
             erros.append(f"Default {k} não pode ser negativo.")
+        elif _f(v) > 100:
+            erros.append(f"Default {k} não pode passar de 100%.")
     cv = d.get("comissao_vendas", {}) or {}
     faixas = cv.get("faixas_comissao", [])
     if not faixas:
@@ -49,9 +53,15 @@ def validar_config_financeira(dados):
             erros.append("Cada faixa de comissão precisa de 'pct'.")
         elif _f(fx.get("pct")) < 0:
             erros.append("Percentual de faixa não pode ser negativo.")
+        elif _f(fx.get("pct")) > 100:
+            erros.append("Percentual de faixa não pode passar de 100%.")
     for lim in (cv.get("limitador_desconto", {}) or {}).get("limites", []):
         if _f(lim.get("redutor_pct")) < 0 or _f(lim.get("desconto_acima_de")) < 0:
             erros.append("Limite de desconto com valor negativo.")
+        if _f(lim.get("redutor_pct")) > 100:
+            erros.append("Limite de desconto fora de 0–100%.")
+        if _f(lim.get("desconto_acima_de")) > 100:
+            erros.append("Limite de desconto fora de 0–100%.")
     return erros
 
 
