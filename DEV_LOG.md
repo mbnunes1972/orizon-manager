@@ -820,3 +820,19 @@ Dia de validação manual no browser da Frente C. Achados e mudanças:
 ### DEFERIDOS da Frente C (follow-ups, não bloqueiam):
 - Edição de `Out_Forn` (sem rota PATCH ainda); wiring de `parametros_default_loja` na criação do
   projeto (carga_trib da loja ainda não flui ao Prov_Imp); acumulador mensal da comissão (Fase 2).
+
+## Sessão 34 — Close-out da Frente C (autônomo)
+
+Trabalho autônomo (usuário ausente) fechando os follow-ups da Frente C. Tudo na branch
+`feat/config-financeira-provisoes` (empilhada). Suíte: **357 passed**.
+- **P2 — wiring `parametros_default_loja`** (`3d13947`): `_negociacao_breakdown` carrega a config da
+  loja uma vez no topo; projeto sem `parametros_json` herda os defaults de negociação da loja
+  (a `carga_trib` da loja passa a fluir ao `Prov_Imp`/margem). Projetos com params próprios: intactos.
+- **P1 — edição de `Out_Forn`** (`4911c8d`, `92a2222`, `059c7c5`): rota `PUT /api/orcamentos/<id>/out-forn`
+  (espelha `/descontos`, escopo + IDOR), campo editável no painel de apoio do modal de Parâmetros
+  (travado em modo read-only), recálculo da margem na hora. Fix de revisão: clamp `out_forn>=0` +
+  validação de corpo (400) + testes de IDOR/clamp.
+- **P3 — guard de contrato desatualizado** (`1382ad9`, `66f4fcc`): `mod_contrato.contrato_desatualizado`
+  compara o snapshot `pagamento_json` com a `forma_pagamento` atual do orçamento de origem (tipo +
+  total); `GET /contrato` devolve `desatualizado`; banner de aviso na etapa Contrato. Resolve o
+  achado da Sessão 33 (contrato Cartão × negociação Aymoré).
