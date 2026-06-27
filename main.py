@@ -13,7 +13,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
-                       membership_loja_ids, UsuarioLoja)
+                       membership_loja_ids, UsuarioLoja, ProvisaoRegistro)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -3438,6 +3438,9 @@ class Handler(BaseHTTPRequestHandler):
                         db.add(etapa7)
                     etapa7.status = "em_andamento"
                     db.commit()
+                    _registrar_provisao_venda(db, db.get(Orcamento, contrato.orcamento_id),
+                                              por_id=(usuario.get("id") if usuario else None))
+                    db.commit()
                     resp = {"ok": True, "contrato_id": contrato.id, "status": "para_assinatura"}
                     if aviso:
                         resp["aviso"] = aviso
@@ -4445,6 +4448,23 @@ def _negociacao_breakdown(orc, db):
                                              com_venda_pct=com_venda_pct)
     d.update(prov)
     return d
+
+
+def _registrar_provisao_venda(db, orc, por_id):
+    """Grava (ou re-snapshota) a versão 'venda' das provisões a partir do breakdown atual."""
+    import mod_provisoes
+    d = _negociacao_breakdown(orc, db)
+    itens = mod_provisoes.itens_provisao(d)
+    existente = db.query(ProvisaoRegistro).filter_by(
+        orcamento_id=orc.id, versao="venda").first()
+    if existente:
+        db.delete(existente); db.flush()
+    db.add(ProvisaoRegistro(
+        orcamento_id=orc.id, versao="venda",
+        itens_json=json.dumps(itens, ensure_ascii=False),
+        cfo=float(d.get("CFO") or 0), val_liq=float(d.get("Val_Liq") or 0),
+        cust_var=float(d.get("Cust_Var") or 0), marg_cont=float(d.get("Marg_Cont") or 0),
+        decisao=None, por_id=por_id))
 
 
 def _recalcular_orcamento(orc, db):
