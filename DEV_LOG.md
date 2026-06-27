@@ -794,3 +794,29 @@ consultor + fechamento de ciclo (provisório→definitivo); fase 3 = custo finan
   `docs/modulos/financeiro/SPEC.md`, `docs/superpowers/specs/2026-06-15-ciclo-completo-projeto-design.md`
   (§Provisões financeiras), `docs/superpowers/specs/2026-06-22-mecanismo-negociacao-design.md`.
 - **Spec/plano:** ainda **não escritos** (próximo passo do brainstorm).
+
+## Sessão 33 — Testes (config financeira) + ajustes de leitura/contrato
+
+Dia de validação manual no browser da Frente C. Achados e mudanças:
+- **Modo somente-leitura em projeto fechado** (commit `3183789`): `btn-params` deixa de ser
+  escondido com contrato assinado; o modal de Parâmetros abre travado (inputs disabled/readonly,
+  Salvar oculto, badge "🔒 somente leitura") e expõe a margem real sob o cadeado de impostos.
+- **Fix de visualização de contrato** (commit `4c8076c`): `contrato.pdf_path` de contratos antigos
+  foi salvo como caminho ABSOLUTO do Windows (`E:/.../Omie_v3/...`) — não resolve em WSL/Linux
+  (case-sensitive) e o contrato não abria mesmo com o PDF presente. `_resolver_pdf_contrato` cai
+  para `CONTRATOS_DIR/<basename>`. Aplicado nas rotas `GET /contrato/pdf` e `GET /contrato`.
+
+### ⚠️ PROBLEMAS REGISTRADOS PARA TRATAR (teste e2e do usuário, em breve)
+1. **Contrato defasado vs negociação:** num projeto com vários orçamentos, o contrato foi gerado
+   de um orçamento (ex.: Cartão) enquanto a negociação exibida está em outro (ex.: Aymoré). O PDF
+   é snapshot do momento da geração e não acompanha mudanças posteriores. **A tratar:** vincular
+   claramente o contrato ao orçamento de origem e/ou alertar/regenerar quando o pagamento mudar
+   após a geração (guard de staleness). Validar no teste e2e do início ao fim.
+2. **super_admin não acessa negociação operacional nem `aprovar_financeiro`** — a margem real só
+   é visível para diretor/gerente adm-fin (correto por design; registrado p/ alinhamento de UX).
+3. **Dados de teste inconsistentes** (Projeto_2 sem etapa 6; contratos antigos): preferir um teste
+   e2e limpo (criar projeto pela UI do início ao fim) a remendar seed.
+
+### DEFERIDOS da Frente C (follow-ups, não bloqueiam):
+- Edição de `Out_Forn` (sem rota PATCH ainda); wiring de `parametros_default_loja` na criação do
+  projeto (carga_trib da loja ainda não flui ao Prov_Imp); acumulador mensal da comissão (Fase 2).
