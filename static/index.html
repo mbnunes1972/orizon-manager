@@ -1751,7 +1751,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <div id="modal-params" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
   <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:598px;width:92%;max-height:90vh;overflow-y:auto;animation:mIn .18s ease">
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;gap:12px">
-      <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:16px">Parametros da negociacao</div>
+      <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:16px">Parametros da negociacao <span id="mp-ro-badge" style="display:none;font-size:11px;font-weight:600;color:var(--muted)">🔒 somente leitura</span></div>
       <div id="mp-total-ambientes" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ok);background:rgba(25,201,160,.08);border:1px solid rgba(25,201,160,.2);border-radius:6px;padding:3px 10px;white-space:nowrap">—</div>
     </div>
 
@@ -1829,7 +1829,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
     <div style="display:flex;gap:10px;margin-top:20px">
       <button class="btn btn-ghost btn-sm" onclick="fecharModalParams(false)" style="flex:1;justify-content:center">Voltar</button>
-      <button class="btn btn-primary btn-sm" onclick="mpSalvarComValidacao()" style="flex:1;justify-content:center">Salvar e continuar</button>
+      <button id="mp-btn-salvar" class="btn btn-primary btn-sm" onclick="mpSalvarComValidacao()" style="flex:1;justify-content:center">Salvar e continuar</button>
     </div>
   </div>
 </div>
@@ -5718,6 +5718,32 @@ function abrirModalParams(){
   };
   document.getElementById('modal-params').style.display = 'flex';
   mpAtualizarApoio();
+  // modo somente-leitura quando o contrato já está assinado/vigente (projeto fechado)
+  _aplicarModoLeituraParams(typeof _contratoAssinado !== 'undefined' && !!_contratoAssinado);
+  _renderImpostosLock();   // reflete a margem real (Cust_Var/Marg_Cont) sob o cadeado de impostos
+}
+
+// Abre o modal de Parâmetros em modo leitura (contrato assinado): inputs travados,
+// botão Salvar oculto, badge "somente leitura". Reversível para projetos não-assinados.
+function _aplicarModoLeituraParams(ro){
+  const modal = document.getElementById('modal-params');
+  if (!modal) return;
+  modal.querySelectorAll('input, select, textarea').forEach(el => {
+    if (el.id === 'mp-desconto') return;   // já é readonly por design (fonte única)
+    if (ro){
+      el.dataset.roLock = '1';
+      if (el.type === 'checkbox' || el.tagName === 'SELECT') el.disabled = true;
+      else el.readOnly = true;
+    } else if (el.dataset.roLock){
+      if (el.type === 'checkbox' || el.tagName === 'SELECT') el.disabled = false;
+      else el.readOnly = false;
+      delete el.dataset.roLock;
+    }
+  });
+  const salvar = document.getElementById('mp-btn-salvar');
+  if (salvar) salvar.style.display = ro ? 'none' : '';
+  const badge = document.getElementById('mp-ro-badge');
+  if (badge) badge.style.display = ro ? '' : 'none';
 }
 let _mpSnapshot = null;
 
@@ -7462,10 +7488,15 @@ function aplicarBloqueioNegociacao(travar) {
 
 function atualizarBotoesAprovacao() {
   const assinado = (typeof _contratoAssinado !== 'undefined') && _contratoAssinado;
-  ['btn-params','btn-pool','btn-novo-ambiente','btn-novo-orc'].forEach(id => {
+  ['btn-pool','btn-novo-ambiente','btn-novo-orc'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = assinado ? 'none' : '';
   });
+  // btn-params permanece VISÍVEL mesmo com contrato assinado — o modal de Parâmetros
+  // abre em modo somente-leitura (ver _aplicarModoLeituraParams), preservando o acesso
+  // de leitura à margem real / provisões em projetos fechados.
+  const _bp = document.getElementById('btn-params');
+  if (_bp) _bp.style.display = '';
   if (assinado) {
     aplicarBloqueioNegociacao(true);
     const actionRow = document.querySelector('#page-02 .action-row');
