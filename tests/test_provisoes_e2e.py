@@ -72,3 +72,13 @@ def test_breakdown_usa_carga_trib_da_loja_quando_projeto_sem_params(app_db, seed
         db.close()
     # carga_trib 10% da loja deve refletir em Prov_Imp (> 0), pois o projeto nao tem params proprios
     assert d["Prov_Imp"] > 0
+
+
+def test_put_out_forn(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, body = c.put("/api/orcamentos/%d/out-forn" % seed["orcamento_l1_id"], {"out_forn": 777})
+    assert st == 200 and body["ok"] is True
+    assert body["sombra"]["Out_Forn"] == 777
+    # persistiu: nova previa reflete
+    st2, b2 = c.post("/api/orcamentos/%d/negociacao-preview" % seed["orcamento_l1_id"], {})
+    assert b2["sombra"]["Out_Forn"] == 777

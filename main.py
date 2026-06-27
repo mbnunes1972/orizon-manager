@@ -3708,6 +3708,37 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        # ── PUT /api/orcamentos/<id>/out-forn — editar outros fornecedores ──
+        m_out = re.match(r"^/api/orcamentos/(\d+)/out-forn$", path)
+        if m_out:
+            oid = int(m_out.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                req = json.loads(body.decode("utf-8", "replace")) if body else {}
+                orc = _obj_da_loja(db, Orcamento, oid, loja_id)
+                if orc is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                    return
+                orc.out_forn = float(req.get("out_forn") or 0)
+                db.commit()
+                self.send_json({"ok": True, "sombra": _negociacao_breakdown(orc, db)})
+                return
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
         self.send_response(404)
         self.end_headers()
 
