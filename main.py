@@ -1145,14 +1145,15 @@ class Handler(BaseHTTPRequestHandler):
                                  .filter_by(projeto_nome=nome_safe)\
                                  .order_by(Contrato.id.desc())\
                                  .first()
-                    if not contrato or not contrato.pdf_path or not os.path.exists(contrato.pdf_path):
+                    _pdf = _resolver_pdf_contrato(contrato.pdf_path) if contrato else None
+                    if not _pdf:
                         self.send_json({"ok": False, "erro": "Arquivo não encontrado"}, code=404)
                         return
-                    eh_pdf  = contrato.pdf_path.endswith(".pdf")
+                    eh_pdf  = _pdf.endswith(".pdf")
                     ct      = "application/pdf" if eh_pdf else \
                               "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ext     = "pdf" if eh_pdf else "docx"
-                    with open(contrato.pdf_path, 'rb') as f:
+                    with open(_pdf, 'rb') as f:
                         arq_data = f.read()
                     self.send_response(200)
                     self.send_header("Content-Type", ct)
@@ -1197,10 +1198,11 @@ class Handler(BaseHTTPRequestHandler):
                         "nome":        a.nome,
                         "assinado_em": a.assinado_em.isoformat(),
                     } for a in contrato.assinaturas]
-                    tem_arquivo = bool(contrato.pdf_path and os.path.exists(contrato.pdf_path))
+                    _pdf_ok = _resolver_pdf_contrato(contrato.pdf_path)
+                    tem_arquivo = bool(_pdf_ok)
                     arquivo_tipo = ""
                     if tem_arquivo:
-                        arquivo_tipo = "pdf" if contrato.pdf_path.endswith(".pdf") else "docx"
+                        arquivo_tipo = "pdf" if _pdf_ok.endswith(".pdf") else "docx"
                     self.send_json({"ok": True, "contrato": {
                         "id":                   contrato.id,
                         "status":               contrato.status,
@@ -4595,6 +4597,21 @@ def _ator_dict(db, usuario_sessao, header_loja_id=None):
     active = mod_tenancy.resolver_loja_ativa(membership, header_loja_id, u.loja_id)
     return {"nivel": u.nivel, "loja_id": u.loja_id, "rede_id": u.rede_id,
             "active_loja_id": active, "lojas_ids": membership}
+
+
+def _resolver_pdf_contrato(pdf_path):
+    """Resolve o caminho do arquivo do contrato de forma robusta. O `pdf_path` salvo pode ser
+    um caminho ABSOLUTO (ex.: Windows 'E:/...') que não resolve neste ambiente (WSL/Linux,
+    case-sensitive); nesse caso cai para CONTRATOS_DIR/<basename>. Retorna o caminho válido
+    (existente) ou None."""
+    if not pdf_path:
+        return None
+    if os.path.exists(pdf_path):
+        return pdf_path
+    from mod_contrato import CONTRATOS_DIR
+    base = os.path.basename(str(pdf_path).replace('\\', '/'))
+    alt = os.path.join(CONTRATOS_DIR, base)
+    return alt if os.path.exists(alt) else None
 
 
 def _obj_da_loja(db, Model, pk, loja_id):
