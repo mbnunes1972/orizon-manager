@@ -3728,7 +3728,11 @@ class Handler(BaseHTTPRequestHandler):
                 if orc is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
-                orc.out_forn = float(req.get("out_forn") or 0)
+                try:
+                    orc.out_forn = max(0.0, float(req.get("out_forn") or 0))
+                except (TypeError, ValueError):
+                    self.send_json({"ok": False, "erro": "Valor inválido"}, code=400)
+                    return
                 db.commit()
                 self.send_json({"ok": True, "sombra": _negociacao_breakdown(orc, db)})
                 return

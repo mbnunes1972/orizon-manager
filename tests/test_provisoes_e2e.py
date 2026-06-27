@@ -82,3 +82,17 @@ def test_put_out_forn(http_client_factory, seed):
     # persistiu: nova previa reflete
     st2, b2 = c.post("/api/orcamentos/%d/negociacao-preview" % seed["orcamento_l1_id"], {})
     assert b2["sombra"]["Out_Forn"] == 777
+
+
+def test_out_forn_fora_de_escopo_403(http_client_factory, seed):
+    # dir_l2 (loja2) nao pode editar out_forn de um orcamento da loja1
+    c = http_client_factory(); c.login("dir_l2", "senha123")
+    st, _ = c.put("/api/orcamentos/%d/out-forn" % seed["orcamento_l1_id"], {"out_forn": 100})
+    assert st in (403, 404)
+
+
+def test_out_forn_clamp_negativo(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, body = c.put("/api/orcamentos/%d/out-forn" % seed["orcamento_l1_id"], {"out_forn": -500})
+    assert st == 200 and body["ok"] is True
+    assert body["sombra"]["Out_Forn"] == 0   # clampado
