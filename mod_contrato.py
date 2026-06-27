@@ -356,6 +356,24 @@ def _parse_pagamento(pag_json_str: str) -> dict:
     }
 
 
+# ── Guard de desatualização ───────────────────────────────────────────────────
+
+def contrato_desatualizado(pagamento_snapshot_json, forma_pagamento_atual_json):
+    """True se o pagamento mudou após a geração do contrato (modalidade 'tipo' ou 'total_cliente').
+    Compara 'tipo' e 'total_cliente' (arredondado a 2 casas). Retorna False se não der pra comparar."""
+    import json as _json
+    def _p(x):
+        if not x: return None
+        try: return _json.loads(x) if isinstance(x, str) else x
+        except Exception: return None
+    a = _p(pagamento_snapshot_json); b = _p(forma_pagamento_atual_json)
+    if not a or not b:
+        return False
+    if (a.get("tipo") or "") != (b.get("tipo") or ""):
+        return True
+    return round(float(a.get("total_cliente") or 0), 2) != round(float(b.get("total_cliente") or 0), 2)
+
+
 # ── Validação de dados do cliente ─────────────────────────────────────────────
 
 def validar_cliente_para_contrato(cliente: dict) -> list:

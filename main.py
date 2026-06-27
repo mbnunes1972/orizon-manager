@@ -1203,6 +1203,11 @@ class Handler(BaseHTTPRequestHandler):
                     arquivo_tipo = ""
                     if tem_arquivo:
                         arquivo_tipo = "pdf" if _pdf_ok.endswith(".pdf") else "docx"
+                    import mod_contrato as _mod_contrato
+                    _orc_src = db.get(Orcamento, contrato.orcamento_id)
+                    _desatualizado = _mod_contrato.contrato_desatualizado(
+                        contrato.pagamento_json,
+                        _orc_src.forma_pagamento if _orc_src else None)
                     self.send_json({"ok": True, "contrato": {
                         "id":                   contrato.id,
                         "status":               contrato.status,
@@ -1212,6 +1217,8 @@ class Handler(BaseHTTPRequestHandler):
                         "tem_pdf":              tem_arquivo,
                         "arquivo_tipo":         arquivo_tipo,
                         "assinaturas":          assinaturas,
+                        "desatualizado":        _desatualizado,
+                        "orcamento_id":         contrato.orcamento_id,
                     }})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
