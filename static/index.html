@@ -1821,6 +1821,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Desconto Total</span><span id="mp-a-margem" style="font-family:'IBM Plex Mono',monospace;color:var(--warn);font-weight:700">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Custo Variável</span><span id="mp-a-cust-var" style="font-family:'IBM Plex Mono',monospace">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Margem de Contribuição</span><span id="mp-a-marg-cont" style="font-family:'IBM Plex Mono',monospace">—</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+          <label for="mp-out-forn" style="color:var(--muted)">Outros fornecedores (R$)</label>
+          <input id="mp-out-forn" type="number" min="0" step="0.01" value="0"
+            style="width:110px;padding:3px 6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'IBM Plex Mono',monospace;text-align:right"
+            onchange="mpSalvarOutForn(this.value)">
+        </div>
       </div>
     </div>
 
@@ -5611,6 +5617,19 @@ async function negPreview() {
 }
 function agendarPreview() { clearTimeout(_previewTimer); _previewTimer = setTimeout(negPreview, 250); }
 
+async function mpSalvarOutForn(val) {
+  if (!_orcamentoAtivoId) return;
+  try {
+    const r = await fetch(`/api/orcamentos/${_orcamentoAtivoId}/out-forn`, {
+      method: 'PUT', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({out_forn: parseFloat(val) || 0}),
+    });
+    const d = await r.json();
+    if (d && d.ok && d.sombra) { _previewNeg = d.sombra; _aplicarPreviewNaTela(d.sombra); }
+  } catch (e) { console.warn('out-forn save:', e); }
+}
+
 // Aplica o breakdown vindo da RESPOSTA de um save (edição → save → exibe). Fonte única.
 function aplicarBreakdownResposta(d) {
   if (d && d.ok && d.sombra) { _previewNeg = d.sombra; _aplicarPreviewNaTela(d.sombra); }
@@ -5697,6 +5716,9 @@ function abrirModalParams(){
   id('mp-brinde-ativo').checked = !!m.brinde_ativo;
   id('mp-brinde').value       = m.brinde || 0;
   id('mp-carga-trib').value   = m.carga_trib !== undefined ? m.carga_trib : 8.00;
+  // preenche out_forn com o valor vindo do preview do motor (Out_Forn)
+  const outFornEl = id('mp-out-forn');
+  if (outFornEl) outFornEl.value = (_previewNeg && _previewNeg.Out_Forn != null) ? _previewNeg.Out_Forn : 0;
   mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
   // Carrega toggle incluir_custos — sincroniza _incluirCustos com o valor salvo
   _incluirCustos = !!m.incluir_custos;
