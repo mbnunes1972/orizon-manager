@@ -8113,6 +8113,12 @@ function renderContratoUI(contrato) {
   const jaAssinou = (contrato.assinaturas || []).length > 0;
 
   ui.innerHTML = `
+    ${contrato.desatualizado ? `
+    <div style="background:#1a1200;border:1px solid var(--warn,#b8960c);border-radius:6px;padding:12px 14px;margin-bottom:14px">
+      <p style="color:var(--warn,#f0c84a);font-size:.85rem;margin:0">
+        &#x26A0;&#xFE0F; Este contrato pode estar desatualizado &mdash; a negocia&ccedil;&atilde;o/pagamento mudou ap&oacute;s a gera&ccedil;&atilde;o. Gere o contrato novamente se necess&aacute;rio.
+      </p>
+    </div>` : ''}
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px">
       <strong>Status:</strong>
       <span class="etapa-badge badge-${status}">${status}</span>
