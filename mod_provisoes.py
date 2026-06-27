@@ -86,6 +86,28 @@ def resolver_comissao_venda(cfg, val_liq_mes, desc_orc_pct):
     return round(pct, 4)
 
 
+_RUBRICAS = {
+    "frete_fab": "Frete_Fab_Orc", "com_adm": "Com_Adm_Orc", "com_venda": "Com_Venda_Orc",
+    "com_med": "Com_Med_Orc", "com_proj_exec": "Com_Proj_Exec_Orc", "frete_loc": "Frete_Loc_Orc",
+    "assist": "Assist_Orc", "ins_loc": "Ins_Loc_Orc", "prov_imp": "Prov_Imp", "out_forn": "Out_Forn",
+}
+
+
+def itens_provisao(siglas):
+    """Extrai as 10 rubricas de provisão do breakdown do motor (dict {rubrica: valor R$})."""
+    s = siglas or {}
+    return {k: round(_f(s.get(v)), 2) for k, v in _RUBRICAS.items()}
+
+
+def cust_var_marg_cont(cfo, val_liq, itens):
+    """Recalcula (Cust_Var, Marg_Cont) a partir de itens (possivelmente editados).
+    Cust_Var = CFO + Σ itens (os itens já incluem out_forn e prov_imp)."""
+    cust_var = round(_f(cfo) + sum(_f(v) for v in (itens or {}).values()), 2)
+    vl = _f(val_liq)
+    marg = round((vl - cust_var) / vl, 4) if vl else 0.0
+    return cust_var, marg
+
+
 def provisoes_orcamento(siglas, cfg, out_forn=0.0, com_venda_pct=0.0):
     s = siglas or {}
     CFO = _f(s.get("CFO")); Val_Liq = _f(s.get("Val_Liq"))

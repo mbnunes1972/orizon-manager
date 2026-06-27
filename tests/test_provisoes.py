@@ -112,3 +112,22 @@ def test_validar_rejeita_redutor_acima_de_100():
     }
     erros = mod_provisoes.validar_config_financeira(c)
     assert erros and any("100" in e for e in erros)
+
+
+def test_itens_provisao_mapeia_rubricas():
+    d = {"Frete_Fab_Orc": 100.0, "Com_Adm_Orc": 200.0, "Com_Venda_Orc": 0.0,
+         "Com_Med_Orc": 0.0, "Com_Proj_Exec_Orc": 0.0, "Frete_Loc_Orc": 50.0,
+         "Assist_Orc": 0.0, "Ins_Loc_Orc": 0.0, "Prov_Imp": 0.0, "Out_Forn": 300.0}
+    itens = mod_provisoes.itens_provisao(d)
+    assert set(itens.keys()) == {"frete_fab","com_adm","com_venda","com_med",
+        "com_proj_exec","frete_loc","assist","ins_loc","prov_imp","out_forn"}
+    assert itens["frete_fab"] == 100.0 and itens["out_forn"] == 300.0 and itens["frete_loc"] == 50.0
+
+
+def test_cust_var_marg_cont_recalcula():
+    itens = {"frete_fab": 100.0, "com_adm": 200.0, "out_forn": 300.0}  # Σ = 600
+    cv, mc = mod_provisoes.cust_var_marg_cont(cfo=4000.0, val_liq=9000.0, itens=itens)
+    assert cv == 4600.0                      # 4000 + 600
+    assert mc == round((9000.0 - 4600.0)/9000.0, 4)
+    # val_liq 0 -> margem 0
+    assert mod_provisoes.cust_var_marg_cont(0.0, 0.0, {})[1] == 0.0
