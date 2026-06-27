@@ -210,3 +210,22 @@ Fluxo de status: **rascunho → para_assinatura → assinado/vigente**.
 **US-CON-005** — Como consultor, quero gerar o contrato para um signatário diferente do cliente cadastrado, informando os dados só para aquele contrato (`signatario_override`).
 
 **US-CON-006** — Como gerente/diretor, quero corrigir pontualmente os campos do contrato abrindo o `.docx` no Word/LibreOffice (só os valores editam; o restante fica travado) e ter o PDF regerado automaticamente ao salvar.
+
+---
+
+## Direção futura — Modelo de contrato por loja (registrado 2026-06-27)
+
+Decisão de produto (a virar slice próprio, dentro do "banco de documentos padronizados da loja" — item #8 da config de loja):
+
+- **Sem edição inline do contrato.** O sistema **gera sempre a partir dos dados** (cadastro do
+  cliente + dados da loja) e produz **PDF**. Remover o fluxo de edição via `contrato_editar.py`
+  ("Abrir para editar" + watcher do .docx).
+- **Modelos por loja** no banco de documentos da loja:
+  - **Contrato Padrão** — modelo base (do sistema / da loja).
+  - **Contrato Personalizado** — versão acessória da loja, na mesma base de dados da loja.
+  - `Contrato.template_path` passa a apontar para o modelo da loja (não para o global
+    `config/contrato_template.docx`).
+- **Testemunhas e demais dados hoje hardcoded** (`_TESTEMUNHAS` em `mod_contrato.py`) passam a vir
+  da config da loja (já marcado como TODO no código).
+- A confirmar no brainstorm: quando a loja tem Padrão **e** Personalizado, como o sistema escolhe
+  qual usar (default da loja? escolha por projeto? Personalizado sempre que existir?).
