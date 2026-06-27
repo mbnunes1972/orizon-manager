@@ -227,5 +227,8 @@ Decisão de produto (a virar slice próprio, dentro do "banco de documentos padr
     `config/contrato_template.docx`).
 - **Testemunhas e demais dados hoje hardcoded** (`_TESTEMUNHAS` em `mod_contrato.py`) passam a vir
   da config da loja (já marcado como TODO no código).
+- **Exibição:** o contrato abre como **PDF de página inteira** (visualização nativa do navegador,
+  nova aba) — não embutido num iframe/modal apertado. (Já aplicado: o iframe de 560px da etapa
+  Contrato foi trocado por um botão "Abrir contrato em tela cheia".)
 - A confirmar no brainstorm: quando a loja tem Padrão **e** Personalizado, como o sistema escolhe
   qual usar (default da loja? escolha por projeto? Personalizado sempre que existir?).
