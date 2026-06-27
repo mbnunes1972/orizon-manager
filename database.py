@@ -402,6 +402,26 @@ class CicloEtapa(Base):
     responsavel = relationship("Usuario", foreign_keys=[responsavel_id])
 
 
+class ProvisaoRegistro(Base):
+    """Provisões registradas por versão (venda/rev1/rev2) de um orçamento.
+    venda = snapshot na geração do contrato; rev1/rev2 = aprovação financeira I/II."""
+    __tablename__ = "provisao_registro"
+
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    orcamento_id = Column(Integer, ForeignKey("orcamentos.id"), nullable=False)
+    versao       = Column(String(8), nullable=False)   # 'venda' | 'rev1' | 'rev2'
+    itens_json   = Column(Text,      nullable=False)    # {rubrica: valor_R$}
+    cfo          = Column(Float, default=0.0)           # base congelada p/ recalcular margem
+    val_liq      = Column(Float, default=0.0)
+    cust_var     = Column(Float, default=0.0)
+    marg_cont    = Column(Float, default=0.0)
+    decisao      = Column(String(10), nullable=True)    # 'concorda' | 'revisa' | None (venda)
+    por_id       = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    criado_em    = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("orcamento_id", "versao", name="uq_provisao_orc_versao"),)
+
+
 class Contrato(Base):
     """Contrato gerado a partir do orçamento aprovado."""
     __tablename__ = "contratos"
