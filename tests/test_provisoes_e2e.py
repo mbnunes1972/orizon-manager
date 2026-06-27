@@ -46,3 +46,29 @@ def test_put_config_rejeita_invalido(http_client_factory, seed):
     cfg = body["config"]; cfg["provisoes"]["frete_fab_pct"] = -5.0
     st, b = c.put("/api/admin/lojas/%d/config-financeira" % seed["loja1_id"], cfg)
     assert b["ok"] is False
+
+
+def test_breakdown_usa_carga_trib_da_loja_quando_projeto_sem_params(app_db, seed, projetos_dir):
+    import main, mod_provisoes, json as _json
+    db = app_db.get_session()
+    try:
+        loja = db.get(app_db.Loja, seed["loja1_id"])
+        cfg = mod_provisoes.config_financeira_default()
+        cfg["defaults_negociacao"]["carga_trib_pct"] = 10.0
+        loja.config_financeira_json = _json.dumps(cfg)
+        # projeto SEM parametros_json
+        proj = db.get(app_db.Projeto, seed["projeto_l1"])
+        proj.parametros_json = None
+        pa = app_db.PoolAmbiente(projeto_id=seed["projeto_l1"], nome="Amb", versao=1,
+                                 nome_exibicao="Amb", xml_path="", ambientes_json="[]",
+                                 budget_total=10000.0, order_total=4000.0)
+        db.add(pa); db.flush()
+        db.add(app_db.OrcamentoAmbiente(orcamento_id=seed["orcamento_l1_id"],
+                                        pool_ambiente_id=pa.id, desconto_individual_pct=0.0))
+        db.commit()
+        orc = db.get(app_db.Orcamento, seed["orcamento_l1_id"])
+        d = main._negociacao_breakdown(orc, db)
+    finally:
+        db.close()
+    # carga_trib 10% da loja deve refletir em Prov_Imp (> 0), pois o projeto nao tem params proprios
+    assert d["Prov_Imp"] > 0

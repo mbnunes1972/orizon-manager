@@ -4356,9 +4356,21 @@ def _sombra_dict(o) -> dict:
 def _negociacao_breakdown(orc, db):
     """Calcula a cadeia do motor lendo SÓ os insumos salvos (parametros_json, desconto do
     orçamento, descontos por ambiente, forma_pagamento). Sem overrides do frontend. NÃO grava."""
-    import mod_negociacao
+    import mod_negociacao, mod_provisoes, mod_orcamento_params
     proj = db.query(Projeto).filter_by(nome_safe=orc.projeto_id).first()
-    params = json.loads(proj.parametros_json) if (proj and proj.parametros_json) else {}
+    # Carrega cfg da loja uma única vez — usado para defaults de params E para provisões
+    _loja = db.get(Loja, orc.loja_id) if getattr(orc, "loja_id", None) else None
+    cfg = {}
+    if _loja and _loja.config_financeira_json:
+        try:
+            cfg = json.loads(_loja.config_financeira_json)
+        except Exception:
+            cfg = {}
+    if not cfg:
+        cfg = mod_provisoes.config_financeira_default()
+    # Projetos sem parametros_json herdam os defaults de negociação da loja (incl. carga_trib)
+    params = (json.loads(proj.parametros_json) if (proj and proj.parametros_json)
+              else mod_orcamento_params.parametros_default_loja(cfg))
     desc_orc = orc.desconto_pct or 0.0
     ambs, ids = [], []
     for lk in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all():
@@ -4384,16 +4396,6 @@ def _negociacao_breakdown(orc, db):
                                           n_total_proj=n_total_proj, vbvo_proj=vbvo_proj)
     for i, amb in enumerate(d.get("ambientes", [])):
         amb["id"] = ids[i] if i < len(ids) else None
-    import mod_provisoes
-    cfg = {}
-    loja = db.get(Loja, orc.loja_id) if getattr(orc, "loja_id", None) else None
-    if loja and loja.config_financeira_json:
-        try:
-            cfg = json.loads(loja.config_financeira_json)
-        except Exception:
-            cfg = {}
-    if not cfg:
-        cfg = mod_provisoes.config_financeira_default()
     # v1: usa o Val_Liq do próprio orçamento como proxy do acumulado mensal do consultor.
     # Fase 2 troca por um acumulador mensal por (consultor, loja, mês). Ver spec/PROVISOES_E_VARIAVEIS.md.
     com_venda_pct = mod_provisoes.resolver_comissao_venda(cfg, d.get("Val_Liq", 0.0), desc_orc)
