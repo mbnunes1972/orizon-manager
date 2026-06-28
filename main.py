@@ -49,6 +49,7 @@ import perfis
 import mod_usuarios
 import mod_tenancy
 import mod_arvore
+import mod_provisoes
 from mod_qualidade_xml import avaliar_qualidade_xml
 
 def _enriquecer_projetos_com_status(projetos):
@@ -4452,7 +4453,6 @@ def _negociacao_breakdown(orc, db):
 
 def _registrar_provisao_venda(db, orc, por_id):
     """Grava (ou re-snapshota) a versão 'venda' das provisões a partir do breakdown atual."""
-    import mod_provisoes
     d = _negociacao_breakdown(orc, db)
     itens = mod_provisoes.itens_provisao(d)
     existente = db.query(ProvisaoRegistro).filter_by(

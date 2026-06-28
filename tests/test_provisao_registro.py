@@ -44,4 +44,7 @@ def test_registrar_venda(app_db, seed, projetos_dir):
             orcamento_id=seed["orcamento_l1_id"], versao="venda").count()
         assert n == 1
     finally:
+        db.query(app_db.ProvisaoRegistro).filter_by(
+            orcamento_id=seed["orcamento_l1_id"], versao="venda").delete()
+        db.commit()
         db.close()
