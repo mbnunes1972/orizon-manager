@@ -7740,6 +7740,11 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
 
 function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
   const concluido = dados.status === 'concluido';
+  const _btnProvisoes = `<button onclick="abrirProvisoes(_orcamentoAtivoId)"
+    style="background:none;border:1px solid var(--border2,#2a4a3a);color:var(--ok,#5DCAA5);
+    border-radius:6px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
+    &#x1F4CA; Provisões
+  </button>`;
   if (concluido) {
     const dt = dados.concluido_em
       ? new Date(dados.concluido_em).toLocaleDateString('pt-BR')
@@ -7753,13 +7758,19 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
     return `
       <p style="color:var(--ok);margin:0 0 10px">
         &#x2713; Aprovação financeira concluída${dt ? ' em ' + dt : ''}.
-      </p>${reabrir}`;
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        ${reabrir}${_btnProvisoes}
+      </div>`;
   }
   if (bloqueada) {
     return `
-      <p style="color:var(--muted);font-size:.85rem;margin:0">
+      <p style="color:var(--muted);font-size:.85rem;margin:0 0 10px">
         🔒 Conclua a etapa anterior para liberar esta etapa.
-      </p>`;
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        ${_btnProvisoes}
+      </div>`;
   }
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px">
@@ -7771,11 +7782,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
         padding:8px 18px;font-size:.9rem;font-weight:700;cursor:pointer">
         &#x2713; Aprovar (gerencial)
       </button>
-      <button onclick="abrirProvisoes(_orcamentoAtivoId)"
-        style="background:none;border:1px solid var(--border2,#2a4a3a);color:var(--ok,#5DCAA5);
-        border-radius:6px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
-        &#x1F4CA; Provisões
-      </button>
+      ${_btnProvisoes}
     </div>`;
 }
 
@@ -7847,15 +7854,6 @@ async function abrirProvisoes(oid) {
 
   // Source itens for Revisa prefill: last registered version or venda
   const prevItens = (pendingRev === 'rev2' && rev1 ? rev1.itens : venda ? venda.itens : null) || {};
-
-  // Build table header
-  let thCols = cols.map(c =>
-    `<th style="text-align:right;padding:4px 10px;white-space:nowrap;color:var(--ok)">${esc(c.label)}</th>`
-  ).join('');
-  let thead = `<thead><tr>
-    <th style="text-align:left;padding:4px 10px;color:var(--muted);font-weight:400;font-size:.8rem">Rubrica</th>
-    ${thCols}
-  </tr></thead>`;
 
   // Build rubrica rows
   let trows = _PROV_RUBRICAS.map(rb => {
@@ -7942,11 +7940,11 @@ async function abrirProvisoes(oid) {
       color:${colors[ver.decisao]||'var(--muted)'}">${esc(ver.decisao)}</span>`;
   };
 
-  // Rebuild thead with decisao badges
-  thCols = cols.map(c =>
+  // Build thead with decisao badges
+  const thCols = cols.map(c =>
     `<th style="text-align:right;padding:4px 10px;white-space:nowrap;color:var(--ok)">${esc(c.label)}${decBadge(c.ver)}</th>`
   ).join('');
-  thead = `<thead><tr>
+  const thead = `<thead><tr>
     <th style="text-align:left;padding:4px 10px;color:var(--muted);font-weight:400;font-size:.8rem">Rubrica</th>
     ${thCols}
   </tr></thead>`;
