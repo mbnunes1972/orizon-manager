@@ -86,6 +86,10 @@ def resolver_comissao_venda(cfg, val_liq_mes, desc_orc_pct):
     return round(pct, 4)
 
 
+# IMPORTANTE: estas 10 rubricas são exatamente os addendos de Cust_Var em provisoes_orcamento
+# (CFO + out_forn + as 8 rubricas % + Prov_Imp). cust_var_marg_cont recalcula Cust_Var como
+# CFO + Σ(itens) — então, ao adicionar/remover uma rubrica do motor, atualize ESTE mapa também,
+# senão as duas fórmulas de Cust_Var divergem silenciosamente.
 _RUBRICAS = {
     "frete_fab": "Frete_Fab_Orc", "com_adm": "Com_Adm_Orc", "com_venda": "Com_Venda_Orc",
     "com_med": "Com_Med_Orc", "com_proj_exec": "Com_Proj_Exec_Orc", "frete_loc": "Frete_Loc_Orc",

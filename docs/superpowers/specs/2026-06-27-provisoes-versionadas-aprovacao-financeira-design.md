@@ -70,7 +70,10 @@ fluxo de **Concorda / Revisa** em cada aprovação financeira. A **separação d
   - `POST /api/orcamentos/<id>/provisoes/<rev1|rev2>` → corpo `{decisao, itens?, out_forn?, senha}`:
     valida a senha (`aprovar_financeiro`, reusa o mecanismo de `liberar_impostos`); se `concorda`,
     copia a versão anterior; se `revisa`, grava os itens editados; registra `por_id`/`criado_em`.
-    Avança a etapa correspondente (8 ou 11d) pela máquina de ciclo existente.
+    **NÃO avança a etapa** — o registro da provisão é desacoplado do avanço do ciclo. O avanço da
+    Etapa 8/11d continua no botão "Aprovar (gerencial)" existente (`concluirAprovacaoFinanceira`),
+    mantendo o gate de aprovação financeira como fonte única do estado do ciclo. (Decisão tomada na
+    implementação; revisão final endossou o desacoplamento.)
 - **Frontend (`static/index.html`):** na etapa de aprovação financeira (8 e 11d), um botão
   **"Provisões"** abre uma tela/modal com as **tabelas lado a lado** (Venda | Rev 1 | Rev 2, conforme
   existirem) e a ação **Concorda / Revisa** (edição dos valores + `Out_Forn` sob senha). Aviso de
