@@ -1,8 +1,21 @@
 import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+import pytest
 from unittest.mock import patch, MagicMock
 from mod_contrato import calcular_hash_assinatura, montar_variaveis_contrato, gerar_pdf_contrato
+
+
+@pytest.fixture(autouse=True)
+def _isola_contratos_dir(tmp_path):
+    """Isola CONTRATOS_DIR num diretório temporário para que a geração de contratos nos testes
+    não escreva na pasta CONTRATOS do repositório (era a origem dos contrato_99/8888/9999.docx)."""
+    import mod_contrato
+    orig = mod_contrato.CONTRATOS_DIR
+    mod_contrato.CONTRATOS_DIR = str(tmp_path / "contratos")
+    os.makedirs(mod_contrato.CONTRATOS_DIR, exist_ok=True)
+    yield
+    mod_contrato.CONTRATOS_DIR = orig
 
 
 def test_hash_assinatura_determinístico():
