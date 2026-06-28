@@ -836,3 +836,26 @@ Trabalho autônomo (usuário ausente) fechando os follow-ups da Frente C. Tudo n
   compara o snapshot `pagamento_json` com a `forma_pagamento` atual do orçamento de origem (tipo +
   total); `GET /contrato` devolve `desatualizado`; banner de aviso na etapa Contrato. Resolve o
   achado da Sessão 33 (contrato Cartão × negociação Aymoré).
+
+## Sessão 35 — Provisões versionadas + faxina de branches
+
+- **Frente "Provisões versionadas + aprovação financeira"** implementada (SDD, 6 tasks TDD,
+  suíte 369, review final READY TO MERGE) e **mergeada na `main`**: tabela `provisao_registro`
+  (venda/rev1/rev2), `mod_provisoes.itens_provisao`/`cust_var_marg_cont`, "Venda" congelada na
+  geração do contrato, rotas `GET/POST /api/orcamentos/<id>/provisoes` (Concorda/Revisa com senha
+  `aprovar_financeiro`, 409/IDOR/clamp), e o botão "Provisões" na etapa de Aprovação Financeira
+  (tabelas Venda|Rev1|Rev2|Atual). Spec/plan em `docs/superpowers/{specs,plans}/2026-06-27-*`.
+- **Faxina de branches:** apagadas as 5 da Frente C (já mergeadas) + `feat/multitenant-f2-tenancy`
+  (mergeada) + `master`. A `master` continha um commit "v2.0.0" (Total Flex / Venda Programada /
+  Cartão X) — **conferido**: a `main` já tem esses arquivos (venda_programada/cartao_x idênticos,
+  total_flex mais novo), v2.0.0 superado → descartado sem perda.
+
+### Isolamento multi-tenant de pool/medição/ciclo — F4 conferido e DISPENSADO
+O worktree `worktree-agent-a3876ec2c1cd36c64` tem o commit `1aa8231` "feat(isolamento): escopo de
+pool/medicao/ciclo (F4)" (2026-06-21), que adicionava guard de loja (`escopo_operacional` +
+`_projeto_da_loja → 404` + 401/403) a pool/medição/ciclo. **Verificado rota a rota: a `main` JÁ tem
+esse guard em todas** — `/ciclo`, `/ciclo/desfazer_aprovacao`, `/medicao`, `/medicao/arquivo`,
+`/medicao/solicitacao`, `/medicao/parecer`, `/pool`, `/pool/criar_forcado` (a main tem 31 pontos com
+`_projeto_da_loja`, implementados nas frentes multi-loja/árvore posteriores). F4 é **redundante** —
+não reaproveitar (aplicá-lo só geraria conflito nas mesmas rotas já reescritas). Worktree mantido
+como está (gerenciado pelo ambiente).
