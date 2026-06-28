@@ -1141,6 +1141,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div class="action-row">
       <button class="btn btn-ok" onclick="salvarOrcamento()">&#x1F4BE; Salvar Orcamento</button>
       <button class="btn btn-amber" onclick="abrirAprovacaoComDados()" title="Aprovar orçamento e iniciar contrato">&#x2713; Aprovar Orcamento</button>
+      <a id="btn-imprimir-orcamento" class="btn btn-ghost" target="_blank" rel="noopener"
+         style="text-decoration:none" href="#"
+         onclick="this.href='/api/orcamentos/'+_orcamentoAtivoId+'/proposta/pdf'">&#x1F5A8; Imprimir Or&ccedil;amento</a>
     </div>
 
     <!-- Ciclo do Projeto (EP-08) -->
@@ -7694,6 +7697,42 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
         border-radius:5px;padding:5px 14px;font-size:.82rem;cursor:pointer">
         ${briefLocked ? '👁 Ver Briefing' : '✎ ' + (concluido ? 'Editar' : 'Preencher') + ' Briefing'}
       </button>` : ''}`;
+  }
+
+  // Card especial etapa 4 — Orçamento: lista os orçamentos do projeto
+  if (etapa.codigo === '4') {
+    if (!_orcamentos || !_orcamentos.length) {
+      return `<p style="color:var(--muted);font-size:.85rem">Nenhum orçamento ainda. Crie um orçamento na tela de negociação.</p>`;
+    }
+    const linhas = _orcamentos.map(o => `
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+        <span style="flex:1">${esc(o.nome || ('Orçamento ' + o.id))}</span>
+        <button class="btn-ciclo" style="font-size:.8rem" onclick="fecharCiclo();ativarOrcamento(${o.id})">Abrir</button>
+        <a class="btn-ciclo" style="font-size:.8rem;text-decoration:none" target="_blank" rel="noopener"
+           href="/api/orcamentos/${o.id}/proposta/pdf">&#x1F5A8; Imprimir</a>
+      </div>`).join('');
+    return `<div>${linhas}</div>`;
+  }
+
+  // Card especial etapa 6 — Aprovação do orçamento: mostra orçamento aprovado
+  if (etapa.codigo === '6') {
+    setTimeout(async () => {
+      const alvo = document.getElementById('aprov-orc-alvo');
+      if (!alvo || !projetoAtivo) return;
+      try {
+        const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato`);
+        const j = await r.json();
+        const oid = j.contrato && j.contrato.orcamento_id;
+        if (!oid) { alvo.innerHTML = '<span style="color:var(--muted)">Nenhum orçamento aprovado ainda.</span>'; return; }
+        const o = (_orcamentos || []).find(x => x.id === oid) || {id: oid, nome: 'Orçamento ' + oid};
+        alvo.innerHTML = `
+          <span style="flex:1">Aprovado: ${esc(o.nome || ('Orçamento ' + oid))}</span>
+          <button class="btn-ciclo" style="font-size:.8rem" onclick="fecharCiclo();ativarOrcamento(${oid})">Abrir</button>
+          <a class="btn-ciclo" style="font-size:.8rem;text-decoration:none" target="_blank" rel="noopener"
+             href="/api/orcamentos/${oid}/proposta/pdf">&#x1F5A8; Imprimir proposta</a>`;
+      } catch (e) { /* silencioso */ }
+    }, 0);
+    return `<div id="aprov-orc-alvo" style="display:flex;gap:8px;align-items:center"><span style="color:var(--muted)">Carregando…</span></div>`;
   }
 
   // Card especial etapa 5 — Revisão: concluída apenas pela aprovação do orçamento
