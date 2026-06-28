@@ -50,6 +50,7 @@ import mod_usuarios
 import mod_tenancy
 import mod_arvore
 import mod_provisoes
+import mod_proposta
 from mod_qualidade_xml import avaliar_qualidade_xml
 
 def _enriquecer_projetos_com_status(projetos):
@@ -873,6 +874,59 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": True, "provisoes": {
                         "venda": venda, "rev1": _reg("rev1"), "rev2": _reg("rev2"),
                         "atual": atual, "desatualizado": desatualizado}})
+                finally:
+                    db.close()
+                return
+
+            # ── GET /api/orcamentos/<id>/proposta/pdf — gera proposta sob demanda ──
+            m = _re.match(r"^/api/orcamentos/(\d+)/proposta/pdf$", path)
+            if m:
+                import tempfile, shutil
+                import mod_proposta as _mprop
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                oid = int(m.group(1))
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    orc = _obj_da_loja(db, Orcamento, oid, loja_id)
+                    if orc is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    _proj, cliente_dict, orcamento_dict = \
+                        _montar_dados_projeto_para_contrato(orc.projeto_id, oid, db)
+                    loja_dict = _loja_dict_para_contrato(db, loja_id)
+                    usuario_ctx = {"nome": usuario.get("nome", ""),
+                                   "telefone": _get_usuario_telefone(usuario["id"], db),
+                                   "email": usuario.get("email", "") or ""}
+                    d = _negociacao_breakdown(orc, db)
+                    variaveis = _mprop.contexto_proposta(
+                        cliente_dict, usuario_ctx, loja_dict, orcamento_dict, d, orc.forma_pagamento or "")
+                    outdir = tempfile.mkdtemp(prefix="proposta_")
+                    try:
+                        caminho, eh_pdf = _mprop.gerar_proposta(variaveis, outdir)
+                        with open(caminho, "rb") as fh:
+                            data = fh.read()
+                        ct = "application/pdf" if eh_pdf else \
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        ext = "pdf" if eh_pdf else "docx"
+                        self.send_response(200)
+                        self.send_header("Content-Type", ct)
+                        self.send_header("Content-Length", len(data))
+                        self.send_header("Content-Disposition",
+                                         'inline; filename="proposta_%d.%s"' % (oid, ext))
+                        self.end_headers()
+                        self.wfile.write(data)
+                    finally:
+                        shutil.rmtree(outdir, ignore_errors=True)
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
                     db.close()
                 return
