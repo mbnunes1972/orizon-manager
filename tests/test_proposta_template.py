@@ -1,8 +1,12 @@
 import os
 from docx import Document
 
-MARCADORES = ["NOME_EMPRESA", "NOME_CLIENTE", "CPF_CLIENTE", "AMBIENTES_LISTA",
-              "VALOR_BRUTO", "DESCONTO_PCT", "VALOR_TOTAL", "MODALIDADE", "VALIDADE"]
+# Trava o contrato de marcadores: o template DEVE conter todos os que contexto_proposta preenche
+# (o motor mantém marcador sem chave literal, então um typo no template vazaria silenciosamente).
+MARCADORES = ["NOME_EMPRESA", "CNPJ_EMPRESA", "NOME_CLIENTE", "CPF_CLIENTE", "EMAIL", "TELEFONE",
+              "CONSULTOR_NOME", "AMBIENTES_LISTA", "VALOR_BRUTO", "DESCONTO_PCT", "VALOR_TOTAL",
+              "MODALIDADE", "VALOR_ENTRADA", "FORMA_ENTRADA", "DATA_ENTRADA", "NUM_PARCELAS",
+              "VALIDADE"]
 
 
 def test_modelo_proposta_existe_e_tem_marcadores():
