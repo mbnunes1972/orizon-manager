@@ -85,3 +85,92 @@ def test_get_provisoes_sem_permission_403(http_client_factory, seed):
     c = http_client_factory(); c.login("super", "senha123")
     st, _ = c.get("/api/orcamentos/%d/provisoes" % seed["orcamento_l1_id"])
     assert st == 403
+
+
+# ── Task 5: POST /api/orcamentos/<id>/provisoes/<rev1|rev2> ──────────────────
+
+def _setup_venda(app_db, seed):
+    import main
+    db = app_db.get_session()
+    try:
+        if not db.query(app_db.PoolAmbiente).filter_by(projeto_id=seed["projeto_l1"]).first():
+            pa = app_db.PoolAmbiente(projeto_id=seed["projeto_l1"], nome="A", versao=1,
+                                     nome_exibicao="A", xml_path="", ambientes_json="[]",
+                                     budget_total=10000.0, order_total=4000.0)
+            db.add(pa); db.flush()
+            db.add(app_db.OrcamentoAmbiente(orcamento_id=seed["orcamento_l1_id"],
+                                            pool_ambiente_id=pa.id, desconto_individual_pct=0.0))
+            db.commit()
+        orc = db.get(app_db.Orcamento, seed["orcamento_l1_id"])
+        main._registrar_provisao_venda(db, orc, por_id=1); db.commit()
+    finally:
+        db.close()
+
+
+def test_rev1_concorda_copia_venda(http_client_factory, app_db, seed, projetos_dir):
+    _setup_venda(app_db, seed)
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, body = c.post("/api/orcamentos/%d/provisoes/rev1" % seed["orcamento_l1_id"],
+                      {"decisao": "concorda", "login": "dir_l1", "senha": "senha123"})
+    assert st == 200 and body["ok"] is True
+    _, prov = c.get("/api/orcamentos/%d/provisoes" % seed["orcamento_l1_id"])
+    assert prov["provisoes"]["rev1"]["itens"] == prov["provisoes"]["venda"]["itens"]
+    assert prov["provisoes"]["rev1"]["decisao"] == "concorda"
+    try:
+        db = app_db.get_session()
+        db.query(app_db.ProvisaoRegistro).filter_by(
+            orcamento_id=seed["orcamento_l1_id"]).delete()
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_rev1_revisa_grava_editado(http_client_factory, app_db, seed, projetos_dir):
+    _setup_venda(app_db, seed)
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    itens = {"frete_fab": 999.0, "com_adm": 0.0, "com_venda": 0.0, "com_med": 0.0,
+             "com_proj_exec": 0.0, "frete_loc": 0.0, "assist": 0.0, "ins_loc": 0.0,
+             "prov_imp": 0.0, "out_forn": -50.0}   # out_forn negativo -> clamp 0
+    st, body = c.post("/api/orcamentos/%d/provisoes/rev1" % seed["orcamento_l1_id"],
+                      {"decisao": "revisa", "itens": itens, "login": "dir_l1", "senha": "senha123"})
+    assert st == 200 and body["ok"] is True
+    _, prov = c.get("/api/orcamentos/%d/provisoes" % seed["orcamento_l1_id"])
+    assert prov["provisoes"]["rev1"]["itens"]["frete_fab"] == 999.0
+    assert prov["provisoes"]["rev1"]["itens"]["out_forn"] == 0.0   # clampado
+    try:
+        db = app_db.get_session()
+        db.query(app_db.ProvisaoRegistro).filter_by(
+            orcamento_id=seed["orcamento_l1_id"]).delete()
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_rev1_senha_invalida_403(http_client_factory, app_db, seed, projetos_dir):
+    _setup_venda(app_db, seed)
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, _ = c.post("/api/orcamentos/%d/provisoes/rev1" % seed["orcamento_l1_id"],
+                   {"decisao": "concorda", "login": "dir_l1", "senha": "errada"})
+    assert st == 403
+    try:
+        db = app_db.get_session()
+        db.query(app_db.ProvisaoRegistro).filter_by(
+            orcamento_id=seed["orcamento_l1_id"]).delete()
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_rev2_sem_rev1_409(http_client_factory, app_db, seed, projetos_dir):
+    _setup_venda(app_db, seed)
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, _ = c.post("/api/orcamentos/%d/provisoes/rev2" % seed["orcamento_l1_id"],
+                   {"decisao": "concorda", "login": "dir_l1", "senha": "senha123"})
+    assert st == 409
+    try:
+        db = app_db.get_session()
+        db.query(app_db.ProvisaoRegistro).filter_by(
+            orcamento_id=seed["orcamento_l1_id"]).delete()
+        db.commit()
+    finally:
+        db.close()

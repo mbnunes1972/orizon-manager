@@ -2155,6 +2155,57 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        elif re.match(r"^/api/orcamentos/(\d+)/provisoes/(rev1|rev2)$", path):
+            # ── POST /api/orcamentos/<id>/provisoes/<rev1|rev2> — Concorda/Revisa ──
+            import mod_provisoes as _mprov
+            m_prov = re.match(r"^/api/orcamentos/(\d+)/provisoes/(rev1|rev2)$", path)
+            oid = int(m_prov.group(1)); versao = m_prov.group(2)
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            req = json.loads(body) if body else {}
+            db = get_session()
+            try:
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"))
+                if not aprovador:
+                    self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                orc = _obj_da_loja(db, Orcamento, oid, loja_id)
+                if orc is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                anterior_versao = "venda" if versao == "rev1" else "rev1"
+                anterior = db.query(ProvisaoRegistro).filter_by(
+                    orcamento_id=oid, versao=anterior_versao).first()
+                if not anterior:
+                    self.send_json({"ok": False,
+                        "erro": "Registre a versão anterior primeiro (%s)." % anterior_versao},
+                        code=409); return
+                decisao = (req.get("decisao") or "").strip()
+                if decisao == "concorda":
+                    itens = json.loads(anterior.itens_json)
+                    cfo, vl = anterior.cfo, anterior.val_liq
+                elif decisao == "revisa":
+                    itens = {k: max(0.0, float(v or 0)) for k, v in (req.get("itens") or {}).items()}
+                    cfo, vl = anterior.cfo, anterior.val_liq   # base congelada da venda
+                else:
+                    self.send_json({"ok": False, "erro": "decisao deve ser concorda|revisa"}); return
+                cust_var, marg = _mprov.cust_var_marg_cont(cfo, vl, itens)
+                existente = db.query(ProvisaoRegistro).filter_by(orcamento_id=oid, versao=versao).first()
+                if existente:
+                    db.delete(existente); db.flush()
+                db.add(ProvisaoRegistro(orcamento_id=oid, versao=versao,
+                    itens_json=json.dumps(itens, ensure_ascii=False),
+                    cfo=cfo, val_liq=vl, cust_var=cust_var, marg_cont=marg,
+                    decisao=decisao, por_id=aprovador.id))
+                db.commit()
+                self.send_json({"ok": True})
+            finally:
+                db.close()
+            return
+
         else:
             import re as _re
 
