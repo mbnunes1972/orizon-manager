@@ -7765,11 +7765,18 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px">
       Confirme a aprovação financeira. Exige login e senha do Gerente Administrativo/Financeiro ou Diretor.
     </p>
-    <button onclick="concluirAprovacaoFinanceira('${codigo}')"
-      style="background:#b8960c;color:#000;border:none;border-radius:6px;
-      padding:8px 18px;font-size:.9rem;font-weight:700;cursor:pointer">
-      &#x2713; Aprovar (gerencial)
-    </button>`;
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button onclick="concluirAprovacaoFinanceira('${codigo}')"
+        style="background:#b8960c;color:#000;border:none;border-radius:6px;
+        padding:8px 18px;font-size:.9rem;font-weight:700;cursor:pointer">
+        &#x2713; Aprovar (gerencial)
+      </button>
+      <button onclick="abrirProvisoes(_orcamentoAtivoId)"
+        style="background:none;border:1px solid var(--border2,#2a4a3a);color:var(--ok,#5DCAA5);
+        border-radius:6px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
+        &#x1F4CA; Provisões
+      </button>
+    </div>`;
 }
 
 async function concluirAprovacaoFinanceira(codigo) {
@@ -7790,6 +7797,251 @@ async function concluirAprovacaoFinanceira(codigo) {
     await carregarCiclo();
   } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'Aprovação Financeira'}); }
 }
+
+// ---- Provisões versionadas -----------------------------------------------
+const _PROV_RUBRICAS = [
+  { key: 'frete_fab',      label: 'Frete Fábrica' },
+  { key: 'com_adm',        label: 'Comissão Adm' },
+  { key: 'com_venda',      label: 'Comissão Venda' },
+  { key: 'com_med',        label: 'Comissão Medição' },
+  { key: 'com_proj_exec',  label: 'Comissão Proj/Exec' },
+  { key: 'frete_loc',      label: 'Frete Local' },
+  { key: 'assist',         label: 'Assistência Técnica' },
+  { key: 'ins_loc',        label: 'Instalação Local' },
+  { key: 'prov_imp',       label: 'Provisão Impostos' },
+  { key: 'out_forn',       label: 'Outros Fornecedores' },
+];
+
+function _fmtR(v) {
+  if (v == null) return '<span style="color:var(--muted)">—</span>';
+  return 'R$ ' + Number(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function _fmtPct(v) {
+  if (v == null) return '<span style="color:var(--muted)">—</span>';
+  return Number(v).toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:2}) + '%';
+}
+
+async function abrirProvisoes(oid) {
+  if (!oid) { showToast('Nenhum orçamento ativo.', true); return; }
+  let pdata;
+  try {
+    const r = await fetch('/api/orcamentos/' + oid + '/provisoes', {credentials:'same-origin'});
+    pdata = await r.json();
+  } catch(e) { showToast('Erro ao carregar provisões: ' + e.message, true); return; }
+  if (!pdata.ok) { await avisoPopup(pdata.erro || 'Falha ao carregar provisões.', {titulo:'Provisões'}); return; }
+
+  const prov = pdata.provisoes || {};
+  const { venda, rev1, rev2, atual, desatualizado } = prov;
+
+  // Determine which versions to show as columns
+  const cols = [];
+  if (venda) cols.push({ label: 'Venda', ver: venda });
+  if (rev1)  cols.push({ label: 'Rev 1', ver: rev1 });
+  if (rev2)  cols.push({ label: 'Rev 2', ver: rev2 });
+  if (atual) cols.push({ label: 'Atual', ver: atual });
+
+  // Determine next pending revision
+  let pendingRev = null;
+  if (!rev1) pendingRev = 'rev1';
+  else if (!rev2) pendingRev = 'rev2';
+
+  // Source itens for Revisa prefill: last registered version or venda
+  const prevItens = (pendingRev === 'rev2' && rev1 ? rev1.itens : venda ? venda.itens : null) || {};
+
+  // Build table header
+  let thCols = cols.map(c =>
+    `<th style="text-align:right;padding:4px 10px;white-space:nowrap;color:var(--ok)">${esc(c.label)}</th>`
+  ).join('');
+  let thead = `<thead><tr>
+    <th style="text-align:left;padding:4px 10px;color:var(--muted);font-weight:400;font-size:.8rem">Rubrica</th>
+    ${thCols}
+  </tr></thead>`;
+
+  // Build rubrica rows
+  let trows = _PROV_RUBRICAS.map(rb => {
+    let tds = cols.map(c => {
+      const v = c.ver && c.ver.itens ? c.ver.itens[rb.key] : null;
+      return `<td style="text-align:right;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem">${_fmtR(v)}</td>`;
+    }).join('');
+    return `<tr><td style="padding:4px 10px;font-size:.82rem">${esc(rb.label)}</td>${tds}</tr>`;
+  }).join('');
+
+  // Cust_Var and Marg_Cont rows
+  let custVarRow = '<tr style="border-top:1px solid var(--border,#2a3f33)">' +
+    `<td style="padding:6px 10px;font-size:.82rem;font-weight:600">Custo Variável</td>` +
+    cols.map(c => `<td style="text-align:right;padding:6px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem">${_fmtR(c.ver ? c.ver.cust_var : null)}</td>`).join('') +
+    '</tr>';
+  let margContRow = '<tr>' +
+    `<td style="padding:4px 10px;font-size:.82rem;font-weight:600">Margem Contribuição</td>` +
+    cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem;color:var(--ok)">${_fmtPct(c.ver ? c.ver.marg_cont : null)}</td>`).join('') +
+    '</tr>';
+  // Val_liq row
+  let valLiqRow = '<tr>' +
+    `<td style="padding:4px 10px;font-size:.82rem;font-weight:600">Val. Líquido</td>` +
+    cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem">${_fmtR(c.ver ? c.ver.val_liq : null)}</td>`).join('') +
+    '</tr>';
+
+  // Action section: Revisa inputs (hidden by default)
+  let revisaSection = '';
+  let actionBtns = '';
+  if (pendingRev) {
+    const revLabel = pendingRev === 'rev1' ? 'Rev 1' : 'Rev 2';
+    // Editable rubrica inputs for Revisa
+    const revisaInputs = _PROV_RUBRICAS.map(rb => {
+      const prev = prevItens[rb.key] != null ? Number(prevItens[rb.key]).toFixed(2) : '';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <label style="font-size:.8rem;color:var(--muted);flex:1">${esc(rb.label)}</label>
+        <input type="number" step="0.01" id="_prov-inp-${rb.key}" value="${esc(prev)}"
+          style="width:120px;background:var(--input,#0d1a0d);border:1px solid var(--border);
+          color:var(--fg);padding:4px 7px;border-radius:4px;font-size:.82rem;text-align:right">
+      </div>`;
+    }).join('');
+
+    revisaSection = `<div id="_prov-revisa-inputs" style="display:none;margin-top:14px;
+        padding:12px;background:rgba(0,0,0,.2);border-radius:6px;border:1px solid var(--border)">
+      <div style="font-size:.8rem;color:var(--warn);margin-bottom:10px;font-weight:600">
+        &#x270F;&#xFE0F; Editar rubricas para ${esc(revLabel)}:
+      </div>
+      ${revisaInputs}
+    </div>`;
+
+    actionBtns = `<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:.8rem;color:var(--muted)">Próxima revisão: <strong style="color:var(--ok)">${esc(revLabel)}</strong></span>
+      <button onclick="_provAcao('${oid}','${pendingRev}','concorda')"
+        style="background:#1a3d2a;color:var(--ok,#5DCAA5);border:1px solid var(--ok,#5DCAA5);
+        border-radius:5px;padding:6px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
+        &#x2713; Concorda
+      </button>
+      <button onclick="_provToggleRevisa()"
+        style="background:none;border:1px solid var(--warn);color:var(--warn);
+        border-radius:5px;padding:6px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
+        &#x270F; Revisa
+      </button>
+      <button id="_prov-btn-confirmar-revisa" onclick="_provAcao('${oid}','${pendingRev}','revisa')"
+        style="display:none;background:#b8960c;color:#000;border:none;
+        border-radius:5px;padding:6px 14px;font-size:.85rem;font-weight:700;cursor:pointer">
+        &#x2713; Confirmar Revisão
+      </button>
+    </div>`;
+  }
+
+  // Build desatualizado banner
+  const desatualizadoBanner = desatualizado ? `
+    <div style="background:#1a1200;border:1px solid var(--warn,#b8960c);border-radius:6px;
+      padding:10px 14px;margin-bottom:14px">
+      <span style="color:var(--warn,#f0c84a);font-size:.85rem">
+        &#x26A0;&#xFE0F; provisões desatualizadas — a negociação mudou após o último registro.
+      </span>
+    </div>` : '';
+
+  // Decisão badges
+  const decBadge = (ver) => {
+    if (!ver || !ver.decisao) return '';
+    const colors = { concorda: 'var(--ok)', revisa: 'var(--warn)' };
+    return ` <span style="font-size:.7rem;background:rgba(0,0,0,.3);border-radius:3px;padding:1px 6px;
+      color:${colors[ver.decisao]||'var(--muted)'}">${esc(ver.decisao)}</span>`;
+  };
+
+  // Rebuild thead with decisao badges
+  thCols = cols.map(c =>
+    `<th style="text-align:right;padding:4px 10px;white-space:nowrap;color:var(--ok)">${esc(c.label)}${decBadge(c.ver)}</th>`
+  ).join('');
+  thead = `<thead><tr>
+    <th style="text-align:left;padding:4px 10px;color:var(--muted);font-weight:400;font-size:.8rem">Rubrica</th>
+    ${thCols}
+  </tr></thead>`;
+
+  // Build the full modal HTML
+  const html =
+    '<h4 style="margin:0 0 4px;color:var(--ok);font-size:1rem">&#x1F4CA; Provisões</h4>' +
+    `<p style="margin:0 0 14px;color:var(--muted);font-size:.78rem">Orçamento #${esc(String(oid))}</p>` +
+    desatualizadoBanner +
+    (cols.length === 0 ? '<p style="color:var(--muted);font-size:.85rem">Nenhuma provisão registrada ainda.</p>' :
+      `<div style="overflow-x:auto;max-height:55vh;overflow-y:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:.83rem">
+          ${thead}
+          <tbody>${trows}${valLiqRow}${custVarRow}${margContRow}</tbody>
+        </table>
+      </div>`) +
+    revisaSection +
+    '<div id="_prov-erro" style="color:var(--err,#e05252);font-size:.78rem;min-height:14px;margin-top:8px"></div>' +
+    actionBtns +
+    '<div style="margin-top:16px;display:flex;justify-content:flex-end">' +
+    '<button data-act="fechar" style="background:none;border:1px solid var(--muted);color:var(--muted);' +
+    'border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">Fechar</button>' +
+    '</div>';
+
+  // Build overlay with wider box for table
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;' +
+    'align-items:center;justify-content:center;z-index:99999';
+  ov.innerHTML = '<div style="background:var(--surface,#10231a);border:1px solid var(--border,#2a3f33);' +
+    'border-radius:10px;padding:22px 24px;max-width:720px;width:95%;max-height:90vh;overflow-y:auto;' +
+    'box-shadow:0 10px 40px rgba(0,0,0,.6)">' + html + '</div>';
+  document.body.appendChild(ov);
+
+  // Store oid on overlay for re-use in _provAcao
+  ov._provOid = oid;
+  window._provModalOv = ov;
+
+  const close = () => { ov.remove(); window._provModalOv = null; };
+  ov.querySelector('[data-act="fechar"]').onclick = close;
+  ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+  document.addEventListener('keydown', function _escClose(e) {
+    if (e.key === 'Escape') { close(); document.removeEventListener('keydown', _escClose); }
+  });
+}
+
+function _provToggleRevisa() {
+  const wrap = document.getElementById('_prov-revisa-inputs');
+  const btn  = document.getElementById('_prov-btn-confirmar-revisa');
+  if (!wrap) return;
+  const showing = wrap.style.display !== 'none';
+  wrap.style.display = showing ? 'none' : 'block';
+  if (btn) btn.style.display = showing ? 'none' : '';
+}
+
+async function _provAcao(oid, rev, decisao) {
+  // Collect itens if decisao === 'revisa'
+  let itens = undefined;
+  if (decisao === 'revisa') {
+    itens = {};
+    for (const rb of _PROV_RUBRICAS) {
+      const el = document.getElementById('_prov-inp-' + rb.key);
+      itens[rb.key] = el ? parseFloat(el.value) || 0 : 0;
+    }
+  }
+
+  const cred = await pedirCredenciaisGerente({
+    titulo: 'Provisão — ' + (decisao === 'concorda' ? 'Concorda' : 'Revisa'),
+    mensagem: 'Login e senha do aprovador financeiro (aprovar_financeiro).' });
+  if (!cred) return;
+
+  const erroEl = document.getElementById('_prov-erro');
+  if (erroEl) erroEl.textContent = '';
+
+  try {
+    const body = { decisao, login: cred.login, senha: cred.senha };
+    if (itens !== undefined) body.itens = itens;
+    const r = await fetch('/api/orcamentos/' + oid + '/provisoes/' + rev, {
+      method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!d.ok) {
+      if (erroEl) erroEl.textContent = d.erro || 'Falha ao registrar provisão.';
+      return;
+    }
+    showToast('Provisão registrada com sucesso!', false);
+    // Close current modal and reopen refreshed
+    if (window._provModalOv) { window._provModalOv.remove(); window._provModalOv = null; }
+    await abrirProvisoes(oid);
+  } catch(e) {
+    if (erroEl) erroEl.textContent = 'Erro: ' + e.message;
+  }
+}
+// ---- fim Provisões versionadas -------------------------------------------
 
 let _medicaoCache = null;
 async function _carregarMedicao() {
