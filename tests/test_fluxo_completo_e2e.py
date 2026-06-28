@@ -12,11 +12,25 @@ Limites do ambiente (documentados, não são lacunas do produto):
   direto no banco (PoolAmbiente), como nos demais e2e financeiros.
 """
 import json
+import os
+import pytest
+
+
+@pytest.fixture
+def contratos_dir(tmp_path):
+    """Redireciona CONTRATOS_DIR para um temp (hermético) — a geração real escreve o .docx ali,
+    sem poluir a pasta CONTRATOS do repo. Restaura no teardown."""
+    import mod_contrato
+    orig = mod_contrato.CONTRATOS_DIR
+    mod_contrato.CONTRATOS_DIR = str(tmp_path / "contratos")
+    os.makedirs(mod_contrato.CONTRATOS_DIR, exist_ok=True)
+    yield mod_contrato.CONTRATOS_DIR
+    mod_contrato.CONTRATOS_DIR = orig
 
 
 def _setup_cenario(app_db, seed):
-    """Cenário comercial no banco: taxas financeiras da loja, 1 ambiente com valor, forma de
-    pagamento A Vista (entrada + liquidação) e desconto zero no orçamento do seed."""
+    """Cenário comercial no banco (idempotente): taxas financeiras da loja, cadastro completo do
+    cliente, 1 ambiente com valor, forma de pagamento A Vista e desconto zero no orçamento do seed."""
     import mod_provisoes
     db = app_db.get_session()
     try:
@@ -27,12 +41,23 @@ def _setup_cenario(app_db, seed):
         cfg["provisoes"]["com_adm_pct"] = 5.0
         loja.config_financeira_json = json.dumps(cfg)
 
-        pa = app_db.PoolAmbiente(projeto_id=seed["projeto_l1"], nome="Cozinha", versao=1,
-                                 nome_exibicao="Cozinha", xml_path="", ambientes_json="[]",
-                                 budget_total=90000.0, order_total=40000.0)
-        db.add(pa); db.flush()
-        db.add(app_db.OrcamentoAmbiente(orcamento_id=seed["orcamento_l1_id"],
-                                        pool_ambiente_id=pa.id, desconto_individual_pct=0.0))
+        # cadastro do cliente completo (exigido para gerar contrato)
+        cli = db.get(app_db.Cliente, seed["cliente_l1_id"])
+        cli.email = "cliente@exemplo.com"; cli.telefone = "(11) 99999-0000"
+        cli.cep = "01310-100"; cli.logradouro = "Av. Paulista"; cli.numero = "1000"
+        cli.bairro = "Bela Vista"; cli.cidade = "São Paulo"; cli.estado = "SP"
+        cli.inst_mesmo_residencial = 1
+
+        # ambiente (idempotente: só adiciona se ainda não houver)
+        ja = db.query(app_db.OrcamentoAmbiente).filter_by(
+            orcamento_id=seed["orcamento_l1_id"]).first()
+        if not ja:
+            pa = app_db.PoolAmbiente(projeto_id=seed["projeto_l1"], nome="Cozinha", versao=1,
+                                     nome_exibicao="Cozinha", xml_path="", ambientes_json="[]",
+                                     budget_total=90000.0, order_total=40000.0)
+            db.add(pa); db.flush()
+            db.add(app_db.OrcamentoAmbiente(orcamento_id=seed["orcamento_l1_id"],
+                                            pool_ambiente_id=pa.id, desconto_individual_pct=0.0))
 
         orc = db.get(app_db.Orcamento, seed["orcamento_l1_id"])
         orc.desconto_pct = 0.0
@@ -135,3 +160,66 @@ def test_fluxo_completo_inicio_ao_fim(app_db, seed, projetos_dir, http_client_fa
     c2.login("dir_l2", "senha123")
     st, _ = c2.get("/api/orcamentos/%d/provisoes" % oid)
     assert st in (403, 404)
+
+
+def test_contrato_real_geracao_e_assinatura(app_db, seed, projetos_dir, contratos_dir,
+                                            http_client_factory):
+    """Geração REAL do contrato (.docx via python-docx; o PDF só com LibreOffice, ausente aqui) +
+    assinatura das duas partes → contrato 'assinado', etapa 7 concluída, projeto 'fechado'."""
+    _setup_cenario(app_db, seed)
+    nome = seed["projeto_l1"]
+    oid = seed["orcamento_l1_id"]
+    c = http_client_factory()
+    c.login("dir_l1", "senha123")
+
+    forma_pag = json.dumps({
+        "tipo": "avista", "nome_forma": "A Vista", "entrada_valor": 10000,
+        "entrada_data": "2026-07-01", "total_cliente": 90000.0,
+        "parcelas": [{"num": 1, "data": "2026-07-20", "valor": 80000.0}]})
+
+    # 1) GERAÇÃO REAL (loja incompleta no seed → confirmar_loja_incompleta)
+    st, b = c.post("/api/projetos/%s/contrato" % nome, {
+        "orcamento_id": oid,
+        "endereco_instalacao": "Av. Paulista, 1000 - São Paulo/SP",
+        "pagamento_json": forma_pag,
+        "confirmar_loja_incompleta": True,
+    })
+    assert st == 200 and b["ok"], b
+    assert b["status"] == "para_assinatura"
+    assert "aviso" in b          # sem LibreOffice → entrega o .docx (degradação graciosa)
+
+    # 2) Contrato persistido: status + arquivo (.docx) disponível
+    st, b = c.get("/api/projetos/%s/contrato" % nome)
+    assert st == 200
+    assert b["contrato"]["status"] == "para_assinatura"
+    assert b["contrato"]["tem_pdf"] is True
+    assert b["contrato"]["arquivo_tipo"] in ("docx", "pdf")
+
+    # 3) O hook REAL de geração registrou a "Venda" das provisões
+    st, b = c.get("/api/orcamentos/%d/provisoes" % oid)
+    assert b["provisoes"]["venda"] is not None
+
+    # 4) Arquivo do contrato é servível
+    st, _ = c.get("/api/projetos/%s/contrato/pdf" % nome)
+    assert st == 200
+
+    # 5) ASSINATURA — loja
+    st, b = c.post("/api/projetos/%s/contrato/assinar" % nome,
+                   {"parte": "loja", "nome": "Gerente Loja 1", "cpf": "111.111.111-11"})
+    assert st == 200 and b["ok"], b
+    assert b["status"] == "assinado_loja"
+
+    # 6) ASSINATURA — cliente → 'assinado'
+    st, b = c.post("/api/projetos/%s/contrato/assinar" % nome,
+                   {"parte": "cliente", "nome": "Cliente L1", "cpf": "111.111.111-11"})
+    assert st == 200 and b["ok"], b
+    assert b["status"] == "assinado"
+
+    # 7) Estado final: contrato assinado pelas 2 partes
+    st, b = c.get("/api/projetos/%s/contrato" % nome)
+    assert b["contrato"]["status"] == "assinado"
+    assert {a["parte"] for a in b["contrato"]["assinaturas"]} == {"loja", "cliente"}
+
+    # 8) Etapa 7 (Contrato) concluída no ciclo
+    st, b = c.get("/api/projetos/%s/ciclo" % nome)
+    assert st == 200
