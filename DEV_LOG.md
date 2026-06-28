@@ -859,3 +859,30 @@ esse guard em todas** — `/ciclo`, `/ciclo/desfazer_aprovacao`, `/medicao`, `/m
 `_projeto_da_loja`, implementados nas frentes multi-loja/árvore posteriores). F4 é **redundante** —
 não reaproveitar (aplicá-lo só geraria conflito nas mesmas rotas já reescritas). Worktree mantido
 como está (gerenciado pelo ambiente).
+
+## Sessão 36 — E2E do início ao fim + faxina de artefatos de contrato
+
+Suíte: **371 passed**. Tudo na `main`.
+
+### E2E do início ao fim (`tests/test_fluxo_completo_e2e.py`)
+Servidor HTTP real + login real (harness do conftest), dois fluxos:
+- **`test_fluxo_completo_inicio_ao_fim`** — login → negociação (motor + margem real: VBVO/CFO/Val_Liq/
+  Cust_Var/Marg_Cont) → `Out_Forn` reflete no Cust_Var → ciclo carrega → "Venda" registrada (hook) →
+  **Provisões**: Venda → Rev 1 (Concorda = cópia) → Rev 2 (Revisa = edita Out_Forn, margem recalcula
+  da base congelada) → **consistência** (negociação muda após a Venda → `desatualizado=true`) →
+  **IDOR** (diretor de outra loja → 404).
+- **`test_contrato_real_geracao_e_assinatura`** — **geração REAL** do contrato via
+  `POST /api/projetos/<n>/contrato` (gera o `.docx` por python-docx) → `para_assinatura` (+ aviso de
+  LibreOffice ausente, degradação graciosa) → hook real grava a Venda → arquivo servível
+  (`GET /contrato/pdf` 200) → **assinatura loja + cliente** → `assinado`, etapa 7 concluída,
+  projeto `fechado`. Hermético: fixture `contratos_dir` isola `CONTRATOS_DIR` num temp.
+
+**Limite de ambiente (não do produto):** sem LibreOffice (`soffice`) o contrato sai `.docx` em vez de
+PDF — único passo dependente de `soffice`. O PDF real valida-se no ambiente do usuário (com LibreOffice).
+Upload de XML coberto por `test_qualidade_upload_e2e`; ambiente montado no banco (PoolAmbiente).
+
+### Faxina — artefatos de teste de contrato
+`test_contrato.py` gerava `.docx` de ids mágicos (`contrato_99/8888/9999.docx`) direto na pasta
+`CONTRATOS/` do repo (não isolava `CONTRATOS_DIR`). Adicionada fixture `autouse` que redireciona
+`CONTRATOS_DIR` para um temp; artefatos antigos (untracked) removidos. Confirmado: rodando a suíte
+completa, nenhum `.docx` novo é escrito no repo. Contratos reais (`contrato_1..15`) preservados.
