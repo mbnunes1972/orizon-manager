@@ -643,12 +643,14 @@ def _libreoffice_cmd() -> str:
     return "libreoffice"
 
 
-def _converter_pdf(docx_path: str) -> str:
-    """Converte um .docx EXISTENTE em PDF (não regenera o docx). Retorna o caminho do PDF."""
+def _converter_pdf(docx_path: str, outdir: str = None) -> str:
+    """Converte um .docx EXISTENTE em PDF (não regenera). Retorna o caminho do PDF.
+    outdir default = CONTRATOS_DIR (comportamento do contrato inalterado)."""
+    destino = outdir or CONTRATOS_DIR
     try:
         subprocess.run(
             [_libreoffice_cmd(), "--headless", "--convert-to", "pdf",
-             "--outdir", CONTRATOS_DIR, docx_path],
+             "--outdir", destino, docx_path],
             check=True, capture_output=True, timeout=120,
         )
     except FileNotFoundError:
@@ -661,7 +663,7 @@ def _converter_pdf(docx_path: str) -> str:
         raise RuntimeError("LibreOffice demorou mais de 120s")
 
     base = os.path.splitext(os.path.basename(docx_path))[0]
-    return os.path.join(CONTRATOS_DIR, f"{base}.pdf")
+    return os.path.join(destino, f"{base}.pdf")
 
 
 def gerar_pdf_contrato(contrato_id: int, variaveis: dict) -> str:
