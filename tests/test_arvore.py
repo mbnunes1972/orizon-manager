@@ -49,7 +49,7 @@ def test_super_ve_projetos_com_agregacao(app_db, seed, com_etapas, ator_super):
     p = next(x for x in out if x["nome_safe"] == "Proj_L1")
     assert p["etapas_concluidas"] == 3
     assert p["etapa_atual_codigo"] == "4"
-    assert p["etapa_atual_nome"] == "Primeiro orçamento"
+    assert p["etapa_atual_nome"] == "Orçamento"
     assert p["total_etapas"] == 20
 
 

@@ -142,3 +142,7 @@ def test_exige_aprovacao_financeira():
 
 def test_etapa10_renomeada_medicao():
     assert mc.ETAPA_NOME["10"] == "Medição"
+
+
+def test_etapa_4_renomeada_para_orcamento():
+    assert mc.ETAPA_NOME["4"] == "Orçamento"

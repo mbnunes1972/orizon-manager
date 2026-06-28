@@ -7172,7 +7172,7 @@ async function salvarOrcamento(){
     await carregarCicloSilencioso();
     showToast('Orçamento salvo!');
   } else {
-    showToast('Orçamento salvo. Adicione ambientes para concluir a etapa "Primeiro orçamento".', false);
+    showToast('Orçamento salvo. Adicione ambientes para concluir a etapa "Orçamento".', false);
   }
 }
 
@@ -7380,7 +7380,7 @@ const ETAPAS_CICLO = [
   { codigo: "1",   nome: "Cadastro do Cliente",                sub: false },
   { codigo: "2",   nome: "Criação do projeto",                 sub: false },
   { codigo: "3",   nome: "Briefing",                           sub: false },
-  { codigo: "4",   nome: "Primeiro orçamento",                 sub: false },
+  { codigo: "4",   nome: "Orçamento",                          sub: false },
   { codigo: "5",   nome: "Revisão de projeto",                 sub: false },
   { codigo: "6",   nome: "Aprovação do orçamento pelo cliente",sub: false },
   { codigo: "7",   nome: "Contrato",                           sub: false, acao: "contrato" },

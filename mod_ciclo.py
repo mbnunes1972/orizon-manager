@@ -17,7 +17,7 @@ ETAPA_NOME = {
     "1": "Cadastro do Cliente",
     "2": "Criação do projeto",
     "3": "Briefing",
-    "4": "Primeiro orçamento",
+    "4": "Orçamento",
     "5": "Revisão de projeto",
     "6": "Aprovação do orçamento pelo cliente",
     "7": "Contrato",
