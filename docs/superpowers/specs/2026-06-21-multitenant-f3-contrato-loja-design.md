@@ -1,7 +1,7 @@
 # Multi-tenant — F3: Contrato puxa da loja
 
 **Data:** 2026-06-21
-**Status:** spec aprovado pelo usuário no brainstorm (aguardando revisão do spec escrito antes do plano)
+**Status:** ✅ Implementado e mergeado na `main` (sessões 23–25). Ver DEV_LOG (F3 contrato puxa da loja).
 **Origem:** terceira fase do programa multi-tenant. A F1
 (`docs/superpowers/specs/2026-06-20-multitenant-f1-fundacao-design.md`) criou as tabelas e
 colunas de tenant; a F2 (`docs/superpowers/specs/2026-06-21-multitenant-f2-tenancy-design.md`)

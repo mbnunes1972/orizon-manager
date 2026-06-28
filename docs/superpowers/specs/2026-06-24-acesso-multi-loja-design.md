@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-24
 **Slice:** Acesso multi-loja (item (b) do pedido pós-#1/#2)
-**Status:** proposto (aguardando revisão)
+**Status:** ✅ Implementado e mergeado na `main` (2026-06-28). Ver DEV_LOG (frente Acesso multi-loja).
 
 ## Contexto
 

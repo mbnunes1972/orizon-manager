@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-27
 **Frente:** Provisões versionadas (continuação da Frente C / item #8 financeiro)
-**Status:** proposto (decisões fechadas no brainstorm; aguarda revisão)
+**Status:** ✅ Implementado e mergeado na `main` (2026-06-28, sessão 35; suíte 369 no merge).
 **Base:** `docs/modulos/financeiro/PROVISOES_E_VARIAVEIS.md`, spec da config financeira
 (`2026-06-24-config-financeira-loja-provisoes-design.md`), §"Provisões financeiras" do ciclo
 (`2026-06-15-ciclo-completo-projeto-design.md`).

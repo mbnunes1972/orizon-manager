@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-28
 **Frente:** Ciclo — etapas como hub de artefatos (foco no Orçamento) + 1º documento do banco (#8): a Proposta
-**Status:** proposto (decisões fechadas no brainstorm; aguarda revisão)
+**Status:** ✅ Implementado e mergeado na `main` (2026-06-28, sessão 37; suíte 378 no merge).
 **Relacionado:** `docs/modulos/contratos/SPEC.md` (direção do banco de documentos por loja, #8),
 `docs/processos/FLUXO_38_ETAPAS.md` (ciclo de 20 etapas), `mod_contrato.py` (motor de documento).
 

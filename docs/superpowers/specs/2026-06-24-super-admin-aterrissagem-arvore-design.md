@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-24
 **Slice:** #1 + #2 do pedido de arquitetura multi-tenant (super_admin/redes/lojas)
-**Status:** proposto (aguardando revisão)
+**Status:** ✅ Implementado e mergeado na `main` (2026-06-28). Ver DEV_LOG (frente super_admin aterrissagem + árvore).
 
 ## Contexto
 

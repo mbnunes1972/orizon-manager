@@ -1,7 +1,7 @@
 # Multi-tenant — F4: Isolamento operacional
 
 **Data:** 2026-06-21
-**Status:** spec aprovado pelo usuário no brainstorm (aguardando revisão do spec escrito antes do plano)
+**Status:** ✅ Implementado e mergeado na `main` (sessões 23–25; regressão E2E em `tests/test_isolamento_f4_e2e.py`). Ver DEV_LOG (F4 isolamento).
 **Origem:** quarta e última fase do programa multi-tenant. A F1 criou o schema; a F2 expôs a
 tenancy na UI/API (escopo só nas telas admin); a F3 fez o contrato puxar da loja. A F4 aplica
 **escopo por loja em TODAS as queries operacionais**, que hoje são globais.

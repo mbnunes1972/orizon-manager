@@ -912,3 +912,25 @@ Spec/plan em `docs/superpowers/{specs,plans}/2026-06-28-*`.
 ### Banco de documentos #8 — pendente
 A lista "etapa → documento" NÃO foi encontrada (busca em todos os transcripts + docs). Fonte provável:
 `1_FLUXO_DE_PROCESSOS.docx` (não está no repo, só com o usuário). Próximo passo do #8: obter essa lista.
+
+## ⏸️ ESTADO ATUAL (pausa 2026-06-28) — retomar aqui
+
+**`main`** consolidada e verde — **suíte 378 passed**. Servidor: `python3 main.py` (porta 8765).
+Branches: só `main` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
+
+**Já na `main` (frentes recentes):** super_admin aterrissagem+árvore; acesso multi-loja; Frente C
+(config financeira/provisões/margem real); provisões versionadas (Venda/Rev1/Rev2 + aprovação);
+etapa Orçamento como hub + Imprimir Orçamento (proposta = 1º doc do banco #8). Fixes de contrato
+(path PDF, staleness, tela cheia). E2E do início ao fim + geração real de contrato/assinatura.
+
+**Status das specs:** atualizado o cabeçalho das specs implementadas+mergeadas (as 5 frentes recentes
++ multitenant F2/F3/F4). Specs anteriores a 24/06 não foram relabeladas (verificar caso a caso ao retomar).
+
+**Pendências / próximos (backlog):**
+1. **Banco de documentos da loja #8 (continuação):** falta a **lista "etapa → documento"** — não está
+   nos transcripts nem nos docs; fonte provável `1_FLUXO_DE_PROCESSOS.docx` (só com o usuário). O
+   usuário vai compartilhar. Depois: modelo de proposta/contrato **por loja** (Padrão/Personalizado).
+2. **Conferência visual** dos 4 itens de UX do Imprimir Orçamento (botão/cards) no browser.
+3. **Defers** (cosméticos): genericizar corpo do 500 da rota de proposta; remover `import _mprop` redundante.
+4. **Seed Orizon (#6)**, **busca LGPD (#4)**, **config de rede (#7)**.
+5. **Não-pushed:** a `main` está à frente do `origin` (merges locais) — `git push` quando o usuário pedir.

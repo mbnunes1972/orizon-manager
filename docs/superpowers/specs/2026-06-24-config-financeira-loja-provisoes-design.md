@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-24
 **Frente:** C (do dia) — painel financeiro com todas as provisões
-**Status:** proposto (decisões fechadas no brainstorm; aguarda revisão)
+**Status:** ✅ Implementado e mergeado na `main` (2026-06-28). Ver DEV_LOG (Frente C — config financeira/provisões/margem real).
 **Referência canônica:** `docs/modulos/financeiro/PROVISOES_E_VARIAVEIS.md` (tabela do motor — fonte
 de verdade das siglas e fórmulas).
 

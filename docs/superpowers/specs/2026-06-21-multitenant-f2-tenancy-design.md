@@ -1,7 +1,7 @@
 # Multi-tenant — F2: Perfis e CRUD de tenancy (consoles Plataforma/Rede/Loja)
 
 **Data:** 2026-06-21
-**Status:** spec aprovado pelo usuário no brainstorm (aguardando revisão do spec escrito antes do plano)
+**Status:** ✅ Implementado e mergeado na `main` (sessões 23–25). Ver DEV_LOG (F2 tenancy).
 **Origem:** segunda fase do programa multi-tenant. A F1 (fundação de dados —
 `docs/superpowers/specs/2026-06-20-multitenant-f1-fundacao-design.md`) criou as tabelas
 `redes`/`lojas`/`parceiro_lojas`, as colunas de tenant e a loja seed, **sem nenhuma
