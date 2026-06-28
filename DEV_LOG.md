@@ -934,3 +934,28 @@ etapa Orçamento como hub + Imprimir Orçamento (proposta = 1º doc do banco #8)
 3. **Defers** (cosméticos): genericizar corpo do 500 da rota de proposta; remover `import _mprop` redundante.
 4. **Seed Orizon (#6)**, **busca LGPD (#4)**, **config de rede (#7)**.
 5. **Não-pushed:** a `main` está à frente do `origin` (merges locais) — `git push` quando o usuário pedir.
+
+## 🔼 PENDÊNCIA: PUSH da `main` para o `origin` (fazer ao retomar)
+
+Estado: a `main` local está **76 commits à frente** de `origin/main` (todos os merges locais das
+frentes recentes). O push **não pôde ser feito pelo agente** — o ambiente não tem credenciais do
+GitHub, nem `gh` CLI, nem credential helper (erro: `could not read Username for 'https://github.com'`).
+Remote: `https://github.com/mbnunes1972/omie_v3.git`.
+
+**Fazer pelo usuário (no próprio shell, onde estão as credenciais):**
+```
+!git push origin main
+```
+Se pedir usuário/senha em HTTPS, usar um **Personal Access Token (PAT)** do GitHub como senha
+(senha de conta não funciona mais).
+
+**Para deixar configurado e não repetir (escolher uma):**
+- **Git Credential Manager do Windows (WSL):**
+  `git config --global credential.helper "/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe"`
+  (ajustar o caminho do GCM); o próximo push abre o login do Windows.
+- **GitHub CLI:** instalar `gh`, rodar `gh auth login` e depois `gh auth setup-git`; o `git push` passa
+  a autenticar via `gh`.
+- **PAT no remote (menos seguro):** `git remote set-url origin https://<PAT>@github.com/mbnunes1972/omie_v3.git`.
+
+Conferir antes: `git rev-list --count origin/main..main` (deve mostrar os commits a publicar) e
+`git log --oneline origin/main..main | head` (o que vai subir).
