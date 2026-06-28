@@ -886,3 +886,29 @@ Upload de XML coberto por `test_qualidade_upload_e2e`; ambiente montado no banco
 `CONTRATOS/` do repo (não isolava `CONTRATOS_DIR`). Adicionada fixture `autouse` que redireciona
 `CONTRATOS_DIR` para um temp; artefatos antigos (untracked) removidos. Confirmado: rodando a suíte
 completa, nenhum `.docx` novo é escrito no repo. Contratos reais (`contrato_1..15`) preservados.
+
+## Sessão 37 — Etapa Orçamento como hub + Imprimir Orçamento (proposta)
+
+Frente desenhada (brainstorm→spec→plano) e implementada (SDD, 5 tasks TDD, suíte 378, review final
+READY TO MERGE) e **mergeada na `main`**. É o 1º documento do banco de documentos da loja (#8).
+Spec/plan em `docs/superpowers/{specs,plans}/2026-06-28-*`.
+
+- **Renomear** etapa 4 "Primeiro orçamento" → **"Orçamento"** (`mod_ciclo.ETAPA_NOME` + frontend).
+- **🖨 Imprimir Orçamento** na negociação (junto de Salvar/Aprovar).
+- Card da etapa **Orçamento**: lista os orçamentos (Abrir → negociação; Imprimir → proposta).
+  Card da etapa **Aprovação**: orçamento aprovado (`contrato.orcamento_id`) com Abrir/Imprimir.
+- **Proposta** (`mod_proposta.py`, reusa `_substituir_marcadores`/`_montar_mapping`/`construir_contexto`
+  de `mod_contrato`) a partir do template **global** `modelo_proposta.docx` (base 1ª pág do contrato,
+  sem cláusulas). Rota `GET /api/orcamentos/<id>/proposta/pdf` — **sob demanda, sem salvar**
+  (gera em `tempfile.mkdtemp`, serve inline, remove o temp), escopo por loja + IDOR 404 + 401.
+  Sem LibreOffice → entrega `.docx` (degradação graciosa). `_converter_pdf` ganhou `outdir`
+  (default `CONTRATOS_DIR` — contrato inalterado).
+
+### Defers (não bloqueiam; do review final)
+- Genericizar o corpo do 500 da rota (`str(e)` pode ecoar caminho interno — padrão do codebase).
+- Remover o `import mod_proposta as _mprop` redundante na rota.
+- Conferência visual no browser (botão Imprimir, lista de orçamentos, orçamento aprovado, abrir inline).
+
+### Banco de documentos #8 — pendente
+A lista "etapa → documento" NÃO foi encontrada (busca em todos os transcripts + docs). Fonte provável:
+`1_FLUXO_DE_PROCESSOS.docx` (não está no repo, só com o usuário). Próximo passo do #8: obter essa lista.
