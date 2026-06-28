@@ -2188,10 +2188,13 @@ class Handler(BaseHTTPRequestHandler):
                     itens = json.loads(anterior.itens_json)
                     cfo, vl = anterior.cfo, anterior.val_liq
                 elif decisao == "revisa":
-                    itens = {k: max(0.0, float(v or 0)) for k, v in (req.get("itens") or {}).items()}
-                    cfo, vl = anterior.cfo, anterior.val_liq   # base congelada da venda
+                    try:
+                        itens = {k: max(0.0, float(v or 0)) for k, v in (req.get("itens") or {}).items()}
+                    except (TypeError, ValueError):
+                        self.send_json({"ok": False, "erro": "Valores de itens inválidos"}, code=400); return
+                    cfo, vl = anterior.cfo, anterior.val_liq   # base congelada (versão anterior: venda p/ rev1, rev1 p/ rev2)
                 else:
-                    self.send_json({"ok": False, "erro": "decisao deve ser concorda|revisa"}); return
+                    self.send_json({"ok": False, "erro": "decisao deve ser concorda|revisa"}, code=400); return
                 cust_var, marg = _mprov.cust_var_marg_cont(cfo, vl, itens)
                 existente = db.query(ProvisaoRegistro).filter_by(orcamento_id=oid, versao=versao).first()
                 if existente:

@@ -174,3 +174,18 @@ def test_rev2_sem_rev1_409(http_client_factory, app_db, seed, projetos_dir):
         db.commit()
     finally:
         db.close()
+
+
+def test_rev1_sem_venda_409(http_client_factory, app_db, seed):
+    # sem 'venda' registrada, rev1 deve falhar 409
+    db = app_db.get_session()
+    try:
+        db.query(app_db.ProvisaoRegistro).filter_by(
+            orcamento_id=seed["orcamento_l1_id"]).delete()
+        db.commit()
+    finally:
+        db.close()
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, _ = c.post("/api/orcamentos/%d/provisoes/rev1" % seed["orcamento_l1_id"],
+                   {"decisao": "concorda", "login": "dir_l1", "senha": "senha123"})
+    assert st == 409
