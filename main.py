@@ -831,6 +831,50 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # ── GET /api/orcamentos/<id>/provisoes — versões + atual + desatualizado ──
+            m = _re.match(r"^/api/orcamentos/(\d+)/provisoes$", path)
+            if m:
+                import mod_provisoes as _mprov
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "aprovar_financeiro"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                    return
+                oid = int(m.group(1))
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    orc = _obj_da_loja(db, Orcamento, oid, loja_id)
+                    if orc is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+
+                    def _reg(versao):
+                        r = db.query(ProvisaoRegistro).filter_by(orcamento_id=oid, versao=versao).first()
+                        if not r:
+                            return None
+                        return {"itens": json.loads(r.itens_json), "cfo": r.cfo, "val_liq": r.val_liq,
+                                "cust_var": r.cust_var, "marg_cont": r.marg_cont, "decisao": r.decisao,
+                                "criado_em": r.criado_em.isoformat() if r.criado_em else None}
+
+                    venda = _reg("venda")
+                    d = _negociacao_breakdown(orc, db)
+                    atual = {"itens": _mprov.itens_provisao(d),
+                             "cfo": float(d.get("CFO") or 0),
+                             "val_liq": float(d.get("Val_Liq") or 0),
+                             "cust_var": float(d.get("Cust_Var") or 0),
+                             "marg_cont": float(d.get("Marg_Cont") or 0)}
+                    desatualizado = bool(venda and venda["itens"] != atual["itens"])
+                    self.send_json({"ok": True, "provisoes": {
+                        "venda": venda, "rev1": _reg("rev1"), "rev2": _reg("rev2"),
+                        "atual": atual, "desatualizado": desatualizado}})
+                finally:
+                    db.close()
+                return
+
             m = _re.match(r"^/projetos/([^/]+)/orcamentos$", path)
             if m:
                 nome_safe = m.group(1)

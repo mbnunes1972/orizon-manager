@@ -48,3 +48,26 @@ def test_registrar_venda(app_db, seed, projetos_dir):
             orcamento_id=seed["orcamento_l1_id"], versao="venda").delete()
         db.commit()
         db.close()
+
+
+def test_get_provisoes(http_client_factory, app_db, seed, projetos_dir):
+    import main, json as _j
+    db = app_db.get_session()
+    try:
+        pa = app_db.PoolAmbiente(projeto_id=seed["projeto_l1"], nome="A", versao=1,
+                                 nome_exibicao="A", xml_path="", ambientes_json="[]",
+                                 budget_total=10000.0, order_total=4000.0)
+        db.add(pa); db.flush()
+        db.add(app_db.OrcamentoAmbiente(orcamento_id=seed["orcamento_l1_id"],
+                                        pool_ambiente_id=pa.id, desconto_individual_pct=0.0))
+        orc = db.get(app_db.Orcamento, seed["orcamento_l1_id"])
+        db.commit()
+        main._registrar_provisao_venda(db, orc, por_id=1); db.commit()
+    finally:
+        db.close()
+    c = http_client_factory(); c.login("dir_l1", "senha123")   # diretor tem aprovar_financeiro
+    st, body = c.get("/api/orcamentos/%d/provisoes" % seed["orcamento_l1_id"])
+    assert st == 200 and body["ok"] is True
+    assert body["provisoes"]["venda"] is not None
+    assert "frete_fab" in body["provisoes"]["atual"]["itens"]
+    assert body["provisoes"]["desatualizado"] is False
