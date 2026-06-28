@@ -834,6 +834,8 @@ class Handler(BaseHTTPRequestHandler):
             # ── GET /api/orcamentos/<id>/provisoes — versões + atual + desatualizado ──
             m = _re.match(r"^/api/orcamentos/(\d+)/provisoes$", path)
             if m:
+                # NOTE: bare `mod_provisoes` vira local no do_GET (import local num elif adiante);
+                # usar alias evita UnboundLocalError.
                 import mod_provisoes as _mprov
                 usuario = get_usuario_sessao(self)
                 if not usuario or not perfis.pode(usuario.get("nivel"), "aprovar_financeiro"):

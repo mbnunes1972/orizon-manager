@@ -71,3 +71,17 @@ def test_get_provisoes(http_client_factory, app_db, seed, projetos_dir):
     assert body["provisoes"]["venda"] is not None
     assert "frete_fab" in body["provisoes"]["atual"]["itens"]
     assert body["provisoes"]["desatualizado"] is False
+
+
+def test_get_provisoes_outra_loja_404(http_client_factory, seed):
+    # dir_l2 (loja2) nao pode ler provisoes de um orcamento da loja1
+    c = http_client_factory(); c.login("dir_l2", "senha123")
+    st, _ = c.get("/api/orcamentos/%d/provisoes" % seed["orcamento_l1_id"])
+    assert st in (403, 404)
+
+
+def test_get_provisoes_sem_permission_403(http_client_factory, seed):
+    # super_admin nao tem aprovar_financeiro
+    c = http_client_factory(); c.login("super", "senha123")
+    st, _ = c.get("/api/orcamentos/%d/provisoes" % seed["orcamento_l1_id"])
+    assert st == 403
