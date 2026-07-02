@@ -946,6 +946,45 @@ aguarda revisão final de branch + conferência visual do usuário.
 - Minors (para a revisão final): assertions do E2E checam headers, não valores; `_ambientes_valor_para_contrato`
   usa fallback nome vazio para id sem match (sem log); alinhamento do título "4. Ambientes" não setado explícito.
 
+## Sessão 39 — Contrato em HTML/Markdown → PDF (WeasyPrint); aposenta o Word (branch `feat/contrato-html-pdf`)
+
+Reescrita do gerador de contrato: sai o template `.docx` + LibreOffice, entra **HTML (capa) +
+Markdown (cláusulas) → PDF via WeasyPrint**. Motivação: a numeração automática de listas do Word era
+frágil (números/alinhamento quebravam de forma imprevisível). Spec/plano em
+`docs/superpowers/{specs,plans}/2026-07-02-contrato-html-pdf*`. Executado por SDD (12 tasks TDD),
+**na branch `feat/contrato-html-pdf`** (empilhada sobre a `main`). Suíte **376 passed / 0 failed**.
+
+- **Motor** (`mod_contrato.py`): `gerar_pdf_contrato(id, ctx)` monta a **capa em HTML**
+  (`_html_capa` — linhas dinâmicas de ambientes/parcelas), converte `contrato.md`→HTML
+  (`_html_corpo`), embrulha no shell, substitui `[MARCADORES]` (`_substituir_marcadores_html`) e
+  renderiza com **WeasyPrint**. Assets versionados em `contrato_template/`
+  (`contrato.md`, `contrato.css`, `contrato.html`, `logo_dalmobile.png`).
+- **Cláusulas — números literais (Opção A):** o `contrato.md` tem os números como texto
+  (`1.1.`, `a)`); o CSS cuida do recuo por nível + *hanging*. Decisão-chave: **exatidão jurídica >
+  numeração automática**. O `_html_corpo` processa **linha a linha** (Markdown só inline) para NÃO
+  acionar a lista ordenada do Markdown (`1.` viraria `<ol><li>` com número dobrado).
+- **Migração do texto:** `scripts/extrair_clausulas_docx.py` — como a numeração do `.docx` é
+  automática (não está em `p.text`), a fonte é o **export em TXT do LibreOffice** (achata a numeração
+  em texto literal). Limpeza de tabs, quebras de linha soltas, alínea `d)`, campos de preenchimento
+  do 2.3.4.1. **Revisão jurídica final do `contrato.md` recomendada** (pendência: 3.6 ausente na origem,
+  mantida).
+- **Capa:** cabeçalho corrido (logo Dalmóbile + subtítulo da rede + número/data à direita), linha do
+  consultor, seções 1–5 (ambientes 2/linha + traços; grade de parcelas só com linhas usadas). Quebra
+  de página → cláusulas na página seguinte; rodapé "Página X de Y".
+- **Corte limpo:** removidos do CONTRATO o caminho `.docx` (`preencher_contrato`, `_preencher_*`,
+  `_set_cell_text`, `_localizar_tabela`, `_proteger_editaveis`, `_MODELO`), a rota `/contrato/editar`
+  e o botão no frontend. **Assinatura inalterada** (hash em DB). Os helpers docx/LibreOffice
+  (`_substituir_marcadores`, `_subst_paragrafo`, `_converter_pdf`, `LibreOfficeIndisponivel`) **ficam**
+  — `mod_proposta.py` (Proposta, ainda docx) os usa.
+- **Deps:** `weasyprint` + `markdown` (apt no servidor; pip no dev). LibreOffice permanece **só para a
+  proposta**.
+
+### Escopo / próxima frente
+- **Só o contrato.** Migrar a **proposta** (`modelo_proposta.docx`) para o mesmo motor é a frente
+  seguinte (reaproveita `_html_capa`/CSS). `contrato_editar.py` ficou órfão (candidato a limpeza).
+- **Pendências:** fonte de config do `[REDE_IDENTIFICADOR]` (hoje fallback = cidade da loja);
+  revisão jurídica final do `contrato.md`.
+
 ## ⏸️ ESTADO ATUAL (pausa 2026-06-28) — retomar aqui
 
 **`main`** consolidada e verde — **suíte 378 passed**. Servidor: `python3 main.py` (porta 8765).
