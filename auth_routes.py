@@ -28,7 +28,7 @@ from auth import (
     verificar_desconto, autorizar_desconto,
     get_token_from_cookie, COOKIE_NAME
 )
-from database import get_session, Usuario, Loja, membership_loja_ids
+from database import get_session, Usuario, Loja, Rede, membership_loja_ids
 import perfis
 
 # ── Caminho do login.html ─────────────────────────────────────────────────────
@@ -72,8 +72,14 @@ def handle_auth_get(handler, path: str) -> bool:
                 ids = membership_loja_ids(db, usuario["id"])
                 if usuario.get("loja_id") and usuario["loja_id"] not in ids:
                     ids = ids + [usuario["loja_id"]]
-                lojas = [{"id": l.id, "nome": l.nome, "codigo": l.codigo}
-                         for l in db.query(Loja).filter(Loja.id.in_(ids)).all()] if ids else []
+                lojas_obj = db.query(Loja).filter(Loja.id.in_(ids)).all() if ids else []
+                rede_ids = {l.rede_id for l in lojas_obj if l.rede_id}
+                redes = ({r.id: r.nome for r in db.query(Rede).filter(Rede.id.in_(rede_ids)).all()}
+                         if rede_ids else {})
+                # rede_id/rede_nome por loja: o front decide se oferece abrangência 'rede'
+                lojas = [{"id": l.id, "nome": l.nome, "codigo": l.codigo,
+                          "rede_id": l.rede_id, "rede_nome": redes.get(l.rede_id, "")}
+                         for l in lojas_obj]
                 usuario["lojas"] = lojas
                 usuario["loja_ativa_id"] = usuario.get("loja_id")
             finally:

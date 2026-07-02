@@ -6526,7 +6526,33 @@ function parAbrangenciaMudou(){
 }
 
 async function parCarregarOpcoesTenant(){
-  // popula select de redes (se houver) e checkboxes de lojas visíveis ao usuário
+  const u = _usuarioAtual || {};
+  const abrSel = document.getElementById('par-abrangencia');
+
+  // ── Usuário com loja operacional (diretor, gerente, consultor…) ──────────────
+  // O parceiro é vinculado automaticamente à loja ativa; a opção "rede" só aparece
+  // se a loja pertencer a uma rede. Não usa /api/admin/lojas (restrito a admins).
+  if (_lojaAtiva != null) {
+    const lojas = u.lojas || [];
+    const ativa = lojas.find(l => l.id === _lojaAtiva) || lojas[0] || null;
+    const temRede = !!(ativa && ativa.rede_id != null);
+    abrSel.innerHTML =
+      `<option value="loja">Esta loja${ativa ? ' — ' + esc(ativa.nome) : ''}</option>` +
+      (temRede ? `<option value="rede">Toda a rede — ${esc(ativa.rede_nome || 'rede')}</option>` : '');
+    abrSel.value = 'loja';
+    document.getElementById('par-lojas-lista').innerHTML = ativa
+      ? `<div style="font-size:12px;color:var(--text)">${esc(ativa.nome)} <span style="color:var(--muted)">(${esc(ativa.codigo||'—')})</span></div>
+         <div style="font-size:11px;color:var(--muted);margin-top:3px">O parceiro será vinculado à sua loja.</div>`
+      : '<em>Sua conta não está vinculada a uma loja.</em>';
+    const rsel = document.getElementById('par-rede');
+    rsel.innerHTML = temRede ? `<option value="${ativa.rede_id}">${esc(ativa.rede_nome||'rede')}</option>` : '';
+    parAbrangenciaMudou();
+    return;
+  }
+
+  // ── Admin multi-loja (super_admin / admin_rede): seletor de lojas + redes ─────
+  abrSel.innerHTML = '<option value="loja">Por loja (vincula a lojas específicas)</option>'
+                   + '<option value="rede">Por rede (toda a rede)</option>';
   try {
     const lojas = await fetch('/api/admin/lojas', {credentials:'same-origin'}).then(r=>r.json());
     const box = document.getElementById('par-lojas-lista');
@@ -6538,12 +6564,12 @@ async function parCarregarOpcoesTenant(){
                style="width:64px;margin-left:auto;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 6px;color:var(--text);font-size:11px"> %
       </label>`).join('') || '<em>Nenhuma loja disponível.</em>';
   } catch(e){ document.getElementById('par-lojas-lista').innerHTML = '<em>Erro ao carregar lojas.</em>'; }
-  // redes (opcional; só super_admin/admin_rede enxergam)
   try {
     const redes = await fetch('/api/admin/redes', {credentials:'same-origin'}).then(r=>r.json());
     const sel = document.getElementById('par-rede');
     sel.innerHTML = (redes.redes||[]).map(r=>`<option value="${r.id}">${esc(r.nome)}</option>`).join('');
-  } catch(e){ /* diretor não tem /api/admin/redes — ok, fica vazio */ }
+  } catch(e){ /* fica vazio */ }
+  parAbrangenciaMudou();
 }
 
 // ── Admin Panel ───────────────────────────────────────────────────────────────

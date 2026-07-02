@@ -2035,13 +2035,15 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 db.add(p)
                 db.flush()        # atribui p.id sem efetivar — transação única e atômica
-                if "abrangencia" in req:
-                    ator = _ator_dict(db, usuario) if usuario else {"nivel": "", "loja_id": None, "rede_id": None}
-                    erros = _aplicar_abrangencia_parceiro(db, p, req, ator)
-                    if erros:
-                        db.rollback()    # desfaz tudo, inclusive o INSERT do parceiro
-                        self.send_json({"ok": False, "erro": " ".join(erros)})
-                        return
+                # Sempre aplica abrangência (default 'loja' → loja ativa do ator): garante
+                # que o parceiro nunca nasça órfão/invisível para quem o cadastrou.
+                ator = (_ator_dict(db, usuario) if usuario
+                        else {"nivel": "", "loja_id": None, "rede_id": None, "active_loja_id": None})
+                erros = _aplicar_abrangencia_parceiro(db, p, req, ator)
+                if erros:
+                    db.rollback()    # desfaz tudo, inclusive o INSERT do parceiro
+                    self.send_json({"ok": False, "erro": " ".join(erros)})
+                    return
                 db.commit()
                 db.refresh(p)
                 self.send_json({"ok": True, "parceiro": _parceiro_dict(p, db)})
@@ -4665,10 +4667,18 @@ def _parceiro_dict(p, db=None) -> dict:
 def _aplicar_abrangencia_parceiro(db, p, req, ator):
     """Grava abrangencia/rede_id no parceiro e sincroniza os vínculos parceiro_lojas.
     Retorna lista de erros (vazia se ok). Só vincula lojas visíveis ao ator."""
+    abr = (req.get("abrangencia") or "loja").strip()
+    # Usuário de loja: sem seleção explícita de lojas, o parceiro entra na loja ATIVA do
+    # ator. O seletor de lojas é conveniência administrativa; consultor/gerente não precisa
+    # dele — "no mínimo", o parceiro entra na loja de quem o cadastrou.
+    if abr == "loja" and not (req.get("lojas") or []):
+        loja_ativa = ator.get("active_loja_id") or ator.get("loja_id")
+        if loja_ativa is not None:
+            req = {**req, "lojas": [{"loja_id": loja_ativa,
+                                     "comissao_padrao_pct": req.get("comissao_padrao_pct") or 0}]}
     erros = mod_tenancy.validar_abrangencia_parceiro(req)
     if erros:
         return erros
-    abr = (req.get("abrangencia") or "loja").strip()
     p.abrangencia = abr
     if abr == "rede":
         rede_id = req.get("rede_id")

@@ -49,6 +49,7 @@ def seed(app_db):
 
     mkuser("Diretor L1", "dir_l1", "diretor", loja_id=l1.id)
     mkuser("Diretor L2", "dir_l2", "diretor", loja_id=l2.id)
+    mkuser("Consultor L1", "cons_l1", "consultor", loja_id=l1.id)
     mkuser("Super",      "super",  "super_admin")
     mkuser("Adm Rede",   "adm_rede", "admin_rede", rede_id=rede.id)
 
@@ -83,6 +84,7 @@ def seed(app_db):
     db.commit()
 
     ctx = {
+        "rede_id": rede.id,
         "loja1_id": l1.id, "loja2_id": l2.id,
         "cliente_l1_id": c1.id, "cliente_l2_id": c2.id,
         "projeto_l1": "Proj_L1", "projeto_l2": "Proj_L2",
