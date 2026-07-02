@@ -904,3 +904,41 @@ def test_substituir_marcadores_cabecalho_fragmentado():
     txt = "".join(t.text or "" for t in hdr._element.iter(qn('w:t')))
     assert "INS-2026-01-01-001" in txt
     assert "[NUM_CONTRATO]" not in txt
+
+
+# ── Valor por ambiente no contrato (rateio do financeiro) ──────────────────────
+
+def test_ambientes_valor_proporcional_ao_vava():
+    from mod_contrato import ambientes_valor_contrato
+    out = ambientes_valor_contrato([("Cozinha", 100.0), ("Sala", 300.0)],
+                                   vavo=400.0, val_cont=440.0)
+    assert out == [("Cozinha", 110.0), ("Sala", 330.0)]
+    assert round(sum(v for _, v in out), 2) == 440.0
+
+
+def test_ambientes_reconciliacao_residuo_no_ultimo():
+    from mod_contrato import ambientes_valor_contrato
+    out = ambientes_valor_contrato(
+        [("A", 33.33), ("B", 33.33), ("C", 33.34)], vavo=100.0, val_cont=100.01)
+    assert round(sum(v for _, v in out), 2) == 100.01
+    # o resíduo de arredondamento cai no último ambiente
+    assert out[-1][0] == "C"
+    assert out[0][1] == 33.33 and out[1][1] == 33.33
+
+
+def test_ambientes_sem_financeiro_valor_igual_vava():
+    from mod_contrato import ambientes_valor_contrato
+    out = ambientes_valor_contrato([("A", 100.0), ("B", 300.0)],
+                                   vavo=400.0, val_cont=400.0)
+    assert out == [("A", 100.0), ("B", 300.0)]
+
+
+def test_ambientes_vavo_zero_nao_divide():
+    from mod_contrato import ambientes_valor_contrato
+    out = ambientes_valor_contrato([("A", 0.0), ("B", 0.0)], vavo=0.0, val_cont=0.0)
+    assert out == [("A", 0.0), ("B", 0.0)]
+
+
+def test_ambientes_lista_vazia():
+    from mod_contrato import ambientes_valor_contrato
+    assert ambientes_valor_contrato([], vavo=0.0, val_cont=0.0) == []

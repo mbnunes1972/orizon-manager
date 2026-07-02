@@ -61,6 +61,28 @@ def _formatar_valor_str(v):
     return str(v).strip()
 
 
+def ambientes_valor_contrato(itens, vavo, val_cont):
+    """Distribui Val_Cont pelos ambientes, proporcional ao VAVA.
+
+    itens: lista [(nome, VAVA_float), ...] na ordem do orçamento.
+    Retorna [(nome, valor_float), ...] com Σ valor == round(val_cont, 2);
+    o resíduo de arredondamento é absorvido pelo último ambiente.
+    vavo<=0 → devolve os próprios VAVA arredondados (sem divisão por zero).
+    """
+    if not itens:
+        return []
+    alvo = round(float(val_cont or 0.0), 2)
+    if not vavo or vavo <= 0:
+        return [(n, round(float(v or 0.0), 2)) for n, v in itens]
+    fator = alvo / vavo
+    out = [(n, round(float(v or 0.0) * fator, 2)) for n, v in itens]
+    resid = round(alvo - sum(v for _, v in out), 2)
+    if resid:
+        n_ult, v_ult = out[-1]
+        out[-1] = (n_ult, round(v_ult + resid, 2))
+    return out
+
+
 def _formatar_data_br(data: str) -> str:
     """Converte ISO 'YYYY-MM-DD' → 'DD/MM/AAAA'. Datas já em DD/MM são passadas direto."""
     if not data:
