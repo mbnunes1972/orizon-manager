@@ -99,6 +99,34 @@ def _formatar_data_br(data: str) -> str:
     return data or "—"
 
 
+def _cel_amb(rotulo, valor):
+    """Retorna as duas <td>s de um ambiente (rótulo e valor)."""
+    return (f'<td class="amb-rotulo">{rotulo}</td>'
+            f'<td class="amb-valor">{valor}</td>')
+
+
+def _html_ambientes_linhas(itens_valores):
+    """<tr>s da tabela de ambientes: 2 por linha; sobra ímpar em traços."""
+    from html import escape
+    n = len(itens_valores)
+    if n == 0:
+        # Lista vazia: 1 linha com 1 slot vazio
+        return "<tr>" + _cel_amb(_TRACO, _TRACO) + "</tr>"
+    n_linhas = (n + 1) // 2
+    linhas = []
+    for k in range(n_linhas):
+        cels = []
+        for slot in (0, 1):
+            idx = 2 * k + slot
+            if idx < n:
+                nome, val = itens_valores[idx]
+                cels.append(_cel_amb(escape(str(nome)), _formatar_valor(val)))
+            else:
+                cels.append(_cel_amb(_TRACO, _TRACO))
+        linhas.append("<tr>" + "".join(cels) + "</tr>")
+    return "\n".join(linhas)
+
+
 # ── Motor de substituição de marcadores [MARCADOR] ────────────────────────────
 
 import re as _re_mark
