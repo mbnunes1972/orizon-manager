@@ -985,10 +985,33 @@ frágil (números/alinhamento quebravam de forma imprevisível). Spec/plano em
 - **Pendências:** fonte de config do `[REDE_IDENTIFICADOR]` (hoje fallback = cidade da loja);
   revisão jurídica final do `contrato.md`.
 
-## ⏸️ ESTADO ATUAL (pausa 2026-06-28) — retomar aqui
+## Sessão 40 — Merge do contrato HTML/PDF na `main` + refinamentos de formatação (2026-07-02)
 
-**`main`** consolidada e verde — **suíte 378 passed**. Servidor: `python3 main.py` (porta 8765).
+Fecha a frente da Sessão 39: a branch `feat/contrato-html-pdf` foi **mergeada na `main`** (fast-forward).
+O merge estava bloqueado por um *lock* do Word sobre `modelo_contrato_mapeado.docx` (git não conseguia
+escrever o arquivo); com o Word fechado, foi limpo. Suíte na `main` mergeada: **379 passed / 0 failed**.
+Branch `feat/contrato-html-pdf` **removida** após o merge.
+
+**Refinamentos de capa/corpo após o usuário revisar o PDF real** (commit `6b1085f` —
+`contrato.md` + `contrato.css` + `mod_contrato.py`):
+- **Preâmbulo** num único parágrafo justificado (não mais fragmentado em ~4 quebras).
+- **Assinaturas:** rótulo com o nome ao lado (`Contratada:`/`Contratante:`/`Testemunha 1:`/`2:`);
+  espaço entre a linha de assinatura e o nome; espaço antes da data (`.data-fecho`) e antes do
+  fecho "E assim, por estarem…" (`.fecho`).
+- **Cláusulas em recuo de BLOCO** por nível (`text-indent: 0` + `padding-left` 0.6/1.2/1.8cm): a 2ª
+  linha alinha com a numeração (antes o *hanging* deslocava à direita).
+- **Capa:** removida a barra sobrando ao lado do nº de parcelas em "5. Forma de Pagamento"; logo
+  recortada (tira faixa branca à esquerda) p/ alinhar "Dalmóbile" com o subtítulo da rede.
+
+**Pendências (mantidas):** fonte de config do `[REDE_IDENTIFICADOR]` (hoje = cidade da loja);
+revisão jurídica final do `contrato.md` (cláusula 3.6 ausente na origem, mantida).
+
+## ⏸️ ESTADO ATUAL (2026-07-02) — retomar aqui
+
+**`main`** consolidada e verde — **suíte 379 passed**. Servidor: `python3 main.py` (porta 8765).
 Branches: só `main` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
+Contrato agora é **HTML/Markdown → PDF (WeasyPrint)** — o caminho `.docx`/LibreOffice do contrato
+foi aposentado (a **proposta** ainda usa docx/LibreOffice).
 
 **Já na `main` (frentes recentes):** super_admin aterrissagem+árvore; acesso multi-loja; Frente C
 (config financeira/provisões/margem real); provisões versionadas (Venda/Rev1/Rev2 + aprovação);
@@ -1009,10 +1032,10 @@ etapa Orçamento como hub + Imprimir Orçamento (proposta = 1º doc do banco #8)
 
 ## 🔼 PENDÊNCIA: PUSH da `main` para o `origin` (fazer ao retomar)
 
-Estado: a `main` local está **76 commits à frente** de `origin/main` (todos os merges locais das
-frentes recentes). O push **não pôde ser feito pelo agente** — o ambiente não tem credenciais do
-GitHub, nem `gh` CLI, nem credential helper (erro: `could not read Username for 'https://github.com'`).
-Remote: `https://github.com/mbnunes1972/omie_v3.git`.
+Estado (2026-07-02): a `main` local está **105 commits à frente** de `origin/main` (todos os merges
+locais das frentes recentes, incluindo o contrato HTML/PDF). O push **não pôde ser feito pelo agente**
+— o ambiente não tem credenciais do GitHub, nem `gh` CLI, nem credential helper (erro:
+`could not read Username for 'https://github.com'`). Remote: `https://github.com/mbnunes1972/omie_v3.git`.
 
 **Fazer pelo usuário (no próprio shell, onde estão as credenciais):**
 ```
