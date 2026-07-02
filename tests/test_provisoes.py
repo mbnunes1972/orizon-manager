@@ -101,7 +101,8 @@ def test_parametros_default_loja_usa_config():
 
 def test_parametros_default_loja_sem_config_cai_no_default():
     p = mod_orcamento_params.parametros_default_loja(None)
-    assert p == dict(mod_orcamento_params.PARAMETROS_DEFAULT)
+    # incluir_custos nasce True (padrão inicial do projeto); o resto segue o PARAMETROS_DEFAULT
+    assert p == dict(mod_orcamento_params.PARAMETROS_DEFAULT, incluir_custos=True)
 
 
 def test_validar_rejeita_redutor_acima_de_100():

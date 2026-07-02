@@ -88,7 +88,6 @@ c) ocorrência de focos de umidade ou constante e excessiva exposição ao sol o
 
 # CLÁUSULA SEXTA – DA ELEIÇÃO DE FORO
 6.1. As PARTES, de comum acordo, elegem o Foro da Comarca de São José dos Campos para dirimir quaisquer controvérsias decorrentes da interpretação, aplicação e/ou execução do presente Contrato, renunciando a qualquer outro, por mais vantajoso que seja ou possa vir a ser.
-[TEXTO_COMPLEMENTAR]
 
 E assim, por estarem assim convencionados, firmam as PARTES o presente instrumento em duas vias e na presença de duas testemunhas.
 
@@ -109,3 +108,5 @@ ________________________________________________________________
 ________________________________________________________________
 **Testemunha 2:** [NOME_TESTEMUNHA_2]
 [CPF_TESTEMUNHA_2]
+
+[TEXTO_COMPLEMENTAR]

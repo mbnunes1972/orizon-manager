@@ -214,6 +214,11 @@ def _html_corpo(md_texto):
             # linha de assinatura (traço para assinar): espaço acima via CSS
             linhas.append(f'<p class="assinatura">{t}</p>')
             continue
+        if "[TEXTO_COMPLEMENTAR]" in t:
+            # adendo (texto livre): ao final do contrato, após as assinaturas,
+            # em itálico para destaque; a substituição do marcador vem depois.
+            linhas.append(f'<p class="adendo">{t}</p>')
+            continue
         alinea = _RE_ALINEA.match(t)
         nivel = _nivel_clausula(t)
         if alinea or nivel is not None:
@@ -723,7 +728,11 @@ def _montar_html_contrato(ctx):
     capa = _html_capa(ctx)
     corpo = _html_corpo(_carregar_md())
     html = shell.replace("<!--CAPA-->", capa).replace("<!--CORPO-->", corpo)
-    return _substituir_marcadores_html(html, mapping)
+    html = _substituir_marcadores_html(html, mapping)
+    # sem adendo: remove o parágrafo vazio (evita traço/espaço solto no fim)
+    if not mapping.get("TEXTO_COMPLEMENTAR"):
+        html = html.replace('<p class="adendo"></p>', "")
+    return html
 
 
 def construir_contexto(cliente: dict, usuario: dict, forma_pagamento_json: str, loja: dict = None) -> dict:

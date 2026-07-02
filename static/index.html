@@ -8452,7 +8452,7 @@ function renderContratoUI(contrato) {
   const temPdf      = temArquivo && arquivoTipo === "pdf";
   const temDocx     = temArquivo && arquivoTipo === "docx";
   const status      = contrato.status;
-  const pdfUrl      = `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato/pdf`;
+  const pdfUrl      = `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato/pdf?v=${Date.now()}`;
   const jaAssinou = (contrato.assinaturas || []).length > 0;
 
   ui.innerHTML = `

@@ -67,6 +67,23 @@ def test_parametros_default_tem_10_chaves_estruturais():
     assert PARAMETROS_DEFAULT["carga_trib"] == 8.0
 
 
+def test_parametros_default_loja_inclui_custos_por_padrao():
+    # Padrão inicial de um projeto novo: o toggle "incluir custos adicionais" nasce ON.
+    from mod_orcamento_params import parametros_default_loja
+    out = parametros_default_loja({})
+    assert out["incluir_custos"] is True
+
+
+def test_parametros_default_loja_herda_pcts_e_mantem_incluir_custos():
+    from mod_orcamento_params import parametros_default_loja
+    out = parametros_default_loja(
+        {"defaults_negociacao": {"comissao_arq_pct": 6, "fidelidade_pct": 2, "carga_trib_pct": 9}})
+    assert out["comissao_arq_pct"] == 6.0
+    assert out["fidelidade_pct"] == 2.0
+    assert out["carga_trib"] == 9.0
+    assert out["incluir_custos"] is True
+
+
 def test_merge_parametros_coage_e_preserva():
     from mod_orcamento_params import merge_parametros, PARAMETROS_DEFAULT
     atual = dict(PARAMETROS_DEFAULT, comissao_arq_pct=10.0)

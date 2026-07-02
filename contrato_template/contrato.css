@@ -47,3 +47,14 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 8.5pt; color: #
 .contrato-corpo p.fecho { margin-top: 22px; }
 .contrato-corpo p.data-fecho { margin-top: 30px; text-align: left; }
 .contrato-corpo p.assinatura { margin-top: 44px; margin-bottom: 5px; text-align: left; }
+/* adendo/observação livre ao final do contrato, após as assinaturas: em itálico
+   para destaque; não pode ser empurrado sozinho para uma página nova. */
+.contrato-corpo p.adendo {
+  font-style: italic;
+  margin-top: 22px;
+  padding-top: 8px;
+  border-top: 1px solid #ccc;
+  text-align: justify;
+  break-before: avoid;
+  break-inside: avoid;
+}
