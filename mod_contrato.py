@@ -1,8 +1,12 @@
 """
-mod_contrato.py — Geração de contrato a partir de modelo_contrato_final.docx
+mod_contrato.py — Geração de contrato via template HTML/Markdown, renderizado em
+PDF com WeasyPrint.
 
-Usa python-docx para preencher capa e assinatura diretamente no modelo original,
-sem necessidade de template pré-processado. LibreOffice converte para PDF.
+Ainda expõe um pequeno motor de substituição de marcadores em .docx
+(_substituir_marcadores/_subst_paragrafo) e a conversão via LibreOffice
+(_converter_pdf/_libreoffice_cmd/LibreOfficeIndisponivel) — não usados mais pelo
+contrato, mas reaproveitados por mod_proposta.py (Proposta comercial, ainda em
+.docx). Não remover sem migrar a Proposta primeiro.
 """
 
 import os
@@ -11,13 +15,10 @@ import platform
 import subprocess
 import hashlib
 from datetime import datetime
-from docx import Document
 
 _THIS_DIR            = os.path.dirname(os.path.abspath(__file__))
 CONTRATOS_DIR        = os.path.join(_THIS_DIR, "CONTRATOS")
 CONTRATO_TEMPLATE_DIR = os.path.join(_THIS_DIR, "contrato_template")
-
-_MODELO = os.path.join(_THIS_DIR, "modelo_contrato_mapeado.docx")
 
 _TRACO = "--------"  # preenche slots de parcela inexistentes
 
@@ -229,6 +230,8 @@ def _substituir_marcadores_html(html, mapping):
     return _MARK_RE.sub(repl, html)
 
 
+# ── Motor de substituição de marcadores em .docx (legado — usado por mod_proposta) ──
+
 def _subst_paragrafo(par, mapping, coletor=None):
     """Reconstrói o parágrafo em segmentos (texto fixo × valor substituído),
     preservando a formatação (``rPr``) de CADA run original.
@@ -333,187 +336,6 @@ def _substituir_marcadores(doc, mapping, coletor=None):
             for txbx in hdr._element.findall(f'.//{{{_W}}}txbxContent'):
                 for p_el in txbx.findall(f'{{{_W}}}p'):
                     _subst_paragrafo(_Paragraph(p_el, None), mapping)
-
-
-def _unique_cells(row):
-    """Retorna apenas células únicas de uma linha (deduplica células mescladas)."""
-    seen, cells = set(), []
-    for c in row.cells:
-        tc = c._tc
-        if id(tc) not in seen:
-            seen.add(id(tc))
-            cells.append(c)
-    return cells
-
-
-def _set_cell_text(cell, txt, coletor=None):
-    """Escreve txt no 1º parágrafo da célula, preservando o estilo; zera runs extras.
-
-    Quando ``coletor`` é fornecido e ``txt`` é um valor real (não vazio, não _TRACO),
-    o run preenchido é anexado a ele para virar região editável.
-    """
-    par = cell.paragraphs[0]
-    if par.runs:
-        par.runs[0].text = txt
-        for r in par.runs[1:]:
-            r.text = ""
-    else:
-        par.text = txt
-    for extra in cell.paragraphs[1:]:
-        for r in extra.runs:
-            r.text = ""
-    if coletor is not None and txt and txt != _TRACO and par.runs:
-        coletor.append(par.runs[0])
-
-
-def _localizar_tabela(doc, titulo_substr):
-    """1ª tabela cujo texto da 1ª linha contém titulo_substr (case-insensitive)."""
-    alvo = titulo_substr.lower()
-    for t in doc.tables:
-        cab = " ".join(c.text for c in t.rows[0].cells).lower()
-        if alvo in cab:
-            return t
-    return None
-
-
-def _preencher_grade(doc, pag, coletor=None):
-    """Preenche a grade de parcelas (linhas 3-10 da tabela de pagamento) por posição.
-
-    Cada linha tem 6 células ÚNICAS no padrão (valor, data) × 3, embora a célula
-    de data do meio seja mesclada e apareça duplicada em ``row.cells``. Usamos
-    ``_unique_cells`` para indexar os pares (0,1), (2,3), (4,5) corretamente.
-
-    Regras:
-      - linha SEM nenhuma parcela (todos os 3 slots > num) é ELIMINADA da tabela.
-      - parcela p (1-based) válida (p <= num e valores[p-1] não vazio):
-        valor na célula de valor; data (ou _TRACO se vazia) na célula de data.
-      - slot vazio dentro de uma linha usada: _TRACO em ambas as células.
-      - cartão: cada parcela p <= num → valor[p-1] na célula de valor e data = "" (sem
-        data); slots vazios → _TRACO em ambas as células.
-    """
-    tipo    = pag.get("tipo", "")
-    num     = pag.get("num_parcelas_int", 0)
-    valores = pag.get("valores", [""] * 24)
-    datas   = pag.get("datas",   [""] * 24)
-    t3 = _localizar_tabela(doc, "forma de pagamento")
-    if t3 is None:
-        return
-    remover = []
-    for gi, row_idx in enumerate(range(3, 11)):
-        row = t3.rows[row_idx]
-        if gi * 3 + 1 > num:            # 1º slot da linha já passa de num → sem parcela
-            remover.append(row)
-            continue
-        cells = _unique_cells(row)
-        for j, (vcol, dcol) in enumerate([(0, 1), (2, 3), (4, 5)]):
-            if dcol >= len(cells):
-                break
-            p = gi * 3 + j + 1
-            if tipo == "cartao":
-                if p <= num and valores[p-1]:
-                    _set_cell_text(cells[vcol], valores[p-1], coletor)
-                    _set_cell_text(cells[dcol], "", coletor)   # cartão: parcela sem data
-                else:
-                    _set_cell_text(cells[vcol], _TRACO, coletor)
-                    _set_cell_text(cells[dcol], _TRACO, coletor)
-            elif p <= num and valores[p-1]:
-                _set_cell_text(cells[vcol], valores[p-1], coletor)
-                _set_cell_text(cells[dcol], datas[p-1] or _TRACO, coletor)
-            else:
-                _set_cell_text(cells[vcol], _TRACO, coletor)
-                _set_cell_text(cells[dcol], _TRACO, coletor)
-    for row in remover:                # elimina linhas sem parcela
-        row._tr.getparent().remove(row._tr)
-
-
-def _preencher_ambientes(doc, itens_valores, coletor=None):
-    """Preenche a tabela 'Ambientes do Projeto' do modelo (2 ambientes por linha).
-
-    A tabela já existe no template com uma linha-modelo cujas células têm rótulo
-    ("Ambiente"/"Valor") + marcador ([NOME_AMBIENTE_1]/[VALOR_AMBIENTE_1]/…) e uma
-    linha de total (VALOR DO CONTRATO | [TOTAL_CONTRATO], preenchida à parte por
-    _substituir_marcadores). O preenchimento troca APENAS o marcador (via
-    _subst_paragrafo), preservando o rótulo e a formatação de cada run.
-
-    Cada linha comporta 2 ambientes; a linha-modelo é clonada inteira quantas vezes
-    forem necessárias — sempre linhas completas: num ímpar preenche a 2ª metade da
-    última linha com traços (mesmo padrão da grade de parcelas). As células de valor
-    entram no coletor de regiões editáveis.
-
-    itens_valores: [(nome, valor_float), ...] (já calculado por
-    ambientes_valor_contrato). Lista vazia → marcadores viram traços
-    (nenhum marcador cru vaza para o contrato).
-    """
-    import copy
-    from docx.table import _Row
-    tbl = _localizar_tabela(doc, "ambientes do projeto")
-    if tbl is None:
-        return
-    # linha-modelo = a que contém os marcadores de ambiente
-    modelo = next((r for r in tbl.rows
-                   if "NOME_AMBIENTE" in " ".join(c.text for c in r.cells).upper()),
-                  None)
-    if modelo is None:
-        return
-
-    n = len(itens_valores)
-    n_linhas = max(1, (n + 1) // 2)  # 2 ambientes por linha; ao menos 1 (limpa marcadores)
-
-    # clona a linha-modelo inteira para as linhas de dados extras
-    linhas = [modelo]
-    ref_tr = modelo._tr
-    for _ in range(n_linhas - 1):
-        novo_tr = copy.deepcopy(modelo._tr)
-        ref_tr.addnext(novo_tr)
-        linhas.append(_Row(novo_tr, tbl))
-        ref_tr = novo_tr
-
-    _CHAVES = ("NOME_AMBIENTE_1", "NOME_AMBIENTE_2",
-               "VALOR_AMBIENTE_1", "VALOR_AMBIENTE_2")
-
-    def _fill(cell, texto, editavel):
-        # substitui o marcador da célula por `texto`, preservando rótulo e estilo.
-        # (cada célula contém só um marcador, então mapear todas as chaves é seguro.)
-        mp = {k: texto for k in _CHAVES}
-        for par in cell.paragraphs:
-            _subst_paragrafo(par, mp, coletor if editavel else None)
-
-    for k, row in enumerate(linhas):
-        cels = _unique_cells(row)
-        for slot, (cn, cv) in enumerate([(0, 1), (2, 3)]):
-            idx = 2 * k + slot
-            if idx < n:
-                nome, val = itens_valores[idx]
-                _fill(cels[cn], nome, False)                    # nome não editável
-                _fill(cels[cv], _formatar_valor(val), True)     # valor editável
-            else:  # sobra de linha ímpar → traços (não editáveis)
-                _fill(cels[cn], _TRACO, False)
-                _fill(cels[cv], _TRACO, False)
-
-
-# ── Proteção: regiões editáveis + documento read-only ─────────────────────────
-
-def _proteger_editaveis(doc, runs):
-    """Envolve cada run de ``runs`` em <w:permStart>/<w:permEnd> (edGrp=everyone)
-    e marca o documento como read-only via <w:documentProtection>.
-
-    Resultado: o documento inteiro fica protegido, exceto os valores preenchidos.
-    """
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-    for i, run in enumerate(runs, start=1):
-        ps = OxmlElement('w:permStart')
-        ps.set(qn('w:id'), str(i))
-        ps.set(qn('w:edGrp'), 'everyone')
-        pe = OxmlElement('w:permEnd')
-        pe.set(qn('w:id'), str(i))
-        r = run._r
-        r.addprevious(ps)
-        r.addnext(pe)
-    prot = OxmlElement('w:documentProtection')
-    prot.set(qn('w:edit'), 'readOnly')
-    prot.set(qn('w:enforcement'), '1')
-    doc.settings.element.append(prot)
 
 
 # ── Parser de pagamento ───────────────────────────────────────────────────────
@@ -714,12 +536,12 @@ def validar_loja_para_contrato(loja: dict) -> list:
 # ── Preenchimento dinâmico do modelo ─────────────────────────────────────────
 
 def _montar_mapping(ctx, pag):
-    """Monta o dicionário {MARCADOR: valor} para _substituir_marcadores().
+    """Monta o dicionário {MARCADOR: valor} para _substituir_marcadores_html().
 
-    Chaves em MAIÚSCULAS sem colchetes, casando com os marcadores do modelo
-    modelo_contrato_mapeado.docx. A grade de parcelas é preenchida à parte por
-    _preencher_grade(); aqui só entram os campos de cabeçalho/identificação.
-    Os dados da loja vêm de ctx['loja'] (F3).
+    Chaves em MAIÚSCULAS sem colchetes, casando com os marcadores do template
+    HTML do contrato. A grade de parcelas e os ambientes são montados à parte
+    (_html_parcelas_linhas/_html_ambientes_linhas); aqui só entram os campos de
+    cabeçalho/identificação. Os dados da loja vêm de ctx['loja'] (F3).
     """
     loja = ctx.get("loja") or {}
     t1n = loja.get("testemunha1_nome", "") or ""
@@ -881,39 +703,6 @@ def _montar_html_contrato(ctx):
     return _substituir_marcadores_html(html, mapping)
 
 
-def preencher_contrato(contrato_id: int, ctx: dict, protegido: bool = True) -> str:
-    """
-    Preenche modelo_contrato_mapeado.docx com os dados de ctx e salva
-    como CONTRATOS/contrato_<id>.docx. Retorna o caminho do .docx.
-
-    Geração 100% por marcadores: a grade de parcelas é preenchida por posição
-    (_preencher_grade) e todos os demais campos via substituição de [MARCADOR]
-    (_substituir_marcadores).
-
-    Quando ``protegido`` (padrão), o documento é gerado read-only com cada valor
-    preenchido isolado em uma região editável (permStart/permEnd). O cabeçalho
-    (número + data, gerados pelo sistema) NÃO é editável.
-    """
-    if not os.path.exists(_MODELO):
-        raise FileNotFoundError(
-            f"Modelo de contrato não encontrado: {_MODELO}\n"
-            "Adicione 'modelo_contrato_mapeado.docx' na raiz do projeto."
-        )
-    os.makedirs(CONTRATOS_DIR, exist_ok=True)
-
-    doc = Document(_MODELO)
-    pag = ctx.get("_pag", {})
-    coletor = [] if protegido else None
-    _preencher_grade(doc, pag, coletor=coletor)
-    _preencher_ambientes(doc, ctx.get("_ambientes") or [], coletor=coletor)
-    _substituir_marcadores(doc, _montar_mapping(ctx, pag), coletor=coletor)
-    if protegido:
-        _proteger_editaveis(doc, coletor)
-    docx_path = os.path.join(CONTRATOS_DIR, f"contrato_{contrato_id}.docx")
-    doc.save(docx_path)
-    return docx_path
-
-
 def construir_contexto(cliente: dict, usuario: dict, forma_pagamento_json: str, loja: dict = None) -> dict:
     """Monta o dicionário completo para preencher o contrato.
 
@@ -973,7 +762,7 @@ def construir_contexto(cliente: dict, usuario: dict, forma_pagamento_json: str, 
         "pgto_num_parcelas":   pag["num_parcelas"],
         "pgto_data_primeira":  pag["data_primeira"],
         "data_contrato":       datetime.now().strftime("%d/%m/%Y"),
-        "_pag":                pag,   # dict normalizado para preencher_contrato()
+        "_pag":                pag,   # dict normalizado para gerar_pdf_contrato()
         "loja":                loja,
     }
     # Grade de datas p01..p24
@@ -982,7 +771,18 @@ def construir_contexto(cliente: dict, usuario: dict, forma_pagamento_json: str, 
     return ctx
 
 
-# ── LibreOffice ───────────────────────────────────────────────────────────────
+def gerar_pdf_contrato(contrato_id: int, ctx: dict, destino: str = None) -> str:
+    """Renderiza o contrato (HTML -> PDF) via WeasyPrint. Retorna o caminho do PDF."""
+    from weasyprint import HTML
+    destino = destino or CONTRATOS_DIR
+    os.makedirs(destino, exist_ok=True)
+    html = _montar_html_contrato(ctx)
+    pdf_path = os.path.join(destino, f"contrato_{contrato_id}.pdf")
+    HTML(string=html, base_url=CONTRATO_TEMPLATE_DIR).write_pdf(pdf_path)
+    return pdf_path
+
+
+# ── LibreOffice (legado — usado por mod_proposta para converter proposta.docx) ─
 
 class LibreOfficeIndisponivel(Exception):
     def __init__(self, docx_path: str):
@@ -1026,42 +826,3 @@ def _converter_pdf(docx_path: str, outdir: str = None) -> str:
 
     base = os.path.splitext(os.path.basename(docx_path))[0]
     return os.path.join(destino, f"{base}.pdf")
-
-
-def gerar_pdf_contrato(contrato_id: int, ctx: dict, destino: str = None) -> str:
-    """Renderiza o contrato (HTML -> PDF) via WeasyPrint. Retorna o caminho do PDF."""
-    from weasyprint import HTML
-    destino = destino or CONTRATOS_DIR
-    os.makedirs(destino, exist_ok=True)
-    html = _montar_html_contrato(ctx)
-    pdf_path = os.path.join(destino, f"contrato_{contrato_id}.pdf")
-    HTML(string=html, base_url=CONTRATO_TEMPLATE_DIR).write_pdf(pdf_path)
-    return pdf_path
-
-
-# ── Legado — mantido para compatibilidade com chamadas antigas ────────────────
-
-def _formatar_bloco_pagamento(pagamento_json_str: str, forma_entrada_label: str = "Pix") -> str:
-    pag = _parse_pagamento(pagamento_json_str)
-    if not pag["nome_forma"]:
-        return ""
-    linhas = [f"Forma de Pagamento: {pag['nome_forma']}",
-              f"Entrada: {pag['entrada_valor']} — {pag['entrada_data']}",
-              f"Modalidade: {pag['modalidade']}  |  {pag['num_parcelas']} parcelas"]
-    return "\n".join(linhas)
-
-
-def montar_variaveis_contrato(projeto, cliente, orcamento, endereco_instalacao,
-                               entrada_valor, parcelas_descricao, adendo,
-                               forma_entrada="pix", forma_parcelas="boleto",
-                               pagamento_json="") -> dict:
-    """Legado — use construir_contexto() para novos contratos."""
-    return {
-        "cliente_nome": cliente.get("nome", ""),
-        "cliente_cpf":  cliente.get("cpf",  ""),
-        "consultor_nome": projeto.get("consultor", ""),
-        "data_contrato":  datetime.now().strftime("%d/%m/%Y"),
-        "tem_adendo": bool(adendo),
-        "adendo":     adendo or "",
-        "_pag": _parse_pagamento(pagamento_json),
-    }
