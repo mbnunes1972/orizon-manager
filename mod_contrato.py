@@ -202,6 +202,14 @@ def _html_corpo(md_texto):
             lvl = len(mh.group(1))
             linhas.append(f"<h{lvl}>{_inline_md(mh.group(2))}</h{lvl}>")
             continue
+        if t.startswith("E assim") and "firmam as PARTES" in t:
+            # parágrafo de fecho: espaço acima via CSS
+            linhas.append(f'<p class="fecho">{_inline_md(t)}</p>')
+            continue
+        if "[DATA_CONTRATO]" in t:
+            # local/data do fecho (área de assinaturas): espaço acima via CSS
+            linhas.append(f'<p class="data-fecho">{_inline_md(t)}</p>')
+            continue
         if _re2.match(r'^_{5,}$', t):
             # linha de assinatura (traço para assinar): espaço acima via CSS
             linhas.append(f'<p class="assinatura">{t}</p>')
@@ -681,7 +689,7 @@ def _html_capa(ctx):
     <td><span class="rotulo">Data</span><span class="valor">[DATA_ENTRADA]</span></td>
   </tr><tr>
     <td><span class="rotulo">Modalidade</span><span class="valor">[MODALIDADE]</span></td>
-    <td><span class="rotulo">Parcelas</span><span class="valor">[NUM_PARCELAS] / [TIPO]</span></td>
+    <td><span class="rotulo">Parcelas</span><span class="valor">[NUM_PARCELAS]</span></td>
     <td><span class="rotulo">Valor do Contrato</span><span class="valor">[TOTAL_CONTRATO]</span></td>
   </tr></table>
   <table>{parc}</table>

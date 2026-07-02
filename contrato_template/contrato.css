@@ -37,11 +37,13 @@ body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 8.5pt; color: #
   margin: 9pt 0 4pt; }
 /* espaçamento padronizado: mesmo respiro entre todos os parágrafos do corpo */
 .contrato-corpo p { margin: 0 0 4pt; text-align: justify; }
-/* recuo/hanging por nível — degraus regulares (0,7cm por nível) */
-.cl-1 { padding-left: 1.1cm; text-indent: -1.1cm; }
-.cl-2 { padding-left: 1.8cm; text-indent: -1.1cm; }
-.cl-3 { padding-left: 2.5cm; text-indent: -1.1cm; }
-.cl-alinea { padding-left: 1.8cm; text-indent: -0.7cm; }
+/* recuo por nível em BLOCO (sem hanging): a 2ª linha alinha com a numeração */
+.cl-1 { padding-left: 0.6cm; text-indent: 0; }
+.cl-2 { padding-left: 1.2cm; text-indent: 0; }
+.cl-3 { padding-left: 1.8cm; text-indent: 0; }
+.cl-alinea { padding-left: 1.2cm; text-indent: 0; }
 
 /* ---- Fecho / assinaturas ---- */
-.contrato-corpo p.assinatura { margin-top: 44px; margin-bottom: 0; text-align: left; }
+.contrato-corpo p.fecho { margin-top: 22px; }
+.contrato-corpo p.data-fecho { margin-top: 30px; text-align: left; }
+.contrato-corpo p.assinatura { margin-top: 44px; margin-bottom: 5px; text-align: left; }

@@ -1,10 +1,6 @@
 CONTRATO DE COMPRA E VENDA DE PRODUTOS E DE PRESTAÇÃO DE SERVIÇOS
 
-Pelo presente instrumento particular, de um lado,
-O CONTRATANTE, já qualificado na capa deste instrumento, doravante denominado CLIENTE, e, de outro lado, INSPIRIUM MÓVEIS PLANEJADOS E DECORAÇÃO LTDA, sociedade por quotas de responsabilidade limitada com sede a Avenida Barão do Rio Branco, 736 – Jardim Esplanada – São José dos Campos – SP – CEP: 12.242-800, inscrita no CNPJ/MF sob o n. 19.152.134/0001-56, doravante denominada CONTRATADA,
-Sendo Contratante e Contratada denominadas, quando mencionadas individualmente, como “PARTE”, e, quando mencionadas em conjunto, denominadas “PARTES”;
-CONSIDERANDO QUE a CONTRATADA é cessionária exclusiva da marca DALMÓBILE, empresa referência nacional na indústria moveleira, sediada em Bento Gonçalves, no Rio Grande do Sul, e com mais de 45 anos de existência;
-CONSIDERANDO QUE o CLIENTE reconhece expressamente que lhe foi exposto o sistema de venda, montagem e instalação dos móveis descritos na capa deste Contrato, estando ciente das variações possíveis decorrentes dos diferentes lotes de material e das necessárias alterações do projeto, eventualmente decorrentes de peculiaridades das dependências do local indicado para entrega, instalação e montagem dos referidos móveis, tem justa e acordada a celebração do presente CONTRATO DE COMPRA E VENDA DE PRODUTOS E PRESTAÇÃO DE SERVIÇOS, regido pelos termos e condições sumarizados na capa deste instrumento e pormenorizados a seguir:
+Pelo presente instrumento particular, de um lado, O CONTRATANTE, já qualificado na capa deste instrumento, doravante denominado CLIENTE, e, de outro lado, INSPIRIUM MÓVEIS PLANEJADOS E DECORAÇÃO LTDA, sociedade por quotas de responsabilidade limitada com sede a Avenida Barão do Rio Branco, 736 – Jardim Esplanada – São José dos Campos – SP – CEP: 12.242-800, inscrita no CNPJ/MF sob o n. 19.152.134/0001-56, doravante denominada CONTRATADA, Sendo Contratante e Contratada denominadas, quando mencionadas individualmente, como “PARTE”, e, quando mencionadas em conjunto, denominadas “PARTES”; CONSIDERANDO QUE a CONTRATADA é cessionária exclusiva da marca DALMÓBILE, empresa referência nacional na indústria moveleira, sediada em Bento Gonçalves, no Rio Grande do Sul, e com mais de 45 anos de existência; CONSIDERANDO QUE o CLIENTE reconhece expressamente que lhe foi exposto o sistema de venda, montagem e instalação dos móveis descritos na capa deste Contrato, estando ciente das variações possíveis decorrentes dos diferentes lotes de material e das necessárias alterações do projeto, eventualmente decorrentes de peculiaridades das dependências do local indicado para entrega, instalação e montagem dos referidos móveis, tem justa e acordada a celebração do presente CONTRATO DE COMPRA E VENDA DE PRODUTOS E PRESTAÇÃO DE SERVIÇOS, regido pelos termos e condições sumarizados na capa deste instrumento e pormenorizados a seguir:
 
 # CLÁUSULA PRIMEIRA – DO OBJETO E PREÇO
 1.1. A CONTRATADA se obriga a fornecer, com entrega no local e data indicados na capa deste instrumento, o material necessário à instalação e montagem dos móveis descritos na mesma capa deste Contrato. Cuja concepção gráfica está demonstrada no esboço de projeto contido nas imagens transmitidas via eletrônica para o CLIENTE no prazo de 48 (quarenta e oito), contados da assinatura deste instrumento, desde que devidamente aprovadas por este último mediante resposta, também via eletrônica e no prazo de 24 (vinte e quatro) horas, para a CONTRATADA.
@@ -96,36 +92,20 @@ c) ocorrência de focos de umidade ou constante e excessiva exposição ao sol o
 
 E assim, por estarem assim convencionados, firmam as PARTES o presente instrumento em duas vias e na presença de duas testemunhas.
 
-
 São José dos Campos - SP, [DATA_CONTRATO].
 
-
-
-
-
-
-
 ________________________________________________________________
-[NOME_EMPRESA]
+**Contratada:** [NOME_EMPRESA]
 [CNPJ_EMPRESA]
 
-
-
-
 ________________________________________________________________
-[NOME_CLIENTE]
+**Contratante:** [NOME_CLIENTE]
 [CPF_CLIENTE]
 
-
-
-
 ________________________________________________________________
-[NOME_TESTEMUNHA_1]
+**Testemunha 1:** [NOME_TESTEMUNHA_1]
 [CPF_TESTEMUNHA_1]
 
-
-
-
 ________________________________________________________________
-[NOME_TESTEMUNHA_2]
+**Testemunha 2:** [NOME_TESTEMUNHA_2]
 [CPF_TESTEMUNHA_2]
