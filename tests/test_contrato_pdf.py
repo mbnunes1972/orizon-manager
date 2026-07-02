@@ -135,3 +135,27 @@ def test_gerar_pdf_contrato_gera_pdf(tmp_path):
     assert path.endswith(".pdf") and os.path.getsize(path) > 1000
     with open(path, "rb") as f:
         assert f.read(5) == b"%PDF-"
+
+
+# ── Refinamentos de capa/corpo (Task 8) ──────────────────────────────────────
+
+def test_html_corpo_linha_assinatura_ganha_classe():
+    from mod_contrato import _html_corpo
+    h = _html_corpo("________________________\n[NOME_EMPRESA]\n")
+    assert 'class="assinatura"' in h
+
+
+def test_mapping_rede_identificador_fallback_cidade():
+    from mod_contrato import _montar_mapping
+    m = _montar_mapping({"loja": {"cidade": "São José dos Campos"}}, {})
+    assert m["REDE_IDENTIFICADOR"] == "São José dos Campos"
+    m2 = _montar_mapping({"loja": {"cidade": "X"}, "rede_identificador": "Rede Y"}, {})
+    assert m2["REDE_IDENTIFICADOR"] == "Rede Y"
+
+
+def test_html_capa_inclui_consultor_e_rede_e_num_dir():
+    from mod_contrato import _html_capa
+    h = _html_capa({"_ambientes": [], "_pag": {}})
+    assert "Consultor:" in h and "[CONSULTOR_NOME]" in h
+    assert "cab-rede" in h and "[REDE_IDENTIFICADOR]" in h
+    assert 'class="cab-dir"' in h and "[NUM_CONTRATO]" in h

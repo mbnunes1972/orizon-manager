@@ -197,6 +197,10 @@ def _html_corpo(md_texto):
             lvl = len(mh.group(1))
             linhas.append(f"<h{lvl}>{_inline_md(mh.group(2))}</h{lvl}>")
             continue
+        if _re2.match(r'^_{5,}$', t):
+            # linha de assinatura (traço para assinar): espaço acima via CSS
+            linhas.append(f'<p class="assinatura">{t}</p>')
+            continue
         nivel = _nivel_clausula(t)
         if nivel is not None:
             mnum = _RE_NUM.match(t) or _RE_ALINEA.match(t)
@@ -752,6 +756,9 @@ def _montar_mapping(ctx, pag):
         "TOTAL_CONTRATO":   pag.get("valor_contrato", "") or "",
         "CONSULTOR_NOME":     ctx.get("consultor_nome", "") or "",
         "CONSULTOR_TELEFONE": ctx.get("consultor_tel", "") or "",
+        # Identificador da rede sob o logo (parâmetro de config do contrato;
+        # fallback p/ a cidade da loja enquanto o campo de config não é definido)
+        "REDE_IDENTIFICADOR": ctx.get("rede_identificador", "") or loja.get("cidade", "") or "",
         "TESTEMUNHA_1_NOME": t1n,
         "TESTEMUNHA_1_DOC":  t1c,
         "TESTEMUNHA_2_NOME": t2n,
@@ -778,9 +785,14 @@ def _html_capa(ctx):
     parc = _html_parcelas_linhas(ctx.get("_pag") or {})
     return f"""
 <div id="cabecalho">
-  <img class="logo" src="logo_dalmobile.png">
-  <span class="num">[NUM_CONTRATO]<br>[DATA_CONTRATO]</span>
+  <div class="cab-esq">
+    <img class="logo" src="logo_dalmobile.png">
+    <div class="cab-rede">[REDE_IDENTIFICADOR]</div>
+  </div>
+  <div class="cab-dir">[NUM_CONTRATO]<br>[DATA_CONTRATO]</div>
 </div>
+
+<div class="consultor">Consultor: [CONSULTOR_NOME] &nbsp;&nbsp;&nbsp; Telefone: [CONSULTOR_TELEFONE]</div>
 
 <div class="secao">
   <div class="titulo">1. Identificação do Cliente</div>
