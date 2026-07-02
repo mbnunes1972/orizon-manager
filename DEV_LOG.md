@@ -1006,9 +1006,28 @@ Branch `feat/contrato-html-pdf` **removida** após o merge.
 **Pendências (mantidas):** fonte de config do `[REDE_IDENTIFICADOR]` (hoje = cidade da loja);
 revisão jurídica final do `contrato.md` (cláusula 3.6 ausente na origem, mantida).
 
+## Sessão 41 — Cadastro de parceiro por usuário de loja (branch `fix/parceiro-vinculo-loja-automatico`)
+
+Bug pego em teste de produção: **consultor/gerente não conseguiam cadastrar parceiro**. O form
+montava a lista de lojas via `/api/admin/lojas` (restrito a `gerir_lojas`/`editar_dados_loja`), então
+usuários de loja recebiam lista vazia e a validação *"Selecione ao menos uma loja"* barrava tudo.
+
+- **Backend** (`main.py`): `_aplicar_abrangencia_parceiro` vincula automaticamente à **loja ATIVA do
+  ator** quando `abrangencia='loja'` e nenhuma loja é enviada; `POST /api/parceiros` **sempre** aplica
+  abrangência (default `loja`) → parceiro nunca nasce órfão/invisível.
+- **`/api/auth/me`** (`auth_routes.py`): passa a informar `rede_id`/`rede_nome` de cada loja, para o
+  front decidir se oferece a abrangência de rede.
+- **Frontend** (`static/index.html`, `parCarregarOpcoesTenant`): usuário com loja operacional vê o
+  vínculo automático à sua loja e a opção **"Toda a rede — <nome>"** apenas se a loja pertence a uma
+  rede; admin multi-loja (super_admin/admin_rede) mantém o seletor de lojas/redes.
+- **Permissão inalterada:** qualquer usuário logado da loja pode cadastrar parceiro (decisão do
+  usuário) — só fica restrito à própria loja/rede.
+- **Testes:** `tests/test_parceiro_vinculo_loja.py` (5 E2E com consultor); seed ganhou um `consultor`
+  e o `rede_id`. Suíte **384 passed**. Mergeada na `main` (ff, `d9e6f6e`); branch removida.
+
 ## ⏸️ ESTADO ATUAL (2026-07-02) — retomar aqui
 
-**`main`** consolidada e verde — **suíte 379 passed**. Servidor: `python3 main.py` (porta 8765).
+**`main`** consolidada e verde — **suíte 384 passed**. Servidor: `python3 main.py` (porta 8765).
 Branches: só `main` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
 Contrato agora é **HTML/Markdown → PDF (WeasyPrint)** — o caminho `.docx`/LibreOffice do contrato
 foi aposentado (a **proposta** ainda usa docx/LibreOffice).
