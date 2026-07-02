@@ -347,7 +347,7 @@ body{overflow:hidden}
 }
 .badge-pendente        { background: #2a2a1a; color: var(--warn, #c8a84b); }
 .badge-em_andamento    { background: #1a2a2a; color: var(--section, #4b8bc8); }
-.badge-para_assinatura { background: #1a2010; color: #80e090; border:1px solid #4caf82; }
+.badge-para_assinatura { background: #1a2010; color: #80e090; }
 .badge-assinado,
 .badge-vigente,
 .badge-concluido,
@@ -8252,6 +8252,34 @@ async function reabrirEtapaCascata(login, senha) {
   } catch (e) { showToast('Erro de rede: ' + e.message, true); }
 }
 
+// Revisar contrato: com senha gerencial, devolve o contrato à fase de Orçamento
+// (reabre a etapa 4 em cascata). O backend bloqueia se as DUAS assinaturas já
+// ocorreram (contrato assinado/vigente).
+async function revisarContrato() {
+  if (!projetoAtivo) return;
+  const ok = await confirmarPopup(
+    'Revisar o contrato o devolve à fase de ORÇAMENTO e reabre todas as etapas seguintes ' +
+    '(voltam a pendente). Só é possível enquanto o contrato não tiver as duas assinaturas.\n' +
+    'Esta ação exige autorização de GERENTE e será registrada.\n\nDeseja continuar?',
+    {titulo:'Revisar contrato', okLabel:'Continuar', cancelLabel:'Cancelar', perigo:true});
+  if (!ok) return;
+  const cred = await pedirCredenciaisGerente({
+    titulo:'Revisar contrato',
+    mensagem:'Login e senha de gerente/diretor para devolver o contrato à fase de Orçamento.'});
+  if (!cred) return;
+  try {
+    const r = await fetch(
+      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/4/reabrir`,
+      { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login: cred.login, senha: cred.senha }) });
+    const d = await r.json();
+    if (!d.ok) { mostrarErroModal(d.erro || 'Não foi possível revisar o contrato.'); return; }
+    showToast('Contrato devolvido à fase de Orçamento.');
+    await carregarCiclo();
+  } catch (e) { showToast('Erro de rede: ' + e.message, true); }
+}
+
 function _renderCardContrato() {
   return `<div id="contrato-ui">
     <p style="color:var(--muted);font-size:.85rem;margin-bottom:12px">Carregando...</p>
@@ -8446,7 +8474,7 @@ function renderContratoUI(contrato) {
           &#x2B07; ${temDocx ? 'Baixar .docx' : 'Abrir PDF'}
         </a>` : ''}
       ${!['assinado','vigente'].includes(status) ? `
-        <button onclick="fecharCiclo();abrirAprovacaoComDados()" class="btn-ciclo" style="font-size:.82rem">
+        <button onclick="revisarContrato()" class="btn-ciclo" style="font-size:.82rem">
           Revisar
         </button>` : ''}
     </div>
@@ -8462,13 +8490,9 @@ function renderContratoUI(contrato) {
 
     ${temPdf ? `
       <div style="margin-bottom:16px">
-        <p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">
+        <p style="color:var(--muted);font-size:.82rem;margin:0">
           Leia o contrato antes de assinar.
         </p>
-        <a href="${pdfUrl}" target="_blank" rel="noopener" class="btn-ciclo"
-           style="text-decoration:none;display:inline-flex;align-items:center;gap:8px;font-size:.9rem;padding:10px 18px">
-          &#x1F4C4; Abrir contrato em tela cheia (PDF)
-        </a>
       </div>` : ''}
 
     ${['assinado','vigente'].includes(status)
@@ -9104,7 +9128,7 @@ function abrirModalAdendo() {
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
             <button onclick="document.getElementById('modal-adendo-overlay').remove()"
               class="btn-ciclo" style="border-color:var(--muted);color:var(--muted)">Cancelar</button>
-            <button onclick="salvarAdendo()" class="btn-ciclo">Salvar e Regenerar PDF</button>
+            <button onclick="salvarAdendo()" class="btn-ciclo">Inserir</button>
           </div>
         </div>
       `;
