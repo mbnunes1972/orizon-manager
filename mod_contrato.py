@@ -12,6 +12,7 @@ import subprocess
 import hashlib
 from datetime import datetime
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 _THIS_DIR     = os.path.dirname(os.path.abspath(__file__))
 CONTRATOS_DIR = os.path.join(_THIS_DIR, "CONTRATOS")
@@ -272,6 +273,46 @@ def _preencher_grade(doc, pag, coletor=None):
             else:
                 _set_cell_text(cells[vcol], _TRACO, coletor)
                 _set_cell_text(cells[dcol], _TRACO, coletor)
+
+
+def _preencher_ambientes(doc, itens_valores, coletor=None):
+    """Insere a seção '4. Ambientes' antes da tabela de Forma de Pagamento.
+
+    itens_valores: [(nome, valor_float), ...] (já calculado por
+    ambientes_valor_contrato). Adiciona uma linha 'Total' = soma e renumera
+    'Forma de Pagamento' para '5.'. Ambas as colunas justificadas à esquerda.
+    As células de valor (menos a do Total) entram no coletor de regiões editáveis.
+    Lista vazia → não faz nada.
+    """
+    if not itens_valores:
+        return
+    grade = _localizar_tabela(doc, "forma de pagamento")
+    if grade is None:
+        return
+    # Renumerar o título da seção de pagamento: '4.' -> '5.'
+    _set_cell_text(_unique_cells(grade.rows[0])[0], "5. Forma de Pagamento")
+
+    total = round(sum(v for _, v in itens_valores), 2)
+    linhas = list(itens_valores) + [("Total", total)]
+
+    tbl = doc.add_table(rows=0, cols=2)
+    tbl.style = grade.style
+    # título da seção, mesclado nas 2 colunas
+    titulo = tbl.add_row().cells
+    titulo[0].merge(titulo[1])
+    _set_cell_text(titulo[0], "4. Ambientes")
+    for nome, val in linhas:
+        cels = tbl.add_row().cells
+        _set_cell_text(cels[0], nome)
+        _set_cell_text(cels[1], _formatar_valor(val),
+                       coletor if nome != "Total" else None)
+        for c in cels:
+            c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+    # posiciona [tabela ambientes][parágrafo separador][grade]
+    sep = doc.add_paragraph()
+    grade._tbl.addprevious(tbl._tbl)
+    grade._tbl.addprevious(sep._p)
 
 
 # ── Proteção: regiões editáveis + documento read-only ─────────────────────────
@@ -578,6 +619,7 @@ def preencher_contrato(contrato_id: int, ctx: dict, protegido: bool = True) -> s
     pag = ctx.get("_pag", {})
     coletor = [] if protegido else None
     _preencher_grade(doc, pag, coletor=coletor)
+    _preencher_ambientes(doc, ctx.get("_ambientes") or [], coletor=coletor)
     _substituir_marcadores(doc, _montar_mapping(ctx, pag), coletor=coletor)
     if protegido:
         _proteger_editaveis(doc, coletor)

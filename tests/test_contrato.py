@@ -952,3 +952,47 @@ def test_localizar_tabela_forma_pagamento():
     assert t is not None
     cab = " ".join(c.text for c in t.rows[0].cells).lower()
     assert "forma de pagamento" in cab
+
+
+def test_contrato_com_secao_ambientes():
+    import os, json
+    from docx import Document
+    from mod_contrato import preencher_contrato, construir_contexto
+    loja = {"nome": "INSPIRIUM MOVEIS LTDA", "cnpj": "19.152.134/0001-56",
+            "testemunha1_nome": "Jaime", "testemunha1_cpf": "123.456.789-00",
+            "testemunha2_nome": "Felipe", "testemunha2_cpf": "987.654.321-00"}
+    ctx = construir_contexto(
+        cliente={"nome": "Ana", "cpf": "111.222.333-44", "email": "a@x.com",
+                 "telefone": "(12) 90000-0000", "logradouro": "Rua A", "numero": "10",
+                 "complemento": "", "bairro": "Centro", "cidade": "SJC", "cep": "12000-000",
+                 "estado": "SP", "inst_mesmo_residencial": True, "inst_logradouro": "",
+                 "inst_numero": "", "inst_complemento": "", "inst_bairro": "", "inst_cidade": "",
+                 "inst_cep": "", "inst_uf": ""},
+        usuario={"nome": "Consultor Z", "telefone": "(12) 91111-1111", "email": "z@x.com"},
+        forma_pagamento_json=json.dumps({
+            "tipo": "aymore", "nome_forma": "Financiamento Aymoré",
+            "entrada_valor": 20000, "entrada_data": "2026-06-18", "entrada_forma": "pix",
+            "total_cliente": 26445.67, "texto_cartao": "",
+            "parcelas": [{"num": i+1, "data": f"18/{7+i:02d}/2026", "valor": 4820.0} for i in range(3)]}),
+        loja=loja)
+    ctx["num_contrato"]  = "INS-2026-07-01-001"
+    ctx["data_contrato"] = "01/07/2026"
+    ctx["_ambientes"] = [("Cozinha", 12345.67), ("Dormitório", 8900.0), ("Home Theater", 5200.0)]
+    path = preencher_contrato(93001, ctx)
+    doc = Document(path)
+    # coleta texto de todas as tabelas
+    tbl_blob = ""
+    for t in doc.tables:
+        for row in t.rows:
+            for c in row.cells:
+                tbl_blob += "\n" + c.text
+    os.remove(path)
+    # seção de ambientes presente com nomes e valores
+    assert "4. Ambientes" in tbl_blob
+    assert "Cozinha" in tbl_blob and "Dormitório" in tbl_blob and "Home Theater" in tbl_blob
+    assert "R$ 12.345,67" in tbl_blob and "R$ 8.900,00" in tbl_blob and "R$ 5.200,00" in tbl_blob
+    # total = soma
+    assert "Total" in tbl_blob and "R$ 26.445,67" in tbl_blob
+    # Forma de pagamento renumerada e grade ainda preenchida
+    assert "5. Forma de Pagamento" in tbl_blob
+    assert "R$ 4.820,00" in tbl_blob
