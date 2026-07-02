@@ -41,7 +41,7 @@ from mod_omie import (
 from mod_margens import _normalizar_faixas
 from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada, calcular_total_flex
 from mod_contrato import (calcular_hash_assinatura, montar_variaveis_contrato,
-                          gerar_pdf_contrato, LibreOfficeIndisponivel,
+                          gerar_pdf_contrato,
                           construir_contexto, _formatar_valor)
 import mod_ciclo
 import mod_medicao
@@ -3555,13 +3555,8 @@ class Handler(BaseHTTPRequestHandler):
                     variaveis["num_contrato"] = contrato.num_contrato
                     db.commit()
                     aviso = None
-                    try:
-                        pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
-                        contrato.pdf_path = pdf_path
-                    except LibreOfficeIndisponivel as lo:
-                        # Salva o .docx e avança mesmo sem PDF
-                        contrato.pdf_path = lo.docx_path
-                        aviso = str(lo)
+                    pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
+                    contrato.pdf_path = pdf_path
                     contrato.status = "para_assinatura"
                     # Marcar etapa 5 (Revisão de projeto) como concluída — a aprovação
                     # conclui Revisão e Aprovação juntas.

@@ -3,11 +3,12 @@
 Percorre: login → negociação (motor + margem real) → Out_Forn → ciclo → contrato (Venda) →
 Provisões (Venda → Rev 1 Concorda → Rev 2 Revisa) → consistência/staleness → isolamento (IDOR).
 
-Limites do ambiente (documentados, não são lacunas do produto):
-- A geração do PDF de contrato (Etapa 7) usa LibreOffice (`soffice`), ausente no CI/WSL. A etapa
-  do contrato é exercida chamando o MESMO hook que o handler de geração usa após persistir o
-  contrato (`main._registrar_provisao_venda`) — o efeito relevante para este fluxo (gravar a
-  "Venda") é idêntico.
+Notas:
+- `test_fluxo_completo_inicio_ao_fim` exercita o efeito do contrato (gravar a "Venda" das
+  provisões) chamando diretamente o MESMO hook que o handler de geração usa após persistir o
+  contrato (`main._registrar_provisao_venda`), sem passar pela rota HTTP de contrato — mais
+  simples para este fluxo, que já é focado em negociação/provisões. A geração REAL via rota HTTP
+  (PDF direto, WeasyPrint, sem LibreOffice) é coberta por `test_contrato_real_geracao_e_assinatura`.
 - O upload de XML de ambiente é coberto por `test_qualidade_upload_e2e`; aqui o ambiente é montado
   direto no banco (PoolAmbiente), como nos demais e2e financeiros.
 """
@@ -18,7 +19,7 @@ import pytest
 
 @pytest.fixture
 def contratos_dir(tmp_path):
-    """Redireciona CONTRATOS_DIR para um temp (hermético) — a geração real escreve o .docx ali,
+    """Redireciona CONTRATOS_DIR para um temp (hermético) — a geração real escreve o .pdf ali,
     sem poluir a pasta CONTRATOS do repo. Restaura no teardown."""
     import mod_contrato
     orig = mod_contrato.CONTRATOS_DIR
@@ -96,8 +97,9 @@ def test_fluxo_completo_inicio_ao_fim(app_db, seed, projetos_dir, http_client_fa
     st, b = c.get("/api/projetos/%s/ciclo" % seed["projeto_l1"])
     assert st == 200
 
-    # 5) [Etapa 7 — Contrato] PDF usa LibreOffice (ausente). Exercita o MESMO hook que o handler
-    #    de geração chama após persistir o contrato: grava a "Venda" das provisões.
+    # 5) [Etapa 7 — Contrato] Exercita o MESMO hook que o handler de geração chama após
+    #    persistir o contrato: grava a "Venda" das provisões (a geração REAL da rota é
+    #    coberta por test_contrato_real_geracao_e_assinatura).
     import main
     db = app_db.get_session()
     try:
@@ -163,14 +165,27 @@ def test_fluxo_completo_inicio_ao_fim(app_db, seed, projetos_dir, http_client_fa
 
 
 def test_contrato_real_geracao_e_assinatura(app_db, seed, projetos_dir, contratos_dir,
-                                            http_client_factory):
-    """Geração REAL do contrato (.docx via python-docx; o PDF só com LibreOffice, ausente aqui) +
-    assinatura das duas partes → contrato 'assinado', etapa 7 concluída, projeto 'fechado'."""
+                                            http_client_factory, monkeypatch):
+    """Geração REAL do contrato (HTML -> PDF via WeasyPrint, sempre) + assinatura das duas
+    partes → contrato 'assinado', etapa 7 concluída, projeto 'fechado'."""
     _setup_cenario(app_db, seed)
     nome = seed["projeto_l1"]
     oid = seed["orcamento_l1_id"]
     c = http_client_factory()
     c.login("dir_l1", "senha123")
+
+    # Espiona o ctx passado a gerar_pdf_contrato: a geração de PDF não expõe o HTML
+    # intermediário, então reconstruímos com _montar_html_contrato p/ checar as seções
+    # injetadas (ambientes/forma de pagamento) — equivalente ao antigo guard do .docx.
+    import main as _main_mod
+    _ctxs = []
+    _orig_gerar_pdf = _main_mod.gerar_pdf_contrato
+
+    def _gerar_pdf_espiao(contrato_id, ctx, destino=None):
+        _ctxs.append(ctx)
+        return _orig_gerar_pdf(contrato_id, ctx, destino=destino)
+
+    monkeypatch.setattr(_main_mod, "gerar_pdf_contrato", _gerar_pdf_espiao)
 
     forma_pag = json.dumps({
         "tipo": "avista", "nome_forma": "A Vista", "entrada_valor": 10000,
@@ -186,47 +201,42 @@ def test_contrato_real_geracao_e_assinatura(app_db, seed, projetos_dir, contrato
     })
     assert st == 200 and b["ok"], b
     assert b["status"] == "para_assinatura"
-    assert "aviso" in b          # sem LibreOffice → entrega o .docx (degradação graciosa)
+    assert "aviso" not in b     # PDF sempre gerado (WeasyPrint) → sem degradação/aviso
 
-    # 1b) Seção "4. Ambientes" presente no .docx gerado (Task 4 — injeção de _ambientes)
+    # 1b) PDF gravado em disco (contrato_<id>.pdf) e seção "Ambientes" com os dados do
+    #     projeto (Task 4 — injeção de _ambientes) presente no HTML que o originou.
     import os as _os
     _contrato_id = b["contrato_id"]
-    _docx = _os.path.join(contratos_dir, f"contrato_{_contrato_id}.docx")
-    from docx import Document as _Doc
-    _blob = ""
-    for _t in _Doc(_docx).tables:
-        for _r in _t.rows:
-            for _c in _r.cells:
-                _blob += "\n" + _c.text
-    assert "4. Ambientes" in _blob
-    assert "5. Forma de Pagamento" in _blob
+    _pdf = _os.path.join(contratos_dir, f"contrato_{_contrato_id}.pdf")
+    assert _os.path.exists(_pdf)
+    with open(_pdf, "rb") as _f:
+        assert _f.read(5) == b"%PDF-"
+    assert len(_ctxs) == 1
+    from mod_contrato import _montar_html_contrato
+    _html = _montar_html_contrato(_ctxs[0])
+    assert "4. Ambientes do Projeto" in _html
+    assert "5. Forma de Pagamento" in _html
+    assert "Cozinha" in _html   # nome do ambiente do cenário — confirma a injeção real
 
     # 1c) Rota de EDIÇÃO/REGENERAÇÃO (PATCH) também injeta a seção de ambientes
     #     — garante que a remoção de _ambientes em do_PATCH seja detectada (Task 4 guard).
-    #     Rota real: PATCH /api/projetos/<nome>/contrato (do_PATCH). Sem LibreOffice, essa
-    #     rota devolve 500 (não degrada como a POST), MAS o .docx é regenerado em disco
-    #     (preencher_contrato o sobrescreve) antes de a conversão falhar — é nele que
-    #     verificamos a seção. O guard vale porque a regeneração sobrescreve o arquivo:
-    #     sem a injeção de _ambientes, o .docx sai SEM a seção (RED).
     st, b = c.patch("/api/projetos/%s/contrato" % nome, {
         "adendo": "Observação de teste",
         "confirmar_loja_incompleta": True,
     })
-    assert st in (200, 500), b   # 200 c/ LibreOffice; 500 (docx já gerado) sem ele
-    _blob2 = ""
-    for _t in _Doc(_docx).tables:
-        for _r in _t.rows:
-            for _c in _r.cells:
-                _blob2 += "\n" + _c.text
-    assert "4. Ambientes" in _blob2, "PATCH/regeneração NÃO injetou a seção de ambientes"
-    assert "5. Forma de Pagamento" in _blob2
+    assert st == 200, b
+    assert len(_ctxs) == 2
+    _html2 = _montar_html_contrato(_ctxs[1])
+    assert "4. Ambientes do Projeto" in _html2, "PATCH/regeneração NÃO injetou a seção de ambientes"
+    assert "5. Forma de Pagamento" in _html2
+    assert "Cozinha" in _html2
 
-    # 2) Contrato persistido: status + arquivo (.docx) disponível
+    # 2) Contrato persistido: status + arquivo (PDF) disponível
     st, b = c.get("/api/projetos/%s/contrato" % nome)
     assert st == 200
     assert b["contrato"]["status"] == "para_assinatura"
     assert b["contrato"]["tem_pdf"] is True
-    assert b["contrato"]["arquivo_tipo"] in ("docx", "pdf")
+    assert b["contrato"]["arquivo_tipo"] == "pdf"
 
     # 3) O hook REAL de geração registrou a "Venda" das provisões
     st, b = c.get("/api/orcamentos/%d/provisoes" % oid)
