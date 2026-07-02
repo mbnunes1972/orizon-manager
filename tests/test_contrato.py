@@ -942,3 +942,13 @@ def test_ambientes_vavo_zero_nao_divide():
 def test_ambientes_lista_vazia():
     from mod_contrato import ambientes_valor_contrato
     assert ambientes_valor_contrato([], vavo=0.0, val_cont=0.0) == []
+
+
+def test_localizar_tabela_forma_pagamento():
+    from docx import Document
+    from mod_contrato import _localizar_tabela, _MODELO
+    doc = Document(_MODELO)
+    t = _localizar_tabela(doc, "forma de pagamento")
+    assert t is not None
+    cab = " ".join(c.text for c in t.rows[0].cells).lower()
+    assert "forma de pagamento" in cab

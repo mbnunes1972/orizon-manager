@@ -221,6 +221,16 @@ def _set_cell_text(cell, txt, coletor=None):
         coletor.append(par.runs[0])
 
 
+def _localizar_tabela(doc, titulo_substr):
+    """1ª tabela cujo texto da 1ª linha contém titulo_substr (case-insensitive)."""
+    alvo = titulo_substr.lower()
+    for t in doc.tables:
+        cab = " ".join(c.text for c in t.rows[0].cells).lower()
+        if alvo in cab:
+            return t
+    return None
+
+
 def _preencher_grade(doc, pag, coletor=None):
     """Preenche a grade de parcelas (tabela 3, linhas 3-10) por posição.
 
@@ -240,7 +250,9 @@ def _preencher_grade(doc, pag, coletor=None):
     valores = pag.get("valores", [""] * 24)
     datas   = pag.get("datas",   [""] * 24)
     texto   = pag.get("texto_cartao", "")
-    t3 = doc.tables[3]
+    t3 = _localizar_tabela(doc, "forma de pagamento")
+    if t3 is None:
+        return
     for gi, row_idx in enumerate(range(3, 11)):
         cells = _unique_cells(t3.rows[row_idx])
         for j, (vcol, dcol) in enumerate([(0, 1), (2, 3), (4, 5)]):
