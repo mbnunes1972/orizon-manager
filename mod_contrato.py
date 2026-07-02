@@ -12,7 +12,6 @@ import subprocess
 import hashlib
 from datetime import datetime
 from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 _THIS_DIR     = os.path.dirname(os.path.abspath(__file__))
 CONTRATOS_DIR = os.path.join(_THIS_DIR, "CONTRATOS")
@@ -115,51 +114,79 @@ def _aplica_mark(texto, mapping):
 
 def _subst_paragrafo(par, mapping, coletor=None):
     """Reconstrói o parágrafo em segmentos (texto fixo × valor substituído),
-    um run por segmento, preservando o estilo do 1º run.
+    preservando a formatação (``rPr``) de CADA run original.
 
-    Quando ``coletor`` é fornecido, cada run que corresponde a um VALOR
-    substituído é anexado a ele (isola o valor para torná-lo editável).
-    O texto resultante (``par.text``) é idêntico ao produzido pela
-    substituição direta — apenas a fragmentação em runs muda.
+    Cada trecho de texto herda o estilo do run de onde veio (rótulo cinza pequeno
+    continua cinza pequeno; valor em negrito continua negrito). O valor substituído
+    herda o estilo do run onde o marcador começava. Quando ``coletor`` é fornecido,
+    o run do VALOR substituído é anexado a ele (isola o valor para torná-lo editável).
+    O texto resultante (``par.text``) é idêntico ao da substituição direta.
     """
     txt = par.text
     if "[" not in txt:
         return
-    base = par.runs[0] if par.runs else None
-    # Se o 1º run for vazio/quebra de linha (ex.: "\n" antes do marcador), herda a
-    # formatação do primeiro run com conteúdo — evita perder negrito/fonte do marcador.
-    if base is not None and not (base.text or "").strip():
-        for _r in par.runs:
-            if (_r.text or "").strip():
-                base = _r
-                break
-    base_name = base.font.name if base is not None else None
-    base_size = base.font.size if base is not None else None
-    base_bold = base.bold if base is not None else None
-    segs = []  # (texto, eh_valor)
+    import copy as _copy
+    from docx.oxml.ns import qn as _qn
+
+    runs = list(par.runs)
+    # mapa caractere -> run original de onde veio (para preservar formatação por run)
+    char_run = []
+    for r in runs:
+        char_run.extend([r] * len(r.text))
+    if len(char_run) != len(txt):
+        # desalinhamento (conteúdo não-run: hyperlink/campo) → não arrisca reformatar
+        char_run = None
+
+    def _src(i):
+        if char_run and 0 <= i < len(char_run):
+            return char_run[i]
+        return runs[0] if runs else None
+
+    # segmentos: (texto, run_fonte, eh_valor) — quebrando trechos fixos por run de origem
+    segs = []
+    def _emit_fixo(sub, ini):
+        if not sub:
+            return
+        if not char_run:
+            segs.append((sub, runs[0] if runs else None, False))
+            return
+        k = 0
+        for j in range(1, len(sub) + 1):
+            if j == len(sub) or char_run[ini + j] is not char_run[ini + j - 1]:
+                segs.append((sub[k:j], char_run[ini + k], False))
+                k = j
+
     pos = 0
     for m in _MARK_RE.finditer(txt):
         if m.start() > pos:
-            segs.append((txt[pos:m.start()], False))
+            _emit_fixo(txt[pos:m.start()], pos)
         chave = m.group(1).strip().upper().replace(" ", "_")
         if chave in mapping:
-            segs.append((mapping[chave], True))
+            segs.append((mapping[chave], _src(m.start()), True))
         else:
-            segs.append((m.group(0), False))
+            _emit_fixo(m.group(0), m.start())
         pos = m.end()
     if pos < len(txt):
-        segs.append((txt[pos:], False))
-    # limpa runs existentes
-    for r in list(par.runs):
+        _emit_fixo(txt[pos:], pos)
+
+    # captura o rPr de cada run fonte ANTES de remover os runs originais
+    rpr_por_run = {}
+    for _, src, _v in segs:
+        if src is not None and id(src) not in rpr_por_run:
+            el = src._r.find(_qn('w:rPr'))
+            rpr_por_run[id(src)] = _copy.deepcopy(el) if el is not None else None
+
+    # limpa runs existentes e recria os segmentos preservando a formatação de origem
+    for r in runs:
         r._r.getparent().remove(r._r)
-    for seg_txt, eh_valor in segs:
+    for seg_txt, src, eh_valor in segs:
         run = par.add_run(seg_txt)
-        if base_name is not None:
-            run.font.name = base_name
-        if base_size is not None:
-            run.font.size = base_size
-        if base_bold is not None:
-            run.bold = base_bold
+        rpr = rpr_por_run.get(id(src)) if src is not None else None
+        if rpr is not None:
+            velho = run._r.find(_qn('w:rPr'))
+            if velho is not None:
+                run._r.remove(velho)
+            run._r.insert(0, _copy.deepcopy(rpr))
         if eh_valor and coletor is not None:
             coletor.append(run)
 
@@ -233,16 +260,17 @@ def _localizar_tabela(doc, titulo_substr):
 
 
 def _preencher_grade(doc, pag, coletor=None):
-    """Preenche a grade de parcelas (tabela 3, linhas 3-10) por posição.
+    """Preenche a grade de parcelas (linhas 3-10 da tabela de pagamento) por posição.
 
     Cada linha tem 6 células ÚNICAS no padrão (valor, data) × 3, embora a célula
     de data do meio seja mesclada e apareça duplicada em ``row.cells``. Usamos
     ``_unique_cells`` para indexar os pares (0,1), (2,3), (4,5) corretamente.
 
     Regras:
+      - linha SEM nenhuma parcela (todos os 3 slots > num) é ELIMINADA da tabela.
       - parcela p (1-based) válida (p <= num e valores[p-1] não vazio):
         valor na célula de valor; data (ou _TRACO se vazia) na célula de data.
-      - slot vazio: _TRACO em ambas as células.
+      - slot vazio dentro de uma linha usada: _TRACO em ambas as células.
       - cartão: cada parcela p <= num → valor[p-1] na célula de valor e data = "" (sem
         data); slots vazios → _TRACO em ambas as células.
     """
@@ -250,12 +278,16 @@ def _preencher_grade(doc, pag, coletor=None):
     num     = pag.get("num_parcelas_int", 0)
     valores = pag.get("valores", [""] * 24)
     datas   = pag.get("datas",   [""] * 24)
-    texto   = pag.get("texto_cartao", "")
     t3 = _localizar_tabela(doc, "forma de pagamento")
     if t3 is None:
         return
+    remover = []
     for gi, row_idx in enumerate(range(3, 11)):
-        cells = _unique_cells(t3.rows[row_idx])
+        row = t3.rows[row_idx]
+        if gi * 3 + 1 > num:            # 1º slot da linha já passa de num → sem parcela
+            remover.append(row)
+            continue
+        cells = _unique_cells(row)
         for j, (vcol, dcol) in enumerate([(0, 1), (2, 3), (4, 5)]):
             if dcol >= len(cells):
                 break
@@ -273,46 +305,73 @@ def _preencher_grade(doc, pag, coletor=None):
             else:
                 _set_cell_text(cells[vcol], _TRACO, coletor)
                 _set_cell_text(cells[dcol], _TRACO, coletor)
+    for row in remover:                # elimina linhas sem parcela
+        row._tr.getparent().remove(row._tr)
 
 
 def _preencher_ambientes(doc, itens_valores, coletor=None):
-    """Insere a seção '4. Ambientes' antes da tabela de Forma de Pagamento.
+    """Preenche a tabela 'Ambientes do Projeto' do modelo (2 ambientes por linha).
+
+    A tabela já existe no template com uma linha-modelo cujas células têm rótulo
+    ("Ambiente"/"Valor") + marcador ([NOME_AMBIENTE_1]/[VALOR_AMBIENTE_1]/…) e uma
+    linha de total (VALOR DO CONTRATO | [TOTAL_CONTRATO], preenchida à parte por
+    _substituir_marcadores). O preenchimento troca APENAS o marcador (via
+    _subst_paragrafo), preservando o rótulo e a formatação de cada run.
+
+    Cada linha comporta 2 ambientes; a linha-modelo é clonada inteira quantas vezes
+    forem necessárias — sempre linhas completas: num ímpar preenche a 2ª metade da
+    última linha com traços (mesmo padrão da grade de parcelas). As células de valor
+    entram no coletor de regiões editáveis.
 
     itens_valores: [(nome, valor_float), ...] (já calculado por
-    ambientes_valor_contrato). Adiciona uma linha 'Total' = soma e renumera
-    'Forma de Pagamento' para '5.'. Ambas as colunas justificadas à esquerda.
-    As células de valor (menos a do Total) entram no coletor de regiões editáveis.
-    Lista vazia → não faz nada.
+    ambientes_valor_contrato). Lista vazia → marcadores viram traços
+    (nenhum marcador cru vaza para o contrato).
     """
-    if not itens_valores:
+    import copy
+    from docx.table import _Row
+    tbl = _localizar_tabela(doc, "ambientes do projeto")
+    if tbl is None:
         return
-    grade = _localizar_tabela(doc, "forma de pagamento")
-    if grade is None:
+    # linha-modelo = a que contém os marcadores de ambiente
+    modelo = next((r for r in tbl.rows
+                   if "NOME_AMBIENTE" in " ".join(c.text for c in r.cells).upper()),
+                  None)
+    if modelo is None:
         return
-    # Renumerar o título da seção de pagamento: '4.' -> '5.'
-    _set_cell_text(_unique_cells(grade.rows[0])[0], "5. Forma de Pagamento")
 
-    total = round(sum(v for _, v in itens_valores), 2)
-    linhas = list(itens_valores) + [("Total", total)]
+    n = len(itens_valores)
+    n_linhas = max(1, (n + 1) // 2)  # 2 ambientes por linha; ao menos 1 (limpa marcadores)
 
-    tbl = doc.add_table(rows=0, cols=2)
-    tbl.style = grade.style
-    # título da seção, mesclado nas 2 colunas
-    titulo = tbl.add_row().cells
-    titulo[0].merge(titulo[1])
-    _set_cell_text(titulo[0], "4. Ambientes")
-    for nome, val in linhas:
-        cels = tbl.add_row().cells
-        _set_cell_text(cels[0], nome)
-        _set_cell_text(cels[1], _formatar_valor(val),
-                       coletor if nome != "Total" else None)
-        for c in cels:
-            c.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
+    # clona a linha-modelo inteira para as linhas de dados extras
+    linhas = [modelo]
+    ref_tr = modelo._tr
+    for _ in range(n_linhas - 1):
+        novo_tr = copy.deepcopy(modelo._tr)
+        ref_tr.addnext(novo_tr)
+        linhas.append(_Row(novo_tr, tbl))
+        ref_tr = novo_tr
 
-    # posiciona [tabela ambientes][parágrafo separador][grade]
-    sep = doc.add_paragraph()
-    grade._tbl.addprevious(tbl._tbl)
-    grade._tbl.addprevious(sep._p)
+    _CHAVES = ("NOME_AMBIENTE_1", "NOME_AMBIENTE_2",
+               "VALOR_AMBIENTE_1", "VALOR_AMBIENTE_2")
+
+    def _fill(cell, texto, editavel):
+        # substitui o marcador da célula por `texto`, preservando rótulo e estilo.
+        # (cada célula contém só um marcador, então mapear todas as chaves é seguro.)
+        mp = {k: texto for k in _CHAVES}
+        for par in cell.paragraphs:
+            _subst_paragrafo(par, mp, coletor if editavel else None)
+
+    for k, row in enumerate(linhas):
+        cels = _unique_cells(row)
+        for slot, (cn, cv) in enumerate([(0, 1), (2, 3)]):
+            idx = 2 * k + slot
+            if idx < n:
+                nome, val = itens_valores[idx]
+                _fill(cels[cn], nome, False)                    # nome não editável
+                _fill(cels[cv], _formatar_valor(val), True)     # valor editável
+            else:  # sobra de linha ímpar → traços (não editáveis)
+                _fill(cels[cn], _TRACO, False)
+                _fill(cels[cv], _TRACO, False)
 
 
 # ── Proteção: regiões editáveis + documento read-only ─────────────────────────

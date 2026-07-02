@@ -536,45 +536,73 @@ def test_substituir_marcadores_em_tabela():
     assert "[NOME_CLIENTE]" not in t.rows[0].cells[0].text
 
 
+def test_subst_preserva_formatacao_por_run():
+    """Substituição preserva a formatação de CADA run: rótulo cinza pequeno
+    continua cinza pequeno; valor em negrito 8.5 continua negrito 8.5."""
+    from docx import Document
+    from docx.shared import Pt, RGBColor
+    from mod_contrato import _substituir_marcadores
+    d = Document()
+    par = d.add_paragraph()
+    r1 = par.add_run("Nome\n")
+    r1.font.size = Pt(7); r1.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
+    r2 = par.add_run("[NOME_CLIENTE]")
+    r2.bold = True; r2.font.size = Pt(8.5)
+    _substituir_marcadores(d, {"NOME_CLIENTE": "Ana Paula"})
+    runs = d.paragraphs[0].runs
+    rot = next(r for r in runs if "Nome" in r.text)
+    val = next(r for r in runs if "Ana Paula" in r.text)
+    # rótulo mantém cinza e tamanho pequeno
+    assert str(rot.font.color.rgb) == "888888"
+    assert rot.font.size.pt == 7.0
+    # valor mantém negrito e tamanho
+    assert val.bold is True
+    assert val.font.size.pt == 8.5
+
+
 # ── Grade de parcelas por posição (valor+data, traços, cartão) ─────────────────
 
 def test_preencher_grade_valores_datas_e_tracos():
     from docx import Document
-    from mod_contrato import _MODELO, _preencher_grade, _TRACO
+    from mod_contrato import _MODELO, _preencher_grade, _TRACO, _localizar_tabela
     d = Document(_MODELO)
     pag = {"tipo": "aymore", "num_parcelas_int": 2,
            "valores": ["R$ 4.820,00", "R$ 4.820,00"] + [""] * 22,
            "datas":   ["18/07/2026", "17/08/2026"] + [""] * 22,
            "texto_cartao": ""}
     _preencher_grade(d, pag)
-    t3 = d.tables[3]
+    t3 = _localizar_tabela(d, "forma de pagamento")
     blob = " ".join(c.text for row in t3.rows for c in row.cells)
     assert "R$ 4.820,00" in blob
     assert "18/07/2026" in blob and "17/08/2026" in blob
-    assert _TRACO in blob
+    assert _TRACO in blob                       # slot 3 (vazio) na linha usada
     assert "[VALOR_PARCELA]" not in blob
     assert "[DATA_PARCELA_3]" not in blob
-    assert len(t3.rows) == 11
+    # 2 parcelas → 1 linha de grade; linhas vazias eliminadas: 3 cabeçalho + 1 = 4
+    assert len(t3.rows) == 4
 
 
 def test_preencher_grade_cartao_valores_sem_data():
     from docx import Document
-    from mod_contrato import _MODELO, _preencher_grade, _TRACO, _unique_cells
+    from mod_contrato import _MODELO, _preencher_grade, _TRACO, _unique_cells, _localizar_tabela
     d = Document(_MODELO)
-    _preencher_grade(d, {"tipo": "cartao", "num_parcelas_int": 3,
-                         "valores": ["R$ 100,00", "R$ 100,00", "R$ 100,00"] + [""] * 21,
+    _preencher_grade(d, {"tipo": "cartao", "num_parcelas_int": 4,
+                         "valores": ["R$ 100,00"] * 4 + [""] * 20,
                          "datas": [""] * 24, "texto_cartao": "12x R$ 300,00"})
-    t3 = d.tables[3]
-    # primeira linha da grade: 3 pares (valor, data) — parcelas 1,2,3
+    t3 = _localizar_tabela(d, "forma de pagamento")
+    # 4 parcelas → 2 linhas de grade; linhas vazias eliminadas: 3 cabeçalho + 2 = 5
+    assert len(t3.rows) == 5
+    # 1ª linha da grade: parcelas 1-3 → valor preenchido, data EM BRANCO
     cells = _unique_cells(t3.rows[3])
-    # parcelas 1-3: valor preenchido, data EM BRANCO (não _TRACO, não data)
     for vcol, dcol in [(0, 1), (2, 3), (4, 5)]:
         assert cells[vcol].text == "R$ 100,00"
         assert cells[dcol].text == ""        # cartão: parcela sem data
-    # slot 4 em diante (linha 4 da grade): traço
+    # 2ª linha: parcela 4 preenchida; slots 5,6 vazios → traços (valor e data)
     cells2 = _unique_cells(t3.rows[4])
-    assert cells2[0].text == _TRACO
-    # texto_cartao NÃO é mais despejado na grade
+    assert cells2[0].text == "R$ 100,00" and cells2[1].text == ""
+    assert cells2[2].text == _TRACO and cells2[3].text == _TRACO
+    assert cells2[4].text == _TRACO and cells2[5].text == _TRACO
+    # texto_cartao NÃO é despejado na grade
     blob = " ".join(c.text for row in t3.rows for c in row.cells)
     assert "12x R$ 300,00" not in blob
 
@@ -954,6 +982,75 @@ def test_localizar_tabela_forma_pagamento():
     assert "forma de pagamento" in cab
 
 
+def test_preencher_ambientes_clona_linhas_do_template():
+    """Preenche a tabela 'Ambientes do Projeto' do template (2 por linha),
+    clonando linhas completas para ambientes extras e sem criar tabela nova."""
+    from docx import Document
+    from mod_contrato import _preencher_ambientes, _localizar_tabela, _unique_cells, _TRACO, _MODELO
+    doc = Document(_MODELO)
+    itens = [("Cozinha", 12345.67), ("Dormitório", 8900.0), ("Home Theater", 5200.0)]
+    _preencher_ambientes(doc, itens)
+
+    t = _localizar_tabela(doc, "ambientes do projeto")
+    assert t is not None
+    # header + ceil(3/2)=2 linhas de dados + linha de total = 4 linhas
+    assert len(t.rows) == 4
+    blob = "\n".join(c.text for r in t.rows for c in r.cells)
+    # nomes e valores presentes
+    for nome in ("Cozinha", "Dormitório", "Home Theater"):
+        assert nome in blob
+    for val in ("R$ 12.345,67", "R$ 8.900,00", "R$ 5.200,00"):
+        assert val in blob
+    # nenhum marcador de ambiente sobrou
+    assert "NOME_AMBIENTE" not in blob and "VALOR_AMBIENTE" not in blob
+    # cada linha de dados é COMPLETA (4 células únicas)
+    for row in (t.rows[1], t.rows[2]):
+        assert len(_unique_cells(row)) == 4
+    # rótulos "Ambiente"/"Valor" das células são PRESERVADOS (só o marcador é trocado)
+    prim = _unique_cells(t.rows[1])
+    assert "Ambiente" in prim[0].text and "Valor" in prim[1].text
+    assert "Cozinha" in prim[0].text                 # rótulo + valor coexistem
+    # linha ímpar: 2ª metade da última linha de dados recebe traços (como na grade)
+    ult = _unique_cells(t.rows[2])
+    assert "Home Theater" in ult[0].text
+    assert _TRACO in ult[2].text and _TRACO in ult[3].text
+    assert "Ambiente" in ult[2].text and "Valor" in ult[3].text  # rótulo mantido no traço
+    # NÃO cria tabela duplicada de ambientes
+    n_amb = sum(1 for tb in doc.tables
+                if "ambiente" in " ".join(c.text for c in tb.rows[0].cells).lower())
+    assert n_amb == 1
+
+
+def test_preencher_ambientes_par_uma_linha():
+    """Nº par de ambientes → uma linha de dados por par (sem sobra)."""
+    from docx import Document
+    from mod_contrato import _preencher_ambientes, _localizar_tabela, _unique_cells, _MODELO
+    doc = Document(_MODELO)
+    _preencher_ambientes(doc, [("Cozinha", 100.0), ("Sala", 200.0)])
+    t = _localizar_tabela(doc, "ambientes do projeto")
+    assert len(t.rows) == 3  # header + 1 linha de dados + total
+    cels = _unique_cells(t.rows[1])
+    assert "Cozinha" in cels[0].text and "Sala" in cels[2].text
+    assert "R$ 100,00" in cels[1].text and "R$ 200,00" in cels[3].text
+
+
+def test_preencher_ambientes_lista_vazia_traces():
+    """Lista vazia → linha-modelo com traços (nenhum marcador cru vaza)."""
+    from docx import Document
+    from mod_contrato import _preencher_ambientes, _localizar_tabela, _unique_cells, _TRACO, _MODELO
+    doc = Document(_MODELO)
+    _preencher_ambientes(doc, [])
+    t = _localizar_tabela(doc, "ambientes do projeto")
+    blob = "\n".join(c.text for r in t.rows for c in r.cells)
+    assert "NOME_AMBIENTE" not in blob and "VALOR_AMBIENTE" not in blob
+    # header + 1 linha de dados (traços) + total
+    assert len(t.rows) == 3
+    # marcadores viram traços; rótulos preservados
+    dados = _unique_cells(t.rows[1])
+    assert all(_TRACO in c.text for c in dados)
+    assert "Ambiente" in dados[0].text and "Valor" in dados[1].text
+
+
 def test_contrato_com_secao_ambientes():
     import os, json
     from docx import Document
@@ -986,13 +1083,18 @@ def test_contrato_com_secao_ambientes():
         for row in t.rows:
             for c in row.cells:
                 tbl_blob += "\n" + c.text
+    # nenhum marcador de ambiente sobrou no documento
+    n_amb_tabelas = sum(1 for t in doc.tables
+                        if "ambiente" in " ".join(c.text for c in t.rows[0].cells).lower())
     os.remove(path)
-    # seção de ambientes presente com nomes e valores
-    assert "4. Ambientes" in tbl_blob
+    # ambientes preenchidos na tabela do template (nomes e valores)
     assert "Cozinha" in tbl_blob and "Dormitório" in tbl_blob and "Home Theater" in tbl_blob
     assert "R$ 12.345,67" in tbl_blob and "R$ 8.900,00" in tbl_blob and "R$ 5.200,00" in tbl_blob
-    # total = soma
-    assert "Total" in tbl_blob and "R$ 26.445,67" in tbl_blob
-    # Forma de pagamento renumerada e grade ainda preenchida
+    assert "NOME_AMBIENTE" not in tbl_blob and "VALOR_AMBIENTE" not in tbl_blob
+    # total (VALOR DO CONTRATO) = soma, via marcador [TOTAL_CONTRATO]
+    assert "R$ 26.445,67" in tbl_blob
+    # não duplica a tabela de ambientes (a do template é a única)
+    assert n_amb_tabelas == 1
+    # Forma de Pagamento e grade ainda preenchidas
     assert "5. Forma de Pagamento" in tbl_blob
     assert "R$ 4.820,00" in tbl_blob
