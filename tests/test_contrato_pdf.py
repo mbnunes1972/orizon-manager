@@ -78,3 +78,12 @@ def test_html_corpo_aplica_classe_por_nivel():
     assert 'class="cl-2"' in html and "Sub item" in html
     assert 'class="cl-alinea"' in html and "alinea" in html
     assert "<li>" not in html and "<ol>" not in html   # não vira lista ordenada
+
+
+def test_assets_template_existem():
+    import os
+    from mod_contrato import CONTRATO_TEMPLATE_DIR
+    for f in ("contrato.css", "contrato.html", "logo_dalmobile.png"):
+        assert os.path.exists(os.path.join(CONTRATO_TEMPLATE_DIR, f)), f
+    shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"), encoding="utf-8").read()
+    assert "<!--CAPA-->" in shell and "<!--CORPO-->" in shell

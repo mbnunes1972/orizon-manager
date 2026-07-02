@@ -1,0 +1,37 @@
+/* contrato_template/contrato.css */
+@page {
+  size: A4;
+  margin: 1cm;
+  @top-left  { content: element(cabecalho); }
+  @bottom-center { content: "Página " counter(page) " de " counter(pages);
+                   font-size: 7pt; color: #888; }
+}
+#cabecalho { position: running(cabecalho); width: 100%;
+             border-bottom: 2px solid #000; padding-bottom: 2px; }
+#cabecalho .logo { height: 34px; }
+#cabecalho .num  { float: right; text-align: right; font-weight: bold; font-size: 9pt; }
+body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 8.5pt; color: #000; }
+
+/* ---- Capa ---- */
+.secao { break-inside: avoid; margin-bottom: 6pt; }
+.secao > .titulo { background: #3b2f2a; color: #C4A265; font-weight: bold;
+                   padding: 3pt 6pt; font-size: 10pt; }
+.secao table { width: 100%; border-collapse: collapse; }
+.secao td { border: 0.5px solid #ddd; padding: 3pt 6pt; vertical-align: top; }
+.rotulo { display: block; color: #888888; font-size: 7pt; }
+.valor  { display: block; font-weight: bold; font-size: 8.5pt; }
+.amb-rotulo { color: #888888; font-size: 7pt; }
+.amb-valor  { font-weight: bold; }
+.total-lbl { font-weight: bold; text-align: center; }
+.total-val { font-weight: bold; text-align: right; }
+.pc-valor, .pc-data { font-size: 8pt; }
+.quebra-capa { break-after: page; }
+
+/* ---- Cláusulas (números literais + hanging por nível) ---- */
+.contrato-corpo h1, .contrato-corpo h2 { font-size: 9.5pt; font-weight: bold;
+  margin: 8pt 0 3pt; }
+.contrato-corpo p { margin: 0 0 4pt; text-align: justify; }
+.cl-1 { padding-left: 1.2cm; text-indent: -1.2cm; }
+.cl-2 { padding-left: 1.4cm; text-indent: -1.0cm; }
+.cl-3 { padding-left: 1.7cm; text-indent: -1.0cm; }
+.cl-alinea { padding-left: 1.9cm; text-indent: -0.8cm; }

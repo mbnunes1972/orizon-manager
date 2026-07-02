@@ -13,8 +13,9 @@ import hashlib
 from datetime import datetime
 from docx import Document
 
-_THIS_DIR     = os.path.dirname(os.path.abspath(__file__))
-CONTRATOS_DIR = os.path.join(_THIS_DIR, "CONTRATOS")
+_THIS_DIR            = os.path.dirname(os.path.abspath(__file__))
+CONTRATOS_DIR        = os.path.join(_THIS_DIR, "CONTRATOS")
+CONTRATO_TEMPLATE_DIR = os.path.join(_THIS_DIR, "contrato_template")
 
 _MODELO = os.path.join(_THIS_DIR, "modelo_contrato_mapeado.docx")
 
