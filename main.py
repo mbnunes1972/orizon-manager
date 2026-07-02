@@ -3529,6 +3529,7 @@ class Handler(BaseHTTPRequestHandler):
                         "tem_adendo":      bool(req.get("adendo")),
                         "adendo":          req.get("adendo") or "",
                         "consultor_nome":  usuario.get("nome", ""),
+                        "_ambientes":      _ambientes_valor_para_contrato(orcamento_id, db),
                     })
                     contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
                                  .order_by(Contrato.id.desc()).first()
@@ -4144,6 +4145,7 @@ class Handler(BaseHTTPRequestHandler):
                         "tem_adendo":      bool(adendo),
                         "adendo":          adendo or "",
                         "consultor_nome":  usuario.get("nome", ""),
+                        "_ambientes":      _ambientes_valor_para_contrato(contrato.orcamento_id, db),
                     })
                     pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
                     contrato.pdf_path = pdf_path
@@ -4640,6 +4642,25 @@ def _get_usuario_telefone(usuario_id: int, db) -> str:
     """Retorna telefone do usuário ou string vazia se não encontrado."""
     u = db.get(Usuario, usuario_id)
     return (u.telefone or "").strip() if u else ""
+
+
+def _ambientes_valor_para_contrato(orcamento_id, db):
+    """Lista [(nome_exibicao, valor_com_financeiro), ...] para a seção de ambientes
+    do contrato. Reusa o breakdown do motor e o rateio de mod_contrato."""
+    from mod_contrato import ambientes_valor_contrato
+    orc = db.get(Orcamento, orcamento_id)
+    if not orc:
+        return []
+    d = _negociacao_breakdown(orc, db)
+    nome_por_id = {
+        oa.pool_ambiente_id: oa.pool_ambiente.nome_exibicao
+        for oa in db.query(OrcamentoAmbiente)
+                    .filter_by(orcamento_id=orcamento_id)
+                    .join(PoolAmbiente).all()
+    }
+    itens = [(nome_por_id.get(a.get("id"), ""), float(a.get("VAVA") or 0.0))
+             for a in d.get("ambientes", [])]
+    return ambientes_valor_contrato(itens, d.get("VAVO", 0.0), d.get("Val_Cont", 0.0))
 
 
 def _montar_dados_projeto_para_contrato(nome_safe: str, orcamento_id: int, db) -> tuple:

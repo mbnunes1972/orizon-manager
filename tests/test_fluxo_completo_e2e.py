@@ -188,6 +188,19 @@ def test_contrato_real_geracao_e_assinatura(app_db, seed, projetos_dir, contrato
     assert b["status"] == "para_assinatura"
     assert "aviso" in b          # sem LibreOffice → entrega o .docx (degradação graciosa)
 
+    # 1b) Seção "4. Ambientes" presente no .docx gerado (Task 4 — injeção de _ambientes)
+    import os as _os
+    _contrato_id = b["contrato_id"]
+    _docx = _os.path.join(contratos_dir, f"contrato_{_contrato_id}.docx")
+    from docx import Document as _Doc
+    _blob = ""
+    for _t in _Doc(_docx).tables:
+        for _r in _t.rows:
+            for _c in _r.cells:
+                _blob += "\n" + _c.text
+    assert "4. Ambientes" in _blob
+    assert "5. Forma de Pagamento" in _blob
+
     # 2) Contrato persistido: status + arquivo (.docx) disponível
     st, b = c.get("/api/projetos/%s/contrato" % nome)
     assert st == 200
