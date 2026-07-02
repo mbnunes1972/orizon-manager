@@ -201,6 +201,26 @@ def test_contrato_real_geracao_e_assinatura(app_db, seed, projetos_dir, contrato
     assert "4. Ambientes" in _blob
     assert "5. Forma de Pagamento" in _blob
 
+    # 1c) Rota de EDIÇÃO/REGENERAÇÃO (PATCH) também injeta a seção de ambientes
+    #     — garante que a remoção de _ambientes em do_PATCH seja detectada (Task 4 guard).
+    #     Rota real: PATCH /api/projetos/<nome>/contrato (do_PATCH). Sem LibreOffice, essa
+    #     rota devolve 500 (não degrada como a POST), MAS o .docx é regenerado em disco
+    #     (preencher_contrato o sobrescreve) antes de a conversão falhar — é nele que
+    #     verificamos a seção. O guard vale porque a regeneração sobrescreve o arquivo:
+    #     sem a injeção de _ambientes, o .docx sai SEM a seção (RED).
+    st, b = c.patch("/api/projetos/%s/contrato" % nome, {
+        "adendo": "Observação de teste",
+        "confirmar_loja_incompleta": True,
+    })
+    assert st in (200, 500), b   # 200 c/ LibreOffice; 500 (docx já gerado) sem ele
+    _blob2 = ""
+    for _t in _Doc(_docx).tables:
+        for _r in _t.rows:
+            for _c in _r.cells:
+                _blob2 += "\n" + _c.text
+    assert "4. Ambientes" in _blob2, "PATCH/regeneração NÃO injetou a seção de ambientes"
+    assert "5. Forma de Pagamento" in _blob2
+
     # 2) Contrato persistido: status + arquivo (.docx) disponível
     st, b = c.get("/api/projetos/%s/contrato" % nome)
     assert st == 200
