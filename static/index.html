@@ -5715,7 +5715,8 @@ function abrirModalParams(){
   const comissaoArq    = pctArqParceiro > 0 ? pctArqParceiro : (m.comissao_arq_pct || 0);
   id('mp-arq-ativa').checked = !!(m.comissao_arq_ativa || (temParceiro && comissaoArq > 0));
   id('mp-arq-pct').value     = comissaoArq || 0;
-  id('mp-fid-ativa').checked = !!(m.fidelidade_ativa || (temParceiro && (m.fidelidade_pct || 0) > 0));
+  // fidelidade entra ativa SEMPRE que houver parceiro (mesmo com % ainda por configurar)
+  id('mp-fid-ativa').checked = !!(m.fidelidade_ativa || temParceiro);
   id('mp-fid-pct').value     = m.fidelidade_pct || 0;
   id('mp-fora-sede').checked  = !!m.fora_da_sede;
   id('mp-viagem').value       = m.custo_viagem   || 0;

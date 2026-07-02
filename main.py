@@ -820,9 +820,14 @@ class Handler(BaseHTTPRequestHandler):
                     negociacao = json.loads(orc.negociacao_json) if (orc and orc.negociacao_json) else None
                     parametros = {}
                     if orc:
-                        from mod_orcamento_params import PARAMETROS_DEFAULT
+                        from mod_orcamento_params import parametros_default_loja
                         _p = db.get(Projeto, orc.projeto_id)
-                        parametros = json.loads(_p.parametros_json) if (_p and _p.parametros_json) else dict(PARAMETROS_DEFAULT)
+                        if _p and _p.parametros_json:
+                            parametros = json.loads(_p.parametros_json)
+                        else:
+                            # projeto sem params salvos: herda defaults da loja (incl. incluir_custos,
+                            # comissão do arquiteto e fidelidade configurados)
+                            parametros = parametros_default_loja(_cfg_financeira_loja(db, orc.loja_id))
                     self.send_json({"ok": True, "orcamento_id": oid,
                                     "desconto_pct": desconto_pct, "negociacao": negociacao,
                                     "parametros": parametros, "ambientes": ambientes})
@@ -1077,7 +1082,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
                     return
-                from mod_orcamento_params import PARAMETROS_DEFAULT
+                from mod_orcamento_params import parametros_default_loja
                 db = get_session()
                 try:
                     ator = _ator_dict(db, usuario)
@@ -1089,7 +1094,8 @@ class Handler(BaseHTTPRequestHandler):
                     if p is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
-                    par = json.loads(p.parametros_json) if p.parametros_json else dict(PARAMETROS_DEFAULT)
+                    par = (json.loads(p.parametros_json) if p.parametros_json
+                           else parametros_default_loja(_cfg_financeira_loja(db, loja_id)))
                     self.send_json({"ok": True, "parametros": par})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -4443,6 +4449,19 @@ def _sombra_dict(o) -> dict:
         "markup":       o.markup       or 0.0,
         "val_cont":     o.val_cont     or 0.0,
     }
+
+
+def _cfg_financeira_loja(db, loja_id):
+    """config_financeira (dict) da loja, ou o default. Base dos defaults de negociação
+    (comissão do arquiteto, fidelidade, carga tributária) herdados por projetos novos."""
+    import mod_provisoes
+    loja = db.get(Loja, loja_id) if loja_id else None
+    if loja and loja.config_financeira_json:
+        try:
+            return json.loads(loja.config_financeira_json)
+        except Exception:
+            pass
+    return mod_provisoes.config_financeira_default()
 
 
 def _negociacao_breakdown(orc, db):
