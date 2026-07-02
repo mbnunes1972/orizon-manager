@@ -7413,8 +7413,6 @@ const ETAPAS_CICLO = [
   { codigo: "2",   nome: "Criação do projeto",                 sub: false },
   { codigo: "3",   nome: "Briefing",                           sub: false },
   { codigo: "4",   nome: "Orçamento",                          sub: false },
-  { codigo: "5",   nome: "Revisão de projeto",                 sub: false },
-  { codigo: "6",   nome: "Aprovação do orçamento pelo cliente",sub: false },
   { codigo: "7",   nome: "Contrato",                           sub: false, acao: "contrato" },
   { codigo: "8",   nome: "Aprovação financeira I",             sub: false },
   { codigo: "9",   nome: "Solicitação de medição",             sub: false, toggleavel: true },
@@ -7438,7 +7436,7 @@ const ETAPAS_CICLO = [
 ];
 
 // Ordem canônica das etapas PRINCIPAIS (espelha mod_ciclo.py no backend).
-const ETAPAS_PRINCIPAIS = ["1","2","3","4","5","6","7","8","9","10",
+const ETAPAS_PRINCIPAIS = ["1","2","3","4","7","8","9","10",
                            "11","12","13","14","15","16","17","18","19","20"];
 // Status que contam como "etapa concluída" (espelha STATUS_CONCLUSIVOS no backend).
 const STATUS_CONCLUSIVOS = new Set(["concluido","aprovado","assinado","vigente",
@@ -7503,8 +7501,10 @@ async function carregarCicloSilencioso() {
 }
 
 function _orcamentoAprovado() {
-  // Retorna true se etapa 6 está concluída (orçamento aprovado)
-  return _cicloData['6']?.status === 'concluido';
+  // Orçamento aprovado = contrato já gerado (etapa Contrato iniciada ou além).
+  // Antes usava a etapa 6 (Aprovação do orçamento), eliminada do ciclo.
+  const st = _cicloData['7']?.status;
+  return !!st && st !== 'pendente';
 }
 
 // Trava/destrava todos os controles de edição da negociação — tanto os
@@ -7741,36 +7741,6 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
            href="/api/orcamentos/${o.id}/proposta/pdf">&#x1F5A8; Imprimir</a>
       </div>`).join('');
     return `<div>${linhas}</div>`;
-  }
-
-  // Card especial etapa 6 — Aprovação do orçamento: mostra orçamento aprovado
-  if (etapa.codigo === '6') {
-    setTimeout(async () => {
-      const alvo = document.getElementById('aprov-orc-alvo');
-      if (!alvo || !projetoAtivo) return;
-      try {
-        const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/contrato`);
-        const j = await r.json();
-        const oid = j.contrato && j.contrato.orcamento_id;
-        if (!oid) { alvo.innerHTML = '<span style="color:var(--muted)">Nenhum orçamento aprovado ainda.</span>'; return; }
-        const o = (_orcamentos || []).find(x => x.id === oid) || {id: oid, nome: 'Orçamento ' + oid};
-        alvo.innerHTML = `
-          <span style="flex:1">Aprovado: ${esc(o.nome || ('Orçamento ' + oid))}</span>
-          <button class="btn-ciclo" style="font-size:.8rem" onclick="fecharCiclo();ativarOrcamento(${oid})">Abrir</button>
-          <a class="btn-ciclo" style="font-size:.8rem;text-decoration:none" target="_blank" rel="noopener"
-             href="/api/orcamentos/${oid}/proposta/pdf">&#x1F5A8; Imprimir proposta</a>`;
-      } catch (e) { /* silencioso */ }
-    }, 0);
-    return `<div id="aprov-orc-alvo" style="display:flex;gap:8px;align-items:center"><span style="color:var(--muted)">Carregando…</span></div>`;
-  }
-
-  // Card especial etapa 5 — Revisão: concluída apenas pela aprovação do orçamento
-  if (etapa.codigo === '5' && !concluido) {
-    return `
-      <div style="font-size:.85rem;color:var(--muted);line-height:1.7">
-        Em revis&atilde;o. Esta etapa &eacute; conclu&iacute;da automaticamente ao clicar
-        <strong style="color:var(--text)">Aprovar Or&ccedil;amento</strong> na aba Negocia&ccedil;&atilde;o.
-      </div>`;
   }
 
   // Cards genéricos — observações + toggle (somente para etapas sem ação concreta)

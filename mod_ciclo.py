@@ -9,7 +9,7 @@ o ETAPAS_CICLO do frontend é alinhado a ela na tarefa de frontend.
 # Etapas PRINCIPAIS, na ordem. Sub-etapas ("11a".."11e", "17a") NÃO entram aqui
 # — elas são livres dentro do pai.
 ETAPAS_PRINCIPAIS = [
-    "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+    "1", "2", "3", "4", "7", "8", "9", "10",
     "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
 ]
 
@@ -18,8 +18,6 @@ ETAPA_NOME = {
     "2": "Criação do projeto",
     "3": "Briefing",
     "4": "Orçamento",
-    "5": "Revisão de projeto",
-    "6": "Aprovação do orçamento pelo cliente",
     "7": "Contrato",
     "8": "Aprovação financeira I",
     "9": "Solicitação de medição",

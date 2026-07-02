@@ -1118,8 +1118,8 @@ class Handler(BaseHTTPRequestHandler):
                                .filter_by(projeto_nome=nome_safe)\
                                .all()
                     codigos_existentes = {e.etapa_codigo for e in etapas}
-                    # Auto-completar etapas 1-5 para projetos que já têm negociação
-                    ETAPAS_PRE = ["1","2","3","4","5"]
+                    # Auto-completar etapas 1-4 para projetos que já têm negociação
+                    ETAPAS_PRE = ["1","2","3","4"]
                     if not any(c in codigos_existentes for c in ETAPAS_PRE):
                         p_meta = db.query(Projeto).filter_by(nome_safe=nome_safe).first()
                         eh_legado = (p_meta is None) or (p_meta.cliente_id is None)
@@ -3175,11 +3175,8 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False,
                                         "erro": "Contrato já assinado — não é possível voltar ao orçamento"})
                         return
-                    # Resetar etapas 5, 6 e 7 (a aprovação concluiu 5+6 e iniciou a 7)
-                    e5 = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo="5").first()
-                    if e5: db.delete(e5)
-                    e6 = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo="6").first()
-                    if e6: db.delete(e6)
+                    # Resetar etapa 7 (a geração do contrato iniciou a 7); a etapa 4
+                    # (Orçamento) permanece concluída — voltar ao orçamento reabre o contrato.
                     e7 = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo="7").first()
                     if e7: db.delete(e7)
                     # Resetar contrato para rascunho
@@ -3476,27 +3473,9 @@ class Handler(BaseHTTPRequestHandler):
                     pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
                     contrato.pdf_path = pdf_path
                     contrato.status = "para_assinatura"
-                    # Marcar etapa 5 (Revisão de projeto) como concluída — a aprovação
-                    # conclui Revisão e Aprovação juntas.
-                    etapa5 = db.query(CicloEtapa).filter_by(
-                        projeto_nome=nome_safe, etapa_codigo="5"
-                    ).first()
-                    if not etapa5:
-                        etapa5 = CicloEtapa(projeto_nome=nome_safe, etapa_codigo="5")
-                        db.add(etapa5)
-                    etapa5.status         = "concluido"
-                    etapa5.concluido_em   = datetime.utcnow()
-                    etapa5.responsavel_id = usuario["id"]
-                    # Marcar etapa 6 (Aprovação do orçamento) como concluída
-                    etapa6 = db.query(CicloEtapa).filter_by(
-                        projeto_nome=nome_safe, etapa_codigo="6"
-                    ).first()
-                    if not etapa6:
-                        etapa6 = CicloEtapa(projeto_nome=nome_safe, etapa_codigo="6")
-                        db.add(etapa6)
-                    etapa6.status       = "concluido"
-                    etapa6.concluido_em = datetime.utcnow()
-                    etapa6.responsavel_id = usuario["id"]
+                    # A geração do contrato conclui a etapa Orçamento (4) — aprovar o
+                    # orçamento e gerar o contrato são a mesma transição (Orçamento → Contrato).
+                    _set_etapa_status(db, nome_safe, "4", "concluido", usuario["id"])
                     db.commit()
                     # Marcar etapa 7 como "em_andamento" (contrato gerado, aguardando assinatura)
                     etapa7 = db.query(CicloEtapa).filter_by(

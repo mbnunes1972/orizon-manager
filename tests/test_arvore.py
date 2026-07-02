@@ -50,7 +50,7 @@ def test_super_ve_projetos_com_agregacao(app_db, seed, com_etapas, ator_super):
     assert p["etapas_concluidas"] == 3
     assert p["etapa_atual_codigo"] == "4"
     assert p["etapa_atual_nome"] == "Orçamento"
-    assert p["total_etapas"] == 20
+    assert p["total_etapas"] == 18   # 20 - etapas 5 (Revisão) e 6 (Aprovação orçamento) eliminadas
 
 
 def test_projetos_sem_pii(app_db, seed, com_etapas, ator_super):

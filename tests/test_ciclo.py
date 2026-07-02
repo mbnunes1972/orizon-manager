@@ -8,6 +8,21 @@ def test_etapa_anterior():
     assert mc.etapa_anterior("11a") is None
 
 
+def test_etapas_revisao_e_aprovacao_orcamento_removidas():
+    # Etapas 5 (Revisão de projeto) e 6 (Aprovação do orçamento pelo cliente) foram
+    # eliminadas: o fluxo vai de Orçamento (4) direto para Contrato (7).
+    assert "5" not in mc.ETAPAS_PRINCIPAIS
+    assert "6" not in mc.ETAPAS_PRINCIPAIS
+    assert "5" not in mc.ETAPA_NOME
+    assert "6" not in mc.ETAPA_NOME
+
+
+def test_contrato_vem_logo_apos_orcamento():
+    assert mc.etapa_anterior("7") == "4"
+    assert mc.pode_avancar("7", {"4": "concluido"}) is True
+    assert mc.pode_avancar("7", {"4": "pendente"}) is False
+
+
 def test_ordenar_codigos_numerico_com_subetapas():
     entrada = ["10", "2", "11a", "11", "3", "1", "17a", "17"]
     assert mc.ordenar_codigos(entrada) == ["1", "2", "3", "10", "11", "11a", "17", "17a"]
