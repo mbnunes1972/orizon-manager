@@ -109,10 +109,7 @@ def _html_ambientes_linhas(itens_valores):
     """<tr>s da tabela de ambientes: 2 por linha; sobra ímpar em traços."""
     from html import escape
     n = len(itens_valores)
-    if n == 0:
-        # Lista vazia: 1 linha com 1 slot vazio
-        return "<tr>" + _cel_amb(_TRACO, _TRACO) + "</tr>"
-    n_linhas = (n + 1) // 2
+    n_linhas = max(1, (n + 1) // 2)
     linhas = []
     for k in range(n_linhas):
         cels = []

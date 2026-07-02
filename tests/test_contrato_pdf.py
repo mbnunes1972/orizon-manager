@@ -38,4 +38,4 @@ def test_html_ambientes_linhas_par_e_impar():
 def test_html_ambientes_linhas_vazio():
     from mod_contrato import _html_ambientes_linhas, _TRACO
     html = _html_ambientes_linhas([])
-    assert html.count("<tr") == 1 and html.count(_TRACO) == 2
+    assert html.count("<tr") == 1 and html.count(_TRACO) == 4
