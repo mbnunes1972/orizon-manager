@@ -176,9 +176,13 @@ def _nivel_clausula(texto):
 
 
 def _inline_md(texto):
-    """Formatação inline do Markdown (negrito/itálico), sem parsing de bloco."""
+    """Formatação inline do Markdown (negrito/itálico), sem parsing de bloco.
+
+    Protege runs de '_' (linhas de preenchimento, ex.: '(nome) __________') para o
+    Markdown não os tratar como ênfase e destruí-los."""
     import markdown
-    html = markdown.markdown(texto or "")
+    t = (texto or "").replace("_", "\x00u\x00")
+    html = markdown.markdown(t).replace("\x00u\x00", "_")
     m = _re2.match(r'^<p>(.*)</p>$', html, _re2.DOTALL)
     return m.group(1) if m else html
 
@@ -202,12 +206,15 @@ def _html_corpo(md_texto):
             # linha de assinatura (traço para assinar): espaço acima via CSS
             linhas.append(f'<p class="assinatura">{t}</p>')
             continue
+        alinea = _RE_ALINEA.match(t)
         nivel = _nivel_clausula(t)
-        if nivel is not None:
-            mnum = _RE_NUM.match(t) or _RE_ALINEA.match(t)
-            prefixo = t[:mnum.end()]        # ex.: "1.1. " ou "a) "
+        if alinea or nivel is not None:
+            if alinea:                       # a), b)… -> alínea
+                mnum, classe = alinea, "cl-alinea"
+            else:                            # cláusula numérica (nível ≥3 usa cl-3)
+                mnum, classe = _RE_NUM.match(t), f"cl-{min(nivel, 3)}"
+            prefixo = t[:mnum.end()]         # ex.: "1.1. " ou "a) "
             resto = t[mnum.end():]
-            classe = "cl-alinea" if nivel == 4 else f"cl-{nivel}"
             linhas.append(f'<p class="{classe}">{prefixo}{_inline_md(resto)}</p>')
         else:
             linhas.append(f'<p>{_inline_md(t)}</p>')
@@ -692,9 +699,17 @@ def _carregar_md():
 
 def _montar_html_contrato(ctx):
     """Monta o HTML final do contrato: capa + corpo, com [MARCADORES] substituídos."""
+    from html import escape
     pag = ctx.get("_pag", {})
     mapping = _montar_mapping(ctx, pag)
     mapping["TEXTO_COMPLEMENTAR"] = ctx.get("adendo", "") or ""
+    # escapa os VALORES dos marcadores (dados do cliente/loja/adendo) para HTML —
+    # nomes/endereços/adendo (texto livre) não podem corromper o documento.
+    # (o escape é aqui, no caminho HTML; _montar_mapping é compartilhado com a
+    #  proposta, que ainda gera .docx e não deve receber texto escapado.)
+    mapping = {k: escape(str(v)) for k, v in mapping.items()}
+    if mapping["TEXTO_COMPLEMENTAR"]:
+        mapping["TEXTO_COMPLEMENTAR"] = mapping["TEXTO_COMPLEMENTAR"].replace("\n", "<br>")
     shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"),
                  encoding="utf-8").read()
     capa = _html_capa(ctx)

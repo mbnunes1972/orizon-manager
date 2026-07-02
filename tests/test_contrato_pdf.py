@@ -159,3 +159,30 @@ def test_html_capa_inclui_consultor_e_rede_e_num_dir():
     assert "Consultor:" in h and "[CONSULTOR_NOME]" in h
     assert "cab-rede" in h and "[REDE_IDENTIFICADOR]" in h
     assert 'class="cab-dir"' in h and "[NUM_CONTRATO]" in h
+
+
+# ── Fixes da revisão final (escape, underscores, nível) ──────────────────────
+
+def test_inline_md_preserva_underscores():
+    from mod_contrato import _inline_md
+    out = _inline_md("(nome do representante) __________, CPF nº __________.")
+    assert "__________" in out
+    assert "<em>" not in out and "<strong>" not in out
+
+
+def test_montar_html_escapa_valores_e_adendo_multilinha():
+    from mod_contrato import _montar_html_contrato
+    ctx = {"_pag": {}, "_ambientes": [], "loja": {"cidade": "X"},
+           "cliente_nome": "A & B <script>", "adendo": "Linha 1 < & >\nLinha 2"}
+    html = _montar_html_contrato(ctx)
+    assert "<script>" not in html                     # nome do cliente escapado
+    assert "&lt;script&gt;" in html
+    assert "Linha 1 &lt; &amp; &gt;" in html          # adendo escapado
+    assert "<br>Linha 2" in html                      # adendo multilinha
+
+
+def test_html_corpo_clausula_4niveis_nao_vira_alinea():
+    from mod_contrato import _html_corpo
+    h = _html_corpo("2.3.4.1. Texto de subcláusula.\na) alinea de verdade.\n")
+    assert 'class="cl-3"' in h                         # 4º nível numérico usa cl-3
+    assert 'class="cl-alinea"' in h                    # a) continua alínea
