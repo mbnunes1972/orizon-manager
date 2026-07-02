@@ -913,6 +913,39 @@ Spec/plan em `docs/superpowers/{specs,plans}/2026-06-28-*`.
 A lista "etapa → documento" NÃO foi encontrada (busca em todos os transcripts + docs). Fonte provável:
 `1_FLUXO_DE_PROCESSOS.docx` (não está no repo, só com o usuário). Próximo passo do #8: obter essa lista.
 
+## Sessão 38 — Lista de ambientes com valor no contrato (branch `feat/ambientes-valor-contrato`)
+
+Frente desenhada (brainstorm→spec→plano) e implementada por SDD (5 tasks TDD, suíte **385**),
+**na branch `feat/ambientes-valor-contrato`** (empilhada sobre a `main`). Spec/plano em
+`docs/superpowers/{specs,plans}/2026-07-01-ambientes-valor-contrato*`. **Ainda não mergeada** —
+aguarda revisão final de branch + conferência visual do usuário.
+
+- **Capa do contrato** ganha a seção **"4. Ambientes"** (a "Forma de Pagamento" passa a **"5"**),
+  uma linha por ambiente do orçamento com o **valor com financiamento** + linha **Total** = `TOTAL_CONTRATO`.
+- **Valor por ambiente** = `Val_Cont_Amb = VAVA × (Val_Cont / VAVO)` — rateio do custo financeiro
+  proporcional ao VAVA (mesma conta que a tela de negociação já mostra na coluna "Com financiamento",
+  `static/index.html:5677`). Reconciliação de centavos no **último** ambiente (Σ = `Val_Cont` ao centavo).
+  Função pura `mod_contrato.ambientes_valor_contrato`.
+- **`mod_contrato._preencher_ambientes`** monta a tabela em código e a insere **antes** da grade de
+  parcelas (via `addprevious`); ambas as colunas justificadas à esquerda; células de valor entram nas
+  regiões editáveis do contrato protegido (a linha Total, não).
+- **Robustez:** `_preencher_grade` deixou de usar índice fixo (`doc.tables[3]`) e passou a localizar a
+  grade **por conteúdo** (`_localizar_tabela`, cabeçalho "forma de pagamento"), imune ao deslocamento.
+- **Fiação:** helper `_ambientes_valor_para_contrato` (reusa `_negociacao_breakdown`; mapeia
+  `pool_ambiente_id → nome_exibicao`) injeta `_ambientes` no ctx nas **duas** rotas de geração —
+  `POST` (criação) e `PATCH` (edição/regeneração). E2E real cobre as duas (guard RED→GREEN da PATCH).
+
+### Escopo / próxima frente
+- **Só o contrato** nesta frente. **Recriar o `modelo_proposta.docx`** para espelhar a 1ª página do
+  contrato (incluindo esta tabela de ambientes) é a **frente seguinte** (spec própria).
+
+### Notas / follow-ups (não bloqueiam)
+- A rota **PATCH** de contrato **não degrada graciosamente** sem LibreOffice (devolve 500, ao contrário
+  da POST que entrega o `.docx` com aviso) — **pré-existente**, candidato a follow-up. O `.docx` é
+  gerado mesmo assim; o E2E verifica a seção no arquivo (aceita status 200|500).
+- Minors (para a revisão final): assertions do E2E checam headers, não valores; `_ambientes_valor_para_contrato`
+  usa fallback nome vazio para id sem match (sem log); alinhamento do título "4. Ambientes" não setado explícito.
+
 ## ⏸️ ESTADO ATUAL (pausa 2026-06-28) — retomar aqui
 
 **`main`** consolidada e verde — **suíte 378 passed**. Servidor: `python3 main.py` (porta 8765).
