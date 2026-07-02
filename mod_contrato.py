@@ -112,6 +112,15 @@ def _aplica_mark(texto, mapping):
     return _MARK_RE.sub(repl, texto)
 
 
+def _substituir_marcadores_html(html, mapping):
+    """Substitui [MARCADOR] (case-insensitive, tolera '[[') numa string HTML/texto.
+    Chaves do mapping em MAIÚSCULAS sem colchetes. Marcador sem chave é mantido."""
+    def repl(m):
+        chave = m.group(1).strip().upper().replace(" ", "_")
+        return mapping[chave] if chave in mapping else m.group(0)
+    return _MARK_RE.sub(repl, html)
+
+
 def _subst_paragrafo(par, mapping, coletor=None):
     """Reconstrói o parágrafo em segmentos (texto fixo × valor substituído),
     preservando a formatação (``rPr``) de CADA run original.
