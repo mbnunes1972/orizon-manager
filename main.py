@@ -820,14 +820,13 @@ class Handler(BaseHTTPRequestHandler):
                     negociacao = json.loads(orc.negociacao_json) if (orc and orc.negociacao_json) else None
                     parametros = {}
                     if orc:
-                        from mod_orcamento_params import parametros_default_loja
                         _p = db.get(Projeto, orc.projeto_id)
                         if _p and _p.parametros_json:
-                            parametros = json.loads(_p.parametros_json)
+                            parametros = json.loads(_p.parametros_json)   # respeita o salvo (edições persistem)
                         else:
-                            # projeto sem params salvos: herda defaults da loja (incl. incluir_custos,
-                            # comissão do arquiteto e fidelidade configurados)
-                            parametros = parametros_default_loja(_cfg_financeira_loja(db, orc.loja_id))
+                            # projeto sem params salvos: valores iniciais (defaults da loja +
+                            # arquiteto/fidelidade do parceiro, se houver)
+                            parametros = _params_iniciais_projeto(db, orc.projeto_id, orc.loja_id)
                     self.send_json({"ok": True, "orcamento_id": oid,
                                     "desconto_pct": desconto_pct, "negociacao": negociacao,
                                     "parametros": parametros, "ambientes": ambientes})
@@ -1082,7 +1081,6 @@ class Handler(BaseHTTPRequestHandler):
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
                     return
-                from mod_orcamento_params import parametros_default_loja
                 db = get_session()
                 try:
                     ator = _ator_dict(db, usuario)
@@ -1095,7 +1093,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
                     par = (json.loads(p.parametros_json) if p.parametros_json
-                           else parametros_default_loja(_cfg_financeira_loja(db, loja_id)))
+                           else _params_iniciais_projeto(db, nome_safe, loja_id))
                     self.send_json({"ok": True, "parametros": par})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -4462,6 +4460,27 @@ def _cfg_financeira_loja(db, loja_id):
         except Exception:
             pass
     return mod_provisoes.config_financeira_default()
+
+
+def _params_iniciais_projeto(db, projeto_nome, loja_id):
+    """parametros de um projeto SEM parametros_json salvos: defaults da loja e — se houver
+    parceiro no projeto — comissão do arquiteto e fidelidade já ATIVAS (valores de cadastro).
+    % do arquiteto = o do próprio parceiro; se ausente, o default da loja. Fidelidade entra
+    sempre que houver parceiro. São apenas os valores INICIAIS: uma vez salvos em
+    parametros_json, passam a ser respeitados como estão (as edições persistem)."""
+    import mod_omie
+    from mod_orcamento_params import parametros_default_loja
+    par = parametros_default_loja(_cfg_financeira_loja(db, loja_id))
+    proj_json = mod_omie._carregar_projeto(projeto_nome) or {}
+    parceiro_id = proj_json.get("parceiro_id")
+    if parceiro_id:
+        parc = db.get(Parceiro, int(parceiro_id))
+        pct_parc = float(getattr(parc, "comissao_padrao_pct", 0) or 0) if parc else 0.0
+        par["comissao_arq_ativa"] = True
+        if pct_parc > 0:
+            par["comissao_arq_pct"] = pct_parc
+        par["fidelidade_ativa"] = True
+    return par
 
 
 def _negociacao_breakdown(orc, db):
