@@ -5707,12 +5707,15 @@ function abrirModalParams(){
     : (m.desconto_pct || 0);
   id('mp-desconto').value      = descontoAtual;
   // Auto-preenche comissão do parceiro se não estiver configurada
-  const comissaoArq = (m.comissao_arq_pct || 0) > 0
-    ? m.comissao_arq_pct
-    : (_parceiroAtivoProjeto?.comissao_padrao_pct || 0);
-  id('mp-arq-ativa').checked = !!(m.comissao_arq_ativa || (comissaoArq > 0 && !m.comissao_arq_pct));
+  // Item 2: com um parceiro inserido, comissão do arquiteto e fidelidade entram ATIVAS
+  // por padrão (mas editáveis aqui). % do arquiteto = o cadastrado no próprio parceiro;
+  // se ele não tiver, cai no default da loja/projeto. % de fidelidade = config da loja.
+  const temParceiro    = !!(_parceiroAtivoProjeto || (projetoAtivo && projetoAtivo.parceiro_id));
+  const pctArqParceiro = _parceiroAtivoProjeto?.comissao_padrao_pct || 0;
+  const comissaoArq    = pctArqParceiro > 0 ? pctArqParceiro : (m.comissao_arq_pct || 0);
+  id('mp-arq-ativa').checked = !!(m.comissao_arq_ativa || (temParceiro && comissaoArq > 0));
   id('mp-arq-pct').value     = comissaoArq || 0;
-  id('mp-fid-ativa').checked = !!m.fidelidade_ativa;
+  id('mp-fid-ativa').checked = !!(m.fidelidade_ativa || (temParceiro && (m.fidelidade_pct || 0) > 0));
   id('mp-fid-pct').value     = m.fidelidade_pct || 0;
   id('mp-fora-sede').checked  = !!m.fora_da_sede;
   id('mp-viagem').value       = m.custo_viagem   || 0;
