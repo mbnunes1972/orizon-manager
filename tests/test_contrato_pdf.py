@@ -39,3 +39,22 @@ def test_html_ambientes_linhas_vazio():
     from mod_contrato import _html_ambientes_linhas, _TRACO
     html = _html_ambientes_linhas([])
     assert html.count("<tr") == 1 and html.count(_TRACO) == 4
+
+
+def test_html_parcelas_linhas_elimina_vazias_e_tracos():
+    from mod_contrato import _html_parcelas_linhas, _TRACO
+    pag = {"tipo": "aymore", "num_parcelas_int": 4,
+           "valores": ["R$ 4.000,00"] * 4 + [""] * 20,
+           "datas": ["10/08/2026", "10/09/2026", "10/10/2026", "10/11/2026"] + [""] * 20}
+    html = _html_parcelas_linhas(pag)
+    assert html.count("<tr") == 2                       # 4 parcelas -> ceil(4/3)=2 linhas
+    assert "R$ 4.000,00" in html and "10/08/2026" in html
+    assert _TRACO in html                               # slots 5,6 vazios na 2a linha
+
+
+def test_html_parcelas_linhas_cartao_sem_data():
+    from mod_contrato import _html_parcelas_linhas
+    pag = {"tipo": "cartao", "num_parcelas_int": 3,
+           "valores": ["R$ 100,00"] * 3 + [""] * 21, "datas": [""] * 24}
+    html = _html_parcelas_linhas(pag)
+    assert html.count("<tr") == 1 and html.count("R$ 100,00") == 3

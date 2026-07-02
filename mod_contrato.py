@@ -124,6 +124,29 @@ def _html_ambientes_linhas(itens_valores):
     return "\n".join(linhas)
 
 
+def _html_parcelas_linhas(pag):
+    """<tr>s da grade de parcelas: 3 por linha, só linhas usadas, tracos no resto."""
+    tipo = pag.get("tipo", "")
+    num = pag.get("num_parcelas_int", 0)
+    valores = pag.get("valores", [""] * 24)
+    datas = pag.get("datas", [""] * 24)
+    n_linhas = (num + 2) // 3  # ceil(num/3)
+    linhas = []
+    for gi in range(n_linhas):
+        cels = []
+        for j in range(3):
+            p = gi * 3 + j + 1  # 1-based
+            if p <= num and valores[p - 1]:
+                val = valores[p - 1]
+                data = "" if tipo == "cartao" else (datas[p - 1] or _TRACO)
+            else:
+                val, data = _TRACO, _TRACO
+            cels.append(f'<td class="pc-valor">{val}</td>'
+                        f'<td class="pc-data">{data}</td>')
+        linhas.append("<tr>" + "".join(cels) + "</tr>")
+    return "\n".join(linhas)
+
+
 # ── Motor de substituição de marcadores [MARCADOR] ────────────────────────────
 
 import re as _re_mark
