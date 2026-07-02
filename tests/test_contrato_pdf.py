@@ -113,3 +113,25 @@ def test_montar_html_contrato_substitui_e_inclui_secoes():
     assert "Cozinha" in html and "R$ 12.345,67" in html
     assert "R$ 4.820,00" in html                     # parcela
     assert "[" not in html.split("contrato-corpo")[0] or "NOME_" not in html  # marcadores da capa consumidos
+
+
+@skip_sem_weasy
+def test_gerar_pdf_contrato_gera_pdf(tmp_path):
+    import json, os
+    from mod_contrato import gerar_pdf_contrato, construir_contexto
+    loja = {"nome": "L", "cnpj": "1", "codigo": "INS",
+            "testemunha1_nome": "J", "testemunha1_cpf": "1",
+            "testemunha2_nome": "F", "testemunha2_cpf": "2"}
+    ctx = construir_contexto(
+        {"nome": "Ana", "cpf": "1", "email": "a@x", "telefone": "1", "logradouro": "R",
+         "numero": "1", "complemento": "", "bairro": "C", "cidade": "S", "cep": "1",
+         "estado": "SP", "inst_mesmo_residencial": True},
+        {"nome": "Z", "telefone": "1", "email": "z@x"},
+        json.dumps({"tipo": "aymore", "nome_forma": "A", "total_cliente": 100.0,
+                    "parcelas": [{"num": 1, "data": "18/07/2026", "valor": 100.0}]}),
+        loja)
+    ctx["num_contrato"] = "INS-1"; ctx["_ambientes"] = [("Cozinha", 100.0)]
+    path = gerar_pdf_contrato(99001, ctx, destino=str(tmp_path))
+    assert path.endswith(".pdf") and os.path.getsize(path) > 1000
+    with open(path, "rb") as f:
+        assert f.read(5) == b"%PDF-"

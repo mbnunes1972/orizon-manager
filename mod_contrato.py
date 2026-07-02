@@ -1016,13 +1016,15 @@ def _converter_pdf(docx_path: str, outdir: str = None) -> str:
     return os.path.join(destino, f"{base}.pdf")
 
 
-def gerar_pdf_contrato(contrato_id: int, variaveis: dict) -> str:
-    """
-    Preenche o modelo de contrato com os dados de variaveis e converte para PDF.
-    Retorna o caminho do PDF (ou .docx se LibreOffice indisponível).
-    """
-    docx_path = preencher_contrato(contrato_id, variaveis)
-    return _converter_pdf(docx_path)
+def gerar_pdf_contrato(contrato_id: int, ctx: dict, destino: str = None) -> str:
+    """Renderiza o contrato (HTML -> PDF) via WeasyPrint. Retorna o caminho do PDF."""
+    from weasyprint import HTML
+    destino = destino or CONTRATOS_DIR
+    os.makedirs(destino, exist_ok=True)
+    html = _montar_html_contrato(ctx)
+    pdf_path = os.path.join(destino, f"contrato_{contrato_id}.pdf")
+    HTML(string=html, base_url=CONTRATO_TEMPLATE_DIR).write_pdf(pdf_path)
+    return pdf_path
 
 
 # ── Legado — mantido para compatibilidade com chamadas antigas ────────────────
