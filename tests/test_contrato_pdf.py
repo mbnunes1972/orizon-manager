@@ -58,3 +58,22 @@ def test_html_parcelas_linhas_cartao_sem_data():
            "valores": ["R$ 100,00"] * 3 + [""] * 21, "datas": [""] * 24}
     html = _html_parcelas_linhas(pag)
     assert html.count("<tr") == 1 and html.count("R$ 100,00") == 3
+
+
+def test_nivel_clausula():
+    from mod_contrato import _nivel_clausula
+    assert _nivel_clausula("2. Após a assinatura...") == 1
+    assert _nivel_clausula("2.3. A execução...") == 2
+    assert _nivel_clausula("2.3.1. O Termo...") == 3
+    assert _nivel_clausula("a) MEDIÇÃO: ...") == 4
+    assert _nivel_clausula("Texto sem número") is None
+
+
+def test_html_corpo_aplica_classe_por_nivel():
+    from mod_contrato import _html_corpo
+    md = "# CLÁUSULA PRIMEIRA\n\n1\\. Item um.\n\n1.1. Sub item.\n\na) alinea.\n"
+    html = _html_corpo(md)
+    assert "<h1" in html or "<h2" in html            # título de cláusula
+    assert 'class="cl-1"' in html and "Item um" in html
+    assert 'class="cl-2"' in html
+    assert 'class="cl-alinea"' in html

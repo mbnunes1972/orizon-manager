@@ -152,6 +152,42 @@ def _html_parcelas_linhas(pag):
 import re as _re_mark
 _MARK_RE = _re_mark.compile(r'\[+\s*([A-Za-z0-9_ ]+?)\s*\]')
 
+# ── Nível de cláusula + Markdown→HTML ──────────────────────────────────────────
+
+import re as _re2
+
+_RE_NUM = _re2.compile(r'^\s*(\d+(?:\.\d+)*)\.\s')
+_RE_ALINEA = _re2.compile(r'^\s*[a-z]\)\s')
+
+
+def _nivel_clausula(texto):
+    """Detecta o nível de uma cláusula pela numeração literal.
+
+    2. → 1, 2.3. → 2, 2.3.1. → 3, a) → 4, caso contrário None.
+    """
+    m = _RE_NUM.match(texto or "")
+    if m:
+        return m.group(1).count(".") + 1
+    if _RE_ALINEA.match(texto or ""):
+        return 4
+    return None
+
+
+def _html_corpo(md_texto):
+    """Markdown -> HTML com classe cl-N por nível de cláusula (numeração literal)."""
+    import markdown
+    html = markdown.markdown(md_texto, output_format="html5")
+
+    def _classificar(m):
+        interno = m.group(1)
+        nivel = _nivel_clausula(interno)
+        if nivel is None:
+            return m.group(0)
+        classe = "cl-alinea" if nivel == 4 else f"cl-{nivel}"
+        return f'<p class="{classe}">{interno}</p>'
+
+    return _re2.sub(r'<p>(.*?)</p>', _classificar, html, flags=_re2.DOTALL)
+
 
 def _aplica_mark(texto, mapping):
     def repl(m):
