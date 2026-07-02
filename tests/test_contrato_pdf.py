@@ -87,3 +87,29 @@ def test_assets_template_existem():
         assert os.path.exists(os.path.join(CONTRATO_TEMPLATE_DIR, f)), f
     shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"), encoding="utf-8").read()
     assert "<!--CAPA-->" in shell and "<!--CORPO-->" in shell
+
+
+def test_montar_html_contrato_substitui_e_inclui_secoes():
+    import json
+    from mod_contrato import construir_contexto, _montar_html_contrato
+    loja = {"nome": "L", "cnpj": "1", "codigo": "INS",
+            "testemunha1_nome": "J", "testemunha1_cpf": "1",
+            "testemunha2_nome": "F", "testemunha2_cpf": "2"}
+    ctx = construir_contexto(
+        {"nome": "Ana Paula", "cpf": "111.222.333-44", "email": "a@x.com",
+         "telefone": "(12)9", "logradouro": "Rua A", "numero": "10", "complemento": "",
+         "bairro": "Jardim Aquarius", "cidade": "SJC", "cep": "12000", "estado": "SP",
+         "inst_mesmo_residencial": True},
+        {"nome": "Z", "telefone": "(12)9", "email": "z@x.com"},
+        json.dumps({"tipo": "aymore", "nome_forma": "Aymoré", "total_cliente": 26445.67,
+                    "parcelas": [{"num": i + 1, "data": f"18/0{7+i}/2026", "valor": 4820.0}
+                                 for i in range(3)]}),
+        loja)
+    ctx["num_contrato"] = "INS-1"
+    ctx["adendo"] = "Acordo especial de entrega."
+    ctx["_ambientes"] = [("Cozinha", 12345.67), ("Sala", 14100.0)]
+    html = _montar_html_contrato(ctx)
+    assert "Ana Paula" in html and "Jardim Aquarius" in html
+    assert "Cozinha" in html and "R$ 12.345,67" in html
+    assert "R$ 4.820,00" in html                     # parcela
+    assert "[" not in html.split("contrato-corpo")[0] or "NOME_" not in html  # marcadores da capa consumidos

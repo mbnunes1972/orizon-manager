@@ -767,6 +767,108 @@ def _montar_mapping(ctx, pag):
     }
 
 
+def _html_capa(ctx):
+    """Monta o HTML da capa (identificação, endereços, ambientes e pagamento).
+
+    Consome _html_ambientes_linhas/_html_parcelas_linhas para as linhas dinâmicas
+    e deixa os demais campos como [MARCADORES] a serem resolvidos por
+    _substituir_marcadores_html() com o mapping de _montar_mapping().
+    """
+    amb = _html_ambientes_linhas(ctx.get("_ambientes") or [])
+    parc = _html_parcelas_linhas(ctx.get("_pag") or {})
+    return f"""
+<div id="cabecalho">
+  <img class="logo" src="logo_dalmobile.png">
+  <span class="num">[NUM_CONTRATO]<br>[DATA_CONTRATO]</span>
+</div>
+
+<div class="secao">
+  <div class="titulo">1. Identificação do Cliente</div>
+  <table><tr>
+    <td><span class="rotulo">Nome</span><span class="valor">[NOME_CLIENTE]</span></td>
+    <td><span class="rotulo">CPF/CNPJ</span><span class="valor">[CPF]</span></td>
+  </tr><tr>
+    <td><span class="rotulo">E-mail</span><span class="valor">[EMAIL]</span></td>
+    <td><span class="rotulo">Telefone</span><span class="valor">[TELEFONE]</span></td>
+  </tr></table>
+</div>
+
+<div class="secao">
+  <div class="titulo">2. Endereço Residencial</div>
+  <table><tr>
+    <td colspan="3"><span class="rotulo">Logradouro</span><span class="valor">[RES_LOGRADOURO]</span></td>
+  </tr><tr>
+    <td><span class="rotulo">Número</span><span class="valor">[RES_NUMERO]</span></td>
+    <td><span class="rotulo">Complemento</span><span class="valor">[RES_COMPLEMENTO]</span></td>
+    <td><span class="rotulo">Bairro</span><span class="valor">[RES_BAIRRO]</span></td>
+  </tr><tr>
+    <td><span class="rotulo">Cidade</span><span class="valor">[RES_CIDADE]</span></td>
+    <td><span class="rotulo">CEP</span><span class="valor">[RES_CEP]</span></td>
+    <td><span class="rotulo">Estado/UF</span><span class="valor">[RES_UF]</span></td>
+  </tr></table>
+</div>
+
+<div class="secao">
+  <div class="titulo">3. Endereço de Instalação</div>
+  <table><tr>
+    <td colspan="3"><span class="rotulo">Logradouro</span><span class="valor">[INST_LOGRADOURO]</span></td>
+  </tr><tr>
+    <td><span class="rotulo">Número</span><span class="valor">[INST_NUMERO]</span></td>
+    <td><span class="rotulo">Complemento</span><span class="valor">[INST_COMPLEMENTO]</span></td>
+    <td><span class="rotulo">Bairro</span><span class="valor">[INST_BAIRRO]</span></td>
+  </tr><tr>
+    <td><span class="rotulo">Cidade</span><span class="valor">[INST_CIDADE]</span></td>
+    <td><span class="rotulo">CEP</span><span class="valor">[INST_CEP]</span></td>
+    <td><span class="rotulo">Estado/UF</span><span class="valor">[INST_UF]</span></td>
+  </tr></table>
+</div>
+
+<div class="secao">
+  <div class="titulo">4. Ambientes do Projeto</div>
+  <table>
+    {amb}
+    <tr><td class="total-lbl" colspan="2">VALOR DO CONTRATO</td>
+        <td class="total-val" colspan="2">[TOTAL_CONTRATO]</td></tr>
+  </table>
+</div>
+
+<div class="secao">
+  <div class="titulo">5. Forma de Pagamento</div>
+  <table><tr>
+    <td><span class="rotulo">Entrada</span><span class="valor">[VALOR_ENTRADA]</span></td>
+    <td><span class="rotulo">Tipo</span><span class="valor">[FORMA_ENTRADA]</span></td>
+    <td><span class="rotulo">Data</span><span class="valor">[DATA_ENTRADA]</span></td>
+  </tr><tr>
+    <td><span class="rotulo">Modalidade</span><span class="valor">[MODALIDADE]</span></td>
+    <td><span class="rotulo">Parcelas</span><span class="valor">[NUM_PARCELAS] / [TIPO]</span></td>
+    <td><span class="rotulo">Valor do Contrato</span><span class="valor">[TOTAL_CONTRATO]</span></td>
+  </tr></table>
+  <table>{parc}</table>
+</div>
+
+<div class="quebra-capa"></div>
+"""
+
+
+def _carregar_md():
+    """Lê contrato_template/contrato.md; retorna "" se o arquivo ainda não existir."""
+    p = os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.md")
+    return open(p, encoding="utf-8").read() if os.path.exists(p) else ""
+
+
+def _montar_html_contrato(ctx):
+    """Monta o HTML final do contrato: capa + corpo, com [MARCADORES] substituídos."""
+    pag = ctx.get("_pag", {})
+    mapping = _montar_mapping(ctx, pag)
+    mapping["TEXTO_COMPLEMENTAR"] = ctx.get("adendo", "") or ""
+    shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"),
+                 encoding="utf-8").read()
+    capa = _html_capa(ctx)
+    corpo = _html_corpo(_carregar_md())
+    html = shell.replace("<!--CAPA-->", capa).replace("<!--CORPO-->", corpo)
+    return _substituir_marcadores_html(html, mapping)
+
+
 def preencher_contrato(contrato_id: int, ctx: dict, protegido: bool = True) -> str:
     """
     Preenche modelo_contrato_mapeado.docx com os dados de ctx e salva
