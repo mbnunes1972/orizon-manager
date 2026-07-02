@@ -173,20 +173,39 @@ def _nivel_clausula(texto):
     return None
 
 
-def _html_corpo(md_texto):
-    """Markdown -> HTML com classe cl-N por nível de cláusula (numeração literal)."""
+def _inline_md(texto):
+    """Formatação inline do Markdown (negrito/itálico), sem parsing de bloco."""
     import markdown
-    html = markdown.markdown(md_texto, output_format="html5")
+    html = markdown.markdown(texto or "")
+    m = _re2.match(r'^<p>(.*)</p>$', html, _re2.DOTALL)
+    return m.group(1) if m else html
 
-    def _classificar(m):
-        interno = m.group(1)
-        nivel = _nivel_clausula(interno)
-        if nivel is None:
-            return m.group(0)
-        classe = "cl-alinea" if nivel == 4 else f"cl-{nivel}"
-        return f'<p class="{classe}">{interno}</p>'
 
-    return _re2.sub(r'<p>(.*?)</p>', _classificar, html, flags=_re2.DOTALL)
+def _html_corpo(md_texto):
+    """Corpo (cláusulas com números literais) em HTML, linha a linha.
+    Linhas '1.'/'1.1.'/'a)' viram <p class="cl-N"> (NÃO <li> de lista ordenada);
+    '#'/'##' viram <h1>/<h2>; o número literal é preservado como texto e o
+    Markdown é aplicado só ao texto após o número (inline)."""
+    linhas = []
+    for bruta in md_texto.splitlines():
+        t = bruta.strip()
+        if not t:
+            continue
+        mh = _re2.match(r'^(#{1,6})\s+(.*)$', t)
+        if mh:
+            lvl = len(mh.group(1))
+            linhas.append(f"<h{lvl}>{_inline_md(mh.group(2))}</h{lvl}>")
+            continue
+        nivel = _nivel_clausula(t)
+        if nivel is not None:
+            mnum = _RE_NUM.match(t) or _RE_ALINEA.match(t)
+            prefixo = t[:mnum.end()]        # ex.: "1.1. " ou "a) "
+            resto = t[mnum.end():]
+            classe = "cl-alinea" if nivel == 4 else f"cl-{nivel}"
+            linhas.append(f'<p class="{classe}">{prefixo}{_inline_md(resto)}</p>')
+        else:
+            linhas.append(f'<p>{_inline_md(t)}</p>')
+    return "\n".join(linhas)
 
 
 def _aplica_mark(texto, mapping):

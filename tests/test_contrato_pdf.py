@@ -71,9 +71,10 @@ def test_nivel_clausula():
 
 def test_html_corpo_aplica_classe_por_nivel():
     from mod_contrato import _html_corpo
-    md = "# CLÁUSULA PRIMEIRA\n\n1\\. Item um.\n\n1.1. Sub item.\n\na) alinea.\n"
+    md = "# CLÁUSULA PRIMEIRA\n\n1. Item um.\n\n1.1. Sub item.\n\na) alinea.\n"
     html = _html_corpo(md)
-    assert "<h1" in html or "<h2" in html            # título de cláusula
+    assert "<h1" in html
     assert 'class="cl-1"' in html and "Item um" in html
-    assert 'class="cl-2"' in html
-    assert 'class="cl-alinea"' in html
+    assert 'class="cl-2"' in html and "Sub item" in html
+    assert 'class="cl-alinea"' in html and "alinea" in html
+    assert "<li>" not in html and "<ol>" not in html   # não vira lista ordenada
