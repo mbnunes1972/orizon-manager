@@ -1,7 +1,7 @@
 # Dependências de runtime do Omie_V3
 # Local (dev): pip install -r requirements.txt
 # Servidor (Ubuntu 24.04 / PEP 668): instalar via apt —
-#   apt install -y python3-docx python3-openpyxl python3-requests python3-sqlalchemy python3-weasyprint python3-markdown
+#   apt install -y python3-docx python3-openpyxl python3-requests python3-sqlalchemy weasyprint python3-markdown
 python-docx
 openpyxl
 requests
