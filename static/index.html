@@ -1857,6 +1857,7 @@ let _descIndividual = {};   // { arquivo: pct } desconto individual por ambiente
 let _descAdicional  = {};   // legado — mantido por compat
 let _margemAtual    = 0;    // % calculada por mpAtualizarApoio — usado para validar limite 35%
 let _margemRealVal  = null; // {cust_var, marg_cont} — exibido sob cadeado de impostos
+let _negTaxaRetencaoPct = 0; // taxa de retenção da modalidade ATIVA (Aymoré/Cartão>0; VP/TF/À-Vista=0)
 const _LIMITE_DESC_TOTAL = 35;
 let _selLocal = {};           // { arquivo: bool } estado local dos checkboxes
 
@@ -3527,12 +3528,17 @@ async function negValorTotalConfirmar(valStr){
   };
   restaurar();
   if (el._esc) { el._esc = false; reverter(); return; }
-  const total = parseFloat((valStr||'').trim()
+  // O valor digitado é o VALOR DE CONTRATO (inclui o custo financeiro da modalidade).
+  const valorContrato = parseFloat((valStr||'').trim()
     .replace(/[^0-9.,]/g,'').replace(/\./g,'').replace(',','.')) || 0;
   const bruto = negValorBrutoAtual();
-  if (total <= 0 || bruto <= 0) { reverter(); return; }
-  // desconto global equivalente: valor à vista = valor bruto × (1 - desc%)
-  const discPct = Math.max(0, parseFloat(((1 - total/bruto) * 100).toFixed(4)));
+  if (valorContrato <= 0 || bruto <= 0) { reverter(); return; }
+  // 1) remove o custo financeiro pela taxa de retenção que a modalidade ATIVA já calculou
+  //    (propriedade do plano de parcelas/entrada, independente do desconto; À-Vista/VP/TF = 0).
+  const taxaRet = Number(_negTaxaRetencaoPct) || 0;
+  const valorAvista = valorContrato * (1 - taxaRet/100);
+  // 2) desconto global equivalente: valor à vista = valor bruto × (1 - desc%)
+  const discPct = Math.max(0, parseFloat(((1 - valorAvista/bruto) * 100).toFixed(4)));
   const max = cfgGetDescontoMax();
 
   const aplicar = async () => {
@@ -3559,7 +3565,7 @@ async function negValorTotalConfirmar(valStr){
       if (typeof _tipoAtivo !== 'undefined' && _tipoAtivo === 'avista') {
         const p = document.getElementById('painel-avista');
         if (p && p.style.display !== 'none') avistaRecalcular();
-        else negMostrarParcelado(total);
+        else negMostrarParcelado(valorContrato);   // à-vista: retenção 0 → contrato = à-vista
       }
     } else {
       // legado: recalcula direto de _negBaseValues e reexibe a faixa superior
@@ -3796,6 +3802,7 @@ async function atualizarAymore() {
   document.getElementById('ay-r-total-cliente').textContent = 'R$ '+fmt(d.total_cliente);
   document.getElementById('ay-r-retencao').textContent    = d.taxa_retencao_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%';
   document.getElementById('ay-r-retencao-rs').textContent = 'R$ '+fmt(d.retencao_rs);
+  _negTaxaRetencaoPct = Number(d.taxa_retencao_pct) || 0;   // à-vista = total_cliente × (1 − retenção)
   document.getElementById('ay-r-parcela').textContent     = 'R$ '+fmt(d.valor_parcela);
   document.getElementById('ay-r-taxa').textContent        = d.taxa_mensal_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%';
 
@@ -3909,6 +3916,7 @@ async function atualizarCartao() {
   document.getElementById('cc-r-total-cliente').textContent = 'R$ '+fmt(d.total_cliente);
   document.getElementById('cc-r-retencao').textContent    = d.taxa_retencao_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%';
   document.getElementById('cc-r-retencao-rs').textContent = 'R$ '+fmt(d.retencao_rs);
+  _negTaxaRetencaoPct = Number(d.taxa_retencao_pct) || 0;   // à-vista = total_cliente × (1 − retenção)
   document.getElementById('cc-r-parcela').textContent     = 'R$ '+fmt(d.valor_parcela);
   const elLiq = document.getElementById('cc-r-liquidacao');
   if (elLiq) elLiq.textContent = d.liquidacao || '1 dia util';
@@ -4085,6 +4093,7 @@ async function atualizarVP() {
   // Contratos grandes
   document.getElementById('vp-c-avista').textContent      = 'R$ ' + fmt(d.valor_liberado);
   document.getElementById('vp-c-avista-sub').textContent  = 'Sem retencao — parcelado direto';
+  _negTaxaRetencaoPct = 0;   // VP: sem retenção → à-vista = total_cliente
   document.getElementById('vp-c-parcelado').textContent   = 'R$ ' + fmt(d.total_cliente);
   document.getElementById('vp-c-parcelado-sub').textContent =
     n + 'x R$ ' + fmt(d.valor_parcela) + (entrada > 0 ? ' | entrada R$ ' + fmt(entrada) : '');
@@ -4443,6 +4452,7 @@ function avistaMostrarPainel(mostrar) {
 }
 
 function avistaRecalcular() {
+  _negTaxaRetencaoPct = 0;   // À-Vista: sem retenção → contrato = à-vista
   const total   = _ayGetValorVenda() || 0;
   negMostrarParcelado(total);   // "Valor Total do Contrato" = Valor à Vista (à vista)
   const entrada = parseMoeda(document.getElementById('av-entrada-valor')?.value) || 0;
@@ -4634,6 +4644,7 @@ async function atualizarTF() {
   const totalCliente = Math.round((entrada + res.total_pago) * 100) / 100;
   document.getElementById('tf-c-avista').textContent     = 'R$ ' + fmt(valorAvista);
   document.getElementById('tf-c-avista-sub').textContent = 'Parcelado direto, sem retencao';
+  _negTaxaRetencaoPct = 0;   // TF: parcelado direto, sem retenção → à-vista = total_cliente
   document.getElementById('tf-c-total').textContent      = 'R$ ' + fmt(totalCliente);
   document.getElementById('tf-c-total-sub').textContent  =
     n_parc + 'x — juros R$ ' + fmt(res.total_juros) +
