@@ -1057,6 +1057,26 @@ mais casos em `test_ciclo`/`test_orcamento_params`/`test_provisoes`. **Pendênci
 das provisões (custos adicionais editáveis recalculando margem) se o usuário quiser; IDOR completo do
 escopo por projetista.
 
+## Sessão 43 — Padronização da tela de Negociação + fix desconto por ambiente (main)
+
+Rodada de UI da negociação (5 commits direto na `main`, após o merge da Sessão 42) + 1 correção.
+Frontend-only (`static/index.html`), verificação manual. Spec:
+`docs/superpowers/specs/2026-07-03-negociacao-ui-uniforme-design.md`.
+
+- **Faixa superior:** Valor Bruto → Desconto → Valor à Vista → **Valor Total do Contrato** (célula
+  nova à direita; nas modalidades com financiamento = total parcelado; no À Vista = Valor à Vista).
+- **Formulário uniforme (uma linha):** Data do Contrato, Entrada, Data da Entrada + campo específico
+  (Aymoré: Carência; Cartão: Bandeira; Total Flex: Prazo; Venda Programada: só os 3). Campos
+  calculados/informativos ocultos (1ª parcela, prazo limite).
+- **Faixa central** (Contrato a Vista/Parcelado) e **cards de resumo** (`cards-3x2`: Loja Recebe,
+  Cliente Paga, Valor/Parcela, Custo Financeiro, Taxa de Retenção, Liquidação…) **removidos de todas
+  as modalidades** (ids preservados ocultos; avisos de prazo VP/TF permanecem).
+- **Provisão de Impostos:** linha fina uniforme com **cadeado liberável por senha** (mecanismo
+  `_renderImpostosLock` intacto; mesmos ids `{p}-r-base-trib`/`-r-impostos`).
+- **Fix — desconto por ambiente acima do limite:** revertia o campo mas mantinha o desconto aplicado
+  (o motor computava antes da checagem de limite e não re-rodava). Agora re-roda `negPreview()` e
+  re-persiste após reverter.
+
 ## ⏸️ ESTADO ATUAL (2026-07-03) — retomar aqui
 
 **`main`** consolidada e verde — **suíte 395 passed**. Servidor: `python3 main.py` (porta 8765).
