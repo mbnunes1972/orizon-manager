@@ -857,12 +857,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <div class="c-card"><div class="c-card-lbl">Taxa Retencao</div><div id="ay-r-retencao" class="c-card-val warn">—</div></div>
           <div class="c-card"><div class="c-card-lbl">Taxa Mensal</div><div id="ay-r-taxa" class="c-card-val">—</div></div>
         </div>
-        <!-- Provisão de Impostos: sempre oculta — linha fina com cadeado -->
-        <div class="tf-tax-box" style="padding:6px 12px;display:flex;align-items:center;gap:8px">
-          <span style="color:var(--warn)">&#x1F512;</span>
-          <span style="font-size:.8rem;color:var(--muted)">Impostos</span>
-          <span id="ay-r-base-trib" style="display:none"></span>
-          <span id="ay-r-impostos" style="display:none"></span>
+        <!-- Impostos: linha fina com cadeado liberável por senha (mesmo aspecto em todas) -->
+        <div class="tf-tax-box" style="padding:7px 12px;display:flex;align-items:center;gap:10px;font-size:.78rem;color:var(--muted)">
+          <span id="ay-r-impostos" class="c-card-val warn" style="cursor:pointer">&#x1F512;</span>
+          <span style="font-weight:600;color:var(--text)">Impostos</span>
+          <span style="margin-left:auto">Base de cálculo</span>
+          <span id="ay-r-base-trib" class="c-card-val" style="margin-left:4px">&#x1F512;</span>
         </div>
         <div class="plano-wrap">
           <div class="plano-hdr">Plano de Pagamento</div>
@@ -877,11 +877,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Painel Cartão -->
     <div class="mod-panel" id="painel-cartao" style="display:none">
       <div class="mod-panel-title" id="painel-cartao-titulo">&#x1F4B3; Cartao de Credito</div>
-      <div class="mod-grid">
+      <div class="mod-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div>
+          <label>Data do Contrato</label>
+          <input type="date" id="cc-data-contrato" oninput="atualizarCartao()">
+        </div>
         <div>
           <label>Entrada (R$) <span id="cc-entrada-pct" style="color:var(--accent);font-size:10px"></span></label>
           <input type="number" id="cc-entrada" value="0" min="0" step="100" oninput="atualizarCartao()">
           <div id="cc-hint-financiado" style="font-size:10px;color:var(--ok);margin-top:4px"></div>
+        </div>
+        <div>
+          <label>Data da entrada</label>
+          <input type="date" id="cc-entrada-data" oninput="atualizarCartao()">
         </div>
         <div>
           <label>Bandeira</label>
@@ -890,25 +898,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             <option value="Mastercard">Mastercard</option>
           </select>
         </div>
-        <div>
-          <label>Data da entrada</label>
-          <input type="date" id="cc-entrada-data" oninput="atualizarCartao()">
-          <input type="date" id="cc-data-contrato" style="display:none" oninput="atualizarCartao()">
-        </div>
       </div>
       <div id="cc-resumo" style="display:none">
-        <div class="contrato-grid">
-          <div class="card-teal">
-            <div class="c-label">Contrato a Vista — Loja Recebe</div>
-            <div id="cc-c-avista" class="c-value">R$ —</div>
-            <div id="cc-c-avista-sub" class="c-sub">Apos retencao do banco</div>
-          </div>
-          <div class="card-amber">
-            <div class="c-label">Contrato Parcelado — Cliente Paga</div>
-            <div id="cc-c-parcelado" class="c-value">R$ —</div>
-            <div id="cc-c-parcelado-sub" class="c-sub">Total pago pelo cliente</div>
-          </div>
-        </div>
+        <span id="cc-c-avista" style="display:none"></span><span id="cc-c-avista-sub" style="display:none"></span>
+        <span id="cc-c-parcelado" style="display:none"></span><span id="cc-c-parcelado-sub" style="display:none"></span>
         <div class="cards-3x2">
           <div class="c-card"><div class="c-card-lbl">Loja Recebe</div><div id="cc-r-liberado" class="c-card-val ok">—</div></div>
           <div class="c-card"><div class="c-card-lbl">Cliente Paga</div><div id="cc-r-total-cliente" class="c-card-val">—</div></div>
@@ -917,12 +910,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <div class="c-card"><div class="c-card-lbl">Taxa Retencao</div><div id="cc-r-retencao" class="c-card-val warn">—</div></div>
           <div class="c-card"><div class="c-card-lbl">Liquidacao</div><div id="cc-r-liquidacao" class="c-card-val">1 dia util</div></div>
         </div>
-        <div class="tf-tax-box">
-          <div class="tf-tax-title">&#x1F4CA; Provisao de Impostos — apenas referencia, nao altera o contrato</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div class="c-card"><div class="c-card-lbl">Base de Calculo</div><div id="cc-r-base-trib" class="c-card-val">—</div></div>
-            <div class="c-card"><div class="c-card-lbl">Provisao Impostos</div><div id="cc-r-impostos" class="c-card-val warn">—</div></div>
-          </div>
+        <!-- Impostos: linha fina com cadeado liberável por senha (mesmo aspecto em todas) -->
+        <div class="tf-tax-box" style="padding:7px 12px;display:flex;align-items:center;gap:10px;font-size:.78rem;color:var(--muted)">
+          <span id="cc-r-impostos" class="c-card-val warn" style="cursor:pointer">&#x1F512;</span>
+          <span style="font-weight:600;color:var(--text)">Impostos</span>
+          <span style="margin-left:auto">Base de cálculo</span>
+          <span id="cc-r-base-trib" class="c-card-val" style="margin-left:4px">&#x1F512;</span>
         </div>
         <div class="plano-wrap">
           <div class="plano-hdr">Plano de Pagamento</div>
@@ -937,7 +930,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Painel Venda Programada -->
     <div class="mod-panel" id="painel-vp" style="display:none">
       <div class="mod-panel-title">&#x1F4C5; Venda Programada</div>
-      <div class="mod-grid" style="grid-template-columns:1fr 1fr 1fr 1fr">
+      <div class="mod-grid" style="grid-template-columns:repeat(3,1fr)">
+        <div>
+          <label>Data do Contrato</label>
+          <input type="date" id="vp-data-contrato" oninput="vpDataContratoChange()">
+        </div>
         <div>
           <label>Entrada (R$) <span id="vp-entrada-pct" style="color:var(--accent);font-size:10px"></span></label>
           <input type="number" id="vp-entrada" value="0" min="0" step="100" oninput="vpEntradaChange()">
@@ -947,29 +944,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <label>Data da entrada</label>
           <input type="date" id="vp-entrada-data" oninput="vpDataContratoChange()">
         </div>
-        <div>
-          <label>Data do Contrato</label>
-          <input type="date" id="vp-data-contrato" oninput="vpDataContratoChange()">
-        </div>
-        <div>
-          <label>Prazo limite <span style="font-size:9px;color:var(--muted)">(395 dias)</span></label>
-          <div id="vp-data-limite" style="padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace">—</div>
-        </div>
       </div>
+      <!-- Prazo limite (395 dias): informativo, mantido oculto -->
+      <div id="vp-data-limite" style="display:none">—</div>
       <div id="vp-aviso" style="display:none;font-size:10px;color:var(--err);margin-bottom:10px;padding:7px 12px;background:rgba(220,53,69,.08);border-radius:6px;border-left:3px solid var(--err)"></div>
       <div id="vp-resumo" style="display:none">
-        <div class="contrato-grid">
-          <div class="card-teal">
-            <div class="c-label">Contrato — Loja Recebe</div>
-            <div id="vp-c-avista" class="c-value">R$ —</div>
-            <div id="vp-c-avista-sub" class="c-sub">Sem retencao — parcelado direto</div>
-          </div>
-          <div class="card-amber">
-            <div class="c-label">Parcelado — Cliente Paga</div>
-            <div id="vp-c-parcelado" class="c-value">R$ —</div>
-            <div id="vp-c-parcelado-sub" class="c-sub">Total pago pelo cliente</div>
-          </div>
-        </div>
+        <span id="vp-c-avista" style="display:none"></span><span id="vp-c-avista-sub" style="display:none"></span>
+        <span id="vp-c-parcelado" style="display:none"></span><span id="vp-c-parcelado-sub" style="display:none"></span>
         <div class="cards-3x2">
           <div class="c-card"><div class="c-card-lbl">Loja Recebe</div><div id="vp-r-avista" class="c-card-val ok">—</div></div>
           <div class="c-card"><div class="c-card-lbl">Cliente Paga</div><div id="vp-r-total" class="c-card-val">—</div></div>
@@ -978,12 +959,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <div class="c-card"><div class="c-card-lbl">Ultima Parcela</div><div id="vp-r-ultima" class="c-card-val">—</div></div>
           <div class="c-card"><div class="c-card-lbl">Status Prazo</div><div id="vp-r-status" class="c-card-val ok">—</div></div>
         </div>
-        <div class="tf-tax-box">
-          <div class="tf-tax-title">&#x1F4CA; Provisao de Impostos — apenas referencia, nao altera o contrato</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div class="c-card"><div class="c-card-lbl">Base de Calculo</div><div id="vp-r-base-trib" class="c-card-val">—</div></div>
-            <div class="c-card"><div class="c-card-lbl">Provisao Impostos</div><div id="vp-r-impostos" class="c-card-val warn">—</div></div>
-          </div>
+        <!-- Impostos: linha fina com cadeado liberável por senha (mesmo aspecto em todas) -->
+        <div class="tf-tax-box" style="padding:7px 12px;display:flex;align-items:center;gap:10px;font-size:.78rem;color:var(--muted)">
+          <span id="vp-r-impostos" class="c-card-val warn" style="cursor:pointer">&#x1F512;</span>
+          <span style="font-weight:600;color:var(--text)">Impostos</span>
+          <span style="margin-left:auto">Base de cálculo</span>
+          <span id="vp-r-base-trib" class="c-card-val" style="margin-left:4px">&#x1F512;</span>
         </div>
         <div class="plano-wrap">
           <div class="plano-hdr">Plano de Pagamento <span style="font-size:10px;font-weight:400;color:var(--muted)">— edite as datas das parcelas</span></div>
@@ -1002,7 +983,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Painel Total Flex -->
     <div class="mod-panel" id="painel-tf" style="display:none">
       <div class="mod-panel-title">&#x26A1; Total Flex — Parcelamento Livre</div>
-      <div class="mod-grid" style="grid-template-columns:1fr 1fr 1fr 1fr 1fr">
+      <div class="mod-grid" style="grid-template-columns:repeat(4,1fr)">
+        <div>
+          <label>Data do Contrato</label>
+          <input type="date" id="tf-data-contrato" oninput="tfDataContratoChange()">
+        </div>
         <div>
           <label>Entrada (R$) <span id="tf-entrada-pct" style="color:var(--accent);font-size:10px"></span></label>
           <input type="number" id="tf-entrada" value="0" min="0" step="100" oninput="tfEntradaChange()">
@@ -1013,32 +998,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <input type="date" id="tf-entrada-data" oninput="tfEntradaChange()">
         </div>
         <div>
-          <label>Data do Contrato</label>
-          <input type="date" id="tf-data-contrato" oninput="tfDataContratoChange()">
-        </div>
-        <div>
           <label>Prazo (meses) <span style="font-size:9px;color:var(--muted)">1 a 12</span></label>
           <input type="number" id="tf-prazo" value="12" min="1" max="12" step="1" oninput="tfPrazoChange()">
         </div>
-        <div>
-          <label>Prazo limite <span style="font-size:9px;color:var(--muted)">(maximo 12 meses)</span></label>
-          <div id="tf-data-limite" style="padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace">—</div>
-        </div>
       </div>
+      <!-- Prazo limite (máximo 12 meses): informativo, mantido oculto -->
+      <div id="tf-data-limite" style="display:none">—</div>
       <div id="tf-aviso" style="display:none;font-size:10px;color:var(--err);margin-bottom:10px;padding:7px 12px;background:rgba(220,53,69,.08);border-radius:6px;border-left:3px solid var(--err)"></div>
       <div id="tf-resumo" style="display:none">
-        <div class="contrato-grid">
-          <div class="card-teal">
-            <div class="c-label">Loja Recebe (a vista)</div>
-            <div id="tf-c-avista" class="c-value">R$ —</div>
-            <div id="tf-c-avista-sub" class="c-sub">Parcelado direto, sem retencao</div>
-          </div>
-          <div class="card-amber">
-            <div class="c-label">Cliente Paga (total)</div>
-            <div id="tf-c-total" class="c-value">R$ —</div>
-            <div id="tf-c-total-sub" class="c-sub">Inclui juros compostos</div>
-          </div>
-        </div>
+        <span id="tf-c-avista" style="display:none"></span><span id="tf-c-avista-sub" style="display:none"></span>
+        <span id="tf-c-total" style="display:none"></span><span id="tf-c-total-sub" style="display:none"></span>
         <div class="cards-3x2">
           <div class="c-card"><div class="c-card-lbl">Loja Recebe</div><div id="tf-r-avista" class="c-card-val ok">—</div></div>
           <div class="c-card"><div class="c-card-lbl">Total Juros</div><div id="tf-r-juros" class="c-card-val warn">—</div></div>
@@ -1047,19 +1016,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <div class="c-card"><div class="c-card-lbl">Ultima Parcela</div><div id="tf-r-ultima" class="c-card-val ok">—</div></div>
           <div class="c-card"><div class="c-card-lbl">Status Prazo</div><div id="tf-r-status" class="c-card-val ok">—</div></div>
         </div>
-        <!-- Provisao de impostos (nao afeta a negociacao) -->
-        <div class="tf-tax-box">
-          <div class="tf-tax-title">&#x1F4CA; Provisao de Impostos — apenas referencia, nao altera o contrato</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div class="c-card">
-              <div class="c-card-lbl">Base de Calculo</div>
-              <div id="tf-r-base-trib" class="c-card-val">—</div>
-            </div>
-            <div class="c-card">
-              <div class="c-card-lbl">Provisao Impostos</div>
-              <div id="tf-r-impostos" class="c-card-val warn">—</div>
-            </div>
-          </div>
+        <!-- Impostos: linha fina com cadeado liberável por senha (mesmo aspecto em todas) -->
+        <div class="tf-tax-box" style="padding:7px 12px;display:flex;align-items:center;gap:10px;font-size:.78rem;color:var(--muted)">
+          <span id="tf-r-impostos" class="c-card-val warn" style="cursor:pointer">&#x1F512;</span>
+          <span style="font-weight:600;color:var(--text)">Impostos</span>
+          <span style="margin-left:auto">Base de cálculo</span>
+          <span id="tf-r-base-trib" class="c-card-val" style="margin-left:4px">&#x1F512;</span>
         </div>
         <div class="plano-wrap">
           <div class="plano-hdr">Plano de Pagamento
@@ -3869,6 +3831,7 @@ async function atualizarCartao() {
   if (elCAvSub) elCAvSub.textContent = 'Loja recebe (retencao '+d.taxa_retencao_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%)';
   if (elCPar) elCPar.textContent = 'R$ '+fmt(d.total_cliente);
   if (elCParSub) elCParSub.textContent = n+'x R$ '+fmt(d.valor_parcela)+(entrada>0?' | entrada R$ '+fmt(entrada):'');
+  negMostrarParcelado(d.total_cliente);   // Contrato Parcelado na faixa superior
 
   // Total de contrato vem SÓ do motor (_aplicarPreviewNaTela = Val_Cont); pagamento não escreve.
   agendarSalvarPagamento();   // auto-save da modalidade → motor recalcula Val_Cont
@@ -4035,6 +3998,7 @@ async function atualizarVP() {
   document.getElementById('vp-c-parcelado').textContent   = 'R$ ' + fmt(d.total_cliente);
   document.getElementById('vp-c-parcelado-sub').textContent =
     n + 'x R$ ' + fmt(d.valor_parcela) + (entrada > 0 ? ' | entrada R$ ' + fmt(entrada) : '');
+  negMostrarParcelado(d.total_cliente);   // Contrato Parcelado na faixa superior
 
   // Total final
   // Total de contrato vem SÓ do motor (_aplicarPreviewNaTela = Val_Cont); pagamento não escreve.
@@ -4583,6 +4547,7 @@ async function atualizarTF() {
   document.getElementById('tf-c-total-sub').textContent  =
     n_parc + 'x — juros R$ ' + fmt(res.total_juros) +
     (entrada > 0 ? ' | entrada R$ ' + fmt(entrada) : '');
+  negMostrarParcelado(totalCliente);   // Contrato Parcelado na faixa superior
 
   // Total de contrato vem SÓ do motor (Val_Cont); pagamento auto-salva → motor reexibe.
   agendarSalvarPagamento();
