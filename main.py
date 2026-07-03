@@ -984,17 +984,17 @@ class Handler(BaseHTTPRequestHandler):
                         # escopo por projetista: consultor não abre projeto de outro
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
-                except Exception as e:
-                    self.send_json({"ok": False, "erro": str(e)}, code=500)
-                    return
-                finally:
-                    db.close()
-                proj = _carregar_projeto(nome_safe)
-                if proj:
+                    proj = _carregar_projeto(nome_safe)
+                    if not proj:
+                        self.send_json({"ok": False, "erro": "Projeto nao encontrado"}, code=404)
+                        return
+                    _enriquecer_cliente_do_projeto(proj, db)   # contato sempre do cadastro vivo
                     session_set("projeto_ativo", nome_safe)
                     self.send_json({"ok": True, "projeto": proj})
-                else:
-                    self.send_json({"ok": False, "erro": "Projeto nao encontrado"}, code=404)
+                except Exception as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
                 return
 
             m = _re.match(r"^/api/clientes/(\d+)$", path)
@@ -3268,6 +3268,54 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # POST /api/projetos/<nome>/parceiro — associa/remove o parceiro (arquiteto) do
+            # projeto (etapa "Criação do Projeto"). Editável só ATÉ a assinatura do contrato.
+            m = _re.match(r'^/api/projetos/([^/]+)/parceiro$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    _meta = _projeto_da_loja(db, nome_safe, loja_id)
+                    if _meta is None or not _projeto_visivel_ao_ator(_meta, usuario):
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    if _contrato_assinado(nome_safe, db):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato assinado — o parceiro não pode mais ser alterado"},
+                                       code=400)
+                        return
+                    req = json.loads(body or b'{}')
+                    pid = req.get("parceiro_id")
+                    parceiro_dict = None
+                    if pid:
+                        parc = db.get(Parceiro, int(pid))
+                        if parc is None or not _parceiro_visivel_loja(db, parc, loja_id):
+                            self.send_json({"ok": False, "erro": "Parceiro fora do seu escopo"}, code=400)
+                            return
+                        parceiro_dict = _parceiro_dict(parc, db)
+                    proj = _carregar_projeto(nome_safe)
+                    if not proj:
+                        self.send_json({"ok": False, "erro": "Projeto não encontrado"}, code=404)
+                        return
+                    proj["parceiro_id"] = int(pid) if pid else None
+                    _salvar_projeto(proj)
+                    self.send_json({"ok": True, "parceiro": parceiro_dict})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
             # POST /api/projetos/<nome>/contrato/assinar — registra assinatura
             m = _re.match(r'^/api/projetos/([^/]+)/contrato/assinar$', path)
             if m:
@@ -4809,6 +4857,22 @@ def _projeto_da_loja(db, nome_safe, loja_id):
     Ponto de escopo das entidades 'por projeto' (pool/medição/ciclo/contrato).
     Delega em _obj_da_loja para manter uma única fonte da regra de escopo."""
     return _obj_da_loja(db, Projeto, nome_safe, loja_id)
+
+
+def _enriquecer_cliente_do_projeto(proj, db):
+    """Atualiza o bloco 'cliente' do projeto.json (snapshot) com os dados VIVOS do cadastro
+    (tabela clientes), para a tela de etapas nunca exibir contato defasado após uma edição."""
+    if not isinstance(proj, dict):
+        return
+    cid = proj.get("cliente_id") or (proj.get("cliente") or {}).get("id")
+    if not cid:
+        return
+    try:
+        c = db.get(Cliente, int(cid))
+    except (TypeError, ValueError):
+        return
+    if c is not None:
+        proj["cliente"] = {**(proj.get("cliente") or {}), **_cliente_dict(c)}
 
 
 def _parceiro_visivel_loja(db, parceiro, loja_id):

@@ -6207,6 +6207,12 @@ async function cliSalvar(){
     if(d.ok){
       const wasNpCadastro = _npCadastrandoCliente && !id;
       showToast(id ? 'Cliente atualizado!' : 'Cliente cadastrado!');
+      // se editou o cliente do projeto aberto, reflete já na tela de etapas (sem contato defasado)
+      if (id && d.cliente && projetoAtivo &&
+          String(projetoAtivo.cliente_id || (projetoAtivo.cliente||{}).id) === String(d.cliente.id)) {
+        projetoAtivo.cliente = Object.assign({}, projetoAtivo.cliente || {}, d.cliente);
+        if (typeof _cicloAberto !== 'undefined' && _cicloAberto && typeof renderCiclo === 'function') renderCiclo();
+      }
       cliFecharModal();
       cliCarregar();
       if(wasNpCadastro){
@@ -7703,6 +7709,27 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
       ${concluido ? `<span style="margin-left:8px;font-size:.8rem;color:var(--ok)">✓ Concluído${dt?' em '+dt:''}</span>` : ''}`;
   }
 
+  // Card especial etapa 2 — Criação do Projeto: parceiro (arquiteto) associado.
+  // Edição do parceiro só até a assinatura do contrato.
+  if (etapa.codigo === '2') {
+    const assinado = (typeof _contratoAssinado !== 'undefined') && _contratoAssinado;
+    const temPar   = !!(projetoAtivo && projetoAtivo.parceiro_id);
+    const par      = _parceiroAtivoProjeto || {};
+    const parNome  = par.nome || (temPar ? ('#' + projetoAtivo.parceiro_id) : '');
+    const info = temPar
+      ? `<div style="font-size:.85rem;color:var(--text);margin-bottom:10px">
+           Parceiro (arquiteto): <strong>${esc(parNome)}</strong>
+           ${par.comissao_padrao_pct ? `<span style="color:var(--muted);margin-left:6px">${par.comissao_padrao_pct}% comissão</span>` : ''}
+         </div>`
+      : `<div style="font-size:.85rem;color:var(--muted);margin-bottom:10px">Nenhum parceiro (arquiteto) associado.</div>`;
+    const botao = assinado
+      ? (temPar ? '' : '<span style="font-size:.78rem;color:var(--muted)">🔒 contrato assinado — não editável</span>')
+      : `<button onclick="abrirAssociarParceiro()" class="btn-ciclo" style="font-size:.82rem">
+           ${temPar ? '✎ Alterar / remover parceiro' : '+ Inserir parceiro'}</button>`;
+    return info + botao +
+      (concluido ? `<span style="margin-left:8px;font-size:.8rem;color:var(--ok)">✓ Concluído${dt?' em '+dt:''}</span>` : '');
+  }
+
   // Card especial etapa 3 — Briefing
   if (etapa.codigo === '3') {
     const briefLocked = _cicloData['4']?.status === 'concluido';
@@ -8301,6 +8328,69 @@ function _popupOverlay(innerHtml) {
     innerHtml + '</div>';
   document.body.appendChild(ov);
   return ov;
+}
+
+// ── Etapa 2: associar/alterar/remover parceiro (arquiteto) do projeto ─────────
+let _apOverlay = null, _apTimer = null;
+
+function abrirAssociarParceiro(){
+  if(!projetoAtivo) return;
+  const atual = _parceiroAtivoProjeto;
+  _apOverlay = _popupOverlay(`
+    <h4 style="margin:0 0 12px;font-size:1rem;color:var(--dalm-gold,#c8a84b)">Parceiro (arquiteto) do projeto</h4>
+    <div style="font-size:.85rem;margin-bottom:10px">${atual
+      ? `Atual: <strong>${esc(atual.nome)}</strong>
+         <button onclick="_associarParceiro(null)" style="margin-left:8px;background:none;border:1px solid var(--err);color:var(--err);border-radius:5px;padding:3px 10px;font-size:.78rem;cursor:pointer">Remover</button>`
+      : '<span style="color:var(--muted)">Nenhum parceiro associado.</span>'}</div>
+    <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Buscar parceiro</label>
+    <input id="_ap-busca" type="text" autocomplete="off" oninput="_apBuscar(this.value)" placeholder="Nome ou CPF/CNPJ…"
+      style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">
+    <div id="_ap-result" style="max-height:190px;overflow-y:auto"></div>
+    <div id="_ap-erro" style="color:var(--err);font-size:.78rem;min-height:14px;margin-top:6px"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px">
+      <button id="_ap-fechar" style="background:none;border:1px solid var(--muted);color:var(--muted);border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">Fechar</button>
+    </div>`);
+  _apOverlay.querySelector('#_ap-fechar').onclick = () => { _apOverlay.remove(); _apOverlay = null; };
+  setTimeout(() => document.getElementById('_ap-busca')?.focus(), 60);
+}
+
+function _apBuscar(q){
+  clearTimeout(_apTimer);
+  const box = document.getElementById('_ap-result');
+  if(!box) return;
+  if(!q || q.trim().length < 2){ box.innerHTML = ''; return; }
+  _apTimer = setTimeout(async () => {
+    try {
+      const r = await fetch('/api/parceiros?q=' + encodeURIComponent(q.trim()));
+      const d = await r.json();
+      const lista = d.parceiros || [];
+      box.innerHTML = lista.length ? lista.map(p =>
+        `<div onclick="_associarParceiro(${p.id})" style="padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
+              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+           <span style="font-weight:600">${esc(p.nome)}</span>
+           ${p.tipo ? `<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(p.tipo)}</span>` : ''}
+           ${p.comissao_padrao_pct ? `<span style="color:var(--ok);margin-left:8px;font-size:10px">${p.comissao_padrao_pct}%</span>` : ''}
+         </div>`).join('') : '<div style="padding:8px;font-size:11px;color:var(--muted)">Nenhum parceiro encontrado.</div>';
+    } catch(e){}
+  }, 300);
+}
+
+async function _associarParceiro(pid){
+  if(!projetoAtivo) return;
+  const erroEl = document.getElementById('_ap-erro');
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/parceiro`, {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parceiro_id: pid })
+    });
+    const d = await r.json();
+    if(!d.ok){ if(erroEl) erroEl.textContent = d.erro || 'Falha ao salvar.'; return; }
+    projetoAtivo.parceiro_id = pid || null;
+    _parceiroAtivoProjeto = d.parceiro || null;
+    if(_apOverlay){ _apOverlay.remove(); _apOverlay = null; }
+    showToast(pid ? 'Parceiro associado.' : 'Parceiro removido.');
+    if (typeof _cicloAberto !== 'undefined' && _cicloAberto && typeof renderCiclo === 'function') renderCiclo();
+  } catch(e){ if(erroEl) erroEl.textContent = 'Erro de conexão.'; }
 }
 
 // Confirmação sim/não. Retorna Promise<boolean>.
