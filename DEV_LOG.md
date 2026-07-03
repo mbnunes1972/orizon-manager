@@ -1076,6 +1076,11 @@ Frontend-only (`static/index.html`), verificação manual. Spec:
 - **Fix — desconto por ambiente acima do limite:** revertia o campo mas mantinha o desconto aplicado
   (o motor computava antes da checagem de limite e não re-rodava). Agora re-roda `negPreview()` e
   re-persiste após reverter.
+- **"Valor Total do Contrato" editável (cálculo reverso):** digitar um valor calcula o desconto global
+  equivalente (`desc% = (1 − valor/base)×100`), zera descontos individuais e aplica. Acima do limite do
+  perfil, abre popup "Desconto excede o limite do perfil de usuário, deseja realizar autorização
+  gerencial?" → modal de login/senha gerencial existente. Exato para o valor à vista; financiamento
+  interpreta como valor de venda (frente futura: inverter por modalidade). Spec atualizado.
 
 ## ⏸️ ESTADO ATUAL (2026-07-03) — retomar aqui
 
