@@ -12,9 +12,11 @@ Garantir continuidade total entre sessões de desenvolvimento, sem perda de cont
 
 | Arquivo | Propósito |
 |---|---|
+| `CLAUDE.md` | Resumo carregado automaticamente pelo Claude Code (aponta para estes docs) |
 | `DEV_RULES.md` | Este arquivo — regras do processo |
 | `DEV_LOG.md` | Diário de desenvolvimento — estado atual e histórico |
 | `REQUIREMENTS.md` | Requisitos do sistema — referência permanente |
+| `docs/superpowers/specs/` | Specs de design por frente |
 
 ---
 
@@ -43,8 +45,8 @@ O Claude Code lê os arquivos diretamente — não precisa colar o conteúdo.
 ### Checklist obrigatório antes de fechar
 
 - [ ] Todos os arquivos modificados foram salvos
-- [ ] O servidor local foi testado (`python main.py`)
-- [ ] Os testes básicos foram feitos (login, funcionalidade alterada)
+- [ ] O servidor local foi testado (`python3 main.py`)
+- [ ] A suíte passou (`python3 -m pytest -q`) e os testes manuais foram feitos (login, funcionalidade alterada)
 - [ ] `git add . && git commit -m "descrição"` foi executado
 - [ ] `git push` foi executado
 - [ ] Se houver mudanças no servidor: `git pull` + restart do app
@@ -99,19 +101,20 @@ curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:8765   # esperad
 ### Banco de dados
 - SQLite: `omie.db` na raiz — **NÃO versionado** (está no `.gitignore`); cada ambiente
   tem o seu. Não comitar `omie.db`.
-- Para recriar usuários (ou um banco novo): `python seed.py` (cria schema via `init_db` + usuários)
+- Para recriar usuários (ou um banco novo): `python3 seed.py` (cria schema via `init_db` + usuários)
 - Migrações: SQLAlchemy + `_migrar_colunas`/`schema_migrations` (já configurado)
 
 ### Dependências
-- Listadas em `requirements.txt`. Local: `pip install -r requirements.txt`.
+- Listadas em `requirements.txt`. Local: `python3 -m pip install -r requirements.txt` (o contrato usa
+  `weasyprint`; a proposta ainda usa docx/LibreOffice).
 - Servidor (Ubuntu 24.04, PEP 668): instalar via `apt` (ver runbook) — `pip install`
   system-wide é bloqueado (`externally-managed-environment`).
 
-### Testes básicos após cada mudança
-1. Login com cada nível (Consultor, Gerente, Diretor)
-2. Limite de desconto respeitado
-3. Autorização delegada funcional
-4. Logout redireciona para `/login`
+### Testes após cada mudança
+1. **Automatizados (backend):** `python3 -m pytest -q` — deve ficar tudo verde ANTES de commitar/mergear.
+2. **Manuais (frontend, `static/index.html` — sem teste JS):** login com cada nível (Consultor, Gerente,
+   Diretor); limite de desconto respeitado; autorização delegada funcional; logout redireciona para
+   `/login`. Para sintaxe do JS: extrair o `<script>` e rodar `node --check`.
 
 ---
 
