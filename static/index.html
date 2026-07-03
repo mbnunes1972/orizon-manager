@@ -1858,6 +1858,7 @@ let _descAdicional  = {};   // legado — mantido por compat
 let _margemAtual    = 0;    // % calculada por mpAtualizarApoio — usado para validar limite 35%
 let _margemRealVal  = null; // {cust_var, marg_cont} — exibido sob cadeado de impostos
 let _negTaxaRetencaoPct = 0; // taxa de retenção da modalidade ATIVA (Aymoré/Cartão>0; VP/TF/À-Vista=0)
+let _negEntradaValor    = 0; // entrada (R$) da modalidade ATIVA — componente à vista, sem custo financeiro
 const _LIMITE_DESC_TOTAL = 35;
 let _selLocal = {};           // { arquivo: bool } estado local dos checkboxes
 
@@ -3535,8 +3536,12 @@ async function negValorTotalConfirmar(valStr){
   if (valorContrato <= 0 || bruto <= 0) { reverter(); return; }
   // 1) remove o custo financeiro pela taxa de retenção que a modalidade ATIVA já calculou
   //    (propriedade do plano de parcelas/entrada, independente do desconto; À-Vista/VP/TF = 0).
+  //    A ENTRADA é componente à vista, SEM custo financeiro — a retenção incide só no financiado
+  //    (valorContrato − entrada). Inverte o backend: total = entrada + (avista − entrada)/(1 − ret).
   const taxaRet = Number(_negTaxaRetencaoPct) || 0;
-  const valorAvista = valorContrato * (1 - taxaRet/100);
+  const entrada = Number(_negEntradaValor) || 0;
+  const financiado = Math.max(0, valorContrato - entrada);   // clamp: contrato < entrada → 0
+  const valorAvista = entrada + financiado * (1 - taxaRet/100);
   // 2) desconto global equivalente: valor à vista = valor bruto × (1 - desc%)
   const discPct = Math.max(0, parseFloat(((1 - valorAvista/bruto) * 100).toFixed(4)));
   const max = cfgGetDescontoMax();
@@ -3803,6 +3808,7 @@ async function atualizarAymore() {
   document.getElementById('ay-r-retencao').textContent    = d.taxa_retencao_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%';
   document.getElementById('ay-r-retencao-rs').textContent = 'R$ '+fmt(d.retencao_rs);
   _negTaxaRetencaoPct = Number(d.taxa_retencao_pct) || 0;   // à-vista = total_cliente × (1 − retenção)
+  _negEntradaValor    = parseFloat(document.getElementById('ay-entrada').value) || 0;
   document.getElementById('ay-r-parcela').textContent     = 'R$ '+fmt(d.valor_parcela);
   document.getElementById('ay-r-taxa').textContent        = d.taxa_mensal_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%';
 
@@ -3917,6 +3923,7 @@ async function atualizarCartao() {
   document.getElementById('cc-r-retencao').textContent    = d.taxa_retencao_pct.toLocaleString('pt-BR',{minimumFractionDigits:4})+'%';
   document.getElementById('cc-r-retencao-rs').textContent = 'R$ '+fmt(d.retencao_rs);
   _negTaxaRetencaoPct = Number(d.taxa_retencao_pct) || 0;   // à-vista = total_cliente × (1 − retenção)
+  _negEntradaValor    = parseFloat(document.getElementById('cc-entrada').value) || 0;
   document.getElementById('cc-r-parcela').textContent     = 'R$ '+fmt(d.valor_parcela);
   const elLiq = document.getElementById('cc-r-liquidacao');
   if (elLiq) elLiq.textContent = d.liquidacao || '1 dia util';
@@ -4094,6 +4101,7 @@ async function atualizarVP() {
   document.getElementById('vp-c-avista').textContent      = 'R$ ' + fmt(d.valor_liberado);
   document.getElementById('vp-c-avista-sub').textContent  = 'Sem retencao — parcelado direto';
   _negTaxaRetencaoPct = 0;   // VP: sem retenção → à-vista = total_cliente
+  _negEntradaValor    = parseFloat(document.getElementById('vp-entrada').value) || 0;
   document.getElementById('vp-c-parcelado').textContent   = 'R$ ' + fmt(d.total_cliente);
   document.getElementById('vp-c-parcelado-sub').textContent =
     n + 'x R$ ' + fmt(d.valor_parcela) + (entrada > 0 ? ' | entrada R$ ' + fmt(entrada) : '');
@@ -4453,6 +4461,7 @@ function avistaMostrarPainel(mostrar) {
 
 function avistaRecalcular() {
   _negTaxaRetencaoPct = 0;   // À-Vista: sem retenção → contrato = à-vista
+  _negEntradaValor    = parseMoeda(document.getElementById('av-entrada-valor')?.value) || 0;
   const total   = _ayGetValorVenda() || 0;
   negMostrarParcelado(total);   // "Valor Total do Contrato" = Valor à Vista (à vista)
   const entrada = parseMoeda(document.getElementById('av-entrada-valor')?.value) || 0;
@@ -4645,6 +4654,7 @@ async function atualizarTF() {
   document.getElementById('tf-c-avista').textContent     = 'R$ ' + fmt(valorAvista);
   document.getElementById('tf-c-avista-sub').textContent = 'Parcelado direto, sem retencao';
   _negTaxaRetencaoPct = 0;   // TF: parcelado direto, sem retenção → à-vista = total_cliente
+  _negEntradaValor    = parseFloat(document.getElementById('tf-entrada').value) || 0;
   document.getElementById('tf-c-total').textContent      = 'R$ ' + fmt(totalCliente);
   document.getElementById('tf-c-total-sub').textContent  =
     n_parc + 'x — juros R$ ' + fmt(res.total_juros) +
