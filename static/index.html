@@ -3491,8 +3491,23 @@ function negValorTotalIniciarEdicao(el){
   el.style.padding = '2px 8px';
   el.style.cursor = 'text';
   const v = parseFloat((el.value || '').replace(/\./g,'').replace(',','.').replace(/[^0-9.]/g,'')) || 0;
+  el._prevVal = v;   // p/ reexibir o valor anterior formatado ao cancelar/reverter
   el.value = v > 0 ? v.toFixed(2).replace('.',',') : '';
   el.select();
+}
+
+// Valor Bruto atual de forma robusta: motor (EP-07) → texto exibido → estrutural (legado).
+// (_negBaseValues fica vazio no EP-07 — a base tem de vir do motor/tela.)
+function negValorBrutoAtual(){
+  if (_previewNeg && Number(_previewNeg.VBNO) > 0) return Number(_previewNeg.VBNO);
+  const elSub = document.getElementById('neg-subtotal');
+  if (elSub) {
+    const v = parseFloat((elSub.textContent||'').replace(/[^\d,]/g,'').replace(',','.')) || 0;
+    if (v > 0) return v;
+  }
+  return (_negBaseValues||[])
+    .filter(b => _negSelLocal[b.arquivo] !== false)
+    .reduce((s,b) => s + (b.estrutural||0), 0);
 }
 
 async function negValorTotalConfirmar(valStr){
@@ -3506,38 +3521,65 @@ async function negValorTotalConfirmar(valStr){
     el.style.padding = '0';
     el.style.cursor = 'pointer';
   };
-  if (el._esc) { el._esc = false; restaurar(); renderTabelaNeg(_orcAmbientesAtivos); return; }
+  const reverter = () => {   // não aplica; reexibe o valor anterior formatado
+    if (el._prevVal > 0) negMostrarParcelado(el._prevVal);
+    renderTabelaNeg(_orcAmbientesAtivos);
+  };
   restaurar();
+  if (el._esc) { el._esc = false; reverter(); return; }
   const total = parseFloat((valStr||'').trim()
     .replace(/[^0-9.,]/g,'').replace(/\./g,'').replace(',','.')) || 0;
-  const negSel = (_negBaseValues||[]).filter(b => _negSelLocal[b.arquivo] !== false);
-  const estTotal = negSel.reduce((s,b) => s + (b.estrutural||0), 0);
-  if (total <= 0 || estTotal <= 0) { renderTabelaNeg(_orcAmbientesAtivos); return; }
-  // desconto global equivalente: valor à vista = base estrutural × (1 - desc%)
-  const discPct = Math.max(0, parseFloat(((1 - total/estTotal) * 100).toFixed(4)));
+  const bruto = negValorBrutoAtual();
+  if (total <= 0 || bruto <= 0) { reverter(); return; }
+  // desconto global equivalente: valor à vista = valor bruto × (1 - desc%)
+  const discPct = Math.max(0, parseFloat(((1 - total/bruto) * 100).toFixed(4)));
   const max = cfgGetDescontoMax();
 
-  const aplicar = () => {
+  const aplicar = async () => {
     (_negBaseValues||[]).forEach(({arquivo}) => { _descIndividual[arquivo] = 0; });
     const discEl = document.getElementById('neg-desconto');
     if (discEl) { discEl.value = discPct; discEl._prev = discPct;
                   if (typeof negValidarLimiteDesconto === 'function') negValidarLimiteDesconto(discPct); }
-    renderTabelaNeg(_orcAmbientesAtivos);
-    if (typeof agendarPreview === 'function') agendarPreview();
-    if (typeof agendarSalvarDesconto === 'function') agendarSalvarDesconto();
+    if (_orcAmbientesAtivos !== null) {
+      // EP-07: zera descontos individuais (mesma regra do Total do Contrato editável)
+      // para o desconto global reproduzir exatamente o valor digitado.
+      let tinhaInd = false;
+      (_orcAmbientesAtivos||[]).forEach(pa => {
+        const k = 'ep07_' + pa.id;
+        if ((parseFloat(_descIndividual[k])||0) || (parseFloat(pa.desconto_individual_pct)||0)) tinhaInd = true;
+        _descIndividual[k] = 0;
+      });
+      if (tinhaInd) await _persistirDescontosOrc();
+      // motor lê insumos SALVOS: salva o desconto PRIMEIRO (a resposta já aplica o
+      // breakdown na tela), só então re-renderiza — o preview agendado sai fresco.
+      await salvarDescontoAutomatico();
+      renderTabelaNeg(_orcAmbientesAtivos);
+      // à vista: reexibe a faixa já com o novo valor (modalidades financiadas são
+      // reexibidas pelos painéis via _atualizarPaineisAbertos/negMostrarParcelado)
+      if (typeof _tipoAtivo !== 'undefined' && _tipoAtivo === 'avista') {
+        const p = document.getElementById('painel-avista');
+        if (p && p.style.display !== 'none') avistaRecalcular();
+        else negMostrarParcelado(total);
+      }
+    } else {
+      // legado: recalcula direto de _negBaseValues e reexibe a faixa superior
+      renderTabelaNeg();
+      negAtualizarDescontoEfetivo();
+      if (typeof agendarSalvarDesconto === 'function') agendarSalvarDesconto();
+    }
   };
 
   if (discPct > max) {
     const ok = await confirmarPopup(
       'Desconto excede o limite do perfil de usuário, deseja realizar autorização gerencial?',
       {titulo:'Autorização de desconto', okLabel:'Autorizar', cancelLabel:'Cancelar', perigo:true});
-    if (!ok) { renderTabelaNeg(_orcAmbientesAtivos); return; }   // não aplica; mantém o atual
+    if (!ok) { reverter(); return; }   // não aplica; mantém o atual
     const auth = await abrirModalAutorizacaoSidebar(discPct, max);
-    if (!auth) { renderTabelaNeg(_orcAmbientesAtivos); return; } // autorização cancelada/negada
+    if (!auth) { reverter(); return; } // autorização cancelada/negada
     _limiteAutorizado = discPct;   // o desconto autorizado passa a ser o limite vigente
-    aplicar();
+    await aplicar();
   } else {
-    aplicar();
+    await aplicar();
   }
 }
 
