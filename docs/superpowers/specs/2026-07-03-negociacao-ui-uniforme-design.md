@@ -40,19 +40,35 @@ Bloco de cards (Loja Recebe, Cliente Paga, Valor/Parcela, Custo Financeiro, Taxa
 Liquidação e afins) removido de todas as modalidades. Ids preservados ocultos. Os **avisos de
 prazo** (VP/TF) permanecem (são separados).
 
-### 6. "Valor Total do Contrato" editável (cálculo reverso + autorização)
-A célula da faixa superior vira **editável** (`neg-parcelado` como `<input>`): ao digitar um valor,
-calcula o **desconto global equivalente** — `desc% = (1 − valor / base_estrutural) × 100` (a base
-estrutural já inclui arq/fid/viagem/brinde) — zera os descontos individuais e aplica. Permite negociar
-pelo campo Desconto e, ao fechar, jogar o valor da proposta direto.
-- **Limite/autorização:** se o desconto resultante > limite do perfil (`cfgGetDescontoMax`), abre
-  `confirmarPopup`: **"Desconto excede o limite do perfil de usuário, deseja realizar autorização
-  gerencial?"** → se sim, o modal existente `abrirModalAutorizacaoSidebar` (login/senha de
-  gerente/diretor); autorizado, fixa `_limiteAutorizado = desc` e aplica. Cancelar não altera.
-- **Trava:** não editável após aprovação do orçamento (`_orcamentoAprovado`).
-- **Exatidão:** a conta é exata para o **Valor à Vista** (base da negociação). Nas modalidades com
-  financiamento o campo exibe o parcelado; a edição interpreta o valor como o de venda (à vista).
-  Inverter a fórmula por modalidade (editar o parcelado) fica como frente futura.
+### 6. "Valor Total do Contrato" editável — cálculo reverso (contraproposta do cliente)
+Objetivo: fechar a negociação registrando a **contraproposta do cliente** (o valor total de contrato)
+sobre uma negociação já avançada. A célula da faixa superior vira **editável** (`neg-parcelado` como
+`<input>`): digitar um valor calcula o **desconto global equivalente**, zera os descontos individuais e
+aplica. Assim negocia-se pelo campo Desconto e, ao final, joga-se o valor da proposta direto.
+
+**O campo é o VALOR DE CONTRATO** (com o custo financeiro embutido), não o à vista. A conta reversa
+remove o custo financeiro e calcula o desconto:
+
+    financiado  = max(0, valorContrato − entrada)          # entrada é à vista, SEM custo financeiro
+    valorAvista = entrada + financiado × (1 − taxaRet/100)  # retenção incide só no financiado
+    discPct     = (1 − valorAvista / bruto) × 100           # limitado ao máximo do perfil
+
+- `bruto` = **Valor Bruto** robusto via `negValorBrutoAtual()`: `_previewNeg.VBNO` (motor/EP07) →
+  texto de `neg-subtotal` → soma estrutural (legado). (Causa do bug inicial: `_negBaseValues` nunca é
+  populado — sempre `[]`.)
+- `taxaRet` = **taxa de retenção** da modalidade ativa (global `_negTaxaRetencaoPct`, capturada no
+  update de cada modalidade: Aymoré/Cartão = `d.taxa_retencao_pct` do backend; VP/TF/À-Vista = 0).
+- `entrada` = **entrada** da modalidade ativa (global `_negEntradaValor`, capturada de
+  `ay/cc/vp/tf-entrada` e `av-entrada-valor`). É o inverso exato do backend
+  `total = entrada + (avista − entrada)/(1 − ret)`; com entrada = 0 vira `valorContrato × (1 − ret)`.
+- **Limite/autorização:** se `discPct > cfgGetDescontoMax()`, abre `confirmarPopup`: **"Desconto excede
+  o limite do perfil de usuário, deseja realizar autorização gerencial?"** → se sim,
+  `abrirModalAutorizacaoSidebar` (login/senha de gerente/diretor); autorizado, `_limiteAutorizado =
+  discPct` e aplica. Cancelar/negar não altera.
+- **EP07:** salva o desconto (`salvarDescontoAutomatico`) ANTES de re-renderizar (elimina a corrida com
+  `negPreview`, que lê insumos salvos). **Trava:** não editável após aprovação (`_orcamentoAprovado`).
+- **Nota:** a conversão é exata (inclusive com entrada). Este trecho foi implementado com apoio do
+  **Fable 5** (lógica financeira intrincada).
 
 ### 5. Provisão de Impostos — linha fina com cadeado liberável por senha
 Painel de impostos vira uma **linha fina uniforme**: `🔒 Impostos … Base de cálculo 🔒`. Usa os

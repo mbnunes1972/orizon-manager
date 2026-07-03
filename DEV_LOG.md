@@ -1076,11 +1076,15 @@ Frontend-only (`static/index.html`), verificação manual. Spec:
 - **Fix — desconto por ambiente acima do limite:** revertia o campo mas mantinha o desconto aplicado
   (o motor computava antes da checagem de limite e não re-rodava). Agora re-roda `negPreview()` e
   re-persiste após reverter.
-- **"Valor Total do Contrato" editável (cálculo reverso):** digitar um valor calcula o desconto global
-  equivalente (`desc% = (1 − valor/base)×100`), zera descontos individuais e aplica. Acima do limite do
-  perfil, abre popup "Desconto excede o limite do perfil de usuário, deseja realizar autorização
-  gerencial?" → modal de login/senha gerencial existente. Exato para o valor à vista; financiamento
-  interpreta como valor de venda (frente futura: inverter por modalidade). Spec atualizado.
+- **"Valor Total do Contrato" editável (cálculo reverso — contraproposta do cliente):** digitar o valor
+  de contrato calcula o desconto global e aplica. O campo é o **valor de contrato** (com custo
+  financeiro): `financiado = max(0, valor − entrada)`; `valorAvista = entrada + financiado × (1 −
+  taxaRet)`; `discPct = (1 − valorAvista/bruto) × 100`. Retenção e entrada capturadas por modalidade
+  (globais `_negTaxaRetencaoPct`/`_negEntradaValor`; VP/TF/À-Vista sem retenção; entrada é à vista, sem
+  custo financeiro). Bruto robusto via `negValorBrutoAtual` (motor/EP07). Acima do limite do perfil,
+  popup "Desconto excede o limite do perfil de usuário, deseja realizar autorização gerencial?" → modal
+  gerencial. **Causa raiz do 1º bug:** `_negBaseValues` nunca é populado. Trecho feito com apoio do
+  **Fable 5**. Spec (seção 6) atualizado.
 
 ## ⏸️ ESTADO ATUAL (2026-07-03) — retomar aqui
 
