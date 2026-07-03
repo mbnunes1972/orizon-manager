@@ -785,8 +785,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       </div>
       <div id="neg-parcelado-sep" style="text-align:center;color:#c8a84b;font-size:16px;display:none">&#x2192;</div>
       <div id="neg-parcelado-cell" style="background:#1a1206;border:0.5px solid #6e5a0f;border-radius:8px;padding:12px 14px;display:none">
-        <div style="font-size:9px;color:#c8a84b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Valor Total do Contrato</div>
-        <div style="font-size:19px;font-weight:500;color:#f0c84a" id="neg-parcelado">R$ 0,00</div>
+        <div style="font-size:9px;color:#c8a84b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Valor Total do Contrato <span style="text-transform:none;letter-spacing:0;opacity:.7">&#x270E;</span></div>
+        <input id="neg-parcelado" type="text" value="R$ 0,00" readonly
+               title="Clique para editar — recalcula o desconto pelo valor"
+               onclick="negValorTotalIniciarEdicao(this)"
+               onblur="negValorTotalConfirmar(this.value)"
+               onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){this._esc=true;this.blur();}"
+               style="font-size:19px;font-weight:500;color:#f0c84a;background:transparent;border:none;border-radius:6px;width:100%;padding:0;outline:none;cursor:pointer;font-family:inherit">
       </div>
     </div>
     <span id="neg-desc-pct-lbl" style="display:none">0</span>
@@ -3470,10 +3475,71 @@ function negMostrarParcelado(valor){
   const val  = document.getElementById('neg-parcelado');
   if (!cell || !sep || !val) return;
   if (valor == null || !(Number(valor) > 0)) { cell.style.display = 'none'; sep.style.display = 'none'; return; }
-  val.textContent = 'R$ ' + fmt(valor);
+  if (!val._editando) val.value = 'R$ ' + fmt(valor);   // não sobrescreve durante a edição
   cell.style.display = ''; sep.style.display = '';
 }
 function negOcultarParcelado(){ negMostrarParcelado(null); }
+
+// Campo "Valor Total do Contrato" editável → recalcula o desconto pelo valor.
+function negValorTotalIniciarEdicao(el){
+  // Travado após a assinatura/aprovação (mesma regra do Total do Contrato).
+  if (typeof _orcamentoAprovado === 'function' && _orcamentoAprovado()) return;
+  el._editando = true; el._esc = false;
+  el.removeAttribute('readonly');
+  el.style.background = 'var(--surface)';
+  el.style.border = '1px solid var(--accent)';
+  el.style.padding = '2px 8px';
+  el.style.cursor = 'text';
+  const v = parseFloat((el.value || '').replace(/\./g,'').replace(',','.').replace(/[^0-9.]/g,'')) || 0;
+  el.value = v > 0 ? v.toFixed(2).replace('.',',') : '';
+  el.select();
+}
+
+async function negValorTotalConfirmar(valStr){
+  const el = document.getElementById('neg-parcelado');
+  if (!el) return;
+  const restaurar = () => {
+    el._editando = false;
+    el.setAttribute('readonly','');
+    el.style.background = 'transparent';
+    el.style.border = 'none';
+    el.style.padding = '0';
+    el.style.cursor = 'pointer';
+  };
+  if (el._esc) { el._esc = false; restaurar(); renderTabelaNeg(_orcAmbientesAtivos); return; }
+  restaurar();
+  const total = parseFloat((valStr||'').trim()
+    .replace(/[^0-9.,]/g,'').replace(/\./g,'').replace(',','.')) || 0;
+  const negSel = (_negBaseValues||[]).filter(b => _negSelLocal[b.arquivo] !== false);
+  const estTotal = negSel.reduce((s,b) => s + (b.estrutural||0), 0);
+  if (total <= 0 || estTotal <= 0) { renderTabelaNeg(_orcAmbientesAtivos); return; }
+  // desconto global equivalente: valor à vista = base estrutural × (1 - desc%)
+  const discPct = Math.max(0, parseFloat(((1 - total/estTotal) * 100).toFixed(4)));
+  const max = cfgGetDescontoMax();
+
+  const aplicar = () => {
+    (_negBaseValues||[]).forEach(({arquivo}) => { _descIndividual[arquivo] = 0; });
+    const discEl = document.getElementById('neg-desconto');
+    if (discEl) { discEl.value = discPct; discEl._prev = discPct;
+                  if (typeof negValidarLimiteDesconto === 'function') negValidarLimiteDesconto(discPct); }
+    renderTabelaNeg(_orcAmbientesAtivos);
+    if (typeof agendarPreview === 'function') agendarPreview();
+    if (typeof agendarSalvarDesconto === 'function') agendarSalvarDesconto();
+  };
+
+  if (discPct > max) {
+    const ok = await confirmarPopup(
+      'Desconto excede o limite do perfil de usuário, deseja realizar autorização gerencial?',
+      {titulo:'Autorização de desconto', okLabel:'Autorizar', cancelLabel:'Cancelar', perigo:true});
+    if (!ok) { renderTabelaNeg(_orcAmbientesAtivos); return; }   // não aplica; mantém o atual
+    const auth = await abrirModalAutorizacaoSidebar(discPct, max);
+    if (!auth) { renderTabelaNeg(_orcAmbientesAtivos); return; } // autorização cancelada/negada
+    _limiteAutorizado = discPct;   // o desconto autorizado passa a ser o limite vigente
+    aplicar();
+  } else {
+    aplicar();
+  }
+}
 
 async function onPagamentoChange(){
   // Oculta resumo de parcelas ao trocar modalidade
