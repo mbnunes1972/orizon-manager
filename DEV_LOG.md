@@ -1025,9 +1025,41 @@ usuários de loja recebiam lista vazia e a validação *"Selecione ao menos uma 
 - **Testes:** `tests/test_parceiro_vinculo_loja.py` (5 E2E com consultor); seed ganhou um `consultor`
   e o `rede_id`. Suíte **384 passed**. Mergeada na `main` (ff, `d9e6f6e`); branch removida.
 
-## ⏸️ ESTADO ATUAL (2026-07-02) — retomar aqui
+## Sessão 42 — Lote de ajustes de teste em produção (branch `fix/contrato-ui-ajustes`)
 
-**`main`** consolidada e verde — **suíte 384 passed**. Servidor: `python3 main.py` (porta 8765).
+Rodada grande de ajustes durante teste em produção (13 commits, suíte **395 passed**), mergeada na
+`main`. Principais:
+
+- **Etapa Contrato (UI):** remove borda verde do badge "para_assinatura", remove o botão grande de PDF
+  (mantém o pequeno), botão **Revisar** pede senha gerencial e devolve o contrato à fase de Orçamento
+  (reabre etapa 4), "Editar Adendo" → botão "Inserir"; remove o botão "Avançar — Aprovação Financeira".
+- **Contrato (conteúdo):** adendo vai ao **final, após as assinaturas, em itálico** (sem página isolada);
+  cache-busting no link do PDF.
+- **Negociação/parâmetros:** toggle "incluir custos" nasce **true**; com **parceiro**, comissão do
+  arquiteto (% do parceiro; senão default da loja) e **fidelidade** entram ativas; endpoints de
+  parâmetros herdam os defaults da loja; **valores salvos são respeitados** (semente do parceiro só
+  inicial). Fidelidade entra sempre que há parceiro.
+- **Ciclo:** eliminadas as etapas **5 (Revisão)** e **6 (Aprovação do orçamento)** — vai de Orçamento (4)
+  direto para Contrato (7). Etapa **2 (Criação do Projeto)** ganha o **parceiro (arquiteto)** com
+  inserir/alterar/remover, travado só quando **ambas** as partes assinam. Etapa **1 (Cadastro)** segue
+  editável após a assinatura; **fix** do telefone defasado (GET do projeto enriquece o cliente com dados
+  vivos).
+- **Escopo por projetista:** Consultor vê só os projetos que **criou** (+ legados sem criador); gerente
+  de vendas e acima veem todos. Nova coluna `projetos_meta.criado_por_id` (+ migração). Escopo aplicado
+  na listagem e na abertura; hardening IDOR dos demais endpoints por-projeto fica como follow-up.
+- **Provisões:** "Instalação Local" → **"Insumos Locais"**; **CFO** como 1ª linha; **fix** da Margem de
+  Contribuição (era exibida ÷100 no modal); bloco informativo de **custos adicionais** (arq/fidelidade/
+  viagem/brinde + total) e **custo financeiro**, sempre visível (já descontados do Val. Líquido, não
+  somam no Cust_Var).
+
+Testes novos: `test_parceiro_vinculo_loja`(já), `test_escopo_projetista`, `test_projeto_parceiro`,
+mais casos em `test_ciclo`/`test_orcamento_params`/`test_provisoes`. **Pendências:** revisão da opção B
+das provisões (custos adicionais editáveis recalculando margem) se o usuário quiser; IDOR completo do
+escopo por projetista.
+
+## ⏸️ ESTADO ATUAL (2026-07-03) — retomar aqui
+
+**`main`** consolidada e verde — **suíte 395 passed**. Servidor: `python3 main.py` (porta 8765).
 Branches: só `main` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
 Contrato agora é **HTML/Markdown → PDF (WeasyPrint)** — o caminho `.docx`/LibreOffice do contrato
 foi aposentado (a **proposta** ainda usa docx/LibreOffice).
