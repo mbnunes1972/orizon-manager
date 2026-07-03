@@ -7901,6 +7901,7 @@ async function abrirProvisoes(oid) {
 
   const prov = pdata.provisoes || {};
   const { venda, rev1, rev2, atual, desatualizado } = prov;
+  const custosAd = prov.custos_adicionais || {};
 
   // Determine which versions to show as columns
   const cols = [];
@@ -7933,7 +7934,7 @@ async function abrirProvisoes(oid) {
     '</tr>';
   let margContRow = '<tr>' +
     `<td style="padding:4px 10px;font-size:.82rem;font-weight:600">Margem Contribuição</td>` +
-    cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem;color:var(--ok)">${_fmtPct(c.ver ? c.ver.marg_cont : null)}</td>`).join('') +
+    cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem;color:var(--ok)">${_fmtPct(c.ver ? c.ver.marg_cont * 100 : null)}</td>`).join('') +
     '</tr>';
   // Val_liq row
   let valLiqRow = '<tr>' +
@@ -8016,6 +8017,24 @@ async function abrirProvisoes(oid) {
     ${thCols}
   </tr></thead>`;
 
+  // Custos adicionais — destacados após a margem (já descontados do Val. Líquido).
+  const _caLinha = (lbl, v) => `<span style="color:var(--muted)">${lbl}</span>` +
+    `<span style="text-align:right;font-family:'IBM Plex Mono',monospace">${_fmtR(v)}</span>`;
+  const custosAdBlock = (Number(custosAd.total) || 0) > 0 ? `
+    <div style="margin-top:14px;padding:10px 12px;background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.25);border-radius:6px">
+      <div style="font-size:.78rem;color:var(--warn,#c8a84b);font-weight:600;margin-bottom:6px">
+        Custos adicionais <span style="font-weight:400;color:var(--muted)">(já descontados do Val. Líquido)</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:3px 14px;font-size:.82rem">
+        ${_caLinha('Comissão arquiteto', custosAd.com_arq)}
+        ${_caLinha('Fidelidade', custosAd.pro_fid)}
+        ${_caLinha('Viagem', custosAd.cust_via)}
+        ${_caLinha('Brinde', custosAd.brinde)}
+        <span style="font-weight:600;border-top:1px solid var(--border);padding-top:3px">Total</span>
+        <span style="text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--warn);border-top:1px solid var(--border);padding-top:3px">${_fmtR(custosAd.total)}</span>
+      </div>
+    </div>` : '';
+
   // Build the full modal HTML
   const html =
     '<h4 style="margin:0 0 4px;color:var(--ok);font-size:1rem">&#x1F4CA; Provisões</h4>' +
@@ -8028,6 +8047,7 @@ async function abrirProvisoes(oid) {
           <tbody>${cfoRow}${trows}${valLiqRow}${custVarRow}${margContRow}</tbody>
         </table>
       </div>`) +
+    custosAdBlock +
     revisaSection +
     '<div id="_prov-erro" style="color:var(--err,#e05252);font-size:.78rem;min-height:14px;margin-top:8px"></div>' +
     actionBtns +

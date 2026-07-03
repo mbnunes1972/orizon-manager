@@ -875,9 +875,19 @@ class Handler(BaseHTTPRequestHandler):
                              "cust_var": float(d.get("Cust_Var") or 0),
                              "marg_cont": float(d.get("Marg_Cont") or 0)}
                     desatualizado = bool(venda and venda["itens"] != atual["itens"])
+                    # custos adicionais (arq/fidelidade/viagem/brinde): já descontados do
+                    # Val. Líquido pelo motor — exibidos à parte, não somam no Cust_Var.
+                    custos_adicionais = {
+                        "com_arq":  float(d.get("Com_Arq")  or 0),
+                        "pro_fid":  float(d.get("Pro_Fid")  or 0),
+                        "cust_via": float(d.get("Cust_Via") or 0),
+                        "brinde":   float(d.get("Bri")      or 0),
+                        "total":    float(d.get("Cust_Ad")  or 0),
+                    }
                     self.send_json({"ok": True, "provisoes": {
                         "venda": venda, "rev1": _reg("rev1"), "rev2": _reg("rev2"),
-                        "atual": atual, "desatualizado": desatualizado}})
+                        "atual": atual, "desatualizado": desatualizado,
+                        "custos_adicionais": custos_adicionais}})
                 finally:
                     db.close()
                 return
