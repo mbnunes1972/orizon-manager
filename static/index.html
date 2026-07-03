@@ -849,14 +849,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
              "Contrato Parcelado" foi para a faixa superior. Ids preservados (ocultos). -->
         <span id="ay-c-avista" style="display:none"></span><span id="ay-c-avista-sub" style="display:none"></span>
         <span id="ay-c-parcelado" style="display:none"></span><span id="ay-c-parcelado-sub" style="display:none"></span>
-        <div class="cards-3x2">
-          <div class="c-card"><div class="c-card-lbl">Loja Recebe</div><div id="ay-r-liberado" class="c-card-val ok">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Cliente Paga</div><div id="ay-r-total-cliente" class="c-card-val">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Valor / Parcela</div><div id="ay-r-parcela" class="c-card-val ok">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Custo Financeiro</div><div id="ay-r-retencao-rs" class="c-card-val warn">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Taxa Retencao</div><div id="ay-r-retencao" class="c-card-val warn">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Taxa Mensal</div><div id="ay-r-taxa" class="c-card-val">—</div></div>
-        </div>
+        <!-- cards de resumo removidos; ids preservados ocultos p/ o JS -->
+        <span id="ay-r-liberado" style="display:none"></span><span id="ay-r-total-cliente" style="display:none"></span><span id="ay-r-parcela" style="display:none"></span><span id="ay-r-retencao-rs" style="display:none"></span><span id="ay-r-retencao" style="display:none"></span><span id="ay-r-taxa" style="display:none"></span>
         <!-- Impostos: linha fina com cadeado liberável por senha (mesmo aspecto em todas) -->
         <div class="tf-tax-box" style="padding:7px 12px;display:flex;align-items:center;gap:10px;font-size:.78rem;color:var(--muted)">
           <span id="ay-r-impostos" class="c-card-val warn" style="cursor:pointer">&#x1F512;</span>
@@ -902,14 +896,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <div id="cc-resumo" style="display:none">
         <span id="cc-c-avista" style="display:none"></span><span id="cc-c-avista-sub" style="display:none"></span>
         <span id="cc-c-parcelado" style="display:none"></span><span id="cc-c-parcelado-sub" style="display:none"></span>
-        <div class="cards-3x2">
-          <div class="c-card"><div class="c-card-lbl">Loja Recebe</div><div id="cc-r-liberado" class="c-card-val ok">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Cliente Paga</div><div id="cc-r-total-cliente" class="c-card-val">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Valor / Parcela</div><div id="cc-r-parcela" class="c-card-val ok">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Custo Financeiro</div><div id="cc-r-retencao-rs" class="c-card-val warn">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Taxa Retencao</div><div id="cc-r-retencao" class="c-card-val warn">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Liquidacao</div><div id="cc-r-liquidacao" class="c-card-val">1 dia util</div></div>
-        </div>
+        <!-- cards de resumo removidos; ids preservados ocultos p/ o JS -->
+        <span id="cc-r-liberado" style="display:none"></span><span id="cc-r-total-cliente" style="display:none"></span><span id="cc-r-parcela" style="display:none"></span><span id="cc-r-retencao-rs" style="display:none"></span><span id="cc-r-retencao" style="display:none"></span><span id="cc-r-liquidacao" style="display:none"></span>
         <!-- Impostos: linha fina com cadeado liberável por senha (mesmo aspecto em todas) -->
         <div class="tf-tax-box" style="padding:7px 12px;display:flex;align-items:center;gap:10px;font-size:.78rem;color:var(--muted)">
           <span id="cc-r-impostos" class="c-card-val warn" style="cursor:pointer">&#x1F512;</span>
@@ -951,14 +939,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <div id="vp-resumo" style="display:none">
         <span id="vp-c-avista" style="display:none"></span><span id="vp-c-avista-sub" style="display:none"></span>
         <span id="vp-c-parcelado" style="display:none"></span><span id="vp-c-parcelado-sub" style="display:none"></span>
-        <div class="cards-3x2">
-          <div class="c-card"><div class="c-card-lbl">Loja Recebe</div><div id="vp-r-avista" class="c-card-val ok">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Cliente Paga</div><div id="vp-r-total" class="c-card-val">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Valor / Parcela</div><div id="vp-r-parcela" class="c-card-val ok">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Acrescimo</div><div id="vp-r-custo" class="c-card-val ok">0,00%</div></div>
-          <div class="c-card"><div class="c-card-lbl">Ultima Parcela</div><div id="vp-r-ultima" class="c-card-val">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Status Prazo</div><div id="vp-r-status" class="c-card-val ok">—</div></div>
-        </div>
+        <!-- cards de resumo removidos; ids preservados ocultos p/ o JS -->
+        <span id="vp-r-avista" style="display:none"></span><span id="vp-r-total" style="display:none"></span><span id="vp-r-parcela" style="display:none"></span><span id="vp-r-custo" style="display:none"></span><span id="vp-r-ultima" style="display:none"></span><span id="vp-r-status" style="display:none"></span>
         <!-- Impostos: linha fina com cadeado liberável por senha (mesmo aspecto em todas) -->
         <div class="tf-tax-box" style="padding:7px 12px;display:flex;align-items:center;gap:10px;font-size:.78rem;color:var(--muted)">
           <span id="vp-r-impostos" class="c-card-val warn" style="cursor:pointer">&#x1F512;</span>
@@ -1008,14 +990,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <div id="tf-resumo" style="display:none">
         <span id="tf-c-avista" style="display:none"></span><span id="tf-c-avista-sub" style="display:none"></span>
         <span id="tf-c-total" style="display:none"></span><span id="tf-c-total-sub" style="display:none"></span>
-        <div class="cards-3x2">
-          <div class="c-card"><div class="c-card-lbl">Loja Recebe</div><div id="tf-r-avista" class="c-card-val ok">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Total Juros</div><div id="tf-r-juros" class="c-card-val warn">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Parcela Ref. (PMT)</div><div id="tf-r-pmt" class="c-card-val">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Total Pago</div><div id="tf-r-total-pago" class="c-card-val">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Ultima Parcela</div><div id="tf-r-ultima" class="c-card-val ok">—</div></div>
-          <div class="c-card"><div class="c-card-lbl">Status Prazo</div><div id="tf-r-status" class="c-card-val ok">—</div></div>
-        </div>
+        <!-- cards de resumo removidos; ids preservados ocultos p/ o JS -->
+        <span id="tf-r-avista" style="display:none"></span><span id="tf-r-juros" style="display:none"></span><span id="tf-r-pmt" style="display:none"></span><span id="tf-r-total-pago" style="display:none"></span><span id="tf-r-ultima" style="display:none"></span><span id="tf-r-status" style="display:none"></span>
         <!-- Impostos: linha fina com cadeado liberável por senha (mesmo aspecto em todas) -->
         <div class="tf-tax-box" style="padding:7px 12px;display:flex;align-items:center;gap:10px;font-size:.78rem;color:var(--muted)">
           <span id="tf-r-impostos" class="c-card-val warn" style="cursor:pointer">&#x1F512;</span>
