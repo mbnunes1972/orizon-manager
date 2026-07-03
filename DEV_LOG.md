@@ -1083,8 +1083,8 @@ etapa Orçamento como hub + Imprimir Orçamento (proposta = 1º doc do banco #8)
 
 ## 🔼 PENDÊNCIA: PUSH da `main` para o `origin` (fazer ao retomar)
 
-Estado (2026-07-02): a `main` local está **105 commits à frente** de `origin/main` (todos os merges
-locais das frentes recentes, incluindo o contrato HTML/PDF). O push **não pôde ser feito pelo agente**
+Estado (2026-07-03): após o push da Sessão 40, a `main` local está **16 commits à frente** de
+`origin/main` (Sessões 41 e 42). O push **não pôde ser feito pelo agente**
 — o ambiente não tem credenciais do GitHub, nem `gh` CLI, nem credential helper (erro:
 `could not read Username for 'https://github.com'`). Remote: `https://github.com/mbnunes1972/omie_v3.git`.
 
