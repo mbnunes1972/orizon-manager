@@ -883,6 +883,7 @@ class Handler(BaseHTTPRequestHandler):
                         "cust_via": float(d.get("Cust_Via") or 0),
                         "brinde":   float(d.get("Bri")      or 0),
                         "total":    float(d.get("Cust_Ad")  or 0),
+                        "cust_fin": float(d.get("Cust_Fin") or 0),   # custo financeiro (informativo)
                     }
                     self.send_json({"ok": True, "provisoes": {
                         "venda": venda, "rev1": _reg("rev1"), "rev2": _reg("rev2"),

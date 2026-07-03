@@ -8020,7 +8020,7 @@ async function abrirProvisoes(oid) {
   // Custos adicionais — destacados após a margem (já descontados do Val. Líquido).
   const _caLinha = (lbl, v) => `<span style="color:var(--muted)">${lbl}</span>` +
     `<span style="text-align:right;font-family:'IBM Plex Mono',monospace">${_fmtR(v)}</span>`;
-  const custosAdBlock = (Number(custosAd.total) || 0) > 0 ? `
+  const custosAdBlock = `
     <div style="margin-top:14px;padding:10px 12px;background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.25);border-radius:6px">
       <div style="font-size:.78rem;color:var(--warn,#c8a84b);font-weight:600;margin-bottom:6px">
         Custos adicionais <span style="font-weight:400;color:var(--muted)">(já descontados do Val. Líquido)</span>
@@ -8032,8 +8032,10 @@ async function abrirProvisoes(oid) {
         ${_caLinha('Brinde', custosAd.brinde)}
         <span style="font-weight:600;border-top:1px solid var(--border);padding-top:3px">Total</span>
         <span style="text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--warn);border-top:1px solid var(--border);padding-top:3px">${_fmtR(custosAd.total)}</span>
+        <span style="color:var(--muted);margin-top:5px;border-top:1px dashed var(--border);padding-top:5px">Custo financeiro <span style="font-size:10px">(informativo)</span></span>
+        <span style="text-align:right;font-family:'IBM Plex Mono',monospace;margin-top:5px;border-top:1px dashed var(--border);padding-top:5px">${_fmtR(custosAd.cust_fin)}</span>
       </div>
-    </div>` : '';
+    </div>`;
 
   // Build the full modal HTML
   const html =
