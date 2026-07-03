@@ -3288,9 +3288,9 @@ class Handler(BaseHTTPRequestHandler):
                     if _meta is None or not _projeto_visivel_ao_ator(_meta, usuario):
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
-                    if _contrato_assinado(nome_safe, db):
+                    if _contrato_totalmente_assinado(nome_safe, db):
                         self.send_json({"ok": False,
-                                        "erro": "Contrato assinado — o parceiro não pode mais ser alterado"},
+                                        "erro": "Contrato assinado por ambas as partes — o parceiro não pode mais ser alterado"},
                                        code=400)
                         return
                     req = json.loads(body or b'{}')

@@ -52,9 +52,21 @@ def test_associar_parceiro_ok(app_db, seed, projetos_dir, http_client_factory):
     assert mod_omie._carregar_projeto(seed["projeto_l1"]).get("parceiro_id") is None
 
 
-def test_associar_parceiro_bloqueado_apos_assinatura(app_db, seed, projetos_dir, http_client_factory):
+def test_associar_parceiro_permitido_com_assinatura_parcial(app_db, seed, projetos_dir, http_client_factory):
+    # só UMA parte assinou (loja): ainda pode alterar o parceiro
     pid = _cria_parceiro_loja(app_db, seed["loja1_id"])
-    # marca o contrato do Proj_L1 como assinado
+    db = app_db.get_session()
+    ct = db.get(app_db.Contrato, seed["contrato_l1_id"])
+    ct.status = "assinado_loja"
+    db.commit(); db.close()
+    c = _login(http_client_factory, "dir_l1")
+    st, b = c.post(f"/api/projetos/{seed['projeto_l1']}/parceiro", {"parceiro_id": pid})
+    assert st == 200 and b.get("ok"), b
+
+
+def test_associar_parceiro_bloqueado_apos_ambas_assinaturas(app_db, seed, projetos_dir, http_client_factory):
+    # AMBAS as partes assinaram (status assinado): parceiro travado
+    pid = _cria_parceiro_loja(app_db, seed["loja1_id"])
     db = app_db.get_session()
     ct = db.get(app_db.Contrato, seed["contrato_l1_id"])
     ct.status = "assinado"

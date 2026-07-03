@@ -7712,7 +7712,8 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
   // Card especial etapa 2 — Criação do Projeto: parceiro (arquiteto) associado.
   // Edição do parceiro só até a assinatura do contrato.
   if (etapa.codigo === '2') {
-    const assinado = (typeof _contratoAssinado !== 'undefined') && _contratoAssinado;
+    // parceiro trava só quando AMBAS as partes assinam (contrato totalmente assinado)
+    const assinado = (typeof _contratoTotalmenteAssinado !== 'undefined') && _contratoTotalmenteAssinado;
     const temPar   = !!(projetoAtivo && projetoAtivo.parceiro_id);
     const par      = _parceiroAtivoProjeto || {};
     const parNome  = par.nome || (temPar ? ('#' + projetoAtivo.parceiro_id) : '');
