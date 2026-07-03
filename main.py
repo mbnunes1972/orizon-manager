@@ -330,7 +330,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
                 projetos = _listar_projetos()
-                projetos = _filtrar_projetos_por_loja(projetos, db, loja_id)
+                projetos = _filtrar_projetos_por_loja(projetos, db, loja_id, ator=usuario)
                 _enriquecer_projetos_com_pool(projetos)
                 _enriquecer_projetos_com_status(projetos)
                 self.send_json({"ok": True, "projetos": projetos})
@@ -354,7 +354,7 @@ class Handler(BaseHTTPRequestHandler):
                 from urllib.parse import parse_qs
                 q = (parse_qs(urlparse(self.path).query).get('q') or [''])[0].strip()
                 locais = _buscar_projetos(q)
-                locais = _filtrar_projetos_por_loja(locais, db, loja_id)
+                locais = _filtrar_projetos_por_loja(locais, db, loja_id, ator=usuario)
                 for p in locais: p['origem'] = 'local'
                 _enriquecer_projetos_com_pool(locais)
                 _enriquecer_projetos_com_status(locais)
@@ -979,7 +979,9 @@ class Handler(BaseHTTPRequestHandler):
                     if _err:
                         self.send_json({"ok": False, "erro": _err}, code=403)
                         return
-                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                    _meta = _projeto_da_loja(db, nome_safe, loja_id)
+                    if _meta is None or not _projeto_visivel_ao_ator(_meta, usuario):
+                        # escopo por projetista: consultor não abre projeto de outro
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
                 except Exception as e:
@@ -1690,6 +1692,8 @@ class Handler(BaseHTTPRequestHandler):
                     p_meta = _db_ciclo.get(Projeto, proj['nome_safe'])
                     if not p_meta:
                         p_meta = Projeto(nome_safe=proj['nome_safe'])
+                        # criador do projeto (escopo por projetista): gravado só na criação
+                        p_meta.criado_por_id = (usuario.get("id") if usuario else None)
                         _db_ciclo.add(p_meta)
                     p_meta.cliente_id = int(cliente_id)
                     p_meta.loja_id = loja_id
@@ -4824,13 +4828,40 @@ def _parceiro_visivel_loja(db, parceiro, loja_id):
     return False
 
 
-def _filtrar_projetos_por_loja(projetos, db, loja_id):
-    """Mantém só os projetos cujo projetos_meta.loja_id == loja_id (a lista vem do storage)."""
+# Perfis que veem apenas os projetos que criaram (os demais veem todos da loja).
+_PERFIS_ESCOPO_PROPRIO = {"consultor"}
+
+
+def _ve_apenas_proprios_projetos(nivel):
+    """True se o perfil vê só os projetos que criou (Consultor/projetista). Gerente de
+    vendas e níveis acima — e os operacionais de pós-venda — veem todos da loja."""
+    return nivel in _PERFIS_ESCOPO_PROPRIO
+
+
+def _projeto_visivel_ao_ator(meta, ator):
+    """True se o projetos_meta `meta` é visível ao ator. Perfis de escopo próprio só veem
+    o que criaram (criado_por_id == ator.id) ou os legados sem criador (criado_por_id NULL)."""
+    if meta is None:
+        return False
+    if not _ve_apenas_proprios_projetos((ator or {}).get("nivel")):
+        return True
+    cpid = getattr(meta, "criado_por_id", None)
+    return cpid is None or cpid == (ator or {}).get("id")
+
+
+def _filtrar_projetos_por_loja(projetos, db, loja_id, ator=None):
+    """Mantém só os projetos cujo projetos_meta.loja_id == loja_id. Se `ator` for de escopo
+    próprio (ex.: Consultor), mantém ainda só os que ele criou ou os legados sem criador."""
+    from sqlalchemy import or_
     nomes = [p.get("nome_safe") for p in projetos if p.get("nome_safe")]
     if not nomes:
         return []
-    permitidos = {r[0] for r in db.query(Projeto.nome_safe)
-                  .filter(Projeto.nome_safe.in_(nomes), Projeto.loja_id == loja_id).all()}
+    q = db.query(Projeto.nome_safe).filter(
+        Projeto.nome_safe.in_(nomes), Projeto.loja_id == loja_id)
+    if ator and _ve_apenas_proprios_projetos(ator.get("nivel")):
+        q = q.filter(or_(Projeto.criado_por_id == ator.get("id"),
+                         Projeto.criado_por_id.is_(None)))
+    permitidos = {r[0] for r in q.all()}
     return [p for p in projetos if p.get("nome_safe") in permitidos]
 
 
