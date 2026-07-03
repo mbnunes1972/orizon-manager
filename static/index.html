@@ -785,7 +785,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       </div>
       <div id="neg-parcelado-sep" style="text-align:center;color:#c8a84b;font-size:16px;display:none">&#x2192;</div>
       <div id="neg-parcelado-cell" style="background:#1a1206;border:0.5px solid #6e5a0f;border-radius:8px;padding:12px 14px;display:none">
-        <div style="font-size:9px;color:#c8a84b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Contrato Parcelado</div>
+        <div style="font-size:9px;color:#c8a84b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Valor Total do Contrato</div>
         <div style="font-size:19px;font-weight:500;color:#f0c84a" id="neg-parcelado">R$ 0,00</div>
       </div>
     </div>
@@ -4330,6 +4330,7 @@ function avistaMostrarPainel(mostrar) {
 
 function avistaRecalcular() {
   const total   = _ayGetValorVenda() || 0;
+  negMostrarParcelado(total);   // "Valor Total do Contrato" = Valor à Vista (à vista)
   const entrada = parseMoeda(document.getElementById('av-entrada-valor')?.value) || 0;
   const saldo   = Math.max(0, total - entrada);
   const elLiq = document.getElementById('av-liq-valor');
@@ -5053,6 +5054,9 @@ function negAtualizarDescontoEfetivo(){
   if (elAv) elAv.textContent = 'R$ ' + fmt(valorAvista);
   const elSub = document.getElementById('neg-subtotal');
   if (elSub) elSub.textContent = 'R$ ' + fmt(Math.round(estTotal*100)/100);
+  // À vista: "Valor Total do Contrato" = Valor à Vista (padroniza a faixa superior).
+  // Modalidades com financiamento setam esse campo com o total parcelado no seu update.
+  if (typeof _tipoAtivo !== 'undefined' && _tipoAtivo === 'avista') negMostrarParcelado(valorAvista);
 }
 
 function _limparResumo(){
