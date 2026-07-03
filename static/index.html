@@ -1918,6 +1918,12 @@ async function _onDescIndBlur(el, key, isEP07){
     el.value = prev;
     if(isEP07) renderTabelaNeg(_orcAmbientesAtivos); else renderTabelaNeg();
     mpAtualizarApoio();
+    // O preview acima (linha ~1910) já rodou com o desconto que excede — as células do
+    // motor mostrariam o desconto mesmo com o campo zerado. Re-roda com o valor revertido
+    // e re-persiste (o oninput do EP07 pode ter salvo o valor que excede).
+    await negPreview();
+    if(_orcamentoAtivoId !== _orcNoBlur) return;
+    if(isEP07) await _persistirDescontosOrc();
     showToast('Desconto total excede o limite máximo de descontos.', true);
   } else {
     if(isEP07) await _persistirDescontosOrc();
