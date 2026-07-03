@@ -7876,7 +7876,7 @@ const _PROV_RUBRICAS = [
   { key: 'com_proj_exec',  label: 'Comissão Proj/Exec' },
   { key: 'frete_loc',      label: 'Frete Local' },
   { key: 'assist',         label: 'Assistência Técnica' },
-  { key: 'ins_loc',        label: 'Instalação Local' },
+  { key: 'ins_loc',        label: 'Insumos Locais' },
   { key: 'prov_imp',       label: 'Provisão Impostos' },
   { key: 'out_forn',       label: 'Outros Fornecedores' },
 ];
@@ -7939,6 +7939,11 @@ async function abrirProvisoes(oid) {
   let valLiqRow = '<tr>' +
     `<td style="padding:4px 10px;font-size:.82rem;font-weight:600">Val. Líquido</td>` +
     cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem">${_fmtR(c.ver ? c.ver.val_liq : null)}</td>`).join('') +
+    '</tr>';
+  // CFO (custo de fábrica) — primeiro item da lista de provisões
+  let cfoRow = '<tr style="border-bottom:1px solid var(--border,#2a3f33)">' +
+    `<td style="padding:4px 10px;font-size:.82rem;font-weight:600">Custo de Fábrica (CFO)</td>` +
+    cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem">${_fmtR(c.ver ? c.ver.cfo : null)}</td>`).join('') +
     '</tr>';
 
   // Action section: Revisa inputs (hidden by default)
@@ -8020,7 +8025,7 @@ async function abrirProvisoes(oid) {
       `<div style="overflow-x:auto;max-height:55vh;overflow-y:auto">
         <table style="width:100%;border-collapse:collapse;font-size:.83rem">
           ${thead}
-          <tbody>${trows}${valLiqRow}${custVarRow}${margContRow}</tbody>
+          <tbody>${cfoRow}${trows}${valLiqRow}${custVarRow}${margContRow}</tbody>
         </table>
       </div>`) +
     revisaSection +
