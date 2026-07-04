@@ -1105,6 +1105,12 @@ Sessão de infraestrutura/processo (sem mudança de código de app; suíte segue
   dedicada).
 - **Push da `main`:** funciona nesta máquina (Git Credential Manager do usuário) — feito nesta sessão.
   A antiga seção "🔼 PENDÊNCIA: PUSH" (que assumia ambiente sem credenciais) foi **removida**.
+- **Repositório GitHub renomeado** `omie_v3 → orizon-manager` (via API `PATCH /repos`, HTTP 200, com a
+  credencial do GCM) e **remote local atualizado** (`git remote set-url origin
+  https://github.com/mbnunes1972/orizon-manager.git`); `fetch` validado, `main` sincronizada com
+  `origin` (0 à frente). GitHub redireciona o nome antigo por um tempo, então nada quebra. **Pendente:**
+  o VPS de produção ainda tem o remote antigo — o `git remote set-url` do runbook (`DEV_RULES.md`) cobre
+  isso no próximo deploy (o fetch de lá segue funcionando via redirecionamento).
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
