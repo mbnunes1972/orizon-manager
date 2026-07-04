@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "orizon": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "--network", "mcp-orizon_default",
+        "-e", "NEO4J_URI=bolt://neo4j:7687",
+        "-e", "NEO4J_USER=neo4j",
+        "-e", "NEO4J_PASSWORD=orizon-dev-password",
+        "-e", "TARGET_PROJECT_PATH=/data/target",
+        "-v", "E:/2026/desenvolvimento/mcp-orizon:/app",
+        "-v", "E:/2026/desenvolvimento/orizon-manager:/data/target:ro",
+        "-w", "/app",
+        "node:24-alpine",
+        "node", "--import", "tsx", "src/mcp/server.ts"
+      ]
+    }
+  }
+}
