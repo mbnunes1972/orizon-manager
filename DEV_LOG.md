@@ -1108,9 +1108,23 @@ Sessão de infraestrutura/processo (sem mudança de código de app; suíte segue
 - **Repositório GitHub renomeado** `omie_v3 → orizon-manager` (via API `PATCH /repos`, HTTP 200, com a
   credencial do GCM) e **remote local atualizado** (`git remote set-url origin
   https://github.com/mbnunes1972/orizon-manager.git`); `fetch` validado, `main` sincronizada com
-  `origin` (0 à frente). GitHub redireciona o nome antigo por um tempo, então nada quebra. **Pendente:**
-  o VPS de produção ainda tem o remote antigo — o `git remote set-url` do runbook (`DEV_RULES.md`) cobre
-  isso no próximo deploy (o fetch de lá segue funcionando via redirecionamento).
+  `origin` (0 à frente). GitHub redireciona o nome antigo por um tempo, então nada quebra.
+- **Deploy completo no VPS de produção (167.88.33.121) — feito e validado.** O servidor estava em
+  código de 24/06 (commit `895e5f6`, sessão ~31), diretório `/root/omie_v3`, banco `omie.db`, remote
+  antigo. Executado o runbook de migração+deploy via SSH (chave ed25519 instalada nesta sessão →
+  login sem senha): **backup** do banco (`orizon.db.bak-...`), parada do app, rename `omie_v3 →
+  orizon-manager` e `omie.db → orizon.db` (dados preservados: 11 usuários/2 clientes/3 projetos/6
+  orçamentos/1 loja), `git reset --hard origin/main` até `ca05a61`, **weasyprint instalado via apt
+  (61.1)**, restart no screen `orizon-manager` com `ORIZON_HOST=0.0.0.0`. **Auto-migração** de schema
+  rodou limpa na subida (`usuario_lojas_backfill_2026`). Validado: porta 8765 em `0.0.0.0`, `/login`
+  **HTTP 200** externo. **[CONTEXTO] Ajuste no runbook:** o screen de produção chamava-se `omie` (não
+  `omie_v3`) e o env var antigo era `OMIE_HOST` — o runbook do `DEV_RULES.md` assume nomes que já não
+  batiam; hoje está tudo padronizado (`orizon-manager`/`ORIZON_HOST`).
+- **[PENDENTE-BAIXA] weasyprint 61.1 no VPS vs 69 no dev local:** conferir um contrato PDF real gerado
+  em produção (possíveis diferenças de CSS entre versões). App não depende dela para subir (import lazy).
+- **[PENDENTE-BAIXA/segurança] `authorized_keys` do root no VPS** tem chaves de terceiros
+  (`igorferreiradaniel99@hotmail.com`, `idaniel@Mac.bbrouter`) + uma linha corrompida da 1ª tentativa de
+  instalação — revisar/limpar quem tem acesso root ao servidor.
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
@@ -1119,7 +1133,11 @@ Branches: só `main` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, 
 Contrato agora é **HTML/Markdown → PDF (WeasyPrint)** — o caminho `.docx`/LibreOffice do contrato
 foi aposentado (a **proposta** ainda usa docx/LibreOffice). **Diretório de trabalho:**
 `E:/2026/desenvolvimento/orizon-manager` (pai renomeado nesta sessão). **MCP `orizon`** ativo e
-ingerido; re-ingerir ao fechar frente.
+ingerido; re-ingerir ao fechar frente. **Produção (VPS 167.88.33.121:8765)** atualizada para
+`ca05a61` (sessão 44) nesta sessão: `/root/orizon-manager`, banco `orizon.db`, remote novo, screen
+`orizon-manager` (`ORIZON_HOST=0.0.0.0`), weasyprint 61.1, `/login` HTTP 200. **SSH por chave** já
+configurado (deploy pode ser conduzido pelo agente). Pendências-baixa: conferir contrato PDF real em
+prod (weasy 61 vs 69) e revisar chaves de terceiros no `authorized_keys` do root.
 
 **Já na `main` (frentes recentes):** super_admin aterrissagem+árvore; acesso multi-loja; Frente C
 (config financeira/provisões/margem real); provisões versionadas (Venda/Rev1/Rev2 + aprovação);
