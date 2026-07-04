@@ -9,5 +9,9 @@ omie_grupos_cache.json
 .env
 .pytest_cache/
 
-omie.db
+orizon.db
+*.bak*
 .claude/settings.local.json
+
+# brainstorm visual companion / sdd scratch
+.superpowers/

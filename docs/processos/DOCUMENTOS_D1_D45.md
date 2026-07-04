@@ -1,7 +1,7 @@
 # Documentos D1-D45 - Governanca Dalmobile
 
 Status: [REFERENCIA] - suite de documentos de governanca da rede
-Projeto: Governanca Dalmobile (paralelo ao Omie_V3)
+Projeto: Governanca Dalmobile (paralelo ao Orizon Manager)
 
 ---
 

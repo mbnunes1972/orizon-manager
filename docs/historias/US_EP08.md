@@ -1,6 +1,6 @@
 # EP-08 — Histórias de Usuário: Secretária Orizon
 
-> Adicionar ao final de `docs/historias/BACKLOG.md` do Omie_V3
+> Adicionar ao final de `docs/historias/BACKLOG.md` do Orizon Manager
 
 ---
 
@@ -11,21 +11,21 @@ perguntas da equipe via chat e voz, e envia alertas proativos via WhatsApp quand
 negociações estão paradas além do prazo.
 
 **Versão alvo:** v0.5.0  
-**Repositório:** secretaria_orizon (novo, separado do Omie_V3)  
-**Dependência:** Endpoints EP-08 no Omie_V3 (ver US-30)
+**Repositório:** secretaria_orizon (novo, separado do Orizon Manager)  
+**Dependência:** Endpoints EP-08 no Orizon Manager (ver US-30)
 
 ---
 
 ### US-27 — Acesso ao painel via token existente
 
-**Como** membro da equipe Orizon já autenticado no Omie_V3,  
+**Como** membro da equipe Orizon já autenticado no Orizon Manager,  
 **Quero** acessar o painel da Secretária sem fazer login novamente,  
 **Para que** o acesso seja fluido e sem atrito.
 
 **Critérios de aceite:**
-- [ ] Token JWT do Omie_V3 é aceito pelo painel da Secretária
+- [ ] Token JWT do Orizon Manager é aceito pelo painel da Secretária
 - [ ] Perfil do usuário (nome, cargo, loja) é carregado automaticamente
-- [ ] Token expirado redireciona para login do Omie_V3
+- [ ] Token expirado redireciona para login do Orizon Manager
 - [ ] Sem campos de login/senha na Secretária
 
 ---
@@ -39,7 +39,7 @@ negociações estão paradas além do prazo.
 **Critérios de aceite:**
 - [ ] Agente lista pendências com: cliente, fase, etapa, responsável, dias parados
 - [ ] Resposta em < 5 segundos
-- [ ] Dados são reais (vindos do Omie_V3), não inventados
+- [ ] Dados são reais (vindos do Orizon Manager), não inventados
 - [ ] Agente sugere próximo passo ao final da resposta
 - [ ] Se não houver pendências, agente informa claramente
 
@@ -60,10 +60,10 @@ negociações estão paradas além do prazo.
 
 ---
 
-### US-30 — Endpoints de leitura no Omie_V3
+### US-30 — Endpoints de leitura no Orizon Manager
 
 **Como** desenvolvedor do EP-08,  
-**Quero** que o Omie_V3 exponha endpoints de leitura do fluxo comercial,  
+**Quero** que o Orizon Manager exponha endpoints de leitura do fluxo comercial,  
 **Para que** a Secretária consuma dados reais sem acessar o SQLite diretamente.
 
 **Critérios de aceite:**
@@ -118,14 +118,14 @@ estiver parada além do prazo,
 - [ ] Aba "Alertas" no painel mostra log de notificações
 - [ ] Cada registro mostra: data, cliente, fase, responsável, canal
 - [ ] Filtrável por loja e por período
-- [ ] Histórico persistido no banco local da Secretária (não no Omie_V3)
+- [ ] Histórico persistido no banco local da Secretária (não no Orizon Manager)
 
 ---
 
-### US-34 — Deploy no VPS junto ao Omie_V3
+### US-34 — Deploy no VPS junto ao Orizon Manager
 
 **Como** desenvolvedor,  
-**Quero** que a Secretária rode no mesmo VPS do Omie_V3 na porta 8766,  
+**Quero** que a Secretária rode no mesmo VPS do Orizon Manager na porta 8766,  
 **Para que** não haja custo adicional de infraestrutura.
 
 **Critérios de aceite:**

@@ -59,7 +59,7 @@ que nenhuma linha operacional fique sem loja.
 | Usuário da Loja 1 (estado de hoje) | continua vendo/operando **tudo** da Loja 1 (sem regressão) |
 | Gerar contrato de um projeto da própria loja | funciona (F3 intacto: snapshot + número por código) |
 
-## 4. Inspeção no banco (SQLite `omie.db`)
+## 4. Inspeção no banco (SQLite `orizon.db`)
 
 ```sql
 -- carimbo de loja nos operacionais

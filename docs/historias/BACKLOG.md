@@ -1,7 +1,7 @@
-# Histórias de Usuário — Omie_V3
+# Histórias de Usuário — Orizon Manager
 
 > Versão de referência: **v0.2.0** | Junho 2026 — atualizado 2026-06-15
-> Repositório: [github.com/mbnunes1972/omie_v3](https://github.com/mbnunes1972/omie_v3)
+> Repositório: [github.com/mbnunes1972/orizon-manager](https://github.com/mbnunes1972/orizon-manager)
 
 **Convenções de status:**
 - `[IMPLEMENTADO]` — funcionalidade concluída e testada
@@ -298,7 +298,7 @@
 ### US-17 — Deploy no VPS Hostinger `[IMPLEMENTADO]`
 
 **Como** desenvolvedor,  
-**quero** ter o Omie_V3 rodando em servidor acessível remotamente,  
+**quero** ter o Orizon Manager rodando em servidor acessível remotamente,  
 **para que** a equipe da loja acesse o sistema sem depender da máquina local.
 
 **Critérios de aceite:**
@@ -317,7 +317,7 @@
 **para que** atualizações cheguem ao servidor de forma controlada e rastreável.
 
 **Critérios de aceite:**
-- Repositório: `github.com/mbnunes1972/omie_v3`
+- Repositório: `github.com/mbnunes1972/orizon-manager`
 - Fluxo: `desenvolver local → testar local → git push → SSH servidor → git pull → restart`
 - Tag `v0.1.0` criada como marco do estado atual
 - Convenção: `v0.x.0` em desenvolvimento, `v1.0.0` na primeira loja em produção

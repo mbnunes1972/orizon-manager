@@ -50,7 +50,7 @@ Este fluxo e a base para o Kanban comercial (v0.4.0).
 
 | Etapa | Descricao | Responsavel |
 |---|---|---|
-| 13 | Importacao do XML do Promob para o Omie_V3 | Consultor |
+| 13 | Importacao do XML do Promob para o Orizon Manager | Consultor |
 | 14 | Configuracao de margens e parametros | Consultor |
 | 15 | Definicao da forma de pagamento | Consultor |
 | 16 | Aplicacao de desconto (com autorizacao se necessario) | Consultor / Gerente |

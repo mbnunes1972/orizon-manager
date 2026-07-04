@@ -3,18 +3,18 @@
 **Épico:** EP-08  
 **Status:** PLANEJADO  
 **Versão alvo:** v0.5.0  
-**Porta:** 8766 (separada do Omie_V3 — porta 8765)  
+**Porta:** 8766 (separada do Orizon Manager — porta 8765)  
 **Repositório:** github.com/mbnunes1972/secretaria_orizon (novo repo)  
-**VPS:** Hostinger — 167.88.33.121 (mesmo servidor do Omie_V3)
+**VPS:** Hostinger — 167.88.33.121 (mesmo servidor do Orizon Manager)
 
 ---
 
 ## 1. Visão geral
 
-A Secretária Orizon é um agente de IA operacional que conhece o fluxo comercial de 38 etapas documentado em `docs/processos/FLUXO_38_ETAPAS.md` do Omie_V3. Ela atua como guardiã do processo comercial, com duas responsabilidades centrais:
+A Secretária Orizon é um agente de IA operacional que conhece o fluxo comercial de 38 etapas documentado em `docs/processos/FLUXO_38_ETAPAS.md` do Orizon Manager. Ela atua como guardiã do processo comercial, com duas responsabilidades centrais:
 
 1. **Modo reativo** — responde a perguntas da equipe via chat ou voz sobre pendências, próximos passos e status de negociações
-2. **Modo proativo** — monitora o banco de dados do Omie_V3 e dispara alertas via WhatsApp quando detecta etapas paradas além do prazo
+2. **Modo proativo** — monitora o banco de dados do Orizon Manager e dispara alertas via WhatsApp quando detecta etapas paradas além do prazo
 
 A interface é um painel web com suporte a voz (Web Speech API) e chat, acessível por Diretor, Gerentes e Consultores com visibilidade filtrada por perfil.
 
@@ -24,12 +24,12 @@ A interface é um painel web com suporte a voz (Web Speech API) e chat, acessív
 
 | Item | Decisão | Justificativa |
 |---|---|---|
-| Banco de dados | Leitura via endpoints REST do Omie_V3 | Evita acesso direto ao SQLite; protege integridade do DB |
+| Banco de dados | Leitura via endpoints REST do Orizon Manager | Evita acesso direto ao SQLite; protege integridade do DB |
 | Escrita no banco | **Proibida** — agente é somente leitura | Separação de responsabilidades |
 | LLM | Claude API (claude-sonnet-4-6) | Consistência com stack de IA do ecossistema |
 | Canal de alertas | WhatsApp via Evolution API (self-hosted no VPS) | Zero custo adicional; controle total |
 | Voz | Web Speech API (browser nativo) | Sem dependência externa; funciona no Chrome/Edge |
-| Autenticação | Token JWT compartilhado com Omie_V3 | Usuário loga uma vez; mesma sessão |
+| Autenticação | Token JWT compartilhado com Orizon Manager | Usuário loga uma vez; mesma sessão |
 | Idioma | Português formal | Padrão da Orizon Soluções |
 
 ---
@@ -40,10 +40,10 @@ A interface é um painel web com suporte a voz (Web Speech API) e chat, acessív
 secretaria_orizon/
 ├── main.py                  # Servidor HTTP (porta 8766)
 ├── agent_core.py            # Integração Claude API + system prompt
-├── db_reader.py             # Consumidor dos endpoints do Omie_V3
+├── db_reader.py             # Consumidor dos endpoints do Orizon Manager
 ├── scheduler.py             # APScheduler — varredura periódica do fluxo
 ├── notifier.py              # Envio de alertas via Evolution API (WhatsApp)
-├── auth.py                  # Validação JWT compartilhado com Omie_V3
+├── auth.py                  # Validação JWT compartilhado com Orizon Manager
 ├── config.py                # Variáveis de ambiente (sem secrets em código)
 ├── static/
 │   ├── index.html           # SPA — painel principal
@@ -71,7 +71,7 @@ Responsável pela conversa com a Claude API.
 
 **Responsabilidades:**
 - Montar o system prompt com contexto do processo Orizon
-- Injetar dados reais do Omie_V3 no contexto de cada requisição
+- Injetar dados reais do Orizon Manager no contexto de cada requisição
 - Gerenciar histórico de conversa por sessão (em memória, até 20 turnos)
 - Retornar resposta em texto para o frontend
 
@@ -91,11 +91,11 @@ def chat(user_message: str, session_id: str, user_profile: dict) -> str
 
 ### 4.2 `db_reader.py`
 
-Consome os endpoints de leitura do Omie_V3.
+Consome os endpoints de leitura do Orizon Manager.
 
 **Endpoints consumidos (todos GET, sem escrita):**
 
-| Endpoint Omie_V3 | Dado obtido |
+| Endpoint Orizon Manager | Dado obtido |
 |---|---|
 | `GET /api/projetos` | Lista de projetos/negociações ativos |
 | `GET /api/projetos/{id}` | Detalhe de um projeto |
@@ -103,7 +103,7 @@ Consome os endpoints de leitura do Omie_V3.
 | `GET /api/usuarios` | Lista de consultores/gerentes por loja |
 | `GET /api/clientes/{id}` | Dados do cliente da negociação |
 
-**Nota:** Estes endpoints precisam ser criados no Omie_V3 como parte do EP-08. Ver seção 7.
+**Nota:** Estes endpoints precisam ser criados no Orizon Manager como parte do EP-08. Ver seção 7.
 
 ---
 
@@ -169,12 +169,12 @@ Acesse o sistema para atualizar o status.
 
 ### 4.5 `auth.py`
 
-Valida o JWT emitido pelo Omie_V3.
+Valida o JWT emitido pelo Orizon Manager.
 
 **Fluxo:**
-1. Usuário já autenticado no Omie_V3 possui token JWT
+1. Usuário já autenticado no Orizon Manager possui token JWT
 2. Frontend da Secretária envia o mesmo token no header `Authorization: Bearer {token}`
-3. `auth.py` valida assinatura com a mesma `SECRET_KEY` do Omie_V3
+3. `auth.py` valida assinatura com a mesma `SECRET_KEY` do Orizon Manager
 4. Retorna perfil do usuário (nome, cargo, loja, limite de desconto)
 
 **Perfis e visibilidade:**
@@ -216,7 +216,7 @@ Input
 
 ### 5.2 Identidade visual
 
-Seguir a paleta Orizon já estabelecida no Omie_V3:
+Seguir a paleta Orizon já estabelecida no Orizon Manager:
 
 | Token | Cor | Uso |
 |---|---|---|
@@ -276,9 +276,9 @@ O processo comercial Orizon tem 6 fases e 38 etapas:
 
 ---
 
-## 7. Endpoints a criar no Omie_V3 (EP-08 backend)
+## 7. Endpoints a criar no Orizon Manager (EP-08 backend)
 
-Estes endpoints precisam ser adicionados ao `main.py` do Omie_V3 como parte desta fase:
+Estes endpoints precisam ser adicionados ao `main.py` do Orizon Manager como parte desta fase:
 
 | Método | Rota | Descrição |
 |---|---|---|
@@ -291,7 +291,7 @@ Estes endpoints precisam ser adicionados ao `main.py` do Omie_V3 como parte dest
 - Somente leitura (SELECT)
 - Autenticação JWT obrigatória
 - Retorno JSON
-- Prefixo `/api/v1/` para diferenciar dos endpoints internos do Omie_V3
+- Prefixo `/api/v1/` para diferenciar dos endpoints internos do Orizon Manager
 
 ---
 
@@ -327,9 +327,9 @@ CREATE TABLE sessoes_chat (
 # Claude API
 ANTHROPIC_API_KEY=sk-ant-...
 
-# Omie_V3 — leitura
-OMIE_V3_BASE_URL=http://localhost:8765
-OMIE_V3_JWT_SECRET=<mesma secret do Omie_V3>
+# Orizon Manager — leitura
+ORIZON_MANAGER_BASE_URL=http://localhost:8765
+ORIZON_MANAGER_JWT_SECRET=<mesma secret do Orizon Manager>
 
 # Evolution API — WhatsApp
 EVOLUTION_API_URL=http://localhost:8080
@@ -350,8 +350,8 @@ DEBUG=false
 
 | # | Critério | Como validar |
 |---|---|---|
-| CA-01 | Usuário autenticado no Omie_V3 acessa o painel sem novo login | Abrir 167.88.33.121:8766 com token válido |
-| CA-02 | Chat responde em < 5 segundos com dados reais do Omie_V3 | curl + cronômetro |
+| CA-01 | Usuário autenticado no Orizon Manager acessa o painel sem novo login | Abrir 167.88.33.121:8766 com token válido |
+| CA-02 | Chat responde em < 5 segundos com dados reais do Orizon Manager | curl + cronômetro |
 | CA-03 | Voz é reconhecida corretamente em pt-BR | Teste manual com 5 frases distintas |
 | CA-04 | Scheduler detecta etapa parada e envia WhatsApp | Criar projeto parado artificialmente |
 | CA-05 | Consultor vê apenas suas negociações | Login com perfil de consultor |

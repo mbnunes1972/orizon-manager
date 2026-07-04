@@ -1,6 +1,6 @@
 """
 database.py — Conexão SQLAlchemy + modelos de dados
-Omie_V3 | Dalmóbile
+Orizon Manager | Dalmóbile
 """
 
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, UniqueConstraint
@@ -17,7 +17,7 @@ def _hash_senha(senha: str) -> str:
 
 # ── Conexão ──────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH  = os.path.join(BASE_DIR, "omie.db")
+DB_PATH  = os.path.join(BASE_DIR, "orizon.db")
 ENGINE   = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 Session  = sessionmaker(bind=ENGINE)
 

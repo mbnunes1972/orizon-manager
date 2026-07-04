@@ -1,6 +1,6 @@
 # Spec — Negociação: bloqueio pós-aprovação, Rever Orçamento, À Vista e Formas de Pagamento
 
-> Sessão 10 | Omie_V3 | Dalmóbile
+> Sessão 10 | Orizon Manager | Dalmóbile
 > Data: 2026-06-18
 > Status: aprovado para plano
 

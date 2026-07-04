@@ -1,7 +1,7 @@
 # Sub-projeto E — Contrato: signatário, testemunhas, formatação + enforcement de aprovação
 
 **Data:** 2026-06-17
-**Projeto:** Omie_V3 — Dalmóbile / Orizon / Inspirium
+**Projeto:** Orizon Manager — Dalmóbile / Orizon / Inspirium
 **Escopo:** Corrigir bugs encontrados em teste (modal sobreposto; aprovação sem ambiente) e ajustar o documento do contrato (2º signatário = cliente; fluxo "é o cliente cadastrado?"; testemunhas provisórias; "CPF"→"CPF/CNPJ"; tags de nomenclatura nos campos editáveis).
 **Origem:** bugs reportados pelo usuário durante teste manual do fluxo completo.
 

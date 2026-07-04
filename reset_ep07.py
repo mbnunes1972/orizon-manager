@@ -4,7 +4,7 @@ Uso: python reset_ep07.py
 """
 import sqlite3, os
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "omie.db")
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "orizon.db")
 
 TABELAS_EP07    = ["orcamento_ambientes", "orcamentos", "pool_ambientes"]
 TABELAS_INTACTAS = ["usuarios", "sessoes", "log_autorizacoes", "clientes", "parceiros"]

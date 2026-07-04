@@ -1,7 +1,7 @@
 # Sub-projeto B — Cadastro completo na aprovação
 
 **Data:** 2026-06-17
-**Projeto:** Omie_V3 — Dalmóbile / Orizon Soluções
+**Projeto:** Orizon Manager — Dalmóbile / Orizon Soluções
 **Escopo:** Cadastro mínimo na criação (nome/e-mail/telefone); gate de cadastro completo ao aprovar o orçamento, com popup "Cadastro Incompleto" que leva ao painel de cadastro; backend como autoridade única da validação.
 **Parte de:** Redesenho do ciclo de vida do projeto (A/B/C/D). Este é o **B**. O **A** (etapas + gating) já foi entregue e mergeado.
 **Pré-requisito já entregue:** `validar_cliente_para_contrato(cliente)` em `mod_contrato.py` (criado e testado no contexto do A) e o gate no endpoint `POST /api/projetos/<nome>/contrato` que retorna **HTTP 400** com `campos_faltando`.

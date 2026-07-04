@@ -1,4 +1,4 @@
-# Documentação — Omie_V3
+# Documentação — Orizon Manager
 ## Dalmóbile | Sistema de Gestão Comercial
 
 ---

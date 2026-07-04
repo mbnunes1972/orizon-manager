@@ -1,6 +1,6 @@
 # Spec — Sub-projeto 1: Correções do ciclo
 
-> Omie_V3 | Dalmóbile | Data: 2026-06-18
+> Orizon Manager | Dalmóbile | Data: 2026-06-18
 > Parte 1 de 4 da decomposição (itens 1 e 2). Status: aprovado para plano.
 
 ## Contexto

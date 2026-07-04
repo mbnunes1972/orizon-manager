@@ -41,7 +41,7 @@ smoke manual — mesma pilha que os IDORs exploravam.
 
 `database.py` liga a engine no nível de módulo no import:
 ```python
-DB_PATH = os.path.join(BASE_DIR, "omie.db")
+DB_PATH = os.path.join(BASE_DIR, "orizon.db")
 ENGINE  = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 ```
 A fixture precisa redirecionar isso para um sqlite temporário **antes** de o app abrir sessões.
@@ -129,8 +129,8 @@ Decisão tomada no **primeiro item do plano** via teste-canário (seção 3.1).
 
 ## 8. Critérios de sucesso
 
-1. `python -m pytest tests/test_isolamento_f4_e2e.py` passa, **sem** depender do `omie.db` real
-   (banco temp descartável; `omie.db` de dev intocado).
+1. `python -m pytest tests/test_isolamento_f4_e2e.py` passa, **sem** depender do `orizon.db` real
+   (banco temp descartável; `orizon.db` de dev intocado).
 2. Toda linha da matriz da seção 5 tem ao menos um teste correspondente.
 3. A suíte completa (`python -m pytest`) segue verde (201 + N).
 4. Se algum teste revelar um IDOR ainda aberto: documentar, corrigir no código de produção com

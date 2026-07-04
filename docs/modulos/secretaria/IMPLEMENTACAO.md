@@ -10,20 +10,20 @@
 
 O EP-08 é desenvolvido em **dois repositórios em paralelo**:
 
-- **Omie_V3** — adição dos endpoints de leitura (Bloco A)
+- **Orizon Manager** — adição dos endpoints de leitura (Bloco A)
 - **secretaria_orizon** — novo repositório com o agente (Blocos B a E)
 
 Cada passo deve ser validado antes de avançar. Não pular etapas.
 
 ---
 
-## Bloco A — Endpoints no Omie_V3 (pré-requisito)
+## Bloco A — Endpoints no Orizon Manager (pré-requisito)
 
-> Fazer no repositório `omie_v3` antes de qualquer coisa.
+> Fazer no repositório `orizon-manager` antes de qualquer coisa.
 
 ### Passo 1 — Criar endpoints de leitura no main.py
 
-**Arquivo:** `main.py` do Omie_V3  
+**Arquivo:** `main.py` do Orizon Manager  
 **O que fazer:** Adicionar 4 rotas GET em `/api/v1/`:
 
 ```
@@ -90,8 +90,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 ANTHROPIC_API_KEY    = os.getenv("ANTHROPIC_API_KEY")
-OMIE_V3_BASE_URL     = os.getenv("OMIE_V3_BASE_URL", "http://localhost:8765")
-OMIE_V3_JWT_SECRET   = os.getenv("OMIE_V3_JWT_SECRET")
+ORIZON_MANAGER_BASE_URL     = os.getenv("ORIZON_MANAGER_BASE_URL", "http://localhost:8765")
+ORIZON_MANAGER_JWT_SECRET   = os.getenv("ORIZON_MANAGER_JWT_SECRET")
 EVOLUTION_API_URL    = os.getenv("EVOLUTION_API_URL", "http://localhost:8080")
 EVOLUTION_API_KEY    = os.getenv("EVOLUTION_API_KEY")
 EVOLUTION_INSTANCE   = os.getenv("EVOLUTION_INSTANCE", "orizon-central")
@@ -113,7 +113,7 @@ python -c "from config import ANTHROPIC_API_KEY; print('Config OK')"
 
 ### Passo 4 — Módulo db_reader.py
 
-Consome os endpoints do Omie_V3. Nenhuma escrita, apenas GET.
+Consome os endpoints do Orizon Manager. Nenhuma escrita, apenas GET.
 
 **Validação:**
 ```bash
@@ -128,14 +128,14 @@ print(f'Pendências encontradas: {len(p)}')
 
 ### Passo 5 — Módulo auth.py
 
-Valida JWT do Omie_V3 e retorna perfil do usuário.
+Valida JWT do Orizon Manager e retorna perfil do usuário.
 
 **Validação:**
 ```bash
-# Obter token válido do Omie_V3 e testar:
+# Obter token válido do Orizon Manager e testar:
 python -c "
 from auth import validar_token
-perfil = validar_token('{token_do_omie_v3}')
+perfil = validar_token('{token_do_orizon-manager}')
 print(perfil)
 "
 ```
@@ -160,7 +160,7 @@ print(resposta)
 "
 ```
 
-**Critério:** Resposta deve citar dados reais do Omie_V3, não dados inventados.
+**Critério:** Resposta deve citar dados reais do Orizon Manager, não dados inventados.
 
 ---
 
@@ -296,7 +296,7 @@ print('Varredura concluída — verifique o WhatsApp e o log_alertas')
 # /etc/systemd/system/secretaria.service
 [Unit]
 Description=Secretaria Orizon
-After=network.target omie_v3.service
+After=network.target orizon-manager.service
 
 [Service]
 User=ubuntu
@@ -328,7 +328,7 @@ curl http://167.88.33.121:8766/health
 
 ## Checklist final antes de considerar MVP concluído
 
-- [ ] Passo 1 — Endpoints Omie_V3 funcionando
+- [ ] Passo 1 — Endpoints Orizon Manager funcionando
 - [ ] Passo 3 — .env configurado no VPS
 - [ ] Passo 6 — Agente respondendo com dados reais
 - [ ] Passo 7 — Servidor HTTP na porta 8766
@@ -343,7 +343,7 @@ curl http://167.88.33.121:8766/health
 
 ## Notas para o Claude Code
 
-- Usar Python 3.12 (mesmo do Omie_V3)
+- Usar Python 3.12 (mesmo do Orizon Manager)
 - Não instalar dependências globais sem `--break-system-packages`
 - Nunca commitar o arquivo `.env`
 - Validar cada passo via curl antes de avançar

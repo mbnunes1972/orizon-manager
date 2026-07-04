@@ -1,4 +1,4 @@
-# Stack Técnica — Omie_V3
+# Stack Técnica — Orizon Manager
 
 ## Visão geral
 
@@ -9,14 +9,14 @@
 | Frontend | HTML/CSS/JS puro (SPA) | Sem framework — single page application |
 | Autenticação | Cookie de sessão (token hex 32) | Sem JWT — sessão server-side |
 | Infraestrutura | Hostinger VPS, Ubuntu 24.04 | IP: 167.88.33.121, porta 8765 |
-| Repositório | GitHub | github.com/mbnunes1972/omie_v3 |
+| Repositório | GitHub | github.com/mbnunes1972/orizon-manager |
 
 ---
 
 ## Estrutura de arquivos
 
 ```
-Omie_V3/
+Orizon Manager/
 ├── main.py                 # Ponto de entrada — servidor HTTP e todas as rotas
 ├── database.py             # Modelos SQLAlchemy e conexão com banco
 ├── auth.py                 # Lógica de autenticação e autorização
@@ -33,7 +33,7 @@ Omie_V3/
 ├── promob_grupos.py        # Classificação de grupos Promob
 ├── storage.py              # Funções de persistência em arquivo JSON
 ├── seed.py                 # Criação de usuários iniciais
-├── omie.db                 # Banco SQLite (não versionar dados de produção)
+├── orizon.db                 # Banco SQLite (não versionar dados de produção)
 ├── omie_config.json        # Credenciais Omie (não commitar)
 ├── perfis_config.json      # Configuração de perfis de acesso
 ├── config/
@@ -114,7 +114,7 @@ goPage(9)  // Configurações
 
 | Variável | Padrão | Uso |
 |---|---|---|
-| `OMIE_HOST` | `127.0.0.1` | Host do servidor HTTP (usar `0.0.0.0` no servidor DEV) |
+| `ORIZON_HOST` | `127.0.0.1` | Host do servidor HTTP (usar `0.0.0.0` no servidor DEV) |
 
 No servidor, após `git pull`:
 ```bash
@@ -128,12 +128,12 @@ python3 main.py
 
 **String de conexão atual (SQLite):**
 ```python
-ENGINE = create_engine("sqlite:///omie.db", echo=False)
+ENGINE = create_engine("sqlite:///orizon.db", echo=False)
 ```
 
 **Para migrar para MySQL** (quando necessário):
 ```python
-ENGINE = create_engine("mysql+mysqlconnector://user:pass@host/omie_v3", echo=False)
+ENGINE = create_engine("mysql+mysqlconnector://user:pass@host/orizon-manager", echo=False)
 ```
 O resto do código não muda — SQLAlchemy abstrai o banco.
 
@@ -143,7 +143,7 @@ O resto do código não muda — SQLAlchemy abstrai o banco.
 
 ```
 omie_config.json
-omie.db
+orizon.db
 __pycache__/
 *.pyc
 .env

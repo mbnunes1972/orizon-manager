@@ -536,7 +536,7 @@ Substituir o conteúdo de `seed.py` por:
 ```python
 """
 seed.py — Cria os usuários iniciais no banco de dados
-Omie_V3 | Dalmóbile
+Orizon Manager | Dalmóbile
 
 Uso: python3 seed.py
 """

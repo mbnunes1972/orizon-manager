@@ -1,6 +1,6 @@
 # Spec — Sub-projeto 4: Workflow de Medição
 
-> Omie_V3 | Dalmóbile | Data: 2026-06-18
+> Orizon Manager | Dalmóbile | Data: 2026-06-18
 > Parte 4 de 4 da decomposição (itens 6 e 7). Depende do Sub-projeto 2 (perfis, incl. `medidor`). Status: aprovado para plano.
 
 ## Contexto

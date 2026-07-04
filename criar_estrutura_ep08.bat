@@ -34,9 +34,9 @@ echo Criando arquivos de configuracao...
 echo # Claude API
 echo ANTHROPIC_API_KEY=sk-ant-...
 echo.
-echo # Omie_V3 - leitura
-echo OMIE_V3_BASE_URL=http://localhost:8765
-echo OMIE_V3_JWT_SECRET=
+echo # Orizon Manager - leitura
+echo ORIZON_MANAGER_BASE_URL=http://localhost:8765
+echo ORIZON_MANAGER_JWT_SECRET=
 echo.
 echo # Evolution API - WhatsApp
 echo EVOLUTION_API_URL=http://localhost:8080
@@ -86,6 +86,6 @@ echo  Proximos passos:
 echo  1. Copiar arquivos .md para docs/
 echo  2. cd %BASE% ^& git init
 echo  3. Preencher .env com as credenciais
-echo  4. Iniciar Passo 1 no Omie_V3
+echo  4. Iniciar Passo 1 no Orizon Manager
 echo ============================================
 pause

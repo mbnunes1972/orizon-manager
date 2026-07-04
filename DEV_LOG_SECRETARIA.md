@@ -9,7 +9,7 @@
 ## STATUS ATUAL
 
 **Fase:** PLANEJAMENTO CONCLUÍDO — aguardando início do desenvolvimento  
-**Próxima ação:** Passo 1 — criar endpoints de leitura no Omie_V3 (main.py)  
+**Próxima ação:** Passo 1 — criar endpoints de leitura no Orizon Manager (main.py)  
 **Bugs abertos:** nenhum
 
 ---
@@ -18,12 +18,12 @@
 
 | Decisão | Escolha | Motivo |
 |---|---|---|
-| Acesso ao banco Omie_V3 | Endpoints REST (não SQLite direto) | Protege integridade do DB; separação de responsabilidades |
+| Acesso ao banco Orizon Manager | Endpoints REST (não SQLite direto) | Protege integridade do DB; separação de responsabilidades |
 | Canal de alertas | WhatsApp via Evolution API (self-hosted) | Zero custo; controle total no VPS |
 | Reconhecimento de voz | Web Speech API (nativo browser) | Sem dependência externa; funciona offline |
-| Autenticação | JWT compartilhado com Omie_V3 | Usuário loga uma vez; sem atrito |
-| Deploy | systemd (não Docker) | Consistência com Omie_V3 |
-| Porta | 8766 | Omie_V3 usa 8765; sem conflito |
+| Autenticação | JWT compartilhado com Orizon Manager | Usuário loga uma vez; sem atrito |
+| Deploy | systemd (não Docker) | Consistência com Orizon Manager |
+| Porta | 8766 | Orizon Manager usa 8765; sem conflito |
 
 ---
 
@@ -31,9 +31,9 @@
 
 A Secretária é um agente operacional da Orizon Soluções. Ela conhece o fluxo
 comercial de 38 etapas (6 fases) documentado em:
-`omie_v3/docs/processos/FLUXO_38_ETAPAS.md`
+`orizon-manager/docs/processos/FLUXO_38_ETAPAS.md`
 
-Ela NÃO substitui o Omie_V3 — consome dados dele e atua como camada de
+Ela NÃO substitui o Orizon Manager — consome dados dele e atua como camada de
 inteligência e comunicação sobre o processo.
 
 **Usuários:**
@@ -57,9 +57,9 @@ inteligência e comunicação sobre o processo.
 **Realizado:**
 - Prototipagem da interface (painel com voz + chat) — aprovado
 - Arquitetura definida: Python + Claude API + Evolution API + Web Speech API
-- Decisão: endpoints REST no Omie_V3 (não acesso direto ao SQLite)
+- Decisão: endpoints REST no Orizon Manager (não acesso direto ao SQLite)
 - Decisão: WhatsApp via Evolution API self-hosted
-- Decisão: JWT compartilhado com Omie_V3
+- Decisão: JWT compartilhado com Orizon Manager
 - Documentação criada:
   - `docs/modulos/secretaria/SPEC.md`
   - `docs/modulos/secretaria/IMPLEMENTACAO.md`
@@ -67,7 +67,7 @@ inteligência e comunicação sobre o processo.
   - `DEV_LOG.md` (este arquivo)
   - `.bat` para criação da estrutura no Windows
 
-**Próxima sessão:** Iniciar Bloco A — Passo 1 (endpoints no Omie_V3)
+**Próxima sessão:** Iniciar Bloco A — Passo 1 (endpoints no Orizon Manager)
 
 ---
 
@@ -79,8 +79,8 @@ _Nenhum ainda — desenvolvimento não iniciado._
 
 ## REFERÊNCIAS
 
-- Omie_V3 DEV_LOG: `omie_v3/DEV_LOG.md`
-- Fluxo comercial: `omie_v3/docs/processos/FLUXO_38_ETAPAS.md`
+- Orizon Manager DEV_LOG: `orizon-manager/DEV_LOG.md`
+- Fluxo comercial: `orizon-manager/docs/processos/FLUXO_38_ETAPAS.md`
 - Protótipo da interface: aprovado na sessão 2026-06-15
 - Evolution API docs: https://doc.evolution-api.com
 - Claude API docs: https://docs.anthropic.com

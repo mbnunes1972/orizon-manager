@@ -1,6 +1,6 @@
 """
 auth_routes.py — Rotas de autenticação para integrar ao main.py
-Omie_V3 | Dalmóbile
+Orizon Manager | Dalmóbile
 
 Como usar:
   1. No topo do main.py, adicione:

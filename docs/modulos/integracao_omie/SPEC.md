@@ -6,14 +6,14 @@
 
 ## Visão geral
 
-Integração entre o sistema Omie_V3 e o ERP Omie para envio de pedidos de venda.
+Integração entre o sistema Orizon Manager e o ERP Omie para envio de pedidos de venda.
 
 ---
 
 ## Fluxo de exportação
 
 ```
-Orçamento aprovado no Omie_V3
+Orçamento aprovado no Orizon Manager
     → XMLs do Promob classificados em grupos
     → Grupos enviados como itens do pedido (R$1,00 × subtotal)
     → Pedido criado no Omie via API

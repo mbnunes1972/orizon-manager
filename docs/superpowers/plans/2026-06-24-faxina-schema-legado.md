@@ -14,7 +14,7 @@
 - **Líquido final inalterado:** a faxina não muda `valor_total`/`valor_liquido` (golden-master opcional: `snapshot_cutover.py` antes / `diff_cutover.py` depois).
 - **Decomposição do motor:** a discriminação passa a refletir a decomposição do motor (bruto → gross-up → desconto → arq/fid/viagem/brinde → líquido). O passo "financeiro" sai do waterfall de **margem** (ele vive em `Val_Cont`, não em `Val_Liq`). Validação visual do usuário.
 - **Fase C (drop da coluna `Orcamento.margens`) NÃO entra aqui** — é irreversível (DB ao vivo), fica para depois com backup + aprovação.
-- `python3 -m pytest`. 301 testes a manter verdes. Commits por task; `git add` só dos arquivos da task. NÃO commitar `perfis_config.json`/`.claude/*`/`omie.db`.
+- `python3 -m pytest`. 301 testes a manter verdes. Commits por task; `git add` só dos arquivos da task. NÃO commitar `perfis_config.json`/`.claude/*`/`orizon.db`.
 
 ---
 

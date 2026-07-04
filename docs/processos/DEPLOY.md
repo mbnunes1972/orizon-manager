@@ -1,4 +1,4 @@
-# Deploy — Omie_V3
+# Deploy — Orizon Manager
 
 ---
 
@@ -29,7 +29,7 @@
 ssh root@167.88.33.121
 
 # 2. Ir para o diretório do projeto
-cd /root/omie_v3
+cd /root/orizon-manager
 
 # 3. Descartar modificações locais (main.py tem 0.0.0.0)
 git checkout main.py
@@ -88,10 +88,10 @@ pip3 install aiohttp --break-system-packages
 
 ```bash
 # Criar usuários iniciais (primeira vez)
-cd /root/omie_v3
+cd /root/orizon-manager
 python3 seed.py
 
-# O omie.db é criado automaticamente ao subir o app
+# O orizon.db é criado automaticamente ao subir o app
 ```
 
 ---
@@ -130,7 +130,7 @@ Criar script que automatiza todo o processo:
 ```bash
 #!/bin/bash
 # deploy.sh — executar no servidor
-cd /root/omie_v3
+cd /root/orizon-manager
 git checkout main.py
 git pull
 sed -i 's/127.0.0.1/0.0.0.0/g' main.py

@@ -4,7 +4,7 @@ import pytest
 
 
 def test_canary_banco_isolado(app_db):
-    assert "omie.db" not in app_db.DB_PATH
+    assert "orizon.db" not in app_db.DB_PATH
     db = app_db.get_session()
     loja = app_db.Loja(nome="Canary")
     db.add(loja); db.commit()

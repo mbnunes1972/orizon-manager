@@ -1,7 +1,7 @@
 @echo off
 echo Criando estrutura de documentacao...
 
-set BASE=E:\2026\ESTUDO_DE_IA\Omie_V3\docs
+set BASE=E:\2026\ESTUDO_DE_IA\orizon-manager\docs
 
 mkdir "%BASE%"
 mkdir "%BASE%\arquitetura"

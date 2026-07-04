@@ -1,7 +1,7 @@
 # Sub-projeto D — Briefing obrigatório por-projeto
 
 **Data:** 2026-06-17
-**Projeto:** Omie_V3 — Dalmóbile / Orizon Soluções
+**Projeto:** Orizon Manager — Dalmóbile / Orizon Soluções
 **Escopo:** Briefing passa a ser **por-projeto** (não por-cliente). Depois de criar o projeto, o consultor é obrigado a preencher os campos obrigatórios do briefing daquele projeto antes de negociar. Backend bloqueia negociação sem briefing.
 **Parte de:** Redesenho do ciclo de vida (A/B/C/D). A, B e C já entregues e mergeados. **D é o último.**
 **Cobre os pontos do usuário:** 7 (briefing obrigatório após criar o projeto), 8 (passado o briefing, inicia o 1º orçamento/negociação).

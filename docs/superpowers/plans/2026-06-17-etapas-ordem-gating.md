@@ -348,13 +348,13 @@ Expected: PASS (all, including swap tests)
 
 Run: `python -c "import database; database.init_db(); print('migrado')"`
 Then verify the swap landed:
-Run: `python -c "import sqlite3; c=sqlite3.connect('omie.db'); print(c.execute(\"SELECT id FROM schema_migrations\").fetchall())"`
+Run: `python -c "import sqlite3; c=sqlite3.connect('orizon.db'); print(c.execute(\"SELECT id FROM schema_migrations\").fetchall())"`
 Expected: contains `('etapas_swap_2_3',)`
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add database.py tests/test_ciclo.py omie.db
+git add database.py tests/test_ciclo.py orizon.db
 git commit -m "feat(ciclo): migracao idempotente troca codigos 2<->3 (briefing/criacao)"
 ```
 
@@ -761,7 +761,7 @@ Expected: todos passam (inclui `test_ciclo.py` e os testes pré-existentes).
 
 - [ ] **Confirm migration marker + ordering on real DB**
 
-Run: `python -X utf8 -c "import sqlite3; c=sqlite3.connect('omie.db'); print('migracao:', c.execute(\"SELECT id FROM schema_migrations\").fetchall())"`
+Run: `python -X utf8 -c "import sqlite3; c=sqlite3.connect('orizon.db'); print('migracao:', c.execute(\"SELECT id FROM schema_migrations\").fetchall())"`
 Expected: contém `etapas_swap_2_3`.
 
 ---

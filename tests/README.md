@@ -1,8 +1,8 @@
-# Testes Unitários — Omie_V3
+# Testes Unitários — Orizon Manager
 
 ## Rodar todos os testes
 ```
-cd E:\2026\ESTUDO_DE_IA\Omie_V3
+cd E:\2026\ESTUDO_DE_IA\orizon-manager
 pytest tests\ -v
 ```
 

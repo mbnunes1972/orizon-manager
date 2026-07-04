@@ -1,4 +1,4 @@
-# Decisões de Arquitetura — Omie_V3
+# Decisões de Arquitetura — Orizon Manager
 
 Registro de decisões técnicas importantes. Antes de reverter qualquer item, leia o contexto.
 
@@ -110,4 +110,4 @@ Registro de decisões técnicas importantes. Antes de reverter qualquer item, le
 
 **Consequência:** O `main.py` no servidor sempre diverge do GitHub após o pull. Sempre executar `git checkout main.py` antes do `git pull` no servidor.
 
-**Alternativa considerada:** Variável de ambiente `OMIE_HOST` — mais elegante, não implementada ainda.
+**Alternativa considerada:** Variável de ambiente `ORIZON_HOST` — mais elegante, não implementada ainda.

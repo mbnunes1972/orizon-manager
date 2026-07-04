@@ -67,7 +67,7 @@ Endpoint dos dois fluxos: `/api/projetos/<nome_safe>/contrato`
 - **Cadastro do cliente incompleto** continua **bloqueando** (campo `campos_faltando`, sem
   `precisa_confirmar_loja`) — comportamento distinto e intencional.
 
-## 5. Inspeção no banco (SQLite `omie.db`)
+## 5. Inspeção no banco (SQLite `orizon.db`)
 
 ```sql
 -- O snapshot e a loja do último contrato gerado

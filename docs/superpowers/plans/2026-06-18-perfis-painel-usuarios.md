@@ -543,7 +543,7 @@ USUARIOS = [
 Run: `python -c "import seed; print('seed importa OK'); print(len(seed.USUARIOS), 'usuarios definidos')"`
 Expected: `seed importa OK` e `10 usuarios definidos`.
 
-> Não rodar `seed.py` contra o `omie.db` local agora (escrita em banco); a verificação real é na Task 9.
+> Não rodar `seed.py` contra o `orizon.db` local agora (escrita em banco); a verificação real é na Task 9.
 
 - [ ] **Step 3: Commit**
 
@@ -702,7 +702,7 @@ git commit -m "feat(admin): painel de usuarios (CRUD) + gate por perfil + remove
 Criar `docs/USUARIOS.md`:
 
 ```markdown
-# Perfis de Usuário — Omie_V3
+# Perfis de Usuário — Orizon Manager
 
 > Fonte da verdade do código: `perfis.py`. Ao adicionar/alterar um perfil, atualize
 > `perfis.py` **e** este documento. Usuários são criados no Painel Admin (Diretor ou

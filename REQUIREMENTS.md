@@ -1,13 +1,13 @@
 # REQUIREMENTS.md — Requisitos do Sistema
-## Omie_V3 | Dalmóbile
+## Orizon Manager | Dalmóbile
 ### Documento vivo — atualizar a cada decisão relevante
 
 ---
 
 ## 1. VISÃO GERAL
 
-**Nome do sistema:** Omie_V3 (nome interno de desenvolvimento)
-**Propósito:** Sistema de gestão comercial e operacional para redes de móveis planejados, integrando o software de projeto Promob com o ERP Omie. Cobre toda a jornada do cliente, do lead ao pós-entrega.
+**Nome do sistema:** Orizon Manager (`Omie_V3` era o nome interno de desenvolvimento anterior; ver §1.1)
+**Propósito:** Sistema de gestão comercial e operacional para redes de móveis planejados, cobrindo toda a jornada do cliente — do lead ao pós-entrega. O orçamento/negociação é feito **na própria plataforma**; a integração com o ERP Omie está sendo **repensada** e hoje mira a etapa fiscal (emissão de NFe), não mais o orçamento (ver §5.5).
 
 **Usuários primários:** Consultores de Vendas, Gerentes, Diretores, Projetistas
 **Usuários futuros:** Cliente (acompanhamento de projeto), Administrador de Rede, Financeiro de Rede
@@ -15,6 +15,23 @@
 **Escopo atual (MVP):** Integração Promob → Omie com negociação de margens e controle de acesso por nível de usuário.
 
 **Escopo futuro:** CRM completo cobrindo as 38 etapas do fluxo de processos Dalmóbile.
+
+### 1.1 Nomenclatura
+- **Marca / linha de produtos:** **Orizon**. Este produto é o **Orizon Manager** (a linha poderá ter outros produtos no futuro).
+- `Omie_V3` / `omie_v3` era o nome interno de desenvolvimento; foi **substituído por Orizon Manager** em docs e código (jul/2026).
+
+**Padrão adotado (forma por contexto):**
+
+| Contexto | Forma | Exemplo |
+|---|---|---|
+| Nome do produto (texto/UI/docs) | `Orizon Manager` | títulos, banners, cláusulas |
+| Diretório e repositório | `orizon-manager` (kebab) | `mbnunes1972/orizon-manager` |
+| Identificador de código / screen / caminho | `orizon-manager` | `screen -S orizon-manager`, `/root/orizon-manager` |
+| Banco de dados | `orizon.db` | `sqlite:///orizon.db` |
+| Variáveis de ambiente | prefixo `ORIZON_` | `ORIZON_HOST`, `ORIZON_MANAGER_BASE_URL`, `ORIZON_MANAGER_JWT_SECRET` |
+
+- **⚠️ Atenção crítica:** "Omie" **sem `_V3`** refere-se ao **ERP externo** e **NÃO** deve ser renomeado — inclui `mod_omie.py`, `OMIE_BLOQUEIO_425`, `omie_codigo`, `omie_sync_*`, `omie_config.json`, `omie_grupos_cache.json` e a "API Omie".
+- **Pendente (mantenedor):** renomear o diretório local, o arquivo de banco em produção e o **repositório GitHub** (`omie_v3` → `orizon-manager`) — ver runbook em `DEV_RULES.md`.
 
 ---
 
@@ -31,7 +48,7 @@
 - **Banco de dados:** SQLite + SQLAlchemy (migração futura para MySQL via troca de string de conexão)
 - **Frontend:** HTML/CSS/JS puro (SPA), sem framework
 - **Infraestrutura:** Hostinger VPS, Ubuntu 24.04, EasyPanel, Docker
-- **Repositório:** GitHub (`mbnunes1972/omie_v3`)
+- **Repositório:** GitHub (`mbnunes1972/orizon-manager` — renomeado de `omie_v3`; ver §1.1)
 
 ### 2.3 Integrações externas
 - **Promob:** leitura de arquivos XML exportados pelo software
@@ -146,10 +163,10 @@ Baseado no documento `1_FLUXO_DE_PROCESSOS.docx`. O sistema deve suportar e even
 - Cada partição de ambientes pode ter status independente
 
 ### 5.3 Clientes e CPF
-- Cliente pode ser cadastrado no Omie_V3 ou no Omie
+- Cliente pode ser cadastrado no Orizon Manager ou no Omie
 - Ao cadastrar, verificar CPF e nome contra os dois sistemas
 - Se já existir: perguntar se é novo projeto ou continuação
-- Sincronização bidirecional Omie_V3 ↔ Omie via API
+- Sincronização bidirecional Orizon Manager ↔ Omie via API
 
 ### 5.4 Negociação — Regras de cálculo e persistência
 
@@ -209,6 +226,13 @@ Baseado no documento `1_FLUXO_DE_PROCESSOS.docx`. O sistema deve suportar e even
 - 45 documentos mapeados no fluxo (D1–D45)
 
 ### 5.5 Integração Promob → Omie
+> 🔄 **EM REVISÃO (jul/2026).** O problema original — montar o **orçamento** enviando o pedido de venda
+> ao Omie — **não se aplica mais**: orçamento e negociação agora são feitos **dentro da plataforma
+> (Orizon Manager)**. O que permanece em aberto é a etapa **fiscal futura**: a **emissão de NFe**, que
+> será baseada na **NFe emitida pela fábrica** e processada **dentro do Omie**. A solução ainda será
+> repensada (a modelar em várias questões); o texto abaixo fica como **referência histórica** até a
+> nova especificação. Ver requisito futuro P9.
+>
 - XML do Promob é classificado em 16 grupos de produtos padronizados
 - Cada grupo tem NCM fixo e é enviado ao Omie com valor unitário R$1,00 e quantidade = subtotal do grupo
 - Rate limit da API Omie deve ser respeitado
@@ -262,8 +286,9 @@ Baseado no documento `1_FLUXO_DE_PROCESSOS.docx`. O sistema deve suportar e even
 | P1 | Módulo de configuração de perfis (definir acessos por módulo) | Futura |
 | P2 | Módulo de acesso do cliente (acompanhamento de projeto) | Futura |
 | P3 | Instância superior para rede de lojas (multi-tenant) | Futura |
-| P4 | Sincronização bidirecional Omie_V3 ↔ Omie para clientes | Média |
+| P4 | Sincronização bidirecional Orizon Manager ↔ Omie para clientes | Média |
 | P5 | Repositório de modelos de documentos (D1–D45) | Média |
 | P6 | Sistema de versionamento de projetos com log de alterações | Alta |
 | P7 | Particionamento de ambientes por pedido | Alta |
 | P8 | Migração SQLite → MySQL quando necessário | Futura |
+| P9 | Emissão de NFe baseada na NFe da fábrica, processada dentro do Omie (nova integração fiscal — substitui o antigo objetivo de orçamento da §5.5) | A definir |

@@ -1,5 +1,5 @@
 """DESTRUTIVO: cancela contratos, volta o ciclo de TODOS os projetos à fase de orçamento e
-recalcula valor_total/valor_liquido pelo motor. FAÇA BACKUP do omie.db antes de rodar."""
+recalcula valor_total/valor_liquido pelo motor. FAÇA BACKUP do orizon.db antes de rodar."""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import get_session, Orcamento, Contrato, ContratoAssinatura, CicloEtapa

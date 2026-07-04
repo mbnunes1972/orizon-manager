@@ -1,7 +1,7 @@
 # Sub-projeto A — Etapas: Ordem + Gating Sequencial
 
 **Data:** 2026-06-17
-**Projeto:** Omie_V3 — Dalmóbile / Orizon Soluções
+**Projeto:** Orizon Manager — Dalmóbile / Orizon Soluções
 **Escopo:** Reordenar Briefing ↔ Criação do projeto; tornar o ciclo de etapas sequencial (gating); reabertura em cascata com autorização gerencial auditada.
 **Parte de:** Redesenho do ciclo de vida do projeto (sub-projetos A/B/C/D). Este é o **A** — a fundação. B (cadastro completo na aprovação), C (semântica de aprovação) e D (briefing obrigatório) têm specs próprios.
 **Ajusta:** `2026-06-16-bloco1-contrato-ciclo-design.md` — aquele spec assumia "briefing antes de criar o projeto"; este inverte para "criar o projeto, depois briefing" (requisito do usuário, ponto 4).

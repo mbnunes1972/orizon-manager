@@ -9,7 +9,7 @@ O contrato gerado saiu errado: número do contrato não gerado, data do cabeçal
 vazia, parcelas não listadas, valor bruto "à vista" caindo na 13ª parcela e datas
 fora do lugar.
 
-Investigação (dados reais do `Contrato` id 6 em `omie.db`) revelou **duas causas**:
+Investigação (dados reais do `Contrato` id 6 em `orizon.db`) revelou **duas causas**:
 
 1. **Captura de pagamento com colunas trocadas (bug real).**
    A tabela "Plano de Pagamento" tem colunas `# | Tipo | Vencimento | Valor`

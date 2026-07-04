@@ -1,4 +1,4 @@
-# Banco de Dados — Omie_V3
+# Banco de Dados — Orizon Manager
 
 ## Visão geral
 

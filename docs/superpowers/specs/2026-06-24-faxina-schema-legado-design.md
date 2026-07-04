@@ -5,7 +5,7 @@
 **REMOVIDA** (decisão do usuário — tinha falhas), em vez de migrada ao motor. Drop da coluna
 `Orcamento.margens` **FEITO** (Sessão 31): código para de usá-la (desconto trafega como `desconto_pct`),
 coluna removida do modelo + migração idempotente `_drop_coluna_margens_orcamentos` (aplicada ao
-`omie.db`, backup `omie.db.bak-2026-06-24-pre-drop-margens`). Ver `NOMENCLATURA.md` e DEV_LOG Sessões 30–31.
+`orizon.db`, backup `omie.db.bak-2026-06-24-pre-drop-margens`). Ver `NOMENCLATURA.md` e DEV_LOG Sessões 30–31.
 **Base:** faxina single-source (Fase 1) + tela fonte única (Sessão 29). **Branch:** `faxina/schema-fase2`.
 **Rollback:** tag `pre-refator-negociacao`.
 
@@ -67,7 +67,7 @@ Após A, removível:
 - Parar de **escrever** `orc.margens` (`POST /margens`, `main.py:~1996`) e de **retornar** em
   `GET /ambientes`; o frontend passa a usar só `parametros` (estruturais do projeto) + `desconto_pct`.
   Conferir que `projetoAtivo.margens` no frontend não dependa mais da parte `orc.margens`.
-- **Só depois**, e **com backup do `omie.db` + aprovação**, dropar a coluna `Orcamento.margens`
+- **Só depois**, e **com backup do `orizon.db` + aprovação**, dropar a coluna `Orcamento.margens`
   (database.py:329) — sqlite exige recriar a tabela. Dados já migrados (`parametros_json` +
   `desconto_pct`); reversível só pelo backup.
 - **Validação:** salvar parâmetros/desconto e reabrir; conferir que tudo persiste sem `orc.margens`.
@@ -88,7 +88,7 @@ Após A, removível:
 - **B (backend):** `main.py` (endpoint `/calcular_margens`, import), `mod_margens.py`,
   `mod_omie.py`, `mod_orcamento_params.py`, `tests/test_margens.py`.
 - **C (schema):** `database.py` (coluna `Orcamento.margens`), `main.py` (`POST /margens`,
-  `GET /ambientes`), migração + backup do `omie.db`.
+  `GET /ambientes`), migração + backup do `orizon.db`.
 
 ## 6. Recomendação
 

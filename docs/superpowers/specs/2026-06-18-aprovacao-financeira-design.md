@@ -1,6 +1,6 @@
 # Spec — Sub-projeto 3: Aprovação financeira gerencial
 
-> Omie_V3 | Dalmóbile | Data: 2026-06-18
+> Orizon Manager | Dalmóbile | Data: 2026-06-18
 > Parte 3 de 4 da decomposição (item 3). Depende do Sub-projeto 2 (perfis). Status: aprovado para plano.
 
 ## Contexto

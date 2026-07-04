@@ -1,7 +1,7 @@
 # Bloco 1 — Contrato Completo e Ciclo de Ponta a Ponta
 
 **Data:** 2026-06-16  
-**Projeto:** Omie_V3 — Dalmóbile / Orizon Soluções  
+**Projeto:** Orizon Manager — Dalmóbile / Orizon Soluções  
 **Escopo:** Cadastro expandido + Briefing digital + Novo template de contrato + Ciclo sequencial (etapas 1–8)  
 **Pré-requisito para:** Bloco 2 (XML Projeto Executivo) e Bloco 3 (NF-e)
 

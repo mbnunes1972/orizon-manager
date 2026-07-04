@@ -4976,8 +4976,8 @@ def main():
     #  de Orcamento.desconto_pct.)
     port   = 8765
     # Host de bind configurável: padrão 127.0.0.1 (dev local seguro);
-    # em produção defina OMIE_HOST=0.0.0.0 para aceitar acesso externo.
-    host   = os.environ.get("OMIE_HOST", "127.0.0.1")
+    # em produção defina ORIZON_HOST=0.0.0.0 para aceitar acesso externo.
+    host   = os.environ.get("ORIZON_HOST", "127.0.0.1")
     server = HTTPServer((host, port), Handler)
     eh_local = host in ("127.0.0.1", "localhost")
     print("\n  Promob -> Omie  |  Negociacao de Margens  v7.3")
@@ -4985,7 +4985,7 @@ def main():
     if eh_local:
         url = "http://127.0.0.1:%d" % port
         print("  Acesse: %s" % url)
-        # Conveniencia de dev local: abre o navegador. Em producao (OMIE_HOST=0.0.0.0) nao abre.
+        # Conveniencia de dev local: abre o navegador. Em producao (ORIZON_HOST=0.0.0.0) nao abre.
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     else:
         print("  Acesse pelo IP/dominio do servidor na porta %d (bind em %s)" % (port, host))

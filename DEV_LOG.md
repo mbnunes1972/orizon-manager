@@ -1,5 +1,5 @@
 # DEV_LOG.md — Diário de Desenvolvimento
-## Omie_V3 | Dalmóbile
+## Orizon Manager | Dalmóbile
 
 ---
 
@@ -101,7 +101,7 @@
 - Desconto total máximo: 35% de (bruto_original − líquido) / bruto_original
 - Banco: SQLite + SQLAlchemy
 - Servidor DEV: `167.88.33.121:8765`
-- GitHub: `https://github.com/mbnunes1972/omie_v3`
+- GitHub: `https://github.com/mbnunes1972/orizon-manager`
 - Auto-sync Omie ao criar cliente: background thread (não bloqueia HTTP); falha silenciosa → fila no painel admin
 - Status "convertido" nunca via dropdown — apenas automático ao aprovar orçamento
 - Último orçamento ativo por projeto: localStorage (não backend) — suficiente para uso em loja fixa
@@ -267,7 +267,7 @@
 - **Migração:** colunas via `_migrar_colunas` (DBs existentes); dados via `_run_migracoes` → `tenancy_v1_2026` (idempotente, em `schema_migrations`): cria a **loja seed** a partir das constantes do contrato (INSPIRIUM, `codigo=INS`; CPFs de testemunha ainda placeholder → corrigir na F2) e faz backfill de `loja_id` em todos os registros + um vínculo `parceiro_lojas` por parceiro.
 - **`seed.py`:** `criar_usuarios_seed(db, usuarios, loja_id)` (puro/testável) vincula os 10 usuários-exemplo à loja seed; helper `loja_seed_id(db)`.
 
-**Verificação:** pytest **167** verde (10 novos: schema, colunas, migração+idempotência+não-sobrescreve-abrangência, seed). Smoke do `init_db()` completo sobre uma **cópia do `omie.db` real**: loja seed criada e **0 registros com `loja_id` NULL** (11 usuários, 6 clientes, 14 projetos, 20 orçamentos, 13 contratos). Sem mudança de UI/rotas/contrato (confirmado por revisão de spec em cada task) — regressão por construção. **Pendente:** regressão Playwright ao vivo não rodada (evitar mutar o DEV DB antes do merge; F1 não tem superfície de UI).
+**Verificação:** pytest **167** verde (10 novos: schema, colunas, migração+idempotência+não-sobrescreve-abrangência, seed). Smoke do `init_db()` completo sobre uma **cópia do `orizon.db` real**: loja seed criada e **0 registros com `loja_id` NULL** (11 usuários, 6 clientes, 14 projetos, 20 orçamentos, 13 contratos). Sem mudança de UI/rotas/contrato (confirmado por revisão de spec em cada task) — regressão por construção. **Pendente:** regressão Playwright ao vivo não rodada (evitar mutar o DEV DB antes do merge; F1 não tem superfície de UI).
 
 **Fixes em revisão:** guard `_tabela_existe("parceiro_lojas")` na migração (robustez a DBs parciais); restaurado o contador "já existia(m)" no resumo do `seed.py`.
 
@@ -373,7 +373,7 @@
 ### Sessão 2026-06-19 (sessão 15 — fix do bloqueio + atualização de documentação)
 - **Bug pego em uso:** no parecer da medição só dava para selecionar "Aprovado". Causa: o `#ciclo-panel` vive dentro de `#page-02`, e o bloqueio pós-aprovação (`aplicarBloqueioNegociacao`) desabilitava todos os `select`/`input` de `#page-02` — incluindo o select de parecer e os uploads da medição. **Correção:** o bloqueio passa a isentar `#ciclo-panel` (fluxo pós-aprovação precisa ficar interativo); a negociação continua travando. Verificado por Playwright. Commit `87679e3`.
 - **Documentação atualizada:** DEV_LOG ([ESTADO]/[PENDENTE]/[CONTEXTO] revisados para os 10 perfis, painel de usuários, aprovação financeira, medição e correções de negociação) e `docs/USUARIOS.md` já refletindo os perfis/capacidades.
-- **Deploy:** sub-projetos 1–4 + correções empurrados ao GitHub; produção atualizada via runbook (deps já instaladas, `OMIE_HOST=0.0.0.0`, banco recriado/seedado com os 10 perfis, `no-cache` ativo).
+- **Deploy:** sub-projetos 1–4 + correções empurrados ao GitHub; produção atualizada via runbook (deps já instaladas, `ORIZON_HOST=0.0.0.0`, banco recriado/seedado com os 10 perfis, `no-cache` ativo).
 
 ### Sessão 2026-06-18 (sessão 14 — sub-projeto 4: workflow de medição)
 Quarto e último sub-projeto da decomposição (fecha os itens 6 e 7).
@@ -707,7 +707,7 @@ Branch `faxina/schema-fase2`. Objetivo (do usuário): **nomenclatura bem definid
   Σ por ambiente = agregados) — disponível para uso futuro pelo motor.
 - **Vestígios Fase 01 em caminhos mortos** (`lerMargensNegociacao`, `_negBaseValues`, branch legado de
   `renderTabelaNeg`) ficam sinalizados para uma passada futura (entrelaçados com funções vivas).
-- **Não-feito (irreversível):** drop da coluna `Orcamento.margens` — exige backup do `omie.db` +
+- **Não-feito (irreversível):** drop da coluna `Orcamento.margens` — exige backup do `orizon.db` +
   aprovação. **295 testes verdes** (caíram 7 do `test_margens` removido).
 - **Fix (race do desconto por ambiente):** o desconto só era salvo no blur (`_persistirDescontosOrc`,
   fire-and-forget) e corria com a troca de orçamento (o `_orcamentoAtivoId` mudava antes do commit) →
@@ -728,7 +728,7 @@ Branch `faxina/drop-orcamento-margens`. Usuário autorizou (base é teste; backu
   (`migrar_margens_para_orcamentos`, `migrar_parametros_para_projeto`) e seus call-sites/testes
   removidos; `test_legado_intacto` passa a exigir que `margens` **não** exista.
 - **Migração idempotente** `_drop_coluna_margens_orcamentos` (startup, sqlite≥3.35) dropa a coluna
-  em DBs existentes; DBs novos já nascem sem ela. **Aplicada ao `omie.db`** (dados preservados:
+  em DBs existentes; DBs novos já nascem sem ela. **Aplicada ao `orizon.db`** (dados preservados:
   21 orçamentos / 13 contratos). **291 testes verdes** (caíram os 4 testes das migrações obsoletas).
 - **Desconto por ambiente — alinhado ao padrão dos campos que funcionam:** era o único campo que
   salvava **só no blur** (`_persistirDescontosOrc`, frágil). Agora:
@@ -802,7 +802,7 @@ Dia de validação manual no browser da Frente C. Achados e mudanças:
   escondido com contrato assinado; o modal de Parâmetros abre travado (inputs disabled/readonly,
   Salvar oculto, badge "🔒 somente leitura") e expõe a margem real sob o cadeado de impostos.
 - **Fix de visualização de contrato** (commit `4c8076c`): `contrato.pdf_path` de contratos antigos
-  foi salvo como caminho ABSOLUTO do Windows (`E:/.../Omie_v3/...`) — não resolve em WSL/Linux
+  foi salvo como caminho ABSOLUTO do Windows (`E:/.../orizon-manager/...`) — não resolve em WSL/Linux
   (case-sensitive) e o contrato não abria mesmo com o PDF presente. `_resolver_pdf_contrato` cai
   para `CONTRATOS_DIR/<basename>`. Aplicado nas rotas `GET /contrato/pdf` e `GET /contrato`.
 
@@ -1116,7 +1116,7 @@ Estado (2026-07-03): após o push da Sessão 40, a `main` local acumulou as Sess
 frente de `origin/main` (confira com `git rev-list --count origin/main..main`). O push **não pôde
 ser feito pelo agente**
 — o ambiente não tem credenciais do GitHub, nem `gh` CLI, nem credential helper (erro:
-`could not read Username for 'https://github.com'`). Remote: `https://github.com/mbnunes1972/omie_v3.git`.
+`could not read Username for 'https://github.com'`). Remote: `https://github.com/mbnunes1972/orizon-manager.git`.
 
 **Fazer pelo usuário (no próprio shell, onde estão as credenciais):**
 ```
@@ -1131,7 +1131,7 @@ Se pedir usuário/senha em HTTPS, usar um **Personal Access Token (PAT)** do Git
   (ajustar o caminho do GCM); o próximo push abre o login do Windows.
 - **GitHub CLI:** instalar `gh`, rodar `gh auth login` e depois `gh auth setup-git`; o `git push` passa
   a autenticar via `gh`.
-- **PAT no remote (menos seguro):** `git remote set-url origin https://<PAT>@github.com/mbnunes1972/omie_v3.git`.
+- **PAT no remote (menos seguro):** `git remote set-url origin https://<PAT>@github.com/mbnunes1972/orizon-manager.git`.
 
 Conferir antes: `git rev-list --count origin/main..main` (deve mostrar os commits a publicar) e
 `git log --oneline origin/main..main | head` (o que vai subir).

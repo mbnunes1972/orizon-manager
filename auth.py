@@ -1,6 +1,6 @@
 """
 auth.py — Autenticação, sessões e autorização delegada
-Omie_V3 | Dalmóbile
+Orizon Manager | Dalmóbile
 """
 
 import os

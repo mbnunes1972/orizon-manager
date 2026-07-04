@@ -1,6 +1,6 @@
 # Spec — Sub-projeto 2: Perfis + Painel Admin de Usuários + Documentação
 
-> Omie_V3 | Dalmóbile | Data: 2026-06-18
+> Orizon Manager | Dalmóbile | Data: 2026-06-18
 > Parte 2 de 4 da decomposição (itens 4 e 5). Fundação reutilizada pelos sub-projetos 3 e 4. Status: aprovado para plano.
 
 ## Contexto

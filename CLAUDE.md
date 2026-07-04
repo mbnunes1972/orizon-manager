@@ -1,4 +1,4 @@
-# CLAUDE.md — Omie_V3 | Dalmóbile
+# CLAUDE.md — Orizon Manager | Dalmóbile
 
 Instruções carregadas automaticamente pelo Claude Code. Regras completas de processo estão em
 `DEV_RULES.md`; **estado atual e histórico** em `DEV_LOG.md` (comece pela seção `## ⏸️ ESTADO ATUAL`,
@@ -6,13 +6,13 @@ no fim); requisitos em `REQUIREMENTS.md`; specs de design em `docs/superpowers/s
 
 ## O que é
 Sistema de vendas de móveis planejados (loja Dalmóbile). **Backend** Python puro com `http.server`
-(sem framework), SQLAlchemy + SQLite (`omie.db`). **Frontend** é um único arquivo `static/index.html`
+(sem framework), SQLAlchemy + SQLite (`orizon.db`). **Frontend** é um único arquivo `static/index.html`
 (HTML+CSS+JS inline). Multi-loja/rede (tenancy). Ciclo do projeto em etapas.
 
 ## Ambiente e execução
 - Use **`python3`** (nunca `python`). WSL/Ubuntu.
 - Servidor local: `python3 main.py` → `http://localhost:8765` (bind `127.0.0.1`; em produção
-  `OMIE_HOST=0.0.0.0`). A mensagem `gio: ... Operation not supported` no start é inofensiva.
+  `ORIZON_HOST=0.0.0.0`). A mensagem `gio: ... Operation not supported` no start é inofensiva.
 - **`static/index.html` é lido do disco a cada request** → mudança de frontend = só **Ctrl+F5**, sem
   restart. Mudança em **Python** (`main.py`/módulos) **exige restart** do servidor.
 
@@ -24,7 +24,7 @@ Sistema de vendas de móveis planejados (loja Dalmóbile). **Backend** Python pu
 ## Git — o que commitar
 - Branch `main`. Commits descritivos (pt-BR): `feat(...)`, `fix(...)`, `docs: ...`.
 - **NÃO commitar ruído** (já modificado no working tree desde o início, ignorar sempre):
-  `omie.db`/`*.bak*`, `perfis_config.json`, `.gitignore`, `XML/…`, `.claude/…`, `~$*.docx`, `*.tmp`.
+  `orizon.db`/`*.bak*`, `perfis_config.json`, `.gitignore`, `XML/…`, `.claude/…`, `~$*.docx`, `*.tmp`.
   **Sempre `git add` só os arquivos da mudança** (nunca `git add .`).
 - Push: as credenciais do GitHub estão no Git Credential Manager (do usuário) — o push funciona; se
   falhar por credencial, peça ao usuário rodar `!git push origin main`.

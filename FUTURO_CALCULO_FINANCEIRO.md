@@ -1,4 +1,4 @@
-# Fluxo de Cálculo Financeiro — Omie_V3
+# Fluxo de Cálculo Financeiro — Orizon Manager
 
 > Documento complementar ao SPEC.md do módulo financeiro  
 > Criado em: 2026-06-10  
@@ -8,7 +8,7 @@
 
 ## Visão geral
 
-O cálculo financeiro do Omie_V3 segue 5 etapas sequenciais, cada uma com
+O cálculo financeiro do Orizon Manager segue 5 etapas sequenciais, cada uma com
 uma origem de dados clara e um papel específico. Este documento formaliza
 esse fluxo para orientar futuras manutenções e novas funcionalidades.
 

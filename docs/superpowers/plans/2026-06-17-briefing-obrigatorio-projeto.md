@@ -505,7 +505,7 @@ git commit -m "feat(briefing): criar projeto -> briefing do projeto obrigatorio 
 ## Final verification (fase /verify ao fim)
 
 - [ ] **Run full suite:** `python -X utf8 -m pytest tests/ -q` → all pass.
-- [ ] **Runtime drive (API):** start one fresh `python main.py` (mate instâncias antigas antes!); login; criar um projeto novo p/ um cliente; `POST /projetos/<novo>/orcamentos` e `/pool` → **400** ("Preencha o briefing…"); `POST /api/projetos/<novo>/briefing` com os 5 obrigatórios → `GET /ciclo` mostra etapa 3 concluída; `POST /orcamentos` agora passa. Confirmar que a etapa 3 de OUTRO projeto do mesmo cliente NÃO foi marcada (leitura direta de `omie.db`).
+- [ ] **Runtime drive (API):** start one fresh `python main.py` (mate instâncias antigas antes!); login; criar um projeto novo p/ um cliente; `POST /projetos/<novo>/orcamentos` e `/pool` → **400** ("Preencha o briefing…"); `POST /api/projetos/<novo>/briefing` com os 5 obrigatórios → `GET /ciclo` mostra etapa 3 concluída; `POST /orcamentos` agora passa. Confirmar que a etapa 3 de OUTRO projeto do mesmo cliente NÃO foi marcada (leitura direta de `orizon.db`).
 - [ ] **GUI drive (Playwright):** criar projeto → o briefing abre automaticamente → preencher os 5 obrigatórios + salvar → cai na negociação (page-02). Limpar dados de teste; parar o servidor.
 
 ---

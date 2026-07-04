@@ -77,8 +77,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 
 def test_canary_banco_isolado(app_db):
-    # o caminho aponta para o temp, não para o omie.db real
-    assert "omie.db" not in app_db.DB_PATH
+    # o caminho aponta para o temp, não para o orizon.db real
+    assert "orizon.db" not in app_db.DB_PATH
     # escrita+leitura sobrevivem entre sessões → engine temp está ativa
     db = app_db.get_session()
     loja = app_db.Loja(nome="Canary")

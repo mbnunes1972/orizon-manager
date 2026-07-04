@@ -1,7 +1,7 @@
 # Sub-projeto C — Semântica de aprovação + botão de assinatura
 
 **Data:** 2026-06-17
-**Projeto:** Omie_V3 — Dalmóbile / Orizon Soluções
+**Projeto:** Orizon Manager — Dalmóbile / Orizon Soluções
 **Escopo:** "Aprovar Orçamento" conclui Revisão (etapa 5) **e** Aprovação (etapa 6) juntas; etapa 5 deixa de ter toggle manual; botão pós-aprovação vira clicável "Orçamento aprovado – assinar contrato" levando ao card de assinatura. `desfazer_aprovacao` passa a resetar 5/6/7.
 **Parte de:** Redesenho do ciclo de vida (A/B/C/D). A e B já entregues e mergeados.
 **Cobre os pontos do usuário:** 9 (1º orçamento por XML — já atendido), 10 e 11 (revisão concluída pela aprovação; "Aprovar Orçamento" conclui as duas fases), 13 (botão clicável renomeado para assinatura).

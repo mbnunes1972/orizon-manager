@@ -24,7 +24,7 @@
 ## Task 1: database.py — modelo Projeto + _upsert_projeto_status
 
 **Files:**
-- Modify: `E:\2026\estudo_de_ia\omie_v3\database.py`
+- Modify: `E:\2026\estudo_de_ia\orizon-manager\database.py`
 
 - [ ] **Step 1: Adicionar modelo Projeto**
 
@@ -82,7 +82,7 @@ Verificar tabela criada:
 ```
 python -c "
 import sqlite3
-c = sqlite3.connect('omie.db')
+c = sqlite3.connect('orizon.db')
 tables = [r[0] for r in c.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()]
 print('projetos_meta' in tables)
 "
@@ -115,7 +115,7 @@ git commit -m "feat: modelo Projeto com status pipeline + upsert_projeto_status"
 ## Task 2: mod_omie.py — _listar_projetos inclui cliente_cpf
 
 **Files:**
-- Modify: `E:\2026\estudo_de_ia\omie_v3\mod_omie.py`
+- Modify: `E:\2026\estudo_de_ia\orizon-manager\mod_omie.py`
 
 O campo `cliente_cpf` já é referenciado em `_buscar_projetos` mas não é populado por `_listar_projetos`. Corrigir isso.
 
@@ -168,7 +168,7 @@ git commit -m "feat: _listar_projetos inclui cliente_cpf"
 ## Task 3: main.py — enriquecer projetos com status e último orçamento
 
 **Files:**
-- Modify: `E:\2026\estudo_de_ia\omie_v3\main.py`
+- Modify: `E:\2026\estudo_de_ia\orizon-manager\main.py`
 
 - [ ] **Step 1: Adicionar função _enriquecer_projetos_com_status**
 
@@ -259,7 +259,7 @@ git commit -m "feat: projetos enriquecidos com status pipeline e valor do últim
 ## Task 4: main.py — PATCH /api/projetos/<nome_safe>/status + "convertido" automático
 
 **Files:**
-- Modify: `E:\2026\estudo_de_ia\omie_v3\main.py`
+- Modify: `E:\2026\estudo_de_ia\orizon-manager\main.py`
 
 - [ ] **Step 1: Adicionar rota PATCH /api/projetos/<nome_safe>/status**
 
@@ -346,7 +346,7 @@ git commit -m "feat: PATCH status projeto + convertido automático ao aprovar"
 ## Task 5: index.html — CSS + HTML page-00 redesign
 
 **Files:**
-- Modify: `E:\2026\estudo_de_ia\omie_v3\static\index.html`
+- Modify: `E:\2026\estudo_de_ia\orizon-manager\static\index.html`
 
 - [ ] **Step 1: Adicionar CSS da tabela de projetos**
 
@@ -431,7 +431,7 @@ git commit -m "feat: page-00 redesign HTML/CSS — tabela projetos com filtro st
 ## Task 6: index.html — JS renderização em tabela + filtros + dropdown status inline
 
 **Files:**
-- Modify: `E:\2026\estudo_de_ia\omie_v3\static\index.html`
+- Modify: `E:\2026\estudo_de_ia\orizon-manager\static\index.html`
 
 - [ ] **Step 1: Substituir renderProjResultados por versão tabela**
 

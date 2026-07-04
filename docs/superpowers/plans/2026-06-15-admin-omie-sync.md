@@ -73,7 +73,7 @@ Esperado: `OK` sem erros. Verificar com:
 ```bash
 python -c "
 import sqlite3
-c = sqlite3.connect('omie.db')
+c = sqlite3.connect('orizon.db')
 cols = [r[1] for r in c.execute('PRAGMA table_info(clientes)').fetchall()]
 print(cols)
 "
@@ -162,7 +162,7 @@ Iniciar o servidor e criar um cliente via interface. Verificar no log do termina
 ```bash
 python -c "
 import sqlite3
-c = sqlite3.connect('omie.db')
+c = sqlite3.connect('orizon.db')
 for row in c.execute('SELECT nome, omie_codigo, omie_sync_status, omie_sync_erro FROM clientes ORDER BY id DESC LIMIT 3').fetchall():
     print(row)
 "

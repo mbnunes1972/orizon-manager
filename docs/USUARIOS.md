@@ -1,4 +1,4 @@
-# Perfis de Usuário — Omie_V3
+# Perfis de Usuário — Orizon Manager
 
 > Fonte da verdade do código: `perfis.py`. Ao adicionar/alterar um perfil, atualize
 > `perfis.py` **e** este documento. Usuários são criados no Painel Admin (Diretor ou

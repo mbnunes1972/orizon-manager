@@ -14,7 +14,7 @@ Historias: US-17, US-18, US-19
 | Frontend | HTML/CSS/JS puro (SPA) | Sem framework |
 | Autenticacao | Cookie de sessao (token_hex 32) | Server-side, sem JWT |
 | Servidor | Hostinger VPS, Ubuntu 24.04 | IP: 167.88.33.121, porta 8765 |
-| Repositorio | GitHub | github.com/mbnunes1972/omie_v3 |
+| Repositorio | GitHub | github.com/mbnunes1972/orizon-manager |
 
 ---
 
@@ -24,13 +24,13 @@ Historias: US-17, US-18, US-19
 |---|---|---|
 | Desenvolvimento local | localhost:8765 | Desenvolvimento e testes |
 | Desenvolvimento remoto | 167.88.33.121 | Testes em ambiente real |
-| Producao ArchDecorPoints | VPS separado (KVM 2) | NUNCA usar para Omie_V3 |
+| Producao ArchDecorPoints | VPS separado (KVM 2) | NUNCA usar para Orizon Manager |
 
 ---
 
 ## 3. Estrutura de arquivos
 
-Omie_V3/
+Orizon Manager/
  main.py                     # Servidor HTTP + todas as rotas
  database.py                 # Modelos SQLAlchemy e conexao
  auth.py                     # Logica de autenticacao
@@ -62,14 +62,14 @@ Omie_V3/
 3. git add . && git commit -m "feat: descricao"
 4. git push origin main
 5. ssh root@167.88.33.121
-6. cd ~/omie_v3 && git pull
+6. cd ~/orizon-manager && git pull
 7. Reiniciar processo no screen
 
 ### Gerenciamento com screen
 
   screen -ls              # ver sessoes ativas
-  screen -r omie_v3       # reconectar
-  screen -S omie_v3       # criar nova sessao
+  screen -r orizon-manager       # reconectar
+  screen -S orizon-manager       # criar nova sessao
   python3 main.py         # iniciar aplicacao
   Ctrl+A D                # desanexar sem matar
 
