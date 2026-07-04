@@ -17,6 +17,7 @@ Garantir continuidade total entre sessões de desenvolvimento, sem perda de cont
 | `DEV_LOG.md` | Diário de desenvolvimento — estado atual e histórico |
 | `REQUIREMENTS.md` | Requisitos do sistema — referência permanente |
 | `docs/superpowers/specs/` | Specs de design por frente |
+| MCP `orizon` (grafo Neo4j) | Camada de **consulta** estrutural (cobertura, impacto, rastreabilidade). **Não** substitui o DEV_LOG — ver seção própria abaixo |
 
 ---
 
@@ -49,6 +50,7 @@ O Claude Code lê os arquivos diretamente — não precisa colar o conteúdo.
 - [ ] A suíte passou (`python3 -m pytest -q`) e os testes manuais foram feitos (login, funcionalidade alterada)
 - [ ] `git add . && git commit -m "descrição"` foi executado
 - [ ] `git push` foi executado
+- [ ] **Re-ingestão do grafo MCP** (`ingerir` com `fonte: "all"`, ou `POST http://localhost:8767/ingest/all`) — para o grafo refletir o código mergeado
 - [ ] Se houver mudanças no servidor: `git pull` + restart do app
 
 ### Pedir ao Claude para atualizar o log
@@ -137,6 +139,27 @@ sleep 3; ss -ltnp | grep 8765; tail -8 app.log
    `/login`. Para sintaxe do JS: extrair o `<script>` e rodar `node --check`.
 
 ---
+
+## MCP `orizon` — grafo de conhecimento (camada de consulta)
+
+O projeto `../mcp-orizon` sobe um **grafo Neo4j** (via docker-compose) que ingere código, requisitos,
+banco e decisões do Orizon Manager. O Claude Code fala com ele via servidor MCP (config em `.mcp.json`,
+mounts para `E:/2026/desenvolvimento/...`). Ferramentas: `cobertura`, `rastrear_requisito`,
+`impacto_de`, `decisoes_de`, `buscar`, `entidades_do_arquivo`, `etapa`, `ingerir`, `criar_relacao`.
+
+**Papel e limites — leia antes de confiar nele:**
+- É uma **camada de consulta/análise** ("o que implementa o requisito X? o que quebra se eu mexer no
+  arquivo Y? quais requisitos não têm código?"). **Não** é controle de versão nem diário.
+- É **derivado do código e local** (container Neo4j, fora do git). **Fica obsoleto** se o código muda e
+  não re-ingere; **some** com `docker compose down -v` — aí é só re-ingerir.
+- **Não substitui o DEV_LOG.** O DEV_LOG continua sendo a fonte narrativa versionada (estado, backlog,
+  decisões + porquê, histórico) e a continuidade entre sessões. O grafo complementa.
+
+**Controle de versão:** segue **100% no git** — o MCP não muda nada nisso.
+
+**Ritual:** após mergear mudança relevante, **re-ingerir** (`ingerir` `fonte: "all"` ou
+`POST http://localhost:8767/ingest/all`). Antes de fechar frente, vale rodar
+`cobertura`/`rastrear_requisito` para pegar requisito sem implementação.
 
 ## TAGS DO DEV_LOG
 

@@ -32,7 +32,20 @@ Sistema de vendas de móveis planejados (loja Dalmóbile). **Backend** Python pu
 ## Fechar uma frente (padrão do projeto)
 1. Suíte verde. 2. Atualizar **DEV_LOG** (nova `## Sessão N`) e o spec em `docs/superpowers/specs/`.
 3. `git add <arquivos> && git commit`. 4. Merge na `main` (ou já está, se commitou direto). 5. `git
-push origin main` (atualiza o "servidor web" = GitHub). Deploy no VPS: runbook em `DEV_RULES.md`.
+push origin main` (atualiza o "servidor web" = GitHub). 6. **Re-ingerir o grafo MCP** (`ingerir`
+com `fonte: "all"`, ou `POST http://localhost:8767/ingest/all`) para o grafo refletir o código novo.
+Deploy no VPS: runbook em `DEV_RULES.md`.
+
+## MCP `orizon` (grafo Neo4j) — camada de consulta, NÃO substitui o DEV_LOG
+Grafo Neo4j que ingere código + requisitos + banco + decisões (projeto `../mcp-orizon`; container
+docker-compose já de pé, config em `.mcp.json`). Responde consultas estruturais: `cobertura`
+(requisitos/etapas sem uso), `rastrear_requisito`, `impacto_de`, `decisoes_de`, `buscar`,
+`entidades_do_arquivo`. **É derivado do código e local (fora do git)** → fica obsoleto se não
+re-ingerir, e some com `docker compose down -v`. Por isso o **DEV_LOG continua sendo a fonte
+narrativa** (estado, backlog, decisões+porquê, histórico) — o grafo complementa, não aposenta.
+Controle de versão segue 100% no **git**. Após mergear mudança relevante, **re-ingerir** (passo 6
+acima). Antes de fechar frente, vale rodar `cobertura`/`rastrear_requisito` para pegar requisito sem
+implementação.
 
 ## Áreas sensíveis (contexto que evita retrabalho)
 - **Contrato:** HTML (capa) + Markdown (cláusulas) → **PDF via WeasyPrint** (assets em

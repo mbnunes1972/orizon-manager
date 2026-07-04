@@ -4,7 +4,7 @@
 ---
 
 ## RESUMO ATUAL
-> Atualizado em: 2026-06-22 (sessão 25 — **F4: suíte de regressão E2E de isolamento** (substitui o smoke manual pendente). Harness hermético em `tests/conftest.py` — servidor real (`main.Handler`) numa thread em porta efêmera + banco SQLite e `PROJETOS_DIR` **temporários** (rebind de `database.ENGINE`/`Session`/`DB_PATH` e `PROJETOS_DIR` em storage/main/mod_omie, restaurados no teardown) + login real (cookie `omie_session`). **33 testes** em `tests/test_isolamento_f4_e2e.py` cobrindo toda a matriz: leitura cross-loja de cliente/projeto/orçamento/contrato → **404**, listagens escopadas, **403** administrativo, **401** anônimo em todos os IDORs corrigidos (status/descontos/valor/parceiros/briefings/ambientes), escrita cross-loja bloqueada com estado intacto, carimbo de `loja_id` na criação, colisão de CPF sem vazamento. **234 testes verdes**. **Bug de produção achado e corrigido:** `import threading` redundante em `do_POST` tornava `threading` local à função inteira → `UnboundLocalError` (quebrava o sync Omie em background ao criar cliente + threads do fluxo de negociação); guard `test_do_post_nao_faz_shadowing_de_threading`. Mergeado na `main` (não-pushed: 38 commits à frente de origin). Antes: sessão 24 — F4 isolamento operacional (~30 endpoints escopados, vários IDORs reais corrigidos); sessão 23 — F3 contrato puxa da loja)
+> Atualizado em: 2026-07-04 (sessão 44 — **manutenção de ambiente + política do MCP**. Renomeação do diretório pai `estudo_de_ia → desenvolvimento` (o repo já vinha renomeado `Omie_V3 → Orizon Manager`, commit `c8eb350`); corrigidos os mounts do `.mcp.json` para `E:/2026/desenvolvimento/...` e reconectado o servidor MCP `orizon` (validado com `cobertura`/`ingerir`). **Decisão de processo:** o grafo MCP é **camada de consulta**, não substitui o DEV_LOG nem o git — DEV_LOG segue como fonte narrativa versionada; adicionado o passo de **re-ingestão** ao ritual de fechar frente (docs `CLAUDE.md`/`DEV_RULES.md`). Push da `main` para o `origin` **funciona** (feito nesta sessão) — a antiga pendência de push foi removida. Suíte permanece **395 passed** (sem mudança de código de app). Antes: sessão 43 — padronização da tela de Negociação + "Valor Total do Contrato" editável (cálculo reverso); sessão 42 — lote de ajustes de teste em produção (395 passed))
 
 ### [ESTADO] O que está funcionando
 - App rodando em `http://167.88.33.121:8765` (servidor DEV) e `http://127.0.0.1:8765` (local)
@@ -1086,12 +1086,34 @@ Frontend-only (`static/index.html`), verificação manual. Spec:
   gerencial. **Causa raiz do 1º bug:** `_negBaseValues` nunca é populado. Trecho feito com apoio do
   **Fable 5**. Spec (seção 6) atualizado.
 
-## ⏸️ ESTADO ATUAL (2026-07-03) — retomar aqui
+## Sessão 44 — Manutenção de ambiente + política do MCP `orizon` (main)
+
+Sessão de infraestrutura/processo (sem mudança de código de app; suíte segue **395 passed**).
+
+- **Renomeação do diretório pai** `E:/2026/estudo_de_ia → E:/2026/desenvolvimento` (feita pelo usuário).
+  O repo já vinha renomeado `Omie_V3 → Orizon Manager` (commit `c8eb350`, sessão anterior).
+- **`.mcp.json`:** corrigidos os dois mounts do container efêmero do MCP para
+  `E:/2026/desenvolvimento/mcp-orizon` e `.../orizon-manager`; arquivo adicionado ao git (`c014884`,
+  já pushado). Verificado que **nenhum código Python** tinha o path antigo hardcoded (só entradas
+  obsoletas de allowlist em `.claude/`, que são ruído ignorado). MCP reconectado via `/mcp` e validado
+  com `cobertura` + `ingerir` (`fonte:"all"` → 893 nós de código, 31 requisitos, 60 banco, 42 decisões).
+- **[DECIDIDO] Papel do MCP vs DEV_LOG:** o grafo Neo4j (`../mcp-orizon`) é **camada de consulta**
+  estrutural (cobertura, impacto, rastreabilidade), **derivada do código e local (fora do git)** →
+  fica obsoleta sem re-ingestão. **Não substitui** o DEV_LOG (fonte narrativa versionada) nem o **git**
+  (único controle de versão). Ritual de fechar frente ganhou o passo de **re-ingestão** após o push.
+  Codificado em `CLAUDE.md` (passo 6 + seção "MCP `orizon`") e `DEV_RULES.md` (checklist + seção
+  dedicada).
+- **Push da `main`:** funciona nesta máquina (Git Credential Manager do usuário) — feito nesta sessão.
+  A antiga seção "🔼 PENDÊNCIA: PUSH" (que assumia ambiente sem credenciais) foi **removida**.
+
+## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
 **`main`** consolidada e verde — **suíte 395 passed**. Servidor: `python3 main.py` (porta 8765).
 Branches: só `main` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
 Contrato agora é **HTML/Markdown → PDF (WeasyPrint)** — o caminho `.docx`/LibreOffice do contrato
-foi aposentado (a **proposta** ainda usa docx/LibreOffice).
+foi aposentado (a **proposta** ainda usa docx/LibreOffice). **Diretório de trabalho:**
+`E:/2026/desenvolvimento/orizon-manager` (pai renomeado nesta sessão). **MCP `orizon`** ativo e
+ingerido; re-ingerir ao fechar frente.
 
 **Já na `main` (frentes recentes):** super_admin aterrissagem+árvore; acesso multi-loja; Frente C
 (config financeira/provisões/margem real); provisões versionadas (Venda/Rev1/Rev2 + aprovação);
@@ -1110,28 +1132,7 @@ etapa Orçamento como hub + Imprimir Orçamento (proposta = 1º doc do banco #8)
 4. **Seed Orizon (#6)**, **busca LGPD (#4)**, **config de rede (#7)**.
 5. **Não-pushed:** a `main` está à frente do `origin` (merges locais) — `git push` quando o usuário pedir.
 
-## 🔼 PENDÊNCIA: PUSH da `main` para o `origin` (fazer ao retomar)
-
-Estado (2026-07-03): após o push da Sessão 40, a `main` local acumulou as Sessões 41, 42 e 43 à
-frente de `origin/main` (confira com `git rev-list --count origin/main..main`). O push **não pôde
-ser feito pelo agente**
-— o ambiente não tem credenciais do GitHub, nem `gh` CLI, nem credential helper (erro:
-`could not read Username for 'https://github.com'`). Remote: `https://github.com/mbnunes1972/orizon-manager.git`.
-
-**Fazer pelo usuário (no próprio shell, onde estão as credenciais):**
-```
-!git push origin main
-```
-Se pedir usuário/senha em HTTPS, usar um **Personal Access Token (PAT)** do GitHub como senha
-(senha de conta não funciona mais).
-
-**Para deixar configurado e não repetir (escolher uma):**
-- **Git Credential Manager do Windows (WSL):**
-  `git config --global credential.helper "/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe"`
-  (ajustar o caminho do GCM); o próximo push abre o login do Windows.
-- **GitHub CLI:** instalar `gh`, rodar `gh auth login` e depois `gh auth setup-git`; o `git push` passa
-  a autenticar via `gh`.
-- **PAT no remote (menos seguro):** `git remote set-url origin https://<PAT>@github.com/mbnunes1972/orizon-manager.git`.
-
-Conferir antes: `git rev-list --count origin/main..main` (deve mostrar os commits a publicar) e
-`git log --oneline origin/main..main | head` (o que vai subir).
+> **Nota (2026-07-04):** a antiga seção "🔼 PENDÊNCIA: PUSH" foi removida — o `git push origin main`
+> funciona nesta máquina (Git Credential Manager do usuário). Remote:
+> `https://github.com/mbnunes1972/orizon-manager.git`. Se algum dia falhar por credencial, peça ao
+> usuário rodar `!git push origin main` no próprio shell.
