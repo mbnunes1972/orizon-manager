@@ -1246,18 +1246,18 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
   consultar/cancelar → `resultado_de_focus`). **Testes offline** (client fake, sem emissão real).
   **[Fase 4]** PIS/COFINS CST "49" + CSOSN são Simples-only (marcado `# TODO Fase 4`) — ramificar por
   regime com o contador.
-- **[CONTEXTO] Fechamento:** Fases 1 e 2 + **Painel Fiscal Sub-frente I** **mergeadas na `main`**; Fase 3b
-  na branch `feat/nfe-mapa-fiscal` (pronta para merge). Próximas frentes em branches novas a partir da `main`.
+- **[CONTEXTO] Fechamento:** Fases 1, 2, **Painel Fiscal Sub-frente I** e **Fase 3b** todas **mergeadas na
+  `main`** (fast-forward), pushadas e re-ingeridas (código 1110 nós); branches deletadas. Próximas frentes
+  em branches novas a partir da `main`.
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
-**`main`** consolidada e verde — **suíte 493 passed** (código 1078 nós / banco 69). **Frente em
+**`main`** consolidada e verde — **suíte 507 passed** (código 1110 nós / banco 69). **Frente em
 andamento:** **Integração NF-e Fábrica→Loja via Focus NFe** (Sessão 47). **Mergeadas na `main`:** Fase 1
-(`mod_nfe.py` parser/precificação + CLI), Fase 2 (`EmissorFiscal`/`focus_client`/`focus_config`) e o
+(`mod_nfe.py` parser/precificação + CLI), Fase 2 (`EmissorFiscal`/`focus_client`/`focus_config`), o
 **Painel de Config Fiscal · Sub-frente I** (`PerfilFiscal` + `fiscal_cripto` Fernet + `mod_fiscal` +
-endpoints; segredos cifrados write-only, produção bloqueada com placeholder). **Implementada em branch
-(`feat/nfe-mapa-fiscal`, suíte 507, pronta para merge):** **Fase 3b** — `mapa_fiscal` (nota→payload Focus)
-+ `EmissorFocusNfe`. **A retomar:** **Fase 4** (emissão real em homologação — token da Focus), **Fase 5**
+endpoints; segredos cifrados write-only, produção bloqueada com placeholder) e a **Fase 3b**
+(`mapa_fiscal` nota→payload Focus + `EmissorFocusNfe`). **A retomar:** **Fase 4** (emissão real em homologação — token da Focus), **Fase 5**
 (orquestração + UI etapa 15) e a **Sub-frente II** (painel fiscal no frontend). **Fase 4 depende do perfil
 fiscal Simples do contador** (CNPJ 19.152.134/0001-56: CST/CSOSN/CFOP/alíquotas) e o **smoke em homologação
 depende do token da Focus**
