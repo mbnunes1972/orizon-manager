@@ -1215,18 +1215,20 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
   `FocusError` **404** (não 401) — prova auth+URL sem payload fiscal. (2) **Perfil fiscal Simples do CNPJ
   19.152.134/0001-56** (do contador: CST/CSOSN/CFOP/alíquotas) para a Fase 3; perfis lucro real/presumido
   virão depois. (3) Implementar Fase 1 (`mod_nfe.py`) e Fase 3 (mapa fiscal + `EmissorFocusNfe`).
-- **[CONTEXTO] Branch:** `feat/nfe` (épico da integração; fases mergeadas à `main` conforme ficam verdes).
-  Fase 2 pronta para merge; Fase 1 ainda é só spec.
+- **[CONTEXTO] Fechamento:** Fase 2 **mergeada na `main`** (fast-forward), pushada e re-ingerida
+  (código 1011 nós); branch `feat/nfe` deletada. Próximas fases (1 e 3) em branches novas a partir da `main`.
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
-**`main`** consolidada e verde (**431 passed**); etapas operacionais 12/13/14 (Sessão 46) já mergeadas.
-**Frente aberta:** **Integração NF-e Fábrica→Loja via Focus NFe** (Sessão 47), branch `feat/nfe` —
-**Fase 2 IMPLEMENTADA** (contrato `EmissorFiscal` + `focus_client` + `focus_config`, **suíte 457**),
-pronta para merge; **Fase 1** (`mod_nfe.py` parser/precificação) ainda só **spec**; **Fase 3** (mapa
-fiscal + `EmissorFocusNfe`) depende do **perfil fiscal Simples do contador** (CNPJ 19.152.134/0001-56) e
-o smoke em homologação depende do **token da Focus**. XMLs reais da fábrica em
-`E:/2026/desenvolvimento/nfe-dalmobile` (fora do git). Servidor: `python3 main.py` (porta 8765) — **atenção:
+**`main`** consolidada e verde — **suíte 457 passed** (etapas operacionais 12/13/14 da Sessão 46 +
+**Fase 2 da integração NF-e** da Sessão 47, ambas mergeadas e pushadas; grafo re-ingerido, código 1011
+nós). **Frente em andamento:** **Integração NF-e Fábrica→Loja via Focus NFe** (Sessão 47) — **Fase 2
+(contrato `EmissorFiscal` + `focus_client` + `focus_config`) mergeada**. **A retomar:** **Fase 1**
+(`mod_nfe.py` parser/precificação — só spec) e **Fase 3** (mapa fiscal + `EmissorFocusNfe`), em branches
+novas a partir da `main`. **Fase 3 depende do perfil fiscal Simples do contador** (CNPJ
+19.152.134/0001-56: CST/CSOSN/CFOP/alíquotas) e o **smoke em homologação depende do token da Focus**
+(ambos pendentes do usuário). XMLs reais da fábrica em `E:/2026/desenvolvimento/nfe-dalmobile` (fora do
+git). Servidor: `python3 main.py` (porta 8765) — **atenção:
 o `python3` do Bash aqui é o stub do WindowsApps (exit 127); subir com o interpretador real
 `C:\Users\mbn19\AppData\Local\Python\pythoncore-3.14-64\python.exe main.py`, e sempre matar servidores
 `main.py` obsoletos que fiquem presos na 8765 (senão o navegador fala com código velho).**
