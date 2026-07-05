@@ -73,3 +73,43 @@ def parse_nfe(xml):
             "infAdProd": infad.text if infad is not None else None,
         })
     return {"cabecalho": cabecalho, "itens": itens}
+
+
+def consolidar(itens):
+    """Agrupa por cProd (na mesma NF-e), somando qCom/vProd/vIPI. Mantém os campos estáticos
+    (xProd, ncm, cfop, uCom, vUnCom, infAdProd) da 1ª ocorrência. Preserva a ordem de aparição."""
+    ordem, por_cod = [], {}
+    for it in itens:
+        cod = it["cProd"]
+        if cod not in por_cod:
+            por_cod[cod] = dict(it)
+            ordem.append(cod)
+        else:
+            ac = por_cod[cod]
+            ac["qCom"] += it["qCom"]
+            ac["vProd"] += it["vProd"]
+            ac["vIPI"] += it["vIPI"]
+    return [por_cod[c] for c in ordem]
+
+
+def precificar(itens_consolidados, markup_pct):
+    """Custo unitário = (vProd + vIPI) / qCom; preco_venda_unit = round(custo * (1+pct/100), 2).
+    Anexa base/id_peca/tipo (split_cprod) e cor/largura/altura (parse_infadprod)."""
+    fator = 1 + (markup_pct / 100.0)
+    out = []
+    for it in itens_consolidados:
+        base, id_peca, tipo = split_cprod(it["cProd"])
+        q = it["qCom"] or 0
+        custo = (it["vProd"] + it["vIPI"]) / q if q else 0.0
+        dim = parse_infadprod(it.get("infAdProd"))
+        out.append({
+            "cProd": it["cProd"], "base": base, "id_peca": id_peca, "tipo": tipo,
+            "xProd": it.get("xProd"), "ncm": it.get("ncm"), "cfop": it.get("cfop"), "uCom": it.get("uCom"),
+            "qCom": it["qCom"], "vUnCom": it.get("vUnCom"), "vProd": it["vProd"], "vIPI": it["vIPI"],
+            "custo_unit": round(custo, 2), "preco_venda_unit": round(custo * fator, 2),
+            "cor": dim["cor"] if dim else None,
+            "largura": dim["largura"] if dim else None,
+            "altura": dim["altura"] if dim else None,
+            "infAdProd": it.get("infAdProd"),
+        })
+    return out

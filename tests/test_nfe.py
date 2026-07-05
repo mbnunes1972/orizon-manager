@@ -65,3 +65,39 @@ def test_parse_nfe_sem_ipi_e_cpf_e_nfe_puro():
     assert nfe["cabecalho"]["dest"]["doc"] == "00000000000"   # CPF
     it = nfe["itens"][0]
     assert it["vIPI"] == 0.0 and it["vProd"] == 50.0
+
+
+def test_consolidar_soma_duplicados():
+    itens = [
+        {"cProd": "50079[2131748]", "xProd": "X", "ncm": "9403", "cfop": "6101", "uCom": "UN",
+         "qCom": 1.0, "vUnCom": 71.63, "vProd": 71.63, "vIPI": 3.58, "infAdProd": "METROPOLITAN 2406 185"},
+        {"cProd": "50079[2131748]", "xProd": "X", "ncm": "9403", "cfop": "6101", "uCom": "UN",
+         "qCom": 1.0, "vUnCom": 71.63, "vProd": 71.63, "vIPI": 3.58, "infAdProd": "METROPOLITAN 2406 185"},
+        {"cProd": "50057[2131751]", "xProd": "Y", "ncm": "9403", "cfop": "6101", "uCom": "UN",
+         "qCom": 1.0, "vUnCom": 29.83, "vProd": 29.83, "vIPI": 1.49, "infAdProd": None},
+    ]
+    out = mn.consolidar(itens)
+    assert len(out) == 2                       # duplicata somada; BASE igual mas [ID] diferente NÃO junta
+    assert out[0]["cProd"] == "50079[2131748]" and out[0]["qCom"] == 2.0
+    assert round(out[0]["vProd"], 2) == 143.26 and round(out[0]["vIPI"], 2) == 7.16
+    assert out[1]["cProd"] == "50057[2131751]" and out[1]["qCom"] == 1.0
+
+
+def test_precificar_custo_e_markup():
+    consol = [{"cProd": "50079[2131748]", "xProd": "X", "ncm": "9403", "cfop": "6101", "uCom": "UN",
+               "qCom": 2.0, "vUnCom": 71.63, "vProd": 143.26, "vIPI": 7.16, "infAdProd": "METROPOLITAN 2406 185"}]
+    out = mn.precificar(consol, 30.0)
+    p = out[0]
+    assert p["tipo"] == "sob_medida" and p["base"] == "50079" and p["id_peca"] == "2131748"
+    assert p["custo_unit"] == 75.21                      # (143.26+7.16)/2
+    assert p["preco_venda_unit"] == 97.77                # round(75.21*1.30, 2)
+    assert p["cor"] == "METROPOLITAN" and p["largura"] == 2406 and p["altura"] == 185
+
+
+def test_precificar_sem_ipi_e_padrao():
+    consol = [{"cProd": "80070", "xProd": "C", "ncm": "8302", "cfop": "6101", "uCom": "UN",
+               "qCom": 1.0, "vUnCom": 50.0, "vProd": 50.0, "vIPI": 0.0, "infAdProd": None}]
+    p = mn.precificar(consol, 30.0)[0]
+    assert p["tipo"] == "padrao" and p["id_peca"] is None
+    assert p["custo_unit"] == 50.0 and p["preco_venda_unit"] == 65.0
+    assert p["cor"] is None and p["largura"] is None
