@@ -1,7 +1,11 @@
 # NF-e Fábrica → Loja · Fase 1 — Parser + Precificação (`mod_nfe.py`) — Design
 
 > Spec de design · 2026-07-05 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Primeira das 5 fases da integração NF-e.
+> Status: **IMPLEMENTADO (Sessão 47)** — branch `feat/nfe-fase1`, `mod_nfe.py` com testes + CLI,
+> conferido nos 5 XMLs reais via CLI (ex.: NFe-170942 → linhas=21 distintos=12). Primeira das fases da
+> integração NF-e. **Nota p/ Fase 3:** `custo_total`/`venda_total` somam o `custo_unit`/`preco_venda_unit`
+> **já arredondados** (2 casas) — pode divergir do total fiscal por centavos; reconciliar na Fase 3 se
+> for comparar com o total da NF-e.
 
 ## 1. Contexto (a integração completa) e o recorte desta fase
 

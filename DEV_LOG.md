@@ -1210,13 +1210,21 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
   `omie_post`; `FocusError`; tolera corpo JSON não-dict). Testes com `requests`/`time.sleep` mockados —
   **zero rede**. Endpoints/auth (Basic token, senha vazia) confirmados na doc da Focus. Concreto
   `EmissorFocusNfe` + payload/impostos = **Fase 3**.
-- **[PENDENTE]** (1) **Token da Focus** (contratação em andamento) → smoke test de transporte em
-  homologação: `FocusClient(token, base_url_de("homologacao")).consultar_nfe("ref-inexistente")` deve dar
-  `FocusError` **404** (não 401) — prova auth+URL sem payload fiscal. (2) **Perfil fiscal Simples do CNPJ
-  19.152.134/0001-56** (do contador: CST/CSOSN/CFOP/alíquotas) para a Fase 3; perfis lucro real/presumido
-  virão depois. (3) Implementar Fase 1 (`mod_nfe.py`) e Fase 3 (mapa fiscal + `EmissorFocusNfe`).
-- **[CONTEXTO] Fechamento:** Fase 2 **mergeada na `main`** (fast-forward), pushada e re-ingerida
-  (código 1011 nós); branch `feat/nfe` deletada. Próximas fases (1 e 3) em branches novas a partir da `main`.
+- **[IMPLEMENTADO] Fase 1 (`mod_nfe.py`, branch `feat/nfe-fase1`):** parser+precificação puros —
+  `parse_nfe` (namespace-aware; localiza `infNFe` sob `nfeProc` ou `NFe` puro; vIPI ausente→0; dest
+  CNPJ/CPF), `split_cprod` (padrão/sob-medida), `parse_infadprod` (tolerante, dims só se 2 últimos tokens
+  inteiros), `consolidar` (soma duplicados por cProd completo), `precificar` (custo=(vProd+vIPI)/qCom,
+  markup %), `preview` (pipeline+totais) e **CLI de eyeball** (`python3 mod_nfe.py <xml> [markup]`).
+  Testes (`tests/test_nfe.py`) com **fixtures anonimizados**. CLI conferido nos XMLs reais (NFe-170942 →
+  linhas=21 distintos=12). **[Atenção Fase 3]** `custo_total`/`venda_total` somam valores unitários **já
+  arredondados** → pode divergir do total fiscal por centavos (reconciliar se comparar com a NF-e).
+- **[PENDENTE]** (1) **Token da Focus** (contratação em andamento) → smoke de transporte em homologação:
+  `FocusClient(token, base_url_de("homologacao")).consultar_nfe("ref-inexistente")` deve dar `FocusError`
+  **404** (não 401). (2) **Perfil fiscal Simples do CNPJ 19.152.134/0001-56** (contador:
+  CST/CSOSN/CFOP/alíquotas) — insumo central da **Fase 3**; lucro real/presumido depois. (3) **Fase 3**
+  (mapa fiscal loja→payload + `EmissorFocusNfe`) e depois Fases 4-5.
+- **[CONTEXTO] Fechamento:** Fase 2 **mergeada na `main`**; Fase 1 na branch `feat/nfe-fase1` (pronta para
+  merge). Próximas fases em branches novas a partir da `main`.
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
