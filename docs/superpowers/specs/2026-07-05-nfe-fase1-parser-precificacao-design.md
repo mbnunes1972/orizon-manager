@@ -11,15 +11,25 @@ de venda** para o mesmo cliente, com **markup** sobre o custo de fábrica. O mot
 recalcula ICMS/IPI/PIS/COFINS do zero (CNPJs/regimes diferentes) — **não** se reaproveita imposto da
 fábrica. Saída **item a item** (não "kit"), para reconciliação limpa de estoque no SPED.
 
-A frente foi **decomposta em 5 fases**, cada uma com seu spec→plano→implementação:
+A frente foi **decomposta em fases**, cada uma com seu spec→plano→implementação. **[Atualizado 2026-07-05
+— guinada de arquitetura]** o motor fiscal deixou de ser o **Omie** e passou a ser a **Focus NFe** (API
+REST direta; a Focus **não** calcula imposto — nós fornecemos o bloco fiscal). O parser/precificação
+desta fase é **engine-agnostic** e permanece válido; muda apenas a camada final de emissão.
 
 1. **Parser + Precificação (esta spec):** ler o XML da NF-e da fábrica → extrair/consolidar itens →
    classificar padrão/sob-medida → custo (`vUnCom + IPI proporcional`) → **markup** → estrutura de
-   *preview*. **Puro, offline, sem Omie/SEFAZ — risco fiscal zero.**
-2. Cadastro de produtos no Omie (`IncluirProdutosPorLote`, idempotente).
-3. Pedido de Venda (`IncluirPedido`) + vínculo local.
-4. Faturamento (`FaturarPedido`) → NF-e da loja + SEFAZ.
-5. UI da etapa 15 (upload do XML, preview, disparo/status).
+   *preview*. **Puro, offline, sem emissor/SEFAZ — risco fiscal zero.**
+2. **`EmissorFiscal`** (interface) + **cliente HTTP Focus NFe** (Basic-auth token, homolog/prod, POST
+   `/nfe?ref`, GET status, cancelar; retry; assíncrono). Infra isolada, testável com mock + homologação.
+3. **Mapa fiscal loja → payload NF-e:** dos itens precificados + config fiscal da loja (regime →
+   CST/CSOSN, CFOP, alíquotas) monta o `items[]` da Focus. Parametrizado por regime (Simples agora;
+   lucro real/presumido depois). O "coração" da guinada — testável offline antes de transmitir.
+4. **Emissão real em homologação:** `emitir_nfe_produto`, polling de status, guarda do XML/DANFE
+   retornados; cancelar/consultar.
+5. **UI da etapa 15** (upload do XML da fábrica, preview, disparo/status).
+
+Cross-cutting: modelo Rede→Loja(CNPJ)→config fiscal + perfil de emissão; NFS-e com interface pronta e
+implementação adiada (2º CNPJ + municípios integrados na Focus).
 
 Esta spec cobre **apenas a Fase 1**. Ela produz a estrutura de dados que as fases seguintes consomem.
 
@@ -137,11 +147,12 @@ Suíte deve seguir verde (`python3 -m pytest -q`).
 
 ## 6. Fora de escopo (Fases seguintes / YAGNI)
 
-- Qualquer chamada ao Omie (cadastro de produto, pedido, faturamento) — Fases 2-4.
+- Qualquer chamada a emissor fiscal (interface `EmissorFiscal`, cliente Focus NFe, payload/impostos,
+  emissão/consulta/cancelamento) — Fases 2-4.
 - UI / endpoint HTTP / upload na etapa 15 — Fase 5.
 - Persistência do preview no banco / vínculo com projeto — Fase 5 (nesta fase o preview é só retorno de
   função / saída do CLI).
-- Markup por grupo/categoria, prefixo de SKU, inativação de produtos, classificação de grupo/NCM Omie —
+- Markup por grupo/categoria, mapa fiscal (CST/CSOSN/CFOP/alíquotas por regime), config fiscal por loja —
   decisões das Fases 2+.
 - Parsing "confiável" de dimensões do `infAdProd` — permanece best-effort; validação em amostra maior
   fica para quando/se a dimensão virar requisito (Fase 2+).
