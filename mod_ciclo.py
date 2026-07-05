@@ -55,10 +55,16 @@ SUBFASES_PE = {
 }
 
 # Subfases que precisam estar concluídas antes de concluir o PE (11e).
+# 11d é a aprovação financeira II (gerida por outro handler, sem entrada em
+# SUBFASES_PE), mas exigida aqui como pré-requisito para concluir o PE.
 PE_SUBFASES_OBRIGATORIAS = ["11a", "11b", "11c", "11d"]
+
+# Subfase final do PE: concluí-la conclui a etapa-mãe 11.
+PE_SUBFASE_FINAL = "11e"
 
 
 def tipo_doc_de(codigo):
+    """Retorna o tipo_doc da subfase de PE, ou None se o código não for uma subfase enriquecida."""
     sf = SUBFASES_PE.get(codigo)
     return sf["tipo_doc"] if sf else None
 
@@ -71,7 +77,7 @@ def guarda_conclusao(codigo, tipos_presentes, status_por_codigo):
         return (False, "Subfase de PE desconhecida.")
     if sf["tipo_doc"] not in tipos_presentes:
         return (False, f"Carregue o documento ({sf['doc_label']}) antes de '{sf['botao']}'.")
-    if codigo == "11e":
+    if codigo == PE_SUBFASE_FINAL:
         faltando = [c for c in PE_SUBFASES_OBRIGATORIAS
                     if status_por_codigo.get(c) not in STATUS_CONCLUSIVOS]
         if faltando:
