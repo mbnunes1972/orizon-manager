@@ -1,8 +1,12 @@
 # Painel de Configuração Fiscal · Sub-frente I — Fundação Backend (`PerfilFiscal`) — Design
 
 > Spec de design · 2026-07-05 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Parte da integração NF-e (Focus NFe); é o
+> Status: **IMPLEMENTADO (Sessão 47)** — branch `feat/perfil-fiscal`, backend com testes (suíte 493);
+> painel (Sub-frente II) e mapa fiscal (Fase 3b) pendentes. Parte da integração NF-e (Focus NFe); é o
 > pré-requisito do "mapa fiscal" que monta o payload da NF-e.
+> **[Reforço p/ Sub-frente II]** a guarda de produção hoje bloqueia só por placeholder pendente; o painel
+> deve também exigir **token de produção definido** antes de permitir trocar para produção (uma loja sem
+> PerfilFiscal tem placeholders vazios e passaria — mas falha seguro na emissão, sem token).
 
 ## 1. Contexto e recorte
 
