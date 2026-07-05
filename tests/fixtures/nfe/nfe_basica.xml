@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc versao="3.10" xmlns="http://www.portalfiscal.inf.br/nfe">
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+<infNFe versao="3.10" Id="NFe00000000000000000000000000000000000000000000">
+<ide><nNF>170942</nNF><serie>1</serie><dhEmi>2016-03-03T10:26:09-03:00</dhEmi><natOp>VENDA DE PRODUCAO</natOp></ide>
+<emit><CNPJ>00000000000000</CNPJ><xNome>FABRICA TESTE LTDA</xNome><CRT>3</CRT></emit>
+<dest><CNPJ>11111111111111</CNPJ><xNome>LOJA TESTE LTDA</xNome></dest>
+<det nItem="1"><prod><cProd>50079[2131748]</cProd><xProd>PAINEL EDITAVEL 50</xProd><NCM>94035000</NCM><CFOP>6101</CFOP><uCom>UN</uCom><qCom>1.00</qCom><vUnCom>71.63</vUnCom><vProd>71.63</vProd></prod><imposto><ICMS><ICMS00><CST>00</CST></ICMS00></ICMS><IPI><IPITrib><vIPI>3.58</vIPI></IPITrib></IPI></imposto><infAdProd>METROPOLITAN 2406 185</infAdProd></det>
+<det nItem="2"><prod><cProd>50079[2131748]</cProd><xProd>PAINEL EDITAVEL 50</xProd><NCM>94035000</NCM><CFOP>6101</CFOP><uCom>UN</uCom><qCom>1.00</qCom><vUnCom>71.63</vUnCom><vProd>71.63</vProd></prod><imposto><IPI><IPITrib><vIPI>3.58</vIPI></IPITrib></IPI></imposto><infAdProd>METROPOLITAN 2406 185</infAdProd></det>
+<det nItem="3"><prod><cProd>80070</cProd><xProd>CORREDICA TELESCOPICA</xProd><NCM>83024200</NCM><CFOP>6101</CFOP><uCom>UN</uCom><qCom>2.00</qCom><vUnCom>10.00</vUnCom><vProd>20.00</vProd></prod><imposto><IPI><IPITrib><vIPI>1.00</vIPI></IPITrib></IPI></imposto></det>
+</infNFe>
+</NFe>
+</nfeProc>

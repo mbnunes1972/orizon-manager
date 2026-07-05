@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+<infNFe versao="3.10" Id="NFe00000000000000000000000000000000000000000001">
+<ide><nNF>170999</nNF><serie>1</serie><dhEmi>2016-03-03T11:00:00-03:00</dhEmi><natOp>VENDA</natOp></ide>
+<emit><CNPJ>00000000000000</CNPJ><xNome>FABRICA TESTE LTDA</xNome><CRT>1</CRT></emit>
+<dest><CPF>00000000000</CPF><xNome>CLIENTE FINAL</xNome></dest>
+<det nItem="1"><prod><cProd>50100[9]</cProd><xProd>PORTA</xProd><NCM>94035000</NCM><CFOP>6101</CFOP><uCom>UN</uCom><qCom>1.00</qCom><vUnCom>50.00</vUnCom><vProd>50.00</vProd></prod><imposto><IPI><IPINT><CST>53</CST></IPINT></IPI></imposto></det>
+</infNFe>
+</NFe>
