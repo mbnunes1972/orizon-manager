@@ -1238,16 +1238,17 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
 - **[PENDENTE integração NF-e]** (1) **Token da Focus** → smoke em homologação. (2) **Valores fiscais reais
   do contador** (CST/CSOSN/CFOP/alíquotas) — entram como **dado** no PerfilFiscal, sem mudar código.
   (3) **Sub-frente II** (painel no frontend) e **Fase 3b** (mapa fiscal + `EmissorFocusNfe`), depois Fases 4-5.
-- **[CONTEXTO] Fechamento:** Fases **1 e 2 mergeadas na `main`**; Painel Fiscal Sub-frente I na branch
-  `feat/perfil-fiscal` (pronta para merge). Próximas frentes em branches novas a partir da `main`.
+- **[CONTEXTO] Fechamento:** Fases 1 e 2 + **Painel Fiscal Sub-frente I** todas **mergeadas na `main`**
+  (fast-forward), pushadas e re-ingeridas (código 1078 nós, banco 69 c/ `perfil_fiscal`); branch
+  `feat/perfil-fiscal` deletada. Próximas frentes em branches novas a partir da `main`.
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
-**`main`** consolidada e verde — **suíte 470 passed** (Fases 1 e 2 da NF-e mergeadas). **Frente em
+**`main`** consolidada e verde — **suíte 493 passed** (código 1078 nós / banco 69). **Frente em
 andamento:** **Integração NF-e Fábrica→Loja via Focus NFe** (Sessão 47). **Mergeadas na `main`:** Fase 1
-(`mod_nfe.py` parser/precificação + CLI) e Fase 2 (`EmissorFiscal`/`focus_client`/`focus_config`).
-**Implementada em branch (`feat/perfil-fiscal`, suíte 493, pronta para merge):** **Painel de Config Fiscal
-· Sub-frente I** — `PerfilFiscal` + `fiscal_cripto` (Fernet) + `mod_fiscal` + endpoints (segredos cifrados
+(`mod_nfe.py` parser/precificação + CLI), Fase 2 (`EmissorFiscal`/`focus_client`/`focus_config`) e o
+**Painel de Config Fiscal · Sub-frente I** (`PerfilFiscal` + `fiscal_cripto` Fernet + `mod_fiscal` +
+endpoints; segredos cifrados
 write-only, produção bloqueada com placeholder). **A retomar:** **Sub-frente II** (painel no frontend) e
 **Fase 3b** (mapa fiscal loja→payload + `EmissorFocusNfe`),
 depois Fases 4-5. **Fase 3 depende do perfil fiscal Simples do contador** (CNPJ
