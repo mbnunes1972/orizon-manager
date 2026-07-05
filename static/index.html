@@ -8521,6 +8521,7 @@ async function peRevisao(codigo, inputRelatorio) {
     'A revisão reabre esta e as fases seguintes do PE. Continuar?',
     { titulo: 'Confirmar Revisão PE', okLabel: 'Continuar', perigo: true });
   if (!ok) return;
+  const motivo = (prompt('Motivo da revisão (opcional):') || '').trim();
   const cred = await pedirCredenciaisGerente({
     titulo: 'Revisão PE',
     mensagem: 'Login e senha de quem pode revisar o PE (Gerente de Vendas, Adm/Financeiro ou Diretor).'
@@ -8530,6 +8531,7 @@ async function peRevisao(codigo, inputRelatorio) {
   fd.append('arquivo', f);
   fd.append('login', cred.login);
   fd.append('senha', cred.senha);
+  if (motivo) fd.append('motivo', motivo);
   try {
     const r = await fetch(
       `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${codigo}/revisao`,
