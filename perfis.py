@@ -22,7 +22,8 @@ PERFIS = {
 _DEFAULT = {"rotulo": "—", "desconto_max": 0.0, "ver_parametros": False,
             "autorizar": False, "gerir_usuarios": False, "aprovar_financeiro": False,
             "registrar_medicao": False, "aprovar_medicao_reprovada": False,
-            "gerir_redes": False, "gerir_lojas": False, "editar_dados_loja": False}
+            "gerir_redes": False, "gerir_lojas": False, "editar_dados_loja": False,
+            "executar_pe": False, "revisar_pe": False}
 
 
 def existe(slug):

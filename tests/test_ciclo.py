@@ -161,19 +161,3 @@ def test_etapa10_renomeada_medicao():
 
 def test_etapa_4_renomeada_para_orcamento():
     assert mc.ETAPA_NOME["4"] == "Orçamento"
-
-
-import perfis
-
-def test_capability_executar_pe():
-    for slug in ("projetista_executivo", "conferente", "gerente_vendas",
-                 "gerente_adm_fin", "diretor"):
-        assert perfis.pode(slug, "executar_pe") is True, slug
-    for slug in ("consultor", "medidor", "assistente_logistico"):
-        assert perfis.pode(slug, "executar_pe") is False, slug
-
-def test_capability_revisar_pe():
-    for slug in ("gerente_vendas", "gerente_adm_fin", "diretor"):
-        assert perfis.pode(slug, "revisar_pe") is True, slug
-    for slug in ("projetista_executivo", "conferente", "consultor"):
-        assert perfis.pode(slug, "revisar_pe") is False, slug

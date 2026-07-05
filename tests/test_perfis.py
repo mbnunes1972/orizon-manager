@@ -77,3 +77,18 @@ def test_capacidades_medicao():
     assert perfis.pode("diretor", "aprovar_medicao_reprovada") is True
     assert perfis.pode("medidor", "aprovar_medicao_reprovada") is False
     assert perfis.pode("consultor", "aprovar_medicao_reprovada") is False
+
+
+def test_capacidade_executar_pe():
+    for slug in ("projetista_executivo", "conferente", "gerente_vendas",
+                 "gerente_adm_fin", "diretor"):
+        assert perfis.pode(slug, "executar_pe") is True, slug
+    for slug in ("consultor", "medidor", "assistente_logistico"):
+        assert perfis.pode(slug, "executar_pe") is False, slug
+
+
+def test_capacidade_revisar_pe():
+    for slug in ("gerente_vendas", "gerente_adm_fin", "diretor"):
+        assert perfis.pode(slug, "revisar_pe") is True, slug
+    for slug in ("projetista_executivo", "conferente", "consultor"):
+        assert perfis.pode(slug, "revisar_pe") is False, slug
