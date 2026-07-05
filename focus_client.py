@@ -1,6 +1,8 @@
 """focus_client.py — cliente HTTP da Focus NFe (transporte puro; sem regra fiscal)."""
-import time  # noqa: F401  (usado pelo retry/polling nas Tasks 4-5; e pelos testes via fc.time)
+import time
 import requests
+
+_STATUS_RETRIAVEIS = {429, 500, 502, 503, 504}
 
 
 class FocusError(Exception):
@@ -17,23 +19,38 @@ class FocusClient:
         self.timeout = timeout
         self.max_tentativas = max_tentativas
 
+    def _backoff(self, tentativa, resp):
+        if resp is not None:
+            ra = resp.headers.get("Retry-After")
+            if ra and str(ra).isdigit():
+                return min(int(ra), 30)
+        return min(2 ** tentativa, 8)
+
     def _request(self, method, path, params=None, json_body=None):
         url = self.base_url + path
-        try:
-            resp = requests.request(method, url, params=params, json=json_body,
-                                    auth=(self.token, ""), timeout=self.timeout)
-        except requests.RequestException as e:
-            raise FocusError("Falha de conexão com a Focus NFe: %s" % e)
-        try:
-            dados = resp.json()
-        except ValueError:
-            dados = {}
-        if resp.status_code >= 400:
-            msg = (dados.get("mensagem") or dados.get("erro")
-                   or (resp.text or "")[:300] or ("HTTP %d" % resp.status_code))
-            raise FocusError(msg, status_code=resp.status_code, erros=dados.get("erros"))
-        dados["_http_status"] = resp.status_code
-        return dados
+        for tentativa in range(self.max_tentativas):
+            ultima = tentativa == self.max_tentativas - 1
+            try:
+                resp = requests.request(method, url, params=params, json=json_body,
+                                        auth=(self.token, ""), timeout=self.timeout)
+            except requests.RequestException as e:
+                if ultima:
+                    raise FocusError("Falha de conexão com a Focus NFe: %s" % e)
+                time.sleep(self._backoff(tentativa, None))
+                continue
+            if resp.status_code in _STATUS_RETRIAVEIS and not ultima:
+                time.sleep(self._backoff(tentativa, resp))
+                continue
+            try:
+                dados = resp.json()
+            except ValueError:
+                dados = {}
+            if resp.status_code >= 400:
+                msg = (dados.get("mensagem") or dados.get("erro")
+                       or (resp.text or "")[:300] or ("HTTP %d" % resp.status_code))
+                raise FocusError(msg, status_code=resp.status_code, erros=dados.get("erros"))
+            dados["_http_status"] = resp.status_code
+            return dados
 
     def enviar_nfe(self, ref, payload):
         return self._request("POST", "/v2/nfe", params={"ref": ref}, json_body=payload)

@@ -77,3 +77,42 @@ def test_erro_4xx_vira_focuserror(monkeypatch):
         _client().enviar_nfe("R1", {})
     assert e.value.status_code == 422 and "cnpj invalido" in str(e.value)
     assert e.value.erros == [{"codigo": "cnpj", "mensagem": "invalido"}]
+
+
+def test_retry_5xx_depois_sucesso(monkeypatch):
+    chamadas = _capture(monkeypatch, [FakeResp(500, {"mensagem": "erro interno"}),
+                                      FakeResp(200, {"status": "autorizado"})])
+    dados = _client().consultar_nfe("R1")
+    assert dados["status"] == "autorizado"
+    assert len(chamadas) == 2   # 1 falha + 1 sucesso
+
+
+def test_retry_esgota_5xx(monkeypatch):
+    chamadas = _capture(monkeypatch, [FakeResp(500, {"mensagem": "e"})] * 3)
+    with pytest.raises(fc.FocusError) as e:
+        _client().consultar_nfe("R1")
+    assert e.value.status_code == 500
+    assert len(chamadas) == 3   # max_tentativas
+
+
+def test_retry_429_respeita(monkeypatch):
+    chamadas = _capture(monkeypatch, [FakeResp(429, {}, headers={"Retry-After": "2"}),
+                                      FakeResp(200, {"status": "autorizado"})])
+    _client().consultar_nfe("R1")
+    assert len(chamadas) == 2
+
+
+def test_erro_conexao_retry_e_falha(monkeypatch):
+    chamadas = _capture(monkeypatch, [requests.ConnectionError("reset"),
+                                      requests.ConnectionError("reset"),
+                                      requests.ConnectionError("reset")])
+    with pytest.raises(fc.FocusError):
+        _client().consultar_nfe("R1")
+    assert len(chamadas) == 3
+
+
+def test_erro_conexao_recupera(monkeypatch):
+    chamadas = _capture(monkeypatch, [requests.ConnectionError("reset"),
+                                      FakeResp(200, {"status": "autorizado"})])
+    dados = _client().consultar_nfe("R1")
+    assert dados["status"] == "autorizado" and len(chamadas) == 2
