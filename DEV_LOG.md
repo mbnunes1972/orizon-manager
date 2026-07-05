@@ -1223,17 +1223,17 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
   **404** (não 401). (2) **Perfil fiscal Simples do CNPJ 19.152.134/0001-56** (contador:
   CST/CSOSN/CFOP/alíquotas) — insumo central da **Fase 3**; lucro real/presumido depois. (3) **Fase 3**
   (mapa fiscal loja→payload + `EmissorFocusNfe`) e depois Fases 4-5.
-- **[CONTEXTO] Fechamento:** Fase 2 **mergeada na `main`**; Fase 1 na branch `feat/nfe-fase1` (pronta para
-  merge). Próximas fases em branches novas a partir da `main`.
+- **[CONTEXTO] Fechamento:** Fases **1 e 2 mergeadas na `main`** (fast-forward), pushadas e re-ingeridas
+  (código 1035 nós); branches `feat/nfe`/`feat/nfe-fase1` deletadas. Próximas fases (3-5) em branches novas.
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
-**`main`** consolidada e verde — **suíte 457 passed** (etapas operacionais 12/13/14 da Sessão 46 +
-**Fase 2 da integração NF-e** da Sessão 47, ambas mergeadas e pushadas; grafo re-ingerido, código 1011
-nós). **Frente em andamento:** **Integração NF-e Fábrica→Loja via Focus NFe** (Sessão 47) — **Fase 2
-(contrato `EmissorFiscal` + `focus_client` + `focus_config`) mergeada**. **A retomar:** **Fase 1**
-(`mod_nfe.py` parser/precificação — só spec) e **Fase 3** (mapa fiscal + `EmissorFocusNfe`), em branches
-novas a partir da `main`. **Fase 3 depende do perfil fiscal Simples do contador** (CNPJ
+**`main`** consolidada e verde — **suíte 470 passed** (etapas operacionais 12/13/14 da Sessão 46 +
+**Fases 1 e 2 da integração NF-e** da Sessão 47, todas mergeadas e pushadas; grafo re-ingerido, código
+1035 nós). **Frente em andamento:** **Integração NF-e Fábrica→Loja via Focus NFe** (Sessão 47) — **Fase 1
+(`mod_nfe.py` parser/precificação + CLI) e Fase 2 (contrato `EmissorFiscal` + `focus_client` +
+`focus_config`) mergeadas**. **A retomar:** **Fase 3** (mapa fiscal loja→payload + `EmissorFocusNfe`),
+depois Fases 4-5. **Fase 3 depende do perfil fiscal Simples do contador** (CNPJ
 19.152.134/0001-56: CST/CSOSN/CFOP/alíquotas) e o **smoke em homologação depende do token da Focus**
 (ambos pendentes do usuário). XMLs reais da fábrica em `E:/2026/desenvolvimento/nfe-dalmobile` (fora do
 git). Servidor: `python3 main.py` (porta 8765) — **atenção:
