@@ -161,3 +161,24 @@ def test_etapa10_renomeada_medicao():
 
 def test_etapa_4_renomeada_para_orcamento():
     assert mc.ETAPA_NOME["4"] == "Orçamento"
+
+
+def test_modelos_ciclo_documento_e_revisao(tmp_path):
+    import importlib, database
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    dbf = str(tmp_path / "t.db")
+    database.DB_PATH = dbf
+    database.ENGINE = create_engine(f"sqlite:///{dbf}")
+    database.Session = sessionmaker(bind=database.ENGINE)
+    database.init_db()
+    s = database.Session()
+    d = database.CicloDocumento(projeto_nome="P", etapa_codigo="11a",
+                                tipo="pe_planta_pontos", arquivo_path="ciclo/11a/x.pdf",
+                                nome_original="x.pdf")
+    s.add(d); s.commit()
+    r = database.CicloRevisao(projeto_nome="P", etapa_codigo="11b", relatorio_doc_id=d.id)
+    s.add(r); s.commit()
+    assert s.query(database.CicloDocumento).count() == 1
+    assert s.query(database.CicloRevisao).first().etapa_codigo == "11b"
+    s.close()

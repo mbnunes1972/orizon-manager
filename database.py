@@ -466,6 +466,37 @@ class ContratoAssinatura(Base):
     contrato = relationship("Contrato", back_populates="assinaturas")
 
 
+class CicloDocumento(Base):
+    """Documento carregado numa subfase do ciclo. Append-only: nunca sobrescreve."""
+    __tablename__ = "ciclo_documentos"
+
+    id             = Column(Integer,  primary_key=True, autoincrement=True)
+    projeto_nome   = Column(Text,     nullable=False)   # nome_safe
+    etapa_codigo   = Column(Text,     nullable=False)   # "11a","11b","11c","11e"
+    tipo           = Column(Text,     nullable=False)   # pe_planta_pontos, ...
+    arquivo_path   = Column(Text,     nullable=False)   # relativo a PROJETOS/<nome>/
+    nome_original  = Column(Text,     nullable=False)
+    enviado_por_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    enviado_em     = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    enviado_por = relationship("Usuario", foreign_keys=[enviado_por_id])
+
+
+class CicloRevisao(Base):
+    """Revisão aberta numa subfase (reabertura em cascata)."""
+    __tablename__ = "ciclo_revisoes"
+
+    id               = Column(Integer,  primary_key=True, autoincrement=True)
+    projeto_nome     = Column(Text,     nullable=False)
+    etapa_codigo     = Column(Text,     nullable=False)
+    aberta_por_id    = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    aberta_em        = Column(DateTime, nullable=False, default=datetime.utcnow)
+    relatorio_doc_id = Column(Integer,  ForeignKey("ciclo_documentos.id"), nullable=True)
+    motivo           = Column(Text,     nullable=True)
+
+    aberta_por = relationship("Usuario", foreign_keys=[aberta_por_id])
+
+
 # ── Inicialização ─────────────────────────────────────────────────────────────
 def init_db():
     Base.metadata.create_all(ENGINE)
