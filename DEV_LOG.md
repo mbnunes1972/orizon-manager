@@ -1155,13 +1155,46 @@ task a task com review de spec + qualidade. **Ainda em branch — não mergeada 
   por perfil, upload/conclusão/revisão, indicador de progresso. Merge na `main` + push + re-ingestão
   do grafo após a conferência.
 
+## Sessão 46 — Etapas operacionais 12/13/14 (Implantação · Produção · Entrega) — branch `feat/etapas-operacionais`
+
+Frente desenhada via brainstorming (spec `docs/superpowers/specs/2026-07-05-etapas-operacionais-implantacao-producao-entrega-design.md`)
+e implementada por **subagentes** (plano `docs/superpowers/plans/2026-07-05-etapas-operacionais-implantacao-producao-entrega.md`),
+task a task com review de spec + qualidade. **Ainda em branch — não mergeada na `main`.**
+
+- **[ESTADO]** Etapas principais **12/13/14** ganharam painéis dedicados (deixam o card genérico):
+  - **12 Implantação do pedido:** upload **append-only** de XMLs ("Carregar Pedidos") + "Encaminhar
+    Pedidos à Fábrica" (fecha; exige ≥1 XML). Integração real com a fábrica = **futuro** (o botão só
+    fecha por ora).
+  - **13 Produção:** "Inserir/Salvar Números dos Pedidos" (lista, texto — os números **vêm da
+    fábrica** como resultado da implantação) + "Produção Concluída" (fecha; exige números).
+  - **14 Entrega no depósito:** "Salvar Relatório de Entrega" (texto livre de **faltas e avarias**) +
+    "Concluir Relatório de Entrega" (fecha; exige relatório não-vazio). Removido o `toggleavel` da 14.
+- **[DECIDIDO] Arquitetura C:** **sem tabela nova, sem capability nova, PE intocado.** XMLs reusam
+  `CicloDocumento` (tipo `implantacao_pedido_xml`); números/relatório em `CicloEtapa.observacoes` das
+  etapas 13/14. Conclusão e salvar-texto reusam o `PATCH /ciclo/<codigo>` existente. **Cycle-gated**
+  (qualquer usuário que já pode avançar o ciclo — ao contrário do PE, que exige `executar_pe`).
+- **[CONTEXTO] Endpoints (`main.py`):** `POST/GET …/ciclo/<codigo>/pedido-xml` (upload/listagem da 12,
+  append-only, cycle-gated) + **guarda operacional** no `PATCH /ciclo` (`mod_ciclo.guarda_conclusao_operacional`)
+  que barra a conclusão de 12/13/14 sem XML/números/relatório. Guarda pura em `mod_ciclo`
+  (`ETAPAS_OPERACIONAIS`, `tipo_doc_operacional`, `guarda_conclusao_operacional` — falha explícita em
+  `exige` desconhecido). Frontend: `_renderCardImplantacao/Producao/Entrega` + handlers com `_patchEtapa`
+  DRY; `esc()` em todo conteúdo dinâmico.
+- **[ESTADO] Testes:** lógica pura em `tests/test_ciclo.py`; e2e HTTP em `tests/test_ciclo_operacional_e2e.py`
+  (upload append-only/listagem, guardas de conclusão de 12/13/14, gating sequencial preservado,
+  cycle-gated com consultor, PE intocado). Suíte **431 passed**. Reviews de spec+qualidade por
+  subagente em cada task (fixes aplicados: footgun do `exige`, DRY do `encaminhar`, upload não falseia
+  sucesso).
+- **[PENDENTE]** Verificação **manual no navegador** (Task 4 sem teste JS; `node` indisponível no
+  ambiente): botões/gating por etapa, upload/download de XML, salvar/concluir números e relatório,
+  reabrir (gerente). Depois: merge na `main` + push + re-ingestão do grafo.
+
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
-**`main`** consolidada e verde — **suíte 414 passed**. **Frente fechada:** subfases do PE (Sessão 45)
-**mergeada na `main`** (fast-forward de 16 commits) após o usuário confirmar a **conferência manual no
-navegador** ("testado"); branch `feat/pe-subfases` **deletada**; suíte re-rodada verde no resultado.
-Servidor: `python3 main.py` (porta 8765).
-Branches: `main` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
+**`main`** consolidada e verde — **suíte 414 passed**. **Frente aberta:** branch `feat/etapas-operacionais`
+(etapas operacionais 12/13/14 — Sessão 46, backend testado **431 passed**, frontend aguardando
+conferência no navegador antes do merge). A frente anterior (subfases do PE, Sessão 45) já está
+**mergeada na `main`** e pushada. Servidor: `python3 main.py` (porta 8765).
+Branches: `main` + `feat/etapas-operacionais` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
 Contrato agora é **HTML/Markdown → PDF (WeasyPrint)** — o caminho `.docx`/LibreOffice do contrato
 foi aposentado (a **proposta** ainda usa docx/LibreOffice). **Diretório de trabalho:**
 `E:/2026/desenvolvimento/orizon-manager` (pai renomeado nesta sessão). **MCP `orizon`** ativo e

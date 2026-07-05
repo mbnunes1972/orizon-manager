@@ -1,7 +1,7 @@
 # Etapas operacionais 12/13/14 (Implantação · Produção · Entrega no depósito) — Design
 
 > Spec de design · 2026-07-05 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Segue o padrão das subfases do PE (Sessão 45).
+> Status: **IMPLEMENTADO (Sessão 46)** — branch `feat/etapas-operacionais`, backend com testes (suíte 431); frontend com verificação manual pendente no navegador. Segue o padrão das subfases do PE (Sessão 45).
 > Frente: enriquecer as etapas operacionais pós-PE com ações/botões próprios.
 
 ## 1. Objetivo
