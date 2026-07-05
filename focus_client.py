@@ -55,6 +55,8 @@ class FocusClient:
             return dados
 
     def enviar_nfe(self, ref, payload):
+        # `ref` é a chave de idempotência: o retry de POST (em 5xx/429/timeout) é seguro
+        # porque a Focus deduplica por `ref` — não desabilitar o retry aqui.
         return self._request("POST", "/v2/nfe", params={"ref": ref}, json_body=payload)
 
     def consultar_nfe(self, ref, completa=False):
