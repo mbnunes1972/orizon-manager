@@ -1246,18 +1246,26 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
   consultar/cancelar → `resultado_de_focus`). **Testes offline** (client fake, sem emissão real).
   **[Fase 4]** PIS/COFINS CST "49" + CSOSN são Simples-only (marcado `# TODO Fase 4`) — ramificar por
   regime com o contador.
-- **[CONTEXTO] Fechamento:** Fases 1, 2, **Painel Fiscal Sub-frente I** e **Fase 3b** todas **mergeadas na
-  `main`** (fast-forward), pushadas e re-ingeridas (código 1110 nós); branches deletadas. Próximas frentes
-  em branches novas a partir da `main`.
+- **[IMPLEMENTADO] Painel Fiscal · Sub-frente II (frontend, direto na `main`):** aba **Fiscal** no admin da
+  loja (`adminRenderLoja`) consumindo os endpoints da Sub-frente I — 7 seções (identificação, regime, NF-e,
+  NFS-e só-dado, certificado ref, credenciais Focus, perfil de emissão), **badges + checkbox de confirmação**
+  por campo placeholder, **credenciais Focus write-only** (nunca ecoadas), **troca de ambiente** com confirm
+  + dupla guarda (produção exige token de produção + zero placeholder). Espelha o padrão da aba Financeiro.
+  Checagem estrutural OK; **backend 507 verde**. **[PENDENTE] verificação manual no navegador** (do usuário).
+  **[GAP]** `cert_validade`/`cert_cnpj` read-only (o PUT config da Sub-frente I não os inclui — ajuste
+  pequeno depois). *(Usuário autorizou seguir direto sem os gates de review; revisão depois.)*
+- **[CONTEXTO] Fechamento:** Fases 1, 2, **Painel Fiscal Sub-frentes I e II** e **Fase 3b** todas na `main`
+  (pushadas e re-ingeridas). **A retomar:** Fases 4-5 (dependem do token da Focus + valores do contador).
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
 **`main`** consolidada e verde — **suíte 507 passed** (código 1110 nós / banco 69). **Frente em
 andamento:** **Integração NF-e Fábrica→Loja via Focus NFe** (Sessão 47). **Mergeadas na `main`:** Fase 1
 (`mod_nfe.py` parser/precificação + CLI), Fase 2 (`EmissorFiscal`/`focus_client`/`focus_config`), o
-**Painel de Config Fiscal · Sub-frente I** (`PerfilFiscal` + `fiscal_cripto` Fernet + `mod_fiscal` +
-endpoints; segredos cifrados write-only, produção bloqueada com placeholder) e a **Fase 3b**
-(`mapa_fiscal` nota→payload Focus + `EmissorFocusNfe`). **A retomar:** **Fase 4** (emissão real em homologação — token da Focus), **Fase 5**
+**Painel de Config Fiscal · Sub-frentes I e II** (`PerfilFiscal` + `fiscal_cripto` Fernet + `mod_fiscal` +
+endpoints + **painel no frontend** aba Fiscal do admin da loja) e a **Fase 3b**
+(`mapa_fiscal` nota→payload Focus + `EmissorFocusNfe`). Painel com **verificação manual no navegador
+pendente** (do usuário). **A retomar:** **Fase 4** (emissão real em homologação — token da Focus), **Fase 5**
 (orquestração + UI etapa 15) e a **Sub-frente II** (painel fiscal no frontend). **Fase 4 depende do perfil
 fiscal Simples do contador** (CNPJ 19.152.134/0001-56: CST/CSOSN/CFOP/alíquotas) e o **smoke em homologação
 depende do token da Focus**

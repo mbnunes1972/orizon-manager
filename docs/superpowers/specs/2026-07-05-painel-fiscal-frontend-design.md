@@ -1,8 +1,11 @@
 # Painel de Configuração Fiscal · Sub-frente II — Frontend — Design
 
 > Spec de design · 2026-07-05 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (usuário autorizou seguir direto; revisão depois)** — a implementar.
+> Status: **IMPLEMENTADO (Sessão 47, direto na `main`)** — painel na aba Fiscal do admin da loja;
+> checagem estrutural OK, backend 507 verde. **Verificação manual no navegador pendente** (do usuário).
 > Frontend do `PerfilFiscal` (Sub-frente I). Sem teste JS (verificação manual + checagem estrutural).
+> **[Gap para depois]** `cert_validade`/`cert_cnpj` são exibidos read-only — o PUT de config da Sub-frente
+> I não os inclui na allowlist; torná-los editáveis é um ajuste pequeno no backend.
 
 ## 1. Contexto e recorte
 
