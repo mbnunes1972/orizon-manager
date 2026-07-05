@@ -144,3 +144,45 @@ def test_concluir_11a_com_documento(http_client_factory, seed, projetos_dir):
     st, body = c.post(f"/api/projetos/{proj}/ciclo/11a/concluir",
                       {"login": "dir_l2", "senha": "senha123"})
     assert st == 200 and body.get("ok") is True
+
+
+def test_revisao_reabre_em_cascata(http_client_factory, seed, projetos_dir, app_db):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    # marca 11e concluída direto no banco para provar que a revisão de 11b a reabre
+    db = app_db.get_session()
+    for cod in ("11b", "11c", "11d", "11e"):
+        et = db.query(app_db.CicloEtapa).filter_by(projeto_nome=proj, etapa_codigo=cod).first()
+        if et:
+            et.status = "concluido"
+        else:
+            db.add(app_db.CicloEtapa(projeto_nome=proj, etapa_codigo=cod, status="concluido"))
+    db.commit(); db.close()
+    st, body = _post_multipart(
+        c.base, c.cookie, f"/api/projetos/{proj}/ciclo/11b/revisao",
+        {"login": "dir_l2", "senha": "senha123", "motivo": "ajuste"},
+        file_field="arquivo", filename="relatorio.pdf", filedata=b"rel")
+    assert st == 200 and "11e" in body["resetadas"], body
+    db = app_db.get_session()
+    e11e = db.query(app_db.CicloEtapa).filter_by(projeto_nome=proj, etapa_codigo="11e").first()
+    assert e11e.status == "pendente"
+    db.close()
+
+
+def test_revisao_exige_gerente(http_client_factory, seed, projetos_dir):
+    c = _login(http_client_factory, "cons_l1")   # consultor não pode revisar
+    proj = seed["projeto_l1"]
+    st, body = _post_multipart(
+        c.base, c.cookie, f"/api/projetos/{proj}/ciclo/11b/revisao",
+        {"login": "cons_l1", "senha": "senha123"},
+        file_field="arquivo", filename="r.pdf", filedata=b"r")
+    assert st == 403
+
+
+def test_revisao_exige_relatorio(http_client_factory, seed, projetos_dir):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    st, body = _post_multipart(
+        c.base, c.cookie, f"/api/projetos/{proj}/ciclo/11b/revisao",
+        {"login": "dir_l2", "senha": "senha123"})   # sem arquivo
+    assert st == 400 and "relatório" in body["erro"].lower()

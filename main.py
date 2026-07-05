@@ -3809,6 +3809,65 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # POST /api/projetos/<nome>/ciclo/<codigo>/revisao — revisão + reabertura em cascata
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/([^/]+)/revisao$', path)
+            if m:
+                nome_safe = unquote(m.group(1)); codigo = unquote(m.group(2))
+                solicitante = get_usuario_sessao(self)
+                if not solicitante:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, solicitante)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    sf = mod_ciclo.SUBFASES_PE.get(codigo)
+                    if not sf or not sf["revisavel"]:
+                        self.send_json({"ok": False, "erro": "Esta subfase não permite revisão."}, code=400); return
+                    u = _usuario_com_capacidade(db, campos.get("login", ""), campos.get("senha", ""), "revisar_pe")
+                    if not u:
+                        self.send_json({"ok": False, "erro": "Revisão exige login+senha de Gerente de Vendas, Gerente Adm/Financeiro ou Diretor."}, code=403); return
+                    if "arquivo" not in arquivos:
+                        self.send_json({"ok": False, "erro": "Anexe o relatório complementar (obrigatório)."}, code=400); return
+                    fname, data = arquivos["arquivo"]
+                    base_nome = os.path.basename(fname)
+                    unico = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid.uuid4().hex[:8] + "_" + base_nome
+                    rel = os.path.join("ciclo", codigo, unico)
+                    doc = CicloDocumento(projeto_nome=nome_safe, etapa_codigo=codigo, tipo="pe_relatorio_complementar",
+                                         arquivo_path=rel, nome_original=base_nome, enviado_por_id=u.id)
+                    db.add(doc); db.flush()   # doc.id para a revisão
+                    todas = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe).all()
+                    codigos = [e.etapa_codigo for e in todas]
+                    resetar = mod_ciclo.codigos_a_resetar(codigo, codigos)
+                    contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe).order_by(Contrato.id.desc()).first()
+                    cstatus = contrato.status if contrato else ""
+                    if mod_ciclo.reabertura_bloqueada_por_contrato(resetar, cstatus):
+                        self.send_json({"ok": False, "erro": "Contrato já assinado — não é possível revisar esta etapa"}, code=400); return
+                    resetar_set = set(resetar)
+                    for e in todas:
+                        if e.etapa_codigo in resetar_set:
+                            e.status = "pendente"; e.iniciado_em = None; e.concluido_em = None; e.responsavel_id = None
+                    # a etapa-mãe 11 volta a "em andamento" (PE deixou de estar concluído)
+                    _set_etapa_status(db, nome_safe, "11", "em_andamento", u.id)
+                    rev = CicloRevisao(projeto_nome=nome_safe, etapa_codigo=codigo, aberta_por_id=u.id,
+                                       relatorio_doc_id=doc.id, motivo=(campos.get("motivo") or None))
+                    db.add(rev)
+                    db.add(LogAcaoGerencial(solicitante_id=solicitante["id"], autorizador_id=u.id,
+                            acao="pe_revisao", projeto_nome=nome_safe, etapa_alvo=codigo,
+                            contexto=json.dumps({"resetadas": sorted(resetar_set)})))
+                    db.commit()
+                    storage_salvar_binario(os.path.join(_projeto_path(nome_safe), rel), data)
+                    self.send_json({"ok": True, "resetadas": sorted(resetar_set)})
+                except Exception as e:
+                    db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
             # POST /api/projetos/<nome>/ciclo/<codigo>/concluir — fecha a subfase de PE
             m = _re.match(r'^/api/projetos/([^/]+)/ciclo/([^/]+)/concluir$', path)
             if m:
