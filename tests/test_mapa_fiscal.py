@@ -41,11 +41,13 @@ def test_payload_destinatario_cpf_e_indicador():
     assert p["cpf_destinatario"] == "22222222222" and "cnpj_destinatario" not in p
     assert p["indicador_inscricao_estadual_destinatario"] == 9
     assert p["pais_destinatario"] == "Brasil" and p["nome_destinatario"] == "CLIENTE Y"
+    assert p["consumidor_final"] == 1          # PF -> consumidor final
 
 
 def test_payload_destinatario_cnpj():
     p = mp.montar_payload(_nota(doc_tipo="cnpj"))
     assert p["cnpj_destinatario"] == "11111111111111" and "cpf_destinatario" not in p
+    assert p["consumidor_final"] == 0          # PJ -> não consumidor final
 
 
 def test_payload_cfop_dentro_uf():

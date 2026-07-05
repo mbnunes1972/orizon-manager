@@ -34,6 +34,8 @@ def montar_nota(perfil, loja, cliente, itens_preview, ref, data_emissao,
             "logradouro": cliente.logradouro, "numero": cliente.numero, "bairro": cliente.bairro,
             "municipio": cliente.cidade, "uf": cliente.estado, "cep": cliente.cep,
         },
+        # TODO Fase 4: PIS/COFINS CST "49" e o CSOSN são do SIMPLES. Para regime normal/presumido,
+        # ramificar aqui (CST próprios + alíquotas ICMS destacadas) com os valores do contador.
         "fiscal": {
             "csosn": perfil.csosn_padrao, "cfop_dentro": perfil.cfop_dentro_uf,
             "cfop_fora": perfil.cfop_fora_uf, "pis_cst": PIS_CST_SIMPLES,
@@ -76,7 +78,7 @@ def montar_payload(nota):
         "data_emissao": nota["data_emissao"],
         "tipo_documento": 1,
         "finalidade_emissao": 1,
-        "consumidor_final": 1,
+        "consumidor_final": 0 if dest["doc_tipo"] == "cnpj" else 1,   # PJ = 0, PF consumidor final = 1
         "presenca_comprador": 1,
         "nome_emitente": emit["nome"],
         "regime_tributario_emitente": emit["regime"],
