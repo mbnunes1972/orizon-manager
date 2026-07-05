@@ -3848,17 +3848,23 @@ class Handler(BaseHTTPRequestHandler):
                     if mod_ciclo.reabertura_bloqueada_por_contrato(resetar, cstatus):
                         self.send_json({"ok": False, "erro": "Contrato já assinado — não é possível revisar esta etapa"}, code=400); return
                     resetar_set = set(resetar)
+                    status_anterior = {e.etapa_codigo: e.status for e in todas
+                                       if e.etapa_codigo in resetar_set}
                     for e in todas:
                         if e.etapa_codigo in resetar_set:
                             e.status = "pendente"; e.iniciado_em = None; e.concluido_em = None; e.responsavel_id = None
-                    # a etapa-mãe 11 volta a "em andamento" (PE deixou de estar concluído)
-                    _set_etapa_status(db, nome_safe, "11", "em_andamento", u.id)
+                    # a etapa-mãe 11 volta a "em andamento" (PE deixou de estar concluído).
+                    # _set_etapa_status cria/atualiza a linha, mas não zera concluido_em/responsavel_id
+                    # ao sair de "concluido" — limpamos aqui para não deixar carimbo obsoleto.
+                    e11 = _set_etapa_status(db, nome_safe, "11", "em_andamento", u.id)
+                    e11.concluido_em = None; e11.responsavel_id = None
                     rev = CicloRevisao(projeto_nome=nome_safe, etapa_codigo=codigo, aberta_por_id=u.id,
                                        relatorio_doc_id=doc.id, motivo=(campos.get("motivo") or None))
                     db.add(rev)
                     db.add(LogAcaoGerencial(solicitante_id=solicitante["id"], autorizador_id=u.id,
                             acao="pe_revisao", projeto_nome=nome_safe, etapa_alvo=codigo,
-                            contexto=json.dumps({"resetadas": sorted(resetar_set)})))
+                            contexto=json.dumps({"resetadas": sorted(resetar_set),
+                                                 "status_anterior": status_anterior})))
                     db.commit()
                     storage_salvar_binario(os.path.join(_projeto_path(nome_safe), rel), data)
                     self.send_json({"ok": True, "resetadas": sorted(resetar_set)})

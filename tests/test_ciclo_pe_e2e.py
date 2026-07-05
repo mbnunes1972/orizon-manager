@@ -166,6 +166,8 @@ def test_revisao_reabre_em_cascata(http_client_factory, seed, projetos_dir, app_
     db = app_db.get_session()
     e11e = db.query(app_db.CicloEtapa).filter_by(projeto_nome=proj, etapa_codigo="11e").first()
     assert e11e.status == "pendente"
+    e11 = db.query(app_db.CicloEtapa).filter_by(projeto_nome=proj, etapa_codigo="11").first()
+    assert e11 is not None and e11.status == "em_andamento" and e11.concluido_em is None
     db.close()
 
 
