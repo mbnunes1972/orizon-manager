@@ -1159,7 +1159,9 @@ task a task com review de spec + qualidade. **Ainda em branch — não mergeada 
 
 Frente desenhada via brainstorming (spec `docs/superpowers/specs/2026-07-05-etapas-operacionais-implantacao-producao-entrega-design.md`)
 e implementada por **subagentes** (plano `docs/superpowers/plans/2026-07-05-etapas-operacionais-implantacao-producao-entrega.md`),
-task a task com review de spec + qualidade. **Ainda em branch — não mergeada na `main`.**
+task a task com review de spec + qualidade. **Mergeada na `main`** (fast-forward de 9 commits) após
+verificação manual no navegador ("Funcionou"); branch `feat/etapas-operacionais` **deletada**; push +
+re-ingestão do grafo (código 945 nós) feitos.
 
 - **[ESTADO]** Etapas principais **12/13/14** ganharam painéis dedicados (deixam o card genérico):
   - **12 Implantação do pedido:** upload **append-only** de XMLs ("Carregar Pedidos") + "Encaminhar
@@ -1190,11 +1192,14 @@ task a task com review de spec + qualidade. **Ainda em branch — não mergeada 
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
-**`main`** consolidada e verde — **suíte 414 passed**. **Frente aberta:** branch `feat/etapas-operacionais`
-(etapas operacionais 12/13/14 — Sessão 46, backend testado **431 passed**, frontend aguardando
-conferência no navegador antes do merge). A frente anterior (subfases do PE, Sessão 45) já está
-**mergeada na `main`** e pushada. Servidor: `python3 main.py` (porta 8765).
-Branches: `main` + `feat/etapas-operacionais` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
+**`main`** consolidada e verde — **suíte 431 passed**. **Frente fechada:** etapas operacionais 12/13/14
+(Sessão 46) **mergeada na `main`** (fast-forward), verificada no navegador, pushada e re-ingerida no
+grafo (código 945 nós). **Próxima frente:** **Emissão de NFe (etapa 15)** — fase crítica, a iniciar em
+branch nova (contexto a ser passado pelo usuário). Servidor: `python3 main.py` (porta 8765) — **atenção:
+o `python3` do Bash aqui é o stub do WindowsApps (exit 127); subir com o interpretador real
+`C:\Users\mbn19\AppData\Local\Python\pythoncore-3.14-64\python.exe main.py`, e sempre matar servidores
+`main.py` obsoletos que fiquem presos na 8765 (senão o navegador fala com código velho).**
+Branches: `main` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
 Contrato agora é **HTML/Markdown → PDF (WeasyPrint)** — o caminho `.docx`/LibreOffice do contrato
 foi aposentado (a **proposta** ainda usa docx/LibreOffice). **Diretório de trabalho:**
 `E:/2026/desenvolvimento/orizon-manager` (pai renomeado nesta sessão). **MCP `orizon`** ativo e
