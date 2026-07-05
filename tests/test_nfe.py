@@ -101,3 +101,23 @@ def test_precificar_sem_ipi_e_padrao():
     assert p["tipo"] == "padrao" and p["id_peca"] is None
     assert p["custo_unit"] == 50.0 and p["preco_venda_unit"] == 65.0
     assert p["cor"] is None and p["largura"] is None
+
+
+def test_preview_end_to_end():
+    pv = mn.preview(_ler("nfe_basica.xml"), 30.0)
+    t = pv["totais"]
+    assert t["n_linhas"] == 3 and t["n_distintos"] == 2
+    assert t["n_padrao"] == 1 and t["n_sob_medida"] == 1
+    assert t["custo_total"] == 171.42     # 75.21*2 + 10.50*2
+    assert t["venda_total"] == 222.84     # 97.77*2 + 13.65*2
+    assert pv["markup_pct"] == 30.0
+    assert pv["cabecalho"]["nNF"] == "170942"
+    # item consolidado sob-medida com dimensão parseada
+    sob = [i for i in pv["itens"] if i["tipo"] == "sob_medida"][0]
+    assert sob["qCom"] == 2.0 and sob["preco_venda_unit"] == 97.77 and sob["altura"] == 185
+
+
+def test_preview_infadprod_ausente_nao_quebra():
+    pv = mn.preview(_ler("nfe_basica.xml"), 10.0)
+    padrao = [i for i in pv["itens"] if i["tipo"] == "padrao"][0]
+    assert padrao["cor"] is None and padrao["largura"] is None   # sem infAdProd → dim None, sem erro

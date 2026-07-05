@@ -113,3 +113,47 @@ def precificar(itens_consolidados, markup_pct):
             "infAdProd": it.get("infAdProd"),
         })
     return out
+
+
+def preview(xml, markup_pct):
+    """Pipeline completo: parse -> consolida -> precifica. Estrutura de handoff + totais."""
+    nfe = parse_nfe(xml)
+    itens = nfe["itens"]
+    consol = consolidar(itens)
+    precificados = precificar(consol, markup_pct)
+    return {
+        "cabecalho": nfe["cabecalho"],
+        "markup_pct": markup_pct,
+        "itens": precificados,
+        "totais": {
+            "n_linhas": len(itens),
+            "n_distintos": len(consol),
+            "n_padrao": sum(1 for p in precificados if p["tipo"] == "padrao"),
+            "n_sob_medida": sum(1 for p in precificados if p["tipo"] == "sob_medida"),
+            "custo_total": round(sum(p["custo_unit"] * p["qCom"] for p in precificados), 2),
+            "venda_total": round(sum(p["preco_venda_unit"] * p["qCom"] for p in precificados), 2),
+        },
+    }
+
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) < 2:
+        print("uso: python3 mod_nfe.py <arquivo.xml> [markup_pct]")
+        sys.exit(1)
+    _pct = float(sys.argv[2]) if len(sys.argv) > 2 else MARKUP_TESTE_PADRAO
+    with open(sys.argv[1], encoding="utf-8") as _f:
+        _pv = preview(_f.read(), _pct)
+    _cab = _pv["cabecalho"]
+    print("NF-e %s serie %s | emit %s (CRT %s) | markup %.1f%%"
+          % (_cab.get("nNF"), _cab.get("serie"), _cab["emit"].get("nome"), _cab["emit"].get("crt"), _pct))
+    print("%-22s %-11s %7s %10s %10s  %s" % ("cProd", "tipo", "qtd", "custo_un", "venda_un", "xProd"))
+    for _it in _pv["itens"]:
+        print("%-22s %-11s %7.2f %10.2f %10.2f  %s"
+              % (_it["cProd"], _it["tipo"], _it["qCom"], _it["custo_unit"],
+                 _it["preco_venda_unit"], (_it["xProd"] or "")[:30]))
+    _t = _pv["totais"]
+    print("-" * 78)
+    print("linhas=%d distintos=%d padrao=%d sob_medida=%d | custo_total=%.2f venda_total=%.2f"
+          % (_t["n_linhas"], _t["n_distintos"], _t["n_padrao"], _t["n_sob_medida"],
+             _t["custo_total"], _t["venda_total"]))
