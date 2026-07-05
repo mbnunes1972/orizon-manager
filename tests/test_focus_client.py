@@ -156,3 +156,19 @@ def test_aguardar_processamento_estoura_timeout(monkeypatch):
                         lambda self, ref, completa=False: {"status": "processando_autorizacao"})
     dados = _client().aguardar_processamento("R1", timeout=6, intervalo=3)
     assert dados["status"] == "processando_autorizacao"   # não trava, retorna o último
+
+
+def test_corpo_nao_dict_nao_quebra(monkeypatch):
+    # se a Focus devolver um array no corpo 2xx, o cliente não deve quebrar
+    _capture(monkeypatch, [FakeResp(200, [{"item": 1}])])
+    dados = _client().consultar_nfe("R1")
+    assert dados["_http_status"] == 200
+    assert dados.get("_raw") == [{"item": 1}]
+
+
+def test_aguardar_intervalo_zero_nao_quebra(monkeypatch):
+    monkeypatch.setattr(fc.time, "sleep", lambda s: None)
+    monkeypatch.setattr(fc.FocusClient, "consultar_nfe",
+                        lambda self, ref, completa=False: {"status": "autorizado"})
+    dados = _client().aguardar_processamento("R1", timeout=6, intervalo=0)  # não deve dividir por zero
+    assert dados["status"] == "autorizado"

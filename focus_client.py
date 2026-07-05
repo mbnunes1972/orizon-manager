@@ -45,6 +45,8 @@ class FocusClient:
                 dados = resp.json()
             except ValueError:
                 dados = {}
+            if not isinstance(dados, dict):
+                dados = {"_raw": dados}
             if resp.status_code >= 400:
                 msg = (dados.get("mensagem") or dados.get("erro")
                        or (resp.text or "")[:300] or ("HTTP %d" % resp.status_code))
@@ -73,6 +75,7 @@ class FocusClient:
     def aguardar_processamento(self, ref, timeout=60, intervalo=3):
         """Polla consultar_nfe até sair de 'processando_autorizacao' ou esgotar as tentativas
         (bounded por timeout/intervalo — determinístico, sem relógio de parede)."""
+        intervalo = max(1, intervalo)
         tentativas = max(1, int(timeout / intervalo))
         dados = self.consultar_nfe(ref)
         for _ in range(tentativas - 1):
