@@ -8523,7 +8523,7 @@ function _renderCardImplantacao(dados, bloqueada) {
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;font-size:.82rem">
           <span style="flex:1">📄 ${esc(d.nome_original)}</span>
           <a class="btn-ciclo" style="font-size:.78rem;text-decoration:none" target="_blank" rel="noopener"
-             href="/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/documento/${d.id}">Baixar</a>
+             href="/api/projetos/${encodeURIComponent(projetoAtivo ? projetoAtivo.nome_safe : '')}/ciclo/documento/${d.id}">Baixar</a>
         </div>`).join('')
     : `<p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">Nenhum pedido (XML) carregado.</p>`;
   const btnReabrir = concluido
@@ -8556,26 +8556,21 @@ async function enviarPedidosXml(inputFile) {
         `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/12/pedido-xml`,
         { method: 'POST', credentials: 'same-origin', body: fd });
       const j = await r.json();
-      if (!j.ok) { await avisoPopup(j.erro || 'Falha ao carregar.', {titulo:'Implantação — Upload'}); break; }
+      if (!j.ok) {
+        await avisoPopup(j.erro || 'Falha ao carregar.', {titulo:'Implantação — Upload'});
+        inputFile.value = '';
+        await carregarCiclo();
+        return;
+      }
     }
+    inputFile.value = '';
     showToast('Pedido(s) carregado(s)!', false);
     await carregarCiclo();
   } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'Implantação — Upload'}); }
 }
 
 async function encaminharPedidosFabrica() {
-  if (!projetoAtivo) return;
-  try {
-    const r = await fetch(
-      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/12`,
-      { method: 'PATCH', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'concluido' }) });
-    const d = await r.json();
-    if (!d.ok) { await avisoPopup(d.erro || 'Falha ao encaminhar.', {titulo:'Implantação'}); return; }
-    showToast('Pedidos encaminhados à fábrica!', false);
-    await carregarCiclo();
-  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'Implantação'}); }
+  await _patchEtapa('12', { status: 'concluido' }, 'Pedidos encaminhados à fábrica!', 'Implantação');
 }
 
 // ── Etapa 13 — Produção ────────────────────────────────────────────────────
