@@ -1826,7 +1826,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <div class="toast" id="toast"></div>
 
 <script>
-const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const fmt = n => Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 
 // ── Multi-loja: loja ativa + interceptor de fetch ─────────────────
@@ -7557,7 +7557,7 @@ let _pePayload = { subfases: {}, documentos: [], revisoes: [] };
 
 async function peCarregar(nomeSafe) {
   try {
-    const r = await fetch(`/api/projetos/${encodeURIComponent(nomeSafe)}/ciclo/pe`);
+    const r = await fetch(`/api/projetos/${encodeURIComponent(nomeSafe)}/ciclo/pe`, { credentials: 'same-origin' });
     const j = await r.json();
     if (j && j.ok) { _pePayload = j; }
   } catch(e) { /* silencioso */ }
@@ -7566,6 +7566,7 @@ async function peCarregar(nomeSafe) {
 // Verifica (UX-only) se o usuário logado tem a capacidade de PE.
 // O backend faz a verificação real de credenciais; esta é apenas para
 // mostrar/ocultar botões no front.
+// MANTER SINCRONIZADO com perfis.py (chaves "executar_pe"/"revisar_pe" do dict PERFIS).
 const _PE_EXEC_NIVEIS = new Set([
   "diretor","gerente_vendas","gerente_adm_fin","conferente","projetista_executivo"
 ]);
