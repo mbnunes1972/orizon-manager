@@ -1,8 +1,12 @@
 # NF-e Fase 3b — Mapa Fiscal + `EmissorFocusNfe` — Design
 
 > Spec de design · 2026-07-05 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. É o "coração" da guinada: transforma dado real
-> (preview + PerfilFiscal) no payload da NF-e e fecha o contrato `EmissorFiscal` com a Focus.
+> Status: **IMPLEMENTADO (Sessão 47)** — branch `feat/nfe-mapa-fiscal`, `mapa_fiscal.py` + `emissor_focus.py`
+> com testes offline (suíte 507). Emissão real (Fase 4) pendente do token da Focus. É o "coração" da
+> guinada: transforma dado real (preview + PerfilFiscal) no payload da NF-e e fecha o contrato
+> `EmissorFiscal` com a Focus.
+> **[Fase 4]** `consumidor_final` já sai condicional (PJ=0/PF=1); **PIS/COFINS CST "49" e o CSOSN são do
+> Simples** (marcado com `# TODO Fase 4` no código) — ramificar por regime normal/presumido com o contador.
 
 ## 1. Contexto e recorte
 

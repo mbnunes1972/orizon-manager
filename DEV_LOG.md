@@ -1238,9 +1238,16 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
 - **[PENDENTE integração NF-e]** (1) **Token da Focus** → smoke em homologação. (2) **Valores fiscais reais
   do contador** (CST/CSOSN/CFOP/alíquotas) — entram como **dado** no PerfilFiscal, sem mudar código.
   (3) **Sub-frente II** (painel no frontend) e **Fase 3b** (mapa fiscal + `EmissorFocusNfe`), depois Fases 4-5.
-- **[CONTEXTO] Fechamento:** Fases 1 e 2 + **Painel Fiscal Sub-frente I** todas **mergeadas na `main`**
-  (fast-forward), pushadas e re-ingeridas (código 1078 nós, banco 69 c/ `perfil_fiscal`); branch
-  `feat/perfil-fiscal` deletada. Próximas frentes em branches novas a partir da `main`.
+- **[IMPLEMENTADO] Fase 3b (mapa fiscal, branch `feat/nfe-mapa-fiscal`, suíte 507):** `mapa_fiscal.py`
+  (`montar_nota` modelos→nota neutra: emitente Loja+perfil, destinatário Cliente PF/PJ, regime→código,
+  CST Simples; `montar_payload` nota→payload Focus: CFOP dentro/fora por UF, CSOSN do perfil, ICMS origem
+  0, PIS/COFINS 49, `valor_bruto`, `consumidor_final` condicional PJ=0/PF=1) e `emissor_focus.py`
+  (`EmissorFocusNfe(EmissorFiscal)` fecha o contrato da Fase 2 com o `FocusClient` injetado; emitir/
+  consultar/cancelar → `resultado_de_focus`). **Testes offline** (client fake, sem emissão real).
+  **[Fase 4]** PIS/COFINS CST "49" + CSOSN são Simples-only (marcado `# TODO Fase 4`) — ramificar por
+  regime com o contador.
+- **[CONTEXTO] Fechamento:** Fases 1 e 2 + **Painel Fiscal Sub-frente I** **mergeadas na `main`**; Fase 3b
+  na branch `feat/nfe-mapa-fiscal` (pronta para merge). Próximas frentes em branches novas a partir da `main`.
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
@@ -1248,11 +1255,12 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
 andamento:** **Integração NF-e Fábrica→Loja via Focus NFe** (Sessão 47). **Mergeadas na `main`:** Fase 1
 (`mod_nfe.py` parser/precificação + CLI), Fase 2 (`EmissorFiscal`/`focus_client`/`focus_config`) e o
 **Painel de Config Fiscal · Sub-frente I** (`PerfilFiscal` + `fiscal_cripto` Fernet + `mod_fiscal` +
-endpoints; segredos cifrados
-write-only, produção bloqueada com placeholder). **A retomar:** **Sub-frente II** (painel no frontend) e
-**Fase 3b** (mapa fiscal loja→payload + `EmissorFocusNfe`),
-depois Fases 4-5. **Fase 3 depende do perfil fiscal Simples do contador** (CNPJ
-19.152.134/0001-56: CST/CSOSN/CFOP/alíquotas) e o **smoke em homologação depende do token da Focus**
+endpoints; segredos cifrados write-only, produção bloqueada com placeholder). **Implementada em branch
+(`feat/nfe-mapa-fiscal`, suíte 507, pronta para merge):** **Fase 3b** — `mapa_fiscal` (nota→payload Focus)
++ `EmissorFocusNfe`. **A retomar:** **Fase 4** (emissão real em homologação — token da Focus), **Fase 5**
+(orquestração + UI etapa 15) e a **Sub-frente II** (painel fiscal no frontend). **Fase 4 depende do perfil
+fiscal Simples do contador** (CNPJ 19.152.134/0001-56: CST/CSOSN/CFOP/alíquotas) e o **smoke em homologação
+depende do token da Focus**
 (ambos pendentes do usuário). XMLs reais da fábrica em `E:/2026/desenvolvimento/nfe-dalmobile` (fora do
 git). Servidor: `python3 main.py` (porta 8765) — **atenção:
 o `python3` do Bash aqui é o stub do WindowsApps (exit 127); subir com o interpretador real
