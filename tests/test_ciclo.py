@@ -163,14 +163,17 @@ def test_etapa_4_renomeada_para_orcamento():
     assert mc.ETAPA_NOME["4"] == "Orçamento"
 
 
-def test_modelos_ciclo_documento_e_revisao(tmp_path):
-    import importlib, database
+def test_modelos_ciclo_documento_e_revisao(tmp_path, monkeypatch):
+    import database
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     dbf = str(tmp_path / "t.db")
-    database.DB_PATH = dbf
-    database.ENGINE = create_engine(f"sqlite:///{dbf}")
-    database.Session = sessionmaker(bind=database.ENGINE)
+    engine = create_engine(f"sqlite:///{dbf}")
+    # monkeypatch restaura os globais no teardown — não deixa `database`
+    # apontando para um banco temp já deletado (espelha o cuidado do conftest).
+    monkeypatch.setattr(database, "DB_PATH", dbf)
+    monkeypatch.setattr(database, "ENGINE", engine)
+    monkeypatch.setattr(database, "Session", sessionmaker(bind=engine))
     database.init_db()
     s = database.Session()
     d = database.CicloDocumento(projeto_nome="P", etapa_codigo="11a",
