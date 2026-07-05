@@ -67,6 +67,6 @@ def resultado_de_focus(dados: dict) -> ResultadoEmissao:
         xml_url=dados.get("caminho_xml_nota_fiscal"),
         danfe_url=dados.get("caminho_danfe"),
         xml_cancelamento_url=dados.get("caminho_xml_cancelamento"),
-        erros=dados.get("erros") or [],
-        raw=dados,
+        erros=list(dados.get("erros") or []),
+        raw=dict(dados),
     )
