@@ -125,12 +125,17 @@ def guarda_conclusao_operacional(codigo, tem_xml, numeros_txt, relatorio_txt):
     if not op:
         return (False, "Etapa operacional desconhecida.")
     exige = op["exige"]
-    if exige == "xml" and not tem_xml:
-        return (False, "Carregue pelo menos um pedido (XML) antes de encaminhar à fábrica.")
-    if exige == "numeros" and not _tem_linha_nao_vazia(numeros_txt):
-        return (False, "Informe os números dos pedidos antes de concluir a produção.")
-    if exige == "relatorio" and not (relatorio_txt or "").strip():
-        return (False, "Preencha o Relatório de Entrega antes de concluí-lo.")
+    if exige == "xml":
+        if not tem_xml:
+            return (False, "Carregue pelo menos um pedido (XML) antes de encaminhar à fábrica.")
+    elif exige == "numeros":
+        if not _tem_linha_nao_vazia(numeros_txt):
+            return (False, "Informe os números dos pedidos antes de concluir a produção.")
+    elif exige == "relatorio":
+        if not _tem_linha_nao_vazia(relatorio_txt):
+            return (False, "Preencha o Relatório de Entrega antes de concluí-lo.")
+    else:
+        raise ValueError(f"exige desconhecido em ETAPAS_OPERACIONAIS: {exige!r}")
     return (True, "")
 
 
