@@ -3809,6 +3809,47 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # POST /api/projetos/<nome>/ciclo/<codigo>/concluir — fecha a subfase de PE
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/([^/]+)/concluir$', path)
+            if m:
+                nome_safe = unquote(m.group(1)); codigo = unquote(m.group(2))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    if codigo not in mod_ciclo.SUBFASES_PE:
+                        self.send_json({"ok": False, "erro": "Subfase de PE inválida."}, code=400); return
+                    req = json.loads(body or b'{}')
+                    u = _usuario_com_capacidade(db, req.get("login", ""), req.get("senha", ""), "executar_pe")
+                    if not u:
+                        self.send_json({"ok": False, "erro": "Ação exige login+senha de Projetista Executivo, Conferente, Gerente ou Diretor."}, code=403); return
+                    docs = db.query(CicloDocumento).filter_by(projeto_nome=nome_safe, etapa_codigo=codigo).all()
+                    tipos_presentes = {d.tipo for d in docs}
+                    todas = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe).all()
+                    status_por = {e.etapa_codigo: e.status for e in todas}
+                    ok, erro = mod_ciclo.guarda_conclusao(codigo, tipos_presentes, status_por)
+                    if not ok:
+                        self.send_json({"ok": False, "erro": erro}, code=400); return
+                    _set_etapa_status(db, nome_safe, codigo, "concluido", u.id)
+                    if codigo == mod_ciclo.PE_SUBFASE_FINAL:
+                        _set_etapa_status(db, nome_safe, "11", "concluido", u.id)
+                    db.add(LogAcaoGerencial(solicitante_id=u.id, autorizador_id=u.id,
+                            acao="pe_concluir_" + codigo, projeto_nome=nome_safe, etapa_alvo=codigo))
+                    db.commit()
+                    self.send_json({"ok": True})
+                except Exception as e:
+                    db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
             else:
                 self.send_response(404)
                 self.end_headers()

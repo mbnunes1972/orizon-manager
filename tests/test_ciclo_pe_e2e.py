@@ -124,3 +124,23 @@ def test_upload_sem_capability_403(http_client_factory, seed, projetos_dir):
         {"login": "cons_l1", "senha": "senha123"},
         file_field="arquivo", filename="x.pdf", filedata=b"x")
     assert st == 403
+
+
+def test_concluir_11a_barra_sem_documento(http_client_factory, seed, projetos_dir):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    # 11b nunca recebe upload nos testes anteriores → guarda rejeita por falta de documento
+    st, body = c.post(f"/api/projetos/{proj}/ciclo/11b/concluir",
+                      {"login": "dir_l2", "senha": "senha123"})
+    assert st == 400 and "Carregue" in body["erro"]
+
+
+def test_concluir_11a_com_documento(http_client_factory, seed, projetos_dir):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    _post_multipart(c.base, c.cookie, f"/api/projetos/{proj}/ciclo/11a/documento",
+                    {"login": "dir_l2", "senha": "senha123"},
+                    file_field="arquivo", filename="p.pdf", filedata=b"x")
+    st, body = c.post(f"/api/projetos/{proj}/ciclo/11a/concluir",
+                      {"login": "dir_l2", "senha": "senha123"})
+    assert st == 200 and body.get("ok") is True
