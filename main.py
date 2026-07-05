@@ -4291,6 +4291,21 @@ class Handler(BaseHTTPRequestHandler):
                                 "erro": f"Conclua a etapa anterior ({nome_ant}) antes de iniciar esta.",
                             }, code=400)
                             return
+                    # Guarda das etapas operacionais (12/13/14): exige XML / números /
+                    # relatório antes de concluir. Usa o obs recebido no request (se veio
+                    # junto do status) ou o persistido na etapa.
+                    if novo_status in mod_ciclo.STATUS_CONCLUSIVOS and etapa_cod in mod_ciclo.ETAPAS_OPERACIONAIS:
+                        tem_xml = db.query(CicloDocumento).filter_by(
+                            projeto_nome=nome_safe, etapa_codigo="12",
+                            tipo=mod_ciclo.tipo_doc_operacional("12")).first() is not None
+                        obs_efetivo   = obs if obs is not None else etapa.observacoes
+                        numeros_txt   = obs_efetivo if etapa_cod == "13" else None
+                        relatorio_txt = obs_efetivo if etapa_cod == "14" else None
+                        ok_op, erro_op = mod_ciclo.guarda_conclusao_operacional(
+                            etapa_cod, tem_xml, numeros_txt, relatorio_txt)
+                        if not ok_op:
+                            self.send_json({"ok": False, "erro": erro_op}, code=400)
+                            return
                     # Aprovação financeira (8/11d): exige login+senha de quem pode aprovar.
                     aprovador = None
                     if novo_status in mod_ciclo.STATUS_CONCLUSIVOS and mod_ciclo.exige_aprovacao_financeira(etapa_cod):

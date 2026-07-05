@@ -106,3 +106,72 @@ def test_upload_xml_cycle_gated_consultor_ok(http_client_factory, seed, projetos
         c.base, c.cookie, f"/api/projetos/{proj}/ciclo/12/pedido-xml", {},
         file_field="arquivo", filename="p.xml", filedata=b"<xml/>")
     assert st == 200 and body.get("ok") is True, body
+
+
+def test_12_nao_conclui_sem_xml_e_conclui_com_xml(http_client_factory, seed, projetos_dir, app_db):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    _reset_etapas(app_db, proj, ["11", "12"])
+    _marcar_concluida(app_db, proj, "11")   # libera o gating sequencial da 12
+    st, body = c.patch(f"/api/projetos/{proj}/ciclo/12", {"status": "concluido"})
+    assert st == 400 and "XML" in body["erro"], body
+    _post_multipart(c.base, c.cookie, f"/api/projetos/{proj}/ciclo/12/pedido-xml", {},
+                    file_field="arquivo", filename="p.xml", filedata=b"<xml/>")
+    st2, body2 = c.patch(f"/api/projetos/{proj}/ciclo/12", {"status": "concluido"})
+    assert st2 == 200 and body2.get("ok") is True, body2
+
+
+def test_13_nao_conclui_sem_numeros_e_conclui_com_numeros(http_client_factory, seed, projetos_dir, app_db):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    _reset_etapas(app_db, proj, ["12", "13"])
+    _marcar_concluida(app_db, proj, "12")   # libera a 13
+    st, body = c.patch(f"/api/projetos/{proj}/ciclo/13", {"status": "concluido"})
+    assert st == 400 and "número" in body["erro"].lower(), body
+    st_s, _ = c.patch(f"/api/projetos/{proj}/ciclo/13", {"observacoes": "P-1001\nP-1002"})
+    assert st_s == 200
+    st2, body2 = c.patch(f"/api/projetos/{proj}/ciclo/13", {"status": "concluido"})
+    assert st2 == 200 and body2.get("ok") is True, body2
+
+
+def test_13_conclui_com_numeros_no_mesmo_patch(http_client_factory, seed, projetos_dir, app_db):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    _reset_etapas(app_db, proj, ["12", "13"])
+    _marcar_concluida(app_db, proj, "12")
+    st, body = c.patch(f"/api/projetos/{proj}/ciclo/13",
+                       {"status": "concluido", "observacoes": "P-9"})
+    assert st == 200 and body.get("ok") is True, body
+
+
+def test_14_nao_conclui_sem_relatorio_e_conclui_com_relatorio(http_client_factory, seed, projetos_dir, app_db):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    _reset_etapas(app_db, proj, ["13", "14"])
+    _marcar_concluida(app_db, proj, "13")   # libera a 14
+    st, body = c.patch(f"/api/projetos/{proj}/ciclo/14", {"status": "concluido", "observacoes": "   "})
+    assert st == 400 and "Relatório" in body["erro"], body
+    st2, body2 = c.patch(f"/api/projetos/{proj}/ciclo/14",
+                         {"status": "concluido", "observacoes": "1 gaveta avariada"})
+    assert st2 == 200 and body2.get("ok") is True, body2
+
+
+def test_gating_sequencial_preservado_13_sem_12(http_client_factory, seed, projetos_dir, app_db):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    _reset_etapas(app_db, proj, ["12", "13"])   # garante 12 NÃO concluída
+    st, body = c.patch(f"/api/projetos/{proj}/ciclo/13",
+                       {"status": "concluido", "observacoes": "P-1"})
+    assert st == 400 and "anterior" in body["erro"].lower(), body
+
+
+def test_pe_intocado_smoke(http_client_factory, seed, projetos_dir, app_db):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    _reset_etapas(app_db, proj, ["11a"])
+    _post_multipart(c.base, c.cookie, f"/api/projetos/{proj}/ciclo/11a/documento",
+                    {"login": "dir_l2", "senha": "senha123"},
+                    file_field="arquivo", filename="p.pdf", filedata=b"x")
+    st, body = c.post(f"/api/projetos/{proj}/ciclo/11a/concluir",
+                      {"login": "dir_l2", "senha": "senha123"})
+    assert st == 200 and body.get("ok") is True, body
