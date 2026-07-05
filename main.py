@@ -1415,6 +1415,32 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # GET /api/projetos/<nome>/ciclo/<codigo>/pedido-xml — lista os XMLs da etapa operacional (12)
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/([^/]+)/pedido-xml$', path)
+            if m:
+                nome_safe = unquote(m.group(1)); codigo = unquote(m.group(2))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    tipo = mod_ciclo.tipo_doc_operacional(codigo)
+                    docs = (db.query(CicloDocumento)
+                              .filter_by(projeto_nome=nome_safe, etapa_codigo=codigo, tipo=tipo)
+                              .order_by(CicloDocumento.enviado_em.desc()).all()) if tipo else []
+                    out = [{"id": d.id, "nome_original": d.nome_original,
+                            "enviado_em": d.enviado_em.isoformat() if d.enviado_em else None} for d in docs]
+                    self.send_json({"ok": True, "documentos": out})
+                finally:
+                    db.close()
+                return
+
             self.send_response(404)
             self.end_headers()
 
@@ -3804,6 +3830,49 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as e:
                     # rollback é no-op se o commit já ocorreu (linha do doc persiste; o
                     # download degrada com 404 se o arquivo não foi para o disco).
+                    db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # POST /api/projetos/<nome>/ciclo/<codigo>/pedido-xml — upload XML da etapa
+            # operacional (12), append-only, CYCLE-GATED (sem capability de PE).
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/([^/]+)/pedido-xml$', path)
+            if m:
+                nome_safe = unquote(m.group(1)); codigo = unquote(m.group(2))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    tipo_esperado = mod_ciclo.tipo_doc_operacional(codigo)
+                    if not tipo_esperado:
+                        self.send_json({"ok": False, "erro": "Esta etapa não aceita upload de pedidos."}, code=400); return
+                    if "arquivo" not in arquivos:
+                        self.send_json({"ok": False, "erro": "Anexe o arquivo XML."}, code=400); return
+                    fname, data = arquivos["arquivo"]
+                    base_nome = os.path.basename(fname)
+                    unico = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid.uuid4().hex[:8] + "_" + base_nome
+                    rel = os.path.join("ciclo", codigo, unico)
+                    doc = CicloDocumento(projeto_nome=nome_safe, etapa_codigo=codigo, tipo=tipo_esperado,
+                                         arquivo_path=rel, nome_original=base_nome, enviado_por_id=usuario["id"])
+                    db.add(doc)
+                    et = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo=codigo).first()
+                    if not et or et.status == "pendente":
+                        _set_etapa_status(db, nome_safe, codigo, "em_andamento", usuario["id"])
+                    db.add(LogAcaoGerencial(solicitante_id=usuario["id"], autorizador_id=usuario["id"],
+                            acao="ciclo_" + tipo_esperado, projeto_nome=nome_safe, etapa_alvo=codigo))
+                    db.commit()
+                    storage_salvar_binario(os.path.join(_projeto_path(nome_safe), rel), data)
+                    self.send_json({"ok": True, "documento_id": doc.id})
+                except Exception as e:
                     db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
                     db.close()
