@@ -69,3 +69,54 @@ def test_payload_itens():
     assert it0["quantidade_comercial"] == 2.0 and it0["valor_unitario_comercial"] == 97.77
     assert it0["valor_bruto"] == 195.54          # round(2 * 97.77, 2)
     assert p["items"][1]["numero_item"] == 2 and p["items"][1]["valor_bruto"] == 13.65
+
+
+from types import SimpleNamespace
+
+
+def test_montar_nota_from_objetos():
+    perfil = SimpleNamespace(razao_social="LOJA X LTDA", regime_tributario="simples",
+                             inscricao_estadual="ISENTO", csosn_padrao="101",
+                             cfop_dentro_uf="5102", cfop_fora_uf="6102")
+    loja = SimpleNamespace(cnpj="19152134000156", nome="Loja X", logradouro="Rua A", numero="1",
+                           bairro="Centro", cidade="Sao Paulo", estado="SP", cep="01000-000")
+    cliente = SimpleNamespace(nome="Cliente Y", cpf="22222222222", logradouro="Rua B", numero="2",
+                              bairro="Jd", cidade="Rio", estado="RJ", cep="20000-000")
+    itens = [{"cProd": "X", "xProd": "P", "ncm": "9403", "uCom": "UN",
+              "qCom": 1.0, "preco_venda_unit": 10.0}]
+    nota = mp.montar_nota(perfil, loja, cliente, itens, ref="R9", data_emissao="D")
+    assert nota["ref"] == "R9" and nota["data_emissao"] == "D"
+    assert nota["natureza_operacao"] == "Venda de mercadoria"
+    assert nota["emitente"]["doc_tipo"] == "cnpj" and nota["emitente"]["doc"] == "19152134000156"
+    assert nota["emitente"]["regime"] == 1 and nota["emitente"]["nome"] == "LOJA X LTDA"
+    assert nota["emitente"]["uf"] == "SP"
+    assert nota["destinatario"]["doc_tipo"] == "cpf" and nota["destinatario"]["doc"] == "22222222222"
+    assert nota["destinatario"]["uf"] == "RJ"
+    assert nota["fiscal"]["csosn"] == "101" and nota["fiscal"]["cfop_dentro"] == "5102"
+    assert nota["fiscal"]["pis_cst"] == "49" and nota["fiscal"]["cofins_cst"] == "49"
+    assert nota["itens"] == itens
+    p = mp.montar_payload(nota)
+    assert p["items"][0]["cfop"] == "6102"          # SP emit vs RJ dest -> fora
+
+
+def test_montar_nota_regime_normal_e_cliente_cnpj():
+    perfil = SimpleNamespace(razao_social="L", regime_tributario="normal", inscricao_estadual="1",
+                             csosn_padrao="101", cfop_dentro_uf="5102", cfop_fora_uf="6102")
+    loja = SimpleNamespace(cnpj="1", nome="L", logradouro="a", numero="1", bairro="b",
+                           cidade="c", estado="SP", cep="1")
+    cliente = SimpleNamespace(nome="C", cnpj="99999999000199", cpf=None, logradouro="a", numero="1",
+                              bairro="b", cidade="c", estado="SP", cep="1")
+    nota = mp.montar_nota(perfil, loja, cliente, [], ref="R", data_emissao="D")
+    assert nota["emitente"]["regime"] == 3          # normal -> 3
+    assert nota["destinatario"]["doc_tipo"] == "cnpj" and nota["destinatario"]["doc"] == "99999999000199"
+
+
+def test_montar_nota_nome_cai_para_loja_sem_razao_social():
+    perfil = SimpleNamespace(razao_social=None, regime_tributario="simples", inscricao_estadual=None,
+                             csosn_padrao="101", cfop_dentro_uf="5102", cfop_fora_uf="6102")
+    loja = SimpleNamespace(cnpj="1", nome="NOME FANTASIA", logradouro="a", numero="1", bairro="b",
+                           cidade="c", estado="SP", cep="1")
+    cliente = SimpleNamespace(nome="C", cpf="2", logradouro="a", numero="1", bairro="b",
+                              cidade="c", estado="SP", cep="1")
+    nota = mp.montar_nota(perfil, loja, cliente, [], ref="R", data_emissao="D")
+    assert nota["emitente"]["nome"] == "NOME FANTASIA"   # sem razao_social -> loja.nome
