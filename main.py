@@ -2,7 +2,7 @@
 main.py — Servidor HTTP, rotas e inicialização.
 Ponto de entrada da aplicação: python main.py
 """
-import os, io, json, time, re, threading, webbrowser, hashlib
+import os, io, json, time, re, threading, webbrowser, hashlib, uuid
 import sys
 import email
 from email import policy as _email_policy
@@ -13,7 +13,8 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
-                       membership_loja_ids, UsuarioLoja, ProvisaoRegistro)
+                       membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
+                       CicloDocumento, CicloRevisao)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -1340,6 +1341,77 @@ class Handler(BaseHTTPRequestHandler):
                     }})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # GET /api/projetos/<nome>/ciclo/pe — documentos + revisões + status das subfases
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/pe$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    docs = db.query(CicloDocumento).filter_by(projeto_nome=nome_safe)\
+                             .order_by(CicloDocumento.enviado_em.desc()).all()
+                    revs = db.query(CicloRevisao).filter_by(projeto_nome=nome_safe)\
+                             .order_by(CicloRevisao.aberta_em.desc()).all()
+                    etapas = db.query(CicloEtapa).filter(CicloEtapa.projeto_nome == nome_safe,
+                                                         CicloEtapa.etapa_codigo.like("11%")).all()
+                    subfases = {e.etapa_codigo: {"status": e.status,
+                                                 "concluido_em": e.concluido_em.isoformat() if e.concluido_em else None}
+                                for e in etapas}
+                    self.send_json({"ok": True,
+                        "subfases": subfases,
+                        "documentos": [{"id": d.id, "etapa_codigo": d.etapa_codigo, "tipo": d.tipo,
+                                        "nome_original": d.nome_original,
+                                        "enviado_em": d.enviado_em.isoformat() if d.enviado_em else None,
+                                        "enviado_por_id": d.enviado_por_id} for d in docs],
+                        "revisoes": [{"id": r.id, "etapa_codigo": r.etapa_codigo,
+                                      "aberta_por_id": r.aberta_por_id,
+                                      "aberta_em": r.aberta_em.isoformat() if r.aberta_em else None,
+                                      "relatorio_doc_id": r.relatorio_doc_id, "motivo": r.motivo} for r in revs]})
+                finally:
+                    db.close()
+                return
+
+            # GET /api/projetos/<nome>/ciclo/documento/<id> — baixa um documento (read-only)
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/documento/(\d+)$', path)
+            if m:
+                nome_safe = unquote(m.group(1)); doc_id = int(m.group(2))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    doc = db.query(CicloDocumento).filter_by(id=doc_id, projeto_nome=nome_safe).first()
+                    if not doc:
+                        self.send_response(404); self.end_headers(); return
+                    caminho = os.path.join(_projeto_path(nome_safe), doc.arquivo_path)
+                    if not os.path.exists(caminho):
+                        self.send_response(404); self.end_headers(); return
+                    with open(caminho, "rb") as f:
+                        conteudo = f.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.send_header("Content-Disposition", f'inline; filename="{doc.nome_original}"')
+                    self.send_header("Content-Length", str(len(conteudo)))
+                    self.end_headers()
+                    self.wfile.write(conteudo)
                 finally:
                     db.close()
                 return
@@ -3687,6 +3759,51 @@ class Handler(BaseHTTPRequestHandler):
                             acao="medicao_excecao_reprovado", projeto_nome=nome_safe, etapa_alvo="10"))
                     db.commit()
                     self.send_json({"ok": True})
+                finally:
+                    db.close()
+                return
+
+            # POST /api/projetos/<nome>/ciclo/<codigo>/documento — upload append-only (PE)
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/([^/]+)/documento$', path)
+            if m:
+                nome_safe = unquote(m.group(1)); codigo = unquote(m.group(2))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    tipo_esperado = mod_ciclo.tipo_doc_de(codigo)
+                    if not tipo_esperado:
+                        self.send_json({"ok": False, "erro": "Subfase de PE inválida."}, code=400); return
+                    u = _usuario_com_capacidade(db, campos.get("login", ""), campos.get("senha", ""), "executar_pe")
+                    if not u:
+                        self.send_json({"ok": False, "erro": "Ação exige login+senha de Projetista Executivo, Conferente, Gerente ou Diretor."}, code=403); return
+                    if "arquivo" not in arquivos:
+                        self.send_json({"ok": False, "erro": "Anexe o arquivo."}, code=400); return
+                    fname, data = arquivos["arquivo"]
+                    base_nome = os.path.basename(fname)
+                    unico = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid.uuid4().hex[:8] + "_" + base_nome
+                    rel = os.path.join("ciclo", codigo, unico)
+                    doc = CicloDocumento(projeto_nome=nome_safe, etapa_codigo=codigo, tipo=tipo_esperado,
+                                         arquivo_path=rel, nome_original=base_nome, enviado_por_id=u.id)
+                    db.add(doc)
+                    et = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo=codigo).first()
+                    if not et or et.status == "pendente":
+                        _set_etapa_status(db, nome_safe, codigo, "em_andamento", u.id)
+                    db.add(LogAcaoGerencial(solicitante_id=u.id, autorizador_id=u.id,
+                            acao="pe_documento_" + tipo_esperado, projeto_nome=nome_safe, etapa_alvo=codigo))
+                    db.commit()
+                    storage_salvar_binario(os.path.join(_projeto_path(nome_safe), rel), data)
+                    self.send_json({"ok": True, "documento_id": doc.id})
+                except Exception as e:
+                    db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
                     db.close()
                 return
