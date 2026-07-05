@@ -14,7 +14,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
-                       CicloDocumento, CicloRevisao)
+                       CicloDocumento, CicloRevisao, PerfilFiscal)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -1437,6 +1437,46 @@ class Handler(BaseHTTPRequestHandler):
                     out = [{"id": d.id, "nome_original": d.nome_original,
                             "enviado_em": d.enviado_em.isoformat() if d.enviado_em else None} for d in docs]
                     self.send_json({"ok": True, "documentos": out})
+                finally:
+                    db.close()
+                return
+
+            # GET /api/admin/lojas/<id>/perfil-fiscal — config fiscal (segredos NUNCA retornados)
+            m = _re.match(r'^/api/admin/lojas/(\d+)/perfil-fiscal$', path)
+            if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                import mod_fiscal, fiscal_cripto
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja = db.get(Loja, int(m.group(1)))
+                    if not loja:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                        self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                    pf = db.query(PerfilFiscal).filter_by(loja_id=loja.id).first()
+                    if not pf:
+                        padrao = mod_fiscal.perfil_padrao_teste()
+                        placeholders = padrao.pop("placeholders")
+                        self.send_json({"ok": True, "existe": False, "perfil": padrao,
+                                        "placeholders": placeholders, "ambiente_ativo": "homologacao",
+                                        "token_homolog_definido": False, "token_prod_definido": False,
+                                        "cert_validade": None, "cert_cnpj": None})
+                        return
+                    perfil = {c: getattr(pf, c) for c in (
+                        "razao_social", "inscricao_estadual", "inscricao_municipal", "regime_tributario",
+                        "csosn_padrao", "cfop_dentro_uf", "cfop_fora_uf", "serie_nfe", "discrimina_impostos",
+                        "cnae_servico", "cod_servico_municipio", "aliquota_iss", "retencao_json",
+                        "municipio_ibge", "papel_cnpj")}
+                    self.send_json({"ok": True, "existe": True, "perfil": perfil,
+                                    "placeholders": json.loads(pf.placeholders_json or "[]"),
+                                    "ambiente_ativo": pf.ambiente_ativo,
+                                    "token_homolog_definido": fiscal_cripto.token_definido(pf.focus_token_homolog_enc),
+                                    "token_prod_definido": fiscal_cripto.token_definido(pf.focus_token_prod_enc),
+                                    "cert_validade": pf.cert_validade.isoformat() if pf.cert_validade else None,
+                                    "cert_cnpj": pf.cert_cnpj})
                 finally:
                     db.close()
                 return
@@ -4018,6 +4058,123 @@ class Handler(BaseHTTPRequestHandler):
                 loja.config_financeira_json = json.dumps(req, ensure_ascii=False)
                 db.commit()
                 self.send_json({"ok": True})
+            finally:
+                db.close()
+            return
+
+        # ── PUT /api/admin/lojas/<id>/perfil-fiscal — config não-secreta ──────
+        m_pf = re.match(r"^/api/admin/lojas/(\d+)/perfil-fiscal$", path)
+        if m_pf:
+            import mod_fiscal
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            try:
+                req = json.loads(body) if body else {}
+            except Exception:
+                self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+            ok, erro = mod_fiscal.validar_config(req)
+            if not ok:
+                self.send_json({"ok": False, "erro": erro}, code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja = db.get(Loja, int(m_pf.group(1)))
+                if not loja:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                pf = db.query(PerfilFiscal).filter_by(loja_id=loja.id).first()
+                if not pf:
+                    pf = PerfilFiscal(loja_id=loja.id); db.add(pf)
+                for c in ("razao_social", "inscricao_estadual", "inscricao_municipal", "regime_tributario",
+                          "csosn_padrao", "cfop_dentro_uf", "cfop_fora_uf", "serie_nfe", "discrimina_impostos",
+                          "cnae_servico", "cod_servico_municipio", "aliquota_iss", "retencao_json",
+                          "municipio_ibge", "papel_cnpj"):
+                    if c in req:
+                        setattr(pf, c, req[c])
+                if "placeholders" in req:
+                    pf.placeholders_json = json.dumps(req["placeholders"], ensure_ascii=False)
+                db.commit()
+                self.send_json({"ok": True})
+            finally:
+                db.close()
+            return
+
+        # ── PUT /api/admin/lojas/<id>/perfil-fiscal/segredos — write-only, cifrado ──
+        m_seg = re.match(r"^/api/admin/lojas/(\d+)/perfil-fiscal/segredos$", path)
+        if m_seg:
+            import fiscal_cripto
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            try:
+                req = json.loads(body) if body else {}
+            except Exception:
+                self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja = db.get(Loja, int(m_seg.group(1)))
+                if not loja:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                pf = db.query(PerfilFiscal).filter_by(loja_id=loja.id).first()
+                if not pf:
+                    pf = PerfilFiscal(loja_id=loja.id); db.add(pf)
+                for campo, col in (("focus_token_homolog", "focus_token_homolog_enc"),
+                                   ("focus_token_prod", "focus_token_prod_enc")):
+                    if campo in req:
+                        v = req[campo]
+                        if v is None:
+                            setattr(pf, col, None)
+                        elif v != "":
+                            setattr(pf, col, fiscal_cripto.encrypt(v))
+                db.commit()
+                self.send_json({"ok": True})
+            except Exception:
+                db.rollback()
+                self.send_json({"ok": False, "erro": "Falha ao salvar segredos"}, code=500)
+            finally:
+                db.close()
+            return
+
+        # ── PUT /api/admin/lojas/<id>/perfil-fiscal/ambiente — troca explícita ──
+        m_amb = re.match(r"^/api/admin/lojas/(\d+)/perfil-fiscal/ambiente$", path)
+        if m_amb:
+            import mod_fiscal
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            try:
+                req = json.loads(body) if body else {}
+            except Exception:
+                self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+            amb = req.get("ambiente")
+            if amb not in ("homologacao", "producao"):
+                self.send_json({"ok": False, "erro": "ambiente inválido"}, code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja = db.get(Loja, int(m_amb.group(1)))
+                if not loja:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                pf = db.query(PerfilFiscal).filter_by(loja_id=loja.id).first()
+                if not pf:
+                    pf = PerfilFiscal(loja_id=loja.id); db.add(pf)
+                if amb == "producao":
+                    placeholders = json.loads(pf.placeholders_json or "[]")
+                    if not mod_fiscal.pode_ativar_producao(placeholders):
+                        self.send_json({"ok": False,
+                                        "erro": "Não é possível ativar produção com valores de teste pendentes: "
+                                                + ", ".join(placeholders)}, code=400)
+                        return
+                pf.ambiente_ativo = amb
+                db.commit()
+                self.send_json({"ok": True, "ambiente_ativo": amb})
             finally:
                 db.close()
             return
