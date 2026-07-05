@@ -116,3 +116,43 @@ def test_erro_conexao_recupera(monkeypatch):
                                       FakeResp(200, {"status": "autorizado"})])
     dados = _client().consultar_nfe("R1")
     assert dados["status"] == "autorizado" and len(chamadas) == 2
+
+
+def test_baixar_conteudo(monkeypatch):
+    chamadas = []
+    class RespBin(FakeResp):
+        content = b"%PDF-bin"
+    def fake_get(url, auth=None, timeout=None):
+        chamadas.append({"url": url, "auth": auth})
+        return RespBin(200)
+    monkeypatch.setattr(fc.requests, "get", fake_get)
+    data = _client().baixar("/notas/12345.pdf")
+    assert data == b"%PDF-bin"
+    assert chamadas[0]["url"].endswith("/notas/12345.pdf")
+    assert chamadas[0]["auth"] == ("Tok", "")
+
+
+def test_baixar_erro(monkeypatch):
+    class RespBin(FakeResp):
+        content = b""
+    monkeypatch.setattr(fc.requests, "get", lambda url, auth=None, timeout=None: RespBin(404))
+    with pytest.raises(fc.FocusError):
+        _client().baixar("/x.pdf")
+
+
+def test_aguardar_processamento_ate_autorizado(monkeypatch):
+    monkeypatch.setattr(fc.time, "sleep", lambda s: None)
+    seq = [{"status": "processando_autorizacao"},
+           {"status": "processando_autorizacao"},
+           {"status": "autorizado"}]
+    monkeypatch.setattr(fc.FocusClient, "consultar_nfe", lambda self, ref, completa=False: seq.pop(0))
+    dados = _client().aguardar_processamento("R1", timeout=9, intervalo=3)
+    assert dados["status"] == "autorizado"
+
+
+def test_aguardar_processamento_estoura_timeout(monkeypatch):
+    monkeypatch.setattr(fc.time, "sleep", lambda s: None)
+    monkeypatch.setattr(fc.FocusClient, "consultar_nfe",
+                        lambda self, ref, completa=False: {"status": "processando_autorizacao"})
+    dados = _client().aguardar_processamento("R1", timeout=6, intervalo=3)
+    assert dados["status"] == "processando_autorizacao"   # não trava, retorna o último

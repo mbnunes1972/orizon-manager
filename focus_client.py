@@ -62,3 +62,22 @@ class FocusClient:
         if not (15 <= len(justificativa or "") <= 255):
             raise ValueError("justificativa deve ter entre 15 e 255 caracteres")
         return self._request("DELETE", "/v2/nfe/%s" % ref, json_body={"justificativa": justificativa})
+
+    def baixar(self, caminho):
+        """GET binário de um caminho relativo retornado pela Focus (xml/danfe)."""
+        resp = requests.get(self.base_url + caminho, auth=(self.token, ""), timeout=self.timeout)
+        if resp.status_code >= 400:
+            raise FocusError("Falha ao baixar %s" % caminho, status_code=resp.status_code)
+        return resp.content
+
+    def aguardar_processamento(self, ref, timeout=60, intervalo=3):
+        """Polla consultar_nfe até sair de 'processando_autorizacao' ou esgotar as tentativas
+        (bounded por timeout/intervalo — determinístico, sem relógio de parede)."""
+        tentativas = max(1, int(timeout / intervalo))
+        dados = self.consultar_nfe(ref)
+        for _ in range(tentativas - 1):
+            if dados.get("status") != "processando_autorizacao":
+                break
+            time.sleep(intervalo)
+            dados = self.consultar_nfe(ref)
+        return dados
