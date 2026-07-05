@@ -163,6 +163,42 @@ def test_etapa_4_renomeada_para_orcamento():
     assert mc.ETAPA_NOME["4"] == "Orçamento"
 
 
+import mod_ciclo as mc2
+
+def test_tipo_doc_de():
+    assert mc2.tipo_doc_de("11a") == "pe_planta_pontos"
+    assert mc2.tipo_doc_de("11c") == "pe_projeto_executivo"
+    assert mc2.tipo_doc_de("11d") is None   # 11d não é subfase enriquecida
+    assert mc2.tipo_doc_de("99z") is None
+
+def test_guarda_conclusao_exige_documento():
+    ok, erro = mc2.guarda_conclusao("11a", set(), {})
+    assert ok is False and "Carregue" in erro
+    ok, erro = mc2.guarda_conclusao("11a", {"pe_planta_pontos"}, {})
+    assert ok is True and erro == ""
+
+def test_guarda_conclusao_11e_exige_anteriores():
+    tipos = {"pe_pe_assinado"}
+    # 11a-11c concluídas, 11d pendente → barra
+    st = {"11a": "concluido", "11b": "concluido", "11c": "concluido", "11d": "pendente"}
+    ok, erro = mc2.guarda_conclusao("11e", tipos, st)
+    assert ok is False and "11d" in erro
+    # todas concluídas → libera
+    st["11d"] = "aprovado"
+    ok, erro = mc2.guarda_conclusao("11e", tipos, st)
+    assert ok is True
+
+def test_versao_atual():
+    from datetime import datetime
+    docs = [
+        {"tipo": "pe_projeto_executivo", "enviado_em": datetime(2026, 7, 10), "id": 1},
+        {"tipo": "pe_projeto_executivo", "enviado_em": datetime(2026, 7, 12), "id": 2},
+        {"tipo": "pe_planta_pontos",     "enviado_em": datetime(2026, 7, 9),  "id": 3},
+    ]
+    assert mc2.versao_atual(docs, "pe_projeto_executivo")["id"] == 2
+    assert mc2.versao_atual(docs, "inexistente") is None
+
+
 def test_modelos_ciclo_documento_e_revisao(tmp_path, monkeypatch):
     import database
     from sqlalchemy import create_engine

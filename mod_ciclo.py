@@ -42,6 +42,51 @@ STATUS_CONCLUSIVOS = frozenset({
 })
 
 
+# ── Projeto Executivo (etapa 11) — subfases enriquecidas ──────────────────────
+SUBFASES_PE = {
+    "11a": {"nome": "Planta de pontos de PE",       "tipo_doc": "pe_planta_pontos",
+            "doc_label": "arquivo de medição",       "botao": "Encaminhar para PE",       "revisavel": False},
+    "11b": {"nome": "Reunião de alinhamento",        "tipo_doc": "pe_relatorio_alinhamento",
+            "doc_label": "relatório da reunião",     "botao": "Projeto Alinhado",         "revisavel": True},
+    "11c": {"nome": "Revisão de PE",                 "tipo_doc": "pe_projeto_executivo",
+            "doc_label": "Projeto Executivo",        "botao": "Concluído",                "revisavel": True},
+    "11e": {"nome": "Aprovação do PE pelo cliente",  "tipo_doc": "pe_pe_assinado",
+            "doc_label": "Projeto Executivo Assinado","botao": "Concluir Projeto Executivo","revisavel": False},
+}
+
+# Subfases que precisam estar concluídas antes de concluir o PE (11e).
+PE_SUBFASES_OBRIGATORIAS = ["11a", "11b", "11c", "11d"]
+
+
+def tipo_doc_de(codigo):
+    sf = SUBFASES_PE.get(codigo)
+    return sf["tipo_doc"] if sf else None
+
+
+def guarda_conclusao(codigo, tipos_presentes, status_por_codigo):
+    """(ok, erro). tipos_presentes: set de tipos de documento já carregados na subfase.
+    status_por_codigo: {codigo: status} — usado no 11e para exigir 11a-11d concluídas."""
+    sf = SUBFASES_PE.get(codigo)
+    if not sf:
+        return (False, "Subfase de PE desconhecida.")
+    if sf["tipo_doc"] not in tipos_presentes:
+        return (False, f"Carregue o documento ({sf['doc_label']}) antes de '{sf['botao']}'.")
+    if codigo == "11e":
+        faltando = [c for c in PE_SUBFASES_OBRIGATORIAS
+                    if status_por_codigo.get(c) not in STATUS_CONCLUSIVOS]
+        if faltando:
+            return (False, "Conclua as subfases anteriores do PE: " + ", ".join(faltando) + ".")
+    return (True, "")
+
+
+def versao_atual(documentos, tipo):
+    """documentos: lista de dicts com 'tipo' e 'enviado_em'. Última versão do tipo, ou None."""
+    do_tipo = [d for d in documentos if d.get("tipo") == tipo]
+    if not do_tipo:
+        return None
+    return max(do_tipo, key=lambda d: d["enviado_em"])
+
+
 # Etapas que exigem autorização financeira (login+senha de quem pode aprovar).
 ETAPAS_APROVACAO_FINANCEIRA = frozenset({"8", "11d"})
 
