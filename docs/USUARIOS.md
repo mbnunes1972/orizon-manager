@@ -59,8 +59,11 @@ Além das colunas acima, `perfis.py` define capacidades específicas de fluxo:
 | `aprovar_financeiro` | Diretor, Gerente Adm/Financeiro | Concluir as etapas 8 e 11d (Aprovação financeira); **liberar a exibição dos campos de imposto** (base tributária e provisão) na tela de negociação — exige login+senha (`POST /api/auth/liberar_impostos`) |
 | `registrar_medicao` | Medidor, Diretor | Confirmar a etapa 9 (Solicitação) e registrar o parecer da etapa 10 (Medição) |
 | `aprovar_medicao_reprovada` | Gerente de Vendas, Gerente Adm/Financeiro, Diretor | Liberar a Medição quando o parecer é "Reprovado" (decisão comercial, 2º passo) |
+| `executar_pe` | Projetista Executivo, Conferente, Gerente de Vendas, Gerente Adm/Financeiro, Diretor | Carregar documentos e concluir as subfases do Projeto Executivo (11a/11b/11c/11e) — exige login+senha |
+| `revisar_pe` | Gerente de Vendas, Gerente Adm/Financeiro, Diretor | Abrir revisão nas subfases 11b/11c (reabertura em cascata do PE + relatório complementar obrigatório) — senha gerencial |
 
 > Gerente de **Vendas não** aprova financeiro; **Medidor não** decide o caso Reprovado.
+> **Conferente/Projetista executam** as subfases de PE mas **não** abrem revisão (só gerência+).
 
 ## Responsabilidades no ciclo (resumo)
 

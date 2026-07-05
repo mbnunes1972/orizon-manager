@@ -1,7 +1,7 @@
 # Subfases do Projeto Executivo (etapa 11) — Design
 
 > Spec de design · 2026-07-04 · Orizon Manager | Dalmóbile
-> Status: **aprovado no brainstorming, aguardando plano de implementação**
+> Status: **IMPLEMENTADO (Sessão 45)** — branch `feat/pe-subfases`, backend com testes; frontend com verificação manual pendente no navegador.
 > Frente: **A** (subfases de PE + monitoramento local). Dashboard entre projetos = frente futura.
 
 ## 1. Objetivo

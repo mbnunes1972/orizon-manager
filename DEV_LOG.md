@@ -1126,10 +1126,41 @@ Sessão de infraestrutura/processo (sem mudança de código de app; suíte segue
   (`igorferreiradaniel99@hotmail.com`, `idaniel@Mac.bbrouter`) + uma linha corrompida da 1ª tentativa de
   instalação — revisar/limpar quem tem acesso root ao servidor.
 
+## Sessão 45 — Subfases do Projeto Executivo (etapa 11) — branch `feat/pe-subfases`
+
+Frente desenhada via brainstorming (spec `docs/superpowers/specs/2026-07-04-projeto-executivo-subfases-design.md`)
+e implementada por **subagentes** (plano `docs/superpowers/plans/2026-07-04-projeto-executivo-subfases.md`),
+task a task com review de spec + qualidade. **Ainda em branch — não mergeada na `main`.**
+
+- **[ESTADO]** Subfases 11a/11b/11c/11e enriquecidas: upload de documentos **append-only** (nunca
+  sobrescreve → registro evolutivo), botões de transição nomeados ("Encaminhar para PE", "Projeto
+  Alinhado", "Concluído", "Concluir Projeto Executivo"), e **revisão** (11b/11c) com **reabertura em
+  cascata** + relatório complementar obrigatório. Concluir 11e conclui a etapa-mãe 11. Medição (etapa
+  10) permanece **inviolável** (o PE só lê/linka).
+- **[DECIDIDO] Dados (abordagem B):** 2 tabelas novas `ciclo_documentos` + `ciclo_revisoes` (chaveadas
+  por projeto+etapa_codigo); status/datas continuam no `CicloEtapa`. Arquivos em
+  `PROJETOS/<nome>/ciclo/<etapa>/<uuid>_...`. Documentos append-only; commit-antes-do-disco (padrão EP-07).
+- **[DECIDIDO] Capabilities (`perfis.py`):** `executar_pe` (Projetista Executivo, Conferente, Gerente
+  Vendas, Gerente Adm/Fin, Diretor) e `revisar_pe` (Gerente Vendas, Adm/Fin, Diretor). A revisão exige
+  capability própria porque o `autorizar` do "reabrir em cascata" existente exclui o Adm/Financeiro.
+- **[CONTEXTO] Endpoints (`main.py`):** `POST …/ciclo/<codigo>/documento` (multipart), `…/concluir`
+  (JSON), `…/revisao` (multipart, cascata); `GET …/ciclo/pe` e `GET …/ciclo/documento/<id>` (download
+  via `storage_ler_binario`). Frontend em `static/index.html` (painéis por subfase, progresso N/4,
+  handlers com `pedirCredenciaisGerente`). Correção lateral: `esc()` passou a escapar aspas (XSS de
+  atributo) — endurece usos pré-existentes.
+- **[ESTADO] Testes:** lógica pura em `tests/test_ciclo.py`; e2e HTTP em `tests/test_ciclo_pe_e2e.py`
+  (upload append-only, guardas de conclusão, 11e conclui 11, revisão reabre em cascata, permissões,
+  download, medição intocada). Suíte **~412 passed** (1 falha pré-existente do weasyprint no local).
+- **[PENDENTE]** Verificação **manual no navegador** do frontend (Tasks 8/9 não têm teste JS): botões
+  por perfil, upload/conclusão/revisão, indicador de progresso. Merge na `main` + push + re-ingestão
+  do grafo após a conferência.
+
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
-**`main`** consolidada e verde — **suíte 395 passed**. Servidor: `python3 main.py` (porta 8765).
-Branches: só `main` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
+**`main`** consolidada e verde — **suíte 395 passed**. **Frente aberta:** branch `feat/pe-subfases`
+(subfases do PE — backend testado, frontend aguardando conferência no navegador antes do merge).
+Servidor: `python3 main.py` (porta 8765).
+Branches: `main` + `feat/pe-subfases` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
 Contrato agora é **HTML/Markdown → PDF (WeasyPrint)** — o caminho `.docx`/LibreOffice do contrato
 foi aposentado (a **proposta** ainda usa docx/LibreOffice). **Diretório de trabalho:**
 `E:/2026/desenvolvimento/orizon-manager` (pai renomeado nesta sessão). **MCP `orizon`** ativo e
