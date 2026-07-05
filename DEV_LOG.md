@@ -1157,10 +1157,11 @@ task a task com review de spec + qualidade. **Ainda em branch — não mergeada 
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
-**`main`** consolidada e verde — **suíte 395 passed**. **Frente aberta:** branch `feat/pe-subfases`
-(subfases do PE — backend testado, frontend aguardando conferência no navegador antes do merge).
+**`main`** consolidada e verde — **suíte 414 passed**. **Frente fechada:** subfases do PE (Sessão 45)
+**mergeada na `main`** (fast-forward de 16 commits) após o usuário confirmar a **conferência manual no
+navegador** ("testado"); branch `feat/pe-subfases` **deletada**; suíte re-rodada verde no resultado.
 Servidor: `python3 main.py` (porta 8765).
-Branches: `main` + `feat/pe-subfases` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
+Branches: `main` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mantido).
 Contrato agora é **HTML/Markdown → PDF (WeasyPrint)** — o caminho `.docx`/LibreOffice do contrato
 foi aposentado (a **proposta** ainda usa docx/LibreOffice). **Diretório de trabalho:**
 `E:/2026/desenvolvimento/orizon-manager` (pai renomeado nesta sessão). **MCP `orizon`** ativo e
