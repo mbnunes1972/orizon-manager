@@ -1,7 +1,7 @@
 # NF-e Fábrica → Loja · Fase 2 — Interface `EmissorFiscal` + Cliente HTTP Focus NFe — Design
 
 > Spec de design · 2026-07-05 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Segunda das fases da integração NF-e (motor: Focus NFe).
+> Status: **IMPLEMENTADO (Sessão 47)** — branch `feat/nfe`, contrato + cliente HTTP com testes (suíte 457); smoke em homologação pendente do token da Focus. Segunda das fases da integração NF-e (motor: Focus NFe).
 
 ## 1. Contexto e recorte
 

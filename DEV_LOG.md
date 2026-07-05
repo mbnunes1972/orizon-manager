@@ -1190,12 +1190,43 @@ re-ingestão do grafo (código 945 nós) feitos.
   ambiente): botões/gating por etapa, upload/download de XML, salvar/concluir números e relatório,
   reabrir (gerente). Depois: merge na `main` + push + re-ingestão do grafo.
 
+## Sessão 47 — Integração NF-e (Fábrica→Loja): guinada Omie→Focus NFe + Fases 1-2 (branch `feat/nfe`)
+
+**Guinada de arquitetura:** o motor fiscal deixou de ser o **Omie** e passou a ser a **Focus NFe** (API
+REST direta, Plano Solo). Decisão-chave descoberta na doc: **a Focus NÃO calcula imposto** — nós
+fornecemos CST/CSOSN/CFOP/alíquotas por item. O que o Omie fazia sozinho vira nosso (Fase 3). O
+parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fases + cross-cutting
+(Rede→Loja→config fiscal, perfil de emissão, NFS-e adiada). Specs/planos em `docs/superpowers/`.
+
+- **[ESTADO] Fase 1 (parser+precificação):** só **spec** (`mod_nfe.py` a implementar). Evidência: 5 NF-es
+  reais da fábrica em `E:/2026/desenvolvimento/nfe-dalmobile` (**fora do git**; 149 linhas→95 distintos,
+  `cProd=BASE[ID]`, consolida duplicados, IPI 100%, `infAdProd` "COR L A" **não-confiável**). Fixtures
+  serão anonimizados. **Fábrica é CRT3-com-IPI; a LOJA emissora é Simples** (CSOSN).
+- **[IMPLEMENTADO] Fase 2 (contrato + transporte), suíte 457:** `emissor_fiscal.py` (ABC `EmissorFiscal`
+  + DTOs `ResultadoEmissao`/`StatusNota` + normalizador `resultado_de_focus`), `focus_config.py`
+  (`base_url_de` homolog/prod + loader `focus_config.json` gitignored), `focus_client.py` (`FocusClient`:
+  `enviar_nfe` POST `/v2/nfe?ref`, `consultar_nfe` GET, `cancelar_nfe` DELETE com justificativa 15-255,
+  `baixar`, `aguardar_processamento` polling determinístico; retry/backoff 5xx/429/conexão espelhando
+  `omie_post`; `FocusError`; tolera corpo JSON não-dict). Testes com `requests`/`time.sleep` mockados —
+  **zero rede**. Endpoints/auth (Basic token, senha vazia) confirmados na doc da Focus. Concreto
+  `EmissorFocusNfe` + payload/impostos = **Fase 3**.
+- **[PENDENTE]** (1) **Token da Focus** (contratação em andamento) → smoke test de transporte em
+  homologação: `FocusClient(token, base_url_de("homologacao")).consultar_nfe("ref-inexistente")` deve dar
+  `FocusError` **404** (não 401) — prova auth+URL sem payload fiscal. (2) **Perfil fiscal Simples do CNPJ
+  19.152.134/0001-56** (do contador: CST/CSOSN/CFOP/alíquotas) para a Fase 3; perfis lucro real/presumido
+  virão depois. (3) Implementar Fase 1 (`mod_nfe.py`) e Fase 3 (mapa fiscal + `EmissorFocusNfe`).
+- **[CONTEXTO] Branch:** `feat/nfe` (épico da integração; fases mergeadas à `main` conforme ficam verdes).
+  Fase 2 pronta para merge; Fase 1 ainda é só spec.
+
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
-**`main`** consolidada e verde — **suíte 431 passed**. **Frente fechada:** etapas operacionais 12/13/14
-(Sessão 46) **mergeada na `main`** (fast-forward), verificada no navegador, pushada e re-ingerida no
-grafo (código 945 nós). **Próxima frente:** **Emissão de NFe (etapa 15)** — fase crítica, a iniciar em
-branch nova (contexto a ser passado pelo usuário). Servidor: `python3 main.py` (porta 8765) — **atenção:
+**`main`** consolidada e verde (**431 passed**); etapas operacionais 12/13/14 (Sessão 46) já mergeadas.
+**Frente aberta:** **Integração NF-e Fábrica→Loja via Focus NFe** (Sessão 47), branch `feat/nfe` —
+**Fase 2 IMPLEMENTADA** (contrato `EmissorFiscal` + `focus_client` + `focus_config`, **suíte 457**),
+pronta para merge; **Fase 1** (`mod_nfe.py` parser/precificação) ainda só **spec**; **Fase 3** (mapa
+fiscal + `EmissorFocusNfe`) depende do **perfil fiscal Simples do contador** (CNPJ 19.152.134/0001-56) e
+o smoke em homologação depende do **token da Focus**. XMLs reais da fábrica em
+`E:/2026/desenvolvimento/nfe-dalmobile` (fora do git). Servidor: `python3 main.py` (porta 8765) — **atenção:
 o `python3` do Bash aqui é o stub do WindowsApps (exit 127); subir com o interpretador real
 `C:\Users\mbn19\AppData\Local\Python\pythoncore-3.14-64\python.exe main.py`, e sempre matar servidores
 `main.py` obsoletos que fiquem presos na 8765 (senão o navegador fala com código velho).**
