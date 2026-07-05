@@ -7552,6 +7552,40 @@ let _cicloData   = {};
 let _contratoAssinado = false;
 let _contratoTotalmenteAssinado = false;
 
+// ── Projeto Executivo (PE) — estado e helpers ──────────────────────────────
+let _pePayload = { subfases: {}, documentos: [], revisoes: [] };
+
+async function peCarregar(nomeSafe) {
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(nomeSafe)}/ciclo/pe`);
+    const j = await r.json();
+    if (j && j.ok) { _pePayload = j; }
+  } catch(e) { /* silencioso */ }
+}
+
+// Verifica (UX-only) se o usuário logado tem a capacidade de PE.
+// O backend faz a verificação real de credenciais; esta é apenas para
+// mostrar/ocultar botões no front.
+const _PE_EXEC_NIVEIS = new Set([
+  "diretor","gerente_vendas","gerente_adm_fin","conferente","projetista_executivo"
+]);
+const _PE_REVIS_NIVEIS = new Set([
+  "diretor","gerente_vendas","gerente_adm_fin"
+]);
+function _podePE(cap) {
+  const nivel = (_usuarioAtual && _usuarioAtual.nivel) || '';
+  if (cap === 'executar_pe') return _PE_EXEC_NIVEIS.has(nivel);
+  if (cap === 'revisar_pe')  return _PE_REVIS_NIVEIS.has(nivel);
+  return false;
+}
+
+const PE_SUBFASES = {
+  "11a": { carregar: "Carregar arquivo de medição",  fechar: "Encaminhar para PE",         tipo: "pe_planta_pontos",         revisavel: false },
+  "11b": { carregar: "Carregar relatório da reunião", fechar: "Projeto Alinhado",            tipo: "pe_relatorio_alinhamento", revisavel: true  },
+  "11c": { carregar: "Carregar Projeto Executivo",   fechar: "Concluído",                   tipo: "pe_projeto_executivo",     revisavel: true  },
+  "11e": { carregar: "Carregar PE Assinado",         fechar: "Concluir Projeto Executivo",  tipo: "pe_pe_assinado",           revisavel: false },
+};
+
 function abrirCiclo() {
   _cicloAberto = true;
   document.getElementById('ciclo-panel').classList.add('ativo');
@@ -7579,6 +7613,7 @@ async function carregarCiclo() {
   try {
     await _fetchCiclo();
     await _carregarMedicao();
+    if (projetoAtivo) await peCarregar(projetoAtivo.nome_safe);
     renderCiclo();
     atualizarBotoesAprovacao();
   } catch(e) { console.error('Erro ao carregar ciclo:', e); }
@@ -7728,6 +7763,8 @@ function renderCiclo() {
                      etStatus === 'em_andamento'  ? 'var(--dalm-gold)' : 'var(--muted)';
     const andamentoLabel = (etStatus === 'em_andamento' && etapa.codigo === '7')
       ? ' <span style="font-size:11px;color:var(--dalm-gold);font-style:italic">(aguardando assinatura)</span>' : '';
+    // Para etapa 11 (pai do PE) mostrar indicador de progresso das subfases
+    const peProgressLabel = (etapa.codigo === '11') ? _renderEtapa11Progress() : '';
     const status = etStatus;
     const badge  = `<span class="etapa-badge badge-${status}" style="color:${etCor}">${etIcone} ${status}${andamentoLabel}</span>`;
     const indent = etapa.sub ? 'margin-left:24px;' : '';
@@ -7737,7 +7774,7 @@ function renderCiclo() {
     card.innerHTML = `
       <div class="ciclo-card-header"${bloqueada ? '' : ` onclick="toggleCicloCard('${etapa.codigo}')"`}>
         <span class="etapa-num" style="color:${etCor}">${etIcone}</span>
-        <span class="etapa-nome">${etapa.nome}${andamentoLabel}</span>
+        <span class="etapa-nome">${etapa.nome}${andamentoLabel}${peProgressLabel}</span>
         ${badge}
       </div>
       <div class="ciclo-card-body" id="ciclo-body-${etapa.codigo}">
@@ -7749,6 +7786,8 @@ function renderCiclo() {
             ? _renderCardSolicitacaoMedicao(dados, bloqueada)
           : etapa.codigo === '10'
             ? _renderCardMedicao(dados, bloqueada)
+          : PE_SUBFASES[etapa.codigo]
+            ? _renderCardPE(etapa.codigo, dados, bloqueada)
             : _renderCardGenerico(etapa, dados, bloqueada)}
       </div>
     `;
@@ -8313,6 +8352,199 @@ async function enviarDecisaoReprovado() {
   showToast('Medição liberada (decisão comercial registrada).', false);
   await carregarCiclo();
 }
+
+// ── Projeto Executivo (PE) — render e ações ───────────────────────────────
+
+function _renderEtapa11Progress() {
+  const SUBFASES_PE = ["11a","11b","11c","11e"];
+  const concluidas = SUBFASES_PE.filter(c => {
+    const st = (_pePayload.subfases[c] || {}).status;
+    return st === 'concluido' || st === 'aprovado';
+  }).length;
+  const pct = Math.round(concluidas / SUBFASES_PE.length * 100);
+  return ` <span style="margin-left:8px;font-size:.75rem;color:var(--muted);font-weight:400">` +
+    `${concluidas}/4 subfases` +
+    `<span style="display:inline-block;margin-left:6px;width:48px;height:5px;` +
+    `background:var(--border,#2a3a2a);border-radius:3px;vertical-align:middle">` +
+    `<span style="display:block;width:${pct}%;height:100%;background:var(--ok,#50c878);border-radius:3px"></span>` +
+    `</span></span>`;
+}
+
+function _renderCardPE(codigo, dados, bloqueada) {
+  const cfg = PE_SUBFASES[codigo];
+  const sfData = _pePayload.subfases[codigo] || {};
+  const concluido = STATUS_CONCLUSIVOS.has(sfData.status);
+  const dt = sfData.concluido_em
+    ? new Date(sfData.concluido_em).toLocaleDateString('pt-BR') : '';
+
+  // Documentos desta subfase (newest first)
+  const docs = (_pePayload.documentos || [])
+    .filter(d => d.etapa_codigo === codigo)
+    .slice().reverse();
+  let docsHtml = '';
+  if (docs.length) {
+    const linhas = docs.map(d => {
+      const dDt = d.enviado_em ? new Date(d.enviado_em).toLocaleDateString('pt-BR') : '';
+      return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:.8rem">
+        <a href="/api/projetos/${encodeURIComponent(projetoAtivo ? projetoAtivo.nome_safe : '')}/ciclo/documento/${d.id}"
+           target="_blank" rel="noopener"
+           style="color:var(--dalm-gold);text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+           title="${esc(d.nome_original)}">&#x1F4CE; ${esc(d.nome_original)}</a>
+        <span style="color:var(--muted);white-space:nowrap">${dDt}</span>
+      </div>`;
+    }).join('');
+    docsHtml = `<div style="margin-bottom:10px">${linhas}</div>`;
+  } else {
+    docsHtml = `<div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Nenhum documento enviado ainda.</div>`;
+  }
+
+  // Revisões desta subfase (11b e 11c)
+  let revisHtml = '';
+  if (cfg.revisavel) {
+    const revs = (_pePayload.revisoes || []).filter(rv => rv.etapa_codigo === codigo);
+    if (revs.length) {
+      const linhas = revs.map(rv => {
+        const rDt = rv.aberta_em ? new Date(rv.aberta_em).toLocaleDateString('pt-BR') : '';
+        const docLink = rv.relatorio_doc_id
+          ? `<a href="/api/projetos/${encodeURIComponent(projetoAtivo ? projetoAtivo.nome_safe : '')}/ciclo/documento/${rv.relatorio_doc_id}"
+               target="_blank" rel="noopener" style="color:var(--dalm-gold);font-size:.78rem;margin-left:6px">&#x1F4CE; relatório</a>`
+          : '';
+        return `<div style="font-size:.78rem;color:var(--warn,#c8a84b);margin-bottom:3px">
+          &#x21BA; Revisão ${rDt}${rv.motivo ? ': ' + esc(rv.motivo) : ''}${docLink}
+        </div>`;
+      }).join('');
+      revisHtml = `<div style="margin-bottom:10px;padding:6px 10px;background:rgba(200,168,75,.07);
+        border-left:2px solid var(--warn,#c8a84b);border-radius:0 4px 4px 0">${linhas}</div>`;
+    }
+  }
+
+  // Status label
+  const statusLabel = concluido
+    ? `<span style="color:var(--ok)">&#x2713; Concluída${dt ? ' em ' + dt : ''}</span>`
+    : bloqueada
+      ? `<span style="color:var(--muted);font-size:.82rem">&#x1F512; Conclua a etapa anterior.</span>`
+      : `<span style="color:var(--muted)">Pendente</span>`;
+
+  if (bloqueada) {
+    return `${docsHtml}${revisHtml}
+      <div style="font-size:.82rem;margin-bottom:8px">${statusLabel}</div>`;
+  }
+
+  // Botões de ação (gatilho UX por capacidade; backend valida credenciais)
+  const podeExec = _podePE('executar_pe');
+  const podeRevis = _podePE('revisar_pe');
+
+  const inputId = `pe-file-${codigo}`;
+  const inputRevisId = `pe-revis-file-${codigo}`;
+
+  const btnCarregar = podeExec
+    ? `<label class="btn-ciclo" style="margin-left:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+        &#x2191; ${esc(cfg.carregar)}
+        <input type="file" id="${inputId}" style="display:none" onchange="peUpload('${codigo}', this)">
+       </label>`
+    : `<span style="font-size:.78rem;color:var(--muted)">&#x1F512; sem permissão para carregar</span>`;
+
+  const btnFechar = (!concluido && podeExec)
+    ? `<button class="btn-ciclo" style="background:#b8960c;color:#000;border-color:#b8960c;font-weight:700"
+         onclick="peConcluir('${codigo}')">&#x2713; ${esc(cfg.fechar)}</button>`
+    : '';
+
+  const btnRevisao = (cfg.revisavel && podeRevis)
+    ? `<label class="btn-ciclo" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;
+         border-color:var(--warn,#c8a84b);color:var(--warn,#c8a84b)">
+        &#x21BA; Revisão
+        <input type="file" id="${inputRevisId}" style="display:none" onchange="peRevisao('${codigo}', this)">
+       </label>`
+    : '';
+
+  return `${docsHtml}${revisHtml}
+    <div style="font-size:.82rem;margin-bottom:10px">${statusLabel}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      ${btnCarregar}
+      ${btnFechar}
+      ${btnRevisao}
+    </div>`;
+}
+
+async function peUpload(codigo, inputFile) {
+  if (!projetoAtivo) return;
+  const f = inputFile.files[0];
+  if (!f) { await avisoPopup('Selecione um arquivo.', {titulo:'PE — Upload'}); return; }
+  const cred = await pedirCredenciaisGerente({
+    titulo: 'Carregar documento PE',
+    mensagem: 'Login e senha de quem executa o PE (Projetista Executivo, Gerente, Diretor…).'
+  });
+  if (!cred) return;
+  const fd = new FormData();
+  fd.append('arquivo', f);
+  fd.append('login', cred.login);
+  fd.append('senha', cred.senha);
+  try {
+    const r = await fetch(
+      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${codigo}/documento`,
+      { method: 'POST', credentials: 'same-origin', body: fd });
+    const j = await r.json();
+    if (!j.ok) { await avisoPopup(j.erro || 'Falha ao carregar.', {titulo:'PE — Upload'}); return; }
+    showToast('Documento carregado com sucesso!', false);
+    await peCarregar(projetoAtivo.nome_safe);
+    await carregarCiclo();
+  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'PE — Upload'}); }
+}
+
+async function peConcluir(codigo) {
+  if (!projetoAtivo) return;
+  const cfgFase = PE_SUBFASES[codigo];
+  const cred = await pedirCredenciaisGerente({
+    titulo: 'Concluir subfase PE',
+    mensagem: `Confirme com login e senha de quem executa o PE para "${cfgFase ? cfgFase.fechar : codigo}".`
+  });
+  if (!cred) return;
+  try {
+    const r = await fetch(
+      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${codigo}/concluir`,
+      { method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login: cred.login, senha: cred.senha }) });
+    const j = await r.json();
+    if (!j.ok) { await avisoPopup(j.erro || 'Não foi possível concluir.', {titulo:'PE — Concluir'}); return; }
+    showToast('Subfase do PE concluída!', false);
+    await peCarregar(projetoAtivo.nome_safe);
+    await carregarCiclo();
+  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'PE — Concluir'}); }
+}
+
+async function peRevisao(codigo, inputRelatorio) {
+  if (!projetoAtivo) return;
+  const f = inputRelatorio.files[0];
+  if (!f) { await avisoPopup('Anexe o relatório complementar (obrigatório).', {titulo:'PE — Revisão'}); return; }
+  const ok = await confirmarPopup(
+    'A revisão reabre esta e as fases seguintes do PE. Continuar?',
+    { titulo: 'Confirmar Revisão PE', okLabel: 'Continuar', perigo: true });
+  if (!ok) return;
+  const cred = await pedirCredenciaisGerente({
+    titulo: 'Revisão PE',
+    mensagem: 'Login e senha de quem pode revisar o PE (Gerente de Vendas, Adm/Financeiro ou Diretor).'
+  });
+  if (!cred) return;
+  const fd = new FormData();
+  fd.append('arquivo', f);
+  fd.append('login', cred.login);
+  fd.append('senha', cred.senha);
+  try {
+    const r = await fetch(
+      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${codigo}/revisao`,
+      { method: 'POST', credentials: 'same-origin', body: fd });
+    const j = await r.json();
+    if (!j.ok) { await avisoPopup(j.erro || 'Falha na revisão.', {titulo:'PE — Revisão'}); return; }
+    await avisoPopup(
+      'Revisão registrada. Fases reabertas: ' + ((j.resetadas || []).join(', ') || '—'),
+      { titulo: 'PE — Revisão' });
+    await peCarregar(projetoAtivo.nome_safe);
+    await carregarCiclo();
+  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'PE — Revisão'}); }
+}
+
+// ── fim Projeto Executivo (PE) ─────────────────────────────────────────────
 
 async function toggleSalvarEtapa(codigo) {
   if (!projetoAtivo) return;
