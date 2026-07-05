@@ -1165,7 +1165,15 @@ Branches: `main` + `worktree-agent-a3876ec2c1cd36c64` (worktree do harness, mant
 Contrato agora é **HTML/Markdown → PDF (WeasyPrint)** — o caminho `.docx`/LibreOffice do contrato
 foi aposentado (a **proposta** ainda usa docx/LibreOffice). **Diretório de trabalho:**
 `E:/2026/desenvolvimento/orizon-manager` (pai renomeado nesta sessão). **MCP `orizon`** ativo e
-ingerido; re-ingerir ao fechar frente. **Produção (VPS 167.88.33.121:8765)** atualizada para
+ingerido; re-ingerir ao fechar frente (grafo re-ingerido após o merge da Sessão 45: código 920 nós,
+banco 66 — inclui `CicloDocumento`/`CicloRevisao`). **[AMBIENTE — fix] `mcp-orizon/.env`:** o
+`TARGET_PROJECT_PATH` ainda apontava para o path antigo `E:/2026/estudo_de_ia/omie_v3` (obsoleto desde
+a renomeação da Sessão 44) — corrigido para `E:/2026/desenvolvimento/orizon-manager`. Sem isso o
+container `mcp-orizon-api` monta diretório inexistente e a ingestão lê o projeto errado. Análogo ao fix
+do `.mcp.json` na Sessão 44. (`.env` é gitignored → não vai pro repo; corrigir na máquina que rodar o
+stack.) Para subir o stack quando o Docker Desktop está fechado: iniciar o Docker Desktop pela sessão do
+usuário (`Start-Process` no PowerShell funciona; `cmd start` não pegou), aguardar `docker info`, então
+`docker compose up -d` em `../mcp-orizon` e `POST http://localhost:8767/ingest/all`. **Produção (VPS 167.88.33.121:8765)** atualizada para
 `ca05a61` (sessão 44) nesta sessão: `/root/orizon-manager`, banco `orizon.db`, remote novo, screen
 `orizon-manager` (`ORIZON_HOST=0.0.0.0`), weasyprint 61.1, `/login` HTTP 200. **SSH por chave** já
 configurado (deploy pode ser conduzido pelo agente). Pendências-baixa: conferir contrato PDF real em
