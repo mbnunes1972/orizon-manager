@@ -69,3 +69,58 @@ def test_get_pe_lista_documentos_e_medicao_intocada(http_client_factory, seed, p
     assert "11c" in body["subfases"]
     med = os.path.join(projetos_dir, proj, "medicao")
     assert not os.path.exists(med) or os.listdir(med) == []
+
+
+def test_download_documento_devolve_conteudo(http_client_factory, seed, projetos_dir):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    st, body = _post_multipart(
+        c.base, c.cookie, f"/api/projetos/{proj}/ciclo/11a/documento",
+        {"login": "dir_l2", "senha": "senha123"},
+        file_field="arquivo", filename="planta.pdf", filedata=b"%PDF-conteudo")
+    assert st == 200
+    doc_id = body["documento_id"]
+    import urllib.request
+    req = urllib.request.Request(c.base + f"/api/projetos/{proj}/ciclo/documento/{doc_id}")
+    req.add_header("Cookie", c.cookie)
+    r = urllib.request.urlopen(req, timeout=5)
+    assert r.status == 200
+    assert r.read() == b"%PDF-conteudo"
+
+
+def test_download_documento_inexistente_404(http_client_factory, seed, projetos_dir):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    st, _ = c.get(f"/api/projetos/{proj}/ciclo/documento/999999")
+    assert st == 404
+
+
+def test_upload_codigo_invalido_400(http_client_factory, seed, projetos_dir):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    # 11d não é subfase enriquecida → 400
+    st, body = _post_multipart(
+        c.base, c.cookie, f"/api/projetos/{proj}/ciclo/11d/documento",
+        {"login": "dir_l2", "senha": "senha123"},
+        file_field="arquivo", filename="x.pdf", filedata=b"x")
+    assert st == 400
+
+
+def test_upload_sem_arquivo_400(http_client_factory, seed, projetos_dir):
+    c = _login(http_client_factory, "dir_l2")
+    proj = seed["projeto_l2"]
+    st, body = _post_multipart(
+        c.base, c.cookie, f"/api/projetos/{proj}/ciclo/11a/documento",
+        {"login": "dir_l2", "senha": "senha123"})   # sem file_field
+    assert st == 400
+
+
+def test_upload_sem_capability_403(http_client_factory, seed, projetos_dir):
+    # consultor (cons_l1) NÃO tem executar_pe; projeto da loja 1
+    c = _login(http_client_factory, "cons_l1")
+    proj = seed["projeto_l1"]
+    st, body = _post_multipart(
+        c.base, c.cookie, f"/api/projetos/{proj}/ciclo/11a/documento",
+        {"login": "cons_l1", "senha": "senha123"},
+        file_field="arquivo", filename="x.pdf", filedata=b"x")
+    assert st == 403

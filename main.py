@@ -1400,12 +1400,11 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     doc = db.query(CicloDocumento).filter_by(id=doc_id, projeto_nome=nome_safe).first()
                     if not doc:
-                        self.send_response(404); self.end_headers(); return
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     caminho = os.path.join(_projeto_path(nome_safe), doc.arquivo_path)
                     if not os.path.exists(caminho):
-                        self.send_response(404); self.end_headers(); return
-                    with open(caminho, "rb") as f:
-                        conteudo = f.read()
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    conteudo = storage_ler_binario(caminho)
                     self.send_response(200)
                     self.send_header("Content-Type", "application/octet-stream")
                     self.send_header("Content-Disposition", f'inline; filename="{doc.nome_original}"')
@@ -3803,6 +3802,8 @@ class Handler(BaseHTTPRequestHandler):
                     storage_salvar_binario(os.path.join(_projeto_path(nome_safe), rel), data)
                     self.send_json({"ok": True, "documento_id": doc.id})
                 except Exception as e:
+                    # rollback é no-op se o commit já ocorreu (linha do doc persiste; o
+                    # download degrada com 404 se o arquivo não foi para o disco).
                     db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
                     db.close()
