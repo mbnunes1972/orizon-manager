@@ -126,7 +126,7 @@ def test_upload_sem_capability_403(http_client_factory, seed, projetos_dir):
     assert st == 403
 
 
-def test_concluir_11a_barra_sem_documento(http_client_factory, seed, projetos_dir):
+def test_concluir_11b_barra_sem_documento(http_client_factory, seed, projetos_dir):
     c = _login(http_client_factory, "dir_l2")
     proj = seed["projeto_l2"]
     # 11b nunca recebe upload nos testes anteriores → guarda rejeita por falta de documento
