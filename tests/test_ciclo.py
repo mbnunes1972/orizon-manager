@@ -197,6 +197,46 @@ def test_versao_atual():
     assert mc.versao_atual(docs, "inexistente") is None
 
 
+def test_tipo_doc_operacional():
+    assert mc.tipo_doc_operacional("12") == "implantacao_pedido_xml"
+    assert mc.tipo_doc_operacional("13") is None   # 13 não aceita upload
+    assert mc.tipo_doc_operacional("14") is None
+    assert mc.tipo_doc_operacional("11a") is None
+
+
+def test_guarda_operacional_12_exige_xml():
+    ok, erro = mc.guarda_conclusao_operacional("12", False, None, None)
+    assert ok is False and "XML" in erro
+    ok, erro = mc.guarda_conclusao_operacional("12", True, None, None)
+    assert ok is True and erro == ""
+
+
+def test_guarda_operacional_13_exige_numeros():
+    ok, erro = mc.guarda_conclusao_operacional("13", False, "   \n  ", None)
+    assert ok is False and "número" in erro.lower()
+    ok, erro = mc.guarda_conclusao_operacional("13", False, "P-1001\nP-1002", None)
+    assert ok is True and erro == ""
+
+
+def test_guarda_operacional_14_exige_relatorio():
+    ok, erro = mc.guarda_conclusao_operacional("14", False, None, "   ")
+    assert ok is False and "Relatório" in erro
+    ok, erro = mc.guarda_conclusao_operacional("14", False, None, "1 porta avariada")
+    assert ok is True and erro == ""
+
+
+def test_guarda_operacional_codigo_desconhecido():
+    ok, erro = mc.guarda_conclusao_operacional("99", False, None, None)
+    assert ok is False and "desconhecida" in erro.lower()
+
+
+def test_etapas_operacionais_registradas():
+    assert set(mc.ETAPAS_OPERACIONAIS) == {"12", "13", "14"}
+    # nomes em sincronia com ETAPA_NOME (fonte canônica)
+    for cod in mc.ETAPAS_OPERACIONAIS:
+        assert mc.ETAPAS_OPERACIONAIS[cod]["nome"] == mc.ETAPA_NOME[cod]
+
+
 def test_modelos_ciclo_documento_e_revisao(tmp_path, monkeypatch):
     import database
     from sqlalchemy import create_engine

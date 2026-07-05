@@ -93,6 +93,47 @@ def versao_atual(documentos, tipo):
     return max(do_tipo, key=lambda d: d["enviado_em"])
 
 
+# ── Etapas operacionais (12/13/14) — ações e guardas de conclusão ─────────────
+# Etapas principais pós-PE com ações próprias no frontend. Cycle-gated (sem
+# capability dedicada): quem já pode avançar o ciclo executa. Só a 12 aceita
+# upload (XMLs dos pedidos); 13/14 guardam texto em CicloEtapa.observacoes.
+ETAPAS_OPERACIONAIS = {
+    "12": {"nome": "Implantação do pedido", "exige": "xml",
+           "tipo_doc": "implantacao_pedido_xml", "botao": "Encaminhar Pedidos à Fábrica"},
+    "13": {"nome": "Produção",              "exige": "numeros",
+           "botao": "Produção Concluída"},
+    "14": {"nome": "Entrega no depósito",   "exige": "relatorio",
+           "botao": "Concluir Relatório de Entrega"},
+}
+
+
+def tipo_doc_operacional(codigo):
+    """tipo_doc da etapa operacional que aceita upload (só a 12), ou None."""
+    op = ETAPAS_OPERACIONAIS.get(codigo)
+    return op.get("tipo_doc") if op else None
+
+
+def _tem_linha_nao_vazia(texto):
+    return any(linha.strip() for linha in (texto or "").splitlines())
+
+
+def guarda_conclusao_operacional(codigo, tem_xml, numeros_txt, relatorio_txt):
+    """(ok, erro) para concluir uma etapa operacional (12/13/14).
+    tem_xml: bool (existe ao menos um XML na etapa 12).
+    numeros_txt / relatorio_txt: texto de observacoes da etapa 13 / 14."""
+    op = ETAPAS_OPERACIONAIS.get(codigo)
+    if not op:
+        return (False, "Etapa operacional desconhecida.")
+    exige = op["exige"]
+    if exige == "xml" and not tem_xml:
+        return (False, "Carregue pelo menos um pedido (XML) antes de encaminhar à fábrica.")
+    if exige == "numeros" and not _tem_linha_nao_vazia(numeros_txt):
+        return (False, "Informe os números dos pedidos antes de concluir a produção.")
+    if exige == "relatorio" and not (relatorio_txt or "").strip():
+        return (False, "Preencha o Relatório de Entrega antes de concluí-lo.")
+    return (True, "")
+
+
 # Etapas que exigem autorização financeira (login+senha de quem pode aprovar).
 ETAPAS_APROVACAO_FINANCEIRA = frozenset({"8", "11d"})
 
