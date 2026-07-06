@@ -14,7 +14,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
-                       CicloDocumento, CicloRevisao, PerfilFiscal)
+                       CicloDocumento, CicloRevisao, PerfilFiscal, NfeEmissao)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -4020,6 +4020,59 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": True})
                 except Exception as e:
                     db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # POST /api/admin/lojas/<id>/nfe/emitir-teste — emissão de teste (homologação)
+            m = _re.match(r'^/api/admin/lojas/(\d+)/nfe/emitir-teste$', path)
+            if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                import mod_nfe, mapa_fiscal, nfe_emissao
+                arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja = db.get(Loja, int(m.group(1)))
+                    if not loja:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                        self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                    perfil = db.query(PerfilFiscal).filter_by(loja_id=loja.id).first()
+                    if not perfil:
+                        self.send_json({"ok": False, "erro": "Configure o Perfil Fiscal da loja antes de emitir."}, code=400); return
+                    if "arquivo" not in arquivos:
+                        self.send_json({"ok": False, "erro": "Anexe o XML da fábrica."}, code=400); return
+                    projeto_nome = campos.get("projeto_nome")
+                    projeto = db.get(Projeto, projeto_nome) if projeto_nome else None
+                    if not projeto:
+                        self.send_json({"ok": False, "erro": "Informe um projeto válido da loja."}, code=400); return
+                    cliente = db.get(Cliente, projeto.cliente_id) if projeto.cliente_id else None
+                    if not cliente:
+                        self.send_json({"ok": False, "erro": "O projeto não tem cliente para o destinatário."}, code=400); return
+                    try:
+                        markup = float(campos.get("markup_pct") or 0)
+                    except ValueError:
+                        markup = 0.0
+                    _fname, data = arquivos["arquivo"]
+                    preview = mod_nfe.preview(data, markup)
+                    ref = "TESTE-" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "-" + uuid.uuid4().hex[:8]
+                    data_emissao = datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00")
+                    nota = mapa_fiscal.montar_nota(perfil, loja, cliente, preview["itens"], ref, data_emissao)
+                    res = nfe_emissao.emitir(db, loja.id, projeto_nome, nota)
+                    reg = db.query(NfeEmissao).filter_by(ref=ref).first()
+                    self.send_json({"ok": True, "ref": ref,
+                                    "status": res.status.value if hasattr(res.status, "value") else res.status,
+                                    "chave": res.chave, "numero": res.numero, "serie": res.serie,
+                                    "mensagem_sefaz": res.mensagem_sefaz, "erros": res.erros,
+                                    "xml_doc_id": reg.xml_doc_id if reg else None,
+                                    "danfe_doc_id": reg.danfe_doc_id if reg else None})
+                except ValueError as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=400)
+                except Exception as e:
+                    db.rollback(); self.send_json({"ok": False, "erro": "Falha na emissão: " + str(e)}, code=500)
                 finally:
                     db.close()
                 return
