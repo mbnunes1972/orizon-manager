@@ -173,3 +173,29 @@ def test_consultar_e_cancelar_etapa15(http_client_factory, seed, app_db, projeto
     assert st == 200 and b["status"] == "autorizado"
     st2, b2 = _post(c, f"/api/projetos/{proj}/ciclo/15/nfe/cancelar", {"ref": ref, "justificativa": "cancelamento teste homologacao"})
     assert st2 == 200 and b2["status"] == "cancelado"
+    # nota cancelada → etapa 15 deixa de ser conclusiva
+    db = app_db.get_session()
+    et = db.query(app_db.CicloEtapa).filter_by(projeto_nome=proj, etapa_codigo="15").first()
+    assert et.status != "emitida"
+    db.close()
+
+
+class FakeEmissorRejeita:
+    def __init__(self): self.client = FakeClient()
+    def emitir_nfe_produto(self, nota):
+        return resultado_de_focus({"ref": nota["ref"], "status": "erro_autorizacao",
+                                   "erros": [{"codigo": "999", "mensagem": "rejeitado"}]})
+
+
+def test_emitir_rejeitada_nao_conclui_etapa(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, lid: FakeEmissorRejeita())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")
+    _, up = _upload_xml(c, proj, _fixture_xml())
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe", {"fabrica_doc_id": up["documento_id"], "markup_pct": 30})
+    assert st == 200 and b["status"] != "autorizado"
+    db = app_db.get_session()
+    et = db.query(app_db.CicloEtapa).filter_by(projeto_nome=proj, etapa_codigo="15").first()
+    assert et.status != "emitida"
+    db.close()

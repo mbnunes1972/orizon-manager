@@ -4199,7 +4199,7 @@ class Handler(BaseHTTPRequestHandler):
                     try:
                         markup = float(req.get("markup_pct") or 0)
                     except (TypeError, ValueError):
-                        markup = 0.0
+                        markup = 0.0   # markup inválido → custo (aceitável: emissão só em homologação por padrão)
                     xml_bytes = storage_ler_binario(os.path.join(_projeto_path(nome_safe), doc.arquivo_path))
                     preview = mod_nfe.preview(xml_bytes, markup)
                     ref = "NFE-" + nome_safe + "-" + str(doc.id)
@@ -4280,6 +4280,9 @@ class Handler(BaseHTTPRequestHandler):
                     if _projeto_da_loja(db, nome_safe, loja_id) is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     res = nfe_emissao.cancelar(db, req.get("ref"), req.get("justificativa") or "")
+                    if res.status.value == "cancelado":
+                        # nota cancelada → etapa 15 volta a não-conclusiva (não deixar "emitida" com NF-e cancelada)
+                        _set_etapa_status(db, nome_safe, "15", "em_andamento", usuario["id"]); db.commit()
                     self.send_json({"ok": True, "status": res.status.value, "mensagem_sefaz": res.mensagem_sefaz})
                 except ValueError as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=400)
