@@ -1259,18 +1259,44 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
 
 ## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
 
-**`main`** consolidada e verde — **suíte 507 passed** (código 1110 nós / banco 69). **Frente em
-andamento:** **Integração NF-e Fábrica→Loja via Focus NFe** (Sessão 47). **Mergeadas na `main`:** Fase 1
-(`mod_nfe.py` parser/precificação + CLI), Fase 2 (`EmissorFiscal`/`focus_client`/`focus_config`), o
-**Painel de Config Fiscal · Sub-frentes I e II** (`PerfilFiscal` + `fiscal_cripto` Fernet + `mod_fiscal` +
-endpoints + **painel no frontend** aba Fiscal do admin da loja) e a **Fase 3b**
-(`mapa_fiscal` nota→payload Focus + `EmissorFocusNfe`). Painel com **verificação manual no navegador
-pendente** (do usuário). **A retomar:** **Fase 4** (emissão real em homologação — token da Focus), **Fase 5**
-(orquestração + UI etapa 15) e a **Sub-frente II** (painel fiscal no frontend). **Fase 4 depende do perfil
-fiscal Simples do contador** (CNPJ 19.152.134/0001-56: CST/CSOSN/CFOP/alíquotas) e o **smoke em homologação
-depende do token da Focus**
-(ambos pendentes do usuário). XMLs reais da fábrica em `E:/2026/desenvolvimento/nfe-dalmobile` (fora do
-git). Servidor: `python3 main.py` (porta 8765) — **atenção:
+**`main`** consolidada e verde — **suíte 507 passed** (código 1110 nós / banco 69).
+
+### 🧾 Módulo Fiscal / Integração NF-e (Fábrica→Loja via Focus NFe) — mapa e continuação (Sessão 47)
+
+**Objetivo:** a fábrica entrega direto ao cliente; a loja emite **sua** NF-e (com markup) via **Focus NFe**
+(a Focus **não** calcula imposto — nós montamos o bloco fiscal). Pipeline em código, ponta a ponta (offline):
+`mod_nfe.preview` → `mapa_fiscal` → `EmissorFocusNfe` → `focus_client`, com `PerfilFiscal` alimentando o mapa.
+
+| Fase / peça | O quê | Estado |
+|---|---|---|
+| **Fase 1** | `mod_nfe.py` — parser XML fábrica + consolidação + markup (`preview`) + CLI | ✅ na `main`, testado |
+| **Fase 2** | `emissor_fiscal.py` (contrato `EmissorFiscal`/DTOs) + `focus_client.py` + `focus_config.py` | ✅ na `main`, testado |
+| **Painel Fiscal I** | `PerfilFiscal` (tabela) + `fiscal_cripto` (Fernet) + `mod_fiscal` + endpoints GET/PUT (config/segredos/ambiente) | ✅ na `main`, testado |
+| **Painel Fiscal II** | Aba **Fiscal** no admin da loja (frontend) — 7 seções, badges de placeholder, segredos write-only, troca de ambiente | ✅ na `main` — **⚠️ verificação manual no navegador PENDENTE** |
+| **Fase 3b** | `mapa_fiscal.py` (nota→payload Focus) + `emissor_focus.py` (`EmissorFocusNfe`) | ✅ na `main`, testado (offline) |
+| **Fase 4** | Emissão **real em homologação**: montar `FocusClient` por loja (`focus_client_para_loja`) → `emitir_nfe_produto` → polling → guardar XML/DANFE retornados | ⏳ **a fazer** |
+| **Fase 5** | Orquestração (do projeto: loja+cliente+preview, gerar `ref`, chamar o emissor) + **UI da etapa 15** | ⏳ a fazer |
+
+**Insumos do usuário (gatilham as próximas fases, não bloqueiam o que já existe):**
+- **Token da Focus NFe** (homologação) — "fácil de obter" (usuário). Habilita a Fase 4. Salvar no painel
+  (aba Fiscal → Credenciais Focus) ou em `focus_config.json`.
+- **Valores fiscais reais do contador** (CST/CSOSN/CFOP/alíquotas) do CNPJ **19.152.134/0001-56 (Simples)** —
+  entram como **dado** no `PerfilFiscal` (perfil-padrão de teste já destrava o desenvolvimento).
+
+**Pendências/gaps conhecidos (ajustes pequenos, registrados):**
+- **[teste]** conferência do **Painel Fiscal (Sub-frente II)** no navegador — o usuário fará **amanhã**.
+- **[GAP]** `cert_validade`/`cert_cnpj` são read-only no painel — o `PUT …/perfil-fiscal` (Sub-frente I) não
+  os inclui na allowlist; torná-los editáveis é ~2 linhas no backend.
+- **[Fase 4]** `mapa_fiscal`: PIS/COFINS CST "49" e o CSOSN são **do Simples** (marcado `# TODO Fase 4`) —
+  ramificar por regime normal/presumido com o contador.
+- **[Fase 4/5]** `custo_total`/`venda_total` do `preview` somam valores unitários **já arredondados** →
+  pode divergir do total fiscal por centavos (reconciliar se comparar com a NF-e).
+
+**Specs/planos:** `docs/superpowers/specs|plans/2026-07-05-nfe-*` e `…-perfil-fiscal-*` e `…-painel-fiscal-*`
+(todos com Status **IMPLEMENTADO**, exceto o que resta das Fases 4-5). XMLs reais da fábrica em
+`E:/2026/desenvolvimento/nfe-dalmobile` (fora do git).
+
+Servidor: `python3 main.py` (porta 8765) — **atenção:
 o `python3` do Bash aqui é o stub do WindowsApps (exit 127); subir com o interpretador real
 `C:\Users\mbn19\AppData\Local\Python\pythoncore-3.14-64\python.exe main.py`, e sempre matar servidores
 `main.py` obsoletos que fiquem presos na 8765 (senão o navegador fala com código velho).**
