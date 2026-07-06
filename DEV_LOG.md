@@ -1325,7 +1325,11 @@ Focus** (empresa + certificado A1 + liberação pelo suporte). Nada de código m
   `ambiente_ativo == "homologacao"`.
 
 **Pendências/gaps conhecidos (ajustes pequenos, registrados):**
-- **[teste]** conferência do **Painel Fiscal (Sub-frente II)** no navegador — o usuário fará **amanhã**.
+- **[teste]** conferência do **Painel Fiscal (Sub-frente II)** e do **painel da etapa 15** (Fase 5) no
+  navegador — o usuário fará **amanhã**, junto do smoke real.
+- **[Fase 5]** cancelar reverte a etapa 15 para `em_andamento` incondicionalmente — se houver **duas** NF-e
+  autorizadas (append-only permite vários XMLs da fábrica no mesmo projeto), cancelar uma "desconclui" a
+  etapa mesmo com a outra ainda válida. Caso de borda (fluxo típico = 1 nota); reavaliar se virar comum.
 - **[GAP]** `cert_validade`/`cert_cnpj` são read-only no painel — o `PUT …/perfil-fiscal` (Sub-frente I) não
   os inclui na allowlist; torná-los editáveis é ~2 linhas no backend.
 - **[Fase 4]** `mapa_fiscal`: PIS/COFINS CST "49" e o CSOSN são **do Simples** (marcado `# TODO Fase 4`) —
