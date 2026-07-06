@@ -7698,6 +7698,16 @@ async function pedidosXmlCarregar(nomeSafe) {
   } catch(e) { _pedidosXml = []; }
 }
 
+// ── Etapa 15 (Emissão da NF-e do cliente) — XMLs da fábrica + emissões ──
+let _nfe15 = { fabrica_xmls: [] };
+async function nfe15Carregar(nomeSafe) {
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(nomeSafe)}/ciclo/15/nfe`, { credentials: 'same-origin' });
+    const j = await r.json();
+    _nfe15 = (j && j.ok) ? j : { fabrica_xmls: [] };
+  } catch(e) { _nfe15 = { fabrica_xmls: [] }; }
+}
+
 // Verifica (UX-only) se o usuário logado tem a capacidade de PE.
 // O backend faz a verificação real de credenciais; esta é apenas para
 // mostrar/ocultar botões no front.
@@ -7713,6 +7723,12 @@ function _podePE(cap) {
   if (cap === 'executar_pe') return _PE_EXEC_NIVEIS.has(nivel);
   if (cap === 'revisar_pe')  return _PE_REVIS_NIVEIS.has(nivel);
   return false;
+}
+
+// níveis com editar_dados_loja (UX-only; backend é a trava). MANTER SINCRONIZADO com perfis.py.
+const _NFE_NIVEIS_EMITE = new Set(["diretor","super_admin","admin_rede"]);
+function _podeEmitirNfe() {
+  return _NFE_NIVEIS_EMITE.has((_usuarioAtual && _usuarioAtual.nivel) || '');
 }
 
 const PE_SUBFASES = {
@@ -7751,6 +7767,7 @@ async function carregarCiclo() {
     await _carregarMedicao();
     if (projetoAtivo) await peCarregar(projetoAtivo.nome_safe);
     if (projetoAtivo) await pedidosXmlCarregar(projetoAtivo.nome_safe);
+    if (projetoAtivo) await nfe15Carregar(projetoAtivo.nome_safe);
     renderCiclo();
     atualizarBotoesAprovacao();
   } catch(e) { console.error('Erro ao carregar ciclo:', e); }
@@ -7931,6 +7948,8 @@ function renderCiclo() {
             ? _renderCardProducao(dados, bloqueada)
           : etapa.codigo === '14'
             ? _renderCardEntrega(dados, bloqueada)
+          : etapa.codigo === '15'
+            ? _renderCardEmissaoNfe(dados, bloqueada)
             : _renderCardGenerico(etapa, dados, bloqueada)}
       </div>
     `;
@@ -8768,6 +8787,83 @@ function _renderCardEntrega(dados, bloqueada) {
            <button onclick="concluirRelatorioEntrega()"
              style="background:var(--dalm-gold);color:#1a1200;border:none;font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:pointer">Concluir Relatório de Entrega</button>
          </div>`}`;
+}
+
+function _renderCardEmissaoNfe(dados, bloqueada) {
+  if (bloqueada) {
+    return `<p style="color:var(--muted);font-size:.85rem;margin:0">🔒 Conclua a etapa anterior para liberar esta etapa.</p>`;
+  }
+  const concluido = dados && (dados.status === 'emitida' || dados.status === 'concluido');
+  const podeEmitir = _podeEmitirNfe();
+  const proj = projetoAtivo ? projetoAtivo.nome_safe : '';
+  const linhas = (_nfe15.fabrica_xmls || []).map(x => {
+    const e = x.emissao;
+    if (e) {
+      const cor = e.status === 'autorizado' ? 'var(--ok)' : e.status === 'erro' ? 'var(--warn)' : e.status === 'cancelado' ? 'var(--muted)' : 'var(--dalm-gold)';
+      const dl = (id, rot) => id ? `<a class="btn-ciclo" style="font-size:.75rem;text-decoration:none" target="_blank" rel="noopener" href="/api/projetos/${encodeURIComponent(proj)}/ciclo/documento/${id}">${rot}</a>` : '';
+      return `<div style="border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px;font-size:.82rem">
+        <div>📄 ${esc(x.nome_original || '')} — <span style="color:${cor};font-weight:700">${esc(e.status || '')}</span>${e.chave ? ' · ' + esc(e.chave) : ''}</div>
+        ${e.mensagem_sefaz ? `<div style="color:var(--muted);font-size:.75rem">${esc(e.mensagem_sefaz)}</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+          ${dl(e.xml_doc_id, 'XML')} ${dl(e.danfe_doc_id, 'DANFE')}
+          ${podeEmitir ? `<button class="btn-ciclo" style="font-size:.75rem" onclick="consultarNfeLoja('${esc(e.ref)}')">Consultar</button>` : ''}
+          ${podeEmitir && e.status === 'autorizado' ? `<button class="btn-ciclo" style="font-size:.75rem" onclick="cancelarNfeLoja('${esc(e.ref)}')">Cancelar</button>` : ''}
+        </div></div>`;
+    }
+    return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:.82rem;flex-wrap:wrap">
+        <span style="flex:1">📄 ${esc(x.nome_original || '')}</span>
+        ${podeEmitir ? `<input id="nfe-markup-${x.id}" type="number" step="0.01" value="30" title="Markup %" style="width:70px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:.8rem">
+          <button class="btn-ciclo" style="font-size:.8rem" onclick="emitirNfeLoja(${x.id})">Emitir NF-e da Loja</button>` : '<span style="color:var(--muted);font-size:.75rem">sem permissão para emitir</span>'}
+      </div>`;
+  }).join('') || `<p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">Nenhuma NF-e da fábrica carregada.</p>`;
+  const upload = podeEmitir ? `<label class="btn-ciclo" style="font-size:.82rem;cursor:pointer">📎 Carregar NF-e da Fábrica<input type="file" accept=".xml" style="display:none" onchange="enviarNfeFabrica(this)"></label>` : '';
+  return `<div style="margin-bottom:10px">${linhas}</div>${upload}${concluido ? '<p style="color:var(--ok);margin:8px 0 0">✓ NF-e emitida.</p>' : ''}`;
+}
+
+async function enviarNfeFabrica(inputFile) {
+  if (!projetoAtivo) return;
+  const f = inputFile.files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('arquivo', f);
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/15/nfe-fabrica`, { method: 'POST', credentials: 'same-origin', body: fd });
+    const j = await r.json();
+    if (!j.ok) { await avisoPopup(j.erro || 'Falha ao carregar.', {titulo:'NF-e — Fábrica'}); return; }
+    showToast('NF-e da fábrica carregada!', false); await carregarCiclo();
+  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'NF-e — Fábrica'}); }
+}
+
+async function emitirNfeLoja(docId) {
+  if (!projetoAtivo) return;
+  const el = document.getElementById('nfe-markup-' + docId);
+  const mk = parseFloat((el && el.value) || '0') || 0;
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/15/emitir-nfe`, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ fabrica_doc_id: docId, markup_pct: mk }) });
+    const j = await r.json();
+    if (!j.ok) { await avisoPopup(j.erro || 'Falha na emissão.', {titulo:'Emitir NF-e'}); return; }
+    showToast('Emissão: ' + j.status, false); await carregarCiclo();
+  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'Emitir NF-e'}); }
+}
+
+async function consultarNfeLoja(ref) {
+  if (!projetoAtivo) return;
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/15/nfe/consultar`, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ref }) });
+    const j = await r.json();
+    if (!j.ok) { await avisoPopup(j.erro || 'Falha.', {titulo:'Consultar NF-e'}); return; }
+    showToast('Status: ' + j.status, false); await carregarCiclo();
+  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'Consultar NF-e'}); }
+}
+
+async function cancelarNfeLoja(ref) {
+  if (!projetoAtivo) return;
+  const just = window.prompt('Justificativa do cancelamento (15 a 255 caracteres):', '');
+  if (!just || just.length < 15) { await avisoPopup('A justificativa deve ter ao menos 15 caracteres.', {titulo:'Cancelar NF-e'}); return; }
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/15/nfe/cancelar`, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ref, justificativa: just }) });
+    const j = await r.json();
+    if (!j.ok) { await avisoPopup(j.erro || 'Falha.', {titulo:'Cancelar NF-e'}); return; }
+    showToast('Cancelamento: ' + j.status, false); await carregarCiclo();
+  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'Cancelar NF-e'}); }
 }
 
 async function salvarRelatorioEntrega() {
