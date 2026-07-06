@@ -17,7 +17,7 @@ vez; (2) tornar visível o que **já existe vs. é lacuna**; (3) habilitar a **v
 ```
 ┌─ MÓDULOS DE DOMÍNIO (ligáveis/desligáveis por cliente) ───────────────┐
 │  Cadastro · Comercial · Produção/Projetos · Fiscal · Estoque ·        │
-│  Financeiro · Pós-venda                                               │
+│  Expedição/Logística · Financeiro · Pós-venda                         │
 └───────────────────────────────────────────────────────────────────────┘
               usa ▼ (nunca o contrário)
 ┌─ NÚCLEO / PLATAFORMA (transversal, sempre ligado) ────────────────────┐
@@ -37,7 +37,7 @@ domínio referenciam-se por **Cadastro** e são orquestrados pelo **Ciclo** — 
 | **Auth** | `mod_usuarios`, `perfis.py`; `usuarios`, `sessoes` | identidade + capabilities (`perfis.pode(nivel, cap)`) |
 | **Tenancy / Rede** | `mod_tenancy`; `redes`, `lojas`, `usuario_lojas`, `parceiro_lojas` | escopo multi-loja/rede — **é o que torna os domínios ligáveis por cliente** |
 | **Auditoria** | `log_autorizacoes`, `log_acoes_gerenciais` | trilha de autorizações e ações gerenciais |
-| **Ciclo (orquestrador)** | `mod_ciclo`; `ciclo_etapas`, `ciclo_documentos`, `ciclo_revisoes` | máquina de estados (etapas 1→16) que **sequencia os domínios**; docs/revisões são o artefato genérico do ciclo. **É o "event flow" pronto — não introduzir event bus.** |
+| **Ciclo (orquestrador)** | `mod_ciclo`; `ciclo_etapas`, `ciclo_documentos`, `ciclo_revisoes` | máquina de estados (etapas 1→20, com sub-etapas) que **sequencia os domínios** por **faixas de titularidade** (ver Governança do Ciclo); docs/revisões são o artefato genérico do ciclo. **É o "event flow" pronto — não introduzir event bus.** |
 | **Integrações** | `emissor_fiscal` (contrato **ABC**), `focus_client`/`focus_config`, `mod_omie` (legado); *futuros* Promob parser, Evolution/WhatsApp, n8n | todo client HTTP externo vira **adapter** aqui; a abstração (ex.: `EmissorFiscal`) mora no Núcleo, a implementação de domínio mora no módulo |
 
 ---
@@ -93,22 +93,70 @@ Status: **EXISTE** (implementado) · **PARCIAL** (parte feita) · **NOVO** (a mo
 - **Cruzamentos:** Fiscal (nota de devolução) + Estoque (retorno de mercadoria).
 - **Neste doc:** só **fronteira (stub)**.
 
+### 8. Expedição / Logística — NOVO (módulo fino + faixa do Ciclo)
+Dono operacional das etapas logísticas (12–16 — ver **Governança do Ciclo**). É ao mesmo tempo uma **faixa**
+que orquestra outros módulos e um **módulo fino** com um núcleo próprio: agendamento de entrega, **expedição**
+e **conhecimento de transporte (CT-e)** — atividades que hoje não têm casa (não são de Estoque, Fiscal nem
+Compras).
+
+**⚠️ Disciplina de fronteira (regra explícita — módulo-agregador tende a engordar):**
+- **PODE conter:** o **estado agregado do ciclo logístico** (status atual, histórico de transições) e
+  **referências por ID** a entidades de outros módulos — ordem de produção (Produção), movimentos de estoque
+  (Estoque), NF-e (Fiscal), conhecimento de transporte/CT-e.
+- **NÃO PODE conter:** **duplicação** de dado que já pertence a Produção, Estoque ou Fiscal. Expedição
+  **nunca é fonte da verdade** desses dados — só **consulta e referencia**. Se surgir a tentação de "só mais
+  um campinho" que já existe noutro módulo, ele **não** entra aqui.
+
 ---
 
-## O fluxo de uma venda mapeado no Ciclo
+## Governança do Ciclo — faixas de titularidade
 
-O "fluxo típico" **não precisa de orquestração nova** — ele já é a sequência de etapas do `mod_ciclo`:
+O Ciclo (Núcleo) não é só uma sequência: ele tem uma dimensão de **titularidade** — cada trecho de etapas
+pertence a uma **equipe/faixa**, e as transições entre faixas são **gates de controle** (alguns financeiros,
+donos do Financeiro). Essa dimensão existe nos requisitos (coluna "Responsável" das 38 etapas) mas **hoje não
+é atributo explícito** de `ciclo_etapas` — está só implícita nas capabilities (`aprovar_financeiro`,
+`executar_pe`, …) e em `ETAPAS_APROVACAO_FINANCEIRA = {8, 11d}` / `ETAPAS_OPERACIONAIS = {12,13,14}`.
 
-```
-Cadastro (cliente, [catálogo])
-  → Comercial        (etapas ~1–4 orçamento → 7 contrato; negociação, Total Flex)
-    → Produção/Proj. (etapas 11x PE, medição → 12–13 pedido/produção)
-      → Estoque       (12–14: reserva/baixa por item, inclusive peça sob medida)  ▲NOVO
-        → Fiscal       (etapa 15: NF-e da loja via Perfil Fiscal + EmissorFiscal)
-          → Financeiro (recebível/Total Flex; entra no DRE)                        ▲PARCIAL
-            → Pós-venda (garantia, assistência, devolução)                          ▲NOVO
-```
-Cada seta é uma transição de `ciclo_etapas`; o estado vive no ciclo, não num barramento.
+> ### ⚠️ CONFLITO ABERTO — numeração de etapas (NÃO decidir operação pelo número de etapas)
+> O **`REQUIREMENTS.md` §4 descreve 38 etapas em 6 fases** (fonte `1_FLUXO_DE_PROCESSOS.docx`), com fases que
+> **já são estas faixas** (Fase 4 = "CD: Compra e Logística"; passo 11 = "Handoff para pós-venda"; passo 20 =
+> "Aprovação financeira"). A **implementação** (`mod_ciclo` / `ETAPAS_CICLO`) tem **~20 etapas renumeradas
+> (1‑4, 7‑20)** e **não** carrega as fases/donos. **Os dois modelos divergem em número e rótulo.** Até a
+> reconciliação entre o fluxo de 38 etapas e este modelo de módulos acontecer (tarefa própria, futura),
+> **nenhuma decisão operacional deve se apoiar no número/rótulo de etapa** — use as **faixas** abaixo, que são
+> estáveis. (O MCP confirma o débito: etapas aparecem "sem uso"/sem rastro a requisito.)
+
+**Faixas sobre as etapas realmente implementadas:**
+
+| Faixa (dono) | Etapas | Papel |
+|---|---|---|
+| **Vendas** (Consultor/Gerente) | 1–4, 7 | capta → orçamento → **contrato** |
+| **⛬ Gate — Aprovação Financeira I** (Financeiro) | **8** | libera Venda → Execução |
+| **Pós-venda / Execução‑Projeto** (Conferente, Projetista Exec., Medidor) | 9, 10, 11(a–e) | medição + PE; contém o gate **11d** |
+| **⛬ Gate — Aprovação Financeira II** (Financeiro) | **11d** | libera Projeto → Produção (empenha $ na fábrica — "ponto sem volta") |
+| **Expedição / Logística** (Assist. Logístico) | 12–16 | pedido à fábrica, produção, recebimento (Estoque), NF‑e (Fiscal), entrega |
+| **Pós-venda / Montagem** (Supervisor Montagem/Consultor) | 17–20 | montagem, assistência, vistoria, aprovação final |
+
+Fluxo: **Vendas → (gate) → Pós-venda executa (Projeto) → (gate) → Logística → volta ao Pós-venda (Montagem).**
+Cada seta é uma transição de `ciclo_etapas`; o estado vive no Ciclo, **não** num barramento.
+
+### Gates financeiros como transições de controle (8 e 11d) — e o papel da IA
+
+Os gates são **costuras entre faixas**, donas do **Financeiro** (capability `aprovar_financeiro`; já exigem
+login+senha de quem aprova). A **Secretária Orizon (IA / EP‑08)** atua no gate como **aceleradora, nunca como
+autoridade**. Dois pontos **inequívocos**:
+
+1. **A aprovação é sempre ação humana do Financeiro.** A IA **nunca** aprova nem libera o gate de forma
+   autônoma — ela apenas prepara, notifica e registra.
+2. **Todo gate financeiro gera registro de auditoria** (`log_autorizacoes`) contendo: **quem** aprovou,
+   **quando**, e um **snapshot dos dados que a IA apresentou** para a decisão (situação de crédito, histórico
+   de inadimplência, consistência contrato × orçamento, alertas de risco). Isso protege o processo **e** a
+   Financeiro/Diretoria caso a aprovação seja questionada depois.
+
+Fora disso, a IA (Núcleo/Integrações — Evolution/WhatsApp): pré-checa os pré-requisitos e monta o dossiê,
+**notifica/cobra** o Financeiro quando a etapa chega ao gate, e após a aprovação **dispara** o handoff para a
+próxima faixa. Ela *lê* o estado do Ciclo e *escreve* notificação/auditoria — **nunca é dona de lógica de
+domínio**.
 
 ---
 
