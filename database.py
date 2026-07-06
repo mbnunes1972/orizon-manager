@@ -579,6 +579,17 @@ class Emitente(Base):
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class PerfilEmissao(Base):
+    """Política: qual Emitente assina cada tipo de documento, por owner (loja|rede)."""
+    __tablename__ = "perfil_emissao"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    owner_tipo = Column(Text, nullable=False)   # "loja" | "rede"
+    owner_id = Column(Integer, nullable=False)
+    tipo_doc = Column(Text, nullable=False)      # "produto" | "servico"
+    emitente_id = Column(Integer, ForeignKey("emitente.id"), nullable=False)
+    criado_em = Column(DateTime, default=datetime.utcnow)
+
+
 class NfeEmissao(Base):
     """Rastreio de uma NF-e emitida pela loja (Focus). `ref` = idempotência. XML/DANFE ficam
     em CicloDocumento (etapa 15) referenciados por xml_doc_id/danfe_doc_id."""
