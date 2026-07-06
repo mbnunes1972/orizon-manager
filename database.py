@@ -965,6 +965,8 @@ def _run_migracoes(conn):
             cur.execute("ALTER TABLE documento_fiscal ADD COLUMN tipo_documento TEXT DEFAULT 'produto'")
         if "emitente_id" not in _cols_df:
             cur.execute("ALTER TABLE documento_fiscal ADD COLUMN emitente_id INTEGER")
+        if "fabrica_doc_id" not in _cols_df:   # DB legado sem a coluna (senão o INSERT de emissão falharia)
+            cur.execute("ALTER TABLE documento_fiscal ADD COLUMN fabrica_doc_id INTEGER")
         if _tabela_existe(cur, "lojas"):
             cur.execute(
                 "UPDATE documento_fiscal SET emitente_id="
