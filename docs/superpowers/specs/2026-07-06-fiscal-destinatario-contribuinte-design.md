@@ -1,9 +1,11 @@
 # Fiscal — Destinatário Contribuinte / Isento / Não Contribuinte — Design
 
 > Spec de design · 2026-07-06 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Faz a emissão sair **correta para os 3 tipos de
-> destinatário** (contribuinte, isento, não contribuinte), hoje cravada em "não contribuinte / consumidor
-> final". Descoberto no smoke autorizado (CSOSN 101 rejeitado para não contribuinte → precisou 102).
+> Status: **IMPLEMENTADO (branch `feat/fiscal-destinatario-contribuinte`, suíte 562)** — emissão correta para
+> os 3 tipos de destinatário (contribuinte/isento/não contribuinte): Cliente ganha tipo+CNPJ+IE; cadastro com
+> seletor; contrato exige o documento certo (não a IE); IE pedida na emissão e persistida; `mapa_fiscal`
+> ramifica indicador IE (1/2/9), envio de IE, CSOSN (override Emitente + default código 101/102) e
+> `consumidor_final`. Origem: smoke autorizado (CSOSN 101 rejeitado p/ não contribuinte → 102).
 
 ## 1. Motivação
 

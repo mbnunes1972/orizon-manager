@@ -1358,6 +1358,12 @@ contra a SEFAZ real. O smoke descobriu e destravou:
   destinatário contribuinte×não-contribuinte — refinamento fiscal, contador; registrar.)* (b) o cliente 2
   (Marcelo) tem **CPF placeholder inválido** (`012.021.345-01`) — para emissão real precisa do CPF real (o
   smoke usou um CPF de teste válido).
+- **✅ Refinamento do destinatário IMPLEMENTADO** (branch `feat/fiscal-destinatario-contribuinte`, suíte 562):
+  Cliente ganha **tipo (Contribuinte/Isento/Não contribuinte)** + CNPJ + IE; cadastro com seletor condicional;
+  contrato exige CPF ou CNPJ conforme o tipo (IE não bloqueia); **IE pedida na emissão e persistida no Cliente**;
+  `mapa_fiscal` ramifica **indicador IE (1/2/9)**, envio de IE, **CSOSN** (default no código 101/102 + override no
+  Emitente `csosn_contribuinte`) e `consumidor_final`. Resolve o achado (a) acima. *(Pendente: CSOSN por operação
+  ST/devolução; não-contribuinte PJ — fora do escopo.)*
 - **Emitente da INSPIRIUM completo** no `orizon.db`: endereço (Av. Barão do Rio Branco, 736, São José dos
   Campos/SP, CEP 12242-800), IE 645636985117, IBGE 3549904, CSOSN 102, token homolog. *(bairro do emitente
   ficou vazio e a SEFAZ aceitou — usa o cadastro da empresa; preencher por higiene.)*
