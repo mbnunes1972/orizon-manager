@@ -1,9 +1,15 @@
 """mapa_fiscal.py — mapa fiscal: preview (Fase 1) + Emitente (identidade fiscal, pode ≠ loja) +
 Cliente (destinatário) -> payload da NF-e da Focus. Puro: sem DB, sem rede. Regime Simples primeiro."""
+import re
 
 REGIME_FOCUS = {"simples": 1, "simples_excesso": 2, "mei": 1, "normal": 3}
 PIS_CST_SIMPLES = "49"
 COFINS_CST_SIMPLES = "49"
+
+
+def _so_digitos(v):
+    """CPF/CNPJ/CEP para a SEFAZ vão só com dígitos (sem pontuação). None/'' preservados."""
+    return re.sub(r"\D", "", v) if v else v
 
 
 def montar_nota(emitente, cliente, itens_preview, ref, data_emissao,
@@ -23,17 +29,17 @@ def montar_nota(emitente, cliente, itens_preview, ref, data_emissao,
         "data_emissao": data_emissao,
         "emitente": {
             "doc_tipo": "cnpj" if getattr(emitente, "cnpj", None) else "cpf",
-            "doc": getattr(emitente, "cnpj", None),
+            "doc": _so_digitos(getattr(emitente, "cnpj", None)),
             "nome": getattr(emitente, "razao_social", None),
             "regime": REGIME_FOCUS.get(getattr(emitente, "regime_tributario", None), 1),
             "ie": getattr(emitente, "inscricao_estadual", None),
             "logradouro": emitente.logradouro, "numero": emitente.numero, "bairro": emitente.bairro,
-            "municipio": emitente.cidade, "uf": emitente.uf, "cep": emitente.cep,
+            "municipio": emitente.cidade, "uf": emitente.uf, "cep": _so_digitos(emitente.cep),
         },
         "destinatario": {
-            "nome": cliente.nome, "doc_tipo": doc_tipo, "doc": doc,
+            "nome": cliente.nome, "doc_tipo": doc_tipo, "doc": _so_digitos(doc),
             "logradouro": cliente.logradouro, "numero": cliente.numero, "bairro": cliente.bairro,
-            "municipio": cliente.cidade, "uf": cliente.estado, "cep": cliente.cep,
+            "municipio": cliente.cidade, "uf": cliente.estado, "cep": _so_digitos(cliente.cep),
         },
         # TODO Fase 4: PIS/COFINS CST "49" e o CSOSN são do SIMPLES. Para regime normal/presumido,
         # ramificar aqui (CST próprios + alíquotas ICMS destacadas) com os valores do contador.
@@ -81,6 +87,7 @@ def montar_payload(nota):
         "finalidade_emissao": 1,
         "consumidor_final": 0 if dest["doc_tipo"] == "cnpj" else 1,   # PJ = 0, PF consumidor final = 1
         "presenca_comprador": 1,
+        "modalidade_frete": 9,   # 9 = sem ocorrência de transporte (default; obrigatório p/ SEFAZ). Revisitar (CIF/FOB config).
         "nome_emitente": emit["nome"],
         "regime_tributario_emitente": emit["regime"],
         "inscricao_estadual_emitente": emit["ie"],

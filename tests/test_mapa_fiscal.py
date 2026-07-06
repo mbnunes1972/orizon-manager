@@ -29,6 +29,7 @@ def test_payload_topo_e_emitente():
     p = mp.montar_payload(_nota())
     assert p["tipo_documento"] == 1 and p["finalidade_emissao"] == 1
     assert p["consumidor_final"] == 1 and p["presenca_comprador"] == 1
+    assert p["modalidade_frete"] == 9      # obrigatório p/ SEFAZ (era ausente → "Modalidade frete não pode ser vazio")
     assert p["natureza_operacao"] == "Venda de mercadoria"
     assert p["data_emissao"] == "2026-07-05T10:00:00-03:00"
     assert p["cnpj_emitente"] == "19152134000156" and "cpf_emitente" not in p
@@ -128,3 +129,18 @@ def test_montar_nota_emitente_e_um_cnpj_distinto_da_loja():
     assert nota["emitente"]["nome"] == "CENTRAL LTDA"
     p = mp.montar_payload(nota)
     assert p["cnpj_emitente"] == "99999999000188"
+
+
+def test_montar_nota_normaliza_doc_e_cep_para_digitos():
+    # SEFAZ rejeitou "CPF inválido" com pontuação → doc/cep devem ir só com dígitos
+    from types import SimpleNamespace
+    emit = SimpleNamespace(cnpj="19.152.134/0001-56", razao_social="L", regime_tributario="simples",
+                           inscricao_estadual="123", csosn_padrao="102", cfop_dentro_uf="5102",
+                           cfop_fora_uf="6102", logradouro="R", numero="1", bairro="C",
+                           cidade="SP", uf="SP", cep="01000-000")
+    cli = SimpleNamespace(nome="C", cnpj=None, cpf="111.444.777-35", logradouro="R", numero="2",
+                          bairro="J", cidade="Rio", estado="RJ", cep="20000-000")
+    nota = mp.montar_nota(emit, cli, [], "R", "D")
+    assert nota["emitente"]["doc"] == "19152134000156"
+    assert nota["destinatario"]["doc"] == "11144477735"
+    assert nota["emitente"]["cep"] == "01000000" and nota["destinatario"]["cep"] == "20000000"
