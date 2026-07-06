@@ -1,6 +1,6 @@
 # Histórias de Usuário — Orizon Manager
 
-> Versão de referência: **v0.2.0** | Junho 2026 — atualizado 2026-06-15
+> Versão de referência: **v0.2.0** | Junho 2026 — atualizado 2026-07-06
 > Repositório: [github.com/mbnunes1972/orizon-manager](https://github.com/mbnunes1972/orizon-manager)
 
 **Convenções de status:**
@@ -21,6 +21,7 @@
 - [EP-07 — Versionamento de Orçamentos](#ep-07--versionamento-de-orçamentos)
 - [EP-08 — Sincronização Omie e Painel Admin](#ep-08--sincronização-omie-e-painel-admin)
 - [EP-09 — Lista de Projetos e Pipeline de Vendas](#ep-09--lista-de-projetos-e-pipeline-de-vendas)
+- [EP-10 — Reconciliação do Ciclo (lacunas 38 etapas ↔ implementado)](#ep-10--reconciliação-do-ciclo-lacunas-38-etapas--implementado)
 
 ---
 
@@ -534,6 +535,72 @@
 - Dropdown de status também disponível no cabeçalho da tela de negociação (page-02)
 - Filtro multi-seleção por status na lista (OR lógico): pode selecionar 1, 2, 3 ou todos os status
 - Botão do filtro exibe contagem dos status ativos quando não está "todos"
+
+---
+
+## EP-10 — Reconciliação do Ciclo (lacunas 38 etapas ↔ implementado)
+
+> Lacunas identificadas na reconciliação entre o fluxo **canônico de 38 etapas**
+> (`docs/referencia/01-fluxo-de-processos.md`) e o **ciclo implementado** (18 principais + 6 sub).
+> Mapa completo em `docs/processos/FLUXO_38_ETAPAS.md`. Governança/faixas em
+> `docs/ARQUITETURA-MODULOS.md`. São micro-etapas do canônico **sem casa** no ciclo atual.
+
+---
+
+### US-32 — Emissão da NFS-e de serviço de montagem `[PLANEJADO]`
+
+**Como** Gerente Adm/Fin,  
+**quero** emitir a **NF de serviço de montagem (NFS-e)** quando aplicável,  
+**para que** a montagem/instalação seja faturada conforme o modelo fiscal da loja.
+
+**Critérios de aceite:**
+- Cobre a etapa canônica **34** (doc **D43** — NF de montagem por estado: SP/RJ/CE).
+- Distinta da **NF-e de produto** (ciclo etapa 15); usa o contrato `EmissorFiscal.emitir_nfse_servico`
+  (hoje `NotImplementedError`) — módulo **Fiscal**.
+- Definir onde encaixa no ciclo (sub-etapa na Montagem/17 ou etapa própria pós-19).
+- **Referência:** lacuna #1 da reconciliação. Entra no fechamento do módulo Fiscal.
+
+---
+
+### US-33 — Pós-entrega: follow-up, ocorrências e recompra `[PLANEJADO]`
+
+**Como** Consultor / Marketing,  
+**quero** registrar follow-up pós-entrega, ocorrências e indicações/recompra,  
+**para que** o relacionamento pós-venda seja acompanhado e gere novas oportunidades.
+
+**Critérios de aceite:**
+- Cobre as etapas canônicas **36** (follow-up 7–15 dias) e **38** (indicação/recompra) — hoje **sem etapa**;
+  a **37** (ocorrências) já é aproximada pela etapa 18 (Assistência pós Montagem).
+- Definir se vira **etapa(s) do ciclo** (pós-20) ou funcionalidade do módulo **Pós-venda / CRM**.
+- **Referência:** lacuna #2 da reconciliação.
+
+---
+
+### US-34 — Definir a posição da Aprovação Financeira (11d × Fase 3) `[PLANEJADO]`
+
+**Como** Financeiro,  
+**quero** que a aprovação financeira ocorra no ponto correto do fluxo,  
+**para que** eu aprove a lista final consolidada no momento certo (antes de comprar).
+
+**Critérios de aceite:**
+- Decidir entre **manter no PE (11d — "antes de detalhar o PE")** ou **mover para pós-PE** (canônico
+  **etapa 20 — "aprovar a lista consolidada antes da compra"**).
+- Documentar a decisão; ajustar `ETAPAS_APROVACAO_FINANCEIRA` / gating em `mod_ciclo.py` se mudar.
+- **Referência:** lacuna #3 (descompasso de posição). Decisão de negócio, não só de código.
+
+---
+
+### US-35 — Marcos de Conferência técnica e Transferência ao CD `[PLANEJADO]`
+
+**Como** Conferente / Gerente Adm-Fin,  
+**quero** marcos próprios para **Conferência técnica (19)** e **Transferência ao CD (22)**,  
+**para que** esses controles — hoje achatados na etapa 12 (Implantação) — sejam rastreáveis.
+
+**Critérios de aceite:**
+- Avaliar **sub-etapas na 12** (ex.: 12a Conferência, 12b Transferência ao CD) **ou** manter achatado com
+  checklist de documentos (D23/D24/D25/D26/D27).
+- Não quebrar o gating sequencial (`mod_ciclo.py`).
+- **Referência:** lacuna #4 da reconciliação.
 
 ---
 
