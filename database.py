@@ -135,6 +135,9 @@ class Cliente(Base):
     id            = Column(Integer,     primary_key=True, autoincrement=True)
     nome          = Column(String(150), nullable=False)
     cpf           = Column(String(14),  nullable=True, unique=True)
+    tipo_dest          = Column(Text, default="nao_contribuinte")  # contribuinte|isento|nao_contribuinte
+    cnpj               = Column(String(18), nullable=True)
+    inscricao_estadual = Column(Text, nullable=True)
     email         = Column(String(120), nullable=True)
     telefone      = Column(String(20),  nullable=True)
     whatsapp      = Column(String(20),  nullable=True)
@@ -672,6 +675,9 @@ def _migrar_colunas():
             ("inst_cep",               "VARCHAR(9)"),
             ("inst_uf",                "VARCHAR(2)"),
             ("loja_id",                "INTEGER"),
+            ("tipo_dest",              "VARCHAR DEFAULT 'nao_contribuinte'"),
+            ("cnpj",                   "VARCHAR(18)"),
+            ("inscricao_estadual",     "TEXT"),
         ]:
             if col not in cli_cols:
                 cur.execute(f"ALTER TABLE clientes ADD COLUMN {col} {tipo}")
