@@ -22,6 +22,7 @@
 - [EP-08 — Sincronização Omie e Painel Admin](#ep-08--sincronização-omie-e-painel-admin)
 - [EP-09 — Lista de Projetos e Pipeline de Vendas](#ep-09--lista-de-projetos-e-pipeline-de-vendas)
 - [EP-10 — Reconciliação do Ciclo (lacunas 38 etapas ↔ implementado)](#ep-10--reconciliação-do-ciclo-lacunas-38-etapas--implementado)
+- [EP-11 — Faturamento multi-CNPJ (Emitente / Plano de Faturamento)](#ep-11--faturamento-multi-cnpj-emitente--plano-de-faturamento)
 
 ---
 
@@ -601,6 +602,56 @@
   checklist de documentos (D23/D24/D25/D26/D27).
 - Não quebrar o gating sequencial (`mod_ciclo.py`).
 - **Referência:** lacuna #4 da reconciliação.
+
+---
+
+## EP-11 — Faturamento multi-CNPJ (Emitente / Plano de Faturamento)
+
+> Base estrutural **implementada** (branch `feat/fiscal-emitente-multicnpj`, spec/plano em
+> `docs/superpowers/{specs,plans}/2026-07-06-fiscal-plano-faturamento-multicnpj*`): `Emitente` de 1ª classe,
+> `PerfilEmissao` (loja/rede), `DocumentoFiscal` (tipo+emitente), e a **emissão de NF-e de produto resolve o
+> Emitente por documento** (produto pode sair sob CNPJ ≠ loja vendedora). Estas histórias completam a frente.
+
+---
+
+### US-36 — Migrar o Painel Fiscal (config) para o Emitente `[PLANEJADO]`
+
+**Como** administrador de loja/rede,
+**quero** que a configuração fiscal (Painel Fiscal) edite o **Emitente** que a emissão realmente usa,
+**para que** alterar dados/credenciais fiscais afete a emissão.
+
+**Critérios de aceite:**
+- **⚠ GAP atual:** o Painel Fiscal (Sub-frentes I/II) e os endpoints `…/perfil-fiscal` escrevem/leem
+  `PerfilFiscal`; a **emissão lê `Emitente`** — divergentes. Editar o painel **não** afeta a emissão hoje.
+- Migrar os endpoints/painel de config para o `Emitente` (ou aposentar `PerfilFiscal` após migrar a config).
+- Confirmar que o `focus_client_para_loja`/`PerfilFiscal` legados podem ser removidos sem quebrar nada.
+
+---
+
+### US-37 — UI do Perfil de Emissão (loja/rede ↔ emitentes) `[PLANEJADO]`
+
+**Como** administrador de rede,
+**quero** associar, por loja/rede, qual **Emitente** assina o produto e qual assina o serviço,
+**para que** a topologia (avulsa, parceira, Rede Orizon) seja configurável sem mexer no banco.
+
+**Critérios de aceite:**
+- Tela para criar/editar `Emitente`s e as linhas de `PerfilEmissao` (produto→emitente, serviço→emitente) por
+  loja e o default da rede.
+- Reflete a resolução `override loja → default rede → self` já implementada.
+
+---
+
+### US-38 — Emissão da NFS-e de serviço sob o Emitente do plano `[PLANEJADO]`
+
+**Como** Gerente Adm/Fin,
+**quero** emitir a **NFS-e de serviço** (montagem/projeto) sob o Emitente que o Plano de Faturamento resolve,
+**para que** o serviço possa sair por um CNPJ distinto do produto (ex.: Rede Orizon — loja emite serviço).
+
+**Critérios de aceite:**
+- Implementar `EmissorFiscal.emitir_nfse_servico` (hoje `NotImplementedError`) via Focus NFS-e.
+- O slot "serviço" do plano (`resolver_emitente(loja,"servico")`) já existe; falta a emissão.
+- **Substitui/unifica a US-32 (EP-10)** — a NFS-e de montagem nasce neste trilho multi-CNPJ.
+- Refinar `resolver_plano` para detectar de fato quando a venda tem serviço (hoje recebe `tem_servico` por parâmetro).
 
 ---
 

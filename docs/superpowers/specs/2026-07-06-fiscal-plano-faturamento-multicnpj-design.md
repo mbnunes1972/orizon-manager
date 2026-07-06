@@ -1,9 +1,12 @@
 # Fiscal — Plano de Faturamento por Venda (multi-CNPJ) — Design
 
 > Spec de design · 2026-07-06 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Corrige, na base, a premissa embutida "1 venda =
-> 1 CNPJ = 1 documento". Escopo: estrutura (Emitente + Perfil de Emissão + Plano/documento_fiscal) +
-> **re-plataforma a emissão de NF-e de produto** atual. NFS-e = slot modelado (emissão fica na US-32).
+> Status: **IMPLEMENTADO (Sessão 49, branch `feat/fiscal-emitente-multicnpj`, suíte 545)** — Emitente de 1ª
+> classe (absorve PerfilFiscal) + Perfil de Emissão (loja/rede, resolução override→default→self) +
+> `DocumentoFiscal` (tipo+emitente) + re-plataforma da NF-e de produto (resolve o Emitente por documento;
+> multi-CNPJ provado em teste). NFS-e = slot modelado (`emitir_nfse_servico` segue NotImplemented — US-32).
+> **⚠ GAP conhecido:** o **Painel Fiscal (config)** ainda escreve `PerfilFiscal`, mas a **emissão lê
+> `Emitente`** — divergentes até a migração do painel de config para o Emitente (EP-11, frente própria).
 
 ## 1. Motivação (auditoria)
 
