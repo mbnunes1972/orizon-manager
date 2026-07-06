@@ -4,8 +4,14 @@ import mapa_fiscal as mp
 
 
 def _nota(uf_emit="SP", uf_dest="SP", doc_tipo="cpf"):
-    dest_doc = {"doc_tipo": doc_tipo,
-                "doc": ("11111111111111" if doc_tipo == "cnpj" else "22222222222")}
+    # doc_tipo cpf -> nao_contribuinte (indicador 9, consumidor_final 1);
+    # doc_tipo cnpj -> contribuinte (indicador 1, consumidor_final 0, IE enviada).
+    if doc_tipo == "cnpj":
+        dest_doc = {"doc_tipo": "cnpj", "doc": "11111111111111",
+                    "indicador_ie": 1, "ie": "ISE123", "consumidor_final": 0}
+    else:
+        dest_doc = {"doc_tipo": "cpf", "doc": "22222222222",
+                    "indicador_ie": 9, "ie": None, "consumidor_final": 1}
     return {
         "ref": "R1", "natureza_operacao": "Venda de mercadoria",
         "data_emissao": "2026-07-05T10:00:00-03:00",
@@ -79,11 +85,57 @@ from types import SimpleNamespace
 
 def _emitente(**kw):
     base = dict(cnpj="19152134000156", razao_social="LOJA X LTDA", regime_tributario="simples",
-                inscricao_estadual="ISENTO", csosn_padrao="101", cfop_dentro_uf="5102",
-                cfop_fora_uf="6102", logradouro="Rua A", numero="1", bairro="Centro",
-                cidade="Sao Paulo", uf="SP", cep="01000-000")
+                inscricao_estadual="ISENTO", csosn_padrao="101", csosn_contribuinte=None,
+                cfop_dentro_uf="5102", cfop_fora_uf="6102", logradouro="Rua A", numero="1",
+                bairro="Centro", cidade="Sao Paulo", uf="SP", cep="01000-000")
     base.update(kw)
     return SimpleNamespace(**base)
+
+
+def _cli(tipo, **kw):
+    base = dict(nome="C", tipo_dest=tipo, cpf="111.444.777-35", cnpj="11.222.333/0001-44",
+                inscricao_estadual="ISE123", logradouro="R", numero="1", bairro="b",
+                cidade="c", estado="SP", cep="20000-000")
+    base.update(kw)
+    return SimpleNamespace(**base)
+
+
+def test_ramo_contribuinte():
+    emit = _emitente(uf="SP", csosn_contribuinte="101", csosn_padrao="102")
+    nota = mp.montar_nota(emit, _cli("contribuinte"), [], "R", "D")
+    d = nota["destinatario"]
+    assert d["doc_tipo"] == "cnpj" and d["doc"] == "11222333000144"
+    assert d["indicador_ie"] == 1 and d["ie"] == "ISE123" and d["consumidor_final"] == 0
+    assert nota["fiscal"]["csosn"] == "101"
+    p = mp.montar_payload(nota)
+    assert p["indicador_inscricao_estadual_destinatario"] == 1
+    assert p["inscricao_estadual_destinatario"] == "ISE123" and p["consumidor_final"] == 0
+
+
+def test_ramo_isento():
+    emit = _emitente(uf="SP", csosn_padrao="102")
+    nota = mp.montar_nota(emit, _cli("isento"), [], "R", "D")
+    d = nota["destinatario"]
+    assert d["doc_tipo"] == "cnpj" and d["indicador_ie"] == 2 and d["consumidor_final"] == 1
+    assert nota["fiscal"]["csosn"] == "102"
+    p = mp.montar_payload(nota)
+    assert p["indicador_inscricao_estadual_destinatario"] == 2 and "inscricao_estadual_destinatario" not in p
+
+
+def test_ramo_nao_contribuinte():
+    emit = _emitente(uf="SP", csosn_padrao="102")
+    nota = mp.montar_nota(emit, _cli("nao_contribuinte"), [], "R", "D")
+    d = nota["destinatario"]
+    assert d["doc_tipo"] == "cpf" and d["doc"] == "11144477735" and d["indicador_ie"] == 9 and d["consumidor_final"] == 1
+    assert nota["fiscal"]["csosn"] == "102"
+    p = mp.montar_payload(nota)
+    assert p["indicador_inscricao_estadual_destinatario"] == 9 and "inscricao_estadual_destinatario" not in p
+
+
+def test_csosn_default_no_codigo_quando_emitente_null():
+    emit = _emitente(uf="SP", csosn_contribuinte=None, csosn_padrao=None)
+    assert mp.montar_nota(emit, _cli("contribuinte"), [], "R", "D")["fiscal"]["csosn"] == "101"
+    assert mp.montar_nota(emit, _cli("nao_contribuinte"), [], "R", "D")["fiscal"]["csosn"] == "102"
 
 
 def test_montar_nota_from_objetos():
@@ -112,7 +164,8 @@ def test_montar_nota_regime_normal_e_cliente_cnpj():
     emitente = _emitente(cnpj="1", razao_social="L", regime_tributario="normal",
                          inscricao_estadual="1", cidade="c", uf="SP", cep="1",
                          logradouro="a", numero="1", bairro="b")
-    cliente = SimpleNamespace(nome="C", cnpj="99999999000199", cpf=None, logradouro="a", numero="1",
+    cliente = SimpleNamespace(nome="C", tipo_dest="contribuinte", cnpj="99999999000199", cpf=None,
+                              inscricao_estadual="1", logradouro="a", numero="1",
                               bairro="b", cidade="c", estado="SP", cep="1")
     nota = mp.montar_nota(emitente, cliente, [], ref="R", data_emissao="D")
     assert nota["emitente"]["regime"] == 3          # normal -> 3

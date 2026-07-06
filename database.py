@@ -555,6 +555,7 @@ class Emitente(Base):
     inscricao_municipal = Column(Text, nullable=True)
     regime_tributario = Column(Text, nullable=True)
     csosn_padrao = Column(Text, nullable=True)
+    csosn_contribuinte = Column(Text, nullable=True)
     cfop_dentro_uf = Column(Text, nullable=True)
     cfop_fora_uf = Column(Text, nullable=True)
     serie_nfe = Column(Text, nullable=True)
@@ -792,6 +793,12 @@ def _migrar_colunas():
         nfe_cols = [r[1] for r in cur.fetchall()]
         if nfe_cols and "fabrica_doc_id" not in nfe_cols:
             cur.execute("ALTER TABLE nfe_emissao ADD COLUMN fabrica_doc_id INTEGER")
+
+        # ── emitente: CSOSN próprio p/ destinatário contribuinte (default no código = 101) ──
+        if _tabela_existe(cur, "emitente"):
+            emit_cols = {c[1] for c in cur.execute("PRAGMA table_info(emitente)").fetchall()}
+            if "csosn_contribuinte" not in emit_cols:
+                cur.execute("ALTER TABLE emitente ADD COLUMN csosn_contribuinte TEXT")
 
         # ── fiscal multi-CNPJ: vínculo loja/rede -> emitente (tabela emitente via create_all) ──
         if _tabela_existe(cur, "lojas"):
