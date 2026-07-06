@@ -187,6 +187,7 @@ class Rede(Base):
     id        = Column(Integer,     primary_key=True, autoincrement=True)
     nome      = Column(String(150), nullable=False)
     cnpj      = Column(String(18),  nullable=True)
+    emitente_central_id = Column(Integer, ForeignKey("emitente.id"), nullable=True)
     ativo     = Column(Integer,     default=1)
     criado_em = Column(DateTime,    default=datetime.utcnow)
 
@@ -213,6 +214,7 @@ class Loja(Base):
     testemunha1_cpf  = Column(String(14),  nullable=True)
     testemunha2_nome = Column(String(120), nullable=True)
     testemunha2_cpf  = Column(String(14),  nullable=True)
+    emitente_id = Column(Integer, ForeignKey("emitente.id"), nullable=True)
     ativo       = Column(Integer,  default=1)
     criado_em   = Column(DateTime, default=datetime.utcnow)
     config_financeira_json = Column(Text, nullable=True)   # config financeira da loja (JSON)
@@ -539,6 +541,44 @@ class PerfilFiscal(Base):
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class Emitente(Base):
+    """Identidade fiscal de 1 CNPJ (absorve PerfilFiscal). Emite documentos; NÃO é a loja vendedora."""
+    __tablename__ = "emitente"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cnpj = Column(String(18), nullable=True)
+    razao_social = Column(Text, nullable=True)
+    nome_fantasia = Column(Text, nullable=True)
+    inscricao_estadual = Column(Text, nullable=True)
+    inscricao_municipal = Column(Text, nullable=True)
+    regime_tributario = Column(Text, nullable=True)
+    csosn_padrao = Column(Text, nullable=True)
+    cfop_dentro_uf = Column(Text, nullable=True)
+    cfop_fora_uf = Column(Text, nullable=True)
+    serie_nfe = Column(Text, nullable=True)
+    discrimina_impostos = Column(Integer, default=1)
+    cnae_servico = Column(Text, nullable=True)
+    cod_servico_municipio = Column(Text, nullable=True)
+    aliquota_iss = Column(Float, nullable=True)
+    retencao_json = Column(Text, nullable=True)
+    municipio_ibge = Column(Text, nullable=True)
+    logradouro = Column(Text, nullable=True)
+    numero = Column(Text, nullable=True)
+    bairro = Column(Text, nullable=True)
+    cidade = Column(Text, nullable=True)
+    uf = Column(Text, nullable=True)
+    cep = Column(Text, nullable=True)
+    cert_validade = Column(DateTime, nullable=True)
+    cert_cnpj = Column(Text, nullable=True)
+    papel_cnpj = Column(Text, nullable=True)
+    focus_token_homolog_enc = Column(Text, nullable=True)
+    focus_token_prod_enc = Column(Text, nullable=True)
+    ambiente_ativo = Column(Text, default="homologacao")
+    placeholders_json = Column(Text, nullable=True)
+    rede_id = Column(Integer, ForeignKey("redes.id"), nullable=True)
+    criado_em = Column(DateTime, default=datetime.utcnow)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class NfeEmissao(Base):
     """Rastreio de uma NF-e emitida pela loja (Focus). `ref` = idempotência. XML/DANFE ficam
     em CicloDocumento (etapa 15) referenciados por xml_doc_id/danfe_doc_id."""
@@ -710,6 +750,16 @@ def _migrar_colunas():
         if nfe_cols and "fabrica_doc_id" not in nfe_cols:
             cur.execute("ALTER TABLE nfe_emissao ADD COLUMN fabrica_doc_id INTEGER")
 
+        # ── fiscal multi-CNPJ: vínculo loja/rede -> emitente (tabela emitente via create_all) ──
+        if _tabela_existe(cur, "lojas"):
+            loja_cols = {c[1] for c in cur.execute("PRAGMA table_info(lojas)").fetchall()}
+            if "emitente_id" not in loja_cols:
+                cur.execute("ALTER TABLE lojas ADD COLUMN emitente_id INTEGER")
+        if _tabela_existe(cur, "redes"):
+            rede_cols = {c[1] for c in cur.execute("PRAGMA table_info(redes)").fetchall()}
+            if "emitente_central_id" not in rede_cols:
+                cur.execute("ALTER TABLE redes ADD COLUMN emitente_central_id INTEGER")
+
         conn.commit()
     except Exception:
         pass
@@ -824,6 +874,39 @@ def _run_migracoes(conn):
     if "usuario_lojas_backfill_2026" not in aplicadas and _tabela_existe(cur, "usuario_lojas"):
         _backfill_usuario_lojas(cur)
         cur.execute("INSERT INTO schema_migrations(id) VALUES('usuario_lojas_backfill_2026')")
+
+    # 2026-07-06: fiscal multi-CNPJ — backfill perfil_fiscal -> emitente (1 por loja/CNPJ);
+    # loja.emitente_id = self. Idempotente: pula loja que já tem emitente_id.
+    if _tabela_existe(cur, "emitente") and _tabela_existe(cur, "perfil_fiscal") \
+            and _tabela_existe(cur, "lojas"):
+        cur.execute("SELECT id, loja_id, razao_social, inscricao_estadual, inscricao_municipal, "
+                    "regime_tributario, csosn_padrao, cfop_dentro_uf, cfop_fora_uf, serie_nfe, "
+                    "discrimina_impostos, cnae_servico, cod_servico_municipio, aliquota_iss, "
+                    "retencao_json, municipio_ibge, cert_validade, cert_cnpj, papel_cnpj, "
+                    "focus_token_homolog_enc, focus_token_prod_enc, ambiente_ativo, "
+                    "placeholders_json FROM perfil_fiscal")
+        for row in cur.fetchall():
+            loja_id = row[1]
+            cur.execute("SELECT emitente_id FROM lojas WHERE id=?", (loja_id,))
+            lj = cur.fetchone()
+            if lj and lj[0]:
+                continue   # já migrado
+            cur.execute("SELECT cnpj, logradouro, numero, bairro, cidade, estado, cep "
+                        "FROM lojas WHERE id=?", (loja_id,))
+            lo = cur.fetchone() or (None,) * 7
+            cur.execute(
+                "INSERT INTO emitente (cnpj, razao_social, inscricao_estadual, inscricao_municipal, "
+                "regime_tributario, csosn_padrao, cfop_dentro_uf, cfop_fora_uf, serie_nfe, "
+                "discrimina_impostos, cnae_servico, cod_servico_municipio, aliquota_iss, "
+                "retencao_json, municipio_ibge, logradouro, numero, bairro, cidade, uf, cep, "
+                "cert_validade, cert_cnpj, papel_cnpj, focus_token_homolog_enc, "
+                "focus_token_prod_enc, ambiente_ativo, placeholders_json) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (lo[0], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10],
+                 row[11], row[12], row[13], row[14], row[15],
+                 lo[1], lo[2], lo[3], lo[4], lo[5], lo[6],
+                 row[16], row[17], row[18], row[19], row[20], row[21], row[22]))
+            cur.execute("UPDATE lojas SET emitente_id=? WHERE id=?", (cur.lastrowid, loja_id))
 
     conn.commit()
 
