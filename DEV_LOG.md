@@ -1287,7 +1287,9 @@ Focus** (empresa + certificado A1 + liberação pelo suporte). Nada de código m
 
 **Insumos do usuário (gatilham as próximas fases, não bloqueiam o que já existe):**
 - **Habilitar o CNPJ na Focus** — cadastrar a empresa 19.152.134/0001-56, enviar o **certificado A1** e
-  pedir liberação para emissão de NF-e (suporte Focus). É o bloqueio atual do smoke real. Token já OK.
+  pedir liberação para emissão de NF-e (suporte Focus). É o bloqueio atual do smoke real. **Token já OK
+  (homologação, autentica); confirmado que a empresa segue "não habilitada" pois o certificado A1 ainda
+  NÃO foi enviado — o usuário fará isso amanhã (2026-07-07). Depois disso, rodar o smoke novamente.**
 - **Valores fiscais reais do contador** (CST/CSOSN/CFOP/alíquotas) do CNPJ **19.152.134/0001-56 (Simples)** —
   entram como **dado** no `PerfilFiscal` (perfil-padrão de teste já destrava o desenvolvimento).
 - **Nota homologação:** o destinatário deve ir com o nome SEFAZ "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO -
