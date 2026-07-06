@@ -617,9 +617,32 @@ class DocumentoFiscal(Base):
 
 # ── Inicialização ─────────────────────────────────────────────────────────────
 def init_db():
+    _migrar_pre_schema()      # renames de TABELA antes do create_all (senão ele cria a nova vazia)
     Base.metadata.create_all(ENGINE)
     _migrar_colunas()
     _migrar_dados()
+
+
+def _migrar_pre_schema():
+    """Renomeações de tabela que DEVEM ocorrer ANTES do create_all — senão o create_all cria a tabela
+    nova vazia e a renomeação (que moveria os dados) nunca acontece. Idempotente."""
+    import sqlite3
+    if not os.path.exists(DB_PATH):
+        return   # banco novo: create_all já nasce com o schema atual
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cur = conn.cursor()
+        def _existe(t):
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (t,))
+            return cur.fetchone() is not None
+        # 2026-07-06: nfe_emissao -> documento_fiscal (preserva as emissões existentes)
+        if _existe("nfe_emissao") and not _existe("documento_fiscal"):
+            cur.execute("ALTER TABLE nfe_emissao RENAME TO documento_fiscal")
+        conn.commit()
+    except Exception:
+        conn.rollback()
+    finally:
+        conn.close()
 
 def _migrar_colunas():
     """Adiciona colunas novas em tabelas existentes sem perder dados."""
