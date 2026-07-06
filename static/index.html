@@ -8858,6 +8858,7 @@ async function cancelarNfeLoja(ref) {
   if (!projetoAtivo) return;
   const just = window.prompt('Justificativa do cancelamento (15 a 255 caracteres):', '');
   if (!just || just.length < 15) { await avisoPopup('A justificativa deve ter ao menos 15 caracteres.', {titulo:'Cancelar NF-e'}); return; }
+  if (just.length > 255) { await avisoPopup('A justificativa não pode passar de 255 caracteres.', {titulo:'Cancelar NF-e'}); return; }
   try {
     const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/15/nfe/cancelar`, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ ref, justificativa: just }) });
     const j = await r.json();
