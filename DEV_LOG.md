@@ -1388,13 +1388,19 @@ etapa Orçamento como hub + Imprimir Orçamento (proposta = 1º doc do banco #8)
 + multitenant F2/F3/F4). Specs anteriores a 24/06 não foram relabeladas (verificar caso a caso ao retomar).
 
 **Pendências / próximos (backlog):**
-1. **Banco de documentos da loja #8 (continuação):** falta a **lista "etapa → documento"** — não está
-   nos transcripts nem nos docs; fonte provável `1_FLUXO_DE_PROCESSOS.docx` (só com o usuário). O
-   usuário vai compartilhar. Depois: modelo de proposta/contrato **por loja** (Padrão/Personalizado).
+1. **Banco de documentos da loja #8 (continuação):** ~~falta a lista "etapa → documento"~~ **RESOLVIDO
+   (2026-07-06):** o `1.FLUXO_DE_PROCESSOS.docx` foi transcrito para `docs/referencia/01-fluxo-de-processos.md`
+   (fonte editável do usuário; ver `docs/referencia/README.md`) — inclui a lista **etapa → documento (D1–D45)**.
+   Ainda pendente: modelo de proposta/contrato **por loja** (Padrão/Personalizado).
 2. **Conferência visual** dos 4 itens de UX do Imprimir Orçamento (botão/cards) no browser.
 3. **Defers** (cosméticos): genericizar corpo do 500 da rota de proposta; remover `import _mprop` redundante.
 4. **Seed Orizon (#6)**, **busca LGPD (#4)**, **config de rede (#7)**.
-5. **Não-pushed:** a `main` está à frente do `origin` (merges locais) — `git push` quando o usuário pedir.
+5. ~~**Não-pushed**~~ **OK (2026-07-06):** `main` sincronizada com `origin` (push funciona nesta máquina).
+6. **EP-10 — Reconciliação do Ciclo (4 lacunas)** — do mapa 38 etapas ↔ ciclo (`docs/processos/FLUXO_38_ETAPAS.md`,
+   canônico em `docs/referencia/01-fluxo-de-processos.md`; faixas em `docs/ARQUITETURA-MODULOS.md`). Registradas
+   em `docs/historias/BACKLOG.md`: **US-32** NFS-e de montagem *(→ módulo Fiscal, o próximo item natural ao
+   retomar o fechamento fiscal)*, **US-33** pós-entrega (follow-up/recompra), **US-34** posição da Aprovação
+   Financeira (11d × Fase 3 — decisão de negócio), **US-35** marcos de Conferência/Transferência ao CD.
 
 > **Nota (2026-07-04):** a antiga seção "🔼 PENDÊNCIA: PUSH" foi removida — o `git push origin main`
 > funciona nesta máquina (Git Credential Manager do usuário). Remote:
