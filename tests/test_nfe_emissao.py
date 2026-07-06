@@ -102,3 +102,36 @@ def test_emitir_erro_autorizacao(app_db, seed, projetos_dir):
     reg = db.query(app_db.NfeEmissao).filter_by(ref="R-4").first()
     assert reg.status == "erro" and reg.erros_json and not reg.xml_doc_id
     db.close()
+
+
+def test_consultar_atualiza_registro(app_db, seed, projetos_dir):
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "R-5", proj); _perfil(app_db, lid, "homologacao")
+    db = app_db.get_session()
+    db.add(app_db.NfeEmissao(ref="R-5", projeto_nome=proj, loja_id=lid, status="processando"))
+    db.commit()
+    res = nfe_emissao.consultar(db, "R-5", emissor=FakeEmissor())
+    assert res.status == StatusNota.AUTORIZADO
+    reg = db.query(app_db.NfeEmissao).filter_by(ref="R-5").first()
+    assert reg.status == "autorizado" and reg.xml_doc_id       # baixou docs ao autorizar
+    db.close()
+
+
+def test_cancelar_atualiza_registro(app_db, seed, projetos_dir):
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "R-6", proj); _perfil(app_db, lid, "homologacao")
+    db = app_db.get_session()
+    db.add(app_db.NfeEmissao(ref="R-6", projeto_nome=proj, loja_id=lid, status="autorizado"))
+    db.commit()
+    res = nfe_emissao.cancelar(db, "R-6", "cancelamento por erro de digitacao", emissor=FakeEmissor())
+    assert res.status == StatusNota.CANCELADO
+    reg = db.query(app_db.NfeEmissao).filter_by(ref="R-6").first()
+    assert reg.status == "cancelado"
+    db.close()
+
+
+def test_consultar_ref_inexistente(app_db, seed, projetos_dir):
+    db = app_db.get_session()
+    with pytest.raises(ValueError):
+        nfe_emissao.consultar(db, "NAO-EXISTE", emissor=FakeEmissor())
+    db.close()
