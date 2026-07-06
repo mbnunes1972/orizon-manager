@@ -1274,7 +1274,7 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
 | **Painel Fiscal I** | `PerfilFiscal` (tabela) + `fiscal_cripto` (Fernet) + `mod_fiscal` + endpoints GET/PUT (config/segredos/ambiente) | ✅ na `main`, testado |
 | **Painel Fiscal II** | Aba **Fiscal** no admin da loja (frontend) — 7 seções, badges de placeholder, segredos write-only, troca de ambiente | ✅ na `main` — **⚠️ verificação manual no navegador PENDENTE** |
 | **Fase 3b** | `mapa_fiscal.py` (nota→payload Focus) + `emissor_focus.py` (`EmissorFocusNfe`) | ✅ na `main`, testado (offline) |
-| **Fase 4** | `NfeEmissao` (rastreio por `ref`) + `nfe_emissao.py` (`emitir`/`consultar`/`cancelar`: emite→polling→baixa XML/DANFE→guarda; idempotente; **recusa produção**) + endpoint `POST …/nfe/emitir-teste` | ✅ testado (offline), branch `feat/nfe-emissao` — **⚠️ smoke real em homologação PENDENTE do token** |
+| **Fase 4** | `NfeEmissao` (rastreio por `ref`) + `nfe_emissao.py` (`emitir`/`consultar`/`cancelar`: emite→polling→baixa XML/DANFE→guarda; idempotente; **recusa produção**) + endpoint `POST …/nfe/emitir-teste` | ✅ na `main`, testado (offline) — **⚠️ smoke real em homologação PENDENTE do token** |
 | **Fase 5** | Orquestração (do projeto: loja+cliente+preview, gerar `ref`, chamar o emissor a partir da etapa 12) + **UI da etapa 15** | ⏳ a fazer |
 
 **Insumos do usuário (gatilham as próximas fases, não bloqueiam o que já existe):**
