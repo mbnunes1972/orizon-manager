@@ -44,7 +44,7 @@ def _nota(ref):
 
 def _reset(app_db, ref, proj):
     db = app_db.get_session()
-    db.query(app_db.NfeEmissao).filter_by(ref=ref).delete()
+    db.query(app_db.DocumentoFiscal).filter_by(ref=ref).delete()
     db.query(app_db.CicloDocumento).filter_by(projeto_nome=proj, etapa_codigo="15").delete()
     db.commit(); db.close()
 
@@ -64,7 +64,7 @@ def test_emitir_autoriza_guarda_docs(app_db, seed, projetos_dir):
     db = app_db.get_session()
     res = nfe_emissao.emitir(db, lid, proj, _nota("R-1"), emissor=fake)
     assert res.status == StatusNota.AUTORIZADO and res.chave == "CH123"
-    reg = db.query(app_db.NfeEmissao).filter_by(ref="R-1").first()
+    reg = db.query(app_db.DocumentoFiscal).filter_by(ref="R-1").first()
     assert reg.status == "autorizado" and reg.xml_doc_id and reg.danfe_doc_id
     docs = db.query(app_db.CicloDocumento).filter_by(projeto_nome=proj, etapa_codigo="15").all()
     assert {d.tipo for d in docs} == {"nfe_loja_xml", "nfe_loja_danfe"}
@@ -101,7 +101,7 @@ def test_emitir_erro_autorizacao(app_db, seed, projetos_dir):
     db = app_db.get_session()
     res = nfe_emissao.emitir(db, lid, proj, _nota("R-4"), emissor=fake)
     assert res.status == StatusNota.ERRO
-    reg = db.query(app_db.NfeEmissao).filter_by(ref="R-4").first()
+    reg = db.query(app_db.DocumentoFiscal).filter_by(ref="R-4").first()
     assert reg.status == "erro" and reg.erros_json and not reg.xml_doc_id
     db.close()
 
@@ -110,11 +110,11 @@ def test_consultar_atualiza_registro(app_db, seed, projetos_dir):
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
     _reset(app_db, "R-5", proj); _perfil(app_db, lid, "homologacao")
     db = app_db.get_session()
-    db.add(app_db.NfeEmissao(ref="R-5", projeto_nome=proj, loja_id=lid, status="processando"))
+    db.add(app_db.DocumentoFiscal(ref="R-5", projeto_nome=proj, loja_id=lid, status="processando"))
     db.commit()
     res = nfe_emissao.consultar(db, "R-5", emissor=FakeEmissor())
     assert res.status == StatusNota.AUTORIZADO
-    reg = db.query(app_db.NfeEmissao).filter_by(ref="R-5").first()
+    reg = db.query(app_db.DocumentoFiscal).filter_by(ref="R-5").first()
     assert reg.status == "autorizado" and reg.xml_doc_id       # baixou docs ao autorizar
     db.close()
 
@@ -123,11 +123,11 @@ def test_cancelar_atualiza_registro(app_db, seed, projetos_dir):
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
     _reset(app_db, "R-6", proj); _perfil(app_db, lid, "homologacao")
     db = app_db.get_session()
-    db.add(app_db.NfeEmissao(ref="R-6", projeto_nome=proj, loja_id=lid, status="autorizado"))
+    db.add(app_db.DocumentoFiscal(ref="R-6", projeto_nome=proj, loja_id=lid, status="autorizado"))
     db.commit()
     res = nfe_emissao.cancelar(db, "R-6", "cancelamento por erro de digitacao", emissor=FakeEmissor())
     assert res.status == StatusNota.CANCELADO
-    reg = db.query(app_db.NfeEmissao).filter_by(ref="R-6").first()
+    reg = db.query(app_db.DocumentoFiscal).filter_by(ref="R-6").first()
     assert reg.status == "cancelado"
     db.close()
 
@@ -144,7 +144,7 @@ def test_emitir_grava_fabrica_doc_id(app_db, seed, projetos_dir):
     _reset(app_db, "R-F1", proj); _perfil(app_db, lid, "homologacao")
     db = app_db.get_session()
     nfe_emissao.emitir(db, lid, proj, _nota("R-F1"), emissor=FakeEmissor(), fabrica_doc_id=99)
-    reg = db.query(app_db.NfeEmissao).filter_by(ref="R-F1").first()
+    reg = db.query(app_db.DocumentoFiscal).filter_by(ref="R-F1").first()
     assert reg.fabrica_doc_id == 99
     db.close()
 

@@ -14,7 +14,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
-                       CicloDocumento, CicloRevisao, PerfilFiscal, NfeEmissao)
+                       CicloDocumento, CicloRevisao, PerfilFiscal, DocumentoFiscal)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -1463,7 +1463,7 @@ class Handler(BaseHTTPRequestHandler):
                               .filter_by(projeto_nome=nome_safe, etapa_codigo="15", tipo="nfe_fabrica_xml")
                               .order_by(CicloDocumento.enviado_em.desc()).all())
                     emissoes = {e.fabrica_doc_id: e for e in
-                                db.query(NfeEmissao).filter_by(projeto_nome=nome_safe).all()
+                                db.query(DocumentoFiscal).filter_by(projeto_nome=nome_safe).all()
                                 if e.fabrica_doc_id is not None}
                     out = []
                     for d in docs:
@@ -4146,7 +4146,7 @@ class Handler(BaseHTTPRequestHandler):
                     data_emissao = datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00")
                     nota = mapa_fiscal.montar_nota(perfil, loja, cliente, preview["itens"], ref, data_emissao)
                     res = nfe_emissao.emitir(db, loja.id, projeto_nome, nota)
-                    reg = db.query(NfeEmissao).filter_by(ref=ref).first()
+                    reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
                     self.send_json({"ok": True, "ref": ref,
                                     "status": res.status.value if hasattr(res.status, "value") else res.status,
                                     "chave": res.chave, "numero": res.numero, "serie": res.serie,
@@ -4208,7 +4208,7 @@ class Handler(BaseHTTPRequestHandler):
                     res = nfe_emissao.emitir(db, loja_id, nome_safe, nota, fabrica_doc_id=doc.id)
                     if res.status.value == "autorizado":
                         _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
-                    reg = db.query(NfeEmissao).filter_by(ref=ref).first()
+                    reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
                     self.send_json({"ok": True, "ref": ref,
                                     "status": res.status.value, "chave": res.chave, "numero": res.numero,
                                     "serie": res.serie, "mensagem_sefaz": res.mensagem_sefaz, "erros": res.erros,
@@ -4245,7 +4245,7 @@ class Handler(BaseHTTPRequestHandler):
                     if _projeto_da_loja(db, nome_safe, loja_id) is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     ref = req.get("ref")
-                    reg = db.query(NfeEmissao).filter_by(ref=ref).first()
+                    reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
                     if not reg or reg.projeto_nome != nome_safe:   # a NF-e tem de pertencer a este projeto (evita cross-tenant via ref do body)
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     res = nfe_emissao.consultar(db, ref)
@@ -4284,7 +4284,7 @@ class Handler(BaseHTTPRequestHandler):
                     if _projeto_da_loja(db, nome_safe, loja_id) is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     ref = req.get("ref")
-                    reg = db.query(NfeEmissao).filter_by(ref=ref).first()
+                    reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
                     if not reg or reg.projeto_nome != nome_safe:   # a NF-e tem de pertencer a este projeto (evita cross-tenant via ref do body)
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     res = nfe_emissao.cancelar(db, ref, req.get("justificativa") or "")

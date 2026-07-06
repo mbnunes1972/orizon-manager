@@ -1,5 +1,5 @@
 """nfe_emissao.py — serviço de emissão da NF-e da loja via Focus (Fase 4).
-Emite, acompanha (polling), guarda XML/DANFE (CicloDocumento) e rastreia (NfeEmissao).
+Emite, acompanha (polling), guarda XML/DANFE (CicloDocumento) e rastreia (DocumentoFiscal).
 Testável offline: `emissor` é injetável. Nenhuma UI/rota aqui."""
 import os
 import json
@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 
 import storage
-from database import NfeEmissao, PerfilFiscal, CicloDocumento
+from database import DocumentoFiscal, PerfilFiscal, CicloDocumento
 from emissor_fiscal import StatusNota, ResultadoEmissao, resultado_de_focus
 
 _TIPO_XML = "nfe_loja_xml"
@@ -65,7 +65,7 @@ def emitir(db, loja_id, projeto_nome, nota, permitir_producao=False, emissor=Non
            fabrica_doc_id=None):
     """Emite (ou devolve idempotente), acompanha até o status final e guarda XML/DANFE."""
     ref = nota["ref"]
-    reg = db.query(NfeEmissao).filter_by(ref=ref).first()
+    reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
     if reg and reg.status == "autorizado":
         return _resultado_de_registro(reg)
     pf = db.query(PerfilFiscal).filter_by(loja_id=loja_id).first()
@@ -80,8 +80,8 @@ def emitir(db, loja_id, projeto_nome, nota, permitir_producao=False, emissor=Non
     if res.status == StatusNota.PROCESSANDO:
         res = resultado_de_focus(emissor.client.aguardar_processamento(ref))
     if not reg:
-        reg = NfeEmissao(ref=ref, projeto_nome=projeto_nome, loja_id=loja_id, etapa_codigo="15",
-                         fabrica_doc_id=fabrica_doc_id)
+        reg = DocumentoFiscal(ref=ref, projeto_nome=projeto_nome, loja_id=loja_id, etapa_codigo="15",
+                              tipo_documento="produto", fabrica_doc_id=fabrica_doc_id)
         db.add(reg)
     _aplicar_resultado(reg, res)
     if res.status == StatusNota.AUTORIZADO:
@@ -92,9 +92,9 @@ def emitir(db, loja_id, projeto_nome, nota, permitir_producao=False, emissor=Non
 
 def consultar(db, ref, emissor=None):
     """Reconsulta o status e atualiza o registro (baixa docs se recém-autorizado)."""
-    reg = db.query(NfeEmissao).filter_by(ref=ref).first()
+    reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
     if not reg:
-        raise ValueError("NfeEmissao %s não encontrada" % (ref,))
+        raise ValueError("DocumentoFiscal %s não encontrada" % (ref,))
     if emissor is None:
         emissor = _emissor_para(db, reg.loja_id)
     res = emissor.consultar_status(ref)
@@ -108,9 +108,9 @@ def consultar(db, ref, emissor=None):
 
 def cancelar(db, ref, justificativa, emissor=None):
     """Cancela na Focus e atualiza o registro (guarda o XML de cancelamento)."""
-    reg = db.query(NfeEmissao).filter_by(ref=ref).first()
+    reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
     if not reg:
-        raise ValueError("NfeEmissao %s não encontrada" % (ref,))
+        raise ValueError("DocumentoFiscal %s não encontrada" % (ref,))
     if emissor is None:
         emissor = _emissor_para(db, reg.loja_id)
     res = emissor.cancelar(ref, justificativa)

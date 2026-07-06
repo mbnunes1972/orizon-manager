@@ -45,7 +45,7 @@ def _perfil(app_db, loja_id, ambiente="homologacao"):
 def _reset15(app_db, proj):
     db = app_db.get_session()
     db.query(app_db.CicloDocumento).filter_by(projeto_nome=proj, etapa_codigo="15").delete()
-    db.query(app_db.NfeEmissao).filter_by(projeto_nome=proj).delete()
+    db.query(app_db.DocumentoFiscal).filter_by(projeto_nome=proj).delete()
     db.commit(); db.close()
 
 
@@ -186,7 +186,7 @@ def test_consultar_cancelar_cross_tenant_via_ref_404(http_client_factory, seed, 
     proj2 = seed["projeto_l2"]; proj1 = seed["projeto_l1"]
     _reset15(app_db, proj2); _reset15(app_db, proj1); _perfil(app_db, seed["loja2_id"])
     db = app_db.get_session()
-    db.add(app_db.NfeEmissao(ref="NFE-ALHEIA-1", projeto_nome=proj1, loja_id=seed["loja1_id"], status="autorizado"))
+    db.add(app_db.DocumentoFiscal(ref="NFE-ALHEIA-1", projeto_nome=proj1, loja_id=seed["loja1_id"], status="autorizado"))
     db.commit(); db.close()
     c = _login(http_client_factory, "dir_l2")
     st, _ = _post(c, f"/api/projetos/{proj2}/ciclo/15/nfe/consultar", {"ref": "NFE-ALHEIA-1"})
@@ -194,7 +194,7 @@ def test_consultar_cancelar_cross_tenant_via_ref_404(http_client_factory, seed, 
     st2, _ = _post(c, f"/api/projetos/{proj2}/ciclo/15/nfe/cancelar", {"ref": "NFE-ALHEIA-1", "justificativa": "tentativa cross tenant xyz"})
     assert st2 == 404
     db = app_db.get_session()
-    reg = db.query(app_db.NfeEmissao).filter_by(ref="NFE-ALHEIA-1").first()
+    reg = db.query(app_db.DocumentoFiscal).filter_by(ref="NFE-ALHEIA-1").first()
     assert reg.status == "autorizado"   # a NF-e da loja1 permanece intocada
     db.close()
 

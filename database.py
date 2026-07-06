@@ -590,15 +590,18 @@ class PerfilEmissao(Base):
     criado_em = Column(DateTime, default=datetime.utcnow)
 
 
-class NfeEmissao(Base):
-    """Rastreio de uma NF-e emitida pela loja (Focus). `ref` = idempotência. XML/DANFE ficam
-    em CicloDocumento (etapa 15) referenciados por xml_doc_id/danfe_doc_id."""
-    __tablename__ = "nfe_emissao"
+class DocumentoFiscal(Base):
+    """Rastreio de um documento fiscal emitido (NF-e produto / NFS-e serviço via Focus).
+    `ref` = idempotência. XML/DANFE ficam em CicloDocumento (etapa 15) referenciados por
+    xml_doc_id/danfe_doc_id. `loja_id` = escopo da venda; `emitente_id` = emitente resolvido."""
+    __tablename__ = "documento_fiscal"
     id             = Column(Integer, primary_key=True, autoincrement=True)
     ref            = Column(Text, nullable=False, unique=True)
     projeto_nome   = Column(Text, nullable=True)
+    tipo_documento = Column(Text, default="produto")   # "produto" | "servico"
     etapa_codigo   = Column(Text, default="15")
     loja_id        = Column(Integer, ForeignKey("lojas.id"), nullable=True)
+    emitente_id    = Column(Integer, ForeignKey("emitente.id"), nullable=True)
     status         = Column(Text, nullable=True)
     chave_nfe      = Column(Text, nullable=True)
     numero         = Column(Text, nullable=True)
@@ -803,6 +806,12 @@ def _tabela_existe(cur, nome):
     return cur.fetchone() is not None
 
 
+def _cols_de(cur, nome):
+    """Set das colunas de `nome`, ou vazio se a tabela não existe (guarda idempotente)."""
+    cur.execute("PRAGMA table_info(%s)" % nome)
+    return {r[1] for r in cur.fetchall()}
+
+
 def _run_migracoes(conn):
     """Migrações de DADOS (não de schema), idempotentes, rastreadas em schema_migrations.
     Recebe uma conexão sqlite3 (facilita teste com :memory:)."""
@@ -920,6 +929,24 @@ def _run_migracoes(conn):
                  lo[1], lo[2], lo[3], lo[4], lo[5], lo[6],
                  row[16], row[17], row[18], row[19], row[20], row[21], row[22]))
             cur.execute("UPDATE lojas SET emitente_id=? WHERE id=?", (cur.lastrowid, loja_id))
+
+    # 2026-07-06: nfe_emissao -> documento_fiscal (rename + tipo_documento + emitente_id + backfill).
+    # Idempotente via PRAGMA table_info (não usa schema_migrations: guardas de existência bastam).
+    _tem_nfe = bool(_cols_de(cur, "nfe_emissao"))
+    _cols_df = _cols_de(cur, "documento_fiscal")
+    if _tem_nfe and not _cols_df:
+        cur.execute("ALTER TABLE nfe_emissao RENAME TO documento_fiscal")
+        _cols_df = _cols_de(cur, "documento_fiscal")
+    if _cols_df:
+        if "tipo_documento" not in _cols_df:
+            cur.execute("ALTER TABLE documento_fiscal ADD COLUMN tipo_documento TEXT DEFAULT 'produto'")
+        if "emitente_id" not in _cols_df:
+            cur.execute("ALTER TABLE documento_fiscal ADD COLUMN emitente_id INTEGER")
+        if _tabela_existe(cur, "lojas"):
+            cur.execute(
+                "UPDATE documento_fiscal SET emitente_id="
+                "(SELECT emitente_id FROM lojas WHERE lojas.id=documento_fiscal.loja_id) "
+                "WHERE emitente_id IS NULL")
 
     conn.commit()
 
