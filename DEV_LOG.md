@@ -1257,9 +1257,37 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
 - **[CONTEXTO] Fechamento:** Fases 1, 2, **Painel Fiscal Sub-frentes I e II** e **Fase 3b** todas na `main`
   (pushadas e re-ingeridas). **A retomar:** Fases 4-5 (dependem do token da Focus + valores do contador).
 
-## ⏸️ ESTADO ATUAL (2026-07-04) — retomar aqui
+## Sessão 48 — NF-e Fase 5: emissão na etapa 15 (orquestração + painel) — branch `feat/nfe-etapa15`
 
-**`main`** consolidada e verde — **suíte 507 passed** (código 1110 nós / banco 69).
+Última peça de código da integração NF-e. Liga o pipeline (Fases 1-4) à **etapa 15 do ciclo**, por projeto,
+com painel dedicado. Subagent-driven (implementer + revisão spec + revisão qualidade por tarefa); spec/plano
+em `docs/superpowers/{specs,plans}/2026-07-06-nfe-fase5-etapa15-emissao*`. **Suíte 522→531** (12 e2e novos).
+
+- **Decisões (brainstorming):** a **NF-e da fábrica entra na própria etapa 15** (upload append-only — a etapa
+  12 segue sendo os *pedidos enviados à fábrica*); **markup por emissão** (campo no painel, default 30);
+  **emissão restrita a `editar_dados_loja`** (≠ etapas 12-14 cycle-gated); **1:1** (uma NF-e da loja por XML
+  da fábrica); etapa **conclui automático** em `emitida` ao autorizar.
+- **Backend:** coluna `NfeEmissao.fabrica_doc_id` (+ migração idempotente em `_migrar_colunas`); `nfe_emissao.emitir`
+  ganhou `fabrica_doc_id=` e **carimba o nome SEFAZ do destinatário em homologação** (centralizado — beneficia
+  também o `emitir-teste` da Fase 4). 5 endpoints `/api/projetos/<nome>/ciclo/15/…` (gated `editar_dados_loja`
+  + escopo): `nfe-fabrica` (upload), `GET nfe` (estado), `emitir-nfe` (`ref` estável `NFE-<projeto>-<doc_id>`
+  → idempotente), `nfe/consultar`, `nfe/cancelar` (**cancelar reverte a etapa 15** para não-conclusiva).
+- **Frontend:** painel `_renderCardEmissaoNfe` na etapa 15 (roteado como 12/13/14) — carregar NF-e da fábrica,
+  markup por linha, emitir, status/chave, **baixar XML/DANFE**, consultar/cancelar; botões UX-gated por
+  `_NFE_NIVEIS_EMITE = {diretor, super_admin, admin_rede}` (casa com `perfis.py`; backend é a trava real).
+- **Testes:** `tests/test_nfe_etapa15_e2e.py` (emissor mockado via `monkeypatch` de `nfe_emissao._emissor_para`
+  — zero rede): upload+estado, 403/401/404/400 (sem arquivo, outra loja, sem perfil), emitir autoriza+conclui+
+  idempotência, homologação carimba nome SEFAZ (test no `test_nfe_emissao.py`), produção **não** carimba,
+  rejeitada **não** conclui, consultar/cancelar + reversão da etapa.
+- **Pendente:** **smoke real em homologação** (só depois do certificado A1 na Focus, 2026-07-07) e **verificação
+  manual do painel** (etapa 15 + Painel Fiscal II). Merge da branch pendente da conferência do usuário.
+- **[obs. de review, não bloqueia]** cancelar já reverte a etapa; `markup_pct` inválido → custo (comentado,
+  só homologação); justificativa de cancelamento validada 15-255 no painel (backend também).
+
+## ⏸️ ESTADO ATUAL (2026-07-06) — retomar aqui
+
+**`main`** consolidada e verde — **suíte 507 passed** (código 1110 nós / banco 69). Branch **`feat/nfe-etapa15`**
+(NF-e Fase 5) verde em **531 passed** — aguarda smoke real + verificação manual do painel antes do merge.
 
 ### 🧾 Módulo Fiscal / Integração NF-e (Fábrica→Loja via Focus NFe) — mapa e continuação (Sessão 47)
 
@@ -1275,7 +1303,7 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
 | **Painel Fiscal II** | Aba **Fiscal** no admin da loja (frontend) — 7 seções, badges de placeholder, segredos write-only, troca de ambiente | ✅ na `main` — **⚠️ verificação manual no navegador PENDENTE** |
 | **Fase 3b** | `mapa_fiscal.py` (nota→payload Focus) + `emissor_focus.py` (`EmissorFocusNfe`) | ✅ na `main`, testado (offline) |
 | **Fase 4** | `NfeEmissao` (rastreio por `ref`) + `nfe_emissao.py` (`emitir`/`consultar`/`cancelar`: emite→polling→baixa XML/DANFE→guarda; idempotente; **recusa produção**) + endpoint `POST …/nfe/emitir-teste` | ✅ na `main`, testado (offline) — **⚠️ smoke real em homologação PENDENTE do token** |
-| **Fase 5** | Orquestração (do projeto: loja+cliente+preview, gerar `ref`, chamar o emissor a partir da etapa 12) + **UI da etapa 15** | ⏳ a fazer |
+| **Fase 5** | Orquestração por projeto na **etapa 15**: upload da NF-e da fábrica → `preview(markup)` → `montar_nota` → `nfe_emissao.emitir` (`ref` estável `NFE-<projeto>-<doc_id>`, idempotente, conclui a etapa em `emitida`) + consultar/cancelar (cancelar **reverte** a etapa) + **painel da etapa 15**. Coluna `NfeEmissao.fabrica_doc_id`; regra do nome SEFAZ do destinatário em homologação centralizada no `nfe_emissao.emitir` | ✅ branch `feat/nfe-etapa15`, e2e (emissor mockado) — **⚠️ smoke real + verificação manual do painel PENDENTES** |
 
 **Smoke em homologação (2026-07-06):** **token validado** ✅ (autentica; consulta de `ref` inexistente →
 404 "Nota fiscal não encontrada"). **Emissão real testada** com um XML real da fábrica (NFe-170942,
@@ -1292,8 +1320,9 @@ Focus** (empresa + certificado A1 + liberação pelo suporte). Nada de código m
   NÃO foi enviado — o usuário fará isso amanhã (2026-07-07). Depois disso, rodar o smoke novamente.**
 - **Valores fiscais reais do contador** (CST/CSOSN/CFOP/alíquotas) do CNPJ **19.152.134/0001-56 (Simples)** —
   entram como **dado** no `PerfilFiscal` (perfil-padrão de teste já destrava o desenvolvimento).
-- **Nota homologação:** o destinatário deve ir com o nome SEFAZ "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO -
-  SEM VALOR FISCAL" (aplicar automático quando ambiente=homologacao na orquestração da Fase 5).
+- **Nota homologação:** o destinatário vai com o nome SEFAZ "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO -
+  SEM VALOR FISCAL" — **✅ implementado (Fase 5)**: `nfe_emissao.emitir` carimba automático quando
+  `ambiente_ativo == "homologacao"`.
 
 **Pendências/gaps conhecidos (ajustes pequenos, registrados):**
 - **[teste]** conferência do **Painel Fiscal (Sub-frente II)** no navegador — o usuário fará **amanhã**.

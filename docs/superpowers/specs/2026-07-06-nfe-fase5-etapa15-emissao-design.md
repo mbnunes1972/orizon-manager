@@ -1,8 +1,11 @@
 # NF-e Fase 5 — Etapa 15 (Emissão da NF-e do cliente) — Design
 
 > Spec de design · 2026-07-06 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Última peça: liga o pipeline (Fases 1-4) à etapa
-> 15 do ciclo, por projeto, com painel no frontend. Backend e2e-testável (emissor mockado); painel manual.
+> Status: **IMPLEMENTADO (Sessão 48, branch `feat/nfe-etapa15`, suíte 531)** — etapa 15: upload da NF-e da
+> fábrica → emitir (markup) → acompanhar → baixar XML/DANFE + consultar/cancelar, com e2e (emissor mockado).
+> **Pendentes:** smoke real em homologação (após o certificado A1 na Focus) e verificação manual do painel.
+> Ajustes de review já aplicados: cancelar reverte a etapa 15; nome SEFAZ do destinatário centralizado no
+> `nfe_emissao.emitir`; testes negativos (produção não carimba; emissão rejeitada não conclui).
 
 ## 1. Contexto e recorte
 
