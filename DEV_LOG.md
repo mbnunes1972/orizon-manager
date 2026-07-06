@@ -1344,6 +1344,24 @@ erro **de negócio**: **"Empresa ainda não habilitada para emissão de NFe, por
 técnico."** → o pipeline está correto; falta o **cadastro/habilitação do CNPJ 19.152.134/0001-56 na
 Focus** (empresa + certificado A1 + liberação pelo suporte). Nada de código muda até lá.
 
+**🎉 SMOKE REAL AUTORIZADO (2026-07-06) — NF-e emitida em homologação, ponta a ponta.**
+Após o merge multi-CNPJ + o certificado A1 na Focus, o smoke rodou pelo **trilho novo (Emitente)** e
+**autorizou**: `status=AUTORIZADO`, `sefaz="Autorizado o uso da NF-e"`, chave
+`NFe35260719152134000156550010000000011051879962` (CNPJ INSPIRIUM na chave → emitiu sob o self-emitente),
+XML+DANFE baixados (`DocumentoFiscal` xml_doc/danfe_doc). Toda a integração (Fases 1-5 + multi-CNPJ) validada
+contra a SEFAZ real. O smoke descobriu e destravou:
+- **2 bugs de código (corrigidos + testados, commit `b443c0a`):** `modalidade_frete` obrigatório (estava
+  ausente → "Modalidade frete não pode ser vazio"); **CPF/CNPJ/CEP só com dígitos** no payload (`_so_digitos`
+  no `montar_nota` — SEFAZ rejeitava "CPF inválido" com pontuação).
+- **2 achados de DADO (não código):** (a) **CSOSN 101 → 102** — venda a consumidor final (não contribuinte)
+  exige CSOSN **102** (sem crédito); ajustado no `Emitente` da INSPIRIUM. *(Ideal: CSOSN por tipo de
+  destinatário contribuinte×não-contribuinte — refinamento fiscal, contador; registrar.)* (b) o cliente 2
+  (Marcelo) tem **CPF placeholder inválido** (`012.021.345-01`) — para emissão real precisa do CPF real (o
+  smoke usou um CPF de teste válido).
+- **Emitente da INSPIRIUM completo** no `orizon.db`: endereço (Av. Barão do Rio Branco, 736, São José dos
+  Campos/SP, CEP 12242-800), IE 645636985117, IBGE 3549904, CSOSN 102, token homolog. *(bairro do emitente
+  ficou vazio e a SEFAZ aceitou — usa o cadastro da empresa; preencher por higiene.)*
+
 **Smoke PREPARADO (2026-07-06) — runbook em `docs/RUNBOOK-smoke-nfe.md`** (dados locais em `orizon.db`,
 gitignored — não vão pro repo):
 - **`config/fiscal.key`** criada (chave Fernet estável; gitignored) — token salvo hoje decripta amanhã.
