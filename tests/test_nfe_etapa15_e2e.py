@@ -86,3 +86,31 @@ def test_get_nfe_nao_autenticado_401(http_client_factory, seed, app_db, projetos
     c = http_client_factory()
     st, _ = c.get(f"/api/projetos/{seed['projeto_l2']}/ciclo/15/nfe")
     assert st == 401
+
+
+def _upload_sem_arquivo(c, proj):
+    boundary = "----t" + _uuid.uuid4().hex
+    parts = [("--"+boundary+"\r\n").encode(),
+             (f'Content-Disposition: form-data; name="dummy"\r\n\r\n').encode(),
+             b"x\r\n", ("--"+boundary+"--\r\n").encode()]
+    req = urllib.request.Request(c.base + f"/api/projetos/{proj}/ciclo/15/nfe-fabrica",
+                                 data=b"".join(parts), method="POST")
+    req.add_header("Content-Type", "multipart/form-data; boundary="+boundary)
+    req.add_header("Cookie", c.cookie)
+    try:
+        r = urllib.request.urlopen(req, timeout=5); return r.status, _json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        return e.code, _json.loads(e.read() or b"{}")
+
+
+def test_upload_sem_arquivo_400(http_client_factory, seed, app_db, projetos_dir):
+    c = _login(http_client_factory, "dir_l2")
+    st, _ = _upload_sem_arquivo(c, seed["projeto_l2"])
+    assert st == 400
+
+
+def test_upload_projeto_de_outra_loja_404(http_client_factory, seed, app_db, projetos_dir):
+    # diretor da loja2 (tem editar_dados_loja) tentando a etapa 15 de um projeto da loja1
+    c = _login(http_client_factory, "dir_l2")
+    st, _ = _upload_xml(c, seed["projeto_l1"], _fixture_xml())
+    assert st == 404
