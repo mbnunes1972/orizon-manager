@@ -114,3 +114,62 @@ def test_upload_projeto_de_outra_loja_404(http_client_factory, seed, app_db, pro
     c = _login(http_client_factory, "dir_l2")
     st, _ = _upload_xml(c, seed["projeto_l1"], _fixture_xml())
     assert st == 404
+
+
+def _post(c, path, body):
+    import urllib.request, urllib.error, json as J
+    req = urllib.request.Request(c.base + path, data=J.dumps(body).encode(), method="POST")
+    req.add_header("Content-Type", "application/json")
+    if c.cookie: req.add_header("Cookie", c.cookie)
+    try:
+        r = urllib.request.urlopen(req, timeout=5); return r.status, J.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        return e.code, J.loads(e.read() or b"{}")
+
+
+def test_emitir_etapa15_autoriza_conclui(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, lid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")
+    _, up = _upload_xml(c, proj, _fixture_xml())
+    doc_id = up["documento_id"]
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe", {"fabrica_doc_id": doc_id, "markup_pct": 30})
+    assert st == 200 and b["status"] == "autorizado" and b["chave"] == "CH-15", b
+    assert b["ref"] == f"NFE-{proj}-{doc_id}" and b["xml_doc_id"]
+    db = app_db.get_session()
+    et = db.query(app_db.CicloEtapa).filter_by(projeto_nome=proj, etapa_codigo="15").first()
+    assert et.status == "emitida"
+    db.close()
+    st2, g = c.get(f"/api/projetos/{proj}/ciclo/15/nfe")
+    assert g["fabrica_xmls"][0]["emissao"]["status"] == "autorizado"
+    st3, b3 = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe", {"fabrica_doc_id": doc_id, "markup_pct": 30})
+    assert st3 == 200 and b3["ref"] == b["ref"]
+
+
+def test_emitir_etapa15_sem_perfil_400(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, lid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj)
+    db = app_db.get_session(); db.query(app_db.PerfilFiscal).filter_by(loja_id=seed["loja2_id"]).delete(); db.commit(); db.close()
+    c = _login(http_client_factory, "dir_l2")
+    dbx = app_db.get_session()
+    d = app_db.CicloDocumento(projeto_nome=proj, etapa_codigo="15", tipo="nfe_fabrica_xml",
+                              arquivo_path="ciclo/15/x.xml", nome_original="x.xml")
+    dbx.add(d); dbx.commit(); did = d.id; dbx.close()
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe", {"fabrica_doc_id": did, "markup_pct": 30})
+    assert st == 400 and "perfil" in b.get("erro", "").lower()
+
+
+def test_consultar_e_cancelar_etapa15(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, lid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")
+    _, up = _upload_xml(c, proj, _fixture_xml())
+    _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe", {"fabrica_doc_id": up["documento_id"], "markup_pct": 30})
+    ref = f"NFE-{proj}-{up['documento_id']}"
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/nfe/consultar", {"ref": ref})
+    assert st == 200 and b["status"] == "autorizado"
+    st2, b2 = _post(c, f"/api/projetos/{proj}/ciclo/15/nfe/cancelar", {"ref": ref, "justificativa": "cancelamento teste homologacao"})
+    assert st2 == 200 and b2["status"] == "cancelado"

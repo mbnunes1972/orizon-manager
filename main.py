@@ -4161,6 +4161,134 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # POST /api/projetos/<nome>/ciclo/15/emitir-nfe — emite a NF-e da loja
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/15/emitir-nfe$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                if not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                import mod_nfe, mapa_fiscal, nfe_emissao
+                try:
+                    req = json.loads(body) if body else {}
+                except Exception:
+                    self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    projeto = _projeto_da_loja(db, nome_safe, loja_id)
+                    if projeto is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    loja = db.get(Loja, loja_id)
+                    perfil = db.query(PerfilFiscal).filter_by(loja_id=loja_id).first()
+                    if not perfil:
+                        self.send_json({"ok": False, "erro": "Configure o Perfil Fiscal da loja antes de emitir."}, code=400); return
+                    cliente = db.get(Cliente, projeto.cliente_id) if projeto.cliente_id else None
+                    if not cliente:
+                        self.send_json({"ok": False, "erro": "O projeto não tem cliente para o destinatário."}, code=400); return
+                    doc_id = req.get("fabrica_doc_id")
+                    doc = db.query(CicloDocumento).filter_by(id=doc_id, projeto_nome=nome_safe,
+                                                             etapa_codigo="15", tipo="nfe_fabrica_xml").first() if doc_id else None
+                    if not doc:
+                        self.send_json({"ok": False, "erro": "XML da fábrica inválido."}, code=400); return
+                    try:
+                        markup = float(req.get("markup_pct") or 0)
+                    except (TypeError, ValueError):
+                        markup = 0.0
+                    xml_bytes = storage_ler_binario(os.path.join(_projeto_path(nome_safe), doc.arquivo_path))
+                    preview = mod_nfe.preview(xml_bytes, markup)
+                    ref = "NFE-" + nome_safe + "-" + str(doc.id)
+                    data_emissao = datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00")
+                    nota = mapa_fiscal.montar_nota(perfil, loja, cliente, preview["itens"], ref, data_emissao)
+                    res = nfe_emissao.emitir(db, loja_id, nome_safe, nota, fabrica_doc_id=doc.id)
+                    if res.status.value == "autorizado":
+                        _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
+                    reg = db.query(NfeEmissao).filter_by(ref=ref).first()
+                    self.send_json({"ok": True, "ref": ref,
+                                    "status": res.status.value, "chave": res.chave, "numero": res.numero,
+                                    "serie": res.serie, "mensagem_sefaz": res.mensagem_sefaz, "erros": res.erros,
+                                    "xml_doc_id": reg.xml_doc_id if reg else None,
+                                    "danfe_doc_id": reg.danfe_doc_id if reg else None})
+                except ValueError as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=400)
+                except Exception as e:
+                    db.rollback(); self.send_json({"ok": False, "erro": "Falha na emissão: " + str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # POST /api/projetos/<nome>/ciclo/15/nfe/consultar
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/15/nfe/consultar$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                if not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                import nfe_emissao
+                try:
+                    req = json.loads(body) if body else {}
+                except Exception:
+                    self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    res = nfe_emissao.consultar(db, req.get("ref"))
+                    if res.status.value == "autorizado":
+                        _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
+                    self.send_json({"ok": True, "status": res.status.value, "chave": res.chave,
+                                    "mensagem_sefaz": res.mensagem_sefaz, "erros": res.erros})
+                except ValueError as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=400)
+                except Exception as e:
+                    db.rollback(); self.send_json({"ok": False, "erro": "Falha: " + str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # POST /api/projetos/<nome>/ciclo/15/nfe/cancelar
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/15/nfe/cancelar$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                if not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                import nfe_emissao
+                try:
+                    req = json.loads(body) if body else {}
+                except Exception:
+                    self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    res = nfe_emissao.cancelar(db, req.get("ref"), req.get("justificativa") or "")
+                    self.send_json({"ok": True, "status": res.status.value, "mensagem_sefaz": res.mensagem_sefaz})
+                except ValueError as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=400)
+                except Exception as e:
+                    db.rollback(); self.send_json({"ok": False, "erro": "Falha: " + str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
             else:
                 self.send_response(404)
                 self.end_headers()
