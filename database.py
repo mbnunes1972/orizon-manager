@@ -889,7 +889,9 @@ def _run_migracoes(conn):
             loja_id = row[1]
             cur.execute("SELECT emitente_id FROM lojas WHERE id=?", (loja_id,))
             lj = cur.fetchone()
-            if lj and lj[0]:
+            if lj is None:
+                continue   # perfil órfão (loja inexistente) — sem loja para receber o vínculo, ignora
+            if lj[0]:
                 continue   # já migrado
             cur.execute("SELECT cnpj, logradouro, numero, bairro, cidade, estado, cep "
                         "FROM lojas WHERE id=?", (loja_id,))
