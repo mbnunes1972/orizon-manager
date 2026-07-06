@@ -556,6 +556,7 @@ class NfeEmissao(Base):
     erros_json     = Column(Text, nullable=True)
     xml_doc_id     = Column(Integer, ForeignKey("ciclo_documentos.id"), nullable=True)
     danfe_doc_id   = Column(Integer, ForeignKey("ciclo_documentos.id"), nullable=True)
+    fabrica_doc_id = Column(Integer, ForeignKey("ciclo_documentos.id"), nullable=True)
     emitido_em     = Column(DateTime, default=datetime.utcnow)
     atualizado_em  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -702,6 +703,12 @@ def _migrar_colunas():
             cur.execute("ALTER TABLE parceiros ADD COLUMN rede_id INTEGER")
         if "abrangencia" not in par_cols:
             cur.execute("ALTER TABLE parceiros ADD COLUMN abrangencia VARCHAR(10) DEFAULT 'loja'")
+
+        # ── nfe_emissao: doc da NF-e da fábrica (etapa 15) ────────────────────
+        cur.execute("PRAGMA table_info(nfe_emissao)")
+        nfe_cols = [r[1] for r in cur.fetchall()]
+        if nfe_cols and "fabrica_doc_id" not in nfe_cols:
+            cur.execute("ALTER TABLE nfe_emissao ADD COLUMN fabrica_doc_id INTEGER")
 
         conn.commit()
     except Exception:

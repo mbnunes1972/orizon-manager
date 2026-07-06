@@ -18,7 +18,9 @@ class FakeClient:
 class FakeEmissor:
     def __init__(self, status="processando_autorizacao", erros=None):
         self.client = FakeClient(); self._status = status; self._erros = erros; self.emit_calls = 0
+        self.nota_recebida = None
     def emitir_nfe_produto(self, nota):
+        self.nota_recebida = nota
         self.emit_calls += 1
         d = {"ref": nota["ref"], "status": self._status}
         if self._erros: d["erros"] = self._erros
@@ -134,4 +136,25 @@ def test_consultar_ref_inexistente(app_db, seed, projetos_dir):
     db = app_db.get_session()
     with pytest.raises(ValueError):
         nfe_emissao.consultar(db, "NAO-EXISTE", emissor=FakeEmissor())
+    db.close()
+
+
+def test_emitir_grava_fabrica_doc_id(app_db, seed, projetos_dir):
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "R-F1", proj); _perfil(app_db, lid, "homologacao")
+    db = app_db.get_session()
+    nfe_emissao.emitir(db, lid, proj, _nota("R-F1"), emissor=FakeEmissor(), fabrica_doc_id=99)
+    reg = db.query(app_db.NfeEmissao).filter_by(ref="R-F1").first()
+    assert reg.fabrica_doc_id == 99
+    db.close()
+
+
+def test_emitir_homologacao_forca_nome_dest_sefaz(app_db, seed, projetos_dir):
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "R-F2", proj); _perfil(app_db, lid, "homologacao")
+    fake = FakeEmissor()
+    db = app_db.get_session()
+    nfe_emissao.emitir(db, lid, proj, _nota("R-F2"), emissor=fake)
+    assert fake.nota_recebida["destinatario"]["nome"] == \
+        "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
     db.close()

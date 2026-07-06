@@ -13,6 +13,7 @@ from emissor_fiscal import StatusNota, ResultadoEmissao, resultado_de_focus
 _TIPO_XML = "nfe_loja_xml"
 _TIPO_DANFE = "nfe_loja_danfe"
 _TIPO_CANC = "nfe_loja_cancelamento_xml"
+_NOME_DEST_HOMOLOG = "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
 
 
 def _emissor_para(db, loja_id):
@@ -60,7 +61,8 @@ def _guardar_docs_autorizado(db, reg, res, client):
         reg.danfe_doc_id = danfe_doc.id
 
 
-def emitir(db, loja_id, projeto_nome, nota, permitir_producao=False, emissor=None):
+def emitir(db, loja_id, projeto_nome, nota, permitir_producao=False, emissor=None,
+           fabrica_doc_id=None):
     """Emite (ou devolve idempotente), acompanha até o status final e guarda XML/DANFE."""
     ref = nota["ref"]
     reg = db.query(NfeEmissao).filter_by(ref=ref).first()
@@ -70,13 +72,16 @@ def emitir(db, loja_id, projeto_nome, nota, permitir_producao=False, emissor=Non
     ambiente = (pf.ambiente_ativo if pf else "homologacao") or "homologacao"
     if ambiente == "producao" and not permitir_producao:
         raise ValueError("Emissão em produção bloqueada (use permitir_producao=True).")
+    if ambiente == "homologacao":
+        nota["destinatario"]["nome"] = _NOME_DEST_HOMOLOG
     if emissor is None:
         emissor = _emissor_para(db, loja_id)
     res = emissor.emitir_nfe_produto(nota)
     if res.status == StatusNota.PROCESSANDO:
         res = resultado_de_focus(emissor.client.aguardar_processamento(ref))
     if not reg:
-        reg = NfeEmissao(ref=ref, projeto_nome=projeto_nome, loja_id=loja_id, etapa_codigo="15")
+        reg = NfeEmissao(ref=ref, projeto_nome=projeto_nome, loja_id=loja_id, etapa_codigo="15",
+                         fabrica_doc_id=fabrica_doc_id)
         db.add(reg)
     _aplicar_resultado(reg, res)
     if res.status == StatusNota.AUTORIZADO:
