@@ -8803,6 +8803,7 @@ function _renderCardEmissaoNfe(dados, bloqueada) {
       const dl = (id, rot) => id ? `<a class="btn-ciclo" style="font-size:.75rem;text-decoration:none" target="_blank" rel="noopener" href="/api/projetos/${encodeURIComponent(proj)}/ciclo/documento/${id}">${rot}</a>` : '';
       return `<div style="border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px;font-size:.82rem">
         <div>📄 ${esc(x.nome_original || '')} — <span style="color:${cor};font-weight:700">${esc(e.status || '')}</span>${e.chave ? ' · ' + esc(e.chave) : ''}</div>
+        ${e.emitente_cnpj ? `<div style="color:var(--muted);font-size:.72rem">Emitente: ${esc(e.emitente_razao || '')} · ${esc(e.emitente_cnpj)}</div>` : ''}
         ${e.mensagem_sefaz ? `<div style="color:var(--muted);font-size:.75rem">${esc(e.mensagem_sefaz)}</div>` : ''}
         <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
           ${dl(e.xml_doc_id, 'XML')} ${dl(e.danfe_doc_id, 'DANFE')}
