@@ -152,6 +152,72 @@ def _post(c, path, body):
         return e.code, J.loads(e.read() or b"{}")
 
 
+def _set_cliente_dest(app_db, proj, tipo_dest, ie, cnpj="12.345.678/0001-90"):
+    """Ajusta o Cliente do projeto para um dado tipo_dest / IE (para os testes de contribuinte)."""
+    db = app_db.get_session()
+    p = db.query(app_db.Projeto).filter_by(nome_safe=proj).first()
+    cli = db.get(app_db.Cliente, p.cliente_id)
+    cli.tipo_dest = tipo_dest
+    cli.inscricao_estadual = ie
+    cli.cnpj = cnpj
+    db.commit(); db.close()
+
+
+def _get_cliente_ie(app_db, proj):
+    db = app_db.get_session()
+    p = db.query(app_db.Projeto).filter_by(nome_safe=proj).first()
+    ie = db.get(app_db.Cliente, p.cliente_id).inscricao_estadual
+    db.close()
+    return ie
+
+
+def test_emitir_contribuinte_sem_ie_no_body_400(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    """Cliente contribuinte sem IE cadastrada e sem `ie` no body → 400 citando Inscrição Estadual;
+    a emissão não ocorre (emissor mockado captura nada)."""
+    FakeEmissorCaptura._ultima.clear()
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissorCaptura())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    _set_cliente_dest(app_db, proj, "contribuinte", None)
+    c = _login(http_client_factory, "dir_l2")
+    _, up = _upload_xml(c, proj, _fixture_xml())
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe",
+                  {"fabrica_doc_id": up["documento_id"], "markup_pct": 30})
+    assert st == 400, b
+    assert "inscrição estadual" in b.get("erro", "").lower()
+    assert "nota" not in FakeEmissorCaptura._ultima   # emissão não chegou ao emissor
+    # restaura o cliente para não afetar testes seguintes do módulo
+    _set_cliente_dest(app_db, proj, "nao_contribuinte", None, cnpj=None)
+
+
+def test_emitir_contribuinte_com_ie_no_body_persiste(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    """Cliente contribuinte sem IE cadastrada + `ie` no body → 200 e a IE é persistida no Cliente."""
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    _set_cliente_dest(app_db, proj, "contribuinte", None)
+    c = _login(http_client_factory, "dir_l2")
+    _, up = _upload_xml(c, proj, _fixture_xml())
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe",
+                  {"fabrica_doc_id": up["documento_id"], "markup_pct": 30, "ie": "123456"})
+    assert st == 200 and b["status"] == "autorizado", b
+    assert _get_cliente_ie(app_db, proj) == "123456"
+    # restaura o cliente para não afetar testes seguintes do módulo
+    _set_cliente_dest(app_db, proj, "nao_contribuinte", None, cnpj=None)
+
+
+def test_emitir_nao_contribuinte_nao_exige_ie(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    """Default (nao_contribuinte): emite normal sem exigir IE (garante que não regrediu)."""
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")
+    _, up = _upload_xml(c, proj, _fixture_xml())
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe",
+                  {"fabrica_doc_id": up["documento_id"], "markup_pct": 30})
+    assert st == 200 and b["status"] == "autorizado", b
+
+
 def test_emitir_etapa15_autoriza_conclui(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
     monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, lid: FakeEmissor())
     proj = seed["projeto_l2"]

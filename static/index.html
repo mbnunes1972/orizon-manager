@@ -8875,12 +8875,23 @@ async function emitirNfeLoja(docId) {
   if (!projetoAtivo) return;
   const el = document.getElementById('nfe-markup-' + docId);
   const mk = parseFloat((el && el.value) || '0') || 0;
+  const body = { fabrica_doc_id: docId, markup_pct: mk };
   try {
-    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/15/emitir-nfe`, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ fabrica_doc_id: docId, markup_pct: mk }) });
-    const j = await r.json();
-    if (!j.ok) { await avisoPopup(j.erro || 'Falha na emissão.', {titulo:'Emitir NF-e'}); return; }
-    showToast('Emissão: ' + j.status, false); await carregarCiclo();
-  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'Emitir NF-e'}); }
+    let j = await _postEmitirNfe(body);
+    // Cliente contribuinte sem IE cadastrada: o backend pede a Inscrição Estadual → coleta e reenvia.
+    if (!j.ok && /inscri[cç][aã]o estadual/i.test(j.erro || '')) {
+      const ie = (window.prompt('Informe a Inscrição Estadual do cliente (contribuinte):', '') || '').trim();
+      if (!ie) { await avisoPopup('Inscrição Estadual é obrigatória para emitir a NF-e deste cliente.', {titulo:'Emitir NF-e'}); return; }
+      j = await _postEmitirNfe(Object.assign({}, body, { ie }));
+    }
+    if (!j.ok) { await avisoPopup(esc(j.erro || 'Falha na emissão.'), {titulo:'Emitir NF-e'}); return; }
+    showToast('Emissão: ' + esc(j.status), false); await carregarCiclo();
+  } catch(e) { await avisoPopup('Erro de rede: ' + esc(e.message), {titulo:'Emitir NF-e'}); }
+}
+
+async function _postEmitirNfe(body) {
+  const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/15/emitir-nfe`, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  return await r.json();
 }
 
 async function consultarNfeLoja(ref) {

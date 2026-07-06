@@ -4211,6 +4211,14 @@ class Handler(BaseHTTPRequestHandler):
                     cliente = db.get(Cliente, projeto.cliente_id) if projeto.cliente_id else None
                     if not cliente:
                         self.send_json({"ok": False, "erro": "O projeto não tem cliente para o destinatário."}, code=400); return
+                    # Contribuinte exige Inscrição Estadual na NF-e. Se ainda não estiver cadastrada,
+                    # coleta a IE do body no ato da emissão e persiste no Cliente.
+                    if (cliente.tipo_dest == "contribuinte") and not (cliente.inscricao_estadual or "").strip():
+                        ie = (req.get("ie") or "").strip()
+                        if not ie:
+                            self.send_json({"ok": False, "erro": "Informe a Inscrição Estadual do cliente para emitir a NF-e (contribuinte)."}, code=400); return
+                        cliente.inscricao_estadual = ie
+                        db.add(cliente); db.commit()
                     doc_id = req.get("fabrica_doc_id")
                     doc = db.query(CicloDocumento).filter_by(id=doc_id, projeto_nome=nome_safe,
                                                              etapa_codigo="15", tipo="nfe_fabrica_xml").first() if doc_id else None
