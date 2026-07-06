@@ -480,10 +480,20 @@ def validar_cliente_para_contrato(cliente: dict) -> list:
     O endereço de instalação só é cobrado quando NÃO for o mesmo do residencial
     (inst_mesmo_residencial falso) — quando é o mesmo, o residencial é reutilizado.
     Complemento é opcional em ambos.
+
+    Documento por tipo de destinatário (tipo_dest):
+    - "contribuinte"/"isento" → exige CNPJ (CPF não substitui);
+    - "nao_contribuinte" (default) → exige CPF.
+    A Inscrição Estadual (IE) NÃO é exigida aqui — não bloqueia o contrato.
     """
+    tipo_dest = (cliente.get("tipo_dest") or "nao_contribuinte").strip()
+    doc_campo, doc_rotulo = (
+        ("cnpj", "CNPJ") if tipo_dest in ("contribuinte", "isento")
+        else ("cpf", "CPF")
+    )
     obrigatorios = [
         ("nome",       "Nome"),
-        ("cpf",        "CPF"),
+        (doc_campo,    doc_rotulo),
         ("email",      "E-mail"),
         ("telefone",   "Telefone"),
         ("logradouro", "Logradouro (residencial)"),

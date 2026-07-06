@@ -200,6 +200,50 @@ def test_validar_inst_mesma_nao_exige_inst_fields():
     assert validar_cliente_para_contrato(c) == []
 
 
+def test_validar_contribuinte_sem_cnpj_barra():
+    """Cliente contribuinte precisa de CNPJ (CPF não substitui)."""
+    from mod_contrato import validar_cliente_para_contrato
+    c = _cliente_completo()
+    c["tipo_dest"] = "contribuinte"
+    c["cnpj"] = ""            # sem CNPJ → deve barrar
+    c["cpf"] = "123.456.789-00"  # CPF preenchido não conta para contribuinte
+    faltando = validar_cliente_para_contrato(c)
+    joined = " ".join(faltando).lower()
+    assert "cnpj" in joined
+    # CPF não deve ser cobrado quando o tipo é contribuinte
+    assert not any(rot.strip().lower() == "cpf" for rot in faltando)
+
+
+def test_validar_isento_sem_cnpj_barra():
+    """Cliente isento (indicador IE 2) também exige CNPJ."""
+    from mod_contrato import validar_cliente_para_contrato
+    c = _cliente_completo()
+    c["tipo_dest"] = "isento"
+    c["cnpj"] = ""
+    faltando = validar_cliente_para_contrato(c)
+    assert "cnpj" in " ".join(faltando).lower()
+
+
+def test_validar_nao_contribuinte_sem_cpf_barra():
+    """Não-contribuinte sem CPF barra (comportamento atual, mantido)."""
+    from mod_contrato import validar_cliente_para_contrato
+    c = _cliente_completo()
+    c["tipo_dest"] = "nao_contribuinte"
+    c["cpf"] = ""
+    faltando = validar_cliente_para_contrato(c)
+    assert any(rot.strip().lower() == "cpf" for rot in faltando)
+
+
+def test_validar_contribuinte_com_cnpj_sem_ie_nao_barra():
+    """IE não bloqueia o contrato: contribuinte com CNPJ e sem IE passa."""
+    from mod_contrato import validar_cliente_para_contrato
+    c = _cliente_completo()
+    c["tipo_dest"] = "contribuinte"
+    c["cnpj"] = "19.152.134/0001-56"
+    c["inscricao_estadual"] = ""   # IE ausente não deve barrar
+    assert validar_cliente_para_contrato(c) == []
+
+
 def test_email_fallback_consultor():
     from mod_contrato import construir_contexto
     cliente = {"nome": "X", "cpf": "", "email": "", "telefone": "",
