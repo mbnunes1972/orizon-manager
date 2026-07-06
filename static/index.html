@@ -1292,11 +1292,27 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             <button class="btn btn-primary btn-sm" onclick="cliHomonimoNao()" style="font-size:11px">Ver cliente existente</button>
           </div>
         </div>
-        <div>
+        <div style="grid-column:1/-1">
+          <label class="field-label">Tipo de destinatário</label>
+          <select id="cli-tipo-dest" onchange="cliTipoDestMudou()">
+            <option value="nao_contribuinte">Não contribuinte</option>
+            <option value="contribuinte">Contribuinte</option>
+            <option value="isento">Isento</option>
+          </select>
+        </div>
+        <div id="cli-cpf-wrap">
           <label class="field-label">CPF</label>
           <input type="text" id="cli-cpf" placeholder="000.000.000-00"
                  oninput="cliFormatarCPF(this)" onblur="cliChecarCPF(this.value)">
           <div id="cli-aviso-cpf" style="display:none;font-size:10px;color:var(--err);margin-top:4px"></div>
+        </div>
+        <div id="cli-cnpj-wrap" style="display:none">
+          <label class="field-label">CNPJ</label>
+          <input type="text" id="cli-cnpj" placeholder="00.000.000/0000-00">
+        </div>
+        <div id="cli-ie-wrap" style="display:none">
+          <label class="field-label">Inscrição Estadual</label>
+          <input type="text" id="cli-ie" placeholder="Inscrição estadual">
         </div>
         <div>
           <label class="field-label">E-mail</label>
@@ -6043,10 +6059,12 @@ async function cliAbrirModal(id){
   document.getElementById('cli-aviso-nome').style.display = 'none';
   document.getElementById('cli-aviso-cpf').style.display  = 'none';
   _cliHomonimoConfirmado = false;
-  ['nome','cpf','email','tel','wpp','cep','logradouro','numero','complemento','bairro','cidade','estado','obs'].forEach(f => {
+  ['nome','cpf','cnpj','ie','email','tel','wpp','cep','logradouro','numero','complemento','bairro','cidade','estado','obs'].forEach(f => {
     const el = document.getElementById('cli-'+f);
     if(el) el.value = '';
   });
+  document.getElementById('cli-tipo-dest').value = 'nao_contribuinte';
+  cliTipoDestMudou();
   // Reset inst address fields
   const elInstMesmoReset = document.getElementById('cli-inst-mesmo');
   if (elInstMesmoReset) { elInstMesmoReset.checked = false; cliToggleInstEnd(false); }
@@ -6061,6 +6079,10 @@ async function cliAbrirModal(id){
         const c = d.cliente;
         document.getElementById('cli-nome').value        = c.nome        || '';
         document.getElementById('cli-cpf').value         = c.cpf         || '';
+        document.getElementById('cli-tipo-dest').value   = c.tipo_dest   || 'nao_contribuinte';
+        document.getElementById('cli-cnpj').value        = c.cnpj        || '';
+        document.getElementById('cli-ie').value          = c.inscricao_estadual || '';
+        cliTipoDestMudou();
         document.getElementById('cli-email').value       = c.email       || '';
         const telEl = document.getElementById('cli-tel');
         const wppEl = document.getElementById('cli-wpp');
@@ -6092,6 +6114,17 @@ async function cliAbrirModal(id){
   }
   document.getElementById('modal-cliente').style.display = 'flex';
   setTimeout(()=>document.getElementById('cli-nome').focus(), 80);
+}
+
+function cliTipoDestMudou(){
+  const tipo = (document.getElementById('cli-tipo-dest') || {}).value || 'nao_contribuinte';
+  const cpf  = document.getElementById('cli-cpf-wrap');
+  const cnpj = document.getElementById('cli-cnpj-wrap');
+  const ie   = document.getElementById('cli-ie-wrap');
+  // nao_contribuinte → CPF; contribuinte → CNPJ+IE; isento → CNPJ
+  if(cpf)  cpf.style.display  = (tipo === 'nao_contribuinte') ? '' : 'none';
+  if(cnpj) cnpj.style.display = (tipo === 'nao_contribuinte') ? 'none' : '';
+  if(ie)   ie.style.display   = (tipo === 'contribuinte')     ? '' : 'none';
 }
 
 function cliFecharModal(){
@@ -6265,9 +6298,14 @@ async function cliSalvar(){
     }
   }
 
+  const tipoDest = document.getElementById('cli-tipo-dest').value || 'nao_contribuinte';
   const payload = {
     nome,
-    cpf:         document.getElementById('cli-cpf').value.trim(),
+    tipo_dest:          tipoDest,
+    // Só envia o documento pertinente ao tipo (CPF p/ não contribuinte; CNPJ p/ contribuinte/isento; IE só contribuinte)
+    cpf:         (tipoDest === 'nao_contribuinte') ? document.getElementById('cli-cpf').value.trim() : '',
+    cnpj:               (tipoDest === 'nao_contribuinte') ? '' : document.getElementById('cli-cnpj').value.trim(),
+    inscricao_estadual: (tipoDest === 'contribuinte') ? document.getElementById('cli-ie').value.trim() : '',
     email:       document.getElementById('cli-email').value.trim(),
     telefone:    document.getElementById('cli-tel').value.trim(),
     whatsapp:    document.getElementById('cli-wpp').value.trim(),

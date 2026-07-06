@@ -1992,9 +1992,13 @@ class Handler(BaseHTTPRequestHandler):
                             self.send_json({"ok": False,
                                             "erro": "CPF já cadastrado em outra unidade."}, code=409)
                         return
+                tipo_dest = (req.get("tipo_dest") or "").strip() or "nao_contribuinte"
                 c = Cliente(
                     nome       =nome, cpf=cpf,
                     loja_id    =loja_id,
+                    tipo_dest         =tipo_dest,
+                    cnpj              =(req.get("cnpj")               or "").strip() or None,
+                    inscricao_estadual=(req.get("inscricao_estadual") or "").strip() or None,
                     email      =(req.get("email")       or "").strip() or None,
                     telefone   =(req.get("telefone")    or "").strip() or None,
                     whatsapp   =(req.get("whatsapp")    or "").strip() or None,
@@ -2193,7 +2197,8 @@ class Handler(BaseHTTPRequestHandler):
                 if not c:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
-                campos = ["nome","cpf","email","telefone","whatsapp",
+                campos = ["nome","cpf","cnpj","inscricao_estadual",
+                          "email","telefone","whatsapp",
                           "cep","logradouro","numero","complemento",
                           "bairro","cidade","estado","observacoes",
                           "inst_logradouro","inst_numero","inst_complemento",
@@ -2201,6 +2206,8 @@ class Handler(BaseHTTPRequestHandler):
                 for f in campos:
                     if f in req:
                         setattr(c, f, (req[f] or "").strip() or None)
+                if "tipo_dest" in req:
+                    c.tipo_dest = (req["tipo_dest"] or "").strip() or "nao_contribuinte"
                 if "inst_mesmo_residencial" in req:
                     c.inst_mesmo_residencial = 1 if req["inst_mesmo_residencial"] else 0
                 if "nome" in req and not c.nome:
@@ -5057,6 +5064,9 @@ def _cliente_dict(c) -> dict:
         "id":          c.id,
         "nome":        c.nome,
         "cpf":         c.cpf         or "",
+        "tipo_dest":         c.tipo_dest         or "nao_contribuinte",
+        "cnpj":              c.cnpj              or "",
+        "inscricao_estadual":c.inscricao_estadual or "",
         "email":       c.email       or "",
         "telefone":    c.telefone    or "",
         "whatsapp":    c.whatsapp    or "",
