@@ -1,0 +1,13 @@
+﻿__pycache__/
+*.pyc
+*.pyo
+omie_config.json
+omie_grupos_cache.json
+/PROJETOS/
+/CONTRATOS/
+*.xlsx
+.env
+.pytest_cache/
+
+omie.db
+.claude/settings.local.json

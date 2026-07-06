@@ -1,0 +1,107 @@
+Attribute VB_Name = "ModFinanciamentoLoja"
+' ============================================================
+' Macro: AplicarParcelas
+' Atalho: Ctrl+Shift+A
+' Funcao: Ajusta a tabela conforme o numero de parcelas em B8
+'         - Linha da ultima parcela recebe o saldo devedor
+'         - Linhas alem do limite ficam cinzas e bloqueadas
+' ============================================================
+Sub AplicarParcelas()
+    Dim ws As Worksheet
+    Dim nParcelas As Integer
+    Dim i As Integer
+    Dim rowParcela As Integer
+    Dim rowInicio As Integer
+    Dim rowUltima As Integer
+    
+    ws = ThisWorkbook.Sheets("Financiamento Loja")
+    rowInicio = 21  ' primeira linha de parcela
+    
+    ' Ler numero de parcelas
+    nParcelas = ws.Range("B8").Value
+    
+    ' Validar range
+    If nParcelas < 1 Or nParcelas > 12 Then
+        MsgBox "Numero de parcelas deve ser entre 1 e 12.", vbExclamation, "Valor invalido"
+        Exit Sub
+    End If
+    
+    rowUltima = rowInicio + nParcelas - 1
+    
+    ' Desproteger se necessario
+    ' ws.Unprotect "senha"
+    
+    For i = 1 To 12
+        rowParcela = rowInicio + i - 1
+        
+        With ws
+            If i < nParcelas Then
+                ' ── Parcela ativa (nao e a ultima) ──────────────────────
+                ' Col A: numero normal
+                .Cells(rowParcela, 1).Interior.Color = RGB(214, 228, 240)  ' AZUL_CLARO
+                .Cells(rowParcela, 1).Font.Color = RGB(31, 56, 100)
+                
+                ' Col B: amarelo editavel, manter valor atual
+                .Cells(rowParcela, 2).Interior.Color = RGB(255, 255, 0)    ' AMARELO
+                .Cells(rowParcela, 2).Font.Color = RGB(0, 0, 255)
+                .Cells(rowParcela, 2).Font.Bold = True
+                .Cells(rowParcela, 2).Locked = False
+                
+                ' Col I: status
+                .Cells(rowParcela, 9).Value = "Ativa"
+                .Cells(rowParcela, 9).Interior.Color = RGB(226, 239, 218)  ' VERDE
+                .Cells(rowParcela, 9).Font.Color = RGB(55, 86, 35)
+                
+            ElseIf i = nParcelas Then
+                ' ── Ultima parcela: fecha o saldo ────────────────────────
+                ' Col A: destaque escuro
+                .Cells(rowParcela, 1).Interior.Color = RGB(31, 56, 100)    ' AZUL_ESCURO
+                .Cells(rowParcela, 1).Font.Color = RGB(255, 255, 255)
+                .Cells(rowParcela, 1).Font.Bold = True
+                
+                ' Col B: calculada = saldo anterior + juros
+                ' Saldo anterior esta em C da linha anterior (ou B11 se for a primeira)
+                If i = 1 Then
+                    .Cells(rowParcela, 2).Formula = "=B11+B11*$B$7"
+                Else
+                    .Cells(rowParcela, 2).Formula = "=C" & rowParcela & "+D" & rowParcela
+                End If
+                .Cells(rowParcela, 2).Interior.Color = RGB(31, 56, 100)    ' AZUL_ESCURO
+                .Cells(rowParcela, 2).Font.Color = RGB(255, 255, 255)
+                .Cells(rowParcela, 2).Font.Bold = True
+                .Cells(rowParcela, 2).Locked = True
+                
+                ' Col I: status
+                .Cells(rowParcela, 9).Value = "Ultima (auto)"
+                .Cells(rowParcela, 9).Interior.Color = RGB(31, 56, 100)
+                .Cells(rowParcela, 9).Font.Color = RGB(255, 255, 255)
+                .Cells(rowParcela, 9).Font.Bold = True
+                
+            Else
+                ' ── Linha inativa (alem do limite) ──────────────────────
+                ' Limpar valores
+                .Cells(rowParcela, 2).Value = 0
+                .Cells(rowParcela, 2).Interior.Color = RGB(191, 191, 191)  ' CINZA
+                .Cells(rowParcela, 2).Font.Color = RGB(128, 128, 128)
+                .Cells(rowParcela, 2).Font.Bold = False
+                .Cells(rowParcela, 2).Locked = True
+                
+                .Cells(rowParcela, 1).Interior.Color = RGB(191, 191, 191)
+                .Cells(rowParcela, 1).Font.Color = RGB(128, 128, 128)
+                
+                ' Col I: status
+                .Cells(rowParcela, 9).Value = "Inativa"
+                .Cells(rowParcela, 9).Interior.Color = RGB(191, 191, 191)
+                .Cells(rowParcela, 9).Font.Color = RGB(128, 128, 128)
+            End If
+        End With
+    Next i
+    
+    MsgBox nParcelas & " parcelas configuradas. Parcela " & nParcelas & " fecha o saldo automaticamente.", _
+           vbInformation, "Parcelas aplicadas"
+End Sub
+
+' Atalho Ctrl+Shift+A mapeado via ThisWorkbook.OnKey no evento Open
+Sub Auto_Open()
+    Application.OnKey "^+A", "AplicarParcelas"
+End Sub

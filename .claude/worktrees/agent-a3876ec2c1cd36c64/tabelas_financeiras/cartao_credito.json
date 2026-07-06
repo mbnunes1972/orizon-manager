@@ -1,0 +1,101 @@
+{
+  "codigo": "cartao_credito",
+  "descricao": "Cartão de Crédito",
+  "tipo": "financiamento_externo",
+  "recebimento": "avista_instituicao",
+  "gerar_boleto": false,
+  "parcelas_max": 21,
+  "bandeiras": [
+    "Visa",
+    "Mastercard"
+  ],
+  "liquidacao_dias_uteis": 1,
+  "observacao": "Liquidacao em 1 dia util. Sem carencia variavel.",
+  "faixas": [
+    {
+      "parcelas": 1,
+      "taxa_retencao_pct": 2.85,
+      "obs": "Credito a vista"
+    },
+    {
+      "parcelas": 2,
+      "taxa_retencao_pct": 3.65
+    },
+    {
+      "parcelas": 3,
+      "taxa_retencao_pct": 4.15
+    },
+    {
+      "parcelas": 4,
+      "taxa_retencao_pct": 4.65
+    },
+    {
+      "parcelas": 5,
+      "taxa_retencao_pct": 5.15
+    },
+    {
+      "parcelas": 6,
+      "taxa_retencao_pct": 5.65
+    },
+    {
+      "parcelas": 7,
+      "taxa_retencao_pct": 6.16
+    },
+    {
+      "parcelas": 8,
+      "taxa_retencao_pct": 6.66
+    },
+    {
+      "parcelas": 9,
+      "taxa_retencao_pct": 7.16
+    },
+    {
+      "parcelas": 10,
+      "taxa_retencao_pct": 7.66
+    },
+    {
+      "parcelas": 11,
+      "taxa_retencao_pct": 8.16
+    },
+    {
+      "parcelas": 12,
+      "taxa_retencao_pct": 8.66
+    },
+    {
+      "parcelas": 13,
+      "taxa_retencao_pct": 9.16
+    },
+    {
+      "parcelas": 14,
+      "taxa_retencao_pct": 9.66
+    },
+    {
+      "parcelas": 15,
+      "taxa_retencao_pct": 10.16
+    },
+    {
+      "parcelas": 16,
+      "taxa_retencao_pct": 10.66
+    },
+    {
+      "parcelas": 17,
+      "taxa_retencao_pct": 11.16
+    },
+    {
+      "parcelas": 18,
+      "taxa_retencao_pct": 11.66
+    },
+    {
+      "parcelas": 19,
+      "taxa_retencao_pct": 12.16
+    },
+    {
+      "parcelas": 20,
+      "taxa_retencao_pct": 12.66
+    },
+    {
+      "parcelas": 21,
+      "taxa_retencao_pct": 13.16
+    }
+  ]
+}

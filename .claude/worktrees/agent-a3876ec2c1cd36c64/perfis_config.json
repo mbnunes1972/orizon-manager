@@ -1,0 +1,26 @@
+{
+  "perfil_ativo": "consultor",
+  "perfis": {
+    "consultor": {
+      "nome": "Consultor de Vendas",
+      "desconto_max_pct": 10.0,
+      "pode_editar_total": true,
+      "pode_ver_margens": false,
+      "cor": "#19c9a0"
+    },
+    "gerente": {
+      "nome": "Gerente de Vendas",
+      "desconto_max_pct": 20.0,
+      "pode_editar_total": true,
+      "pode_ver_margens": true,
+      "cor": "#f0a500"
+    },
+    "diretoria": {
+      "nome": "Diretoria",
+      "desconto_max_pct": 100.0,
+      "pode_editar_total": true,
+      "pode_ver_margens": true,
+      "cor": "#e8611a"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+TERMO DE CIÊNCIA — VENDA PROGRAMADA
+
+[TERMO A SER REDIGIDO]
+
+Cliente: {nome_cliente}
+Data: {data}
+Consultor: {consultor}
+Valor total do contrato: R$ {valor_total}
+Data de entrega prevista: {data_entrega}
+Percentual mínimo a liquidar antes da entrega: 80%
+Valor mínimo a liquidar antes da entrega: R$ {valor_minimo_entrega}
+
+O cliente declara ter ciência de que a entrega do pedido está condicionada
+à liquidação de no mínimo 80% (oitenta por cento) do valor total do contrato
+antes da data de entrega prevista acima indicada.
+
+Assinatura do cliente: ___________________________________
+
+Assinatura do consultor: ___________________________________
