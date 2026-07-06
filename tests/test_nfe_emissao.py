@@ -114,9 +114,9 @@ def test_emitir_erro_autorizacao(app_db, seed, projetos_dir):
 
 def test_consultar_atualiza_registro(app_db, seed, projetos_dir):
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
-    _reset(app_db, "R-5", proj); _perfil(app_db, lid, "homologacao")
+    _reset(app_db, "R-5", proj); eid = _perfil(app_db, lid, "homologacao")
     db = app_db.get_session()
-    db.add(app_db.DocumentoFiscal(ref="R-5", projeto_nome=proj, loja_id=lid, status="processando"))
+    db.add(app_db.DocumentoFiscal(ref="R-5", projeto_nome=proj, loja_id=lid, emitente_id=eid, status="processando"))
     db.commit()
     res = nfe_emissao.consultar(db, "R-5", emissor=FakeEmissor())
     assert res.status == StatusNota.AUTORIZADO
@@ -127,14 +127,31 @@ def test_consultar_atualiza_registro(app_db, seed, projetos_dir):
 
 def test_cancelar_atualiza_registro(app_db, seed, projetos_dir):
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
-    _reset(app_db, "R-6", proj); _perfil(app_db, lid, "homologacao")
+    _reset(app_db, "R-6", proj); eid = _perfil(app_db, lid, "homologacao")
     db = app_db.get_session()
-    db.add(app_db.DocumentoFiscal(ref="R-6", projeto_nome=proj, loja_id=lid, status="autorizado"))
+    db.add(app_db.DocumentoFiscal(ref="R-6", projeto_nome=proj, loja_id=lid, emitente_id=eid, status="autorizado"))
     db.commit()
     res = nfe_emissao.cancelar(db, "R-6", "cancelamento por erro de digitacao", emissor=FakeEmissor())
     assert res.status == StatusNota.CANCELADO
     reg = db.query(app_db.DocumentoFiscal).filter_by(ref="R-6").first()
     assert reg.status == "cancelado"
+    db.close()
+
+
+def test_consultar_resolve_emissor_pelo_emitente_id(app_db, seed, projetos_dir, monkeypatch):
+    # o switch reg.loja_id -> reg.emitente_id: consultar SEM emissor injetado resolve pelo emitente do documento
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "R-7", proj)
+    db = app_db.get_session()
+    db.add(app_db.DocumentoFiscal(ref="R-7", projeto_nome=proj, loja_id=lid, emitente_id=777, status="processando"))
+    db.commit()
+    capturado = {}
+    def _fake_emissor_para(_db, emitente_id):
+        capturado["eid"] = emitente_id
+        return FakeEmissor()
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", _fake_emissor_para)
+    nfe_emissao.consultar(db, "R-7")
+    assert capturado["eid"] == 777      # resolveu pelo emitente do documento, não pela loja (lid != 777)
     db.close()
 
 
