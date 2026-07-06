@@ -4244,7 +4244,11 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": _err}, code=403); return
                     if _projeto_da_loja(db, nome_safe, loja_id) is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
-                    res = nfe_emissao.consultar(db, req.get("ref"))
+                    ref = req.get("ref")
+                    reg = db.query(NfeEmissao).filter_by(ref=ref).first()
+                    if not reg or reg.projeto_nome != nome_safe:   # a NF-e tem de pertencer a este projeto (evita cross-tenant via ref do body)
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    res = nfe_emissao.consultar(db, ref)
                     if res.status.value == "autorizado":
                         _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
                     self.send_json({"ok": True, "status": res.status.value, "chave": res.chave,
@@ -4279,7 +4283,11 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": _err}, code=403); return
                     if _projeto_da_loja(db, nome_safe, loja_id) is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
-                    res = nfe_emissao.cancelar(db, req.get("ref"), req.get("justificativa") or "")
+                    ref = req.get("ref")
+                    reg = db.query(NfeEmissao).filter_by(ref=ref).first()
+                    if not reg or reg.projeto_nome != nome_safe:   # a NF-e tem de pertencer a este projeto (evita cross-tenant via ref do body)
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    res = nfe_emissao.cancelar(db, ref, req.get("justificativa") or "")
                     if res.status.value == "cancelado":
                         # nota cancelada → etapa 15 volta a não-conclusiva (não deixar "emitida" com NF-e cancelada)
                         _set_etapa_status(db, nome_safe, "15", "em_andamento", usuario["id"]); db.commit()

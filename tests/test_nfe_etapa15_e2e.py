@@ -180,6 +180,25 @@ def test_consultar_e_cancelar_etapa15(http_client_factory, seed, app_db, projeto
     db.close()
 
 
+def test_consultar_cancelar_cross_tenant_via_ref_404(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    # dir_l2 opera sobre o SEU projeto na URL, mas envia um ref de uma NF-e da loja1 no body → 404, sem tocar a nota alheia
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, lid: FakeEmissor())
+    proj2 = seed["projeto_l2"]; proj1 = seed["projeto_l1"]
+    _reset15(app_db, proj2); _reset15(app_db, proj1); _perfil(app_db, seed["loja2_id"])
+    db = app_db.get_session()
+    db.add(app_db.NfeEmissao(ref="NFE-ALHEIA-1", projeto_nome=proj1, loja_id=seed["loja1_id"], status="autorizado"))
+    db.commit(); db.close()
+    c = _login(http_client_factory, "dir_l2")
+    st, _ = _post(c, f"/api/projetos/{proj2}/ciclo/15/nfe/consultar", {"ref": "NFE-ALHEIA-1"})
+    assert st == 404
+    st2, _ = _post(c, f"/api/projetos/{proj2}/ciclo/15/nfe/cancelar", {"ref": "NFE-ALHEIA-1", "justificativa": "tentativa cross tenant xyz"})
+    assert st2 == 404
+    db = app_db.get_session()
+    reg = db.query(app_db.NfeEmissao).filter_by(ref="NFE-ALHEIA-1").first()
+    assert reg.status == "autorizado"   # a NF-e da loja1 permanece intocada
+    db.close()
+
+
 class FakeEmissorRejeita:
     def __init__(self): self.client = FakeClient()
     def emitir_nfe_produto(self, nota):
