@@ -158,3 +158,14 @@ def test_emitir_homologacao_forca_nome_dest_sefaz(app_db, seed, projetos_dir):
     assert fake.nota_recebida["destinatario"]["nome"] == \
         "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
     db.close()
+
+
+def test_emitir_producao_nao_forca_nome_dest(app_db, seed, projetos_dir):
+    # regra SEFAZ só vale em homologação: em produção o nome do destinatário é preservado
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "R-F3", proj); _perfil(app_db, lid, "producao")
+    fake = FakeEmissor()
+    db = app_db.get_session()
+    nfe_emissao.emitir(db, lid, proj, _nota("R-F3"), permitir_producao=True, emissor=fake)
+    assert fake.nota_recebida["destinatario"]["nome"] == "C"
+    db.close()
