@@ -539,6 +539,27 @@ class PerfilFiscal(Base):
     atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class NfeEmissao(Base):
+    """Rastreio de uma NF-e emitida pela loja (Focus). `ref` = idempotência. XML/DANFE ficam
+    em CicloDocumento (etapa 15) referenciados por xml_doc_id/danfe_doc_id."""
+    __tablename__ = "nfe_emissao"
+    id             = Column(Integer, primary_key=True, autoincrement=True)
+    ref            = Column(Text, nullable=False, unique=True)
+    projeto_nome   = Column(Text, nullable=True)
+    etapa_codigo   = Column(Text, default="15")
+    loja_id        = Column(Integer, ForeignKey("lojas.id"), nullable=True)
+    status         = Column(Text, nullable=True)
+    chave_nfe      = Column(Text, nullable=True)
+    numero         = Column(Text, nullable=True)
+    serie          = Column(Text, nullable=True)
+    mensagem_sefaz = Column(Text, nullable=True)
+    erros_json     = Column(Text, nullable=True)
+    xml_doc_id     = Column(Integer, ForeignKey("ciclo_documentos.id"), nullable=True)
+    danfe_doc_id   = Column(Integer, ForeignKey("ciclo_documentos.id"), nullable=True)
+    emitido_em     = Column(DateTime, default=datetime.utcnow)
+    atualizado_em  = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 # ── Inicialização ─────────────────────────────────────────────────────────────
 def init_db():
     Base.metadata.create_all(ENGINE)
