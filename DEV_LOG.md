@@ -1313,6 +1313,22 @@ erro **de negócio**: **"Empresa ainda não habilitada para emissão de NFe, por
 técnico."** → o pipeline está correto; falta o **cadastro/habilitação do CNPJ 19.152.134/0001-56 na
 Focus** (empresa + certificado A1 + liberação pelo suporte). Nada de código muda até lá.
 
+**Smoke PREPARADO (2026-07-06) — runbook em `docs/RUNBOOK-smoke-nfe.md`** (dados locais em `orizon.db`,
+gitignored — não vão pro repo):
+- **`config/fiscal.key`** criada (chave Fernet estável; gitignored) — token salvo hoje decripta amanhã.
+- **`PerfilFiscal` da loja 1 (INSPIRIUM, 19.152.134/0001-56)** provisionado: `ambiente_ativo=homologacao`,
+  perfil-padrão (Simples, CSOSN 101, CFOP 5102/6102, ISS 5%, placeholders → **produção bloqueada**).
+  **Token de homologação salvo (encriptado)** e **revalidado** via `focus_client_para_loja` (404 em `ref`
+  inexistente = autentica).
+- **Projeto-alvo do smoke: `Projeto_Teste_Neg`** (loja 1, cliente **Marcelo Buonocore Nunes** com CPF; ciclo
+  concluído até a etapa 14 → **etapa 15 destravada**). **Dry-run offline OK** (perfil INSPIRIUM + cliente 2 +
+  `NFe-170942.xml` → preview 12 itens/custo 730,89/venda 950,16 → `montar_nota` → `montar_payload` sem erro).
+- **⚠️ GAP de dado (só o usuário tem):** a **loja INSPIRIUM está sem endereço** (Loja: logradouro/cidade/UF/CEP)
+  e **sem IE** (perfil). `montar_nota` monta o emitente a partir daí → sem a **UF do emitente** o CFOP sai 6102
+  (interestadual) e a Focus pode rejeitar campos do emitente quando habilitada. **Preencher** o endereço (painel
+  de dados da loja) + IE/município IBGE (aba Fiscal) antes/durante o smoke. (Oferecido preencher se o usuário
+  passar os valores.)
+
 **Insumos do usuário (gatilham as próximas fases, não bloqueiam o que já existe):**
 - **Habilitar o CNPJ na Focus** — cadastrar a empresa 19.152.134/0001-56, enviar o **certificado A1** e
   pedir liberação para emissão de NF-e (suporte Focus). É o bloqueio atual do smoke real. **Token já OK
