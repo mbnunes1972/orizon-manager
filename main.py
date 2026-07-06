@@ -1441,6 +1441,46 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # GET /api/projetos/<nome>/ciclo/15/nfe — estado da etapa 15 (XMLs da fábrica
+            # + emissões associadas), gated por capacidade fiscal (editar_dados_loja).
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/15/nfe$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                if not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    docs = (db.query(CicloDocumento)
+                              .filter_by(projeto_nome=nome_safe, etapa_codigo="15", tipo="nfe_fabrica_xml")
+                              .order_by(CicloDocumento.enviado_em.desc()).all())
+                    emissoes = {e.fabrica_doc_id: e for e in
+                                db.query(NfeEmissao).filter_by(projeto_nome=nome_safe).all()
+                                if e.fabrica_doc_id is not None}
+                    out = []
+                    for d in docs:
+                        e = emissoes.get(d.id)
+                        emissao = None if not e else {
+                            "ref": e.ref, "status": e.status, "chave": e.chave_nfe, "numero": e.numero,
+                            "serie": e.serie, "mensagem_sefaz": e.mensagem_sefaz,
+                            "erros": json.loads(e.erros_json) if e.erros_json else [],
+                            "xml_doc_id": e.xml_doc_id, "danfe_doc_id": e.danfe_doc_id}
+                        out.append({"id": d.id, "nome_original": d.nome_original,
+                                    "enviado_em": d.enviado_em.isoformat() if d.enviado_em else None,
+                                    "emissao": emissao})
+                    self.send_json({"ok": True, "fabrica_xmls": out})
+                finally:
+                    db.close()
+                return
+
             # GET /api/admin/lojas/<id>/perfil-fiscal — config fiscal (segredos NUNCA retornados)
             m = _re.match(r'^/api/admin/lojas/(\d+)/perfil-fiscal$', path)
             if m:
@@ -3909,6 +3949,48 @@ class Handler(BaseHTTPRequestHandler):
                         _set_etapa_status(db, nome_safe, codigo, "em_andamento", usuario["id"])
                     db.add(LogAcaoGerencial(solicitante_id=usuario["id"], autorizador_id=usuario["id"],
                             acao="ciclo_" + tipo_esperado, projeto_nome=nome_safe, etapa_alvo=codigo))
+                    db.commit()
+                    storage_salvar_binario(os.path.join(_projeto_path(nome_safe), rel), data)
+                    self.send_json({"ok": True, "documento_id": doc.id})
+                except Exception as e:
+                    db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # POST /api/projetos/<nome>/ciclo/15/nfe-fabrica — upload da NF-e da fábrica
+            # (etapa 15), append-only, gated por capacidade fiscal (editar_dados_loja).
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/15/nfe-fabrica$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                if not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    if "arquivo" not in arquivos:
+                        self.send_json({"ok": False, "erro": "Anexe o XML da NF-e da fábrica."}, code=400); return
+                    fname, data = arquivos["arquivo"]
+                    base_nome = os.path.basename(fname)
+                    unico = datetime.utcnow().strftime("%Y%m%d%H%M%S") + "_" + uuid.uuid4().hex[:8] + "_" + base_nome
+                    rel = os.path.join("ciclo", "15", unico)
+                    doc = CicloDocumento(projeto_nome=nome_safe, etapa_codigo="15", tipo="nfe_fabrica_xml",
+                                         arquivo_path=rel, nome_original=base_nome, enviado_por_id=usuario["id"])
+                    db.add(doc)
+                    et = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo="15").first()
+                    if not et or et.status == "pendente":
+                        _set_etapa_status(db, nome_safe, "15", "em_andamento", usuario["id"])
+                    db.add(LogAcaoGerencial(solicitante_id=usuario["id"], autorizador_id=usuario["id"],
+                            acao="ciclo_nfe_fabrica_xml", projeto_nome=nome_safe, etapa_alvo="15"))
                     db.commit()
                     storage_salvar_binario(os.path.join(_projeto_path(nome_safe), rel), data)
                     self.send_json({"ok": True, "documento_id": doc.id})
