@@ -1,8 +1,10 @@
 # NF-e Fase 4 — Emissão real + acompanhamento (`nfe_emissao`) — Design
 
 > Spec de design · 2026-07-05 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Emite a NF-e da loja em **homologação** via Focus,
-> acompanha o status e guarda o XML/DANFE. Máquina offline-testável; a emissão real dispara com o token.
+> Status: **IMPLEMENTADO (Sessão 47)** — branch `feat/nfe-emissao`, `NfeEmissao` + `nfe_emissao.py` +
+> endpoint `emitir-teste` com testes offline (suíte 518). **Smoke real em homologação pendente do token
+> da Focus** (salvar no perfil da loja → painel Fiscal → Credenciais Focus). Emite a NF-e da loja em
+> homologação, acompanha o status e guarda o XML/DANFE.
 
 ## 1. Contexto e recorte
 
