@@ -43,3 +43,26 @@ def test_resolver_sem_emitente_erra(app_db):
     with pytest.raises(ValueError):
         mod_fiscal.resolver_emitente(db, loja, "produto")
     db.close()
+
+
+def test_resolver_plano_conta_docs(app_db):
+    db = app_db.get_session()
+    e = app_db.Emitente(cnpj="X"); db.add(e); db.flush()
+    loja = app_db.Loja(nome="L", emitente_id=e.id); db.add(loja); db.flush()
+    proj = app_db.Projeto(nome_safe="P", loja_id=loja.id); db.add(proj); db.commit()
+    tipos = lambda **kw: [x["tipo_doc"] for x in mod_fiscal.resolver_plano(db, proj, **kw)]
+    assert tipos(tem_produto=True, tem_servico=False) == ["produto"]
+    assert tipos(tem_produto=True, tem_servico=True) == ["produto", "servico"]
+    assert tipos(tem_produto=False, tem_servico=False) == []
+    db.close()
+
+
+def test_focus_client_para_emitente_usa_token_do_ambiente(app_db):
+    import fiscal_cripto
+    db = app_db.get_session()
+    e = app_db.Emitente(cnpj="X", ambiente_ativo="homologacao",
+                        focus_token_homolog_enc=fiscal_cripto.encrypt("TOKHOMOLOG"))
+    db.add(e); db.commit()
+    client = mod_fiscal.focus_client_para_emitente(db, e.id)
+    assert client.token == "TOKHOMOLOG" and "homologacao" in client.base_url
+    db.close()
