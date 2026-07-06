@@ -1277,11 +1277,21 @@ parser/precificação (Fase 1) é engine-agnostic e não muda. Roadmap em 5 fase
 | **Fase 4** | `NfeEmissao` (rastreio por `ref`) + `nfe_emissao.py` (`emitir`/`consultar`/`cancelar`: emite→polling→baixa XML/DANFE→guarda; idempotente; **recusa produção**) + endpoint `POST …/nfe/emitir-teste` | ✅ na `main`, testado (offline) — **⚠️ smoke real em homologação PENDENTE do token** |
 | **Fase 5** | Orquestração (do projeto: loja+cliente+preview, gerar `ref`, chamar o emissor a partir da etapa 12) + **UI da etapa 15** | ⏳ a fazer |
 
+**Smoke em homologação (2026-07-06):** **token validado** ✅ (autentica; consulta de `ref` inexistente →
+404 "Nota fiscal não encontrada"). **Emissão real testada** com um XML real da fábrica (NFe-170942,
+markup 30% → 12 produtos, custo 730,89/venda 950,16): o **payload foi aceito estruturalmente** (a Focus
+NÃO rejeitou campo nenhum → `preview→mapa_fiscal→payload→transporte` validado ponta a ponta) e parou num
+erro **de negócio**: **"Empresa ainda não habilitada para emissão de NFe, por favor contate o suporte
+técnico."** → o pipeline está correto; falta o **cadastro/habilitação do CNPJ 19.152.134/0001-56 na
+Focus** (empresa + certificado A1 + liberação pelo suporte). Nada de código muda até lá.
+
 **Insumos do usuário (gatilham as próximas fases, não bloqueiam o que já existe):**
-- **Token da Focus NFe** (homologação) — "fácil de obter" (usuário). Habilita a Fase 4. Salvar no painel
-  (aba Fiscal → Credenciais Focus) ou em `focus_config.json`.
+- **Habilitar o CNPJ na Focus** — cadastrar a empresa 19.152.134/0001-56, enviar o **certificado A1** e
+  pedir liberação para emissão de NF-e (suporte Focus). É o bloqueio atual do smoke real. Token já OK.
 - **Valores fiscais reais do contador** (CST/CSOSN/CFOP/alíquotas) do CNPJ **19.152.134/0001-56 (Simples)** —
   entram como **dado** no `PerfilFiscal` (perfil-padrão de teste já destrava o desenvolvimento).
+- **Nota homologação:** o destinatário deve ir com o nome SEFAZ "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO -
+  SEM VALOR FISCAL" (aplicar automático quando ambiente=homologacao na orquestração da Fase 5).
 
 **Pendências/gaps conhecidos (ajustes pequenos, registrados):**
 - **[teste]** conferência do **Painel Fiscal (Sub-frente II)** no navegador — o usuário fará **amanhã**.
