@@ -49,10 +49,32 @@ def _fixture_xml():
 
 
 def _perfil(app_db, loja_id):
+    """Garante o Emitente próprio da loja (do seed) em homologação com tokens; a emissão
+    resolve o Emitente (não o PerfilFiscal)."""
+    import fiscal_cripto
     db = app_db.get_session()
-    db.query(app_db.PerfilFiscal).filter_by(loja_id=loja_id).delete()
-    db.add(app_db.PerfilFiscal(loja_id=loja_id, ambiente_ativo="homologacao", razao_social="LOJA X",
-                               csosn_padrao="101", cfop_dentro_uf="5102", cfop_fora_uf="6102"))
+    loja = db.get(app_db.Loja, loja_id)
+    em = db.get(app_db.Emitente, loja.emitente_id) if loja.emitente_id else None
+    if em is None:
+        em = app_db.Emitente(cnpj="90000000000%02d" % loja_id, razao_social="LOJA X",
+                             regime_tributario="simples", csosn_padrao="101",
+                             cfop_dentro_uf="5102", cfop_fora_uf="6102", uf="SP",
+                             cidade="Sao Paulo", logradouro="Rua A", numero="1",
+                             bairro="Centro", cep="01000-000")
+        db.add(em); db.flush()
+        loja.emitente_id = em.id
+    em.ambiente_ativo = "homologacao"
+    em.focus_token_homolog_enc = fiscal_cripto.encrypt("tok-homolog")
+    db.commit(); db.close()
+
+
+def _sem_emitente(app_db, loja_id):
+    db = app_db.get_session()
+    loja = db.get(app_db.Loja, loja_id)
+    db.query(app_db.PerfilEmissao).filter_by(owner_tipo="loja", owner_id=loja_id).delete()
+    if loja.rede_id is not None:
+        db.query(app_db.PerfilEmissao).filter_by(owner_tipo="rede", owner_id=loja.rede_id).delete()
+    loja.emitente_id = None
     db.commit(); db.close()
 
 
@@ -67,13 +89,14 @@ def test_emitir_teste_ok(http_client_factory, seed, app_db, projetos_dir, monkey
     assert b["status"] == "autorizado" and b["chave"] == "CH999" and b["xml_doc_id"]
 
 
-def test_emitir_teste_sem_perfil_400(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
-    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, lid: FakeEmissor())
-    db = app_db.get_session(); db.query(app_db.PerfilFiscal).filter_by(loja_id=seed["loja2_id"]).delete(); db.commit(); db.close()
+def test_emitir_teste_sem_emitente_400(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
+    _sem_emitente(app_db, seed["loja2_id"])
     c = _login(http_client_factory, "dir_l2")
     st, b = _post_multipart(c.base, c.cookie, f"/api/admin/lojas/{seed['loja2_id']}/nfe/emitir-teste",
                             {"projeto_nome": seed["projeto_l2"], "markup_pct": "30"}, "f.xml", _fixture_xml())
     assert st == 400
+    _perfil(app_db, seed["loja2_id"])   # restaura o emitente para os demais testes do módulo
 
 
 def test_emitir_teste_perm_403(http_client_factory, seed, app_db, projetos_dir):

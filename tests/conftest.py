@@ -41,6 +41,21 @@ def seed(app_db):
     l2 = app_db.Loja(nome="Loja 2", rede_id=rede.id, codigo="LJ2")
     db.add_all([l1, l2]); db.flush()
 
+    # Emitente próprio de cada loja (identidade fiscal — Task 1/2/4). loja.emitente_id = self.
+    def mk_emitente(cnpj, razao, uf="SP"):
+        em = app_db.Emitente(cnpj=cnpj, razao_social=razao, regime_tributario="simples",
+                             csosn_padrao="101", cfop_dentro_uf="5102", cfop_fora_uf="6102",
+                             inscricao_estadual="ISENTO", logradouro="Rua Emit", numero="1",
+                             bairro="Centro", cidade="Sao Paulo", uf=uf, cep="01000-000",
+                             ambiente_ativo="homologacao")
+        db.add(em); db.flush()
+        return em
+    em1 = mk_emitente("11111111000111", "EMITENTE LOJA 1 LTDA")
+    em2 = mk_emitente("22222222000122", "EMITENTE LOJA 2 LTDA")
+    l1.emitente_id = em1.id
+    l2.emitente_id = em2.id
+    db.flush()
+
     def mkuser(nome, login, nivel, loja_id=None, rede_id=None):
         u = app_db.Usuario(nome=nome, login=login, nivel=nivel,
                            loja_id=loja_id, rede_id=rede_id, ativo=1)
@@ -86,6 +101,7 @@ def seed(app_db):
     ctx = {
         "rede_id": rede.id,
         "loja1_id": l1.id, "loja2_id": l2.id,
+        "emitente_l1_id": em1.id, "emitente_l2_id": em2.id,
         "cliente_l1_id": c1.id, "cliente_l2_id": c2.id,
         "projeto_l1": "Proj_L1", "projeto_l2": "Proj_L2",
         "orcamento_l1_id": o1.id, "orcamento_l2_id": o2.id,

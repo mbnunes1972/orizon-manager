@@ -14,7 +14,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
-                       CicloDocumento, CicloRevisao, PerfilFiscal, DocumentoFiscal)
+                       CicloDocumento, CicloRevisao, PerfilFiscal, DocumentoFiscal, Emitente)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -1465,14 +1465,24 @@ class Handler(BaseHTTPRequestHandler):
                     emissoes = {e.fabrica_doc_id: e for e in
                                 db.query(DocumentoFiscal).filter_by(projeto_nome=nome_safe).all()
                                 if e.fabrica_doc_id is not None}
+                    _emit_cache = {}
+                    def _emitente(eid):
+                        if eid is None:
+                            return None
+                        if eid not in _emit_cache:
+                            _emit_cache[eid] = db.get(Emitente, eid)
+                        return _emit_cache[eid]
                     out = []
                     for d in docs:
                         e = emissoes.get(d.id)
+                        em = _emitente(e.emitente_id) if e else None
                         emissao = None if not e else {
                             "ref": e.ref, "status": e.status, "chave": e.chave_nfe, "numero": e.numero,
                             "serie": e.serie, "mensagem_sefaz": e.mensagem_sefaz,
                             "erros": json.loads(e.erros_json) if e.erros_json else [],
-                            "xml_doc_id": e.xml_doc_id, "danfe_doc_id": e.danfe_doc_id}
+                            "xml_doc_id": e.xml_doc_id, "danfe_doc_id": e.danfe_doc_id,
+                            "emitente_cnpj": em.cnpj if em else None,
+                            "emitente_razao": em.razao_social if em else None}
                         out.append({"id": d.id, "nome_original": d.nome_original,
                                     "enviado_em": d.enviado_em.isoformat() if d.enviado_em else None,
                                     "emissao": emissao})
@@ -4112,7 +4122,7 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                import mod_nfe, mapa_fiscal, nfe_emissao
+                import mod_nfe, mapa_fiscal, nfe_emissao, mod_fiscal
                 arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
                 db = get_session()
                 try:
@@ -4122,9 +4132,10 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                         self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                    perfil = db.query(PerfilFiscal).filter_by(loja_id=loja.id).first()
-                    if not perfil:
-                        self.send_json({"ok": False, "erro": "Configure o Perfil Fiscal da loja antes de emitir."}, code=400); return
+                    try:
+                        emitente = mod_fiscal.resolver_emitente(db, loja, "produto")
+                    except ValueError as e:
+                        self.send_json({"ok": False, "erro": str(e)}, code=400); return
                     if "arquivo" not in arquivos:
                         self.send_json({"ok": False, "erro": "Anexe o XML da fábrica."}, code=400); return
                     projeto_nome = campos.get("projeto_nome")
@@ -4144,8 +4155,9 @@ class Handler(BaseHTTPRequestHandler):
                     preview = mod_nfe.preview(data, markup)
                     ref = "TESTE-" + datetime.utcnow().strftime("%Y%m%d%H%M%S") + "-" + uuid.uuid4().hex[:8]
                     data_emissao = datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00")
-                    nota = mapa_fiscal.montar_nota(perfil, loja, cliente, preview["itens"], ref, data_emissao)
-                    res = nfe_emissao.emitir(db, loja.id, projeto_nome, nota)
+                    nota = mapa_fiscal.montar_nota(emitente, cliente, preview["itens"], ref, data_emissao)
+                    res = nfe_emissao.emitir(db, loja.id, projeto_nome, nota, tipo_documento="produto",
+                                             emitente_id=emitente.id)
                     reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
                     self.send_json({"ok": True, "ref": ref,
                                     "status": res.status.value if hasattr(res.status, "value") else res.status,
@@ -4170,7 +4182,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
                 if not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                import mod_nfe, mapa_fiscal, nfe_emissao
+                import mod_nfe, mapa_fiscal, nfe_emissao, mod_fiscal
                 try:
                     req = json.loads(body) if body else {}
                 except Exception:
@@ -4185,9 +4197,10 @@ class Handler(BaseHTTPRequestHandler):
                     if projeto is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     loja = db.get(Loja, loja_id)
-                    perfil = db.query(PerfilFiscal).filter_by(loja_id=loja_id).first()
-                    if not perfil:
-                        self.send_json({"ok": False, "erro": "Configure o Perfil Fiscal da loja antes de emitir."}, code=400); return
+                    try:
+                        emitente = mod_fiscal.resolver_emitente(db, loja, "produto")
+                    except ValueError as e:
+                        self.send_json({"ok": False, "erro": str(e)}, code=400); return
                     cliente = db.get(Cliente, projeto.cliente_id) if projeto.cliente_id else None
                     if not cliente:
                         self.send_json({"ok": False, "erro": "O projeto não tem cliente para o destinatário."}, code=400); return
@@ -4204,8 +4217,9 @@ class Handler(BaseHTTPRequestHandler):
                     preview = mod_nfe.preview(xml_bytes, markup)
                     ref = "NFE-" + nome_safe + "-" + str(doc.id)
                     data_emissao = datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00")
-                    nota = mapa_fiscal.montar_nota(perfil, loja, cliente, preview["itens"], ref, data_emissao)
-                    res = nfe_emissao.emitir(db, loja_id, nome_safe, nota, fabrica_doc_id=doc.id)
+                    nota = mapa_fiscal.montar_nota(emitente, cliente, preview["itens"], ref, data_emissao)
+                    res = nfe_emissao.emitir(db, loja_id, nome_safe, nota, tipo_documento="produto",
+                                             emitente_id=emitente.id, fabrica_doc_id=doc.id)
                     if res.status.value == "autorizado":
                         _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
                     reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()

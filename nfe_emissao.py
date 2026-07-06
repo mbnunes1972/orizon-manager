@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 
 import storage
-from database import DocumentoFiscal, PerfilFiscal, CicloDocumento
+from database import DocumentoFiscal, Emitente, CicloDocumento
 from emissor_fiscal import StatusNota, ResultadoEmissao, resultado_de_focus
 
 _TIPO_XML = "nfe_loja_xml"
@@ -16,10 +16,10 @@ _TIPO_CANC = "nfe_loja_cancelamento_xml"
 _NOME_DEST_HOMOLOG = "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
 
 
-def _emissor_para(db, loja_id):
+def _emissor_para(db, emitente_id):
     import mod_fiscal
     from emissor_focus import EmissorFocusNfe
-    return EmissorFocusNfe(mod_fiscal.focus_client_para_loja(db, loja_id))
+    return EmissorFocusNfe(mod_fiscal.focus_client_para_emitente(db, emitente_id))
 
 
 def _guardar_doc(db, projeto_nome, tipo, caminho_focus, client):
@@ -61,27 +61,29 @@ def _guardar_docs_autorizado(db, reg, res, client):
         reg.danfe_doc_id = danfe_doc.id
 
 
-def emitir(db, loja_id, projeto_nome, nota, permitir_producao=False, emissor=None,
-           fabrica_doc_id=None):
-    """Emite (ou devolve idempotente), acompanha até o status final e guarda XML/DANFE."""
+def emitir(db, loja_id, projeto_nome, nota, tipo_documento="produto", emitente_id=None,
+           permitir_producao=False, emissor=None, fabrica_doc_id=None):
+    """Emite (ou devolve idempotente), acompanha até o status final e guarda XML/DANFE.
+    O ambiente (guarda de produção + carimbo SEFAZ de homologação) vem do `Emitente` resolvido."""
     ref = nota["ref"]
     reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
     if reg and reg.status == "autorizado":
         return _resultado_de_registro(reg)
-    pf = db.query(PerfilFiscal).filter_by(loja_id=loja_id).first()
-    ambiente = (pf.ambiente_ativo if pf else "homologacao") or "homologacao"
+    em = db.get(Emitente, emitente_id) if emitente_id is not None else None
+    ambiente = (em.ambiente_ativo if em else "homologacao") or "homologacao"
     if ambiente == "producao" and not permitir_producao:
         raise ValueError("Emissão em produção bloqueada (use permitir_producao=True).")
     if ambiente == "homologacao":
         nota["destinatario"]["nome"] = _NOME_DEST_HOMOLOG
     if emissor is None:
-        emissor = _emissor_para(db, loja_id)
+        emissor = _emissor_para(db, emitente_id)
     res = emissor.emitir_nfe_produto(nota)
     if res.status == StatusNota.PROCESSANDO:
         res = resultado_de_focus(emissor.client.aguardar_processamento(ref))
     if not reg:
         reg = DocumentoFiscal(ref=ref, projeto_nome=projeto_nome, loja_id=loja_id, etapa_codigo="15",
-                              tipo_documento="produto", fabrica_doc_id=fabrica_doc_id)
+                              tipo_documento=tipo_documento, emitente_id=emitente_id,
+                              fabrica_doc_id=fabrica_doc_id)
         db.add(reg)
     _aplicar_resultado(reg, res)
     if res.status == StatusNota.AUTORIZADO:
@@ -96,7 +98,7 @@ def consultar(db, ref, emissor=None):
     if not reg:
         raise ValueError("DocumentoFiscal %s não encontrada" % (ref,))
     if emissor is None:
-        emissor = _emissor_para(db, reg.loja_id)
+        emissor = _emissor_para(db, reg.emitente_id)
     res = emissor.consultar_status(ref)
     ja_tinha = reg.xml_doc_id is not None
     _aplicar_resultado(reg, res)
@@ -112,7 +114,7 @@ def cancelar(db, ref, justificativa, emissor=None):
     if not reg:
         raise ValueError("DocumentoFiscal %s não encontrada" % (ref,))
     if emissor is None:
-        emissor = _emissor_para(db, reg.loja_id)
+        emissor = _emissor_para(db, reg.emitente_id)
     res = emissor.cancelar(ref, justificativa)
     _aplicar_resultado(reg, res)
     if res.xml_cancelamento_url:

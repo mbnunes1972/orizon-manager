@@ -50,19 +50,24 @@ def _reset(app_db, ref, proj):
 
 
 def _perfil(app_db, loja_id, ambiente="homologacao"):
+    """Garante o Emitente da loja (o do seed) com o ambiente pedido; devolve seu id.
+    A emissão agora lê o Emitente (não o PerfilFiscal)."""
     db = app_db.get_session()
-    db.query(app_db.PerfilFiscal).filter_by(loja_id=loja_id).delete()
-    db.add(app_db.PerfilFiscal(loja_id=loja_id, ambiente_ativo=ambiente, csosn_padrao="101",
-                               cfop_dentro_uf="5102", cfop_fora_uf="6102"))
-    db.commit(); db.close()
+    loja = db.get(app_db.Loja, loja_id)
+    em = db.get(app_db.Emitente, loja.emitente_id)
+    em.ambiente_ativo = ambiente
+    db.commit()
+    eid = em.id
+    db.close()
+    return eid
 
 
 def test_emitir_autoriza_guarda_docs(app_db, seed, projetos_dir):
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
-    _reset(app_db, "R-1", proj); _perfil(app_db, lid, "homologacao")
+    _reset(app_db, "R-1", proj); eid = _perfil(app_db, lid, "homologacao")
     fake = FakeEmissor()
     db = app_db.get_session()
-    res = nfe_emissao.emitir(db, lid, proj, _nota("R-1"), emissor=fake)
+    res = nfe_emissao.emitir(db, lid, proj, _nota("R-1"), emitente_id=eid, emissor=fake)
     assert res.status == StatusNota.AUTORIZADO and res.chave == "CH123"
     reg = db.query(app_db.DocumentoFiscal).filter_by(ref="R-1").first()
     assert reg.status == "autorizado" and reg.xml_doc_id and reg.danfe_doc_id
@@ -74,32 +79,33 @@ def test_emitir_autoriza_guarda_docs(app_db, seed, projetos_dir):
 
 def test_emitir_idempotente(app_db, seed, projetos_dir):
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
-    _reset(app_db, "R-2", proj); _perfil(app_db, lid, "homologacao")
+    _reset(app_db, "R-2", proj); eid = _perfil(app_db, lid, "homologacao")
     fake = FakeEmissor()
     db = app_db.get_session()
-    nfe_emissao.emitir(db, lid, proj, _nota("R-2"), emissor=fake)
-    nfe_emissao.emitir(db, lid, proj, _nota("R-2"), emissor=fake)
+    nfe_emissao.emitir(db, lid, proj, _nota("R-2"), emitente_id=eid, emissor=fake)
+    nfe_emissao.emitir(db, lid, proj, _nota("R-2"), emitente_id=eid, emissor=fake)
     assert fake.emit_calls == 1
     db.close()
 
 
 def test_emitir_guarda_producao(app_db, seed, projetos_dir):
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
-    _reset(app_db, "R-3", proj); _perfil(app_db, lid, "producao")
+    _reset(app_db, "R-3", proj); eid = _perfil(app_db, lid, "producao")
     db = app_db.get_session()
     with pytest.raises(ValueError):
-        nfe_emissao.emitir(db, lid, proj, _nota("R-3"), emissor=FakeEmissor())
-    res = nfe_emissao.emitir(db, lid, proj, _nota("R-3"), permitir_producao=True, emissor=FakeEmissor())
+        nfe_emissao.emitir(db, lid, proj, _nota("R-3"), emitente_id=eid, emissor=FakeEmissor())
+    res = nfe_emissao.emitir(db, lid, proj, _nota("R-3"), emitente_id=eid,
+                             permitir_producao=True, emissor=FakeEmissor())
     assert res.status == StatusNota.AUTORIZADO
     db.close()
 
 
 def test_emitir_erro_autorizacao(app_db, seed, projetos_dir):
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
-    _reset(app_db, "R-4", proj); _perfil(app_db, lid, "homologacao")
+    _reset(app_db, "R-4", proj); eid = _perfil(app_db, lid, "homologacao")
     fake = FakeEmissor(status="erro_autorizacao", erros=[{"codigo": "215", "mensagem": "falha"}])
     db = app_db.get_session()
-    res = nfe_emissao.emitir(db, lid, proj, _nota("R-4"), emissor=fake)
+    res = nfe_emissao.emitir(db, lid, proj, _nota("R-4"), emitente_id=eid, emissor=fake)
     assert res.status == StatusNota.ERRO
     reg = db.query(app_db.DocumentoFiscal).filter_by(ref="R-4").first()
     assert reg.status == "erro" and reg.erros_json and not reg.xml_doc_id
@@ -141,20 +147,21 @@ def test_consultar_ref_inexistente(app_db, seed, projetos_dir):
 
 def test_emitir_grava_fabrica_doc_id(app_db, seed, projetos_dir):
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
-    _reset(app_db, "R-F1", proj); _perfil(app_db, lid, "homologacao")
+    _reset(app_db, "R-F1", proj); eid = _perfil(app_db, lid, "homologacao")
     db = app_db.get_session()
-    nfe_emissao.emitir(db, lid, proj, _nota("R-F1"), emissor=FakeEmissor(), fabrica_doc_id=99)
+    nfe_emissao.emitir(db, lid, proj, _nota("R-F1"), emitente_id=eid, emissor=FakeEmissor(),
+                       fabrica_doc_id=99)
     reg = db.query(app_db.DocumentoFiscal).filter_by(ref="R-F1").first()
-    assert reg.fabrica_doc_id == 99
+    assert reg.fabrica_doc_id == 99 and reg.emitente_id == eid
     db.close()
 
 
 def test_emitir_homologacao_forca_nome_dest_sefaz(app_db, seed, projetos_dir):
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
-    _reset(app_db, "R-F2", proj); _perfil(app_db, lid, "homologacao")
+    _reset(app_db, "R-F2", proj); eid = _perfil(app_db, lid, "homologacao")
     fake = FakeEmissor()
     db = app_db.get_session()
-    nfe_emissao.emitir(db, lid, proj, _nota("R-F2"), emissor=fake)
+    nfe_emissao.emitir(db, lid, proj, _nota("R-F2"), emitente_id=eid, emissor=fake)
     assert fake.nota_recebida["destinatario"]["nome"] == \
         "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
     db.close()
@@ -163,9 +170,10 @@ def test_emitir_homologacao_forca_nome_dest_sefaz(app_db, seed, projetos_dir):
 def test_emitir_producao_nao_forca_nome_dest(app_db, seed, projetos_dir):
     # regra SEFAZ só vale em homologação: em produção o nome do destinatário é preservado
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
-    _reset(app_db, "R-F3", proj); _perfil(app_db, lid, "producao")
+    _reset(app_db, "R-F3", proj); eid = _perfil(app_db, lid, "producao")
     fake = FakeEmissor()
     db = app_db.get_session()
-    nfe_emissao.emitir(db, lid, proj, _nota("R-F3"), permitir_producao=True, emissor=fake)
+    nfe_emissao.emitir(db, lid, proj, _nota("R-F3"), emitente_id=eid,
+                       permitir_producao=True, emissor=fake)
     assert fake.nota_recebida["destinatario"]["nome"] == "C"
     db.close()

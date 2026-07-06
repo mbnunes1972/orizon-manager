@@ -1,16 +1,17 @@
-"""mapa_fiscal.py — mapa fiscal: preview (Fase 1) + PerfilFiscal/Loja (emitente) + Cliente
-(destinatário) -> payload da NF-e da Focus. Puro: sem DB, sem rede. Regime Simples primeiro."""
+"""mapa_fiscal.py — mapa fiscal: preview (Fase 1) + Emitente (identidade fiscal, pode ≠ loja) +
+Cliente (destinatário) -> payload da NF-e da Focus. Puro: sem DB, sem rede. Regime Simples primeiro."""
 
 REGIME_FOCUS = {"simples": 1, "simples_excesso": 2, "mei": 1, "normal": 3}
 PIS_CST_SIMPLES = "49"
 COFINS_CST_SIMPLES = "49"
 
 
-def montar_nota(perfil, loja, cliente, itens_preview, ref, data_emissao,
+def montar_nota(emitente, cliente, itens_preview, ref, data_emissao,
                 natureza="Venda de mercadoria"):
     """Assembla o dict neutro `nota` a partir dos modelos (recebe objetos; sem DB).
-    Emitente = Loja (cnpj/endereço) + perfil (razão social/IE/regime); destinatário = Cliente
-    (CPF -> PF consumidor final; CNPJ -> PJ, via getattr para cobrir modelo futuro)."""
+    Emitente = objeto `Emitente` (cnpj/endereço/razão/IE/regime + csosn/cfop — pode ≠ loja
+    vendedora); destinatário = Cliente (CPF -> PF consumidor final; CNPJ -> PJ, via getattr
+    para cobrir modelo futuro)."""
     cli_cnpj = getattr(cliente, "cnpj", None)
     if cli_cnpj:
         doc_tipo, doc = "cnpj", cli_cnpj
@@ -21,13 +22,13 @@ def montar_nota(perfil, loja, cliente, itens_preview, ref, data_emissao,
         "natureza_operacao": natureza,
         "data_emissao": data_emissao,
         "emitente": {
-            "doc_tipo": "cnpj" if getattr(loja, "cnpj", None) else "cpf",
-            "doc": getattr(loja, "cnpj", None),
-            "nome": getattr(perfil, "razao_social", None) or getattr(loja, "nome", None),
-            "regime": REGIME_FOCUS.get(getattr(perfil, "regime_tributario", None), 1),
-            "ie": getattr(perfil, "inscricao_estadual", None),
-            "logradouro": loja.logradouro, "numero": loja.numero, "bairro": loja.bairro,
-            "municipio": loja.cidade, "uf": loja.estado, "cep": loja.cep,
+            "doc_tipo": "cnpj" if getattr(emitente, "cnpj", None) else "cpf",
+            "doc": getattr(emitente, "cnpj", None),
+            "nome": getattr(emitente, "razao_social", None),
+            "regime": REGIME_FOCUS.get(getattr(emitente, "regime_tributario", None), 1),
+            "ie": getattr(emitente, "inscricao_estadual", None),
+            "logradouro": emitente.logradouro, "numero": emitente.numero, "bairro": emitente.bairro,
+            "municipio": emitente.cidade, "uf": emitente.uf, "cep": emitente.cep,
         },
         "destinatario": {
             "nome": cliente.nome, "doc_tipo": doc_tipo, "doc": doc,
@@ -37,8 +38,8 @@ def montar_nota(perfil, loja, cliente, itens_preview, ref, data_emissao,
         # TODO Fase 4: PIS/COFINS CST "49" e o CSOSN são do SIMPLES. Para regime normal/presumido,
         # ramificar aqui (CST próprios + alíquotas ICMS destacadas) com os valores do contador.
         "fiscal": {
-            "csosn": perfil.csosn_padrao, "cfop_dentro": perfil.cfop_dentro_uf,
-            "cfop_fora": perfil.cfop_fora_uf, "pis_cst": PIS_CST_SIMPLES,
+            "csosn": emitente.csosn_padrao, "cfop_dentro": emitente.cfop_dentro_uf,
+            "cfop_fora": emitente.cfop_fora_uf, "pis_cst": PIS_CST_SIMPLES,
             "cofins_cst": COFINS_CST_SIMPLES,
         },
         "itens": list(itens_preview),
