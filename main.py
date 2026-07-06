@@ -4049,6 +4049,8 @@ class Handler(BaseHTTPRequestHandler):
                     projeto = db.get(Projeto, projeto_nome) if projeto_nome else None
                     if not projeto:
                         self.send_json({"ok": False, "erro": "Informe um projeto válido da loja."}, code=400); return
+                    if projeto.loja_id != loja.id:
+                        self.send_json({"ok": False, "erro": "O projeto não pertence a esta loja."}, code=400); return
                     cliente = db.get(Cliente, projeto.cliente_id) if projeto.cliente_id else None
                     if not cliente:
                         self.send_json({"ok": False, "erro": "O projeto não tem cliente para o destinatário."}, code=400); return

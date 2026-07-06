@@ -81,3 +81,12 @@ def test_emitir_teste_perm_403(http_client_factory, seed, app_db, projetos_dir):
     st, _ = _post_multipart(c.base, c.cookie, f"/api/admin/lojas/{seed['loja1_id']}/nfe/emitir-teste",
                             {"projeto_nome": seed["projeto_l1"], "markup_pct": "30"}, "f.xml", _fixture_xml())
     assert st == 403
+
+
+def test_emitir_teste_projeto_de_outra_loja_400(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, lid: FakeEmissor())
+    _perfil(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")   # diretor loja2, mas projeto é da loja1
+    st, b = _post_multipart(c.base, c.cookie, f"/api/admin/lojas/{seed['loja2_id']}/nfe/emitir-teste",
+                            {"projeto_nome": seed["projeto_l1"], "markup_pct": "30"}, "f.xml", _fixture_xml())
+    assert st == 400 and "não pertence" in b.get("erro", "").lower()
