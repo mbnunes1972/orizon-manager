@@ -10,13 +10,19 @@ class FakeClient:
     def aguardar_processamento(self, ref, timeout=60, intervalo=3):
         return {"ref": ref, "status": "autorizado", "chave_nfe": "CH-15",
                 "caminho_xml_nota_fiscal": "/x.xml", "caminho_danfe": "/d.pdf"}
+    def aguardar_processamento_nfse(self, ref, timeout=60, intervalo=3):
+        return {"ref": ref, "status": "autorizado", "chave_nfe": "CHS-15", "numero": "9", "serie": "1",
+                "caminho_xml_nota_fiscal": "/nfse/x.xml", "url": "/nfse/nota.pdf"}
     def baixar(self, caminho): return b"BYTES"
 
 
 class FakeEmissor:
-    def __init__(self): self.client = FakeClient(); self.nota_recebida = None
+    def __init__(self): self.client = FakeClient(); self.nota_recebida = None; self.nota_nfse = None
     def emitir_nfe_produto(self, nota):
         self.nota_recebida = nota
+        return resultado_de_focus({"ref": nota["ref"], "status": "processando_autorizacao"})
+    def emitir_nfse_servico(self, nota):
+        self.nota_nfse = nota
         return resultado_de_focus({"ref": nota["ref"], "status": "processando_autorizacao"})
     def consultar_status(self, ref):
         return resultado_de_focus({"ref": ref, "status": "autorizado", "chave_nfe": "CH-15",
@@ -379,3 +385,87 @@ def test_emitir_produto_sob_emitente_central_da_rede(http_client_factory, seed, 
     db.query(app_db.PerfilEmissao).filter_by(owner_tipo="rede", owner_id=rede_id,
                                              tipo_doc="produto").delete()
     db.commit(); db.close()
+
+
+# ---------------------------------------------------------------------------
+# NFS-e (serviço, valor manual) — POST .../ciclo/15/emitir-nfse + estado no GET
+# ---------------------------------------------------------------------------
+
+def test_emitir_nfse_autoriza_e_estado_no_get(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    """valor_servico>0 → 200 autorizado; DocumentoFiscal(servico, ref=NFSE-<proj>);
+    GET .../ciclo/15/nfe expõe o estado da NFS-e em g["nfse"]."""
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 500})
+    assert st == 200 and b["status"] == "autorizado" and b["chave"] == "CHS-15", b
+    assert b["ref"] == f"NFSE-{proj}", b
+    # DocumentoFiscal de serviço gravado
+    db = app_db.get_session()
+    reg = db.query(app_db.DocumentoFiscal).filter_by(projeto_nome=proj, tipo_documento="servico").first()
+    assert reg is not None and reg.ref == f"NFSE-{proj}"
+    db.close()
+    # GET expõe o estado da NFS-e
+    st2, g = c.get(f"/api/projetos/{proj}/ciclo/15/nfe")
+    assert st2 == 200 and g["ok"] is True
+    assert g["nfse"] is not None
+    assert g["nfse"]["status"] == "autorizado" and g["nfse"]["chave"] == "CHS-15"
+    assert g["nfse"]["ref"] == f"NFSE-{proj}"
+
+
+def test_emitir_nfse_valor_ausente_ou_zero_400(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {})
+    assert st == 400, b
+    st2, b2 = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 0})
+    assert st2 == 400, b2
+    st3, b3 = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": -10})
+    assert st3 == 400, b3
+    # nada foi emitido
+    db = app_db.get_session()
+    reg = db.query(app_db.DocumentoFiscal).filter_by(projeto_nome=proj, tipo_documento="servico").first()
+    assert reg is None
+    db.close()
+
+
+def test_emitir_nfse_sem_emitente_servico_400(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _sem_emitente(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 500})
+    assert st == 400 and "emitente" in b.get("erro", "").lower(), b
+    _perfil(app_db, seed["loja2_id"])   # restaura
+
+
+def test_emitir_nfse_idempotente(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    """2ª emissão do mesmo projeto → mesmo ref, sem re-emitir (nfe_emissao.emitir devolve o registro)."""
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 500})
+    assert st == 200 and b["status"] == "autorizado", b
+    st2, b2 = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 999})
+    assert st2 == 200 and b2["ref"] == b["ref"], b2
+    # continua um único DocumentoFiscal de serviço
+    db = app_db.get_session()
+    n = db.query(app_db.DocumentoFiscal).filter_by(projeto_nome=proj, tipo_documento="servico").count()
+    assert n == 1
+    db.close()
+
+
+def test_emitir_nfse_consultor_403(http_client_factory, seed, app_db, projetos_dir):
+    c = _login(http_client_factory, "cons_l1")   # sem editar_dados_loja
+    st, _ = _post(c, f"/api/projetos/{seed['projeto_l1']}/ciclo/15/emitir-nfse", {"valor_servico": 500})
+    assert st == 403
+
+
+def test_emitir_nfse_nao_autenticado_401(http_client_factory, seed, app_db, projetos_dir):
+    c = http_client_factory()
+    st, _ = _post(c, f"/api/projetos/{seed['projeto_l2']}/ciclo/15/emitir-nfse", {"valor_servico": 500})
+    assert st == 401

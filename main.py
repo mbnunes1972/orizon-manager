@@ -1487,7 +1487,20 @@ class Handler(BaseHTTPRequestHandler):
                         out.append({"id": d.id, "nome_original": d.nome_original,
                                     "enviado_em": d.enviado_em.isoformat() if d.enviado_em else None,
                                     "emissao": emissao})
-                    self.send_json({"ok": True, "fabrica_xmls": out})
+                    # Estado da NFS-e (serviço, valor manual) — o DocumentoFiscal tipo="servico"
+                    # deste projeto (ref NFSE-<projeto>), serializado como uma emissão de produto.
+                    nfse_reg = (db.query(DocumentoFiscal)
+                                  .filter_by(projeto_nome=nome_safe, tipo_documento="servico").first())
+                    emn = _emitente(nfse_reg.emitente_id) if nfse_reg else None
+                    nfse = None if not nfse_reg else {
+                        "ref": nfse_reg.ref, "status": nfse_reg.status, "chave": nfse_reg.chave_nfe,
+                        "numero": nfse_reg.numero, "serie": nfse_reg.serie,
+                        "mensagem_sefaz": nfse_reg.mensagem_sefaz,
+                        "erros": json.loads(nfse_reg.erros_json) if nfse_reg.erros_json else [],
+                        "xml_doc_id": nfse_reg.xml_doc_id, "danfe_doc_id": nfse_reg.danfe_doc_id,
+                        "emitente_cnpj": emn.cnpj if emn else None,
+                        "emitente_razao": emn.razao_social if emn else None}
+                    self.send_json({"ok": True, "fabrica_xmls": out, "nfse": nfse})
                 finally:
                     db.close()
                 return
@@ -4278,6 +4291,63 @@ class Handler(BaseHTTPRequestHandler):
                                              emitente_id=emitente.id, fabrica_doc_id=doc.id)
                     if res.status.value == "autorizado":
                         _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
+                    reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
+                    self.send_json({"ok": True, "ref": ref,
+                                    "status": res.status.value, "chave": res.chave, "numero": res.numero,
+                                    "serie": res.serie, "mensagem_sefaz": res.mensagem_sefaz, "erros": res.erros,
+                                    "xml_doc_id": reg.xml_doc_id if reg else None,
+                                    "danfe_doc_id": reg.danfe_doc_id if reg else None})
+                except ValueError as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=400)
+                except Exception as e:
+                    db.rollback(); self.send_json({"ok": False, "erro": "Falha na emissão: " + str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # POST /api/projetos/<nome>/ciclo/15/emitir-nfse — emite a NFS-e (serviço, valor manual)
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/15/emitir-nfse$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                if not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                import mapa_fiscal, nfe_emissao, mod_fiscal
+                try:
+                    req = json.loads(body) if body else {}
+                except Exception:
+                    self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    projeto = _projeto_da_loja(db, nome_safe, loja_id)
+                    if projeto is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    loja = db.get(Loja, loja_id)
+                    try:
+                        emitente = mod_fiscal.resolver_emitente(db, loja, "servico")
+                    except ValueError as e:
+                        self.send_json({"ok": False, "erro": str(e)}, code=400); return
+                    cliente = db.get(Cliente, projeto.cliente_id) if projeto.cliente_id else None
+                    if not cliente:
+                        self.send_json({"ok": False, "erro": "O projeto não tem cliente para o destinatário."}, code=400); return
+                    try:
+                        valor = float(req.get("valor_servico") or 0)
+                    except (TypeError, ValueError):
+                        valor = 0.0
+                    if valor <= 0:
+                        self.send_json({"ok": False, "erro": "Informe o valor do serviço."}, code=400); return
+                    ref = "NFSE-" + nome_safe
+                    data_emissao = datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00")
+                    discriminacao = req.get("discriminacao") or "Serviço de montagem/instalação de móveis planejados"
+                    nota = mapa_fiscal.montar_nota_nfse(emitente, cliente, round(valor, 2), ref, data_emissao, discriminacao)
+                    res = nfe_emissao.emitir(db, loja_id, nome_safe, nota, tipo_documento="servico",
+                                             emitente_id=emitente.id)
                     reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
                     self.send_json({"ok": True, "ref": ref,
                                     "status": res.status.value, "chave": res.chave, "numero": res.numero,
