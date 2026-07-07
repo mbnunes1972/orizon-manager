@@ -4417,7 +4417,9 @@ class Handler(BaseHTTPRequestHandler):
                     nfse_regs = (db.query(DocumentoFiscal)
                                    .filter_by(projeto_nome=nome_safe, tipo_documento="servico")
                                    .order_by(DocumentoFiscal.id.asc()).all())
-                    if nfse_regs and nfse_regs[-1].status == "autorizado":
+                    # Idempotente enquanto a última está autorizada OU ainda processando (evita 2ª nota
+                    # antes de a 1ª resolver). Só rejeitada/cancelada libera uma nova tentativa.
+                    if nfse_regs and nfse_regs[-1].status in ("autorizado", "processando"):
                         reg = nfse_regs[-1]
                         self.send_json({"ok": True, "ref": reg.ref, "status": reg.status,
                                         "chave": reg.chave_nfe, "numero": reg.numero, "serie": reg.serie,

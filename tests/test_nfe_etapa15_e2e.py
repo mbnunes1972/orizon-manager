@@ -554,3 +554,30 @@ def test_emitir_produto_prontidao_regime_nao_simples_400(http_client_factory, se
     db = app_db.get_session()
     loja = db.get(app_db.Loja, seed["loja2_id"]); em = db.get(app_db.Emitente, loja.emitente_id)
     em.regime_tributario = "simples"; db.commit(); db.close()
+
+
+class _FakeClientProcessando(FakeClient):
+    def aguardar_processamento_nfse(self, ref, timeout=60, intervalo=3):
+        return {"ref": ref, "status": "processando_autorizacao"}
+
+
+class _FakeEmissorProcessando(FakeEmissor):
+    def __init__(self):
+        super().__init__(); self.client = _FakeClientProcessando()
+
+
+def test_emitir_nfse_processando_idempotente(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    """Enquanto a NFS-e está 'processando', um 2º POST NÃO cria nova tentativa (evita nota dupla)."""
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: _FakeEmissorProcessando())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 500})
+    assert st == 200 and b["status"] == "processando", b
+    assert b["ref"] == f"NFSE-{proj}-1", b
+    st2, b2 = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 500})
+    assert st2 == 200 and b2["ref"] == f"NFSE-{proj}-1", b2   # idempotente, mesma tentativa
+    db = app_db.get_session()
+    n = db.query(app_db.DocumentoFiscal).filter_by(projeto_nome=proj, tipo_documento="servico").count()
+    db.close()
+    assert n == 1
