@@ -115,6 +115,11 @@ def _serve_html():
     with open(path, encoding="utf-8") as f:
         return f.read()
 
+# Omie em descontinuação: auto-sincronização de cliente no cadastro DESLIGADA por padrão.
+# Reative com a env OMIE_AUTO_SYNC=1 (a sincronização manual "Tentar" na fila segue funcionando).
+_OMIE_AUTO_SYNC = os.environ.get("OMIE_AUTO_SYNC", "").strip().lower() in ("1", "true", "on", "sim")
+
+
 def _tentar_sync_omie(c, db):
     """Tenta criar cliente no Omie. Atualiza omie_sync_* em c e faz db.commit()."""
     from datetime import datetime as _dt
@@ -2069,20 +2074,26 @@ class Handler(BaseHTTPRequestHandler):
                 db.commit()
                 db.refresh(c)
                 cliente_id = c.id
+                if not _OMIE_AUTO_SYNC:
+                    # Omie desligado: não sincroniza no cadastro; marca 'dispensado' para não cair na
+                    # fila (que inclui omie_sync_status NULL).
+                    c.omie_sync_status = "dispensado"
+                    db.commit(); db.refresh(c)
                 self.send_json({"ok": True, "cliente": _cliente_dict(c)})
 
-                def _sync_bg():
-                    db2 = get_session()
-                    try:
-                        c2 = db2.get(Cliente, cliente_id)
-                        if c2:
-                            _tentar_sync_omie(c2, db2)
-                    except Exception:
-                        pass
-                    finally:
-                        db2.close()
+                if _OMIE_AUTO_SYNC:
+                    def _sync_bg():
+                        db2 = get_session()
+                        try:
+                            c2 = db2.get(Cliente, cliente_id)
+                            if c2:
+                                _tentar_sync_omie(c2, db2)
+                        except Exception:
+                            pass
+                        finally:
+                            db2.close()
 
-                threading.Thread(target=_sync_bg, daemon=True).start()
+                    threading.Thread(target=_sync_bg, daemon=True).start()
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)})

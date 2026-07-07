@@ -64,3 +64,13 @@ def test_editar_cliente_atualiza_campos_fiscais(http_client_factory, seed):
     st3, d3 = c.get(f"/api/clientes/{cid}")
     assert d3["cliente"]["tipo_dest"] == "isento"
     assert d3["cliente"]["cnpj"] == "98.765.432/0001-10"
+
+
+def test_cria_cliente_nao_sincroniza_omie_por_padrao(http_client_factory, seed):
+    # Omie em descontinuação (OMIE_AUTO_SYNC off por padrão): cliente novo sai 'dispensado',
+    # fora da fila de sync (que inclui status NULL).
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/clientes", {"nome": "Cliente Sem Omie", "cpf": "555.666.777-88",
+                                     "email": "x@x.com", "telefone": "(12) 90000-0000"})
+    assert st == 200 and d["ok"], d
+    assert d["cliente"]["omie_sync_status"] == "dispensado"
