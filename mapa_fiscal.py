@@ -165,6 +165,20 @@ def _iss_retido(emitente):
     return bool(isinstance(dados, dict) and dados.get("iss_retido"))
 
 
+def _tributacao_nfse(emitente):
+    """Bloco de tributação da NFS-e derivado do regime do Emitente. Descoberto no smoke real de
+    SJC (2026-07-07): a prefeitura rejeita (E188) se o Simples Nacional não vier coerente com o
+    Regime Especial de Tributação. `optante_simples_nacional` vem do regime; RET 6 = ME/EPP do
+    Simples (caso da INSPIRIUM; MEI seria 5 — refinar quando o Emitente distinguir). `natureza_operacao`
+    1 = tributação no município (montagem prestada no local do cliente, ISS devido no município)."""
+    optante = (getattr(emitente, "regime_tributario", None) or "").lower() == "simples"
+    return {
+        "optante_simples_nacional": optante,
+        "regime_especial_tributacao": "6" if optante else None,
+        "natureza_operacao": "1",
+    }
+
+
 def montar_nota_nfse(emitente, cliente, valor_servico, ref, data_emissao, discriminacao):
     """Assembla o dict neutro `nota_nfse` (sem DB/rede): prestador (do Emitente), tomador (do
     cliente via `_dest_fiscal`), servico (valor/ISS/código de serviço). Docs só-dígitos."""
@@ -172,6 +186,8 @@ def montar_nota_nfse(emitente, cliente, valor_servico, ref, data_emissao, discri
     return {
         "ref": ref,
         "data_emissao": data_emissao,
+        # tributação (Simples/RET/natureza) — vai ao topo do payload; ver _tributacao_nfse.
+        "tributacao": _tributacao_nfse(emitente),
         "prestador": {
             "cnpj": _so_digitos(getattr(emitente, "cnpj", None)),
             "inscricao_municipal": getattr(emitente, "inscricao_municipal", None),
@@ -183,6 +199,8 @@ def montar_nota_nfse(emitente, cliente, valor_servico, ref, data_emissao, discri
             "razao_social": cliente.nome,
             "logradouro": cliente.logradouro, "numero": cliente.numero, "bairro": cliente.bairro,
             "municipio": cliente.cidade, "uf": cliente.estado, "cep": _so_digitos(cliente.cep),
+            # IBGE do tomador — sem ele a prefeitura marca "Tomador Não Identificado" (L999).
+            "codigo_municipio": getattr(cliente, "municipio_ibge", None),
         },
         "servico": {
             "valor_servicos": valor_servico,
@@ -202,19 +220,23 @@ def montar_payload_nfse(nota):
     pr = nota["prestador"]
     to = nota["tomador"]
     sv = nota["servico"]
-    tomador = {
-        "razao_social": to["razao_social"],
-        "endereco": {
-            "logradouro": to["logradouro"], "numero": to["numero"], "bairro": to["bairro"],
-            "municipio": to["municipio"], "uf": to["uf"], "cep": to["cep"],
-        },
+    trib = nota.get("tributacao") or {}
+    endereco = {
+        "logradouro": to["logradouro"], "numero": to["numero"], "bairro": to["bairro"],
+        "municipio": to["municipio"], "uf": to["uf"], "cep": to["cep"],
     }
+    if to.get("codigo_municipio"):
+        endereco["codigo_municipio"] = to["codigo_municipio"]
+    tomador = {"razao_social": to["razao_social"], "endereco": endereco}
     if to["doc_tipo"] == "cnpj":
         tomador["cnpj"] = to["doc"]
     else:
         tomador["cpf"] = to["doc"]
-    return {
+    payload = {
         "data_emissao": nota["data_emissao"],
+        # tributação no topo do objeto NFS-e (Focus). optante sempre; RET só quando aplicável.
+        "optante_simples_nacional": bool(trib.get("optante_simples_nacional")),
+        "natureza_operacao": trib.get("natureza_operacao", "1"),
         "prestador": {
             "cnpj": pr["cnpj"],
             "inscricao_municipal": pr["inscricao_municipal"],
@@ -230,3 +252,6 @@ def montar_payload_nfse(nota):
             "discriminacao": sv["discriminacao"],
         },
     }
+    if trib.get("regime_especial_tributacao"):
+        payload["regime_especial_tributacao"] = trib["regime_especial_tributacao"]
+    return payload

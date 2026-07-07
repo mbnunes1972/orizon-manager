@@ -1354,6 +1354,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
               <input type="text" id="cli-estado" placeholder="SP" maxlength="2" style="text-transform:uppercase">
             </div>
           </div>
+          <!-- IBGE do município (tomador NFS-e) — preenchido pelo ViaCEP, não editável -->
+          <input type="hidden" id="cli-municipio-ibge">
         </div>
         <div style="grid-column:1/-1">
           <label class="field-label">Observações</label>
@@ -6079,6 +6081,7 @@ async function cliBuscarCEP(cep){
       document.getElementById('cli-bairro').value     = d.bairro     || '';
       document.getElementById('cli-cidade').value     = d.localidade || '';
       document.getElementById('cli-estado').value     = d.uf         || '';
+      document.getElementById('cli-municipio-ibge').value = d.ibge   || '';  // IBGE p/ NFS-e
     }
   } catch(e){
     erroEl.style.display = 'block';
@@ -6096,7 +6099,7 @@ async function cliAbrirModal(id){
   document.getElementById('cli-aviso-cpf').style.display  = 'none';
   document.getElementById('cli-aviso-cnpj').style.display = 'none';
   _cliHomonimoConfirmado = false;
-  ['nome','cpf','cnpj','ie','email','tel','wpp','cep','logradouro','numero','complemento','bairro','cidade','estado','obs'].forEach(f => {
+  ['nome','cpf','cnpj','ie','email','tel','wpp','cep','logradouro','numero','complemento','bairro','cidade','estado','municipio-ibge','obs'].forEach(f => {
     const el = document.getElementById('cli-'+f);
     if(el) el.value = '';
   });
@@ -6134,6 +6137,7 @@ async function cliAbrirModal(id){
         document.getElementById('cli-bairro').value      = c.bairro      || '';
         document.getElementById('cli-cidade').value      = c.cidade      || '';
         document.getElementById('cli-estado').value      = c.estado      || '';
+        document.getElementById('cli-municipio-ibge').value = c.municipio_ibge || '';
         document.getElementById('cli-obs').value         = c.observacoes || '';
         const instMesmo = c.inst_mesmo_residencial !== false;
         const elInstMesmo = document.getElementById('cli-inst-mesmo');
@@ -6375,6 +6379,7 @@ async function cliSalvar(){
     bairro:      document.getElementById('cli-bairro').value.trim(),
     cidade:      document.getElementById('cli-cidade').value.trim(),
     estado:      document.getElementById('cli-estado').value.trim().toUpperCase(),
+    municipio_ibge: document.getElementById('cli-municipio-ibge').value.trim(),
     observacoes: document.getElementById('cli-obs').value.trim(),
     inst_mesmo_residencial: document.getElementById('cli-inst-mesmo').checked,
     inst_logradouro:   document.getElementById('cli-inst-logradouro')?.value.trim()  || '',

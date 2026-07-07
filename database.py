@@ -148,6 +148,7 @@ class Cliente(Base):
     bairro        = Column(String(100), nullable=True)
     cidade        = Column(String(80),  nullable=True)
     estado        = Column(String(2),   nullable=True)
+    municipio_ibge = Column(String(7),  nullable=True)   # código IBGE do município (tomador NFS-e; via ViaCEP)
     observacoes   = Column(Text,        nullable=True)
     inst_mesmo_residencial = Column(Integer,     default=1)   # 1=True, 0=False
     inst_logradouro        = Column(String(200), nullable=True)
@@ -637,6 +638,7 @@ def _migrar_colunas():
             ("tipo_dest",              "VARCHAR DEFAULT 'nao_contribuinte'"),
             ("cnpj",                   "VARCHAR(18)"),
             ("inscricao_estadual",     "TEXT"),
+            ("municipio_ibge",         "VARCHAR(7)"),
         ]:
             if col not in cli_cols:
                 cur.execute(f"ALTER TABLE clientes ADD COLUMN {col} {tipo}")

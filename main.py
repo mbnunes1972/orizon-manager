@@ -2075,6 +2075,7 @@ class Handler(BaseHTTPRequestHandler):
                     bairro     =(req.get("bairro")      or "").strip() or None,
                     cidade     =(req.get("cidade")      or "").strip() or None,
                     estado     =(req.get("estado")      or "").strip() or None,
+                    municipio_ibge=(req.get("municipio_ibge") or "").strip() or None,
                     observacoes=(req.get("observacoes") or "").strip() or None,
                 )
                 db.add(c)
@@ -2279,7 +2280,7 @@ class Handler(BaseHTTPRequestHandler):
                 campos = ["nome","cpf","cnpj","inscricao_estadual",
                           "email","telefone","whatsapp",
                           "cep","logradouro","numero","complemento",
-                          "bairro","cidade","estado","observacoes",
+                          "bairro","cidade","estado","municipio_ibge","observacoes",
                           "inst_logradouro","inst_numero","inst_complemento",
                           "inst_bairro","inst_cidade","inst_cep","inst_uf"]
                 for f in campos:
@@ -4387,6 +4388,13 @@ class Handler(BaseHTTPRequestHandler):
                     cliente = db.get(Cliente, projeto.cliente_id) if projeto.cliente_id else None
                     if not cliente:
                         self.send_json({"ok": False, "erro": "O projeto não tem cliente para o destinatário."}, code=400); return
+                    # IBGE do tomador é obrigatório para a NFS-e (L999 "Tomador Não Identificado").
+                    # Clientes novos já capturam via ViaCEP no cadastro; para os antigos, backfill best-effort.
+                    if not (cliente.municipio_ibge or "").strip() and (cliente.cep or "").strip():
+                        ibge = _ibge_por_cep(cliente.cep)
+                        if ibge:
+                            cliente.municipio_ibge = ibge
+                            db.commit()
                     try:
                         valor = float(req.get("valor_servico") or 0)
                     except (TypeError, ValueError):
@@ -5374,6 +5382,21 @@ def validar_cadastro_minimo(req: dict) -> list:
     return faltando
 
 
+def _ibge_por_cep(cep):
+    """Resolve o código IBGE do município a partir do CEP via ViaCEP (best-effort, offline-safe).
+    Retorna o código (7 díg.) ou None. Usado no backfill de clientes antigos sem `municipio_ibge`."""
+    dig = _re.sub(r"\D", "", cep or "")
+    if len(dig) != 8:
+        return None
+    try:
+        import requests
+        r = requests.get("https://viacep.com.br/ws/%s/json/" % dig, timeout=5)
+        ibge = (r.json() or {}).get("ibge") if r.status_code == 200 else None
+        return ibge or None
+    except Exception:
+        return None
+
+
 def _cliente_dict(c) -> dict:
     return {
         "id":          c.id,
@@ -5392,6 +5415,7 @@ def _cliente_dict(c) -> dict:
         "bairro":      c.bairro      or "",
         "cidade":      c.cidade      or "",
         "estado":      c.estado      or "",
+        "municipio_ibge": c.municipio_ibge or "",
         "observacoes": c.observacoes or "",
         "inst_mesmo_residencial": bool(c.inst_mesmo_residencial if c.inst_mesmo_residencial is not None else 1),
         "inst_logradouro":  c.inst_logradouro  or "",
