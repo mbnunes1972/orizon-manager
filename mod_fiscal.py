@@ -48,6 +48,35 @@ def pode_ativar_producao(placeholders):
     return not placeholders
 
 
+def prontidao_emitente(emitente, tipo_doc):
+    """Mensagem de erro se o Emitente NÃO está pronto para emitir `tipo_doc` ('produto'|'servico'),
+    ou None se estiver pronto. Barra ANTES de chamar a Focus o que hoje geraria (a) nota autorizada
+    porém ERRADA em silêncio — regime ≠ Simples usa PIS/COFINS/CSOSN do Simples; UF do emitente vazia
+    cai em CFOP interestadual — ou (b) recusa com erro genérico por dado fiscal faltante.
+    Descoberto na auditoria fiscal 2026-07-07 (achados A2/A3/A5)."""
+    def _vazio(v):
+        return not (str(v).strip() if v is not None else "")
+    regime = (getattr(emitente, "regime_tributario", None) or "").strip().lower()
+    if tipo_doc == "produto":
+        if regime != "simples":
+            return ("Emissão de NF-e de produto hoje só é suportada para o Simples Nacional "
+                    "(regime do emitente: %s). Ajuste o regime do emitente no painel Fiscal."
+                    % (regime or "não informado"))
+        if _vazio(getattr(emitente, "uf", None)):
+            return "Configure a UF do emitente no painel Fiscal antes de emitir a NF-e (define o CFOP)."
+        return None
+    if tipo_doc == "servico":
+        faltando = []
+        if _vazio(getattr(emitente, "inscricao_municipal", None)):   faltando.append("Inscrição Municipal")
+        if _vazio(getattr(emitente, "municipio_ibge", None)):        faltando.append("código IBGE do município")
+        if _vazio(getattr(emitente, "cod_servico_municipio", None)): faltando.append("código de serviço do município")
+        if getattr(emitente, "aliquota_iss", None) in (None, ""):    faltando.append("alíquota de ISS")
+        if faltando:
+            return "Configure no painel Fiscal antes de emitir a NFS-e: " + ", ".join(faltando) + "."
+        return None
+    return None
+
+
 def resolver_emitente(db, loja, tipo_doc):
     """Resolve qual Emitente assina `tipo_doc` para `loja`.
     Precedência: override da loja (PerfilEmissao owner="loja") → default da rede

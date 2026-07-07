@@ -39,3 +39,48 @@ def test_validar_config_iss_fora_faixa():
 def test_pode_ativar_producao():
     assert mf.pode_ativar_producao([]) is True
     assert mf.pode_ativar_producao(["regime_tributario"]) is False
+
+
+# ── prontidao_emitente (US-42 / auditoria A2/A3/A5) ───────────────────────────
+from types import SimpleNamespace
+
+
+def _emit_pronto_produto(**kw):
+    base = dict(regime_tributario="simples", uf="SP", inscricao_estadual="123")
+    base.update(kw); return SimpleNamespace(**base)
+
+
+def _emit_pronto_servico(**kw):
+    base = dict(regime_tributario="simples", inscricao_municipal="322176",
+                municipio_ibge="3549904", cod_servico_municipio="14.13.03", aliquota_iss=5.0)
+    base.update(kw); return SimpleNamespace(**base)
+
+
+def test_prontidao_produto_ok():
+    assert mf.prontidao_emitente(_emit_pronto_produto(), "produto") is None
+
+
+def test_prontidao_produto_regime_nao_simples_barra():
+    e = mf.prontidao_emitente(_emit_pronto_produto(regime_tributario="normal"), "produto")
+    assert e and "Simples" in e
+
+
+def test_prontidao_produto_uf_vazia_barra():
+    for uf in (None, "", "  "):
+        e = mf.prontidao_emitente(_emit_pronto_produto(uf=uf), "produto")
+        assert e and "UF" in e
+
+
+def test_prontidao_servico_ok():
+    assert mf.prontidao_emitente(_emit_pronto_servico(), "servico") is None
+
+
+def test_prontidao_servico_sem_im_barra():
+    e = mf.prontidao_emitente(_emit_pronto_servico(inscricao_municipal=None), "servico")
+    assert e and "Inscrição Municipal" in e
+
+
+def test_prontidao_servico_sem_ibge_ou_cod_ou_iss_barra():
+    assert mf.prontidao_emitente(_emit_pronto_servico(municipio_ibge=""), "servico")
+    assert mf.prontidao_emitente(_emit_pronto_servico(cod_servico_municipio=None), "servico")
+    assert mf.prontidao_emitente(_emit_pronto_servico(aliquota_iss=None), "servico")

@@ -83,7 +83,11 @@ def montar_payload(nota):
     indicador_ie = dest.get("indicador_ie", 9)
     consumidor_final = dest.get("consumidor_final", 0 if dest["doc_tipo"] == "cnpj" else 1)
     ie_dest = dest.get("ie")
-    dentro = emit["uf"] == dest["uf"]
+    # UF normalizada (evita 'sp'/'SP '/None cair em interestadual por engano — A3 da auditoria).
+    # A prontidão do emitente (mod_fiscal) já barra UF vazia antes de chegar aqui.
+    _uf_emit = (emit.get("uf") or "").strip().upper()
+    _uf_dest = (dest.get("uf") or "").strip().upper()
+    dentro = bool(_uf_emit) and _uf_emit == _uf_dest
     cfop = fisc["cfop_dentro"] if dentro else fisc["cfop_fora"]
 
     items = []

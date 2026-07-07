@@ -56,6 +56,11 @@ def _perfil(app_db, loja_id, ambiente="homologacao"):
         db.add(em); db.flush()
         loja.emitente_id = em.id
     em.ambiente_ativo = ambiente
+    # Prontidão fiscal de serviço (US-42): IM + IBGE + cód. serviço + ISS preenchidos.
+    em.inscricao_municipal = "322176"
+    em.municipio_ibge = "3549904"
+    em.cod_servico_municipio = "14.13.03"
+    em.aliquota_iss = 5.0
     em.focus_token_homolog_enc = fiscal_cripto.encrypt("tok-homolog")
     em.focus_token_prod_enc = fiscal_cripto.encrypt("tok-prod")
     db.commit(); db.close()
@@ -400,18 +405,18 @@ def test_emitir_nfse_autoriza_e_estado_no_get(http_client_factory, seed, app_db,
     c = _login(http_client_factory, "dir_l2")
     st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 500})
     assert st == 200 and b["status"] == "autorizado" and b["chave"] == "CHS-15", b
-    assert b["ref"] == f"NFSE-{proj}", b
+    assert b["ref"] == f"NFSE-{proj}-1", b   # ref por tentativa (US-41)
     # DocumentoFiscal de serviço gravado
     db = app_db.get_session()
     reg = db.query(app_db.DocumentoFiscal).filter_by(projeto_nome=proj, tipo_documento="servico").first()
-    assert reg is not None and reg.ref == f"NFSE-{proj}"
+    assert reg is not None and reg.ref == f"NFSE-{proj}-1"
     db.close()
     # GET expõe o estado da NFS-e
     st2, g = c.get(f"/api/projetos/{proj}/ciclo/15/nfe")
     assert st2 == 200 and g["ok"] is True
     assert g["nfse"] is not None
     assert g["nfse"]["status"] == "autorizado" and g["nfse"]["chave"] == "CHS-15"
-    assert g["nfse"]["ref"] == f"NFSE-{proj}"
+    assert g["nfse"]["ref"] == f"NFSE-{proj}-1"
 
 
 def test_emitir_nfse_valor_ausente_ou_zero_400(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
@@ -469,3 +474,83 @@ def test_emitir_nfse_nao_autenticado_401(http_client_factory, seed, app_db, proj
     c = http_client_factory()
     st, _ = _post(c, f"/api/projetos/{seed['projeto_l2']}/ciclo/15/emitir-nfse", {"valor_servico": 500})
     assert st == 401
+
+
+# ---------------------------------------------------------------------------
+# US-41 — NFS-e rejeitada NÃO trava a etapa (re-emissão gera RPS novo). Auditoria A4.
+# ---------------------------------------------------------------------------
+
+class _FakeClientRejeita(FakeClient):
+    def aguardar_processamento_nfse(self, ref, timeout=60, intervalo=3):
+        return {"ref": ref, "status": "erro_autorizacao",
+                "erros": [{"codigo": "E188", "mensagem": "Simples conflita com RET"}]}
+
+
+class _FakeEmissorRejeita(FakeEmissor):
+    def __init__(self):
+        super().__init__(); self.client = _FakeClientRejeita()
+
+
+def test_emitir_nfse_rejeitada_permite_reemitir(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")
+    # 1ª tentativa: rejeitada → registro em 'erro', ref -1
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: _FakeEmissorRejeita())
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 500})
+    assert st == 200 and b["status"] == "erro", b
+    assert b["ref"] == f"NFSE-{proj}-1", b
+    # GET mostra a última (rejeitada) — a UI libera nova emissão
+    st_g, g = c.get(f"/api/projetos/{proj}/ciclo/15/nfe")
+    assert g["nfse"]["status"] == "erro" and g["nfse"]["ref"] == f"NFSE-{proj}-1"
+    # 2ª tentativa: agora autoriza → ref NOVO (-2). NÃO fica preso no RPS morto.
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
+    st2, b2 = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 500})
+    assert st2 == 200 and b2["status"] == "autorizado", b2
+    assert b2["ref"] == f"NFSE-{proj}-2", b2
+    db = app_db.get_session()
+    n = db.query(app_db.DocumentoFiscal).filter_by(projeto_nome=proj, tipo_documento="servico").count()
+    db.close()
+    assert n == 2
+    st_g2, g2 = c.get(f"/api/projetos/{proj}/ciclo/15/nfe")
+    assert g2["nfse"]["status"] == "autorizado" and g2["nfse"]["ref"] == f"NFSE-{proj}-2"
+    # 3ª chamada: última já autorizada → idempotente (mesmo ref, sem novo registro)
+    st3, b3 = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 500})
+    assert st3 == 200 and b3["ref"] == f"NFSE-{proj}-2", b3
+    db = app_db.get_session()
+    n2 = db.query(app_db.DocumentoFiscal).filter_by(projeto_nome=proj, tipo_documento="servico").count()
+    db.close()
+    assert n2 == 2
+
+
+# ---------------------------------------------------------------------------
+# US-42 — prontidão fiscal do Emitente barra emissão que geraria nota errada/recusa. Auditoria A2/A3/A5.
+# ---------------------------------------------------------------------------
+
+def test_emitir_nfse_prontidao_sem_im_400(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    db = app_db.get_session()
+    loja = db.get(app_db.Loja, seed["loja2_id"]); em = db.get(app_db.Emitente, loja.emitente_id)
+    em.inscricao_municipal = None; db.commit(); db.close()
+    c = _login(http_client_factory, "dir_l2")
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 500})
+    assert st == 400 and "Inscrição Municipal" in b.get("erro", ""), b
+    _perfil(app_db, seed["loja2_id"])   # restaura IM
+
+
+def test_emitir_produto_prontidao_regime_nao_simples_400(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    db = app_db.get_session()
+    loja = db.get(app_db.Loja, seed["loja2_id"]); em = db.get(app_db.Emitente, loja.emitente_id)
+    em.regime_tributario = "normal"; db.commit(); db.close()
+    c = _login(http_client_factory, "dir_l2")
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe", {"fabrica_doc_id": 1, "markup_pct": 30})
+    assert st == 400 and "Simples" in b.get("erro", ""), b
+    # restaura regime (app_db é module-scoped)
+    db = app_db.get_session()
+    loja = db.get(app_db.Loja, seed["loja2_id"]); em = db.get(app_db.Emitente, loja.emitente_id)
+    em.regime_tributario = "simples"; db.commit(); db.close()

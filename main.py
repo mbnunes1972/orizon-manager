@@ -1495,7 +1495,8 @@ class Handler(BaseHTTPRequestHandler):
                     # Estado da NFS-e (serviço, valor manual) — o DocumentoFiscal tipo="servico"
                     # deste projeto (ref NFSE-<projeto>), serializado como uma emissão de produto.
                     nfse_reg = (db.query(DocumentoFiscal)
-                                  .filter_by(projeto_nome=nome_safe, tipo_documento="servico").first())
+                                  .filter_by(projeto_nome=nome_safe, tipo_documento="servico")
+                                  .order_by(DocumentoFiscal.id.desc()).first())
                     emn = _emitente(nfse_reg.emitente_id) if nfse_reg else None
                     nfse = None if not nfse_reg else {
                         "ref": nfse_reg.ref, "status": nfse_reg.status, "chave": nfse_reg.chave_nfe,
@@ -4249,6 +4250,9 @@ class Handler(BaseHTTPRequestHandler):
                         emitente = mod_fiscal.resolver_emitente(db, loja, "produto")
                     except ValueError as e:
                         self.send_json({"ok": False, "erro": str(e)}, code=400); return
+                    _pront = mod_fiscal.prontidao_emitente(emitente, "produto")
+                    if _pront:
+                        self.send_json({"ok": False, "erro": _pront}, code=400); return
                     if "arquivo" not in arquivos:
                         self.send_json({"ok": False, "erro": "Anexe o XML da fábrica."}, code=400); return
                     projeto_nome = campos.get("projeto_nome")
@@ -4314,6 +4318,9 @@ class Handler(BaseHTTPRequestHandler):
                         emitente = mod_fiscal.resolver_emitente(db, loja, "produto")
                     except ValueError as e:
                         self.send_json({"ok": False, "erro": str(e)}, code=400); return
+                    _pront = mod_fiscal.prontidao_emitente(emitente, "produto")
+                    if _pront:
+                        self.send_json({"ok": False, "erro": _pront}, code=400); return
                     cliente = db.get(Cliente, projeto.cliente_id) if projeto.cliente_id else None
                     if not cliente:
                         self.send_json({"ok": False, "erro": "O projeto não tem cliente para o destinatário."}, code=400); return
@@ -4385,6 +4392,9 @@ class Handler(BaseHTTPRequestHandler):
                         emitente = mod_fiscal.resolver_emitente(db, loja, "servico")
                     except ValueError as e:
                         self.send_json({"ok": False, "erro": str(e)}, code=400); return
+                    _pront = mod_fiscal.prontidao_emitente(emitente, "servico")
+                    if _pront:
+                        self.send_json({"ok": False, "erro": _pront}, code=400); return
                     cliente = db.get(Cliente, projeto.cliente_id) if projeto.cliente_id else None
                     if not cliente:
                         self.send_json({"ok": False, "erro": "O projeto não tem cliente para o destinatário."}, code=400); return
@@ -4401,7 +4411,20 @@ class Handler(BaseHTTPRequestHandler):
                         valor = 0.0
                     if valor <= 0:
                         self.send_json({"ok": False, "erro": "Informe o valor do serviço."}, code=400); return
-                    ref = "NFSE-" + nome_safe
+                    # NFS-e por TENTATIVA: um RPS rejeitado é "morto" (a Focus deduplica por ref), então
+                    # re-emitir usa um ref novo (NFSE-<projeto>-<n>). Se a última tentativa já está
+                    # autorizada, é idempotente (não emite de novo). Corrige o beco-sem-saída da auditoria (A4).
+                    nfse_regs = (db.query(DocumentoFiscal)
+                                   .filter_by(projeto_nome=nome_safe, tipo_documento="servico")
+                                   .order_by(DocumentoFiscal.id.asc()).all())
+                    if nfse_regs and nfse_regs[-1].status == "autorizado":
+                        reg = nfse_regs[-1]
+                        self.send_json({"ok": True, "ref": reg.ref, "status": reg.status,
+                                        "chave": reg.chave_nfe, "numero": reg.numero, "serie": reg.serie,
+                                        "mensagem_sefaz": reg.mensagem_sefaz,
+                                        "erros": json.loads(reg.erros_json) if reg.erros_json else [],
+                                        "xml_doc_id": reg.xml_doc_id, "danfe_doc_id": reg.danfe_doc_id}); return
+                    ref = "NFSE-%s-%d" % (nome_safe, len(nfse_regs) + 1)
                     data_emissao = datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00")
                     discriminacao = req.get("discriminacao") or "Serviço de montagem/instalação de móveis planejados"
                     nota = mapa_fiscal.montar_nota_nfse(emitente, cliente, round(valor, 2), ref, data_emissao, discriminacao)
