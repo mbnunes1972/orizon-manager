@@ -5384,11 +5384,12 @@ def validar_cadastro_minimo(req: dict) -> list:
 
 def _ibge_por_cep(cep):
     """Resolve o código IBGE do município a partir do CEP via ViaCEP (best-effort, offline-safe).
-    Retorna o código (7 díg.) ou None. Usado no backfill de clientes antigos sem `municipio_ibge`."""
-    dig = _re.sub(r"\D", "", cep or "")
-    if len(dig) != 8:
-        return None
+    Retorna o código (7 díg.) ou None. Usado no backfill de clientes antigos sem `municipio_ibge`.
+    Nunca lança — qualquer falha (rede, CEP inválido, JSON) degrada para None."""
     try:
+        dig = re.sub(r"\D", "", cep or "")   # `re` (global do módulo); `_re` só existe local nos handlers
+        if len(dig) != 8:
+            return None
         import requests
         r = requests.get("https://viacep.com.br/ws/%s/json/" % dig, timeout=5)
         ibge = (r.json() or {}).get("ibge") if r.status_code == 200 else None
