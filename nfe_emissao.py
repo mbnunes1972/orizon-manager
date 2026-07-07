@@ -13,6 +13,8 @@ from emissor_fiscal import StatusNota, ResultadoEmissao, resultado_de_focus
 _TIPO_XML = "nfe_loja_xml"
 _TIPO_DANFE = "nfe_loja_danfe"
 _TIPO_CANC = "nfe_loja_cancelamento_xml"
+_TIPO_NFSE_XML = "nfse_loja_xml"
+_TIPO_NFSE_PDF = "nfse_loja_pdf"
 _NOME_DEST_HOMOLOG = "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"
 
 
@@ -52,9 +54,17 @@ def _resultado_de_registro(reg):
                             serie=reg.serie, mensagem_sefaz=reg.mensagem_sefaz)
 
 
+def _tipos_docs(tipo_documento):
+    """(tipo XML, tipo PDF/DANFE) do CicloDocumento conforme o documento (NF-e produto vs NFS-e serviço)."""
+    if tipo_documento == "servico":
+        return _TIPO_NFSE_XML, _TIPO_NFSE_PDF
+    return _TIPO_XML, _TIPO_DANFE
+
+
 def _guardar_docs_autorizado(db, reg, res, client):
-    xml_doc = _guardar_doc(db, reg.projeto_nome, _TIPO_XML, res.xml_url, client)
-    danfe_doc = _guardar_doc(db, reg.projeto_nome, _TIPO_DANFE, res.danfe_url, client)
+    tipo_xml, tipo_pdf = _tipos_docs(reg.tipo_documento)
+    xml_doc = _guardar_doc(db, reg.projeto_nome, tipo_xml, res.xml_url, client)
+    danfe_doc = _guardar_doc(db, reg.projeto_nome, tipo_pdf, res.danfe_url, client)
     if xml_doc:
         reg.xml_doc_id = xml_doc.id
     if danfe_doc:
@@ -73,13 +83,19 @@ def emitir(db, loja_id, projeto_nome, nota, tipo_documento="produto", emitente_i
     ambiente = (em.ambiente_ativo if em else "homologacao") or "homologacao"
     if ambiente == "producao" and not permitir_producao:
         raise ValueError("Emissão em produção bloqueada (use permitir_producao=True).")
-    if ambiente == "homologacao":
+    # Carimbo SEFAZ de homologação é regra do NF-e (produto); a NFS-e não tem `destinatario`.
+    if ambiente == "homologacao" and tipo_documento != "servico":
         nota["destinatario"]["nome"] = _NOME_DEST_HOMOLOG
     if emissor is None:
         emissor = _emissor_para(db, emitente_id)
-    res = emissor.emitir_nfe_produto(nota)
+    if tipo_documento == "servico":
+        res = emissor.emitir_nfse_servico(nota)
+        aguardar = emissor.client.aguardar_processamento_nfse
+    else:
+        res = emissor.emitir_nfe_produto(nota)
+        aguardar = emissor.client.aguardar_processamento
     if res.status == StatusNota.PROCESSANDO:
-        res = resultado_de_focus(emissor.client.aguardar_processamento(ref))
+        res = resultado_de_focus(aguardar(ref))
     if not reg:
         reg = DocumentoFiscal(ref=ref, projeto_nome=projeto_nome, loja_id=loja_id, etapa_codigo="15",
                               tipo_documento=tipo_documento, emitente_id=emitente_id,
@@ -99,7 +115,8 @@ def consultar(db, ref, emissor=None):
         raise ValueError("DocumentoFiscal %s não encontrada" % (ref,))
     if emissor is None:
         emissor = _emissor_para(db, reg.emitente_id)
-    res = emissor.consultar_status(ref)
+    res = (emissor.consultar_status_nfse(ref) if reg.tipo_documento == "servico"
+           else emissor.consultar_status(ref))
     ja_tinha = reg.xml_doc_id is not None
     _aplicar_resultado(reg, res)
     if res.status == StatusNota.AUTORIZADO and not ja_tinha:
@@ -115,7 +132,8 @@ def cancelar(db, ref, justificativa, emissor=None):
         raise ValueError("DocumentoFiscal %s não encontrada" % (ref,))
     if emissor is None:
         emissor = _emissor_para(db, reg.emitente_id)
-    res = emissor.cancelar(ref, justificativa)
+    res = (emissor.cancelar_nfse(ref, justificativa) if reg.tipo_documento == "servico"
+           else emissor.cancelar(ref, justificativa))
     _aplicar_resultado(reg, res)
     if res.xml_cancelamento_url:
         _guardar_doc(db, reg.projeto_nome, _TIPO_CANC, res.xml_cancelamento_url, emissor.client)

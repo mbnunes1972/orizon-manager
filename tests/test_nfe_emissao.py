@@ -32,6 +32,43 @@ class FakeEmissor:
         return resultado_de_focus({"ref": ref, "status": "cancelado", "caminho_xml_cancelamento": "/c.xml"})
 
 
+class FakeClientNfse:
+    def __init__(self): self.baixados = []
+    def aguardar_processamento_nfse(self, ref, timeout=60, intervalo=3):
+        return {"ref": ref, "status": "autorizado", "chave_nfe": "CHS1", "numero": "5", "serie": "1",
+                "caminho_xml_nota_fiscal": "/nfse/xml.xml", "url": "/nfse/nota.pdf"}
+    def baixar(self, caminho):
+        self.baixados.append(caminho)
+        return b"BYTES:" + caminho.encode()
+
+
+class FakeEmissorNfse:
+    """Emissor de NFS-e: espelha o de produto mas usa emitir_nfse_servico/consultar_status_nfse/cancelar_nfse."""
+    def __init__(self, status="processando_autorizacao"):
+        self.client = FakeClientNfse(); self._status = status; self.emit_calls = 0
+        self.nota_recebida = None
+    def emitir_nfse_servico(self, nota):
+        self.nota_recebida = nota
+        self.emit_calls += 1
+        return resultado_de_focus({"ref": nota["ref"], "status": self._status})
+    def consultar_status_nfse(self, ref):
+        return resultado_de_focus({"ref": ref, "status": "autorizado", "chave_nfe": "CHS",
+                                   "caminho_xml_nota_fiscal": "/x.xml", "url": "/nota.pdf"})
+    def cancelar_nfse(self, ref, justificativa):
+        return resultado_de_focus({"ref": ref, "status": "cancelado", "caminho_xml_cancelamento": "/c.xml"})
+
+
+def _nota_nfse(ref):
+    return {"ref": ref, "data_emissao": "D",
+            "prestador": {"cnpj": "1", "inscricao_municipal": "IM", "codigo_municipio": "3549904",
+                          "razao_social": "L"},
+            "tomador": {"doc_tipo": "cpf", "doc": "2", "razao_social": "C", "logradouro": "a",
+                        "numero": "1", "bairro": "b", "municipio": "c", "uf": "SP", "cep": "1"},
+            "servico": {"valor_servicos": 100.0, "aliquota": 2.0, "discriminacao": "Montagem",
+                        "iss_retido": False, "item_lista_servico": "14.06",
+                        "codigo_tributario_municipio": "3101"}}
+
+
 def _nota(ref):
     return {"ref": ref, "natureza_operacao": "Venda", "data_emissao": "D",
             "emitente": {"doc_tipo": "cnpj", "doc": "1", "nome": "L", "regime": 1, "ie": "1",
@@ -193,4 +230,65 @@ def test_emitir_producao_nao_forca_nome_dest(app_db, seed, projetos_dir):
     nfe_emissao.emitir(db, lid, proj, _nota("R-F3"), emitente_id=eid,
                        permitir_producao=True, emissor=fake)
     assert fake.nota_recebida["destinatario"]["nome"] == "C"
+    db.close()
+
+
+# ------------------------------------------------------------------------------------------------
+# NFS-e de serviço: emitir ramifica por tipo_documento="servico" (caminho aditivo, produto intacto)
+# ------------------------------------------------------------------------------------------------
+
+def test_emitir_servico_autoriza_guarda_docs(app_db, seed, projetos_dir):
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "S-1", proj); eid = _perfil(app_db, lid, "homologacao")
+    fake = FakeEmissorNfse()
+    db = app_db.get_session()
+    res = nfe_emissao.emitir(db, lid, proj, _nota_nfse("S-1"), tipo_documento="servico",
+                             emitente_id=eid, emissor=fake)
+    assert res.status == StatusNota.AUTORIZADO and res.chave == "CHS1"
+    reg = db.query(app_db.DocumentoFiscal).filter_by(ref="S-1").first()
+    assert reg.tipo_documento == "servico" and reg.status == "autorizado"
+    assert reg.xml_doc_id and reg.danfe_doc_id
+    docs = db.query(app_db.CicloDocumento).filter_by(projeto_nome=proj, etapa_codigo="15").all()
+    assert {d.tipo for d in docs} == {"nfse_loja_xml", "nfse_loja_pdf"}
+    assert fake.client.baixados == ["/nfse/xml.xml", "/nfse/nota.pdf"]
+    db.close()
+
+
+def test_emitir_servico_nao_carimba_nome_dest(app_db, seed, projetos_dir):
+    # a NFS-e não tem `destinatario`; o carimbo SEFAZ de homologação (regra do NF-e) não se aplica.
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "S-2", proj); eid = _perfil(app_db, lid, "homologacao")
+    fake = FakeEmissorNfse()
+    db = app_db.get_session()
+    nfe_emissao.emitir(db, lid, proj, _nota_nfse("S-2"), tipo_documento="servico",
+                       emitente_id=eid, emissor=fake)
+    assert "destinatario" not in fake.nota_recebida     # nota NFS-e intacta, sem carimbo
+    db.close()
+
+
+def test_consultar_servico_usa_caminho_nfse(app_db, seed, projetos_dir):
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "S-3", proj); eid = _perfil(app_db, lid, "homologacao")
+    db = app_db.get_session()
+    db.add(app_db.DocumentoFiscal(ref="S-3", projeto_nome=proj, loja_id=lid, emitente_id=eid,
+                                  tipo_documento="servico", status="processando"))
+    db.commit()
+    res = nfe_emissao.consultar(db, "S-3", emissor=FakeEmissorNfse())
+    assert res.status == StatusNota.AUTORIZADO and res.chave == "CHS"
+    reg = db.query(app_db.DocumentoFiscal).filter_by(ref="S-3").first()
+    assert reg.status == "autorizado" and reg.xml_doc_id
+    db.close()
+
+
+def test_cancelar_servico_usa_caminho_nfse(app_db, seed, projetos_dir):
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "S-4", proj); eid = _perfil(app_db, lid, "homologacao")
+    db = app_db.get_session()
+    db.add(app_db.DocumentoFiscal(ref="S-4", projeto_nome=proj, loja_id=lid, emitente_id=eid,
+                                  tipo_documento="servico", status="autorizado"))
+    db.commit()
+    res = nfe_emissao.cancelar(db, "S-4", "cancelamento por erro de digitacao", emissor=FakeEmissorNfse())
+    assert res.status == StatusNota.CANCELADO
+    reg = db.query(app_db.DocumentoFiscal).filter_by(ref="S-4").first()
+    assert reg.status == "cancelado"
     db.close()

@@ -64,8 +64,10 @@ def resultado_de_focus(dados: dict) -> ResultadoEmissao:
         serie=dados.get("serie"),
         status_sefaz=dados.get("status_sefaz"),
         mensagem_sefaz=dados.get("mensagem_sefaz"),
-        xml_url=dados.get("caminho_xml_nota_fiscal"),
-        danfe_url=dados.get("caminho_danfe"),
+        # xml: NF-e usa `caminho_xml_nota_fiscal`; a NFS-e da Focus pode devolver `caminho_nfse`.
+        xml_url=(dados.get("caminho_xml_nota_fiscal") or dados.get("caminho_nfse")),
+        # pdf: NF-e usa `caminho_danfe`; a NFS-e devolve o PDF em `url`/`caminho_pdf`.
+        danfe_url=(dados.get("caminho_danfe") or dados.get("caminho_pdf") or dados.get("url")),
         xml_cancelamento_url=dados.get("caminho_xml_cancelamento"),
         erros=list(dados.get("erros") or []),
         raw=dict(dados),

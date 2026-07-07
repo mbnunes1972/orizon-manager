@@ -19,3 +19,14 @@ class EmissorFocusNfe(EmissorFiscal):
 
     def cancelar(self, ref, justificativa):
         return resultado_de_focus(self.client.cancelar_nfe(ref, justificativa))
+
+    # --- NFS-e de serviço (municipal). Espelha o caminho do produto, mas via /v2/nfse. ---
+    def emitir_nfse_servico(self, nota):
+        payload = mapa_fiscal.montar_payload_nfse(nota)
+        return resultado_de_focus(self.client.enviar_nfse(nota["ref"], payload))
+
+    def consultar_status_nfse(self, ref):
+        return resultado_de_focus(self.client.consultar_nfse(ref))
+
+    def cancelar_nfse(self, ref, justificativa):
+        return resultado_de_focus(self.client.cancelar_nfse(ref, justificativa))
