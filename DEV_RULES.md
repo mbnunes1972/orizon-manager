@@ -83,6 +83,11 @@ O Claude Code lê os arquivos diretamente — não precisa colar o conteúdo.
   se houver, no painel do provedor do VPS).
 
 #### Runbook de deploy (rodar no servidor via ssh)
+> ⚠️ **Rodar numa sessão SSH interativa** (`ssh root@...` e depois colar), OU salvar num arquivo no VPS e
+> executar (`bash deploy_once.sh`). **NÃO** cole o script inteiro como comando único do `ssh host '<script>'`:
+> o argv da shell passa a conter `main.py`, e o `pkill -f main.py` casa com a própria shell do deploy e a
+> **auto-mata** (o script para logo no primeiro passo). Rodando via arquivo, o argv é `bash deploy_once.sh`
+> (sem `main.py`) e o `pkill` só atinge o app real.
 ```bash
 cd /root/orizon-manager
 pkill -f main.py; sleep 1

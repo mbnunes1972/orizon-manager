@@ -1341,7 +1341,19 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 
 ## ⏸️ ESTADO ATUAL (2026-07-07) — retomar aqui
 
-**Módulo Fiscal / NF-e completo e na `main`** (suíte **600**, tudo mergeado+pushado):
+> **🚀 Deploy no VPS (2026-07-07):** servidor online `http://167.88.33.121:8765` atualizado de `ca05a61`
+> (Sessão 44) → **`ce209ad`** (Sessão 50 + auditoria fiscal 100%). `origin/main`, VPS e local **em sincronia
+> (ce209ad)**. Banco **recriado limpo** (`rm orizon.db && python3 seed.py`, 10 usuários de exemplo, loja seed
+> id=1 — dados de teste anteriores do VPS foram descartados, conforme combinado: tudo é falso). App em screen
+> `orizon-manager`, bind `0.0.0.0`, `app.log` sem erros, HTTP **302** local **e externo**. **Contexto:** o VPS
+> é ambiente **de dev/teste aberto a pessoas remotas**, ainda **não** há produção operacional; todos os dados
+> são falsos. **Atenção:** o banco novo **não** tem config fiscal/token Focus (vive só no banco local) — testar
+> emissão no VPS exige configurar o Emitente primeiro. Senhas seed são de exemplo (fracas) e agora acessíveis de
+> fora. **Gotcha do runbook** (anotado no `DEV_RULES.md`): rodar o deploy **colado como comando SSH único** faz
+> o `pkill -f main.py` casar com a própria shell e se auto-matar; rodar via **arquivo** (`bash deploy_once.sh`,
+> deixado em `/root/`) ou numa sessão SSH interativa.
+
+**Módulo Fiscal / NF-e completo e na `main`** (suíte **650**, tudo mergeado+pushado; auditoria fiscal 100% endereçada):
 Fase 5 (etapa 15) · **multi-CNPJ** (Emitente 1ª classe, DocumentoFiscal) · **destinatário 3 tipos**
 (contribuinte/isento/não-contribuinte) · **painel de config → Emitente** (US-36) · **UI do Perfil de Emissão**
 (US-37: painel Fiscal da rede + política produto/serviço → self|central em 2 níveis) · **NFS-e de serviço**
