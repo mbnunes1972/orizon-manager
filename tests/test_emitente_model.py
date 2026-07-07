@@ -31,16 +31,29 @@ def test_migracao_perfil_fiscal_para_emitente_idempotente(app_db):
     lj = app_db.Loja(nome="Loja Fiscal", cnpj="19152134000156", estado="SP",
                      cidade="SAO PAULO", logradouro="Rua A", numero="10", bairro="Centro",
                      cep="12000-000")
-    s.add(lj); s.flush()
-    pf = app_db.PerfilFiscal(loja_id=lj.id, razao_social="INSPIRIUM",
-                             regime_tributario="simples", csosn_padrao="101",
-                             cfop_dentro_uf="5102", cfop_fora_uf="6102", serie_nfe="1",
-                             papel_cnpj="loja_produto_servico",
-                             focus_token_prod_enc="TOKEN_SECRETO_ENC",
-                             ambiente_ativo="producao")
-    s.add(pf); s.commit()
+    s.add(lj); s.commit()
     loja_id = lj.id
     s.close()
+
+    # perfil_fiscal é tabela legada (modelo ORM aposentado): cria/insere via SQL cru,
+    # exatamente como existiria num banco antigo, para exercitar o backfill.
+    conn = sqlite3.connect(app_db.DB_PATH)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS perfil_fiscal ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, loja_id INTEGER, razao_social TEXT, "
+        "inscricao_estadual TEXT, inscricao_municipal TEXT, regime_tributario TEXT, "
+        "csosn_padrao TEXT, cfop_dentro_uf TEXT, cfop_fora_uf TEXT, serie_nfe TEXT, "
+        "discrimina_impostos INTEGER, cnae_servico TEXT, cod_servico_municipio TEXT, "
+        "aliquota_iss REAL, retencao_json TEXT, municipio_ibge TEXT, cert_validade TEXT, "
+        "cert_cnpj TEXT, papel_cnpj TEXT, focus_token_homolog_enc TEXT, "
+        "focus_token_prod_enc TEXT, ambiente_ativo TEXT, placeholders_json TEXT)")
+    conn.execute(
+        "INSERT INTO perfil_fiscal (loja_id, razao_social, regime_tributario, csosn_padrao, "
+        "cfop_dentro_uf, cfop_fora_uf, serie_nfe, papel_cnpj, focus_token_prod_enc, ambiente_ativo) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (loja_id, "INSPIRIUM", "simples", "101", "5102", "6102", "1",
+         "loja_produto_servico", "TOKEN_SECRETO_ENC", "producao"))
+    conn.commit(); conn.close()
 
     # roda a migração de dados 2x sobre o mesmo banco (idempotência)
     conn = sqlite3.connect(app_db.DB_PATH)

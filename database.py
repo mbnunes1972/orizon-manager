@@ -502,50 +502,8 @@ class CicloRevisao(Base):
     aberta_por = relationship("Usuario", foreign_keys=[aberta_por_id])
 
 
-class PerfilFiscal(Base):
-    """Perfil fiscal por CNPJ/loja (1:1 com Loja). Complementa Loja.cnpj/endereço.
-    Segredos (tokens Focus) ficam CIFRADOS (fiscal_cripto); o certificado A1 NÃO fica aqui
-    (vive no painel da Focus) — só validade + CNPJ de referência."""
-    __tablename__ = "perfil_fiscal"
-
-    id      = Column(Integer, primary_key=True, autoincrement=True)
-    loja_id = Column(Integer, ForeignKey("lojas.id"), nullable=False, unique=True)
-
-    razao_social        = Column(Text, nullable=True)
-    inscricao_estadual  = Column(Text, nullable=True)
-    inscricao_municipal = Column(Text, nullable=True)
-
-    regime_tributario   = Column(Text, nullable=True)   # simples|simples_excesso|normal|mei
-    csosn_padrao        = Column(Text, nullable=True)
-
-    cfop_dentro_uf      = Column(Text, nullable=True)
-    cfop_fora_uf        = Column(Text, nullable=True)
-    serie_nfe           = Column(Text, nullable=True)
-    discrimina_impostos = Column(Integer, default=1)
-
-    cnae_servico          = Column(Text,  nullable=True)
-    cod_servico_municipio = Column(Text,  nullable=True)
-    aliquota_iss          = Column(Float, nullable=True)
-    retencao_json         = Column(Text,  nullable=True)
-    municipio_ibge        = Column(Text,  nullable=True)
-
-    cert_validade = Column(DateTime, nullable=True)
-    cert_cnpj     = Column(Text,     nullable=True)
-
-    papel_cnpj    = Column(Text, nullable=True)   # central_produto|loja_servico|loja_produto_servico|avulso
-
-    focus_token_homolog_enc = Column(Text, nullable=True)
-    focus_token_prod_enc    = Column(Text, nullable=True)
-    ambiente_ativo          = Column(Text, default="homologacao")
-
-    placeholders_json = Column(Text, nullable=True)
-
-    criado_em     = Column(DateTime, default=datetime.utcnow)
-    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
 class Emitente(Base):
-    """Identidade fiscal de 1 CNPJ (absorve PerfilFiscal). Emite documentos; NÃO é a loja vendedora."""
+    """Identidade fiscal de 1 CNPJ. Emite documentos; NÃO é a loja vendedora."""
     __tablename__ = "emitente"
     id = Column(Integer, primary_key=True, autoincrement=True)
     cnpj = Column(String(18), nullable=True)

@@ -5,7 +5,7 @@ from emissor_fiscal import EmissorFiscal, resultado_de_focus
 
 
 class EmissorFocusNfe(EmissorFiscal):
-    """Recebe um FocusClient injetado (montado por mod_fiscal.focus_client_para_loja)."""
+    """Recebe um FocusClient injetado (montado por mod_fiscal.focus_client_para_emitente)."""
 
     def __init__(self, client):
         self.client = client

@@ -143,37 +143,3 @@ def test_nao_autenticado_401(http_client_factory, seed, app_db):
     lid = seed["loja2_id"]
     st, _ = c.get(f"/api/admin/lojas/{lid}/perfil-fiscal")
     assert st == 401
-
-
-def _reset_perfil(app_db, loja_id):
-    db = app_db.get_session()
-    db.query(app_db.PerfilFiscal).filter_by(loja_id=loja_id).delete()
-    db.commit(); db.close()
-
-
-def test_focus_client_para_loja(http_client_factory, seed, app_db):
-    import mod_fiscal, fiscal_cripto
-    lid = seed["loja2_id"]
-    _reset_perfil(app_db, lid)
-    db = app_db.get_session()
-    db.add(app_db.PerfilFiscal(loja_id=lid, ambiente_ativo="homologacao",
-                               focus_token_homolog_enc=fiscal_cripto.encrypt("TESTE-TOKEN")))
-    db.commit(); db.close()
-    db2 = app_db.get_session()
-    cli = mod_fiscal.focus_client_para_loja(db2, lid)
-    assert cli.token == "TESTE-TOKEN"
-    assert cli.base_url == "https://homologacao.focusnfe.com.br"
-    db2.close()
-
-
-def test_focus_client_para_loja_sem_token(http_client_factory, seed, app_db):
-    import mod_fiscal, pytest
-    lid = seed["loja2_id"]
-    _reset_perfil(app_db, lid)
-    db = app_db.get_session()
-    db.add(app_db.PerfilFiscal(loja_id=lid, ambiente_ativo="producao"))
-    db.commit(); db.close()
-    db2 = app_db.get_session()
-    with pytest.raises(ValueError):
-        mod_fiscal.focus_client_para_loja(db2, lid)
-    db2.close()

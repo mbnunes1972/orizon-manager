@@ -14,7 +14,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
-                       CicloDocumento, CicloRevisao, PerfilFiscal, DocumentoFiscal, Emitente)
+                       CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente)
 from urllib.parse import urlparse, unquote
 
 from storage import (

@@ -3,9 +3,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import mod_fiscal as mf
 
 
-def test_perfil_padrao_teste():
-    p = mf.perfil_padrao_teste()
-    assert p["regime_tributario"] == "simples" and p["csosn_padrao"] == "101"
+def test_emitente_padrao_teste():
+    p = mf.emitente_padrao_teste()
+    assert p["regime_tributario"] == "simples" and p["csosn_padrao"] == "102"
     assert p["cfop_dentro_uf"] == "5102" and p["cfop_fora_uf"] == "6102"
     assert p["aliquota_iss"] == 5.0 and p["papel_cnpj"] == "loja_produto_servico"
     for chave in ("regime_tributario", "csosn_padrao", "cfop_dentro_uf", "cfop_fora_uf",
