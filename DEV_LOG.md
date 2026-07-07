@@ -1348,17 +1348,31 @@ Fase 5 (etapa 15) · **multi-CNPJ** (Emitente 1ª classe, DocumentoFiscal) · **
 (US-38: emite montagem via `/v2/nfse`, valor manual, no painel da etapa 15 — **faturamento produto+serviço
 completo**). Tudo **mergeado na `main`** (US-36/37/38).
 **🎉 SMOKE REAL AUTORIZADO** — NF-e de **produto** da INSPIRIUM emitida pela SEFAZ.
-**Smoke da NFS-e (2026-07-06):** CNPJ **habilitado p/ NFS-e** em SJC, payload **aceito** (RPS gerado,
-processando), prefeitura rejeitou por **DADO**: **E70 — Inscrição Municipal do prestador** (Emitente com
-`inscricao_municipal=None`). Pipeline validado ponta a ponta; faltam **IM + código do serviço no município**
-(item LC 116) — ambos editáveis no painel Fiscal. Re-rodar após preencher.
-Pendências fiscais: preencher **IM + código de serviço** e re-rodar smoke NFS-e · refinamentos (CSOSN por
-operação; não-contribuinte PJ) · **dados reais** (CPFs válidos dos clientes) · verificação manual dos painéis.
+**🎉 SMOKE NFS-e AUTORIZADO (2026-07-07)** — a INSPIRIUM emitiu NFS-e **autorizada** por São José dos Campos
+(homologação): nº 1, cód. verificação `LWWCfsDUg`, XML + DANFSE gerados (`homol-notajoseense.sjc.sp.gov.br`).
+O smoke foi na camada do emissor com **ref único** (RPS rejeitado é morto → emite-se novo) e **sem gravar
+DocumentoFiscal**. Sequência de correções descoberta (cada uma destravou o próximo motivo de rejeição):
+> 1. **E70** (Inscrição Municipal ausente) → **DADO**: preenchido no Emitente (IM `322176`, cód. serviço
+>    `14.13.03`, município IBGE `3549904`, CNAE `4330404`, ISS 5%). ✅
+> 2. **E188** (Simples Nacional conflita com Regime Especial de Tributação) → **CÓDIGO**: o payload NFS-e
+>    precisa enviar, no topo, `optante_simples_nacional` (derivado de `emitente.regime_tributario=='simples'`),
+>    `regime_especial_tributacao="6"` (ME/EPP do Simples) e `natureza_operacao="1"`. **Hoje `montar_payload_nfse`
+>    NÃO envia** → o endpoint real ainda cairia aqui.
+> 3. **L999** ("Tomador Não Identificado para a atividade") → **CÓDIGO**: o tomador precisa de
+>    `endereco.codigo_municipio` (IBGE). Isolado: o `codigo_municipio` **sozinho** resolve (CEP inválido é
+>    tolerado). **Hoje `montar_payload_nfse` NÃO envia** o IBGE do tomador — e o **Cliente não tem `municipio_ibge`**
+>    (só cidade/UF): falta origem do dado (resolver por cidade/UF ou novo campo).
+>
+> **→ Backlog EP-11 / US-39 (a fazer):** codificar em `mapa_fiscal` (TDD) os campos acima no payload NFS-e para o
+> **endpoint da etapa 15** emitir autorizado (hoje ele falharia E188+L999); definir a origem do **IBGE do tomador**.
 
-**Validação de CPF/CNPJ (Sessão 50, branch `feat/validacao-cpf-cnpj`, suíte 624):** todos os cadastros
+Pendências fiscais: **US-39** (payload NFS-e: optante/RET/natureza + IBGE do tomador) · re-smoke via endpoint da
+etapa 15 após US-39 · refinamentos (CSOSN por operação; não-contribuinte PJ) · **dados reais** (CPFs/CEPs
+válidos dos clientes; muitos hoje são placeholder) · verificação manual dos painéis.
+
+**Validação de CPF/CNPJ (Sessão 50, na `main`, suíte 624):** todos os cadastros
 (Cliente/Parceiro/Usuário/Rede/Loja) **rejeitam número falso** (dígito verificador) no backend + inline no
-modal de cliente; documento segue **opcional** (valida só se informado). **Pendente:** mergear na `main` +
-re-ingerir MCP.
+modal de cliente; documento segue **opcional** (valida só se informado). Mergeado + MCP re-ingerido.
 
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
