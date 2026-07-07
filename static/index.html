@@ -7019,7 +7019,9 @@ async function adminFiscalCarregar(){
     sec('Identificação fiscal') +
     `<div class="grid2" style="gap:14px">${inp('razao_social','Razão social')}${inp('inscricao_estadual','Inscrição estadual')}${inp('inscricao_municipal','Inscrição municipal')}</div>` +
     sec('Regime tributário') +
-    `<div class="grid2" style="gap:14px">${sel('regime_tributario','Regime',[['simples','Simples Nacional'],['simples_excesso','Simples — Excesso sublimite'],['normal','Regime Normal'],['mei','MEI']])}${inp('csosn_padrao','CSOSN padrão')}</div>` +
+    `<div class="grid2" style="gap:14px">${sel('regime_tributario','Regime',[['simples','Simples Nacional'],['simples_excesso','Simples — Excesso sublimite'],['normal','Regime Normal'],['mei','MEI']])}${inp('csosn_padrao','CSOSN não-contribuinte')}${inp('csosn_contribuinte','CSOSN contribuinte')}</div>` +
+    sec('Endereço do emitente') +
+    `<div class="grid2" style="gap:14px">${inp('logradouro','Logradouro')}${inp('numero','Número')}${inp('bairro','Bairro')}${inp('cidade','Cidade')}${inp('uf','UF')}${inp('cep','CEP')}</div>` +
     sec('NF-e produto') +
     `<div class="grid2" style="gap:14px">${inp('cfop_dentro_uf','CFOP dentro do estado')}${inp('cfop_fora_uf','CFOP fora do estado')}${inp('serie_nfe','Série da NF-e')}
       <div><label class="field-label">Discrimina impostos (Lei da Transparência)</label>
@@ -7052,8 +7054,11 @@ async function adminFiscalSalvar(lid){
   const payload = {
     razao_social: v('razao_social'), inscricao_estadual: v('inscricao_estadual'),
     inscricao_municipal: v('inscricao_municipal'), regime_tributario: v('regime_tributario'),
-    csosn_padrao: v('csosn_padrao'), cfop_dentro_uf: v('cfop_dentro_uf'), cfop_fora_uf: v('cfop_fora_uf'),
+    csosn_padrao: v('csosn_padrao'), csosn_contribuinte: v('csosn_contribuinte'),
+    cfop_dentro_uf: v('cfop_dentro_uf'), cfop_fora_uf: v('cfop_fora_uf'),
     serie_nfe: v('serie_nfe'),
+    logradouro: v('logradouro'), numero: v('numero'), bairro: v('bairro'),
+    cidade: v('cidade'), uf: v('uf'), cep: v('cep'),
     discrimina_impostos: document.getElementById('pf-discrimina_impostos').checked ? 1 : 0,
     cnae_servico: v('cnae_servico'), cod_servico_municipio: v('cod_servico_municipio'),
     aliquota_iss: (iss === '' || iss == null) ? null : parseFloat(iss),
