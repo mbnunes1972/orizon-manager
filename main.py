@@ -2313,6 +2313,11 @@ class Handler(BaseHTTPRequestHandler):
             if not nome:
                 self.send_json({"ok": False, "erro": "Nome é obrigatório"})
                 return
+            import validacao_doc
+            _e = validacao_doc.erro_doc(req.get("cpf_cnpj"), "CPF/CNPJ")
+            if _e:
+                self.send_json({"ok": False, "erro": _e}, code=400)
+                return
             db = get_session()
             try:
                 p = Parceiro(
@@ -2363,6 +2368,12 @@ class Handler(BaseHTTPRequestHandler):
                 if p is None or not _parceiro_visivel_loja(db, p, loja_id):
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
+                if "cpf_cnpj" in req:
+                    import validacao_doc
+                    _e = validacao_doc.erro_doc(req.get("cpf_cnpj"), "CPF/CNPJ")
+                    if _e:
+                        self.send_json({"ok": False, "erro": _e}, code=400)
+                        return
                 for f in ["nome","cpf_cnpj","tipo","email","telefone","whatsapp","observacoes"]:
                     if f in req:
                         setattr(p, f, (req[f] or "").strip() or None)
@@ -3247,6 +3258,11 @@ class Handler(BaseHTTPRequestHandler):
                     if erros:
                         self.send_json({"ok": False, "erro": " ".join(erros)})
                         return
+                    import validacao_doc
+                    _e = validacao_doc.erro_doc(req.get("cpf"), "CPF", "cpf")
+                    if _e:
+                        self.send_json({"ok": False, "erro": _e}, code=400)
+                        return
                     primary_loja_id = loja_ids[0] if loja_ids else None
                     u = Usuario(nome=req["nome"].strip(), login=req["login"].strip(),
                                 nivel=req["nivel"].strip(),
@@ -3275,6 +3291,11 @@ class Handler(BaseHTTPRequestHandler):
                 if erros:
                     self.send_json({"ok": False, "erro": " ".join(erros)})
                     return
+                import validacao_doc
+                _e = validacao_doc.erro_doc(req.get("cnpj"), "CNPJ", "cnpj")
+                if _e:
+                    self.send_json({"ok": False, "erro": _e}, code=400)
+                    return
                 db = get_session()
                 try:
                     r = Rede(nome=req["nome"].strip(),
@@ -3301,6 +3322,11 @@ class Handler(BaseHTTPRequestHandler):
                         rede_id = ator.get("rede_id")
                     if erros:
                         self.send_json({"ok": False, "erro": " ".join(erros)})
+                        return
+                    import validacao_doc
+                    _e = validacao_doc.erro_doc(req.get("cnpj"), "CNPJ", "cnpj")
+                    if _e:
+                        self.send_json({"ok": False, "erro": _e}, code=400)
                         return
                     l = Loja(
                         nome=req["nome"].strip(),
@@ -5205,6 +5231,12 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False,
                             "erro": "Sem permissão para atribuir esse perfil."}, code=403)
                         return
+                    if "cpf" in req:
+                        import validacao_doc
+                        _e = validacao_doc.erro_doc(req.get("cpf"), "CPF", "cpf")
+                        if _e:
+                            self.send_json({"ok": False, "erro": _e}, code=400)
+                            return
                     if "nome" in req:     u.nome     = req["nome"].strip()
                     if "nivel" in req:    u.nivel    = req["nivel"].strip()
                     if "telefone" in req: u.telefone = (req.get("telefone") or "").strip()
@@ -5258,7 +5290,13 @@ class Handler(BaseHTTPRequestHandler):
                             self.send_json({"ok": False, "erro": "Nome da rede é obrigatório."})
                             return
                         r.nome = nome
-                    if "cnpj" in req:  r.cnpj  = (req["cnpj"] or "").strip() or None
+                    if "cnpj" in req:
+                        import validacao_doc
+                        _e = validacao_doc.erro_doc(req.get("cnpj"), "CNPJ", "cnpj")
+                        if _e:
+                            self.send_json({"ok": False, "erro": _e}, code=400)
+                            return
+                        r.cnpj = (req["cnpj"] or "").strip() or None
                     if "ativo" in req: r.ativo = 1 if req["ativo"] else 0
                     db.commit()
                     self.send_json({"ok": True, "rede": _rede_dict(r)})
@@ -5293,6 +5331,12 @@ class Handler(BaseHTTPRequestHandler):
                             self.send_json({"ok": False, "erro": " ".join(erros)})
                             return
                         l.codigo = req["codigo"].strip().upper()
+                    if "cnpj" in req:
+                        import validacao_doc
+                        _e = validacao_doc.erro_doc(req.get("cnpj"), "CNPJ", "cnpj")
+                        if _e:
+                            self.send_json({"ok": False, "erro": _e}, code=400)
+                            return
                     for campo in ("nome", "cnpj", "telefone", "email", "cep", "logradouro",
                                   "numero", "complemento", "bairro", "cidade", "estado",
                                   "testemunha1_nome", "testemunha1_cpf",

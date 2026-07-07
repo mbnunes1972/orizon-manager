@@ -35,3 +35,77 @@ def test_cliente_editar_cpf_invalido_400(http_client_factory, seed):
     st, d = _cli(c, cpf="168.995.350-09"); cid = d["cliente"]["id"]
     st2, d2 = c.post(f"/api/clientes/{cid}/editar", {"cpf": "111.444.777-00"})
     assert st2 == 400
+
+
+# ── VD-Task 3: parceiro / usuário / rede / loja ──────────────────────────────
+
+def test_parceiro_cpf_cnpj_invalido_400(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/parceiros", {"nome": "P", "tipo": "arquiteto",
+                                      "cpf_cnpj": "111.111.111-11"})
+    assert st == 400, d
+
+def test_parceiro_cpf_cnpj_valido_200(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/parceiros", {"nome": "P", "tipo": "arquiteto",
+                                      "cpf_cnpj": "111.444.777-35"})
+    assert st == 200 and d.get("ok"), d
+
+def test_parceiro_cnpj_valido_200(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/parceiros", {"nome": "P PJ", "tipo": "arquiteto",
+                                      "cpf_cnpj": "11.222.333/0001-81"})
+    assert st == 200 and d.get("ok"), d
+
+def test_parceiro_sem_doc_200(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/parceiros", {"nome": "P Sem Doc", "tipo": "arquiteto"})
+    assert st == 200 and d.get("ok"), d
+
+def test_parceiro_editar_cpf_cnpj_invalido_400(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/parceiros", {"nome": "P Edit", "tipo": "arquiteto"})
+    pid = d["parceiro"]["id"]
+    st2, d2 = c.post(f"/api/parceiros/{pid}/editar", {"cpf_cnpj": "11.222.333/0001-00"})
+    assert st2 == 400, d2
+
+
+def test_usuario_cpf_invalido_400(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/admin/usuarios", {
+        "nome": "U", "login": "u_cpf_bad", "senha": "s1", "nivel": "consultor",
+        "cpf": "111.111.111-11", "loja_id": seed["loja1_id"]})
+    assert st == 400, d
+
+def test_usuario_cpf_valido_200(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/admin/usuarios", {
+        "nome": "U", "login": "u_cpf_ok", "senha": "s1", "nivel": "consultor",
+        "cpf": "390.533.447-05", "loja_id": seed["loja1_id"]})
+    assert st == 200 and d.get("ok"), d
+
+
+def test_rede_cnpj_invalido_400(http_client_factory, seed):
+    c = http_client_factory(); c.login("super", "senha123")
+    st, d = c.post("/api/admin/redes", {"nome": "R Bad", "cnpj": "11.222.333/0001-00"})
+    assert st == 400, d
+
+def test_rede_cnpj_valido_200(http_client_factory, seed):
+    c = http_client_factory(); c.login("super", "senha123")
+    st, d = c.post("/api/admin/redes", {"nome": "R Ok", "cnpj": "11.222.333/0001-81"})
+    assert st == 200 and d.get("ok"), d
+
+
+def test_loja_cnpj_invalido_400(http_client_factory, seed):
+    c = http_client_factory(); c.login("super", "senha123")
+    st, d = c.post("/api/admin/lojas", {
+        "nome": "L Bad", "codigo": "XBD", "rede_id": seed["rede_id"],
+        "cnpj": "11.222.333/0001-00"})
+    assert st == 400, d
+
+def test_loja_cnpj_valido_200(http_client_factory, seed):
+    c = http_client_factory(); c.login("super", "senha123")
+    st, d = c.post("/api/admin/lojas", {
+        "nome": "L Ok", "codigo": "XOK", "rede_id": seed["rede_id"],
+        "cnpj": "11.222.333/0001-81"})
+    assert st == 200 and d.get("ok"), d

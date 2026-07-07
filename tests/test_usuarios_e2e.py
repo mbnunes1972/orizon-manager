@@ -58,7 +58,7 @@ def test_diretor_cria_usuario_loja_com_contato(http_client_factory, seed):
     c = _login(http_client_factory, "dir_l1")
     st, body = c.post("/api/admin/usuarios", {
         "nome": "Nova Pessoa", "login": "nova1", "senha": "s1", "nivel": "consultor",
-        "telefone": "1", "whatsapp": "2", "email": "n@p.com", "cpf": "000",
+        "telefone": "1", "whatsapp": "2", "email": "n@p.com", "cpf": "390.533.447-05",
         "loja_id": seed["loja1_id"]})
     assert st == 200 and body["ok"]
     st2, lst = c.get(f"/api/admin/usuarios?escopo=loja&loja_id={seed['loja1_id']}")
