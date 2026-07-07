@@ -4400,10 +4400,14 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "O projeto não tem cliente para o destinatário."}, code=400); return
                     # IBGE do tomador é obrigatório para a NFS-e (L999 "Tomador Não Identificado").
                     # Clientes novos já capturam via ViaCEP no cadastro; para os antigos, backfill best-effort.
+                    # Consistência (auditoria A11): alinha cidade/UF à MESMA fonte (ViaCEP) que define o IBGE,
+                    # senão o tomador iria com município textual divergente do código IBGE.
                     if not (cliente.municipio_ibge or "").strip() and (cliente.cep or "").strip():
-                        ibge = _ibge_por_cep(cliente.cep)
-                        if ibge:
-                            cliente.municipio_ibge = ibge
+                        end = _endereco_por_cep(cliente.cep)
+                        if end:
+                            cliente.municipio_ibge = end["ibge"]
+                            if end.get("cidade"): cliente.cidade = end["cidade"]
+                            if end.get("uf"):     cliente.estado = end["uf"]
                             db.commit()
                     try:
                         valor = float(req.get("valor_servico") or 0)
@@ -4615,7 +4619,7 @@ class Handler(BaseHTTPRequestHandler):
                 rede = db.get(Rede, rid)
                 if not rede:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
-                if not mod_tenancy.pode_ver_rede(ator, rid):
+                if not mod_tenancy.pode_editar_dados_rede(ator, rid):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
                 em, attr = _emitente_do_dono(db, "rede", rede)
                 if not em:
@@ -4675,7 +4679,7 @@ class Handler(BaseHTTPRequestHandler):
                 rede = db.get(Rede, rid)
                 if not rede:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
-                if not mod_tenancy.pode_ver_rede(ator, rid):
+                if not mod_tenancy.pode_editar_dados_rede(ator, rid):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
                 em, attr = _emitente_do_dono(db, "rede", rede)
                 if not em:
@@ -4743,7 +4747,7 @@ class Handler(BaseHTTPRequestHandler):
                 rede = db.get(Rede, rid)
                 if not rede:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
-                if not mod_tenancy.pode_ver_rede(ator, rid):
+                if not mod_tenancy.pode_editar_dados_rede(ator, rid):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
                 em, attr = _emitente_do_dono(db, "rede", rede)
                 if not em:
@@ -4774,7 +4778,7 @@ class Handler(BaseHTTPRequestHandler):
                 rede = db.get(Rede, rid)
                 if not rede:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
-                if not mod_tenancy.pode_ver_rede(ator, rid):
+                if not mod_tenancy.pode_editar_dados_rede(ator, rid):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
                 payload, code = _perfil_emissao_put(db, "rede", rid, rede, req)
                 self.send_json(payload, code=code)
@@ -5407,20 +5411,29 @@ def validar_cadastro_minimo(req: dict) -> list:
     return faltando
 
 
-def _ibge_por_cep(cep):
-    """Resolve o código IBGE do município a partir do CEP via ViaCEP (best-effort, offline-safe).
-    Retorna o código (7 díg.) ou None. Usado no backfill de clientes antigos sem `municipio_ibge`.
-    Nunca lança — qualquer falha (rede, CEP inválido, JSON) degrada para None."""
+def _endereco_por_cep(cep):
+    """Consulta o ViaCEP e devolve {'ibge', 'cidade', 'uf'} (best-effort, offline-safe) ou None.
+    Nunca lança — qualquer falha (rede, CEP inválido, JSON, sem IBGE) degrada para None."""
     try:
         dig = re.sub(r"\D", "", cep or "")   # `re` (global do módulo); `_re` só existe local nos handlers
         if len(dig) != 8:
             return None
         import requests
         r = requests.get("https://viacep.com.br/ws/%s/json/" % dig, timeout=5)
-        ibge = (r.json() or {}).get("ibge") if r.status_code == 200 else None
-        return ibge or None
+        d = (r.json() or {}) if r.status_code == 200 else {}
+        ibge = d.get("ibge")
+        if not ibge:
+            return None
+        return {"ibge": ibge, "cidade": d.get("localidade") or None, "uf": d.get("uf") or None}
     except Exception:
         return None
+
+
+def _ibge_por_cep(cep):
+    """Compat: só o código IBGE do município (via `_endereco_por_cep`). Usado no backfill de
+    clientes antigos sem `municipio_ibge`."""
+    end = _endereco_por_cep(cep)
+    return end["ibge"] if end else None
 
 
 def _cliente_dict(c) -> dict:

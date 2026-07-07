@@ -131,3 +131,11 @@ def test_montar_payload_nfse_sem_ibge_tomador_omite():
     nota = mp.montar_nota_nfse(_emit(), _cli(municipio_ibge=None), 300.0, "NFSE-S4", "D", "svc")
     p = mp.montar_payload_nfse(nota)
     assert "codigo_municipio" not in p["tomador"]["endereco"]
+
+
+def test_montar_payload_nfse_mei_ret_5():
+    # MEI → optante true + RET 5 (auditoria A10)
+    nota = mp.montar_nota_nfse(_emit(regime_tributario="mei"), _cli(), 300.0, "NFSE-M1", "D", "svc")
+    p = mp.montar_payload_nfse(nota)
+    assert p["optante_simples_nacional"] is True
+    assert p["regime_especial_tributacao"] == "5"

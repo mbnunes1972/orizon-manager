@@ -41,3 +41,28 @@ def test_ibge_por_cep_sem_ibge_no_retorno(app_db, monkeypatch):
 
     monkeypatch.setattr(requests, "get", lambda *a, **k: _R())
     assert main._ibge_por_cep("00000-000") is None
+
+
+def test_endereco_por_cep_reconcilia_cidade_uf(app_db, monkeypatch):
+    # auditoria A11: retorna ibge + cidade + uf da mesma fonte (ViaCEP)
+    import main, requests
+
+    class _R:
+        status_code = 200
+        def json(self): return {"ibge": "3549904", "localidade": "Sao Jose dos Campos", "uf": "SP"}
+
+    monkeypatch.setattr(requests, "get", lambda *a, **k: _R())
+    assert main._endereco_por_cep("12242-800") == {"ibge": "3549904", "cidade": "Sao Jose dos Campos", "uf": "SP"}
+    assert main._ibge_por_cep("12242-800") == "3549904"   # compat
+
+
+def test_endereco_por_cep_sem_ibge_none(app_db, monkeypatch):
+    import main, requests
+
+    class _R:
+        status_code = 200
+        def json(self): return {"localidade": "X", "uf": "SP"}   # sem ibge → None
+
+    monkeypatch.setattr(requests, "get", lambda *a, **k: _R())
+    assert main._endereco_por_cep("12242-800") is None
+    assert main._ibge_por_cep("12242-800") is None

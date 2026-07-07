@@ -99,6 +99,16 @@ def pode_editar_dados_loja(ator, loja):
     return pode_ver_loja(ator, loja)
 
 
+def pode_editar_dados_rede(ator, rede_id):
+    """Editar config da rede (segredos, ambiente, perfil de emissão) exige capacidade de EDIÇÃO,
+    não só de leitura — espelha `pode_editar_dados_loja`. Defensivo (auditoria A6): hoje quem enxerga
+    a rede já tem `editar_dados_loja`, mas gravar segredo/virar produção não deve depender do predicado
+    de leitura `pode_ver_rede`."""
+    if not perfis.pode(ator.get("nivel"), "editar_dados_loja"):
+        return False
+    return pode_ver_rede(ator, rede_id)
+
+
 def atribuir_tenant_usuario(ator, dados):
     """Decide (loja_id, rede_id) do NOVO usuário conforme quem cria.
     Retorna (loja_id, rede_id, erros). A checagem de que a loja escolhida pertence

@@ -18,6 +18,17 @@ def test_pode_ver_rede():
     assert mt.pode_ver_rede(DIR, 1) is False
 
 
+def test_pode_editar_dados_rede():
+    # auditoria A6: editar config da rede exige capacidade de edição + escopo da rede.
+    assert mt.pode_editar_dados_rede(SUPER, 1) is True
+    assert mt.pode_editar_dados_rede(SUPER, 99) is True
+    assert mt.pode_editar_dados_rede(ADMR, 1) is True
+    assert mt.pode_editar_dados_rede(ADMR, 2) is False     # outra rede
+    assert mt.pode_editar_dados_rede(DIR, 1) is False      # diretor não enxerga a rede
+    # gerente adm/fin não tem editar_dados_loja → nunca edita config de rede
+    assert mt.pode_editar_dados_rede({"nivel": "gerente_adm_fin", "rede_id": 1}, 1) is False
+
+
 def test_pode_ver_loja():
     assert mt.pode_ver_loja(SUPER, LOJA_R2) is True
     assert mt.pode_ver_loja(SUPER, LOJA_AVULSA) is True

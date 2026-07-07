@@ -172,13 +172,14 @@ def _iss_retido(emitente):
 def _tributacao_nfse(emitente):
     """Bloco de tributação da NFS-e derivado do regime do Emitente. Descoberto no smoke real de
     SJC (2026-07-07): a prefeitura rejeita (E188) se o Simples Nacional não vier coerente com o
-    Regime Especial de Tributação. `optante_simples_nacional` vem do regime; RET 6 = ME/EPP do
-    Simples (caso da INSPIRIUM; MEI seria 5 — refinar quando o Emitente distinguir). `natureza_operacao`
-    1 = tributação no município (montagem prestada no local do cliente, ISS devido no município)."""
-    optante = (getattr(emitente, "regime_tributario", None) or "").lower() == "simples"
+    Regime Especial de Tributação. RET (regime especial de tributação): 5 = MEI, 6 = ME/EPP do
+    Simples Nacional. `optante_simples_nacional` = há RET do Simples. `natureza_operacao` 1 =
+    tributação no município (montagem prestada no local do cliente, ISS devido no município)."""
+    regime = (getattr(emitente, "regime_tributario", None) or "").strip().lower()
+    ret = {"mei": "5", "simples": "6"}.get(regime)
     return {
-        "optante_simples_nacional": optante,
-        "regime_especial_tributacao": "6" if optante else None,
+        "optante_simples_nacional": ret is not None,
+        "regime_especial_tributacao": ret,
         "natureza_operacao": "1",
     }
 

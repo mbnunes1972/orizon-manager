@@ -292,3 +292,33 @@ def test_cancelar_servico_usa_caminho_nfse(app_db, seed, projetos_dir):
     reg = db.query(app_db.DocumentoFiscal).filter_by(ref="S-4").first()
     assert reg.status == "cancelado"
     db.close()
+
+
+class _FakeClientBaixaFalha(FakeClient):
+    def baixar(self, caminho):
+        raise RuntimeError("rede caiu ao baixar XML")
+
+
+class _FakeEmissorBaixaFalha(FakeEmissor):
+    def __init__(self):
+        super().__init__(); self.client = _FakeClientBaixaFalha()
+
+
+def test_emitir_autorizado_persiste_mesmo_se_baixa_falha(app_db, seed, projetos_dir):
+    """Auditoria A9: se a baixa de XML/DANFE falhar, a nota JÁ autorizada não é desfeita;
+    `consultar` rebaixa os documentos depois."""
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "R-A9", proj); eid = _perfil(app_db, lid, "homologacao")
+    db = app_db.get_session()
+    res = nfe_emissao.emitir(db, lid, proj, _nota("R-A9"), emitente_id=eid, emissor=_FakeEmissorBaixaFalha())
+    assert res.status == StatusNota.AUTORIZADO
+    reg = db.query(app_db.DocumentoFiscal).filter_by(ref="R-A9").first()
+    assert reg is not None and reg.status == "autorizado"        # a nota NÃO se perdeu
+    assert reg.xml_doc_id is None and reg.danfe_doc_id is None    # a baixa falhou
+    db.close()
+    # consultar (com cliente que baixa OK) recupera os documentos
+    db2 = app_db.get_session()
+    nfe_emissao.consultar(db2, "R-A9", emissor=FakeEmissor())
+    reg2 = db2.query(app_db.DocumentoFiscal).filter_by(ref="R-A9").first()
+    assert reg2.xml_doc_id and reg2.danfe_doc_id
+    db2.close()

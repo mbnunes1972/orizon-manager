@@ -75,6 +75,8 @@ class FocusClient:
         return self._request("GET", "/v2/nfse/%s" % ref, params={"completa": 1 if completa else 0})
 
     def cancelar_nfse(self, ref, justificativa):
+        if not (15 <= len(justificativa or "") <= 255):
+            raise ValueError("justificativa deve ter entre 15 e 255 caracteres")
         return self._request("DELETE", "/v2/nfse/%s" % ref,
                              json_body={"justificativa": justificativa})
 

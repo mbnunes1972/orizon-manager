@@ -102,9 +102,16 @@ def emitir(db, loja_id, projeto_nome, nota, tipo_documento="produto", emitente_i
                               fabrica_doc_id=fabrica_doc_id)
         db.add(reg)
     _aplicar_resultado(reg, res)
-    if res.status == StatusNota.AUTORIZADO:
-        _guardar_docs_autorizado(db, reg, res, emissor.client)
+    # Atomicidade (auditoria A9): persiste a autorização/rejeição ANTES de baixar os binários.
+    # Se a baixa de XML/DANFE (rede) falhar depois, a nota — que JÁ foi autorizada de verdade na
+    # SEFAZ/prefeitura — não é desfeita; `consultar` rebaixa os documentos numa próxima chamada.
     db.commit()
+    if res.status == StatusNota.AUTORIZADO:
+        try:
+            _guardar_docs_autorizado(db, reg, res, emissor.client)
+            db.commit()
+        except Exception:
+            db.rollback()
     return res
 
 

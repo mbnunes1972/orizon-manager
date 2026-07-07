@@ -97,6 +97,13 @@ def test_cancelar_nfse(monkeypatch):
     assert c["json"] == {"justificativa": "Cancelamento por erro na montagem"}
 
 
+def test_cancelar_nfse_justificativa_curta(monkeypatch):
+    # auditoria A7: NFS-e também valida 15-255 no backend (não só a UI)
+    _capture(monkeypatch, [])  # não deve chegar a requisitar
+    with pytest.raises(ValueError):
+        _client().cancelar_nfse("S1", "curta")
+
+
 def test_aguardar_processamento_nfse_ate_autorizado(monkeypatch):
     monkeypatch.setattr(fc.time, "sleep", lambda s: None)
     seq = [{"status": "processando_autorizacao"},
