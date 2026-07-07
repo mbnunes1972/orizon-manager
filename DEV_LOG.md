@@ -1319,13 +1319,15 @@ emite). Subagent-driven, TDD, suíte **532 → 545**. Spec/plano: `docs/superpow
 
 ## ⏸️ ESTADO ATUAL (2026-07-06) — retomar aqui
 
-**Módulo Fiscal / NF-e essencialmente completo e na `main`** (suíte **561**, tudo mergeado+pushado):
+**Módulo Fiscal / NF-e completo e na `main`** (suíte **600**, tudo mergeado+pushado):
 Fase 5 (etapa 15) · **multi-CNPJ** (Emitente 1ª classe, DocumentoFiscal) · **destinatário 3 tipos**
 (contribuinte/isento/não-contribuinte) · **painel de config → Emitente** (US-36) · **UI do Perfil de Emissão**
-(US-37: painel Fiscal da rede + política produto/serviço → self|central em 2 níveis). **🎉 SMOKE REAL
-AUTORIZADO** em homologação (NF-e da INSPIRIUM emitida pela SEFAZ). Branch aberta: `feat/fiscal-perfil-emissao-ui`
-(US-37, **578**) aguardando merge.
-Pendências fiscais: **US-38/US-32** (NFS-e de serviço) · refinamentos (CSOSN por operação; não-contribuinte
+(US-37: painel Fiscal da rede + política produto/serviço → self|central em 2 níveis) · **NFS-e de serviço**
+(US-38: emite montagem via `/v2/nfse`, valor manual, no painel da etapa 15 — **faturamento produto+serviço
+completo**). **🎉 SMOKE REAL AUTORIZADO** (NF-e de produto da INSPIRIUM emitida pela SEFAZ). Branch aberta:
+`feat/fiscal-nfse-servico` (US-38, **600**) aguardando merge.
+Pendências fiscais: **smoke real da NFS-e** (habilitação do CNPJ p/ NFS-e no município + confirmar campos do
+payload Focus NFS-e) · refinamentos (CSOSN por operação; não-contribuinte
 PJ) · **dados reais** (CPFs válidos dos clientes) · verificação manual dos painéis no navegador. O smoke pode
 ser re-rodado a qualquer momento (Emitente da INSPIRIUM completo no `orizon.db`).
 

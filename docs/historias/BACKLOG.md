@@ -651,7 +651,15 @@
 
 ---
 
-### US-38 — Emissão da NFS-e de serviço sob o Emitente do plano `[PLANEJADO]`
+### US-38 — Emissão da NFS-e de serviço sob o Emitente do plano `[IMPLEMENTADO]`
+
+> **Feito (2026-07-06, branch `feat/fiscal-nfse-servico`):** `focus_client /v2/nfse`,
+> `mapa_fiscal.montar_nota_nfse/payload_nfse`, `EmissorFocusNfe.emitir_nfse_servico`, `nfe_emissao` ramifica
+> NF-e/NFS-e por `tipo_documento`, endpoint `…/ciclo/15/emitir-nfse` (valor manual) + seção no painel da etapa
+> 15. Emite sob `resolver_emitente(loja,"servico")`. **Substitui/unifica a US-32.** ⚠ smoke real pendente da
+> habilitação NFS-e do CNPJ no município (confirmar campos exatos do payload Focus NFS-e). *(Refino de
+> `resolver_plano` — detecção automática de "tem serviço" — segue como melhoria futura.)*
+
 
 **Como** Gerente Adm/Fin,
 **quero** emitir a **NFS-e de serviço** (montagem/projeto) sob o Emitente que o Plano de Faturamento resolve,

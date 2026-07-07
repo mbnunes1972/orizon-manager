@@ -1,10 +1,12 @@
 # Fiscal — NFS-e de Serviço (montagem) (US-38) — Design
 
 > Spec de design · 2026-07-06 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Fecha o faturamento: além da NF-e de **produto**
-> (etapa 15), emite a **NFS-e de serviço** (montagem/instalação) — o último documento fiscal que ainda não
-> emite. Espelha o caminho do produto; smoke estrutural agora (a **habilitação NFS-e no município** é passo à
-> parte, como foi o certificado do produto).
+> Status: **IMPLEMENTADO (branch `feat/fiscal-nfse-servico`, suíte 600)** — emite a **NFS-e de serviço**
+> (montagem): `focus_client /v2/nfse`, `mapa_fiscal.montar_nota_nfse`/`montar_payload_nfse`,
+> `EmissorFocusNfe.emitir_nfse_servico`, `nfe_emissao` ramifica NF-e/NFS-e por `tipo_documento`, endpoint
+> `…/ciclo/15/emitir-nfse` (valor manual) + estado `nfse` no GET + seção no painel. **Faturamento
+> produto+serviço multi-CNPJ completo.** ⚠ **Smoke real da NFS-e pendente** da habilitação do CNPJ para NFS-e
+> no município (São José dos Campos) — os nomes exatos dos campos do payload Focus NFS-e ficam a confirmar lá.
 
 ## 1. Motivação
 
