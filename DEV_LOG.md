@@ -1363,12 +1363,18 @@ DocumentoFiscal**. Sequência de correções descoberta (cada uma destravou o pr
 >    tolerado). **Hoje `montar_payload_nfse` NÃO envia** o IBGE do tomador — e o **Cliente não tem `municipio_ibge`**
 >    (só cidade/UF): falta origem do dado (resolver por cidade/UF ou novo campo).
 >
-> **→ Backlog EP-11 / US-39 (a fazer):** codificar em `mapa_fiscal` (TDD) os campos acima no payload NFS-e para o
-> **endpoint da etapa 15** emitir autorizado (hoje ele falharia E188+L999); definir a origem do **IBGE do tomador**.
+> ### ✅ US-39 — payload NFS-e completo — IMPLEMENTADO (2026-07-07, branch `feat/nfse-payload-us39`, suíte 632)
+> `mapa_fiscal.montar_payload_nfse` agora envia, no topo, `optante_simples_nacional` (derivado de
+> `emitente.regime_tributario=='simples'`), `regime_especial_tributacao="6"` (ME/EPP do Simples; só quando optante)
+> e `natureza_operacao="1"`; e `codigo_municipio` (IBGE) no `tomador.endereco`. Novo campo `Cliente.municipio_ibge`
+> (migração idempotente), capturado via **ViaCEP** no modal (o ViaCEP devolve `ibge`) + **backfill best-effort**
+> por CEP na emissão (`_ibge_por_cep`, offline-safe) para clientes antigos. **Smoke pelo caminho real de código →
+> NFS-e AUTORIZADA** por SJC. RET=6/natureza=1 são defaults documentados (MEI seria 5; refinar quando o Emitente
+> distinguir). **Pendente:** merge + re-ingerir MCP.
 
-Pendências fiscais: **US-39** (payload NFS-e: optante/RET/natureza + IBGE do tomador) · re-smoke via endpoint da
-etapa 15 após US-39 · refinamentos (CSOSN por operação; não-contribuinte PJ) · **dados reais** (CPFs/CEPs
-válidos dos clientes; muitos hoje são placeholder) · verificação manual dos painéis.
+Pendências fiscais: re-smoke via **endpoint da etapa 15** (server+login, com um projeto de serviço) — o caminho de
+código já foi provado · refinamentos (CSOSN por operação; não-contribuinte PJ; RET MEI=5) · **dados reais** (CPFs/CEPs
+válidos dos clientes; muitos hoje são placeholder → sem IBGE resolvível) · verificação manual dos painéis.
 
 **Validação de CPF/CNPJ (Sessão 50, na `main`, suíte 624):** todos os cadastros
 (Cliente/Parceiro/Usuário/Rede/Loja) **rejeitam número falso** (dígito verificador) no backend + inline no
