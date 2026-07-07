@@ -67,6 +67,17 @@ class FocusClient:
             raise ValueError("justificativa deve ter entre 15 e 255 caracteres")
         return self._request("DELETE", "/v2/nfe/%s" % ref, json_body={"justificativa": justificativa})
 
+    def enviar_nfse(self, ref, payload):
+        # `ref` é a chave de idempotência (a Focus deduplica por `ref`) — retry de POST é seguro.
+        return self._request("POST", "/v2/nfse", params={"ref": ref}, json_body=payload)
+
+    def consultar_nfse(self, ref, completa=False):
+        return self._request("GET", "/v2/nfse/%s" % ref, params={"completa": 1 if completa else 0})
+
+    def cancelar_nfse(self, ref, justificativa):
+        return self._request("DELETE", "/v2/nfse/%s" % ref,
+                             json_body={"justificativa": justificativa})
+
     def baixar(self, caminho):
         """GET binário de um caminho relativo retornado pela Focus (xml/danfe)."""
         resp = requests.get(self.base_url + caminho, auth=(self.token, ""), timeout=self.timeout)
@@ -85,4 +96,16 @@ class FocusClient:
                 break
             time.sleep(intervalo)
             dados = self.consultar_nfe(ref)
+        return dados
+
+    def aguardar_processamento_nfse(self, ref, timeout=60, intervalo=3):
+        """Espelha aguardar_processamento, mas polla consultar_nfse (NFS-e)."""
+        intervalo = max(1, intervalo)
+        tentativas = max(1, int(timeout / intervalo))
+        dados = self.consultar_nfse(ref)
+        for _ in range(tentativas - 1):
+            if dados.get("status") != "processando_autorizacao":
+                break
+            time.sleep(intervalo)
+            dados = self.consultar_nfse(ref)
         return dados

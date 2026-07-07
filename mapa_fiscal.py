@@ -1,5 +1,6 @@
 """mapa_fiscal.py — mapa fiscal: preview (Fase 1) + Emitente (identidade fiscal, pode ≠ loja) +
 Cliente (destinatário) -> payload da NF-e da Focus. Puro: sem DB, sem rede. Regime Simples primeiro."""
+import json
 import re
 
 REGIME_FOCUS = {"simples": 1, "simples_excesso": 2, "mei": 1, "normal": 3}
@@ -145,3 +146,87 @@ def montar_payload(nota):
     if indicador_ie == 1 and ie_dest:
         payload["inscricao_estadual_destinatario"] = ie_dest
     return payload
+
+
+# ------------------------------------------------------------------------------------------------
+# NFS-e de serviço (municipal). Espelha o caminho do NF-e de produto, mas a nota é ISS/serviço:
+# prestador (Emitente) + tomador (Cliente) + servico (valor/alíquota/discriminação/código).
+# ------------------------------------------------------------------------------------------------
+
+def _iss_retido(emitente):
+    """Lê `retencao_json` do Emitente (se houver) -> iss_retido (bool). Default False."""
+    raw = getattr(emitente, "retencao_json", None)
+    if not raw:
+        return False
+    try:
+        dados = json.loads(raw) if isinstance(raw, str) else raw
+    except (ValueError, TypeError):
+        return False
+    return bool(isinstance(dados, dict) and dados.get("iss_retido"))
+
+
+def montar_nota_nfse(emitente, cliente, valor_servico, ref, data_emissao, discriminacao):
+    """Assembla o dict neutro `nota_nfse` (sem DB/rede): prestador (do Emitente), tomador (do
+    cliente via `_dest_fiscal`), servico (valor/ISS/código de serviço). Docs só-dígitos."""
+    doc_tipo, doc, _indicador, _ie, _consumidor = _dest_fiscal(cliente)
+    return {
+        "ref": ref,
+        "data_emissao": data_emissao,
+        "prestador": {
+            "cnpj": _so_digitos(getattr(emitente, "cnpj", None)),
+            "inscricao_municipal": getattr(emitente, "inscricao_municipal", None),
+            "codigo_municipio": getattr(emitente, "municipio_ibge", None),
+            "razao_social": getattr(emitente, "razao_social", None),
+        },
+        "tomador": {
+            "doc_tipo": doc_tipo, "doc": _so_digitos(doc),
+            "razao_social": cliente.nome,
+            "logradouro": cliente.logradouro, "numero": cliente.numero, "bairro": cliente.bairro,
+            "municipio": cliente.cidade, "uf": cliente.estado, "cep": _so_digitos(cliente.cep),
+        },
+        "servico": {
+            "valor_servicos": valor_servico,
+            "aliquota": getattr(emitente, "aliquota_iss", None),
+            "discriminacao": discriminacao,
+            "iss_retido": _iss_retido(emitente),
+            # item_lista_servico = código do serviço no município (LC 116); codigo_tributario = CNAE.
+            "item_lista_servico": getattr(emitente, "cod_servico_municipio", None),
+            "codigo_tributario_municipio": getattr(emitente, "cnae_servico", None),
+        },
+    }
+
+
+def montar_payload_nfse(nota):
+    """Converte o dict neutro `nota_nfse` no payload JSON da Focus `/v2/nfse`.
+    Nomes de campo próximos à doc da Focus NFS-e (validar no smoke estrutural)."""
+    pr = nota["prestador"]
+    to = nota["tomador"]
+    sv = nota["servico"]
+    tomador = {
+        "razao_social": to["razao_social"],
+        "endereco": {
+            "logradouro": to["logradouro"], "numero": to["numero"], "bairro": to["bairro"],
+            "municipio": to["municipio"], "uf": to["uf"], "cep": to["cep"],
+        },
+    }
+    if to["doc_tipo"] == "cnpj":
+        tomador["cnpj"] = to["doc"]
+    else:
+        tomador["cpf"] = to["doc"]
+    return {
+        "data_emissao": nota["data_emissao"],
+        "prestador": {
+            "cnpj": pr["cnpj"],
+            "inscricao_municipal": pr["inscricao_municipal"],
+            "codigo_municipio": pr["codigo_municipio"],
+        },
+        "tomador": tomador,
+        "servico": {
+            "valor_servicos": sv["valor_servicos"],
+            "aliquota": sv["aliquota"],
+            "iss_retido": sv["iss_retido"],
+            "item_lista_servico": sv["item_lista_servico"],
+            "codigo_tributario_municipio": sv["codigo_tributario_municipio"],
+            "discriminacao": sv["discriminacao"],
+        },
+    }

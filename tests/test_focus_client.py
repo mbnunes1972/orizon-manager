@@ -70,6 +70,51 @@ def test_cancelar_justificativa_curta(monkeypatch):
         _client().cancelar_nfe("R1", "curta")
 
 
+def test_enviar_nfse_monta_request(monkeypatch):
+    chamadas = _capture(monkeypatch, [FakeResp(202, {"status": "processando_autorizacao", "ref": "S1"})])
+    dados = _client().enviar_nfse("S1", {"prestador": {"cnpj": "19152134000156"}})
+    c = chamadas[0]
+    assert c["method"] == "POST" and c["url"].endswith("/v2/nfse")
+    assert c["params"] == {"ref": "S1"}
+    assert c["json"]["prestador"]["cnpj"] == "19152134000156"
+    assert c["auth"] == ("Tok", "")
+    assert dados["status"] == "processando_autorizacao" and dados["_http_status"] == 202
+
+
+def test_consultar_nfse(monkeypatch):
+    chamadas = _capture(monkeypatch, [FakeResp(200, {"status": "autorizado"})])
+    _client().consultar_nfse("S1", completa=True)
+    c = chamadas[0]
+    assert c["method"] == "GET" and c["url"].endswith("/v2/nfse/S1")
+    assert c["params"] == {"completa": 1}
+
+
+def test_cancelar_nfse(monkeypatch):
+    chamadas = _capture(monkeypatch, [FakeResp(200, {"status": "cancelado"})])
+    _client().cancelar_nfse("S1", "Cancelamento por erro na montagem")
+    c = chamadas[0]
+    assert c["method"] == "DELETE" and c["url"].endswith("/v2/nfse/S1")
+    assert c["json"] == {"justificativa": "Cancelamento por erro na montagem"}
+
+
+def test_aguardar_processamento_nfse_ate_autorizado(monkeypatch):
+    monkeypatch.setattr(fc.time, "sleep", lambda s: None)
+    seq = [{"status": "processando_autorizacao"},
+           {"status": "processando_autorizacao"},
+           {"status": "autorizado"}]
+    monkeypatch.setattr(fc.FocusClient, "consultar_nfse", lambda self, ref, completa=False: seq.pop(0))
+    dados = _client().aguardar_processamento_nfse("S1", timeout=9, intervalo=3)
+    assert dados["status"] == "autorizado"
+
+
+def test_aguardar_processamento_nfse_estoura_timeout(monkeypatch):
+    monkeypatch.setattr(fc.time, "sleep", lambda s: None)
+    monkeypatch.setattr(fc.FocusClient, "consultar_nfse",
+                        lambda self, ref, completa=False: {"status": "processando_autorizacao"})
+    dados = _client().aguardar_processamento_nfse("S1", timeout=6, intervalo=3)
+    assert dados["status"] == "processando_autorizacao"   # não trava, retorna o último
+
+
 def test_erro_4xx_vira_focuserror(monkeypatch):
     _capture(monkeypatch, [FakeResp(422, {"mensagem": "cnpj invalido",
                                           "erros": [{"codigo": "cnpj", "mensagem": "invalido"}]})])
