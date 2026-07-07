@@ -614,7 +614,12 @@
 
 ---
 
-### US-36 — Migrar o Painel Fiscal (config) para o Emitente `[PLANEJADO]`
+### US-36 — Migrar o Painel Fiscal (config) para o Emitente `[IMPLEMENTADO]`
+
+> **Feito (2026-07-06, branch `feat/fiscal-painel-emitente`):** o painel opera o `Emitente` da loja
+> (`loja.emitente_id`, cria se faltar) com endereço + CSOSN contribuinte editáveis; `PerfilFiscal` (modelo +
+> `focus_client_para_loja`) removido; tabela `perfil_fiscal` mantida como legado. Gap de config fechado.
+
 
 **Como** administrador de loja/rede,
 **quero** que a configuração fiscal (Painel Fiscal) edite o **Emitente** que a emissão realmente usa,

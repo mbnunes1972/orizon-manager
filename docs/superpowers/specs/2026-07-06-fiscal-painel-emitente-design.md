@@ -1,9 +1,10 @@
 # Fiscal — Painel de Config → Emitente (US-36) — Design
 
 > Spec de design · 2026-07-06 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Fecha o gap: o **Painel Fiscal (config)** ainda
-> escreve/lê `PerfilFiscal`, mas a **emissão lê `Emitente`** → editar o painel não afeta a emissão. Passa o
-> painel a operar o **Emitente da loja** e aposenta o modelo `PerfilFiscal`.
+> Status: **IMPLEMENTADO (branch `feat/fiscal-painel-emitente`, suíte 561)** — o Painel Fiscal passou a
+> operar o **Emitente da loja** (`loja.emitente_id`, cria se faltar), com **endereço + CSOSN contribuinte**
+> editáveis; `PerfilFiscal` (modelo + `focus_client_para_loja`) **removido** (tabela `perfil_fiscal` mantida
+> como legado). **Gap de config divergente FECHADO** — editar o painel agora afeta a emissão.
 
 ## 1. Motivação
 

@@ -1303,11 +1303,12 @@ emite). Subagent-driven, TDD, suíte **532 → 545**. Spec/plano: `docs/superpow
   **Multi-CNPJ provado:** teste emite o produto sob o CNPJ da **central da rede** (≠ loja vendedora).
 - **NFS-e** segue slot modelado (`emitir_nfse_servico` NotImplemented — US-32).
 
-> ### ⚠ GAP conhecido (registrar antes do smoke) — config divergente
-> O **Painel Fiscal (config, Sub-frentes I/II)** ainda escreve/le `PerfilFiscal`; a **emissão agora lê
-> `Emitente`**. Editar o painel **não afeta mais a emissão** até a migração do painel de config para o
-> `Emitente` (**EP-11**, frente própria). **Para o smoke:** o `Emitente` da INSPIRIUM (criado pela migração,
-> com o token) é quem vale — o `focus_client_para_loja`/`PerfilFiscal` viraram legado não-lido pela emissão.
+> ### ✅ GAP config divergente — FECHADO (US-36, 2026-07-06)
+> ~~O Painel Fiscal escrevia `PerfilFiscal` mas a emissão lê `Emitente`.~~ **RESOLVIDO** (branch
+> `feat/fiscal-painel-emitente`, suíte 561): o **Painel Fiscal agora opera o `Emitente` da loja**
+> (`loja.emitente_id`, cria se faltar) com **endereço + CSOSN contribuinte** editáveis; o modelo
+> `PerfilFiscal` + `focus_client_para_loja` foram **removidos** (tabela `perfil_fiscal` mantida como legado).
+> Editar o painel volta a afetar a emissão. Falta só a **US-37** (UI do Perfil de Emissão loja/rede ↔ emitentes).
 
 - **Pendente:** merge desta branch; migração do painel de config → Emitente (EP-11); NFS-e (US-32). O smoke
   real (cert A1) pode rodar nesta branch (usa o `Emitente`) ou na `main` atual (usa `PerfilFiscal`) — **decidir
@@ -1315,10 +1316,15 @@ emite). Subagent-driven, TDD, suíte **532 → 545**. Spec/plano: `docs/superpow
 
 ## ⏸️ ESTADO ATUAL (2026-07-06) — retomar aqui
 
-**`main`** já tem a **Fase 5 (etapa 15)** mergeada e pushada (fast-forward; suíte 532). Branch aberta:
-**`feat/fiscal-emitente-multicnpj`** (multi-CNPJ / Emitente, **545 passed**) — aguarda revisão final + merge.
-Pendências transversais: smoke real (cert A1) — decidir o trilho (recomendado mergear a multi-CNPJ e rodar
-no novo); verificação manual dos painéis; migração do painel de config → Emitente (EP-11).
+**Módulo Fiscal / NF-e essencialmente completo e na `main`** (suíte **561**, tudo mergeado+pushado):
+Fase 5 (etapa 15) · **multi-CNPJ** (Emitente 1ª classe, DocumentoFiscal) · **destinatário 3 tipos**
+(contribuinte/isento/não-contribuinte) · **painel de config → Emitente** (US-36, gap fechado). **🎉 SMOKE REAL
+AUTORIZADO** em homologação (NF-e da INSPIRIUM emitida pela SEFAZ). Branch aberta: `feat/fiscal-painel-emitente`
+(US-36, 561) aguardando merge.
+Pendências fiscais: **US-37** (UI do Perfil de Emissão loja/rede ↔ emitentes) · **US-38/US-32** (NFS-e de
+serviço) · refinamentos (CSOSN por operação; não-contribuinte PJ) · **dados reais** (CPFs válidos dos clientes)
+· verificação manual dos painéis no navegador. O smoke pode ser re-rodado a qualquer momento (Emitente da
+INSPIRIUM completo no `orizon.db`).
 
 ### 🧾 Módulo Fiscal / Integração NF-e (Fábrica→Loja via Focus NFe) — mapa e continuação (Sessão 47)
 
