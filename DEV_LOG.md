@@ -1324,12 +1324,20 @@ Fase 5 (etapa 15) · **multi-CNPJ** (Emitente 1ª classe, DocumentoFiscal) · **
 (contribuinte/isento/não-contribuinte) · **painel de config → Emitente** (US-36) · **UI do Perfil de Emissão**
 (US-37: painel Fiscal da rede + política produto/serviço → self|central em 2 níveis) · **NFS-e de serviço**
 (US-38: emite montagem via `/v2/nfse`, valor manual, no painel da etapa 15 — **faturamento produto+serviço
-completo**). **🎉 SMOKE REAL AUTORIZADO** (NF-e de produto da INSPIRIUM emitida pela SEFAZ). Branch aberta:
-`feat/fiscal-nfse-servico` (US-38, **600**) aguardando merge.
-Pendências fiscais: **smoke real da NFS-e** (habilitação do CNPJ p/ NFS-e no município + confirmar campos do
-payload Focus NFS-e) · refinamentos (CSOSN por operação; não-contribuinte
-PJ) · **dados reais** (CPFs válidos dos clientes) · verificação manual dos painéis no navegador. O smoke pode
-ser re-rodado a qualquer momento (Emitente da INSPIRIUM completo no `orizon.db`).
+completo**). Tudo **mergeado na `main`** (US-36/37/38).
+**🎉 SMOKE REAL AUTORIZADO** — NF-e de **produto** da INSPIRIUM emitida pela SEFAZ.
+**Smoke da NFS-e (2026-07-06):** CNPJ **habilitado p/ NFS-e** em SJC, payload **aceito** (RPS gerado,
+processando), prefeitura rejeitou por **DADO**: **E70 — Inscrição Municipal do prestador** (Emitente com
+`inscricao_municipal=None`). Pipeline validado ponta a ponta; faltam **IM + código do serviço no município**
+(item LC 116) — ambos editáveis no painel Fiscal. Re-rodar após preencher.
+Pendências fiscais: preencher **IM + código de serviço** e re-rodar smoke NFS-e · refinamentos (CSOSN por
+operação; não-contribuinte PJ) · **dados reais** (CPFs válidos dos clientes) · verificação manual dos painéis.
+
+> **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
+> persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
+> 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:
+> toda mudança em Python exige reiniciar o servidor** (o `main.py` é lido só no start; o `index.html` é lido
+> do disco a cada request).
 
 ### 🧾 Módulo Fiscal / Integração NF-e (Fábrica→Loja via Focus NFe) — mapa e continuação (Sessão 47)
 

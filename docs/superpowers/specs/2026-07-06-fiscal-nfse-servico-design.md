@@ -5,8 +5,15 @@
 > (montagem): `focus_client /v2/nfse`, `mapa_fiscal.montar_nota_nfse`/`montar_payload_nfse`,
 > `EmissorFocusNfe.emitir_nfse_servico`, `nfe_emissao` ramifica NF-e/NFS-e por `tipo_documento`, endpoint
 > `…/ciclo/15/emitir-nfse` (valor manual) + estado `nfse` no GET + seção no painel. **Faturamento
-> produto+serviço multi-CNPJ completo.** ⚠ **Smoke real da NFS-e pendente** da habilitação do CNPJ para NFS-e
-> no município (São José dos Campos) — os nomes exatos dos campos do payload Focus NFS-e ficam a confirmar lá.
+> produto+serviço multi-CNPJ completo.**
+>
+> **Smoke real da NFS-e testado (2026-07-06):** o CNPJ **está habilitado para NFS-e** em São José dos Campos,
+> o **payload foi aceito** (Focus gerou RPS nº 1/série 1, `processando_autorizacao` HTTP 202 — estrutura
+> prestador/tomador/serviço OK) e a **prefeitura rejeitou por DADO**, não por código: **E70 — "Inscrição
+> Municipal do prestador ... não confere"** (o `Emitente` da INSPIRIUM está com `inscricao_municipal=None`).
+> ⇒ **pipeline validado ponta a ponta** (transporte → Focus → município); faltam **2 dados** (contador/loja):
+> **Inscrição Municipal** e o **código do serviço no município** (item LC 116). Ambos já editáveis no painel
+> Fiscal (US-36). Re-rodar o smoke após preenchê-los.
 
 ## 1. Motivação
 
