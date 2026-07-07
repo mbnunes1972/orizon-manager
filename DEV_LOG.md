@@ -1386,8 +1386,11 @@ Veredito: isolamento multi-tenant e segredos sólidos; riscos em chave local, be
 hardcodes fiscais. **🔴 Altos corrigidos** (branch `feat/fiscal-altos-auditoria`, suíte 641): **A1**
 (.gitignore da chave Fernet), **US-42** (`prontidao_emitente`: barra produto fora do Simples / UF vazia e NFS-e
 sem IM/IBGE/cód-serviço/alíquota — A2/A3/A5), **US-41** (NFS-e rejeitada re-emite com ref por tentativa — A4).
-Pendentes na auditoria: 🟠 Médios (config da rede gated por leitura A6; justificativa NFS-e A7; atomicidade A9;
-idempotência A8) e 🟡 Baixos (A12/A13/A14). Ver `docs/avaliacao/2026-07-07-auditoria-fiscal.md`.
+**🟠 Médios corrigidos** (branch `feat/fiscal-medios-auditoria`, suíte 648): **A6** (config da rede exige
+`pode_editar_dados_rede`), **A7** (justificativa NFS-e 15-255 no backend), **A9** (atomicidade: autorização
+persiste antes de baixar XML/DANFE — `consultar` rebaixa), **A10** (RET MEI=5/ME-EPP=6), **A11** (backfill IBGE
+alinha cidade/UF). A8 mitigado. **Restam só 🟡 Baixos** (A12 unicidade PerfilEmissao; A13 2º clique→500; A14
+NFS-e não conclui etapa 15). Ver `docs/avaliacao/2026-07-07-auditoria-fiscal.md`.
 
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam

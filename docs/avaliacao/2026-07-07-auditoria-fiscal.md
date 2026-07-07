@@ -4,7 +4,16 @@
 > **A1** — chave Fernet + segredos agora no `.gitignore` versionado. **A2/A3/A5** — `mod_fiscal.prontidao_emitente`
 > barra com 400 claro: NF-e de produto fora do Simples, UF do emitente vazia (+ normalização do CFOP), e NFS-e sem
 > IM/IBGE/cód-serviço/alíquota. **A4** — NFS-e usa ref por tentativa (`NFSE-<projeto>-<n>`); rejeitada/cancelada
-> libera nova emissão; a UI reexibe a form com o motivo anterior. Restam os 🟠 Médios / 🟡 Baixos abaixo.
+> libera nova emissão; a UI reexibe a form com o motivo anterior.
+>
+> **⏱ Atualização 2026-07-07 — 🟠 Médios corrigidos** (branch `feat/fiscal-medios-auditoria`, suíte 648):
+> **A6** — config da rede (segredos/ambiente/perfil-emissão/perfil-fiscal) passa a exigir `pode_editar_dados_rede`
+> (edição + escopo), não o predicado de leitura. **A7** — `cancelar_nfse` valida a justificativa (15-255) no backend.
+> **A9** — `emitir` persiste a autorização **antes** de baixar XML/DANFE (falha na baixa não perde a nota; `consultar`
+> rebaixa). **A10** — RET da NFS-e por regime (MEI=5, ME/EPP=6). **A11** — backfill de IBGE alinha cidade/UF à mesma
+> fonte (ViaCEP). **A8** (idempotência) fica mitigado: NFS-e resolvida por A4; produto recuperável por novo upload
+> (novo `doc_id` → novo ref) e a prontidão A2/A5 evita o caso comum (dado faltante) antes de gerar rejeição.
+> **Restam só 🟡 Baixos:** A12 (unicidade do PerfilEmissao), A13 (2º clique → 500), A14 (NFS-e não conclui a etapa 15).
 
 
 > Auditoria **adversarial** (4 frentes independentes, só leitura) do módulo fiscal. Objetivo: achar furos reais
