@@ -176,12 +176,12 @@ def test_briefing_cliente_cross_loja_bloqueado(http_client_factory, seed):
 def test_criacao_de_cliente_carimba_loja_do_autor(http_client_factory, seed, app_db):
     c = _login(http_client_factory, "dir_l2")
     # Required fields: nome, email, telefone (validar_cadastro_minimo); CPF optional
-    novo = {"nome": "Cliente Novo L2", "cpf": "333.333.333-33",
+    novo = {"nome": "Cliente Novo L2", "cpf": "529.982.247-25",
             "email": "novol2@example.com", "telefone": "(12) 90000-0000"}
     status, body = c.post("/api/clientes", novo)
     assert status in (200, 201)
     db = app_db.get_session()
-    cli = db.query(app_db.Cliente).filter_by(cpf="333.333.333-33").first()
+    cli = db.query(app_db.Cliente).filter_by(cpf="529.982.247-25").first()
     loja = cli.loja_id if cli else None
     db.close()
     assert cli is not None
@@ -200,11 +200,12 @@ def test_diretor_l1_opera_normalmente(http_client_factory, seed, projetos_dir):
 
 def test_colisao_cpf_nao_vaza_cliente_de_outra_loja(http_client_factory, seed, app_db):
     c = _login(http_client_factory, "dir_l2")
-    # CPF "111.111.111-11" belongs to cliente_l1 (Loja 1).
+    # CPF "111.444.777-35" belongs to cliente_l1 (Loja 1). CPF válido (passa na
+    # validação de DV) para exercitar a checagem de unicidade cross-loja, não a validação.
     # Handler contract (F4 fix): cross-loja CPF collision → 409 with
     # {"ok": False, "erro": "CPF já cadastrado em outra unidade."} — no cliente data.
     status, body = c.post("/api/clientes",
-                          {"nome": "Homonimo", "cpf": "111.111.111-11",
+                          {"nome": "Homonimo", "cpf": "111.444.777-35",
                            "email": "homonimo@example.com", "telefone": "(11) 90000-0000"})
     # Must be a rejection (409); NEVER a success that leaks Loja-1 data
     assert status == 409, (

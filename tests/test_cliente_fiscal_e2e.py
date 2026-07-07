@@ -13,20 +13,20 @@ def test_cria_cliente_contribuinte_persiste_campos_fiscais(http_client_factory, 
         "email": "contrib@ex.com",
         "telefone": "(11) 99999-0001",
         "tipo_dest": "contribuinte",
-        "cnpj": "12.345.678/0001-99",
+        "cnpj": "11.222.333/0001-81",
         "inscricao_estadual": "123456789",
     })
     assert st == 200 and d["ok"], d
     cid = d["cliente"]["id"]
     assert d["cliente"]["tipo_dest"] == "contribuinte"
-    assert d["cliente"]["cnpj"] == "12.345.678/0001-99"
+    assert d["cliente"]["cnpj"] == "11.222.333/0001-81"
     assert d["cliente"]["inscricao_estadual"] == "123456789"
 
     # relê via GET para confirmar persistência
     st2, d2 = c.get(f"/api/clientes/{cid}")
     assert st2 == 200 and d2["ok"], d2
     assert d2["cliente"]["tipo_dest"] == "contribuinte"
-    assert d2["cliente"]["cnpj"] == "12.345.678/0001-99"
+    assert d2["cliente"]["cnpj"] == "11.222.333/0001-81"
     assert d2["cliente"]["inscricao_estadual"] == "123456789"
 
 
@@ -55,22 +55,22 @@ def test_editar_cliente_atualiza_campos_fiscais(http_client_factory, seed):
 
     st2, d2 = c.post(f"/api/clientes/{cid}/editar", {
         "tipo_dest": "isento",
-        "cnpj": "98.765.432/0001-10",
+        "cnpj": "45.997.418/0001-53",
     })
     assert st2 == 200 and d2["ok"], d2
     assert d2["cliente"]["tipo_dest"] == "isento"
-    assert d2["cliente"]["cnpj"] == "98.765.432/0001-10"
+    assert d2["cliente"]["cnpj"] == "45.997.418/0001-53"
 
     st3, d3 = c.get(f"/api/clientes/{cid}")
     assert d3["cliente"]["tipo_dest"] == "isento"
-    assert d3["cliente"]["cnpj"] == "98.765.432/0001-10"
+    assert d3["cliente"]["cnpj"] == "45.997.418/0001-53"
 
 
 def test_cria_cliente_nao_sincroniza_omie_por_padrao(http_client_factory, seed):
     # Omie em descontinuação (OMIE_AUTO_SYNC off por padrão): cliente novo sai 'dispensado',
     # fora da fila de sync (que inclui status NULL).
     c = http_client_factory(); c.login("dir_l1", "senha123")
-    st, d = c.post("/api/clientes", {"nome": "Cliente Sem Omie", "cpf": "555.666.777-88",
+    st, d = c.post("/api/clientes", {"nome": "Cliente Sem Omie", "cpf": "390.533.447-05",
                                      "email": "x@x.com", "telefone": "(12) 90000-0000"})
     assert st == 200 and d["ok"], d
     assert d["cliente"]["omie_sync_status"] == "dispensado"

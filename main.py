@@ -2033,6 +2033,13 @@ class Handler(BaseHTTPRequestHandler):
                                 "erro": "Campos obrigatórios faltando: " + ", ".join(faltando)})
                 return
             nome = (req.get("nome") or "").strip()
+            import validacao_doc
+            for _val, _rot, _tipo in ((req.get("cpf"), "CPF", "cpf"),
+                                      (req.get("cnpj"), "CNPJ", "cnpj")):
+                _e = validacao_doc.erro_doc(_val, _rot, _tipo)
+                if _e:
+                    self.send_json({"ok": False, "erro": _e}, code=400)
+                    return
             cpf = (req.get("cpf") or "").strip() or None
             db  = get_session()
             try:
@@ -2262,6 +2269,13 @@ class Handler(BaseHTTPRequestHandler):
                 if not c:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
+                import validacao_doc
+                for _val, _rot, _tipo in ((req.get("cpf"), "CPF", "cpf"),
+                                          (req.get("cnpj"), "CNPJ", "cnpj")):
+                    _e = validacao_doc.erro_doc(_val, _rot, _tipo)
+                    if _e:
+                        self.send_json({"ok": False, "erro": _e}, code=400)
+                        return
                 campos = ["nome","cpf","cnpj","inscricao_estadual",
                           "email","telefone","whatsapp",
                           "cep","logradouro","numero","complemento",
