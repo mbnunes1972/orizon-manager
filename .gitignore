@@ -13,5 +13,11 @@ orizon.db
 *.bak*
 .claude/settings.local.json
 
+# segredos fiscais — NUNCA versionar (chave Fernet decripta os tokens Focus)
+config/fiscal.key
+*.key
+focus_config.json
+nfe_amostras/
+
 # brainstorm visual companion / sdd scratch
 .superpowers/
