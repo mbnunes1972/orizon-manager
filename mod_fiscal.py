@@ -25,6 +25,20 @@ def perfil_padrao_teste():
     }
 
 
+def emitente_padrao_teste():
+    """Valores de teste p/ desbloquear a config do Emitente (Simples, CFOP 5102/6102,
+    CNAE placeholder, ISS 5%). Espelha perfil_padrao_teste com os campos do Emitente."""
+    return {
+        "razao_social": None, "inscricao_estadual": None, "inscricao_municipal": None,
+        "regime_tributario": "simples", "csosn_padrao": "102", "csosn_contribuinte": "101",
+        "cfop_dentro_uf": "5102", "cfop_fora_uf": "6102",
+        "serie_nfe": None, "discrimina_impostos": 1, "cnae_servico": _CNAE_PLACEHOLDER,
+        "cod_servico_municipio": None, "aliquota_iss": 5.0, "retencao_json": None,
+        "municipio_ibge": None, "papel_cnpj": "loja_produto_servico",
+        "placeholders": list(_CAMPOS_PADRAO),
+    }
+
+
 def validar_config(req):
     """(ok, erro) para os campos não-secretos do PUT de config."""
     reg = req.get("regime_tributario")

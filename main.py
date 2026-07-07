@@ -1506,27 +1506,28 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                         self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                    pf = db.query(PerfilFiscal).filter_by(loja_id=loja.id).first()
-                    if not pf:
-                        padrao = mod_fiscal.perfil_padrao_teste()
+                    em = db.get(Emitente, loja.emitente_id) if loja.emitente_id else None
+                    if not em:
+                        padrao = mod_fiscal.emitente_padrao_teste()
                         placeholders = padrao.pop("placeholders")
                         self.send_json({"ok": True, "existe": False, "perfil": padrao,
                                         "placeholders": placeholders, "ambiente_ativo": "homologacao",
                                         "token_homolog_definido": False, "token_prod_definido": False,
                                         "cert_validade": None, "cert_cnpj": None})
                         return
-                    perfil = {c: getattr(pf, c) for c in (
+                    perfil = {c: getattr(em, c) for c in (
                         "razao_social", "inscricao_estadual", "inscricao_municipal", "regime_tributario",
-                        "csosn_padrao", "cfop_dentro_uf", "cfop_fora_uf", "serie_nfe", "discrimina_impostos",
-                        "cnae_servico", "cod_servico_municipio", "aliquota_iss", "retencao_json",
-                        "municipio_ibge", "papel_cnpj")}
+                        "csosn_padrao", "csosn_contribuinte", "cfop_dentro_uf", "cfop_fora_uf",
+                        "serie_nfe", "discrimina_impostos", "cnae_servico", "cod_servico_municipio",
+                        "aliquota_iss", "retencao_json", "municipio_ibge", "papel_cnpj",
+                        "logradouro", "numero", "bairro", "cidade", "uf", "cep")}
                     self.send_json({"ok": True, "existe": True, "perfil": perfil,
-                                    "placeholders": json.loads(pf.placeholders_json or "[]"),
-                                    "ambiente_ativo": pf.ambiente_ativo,
-                                    "token_homolog_definido": fiscal_cripto.token_definido(pf.focus_token_homolog_enc),
-                                    "token_prod_definido": fiscal_cripto.token_definido(pf.focus_token_prod_enc),
-                                    "cert_validade": pf.cert_validade.isoformat() if pf.cert_validade else None,
-                                    "cert_cnpj": pf.cert_cnpj})
+                                    "placeholders": json.loads(em.placeholders_json or "[]"),
+                                    "ambiente_ativo": em.ambiente_ativo,
+                                    "token_homolog_definido": fiscal_cripto.token_definido(em.focus_token_homolog_enc),
+                                    "token_prod_definido": fiscal_cripto.token_definido(em.focus_token_prod_enc),
+                                    "cert_validade": em.cert_validade.isoformat() if em.cert_validade else None,
+                                    "cert_cnpj": em.cert_cnpj})
                 finally:
                     db.close()
                 return
@@ -4389,17 +4390,20 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                 if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                pf = db.query(PerfilFiscal).filter_by(loja_id=loja.id).first()
-                if not pf:
-                    pf = PerfilFiscal(loja_id=loja.id); db.add(pf)
+                em = db.get(Emitente, loja.emitente_id) if loja.emitente_id else None
+                if not em:
+                    em = Emitente(ambiente_ativo="homologacao", rede_id=loja.rede_id)
+                    db.add(em); db.flush(); loja.emitente_id = em.id
                 for c in ("razao_social", "inscricao_estadual", "inscricao_municipal", "regime_tributario",
-                          "csosn_padrao", "cfop_dentro_uf", "cfop_fora_uf", "serie_nfe", "discrimina_impostos",
-                          "cnae_servico", "cod_servico_municipio", "aliquota_iss", "retencao_json",
-                          "municipio_ibge", "papel_cnpj"):
+                          "csosn_padrao", "csosn_contribuinte", "cfop_dentro_uf", "cfop_fora_uf",
+                          "serie_nfe", "discrimina_impostos", "cnae_servico", "cod_servico_municipio",
+                          "aliquota_iss", "retencao_json", "municipio_ibge", "papel_cnpj",
+                          "logradouro", "numero", "bairro", "cidade", "uf", "cep",
+                          "cert_validade", "cert_cnpj"):
                     if c in req:
-                        setattr(pf, c, req[c])
+                        setattr(em, c, req[c])
                 if "placeholders" in req:
-                    pf.placeholders_json = json.dumps(req["placeholders"], ensure_ascii=False)
+                    em.placeholders_json = json.dumps(req["placeholders"], ensure_ascii=False)
                 db.commit()
                 self.send_json({"ok": True})
             finally:
@@ -4425,17 +4429,18 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                 if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                pf = db.query(PerfilFiscal).filter_by(loja_id=loja.id).first()
-                if not pf:
-                    pf = PerfilFiscal(loja_id=loja.id); db.add(pf)
+                em = db.get(Emitente, loja.emitente_id) if loja.emitente_id else None
+                if not em:
+                    em = Emitente(ambiente_ativo="homologacao", rede_id=loja.rede_id)
+                    db.add(em); db.flush(); loja.emitente_id = em.id
                 for campo, col in (("focus_token_homolog", "focus_token_homolog_enc"),
                                    ("focus_token_prod", "focus_token_prod_enc")):
                     if campo in req:
                         v = req[campo]
                         if v is None:
-                            setattr(pf, col, None)
+                            setattr(em, col, None)
                         elif v != "":
-                            setattr(pf, col, fiscal_cripto.encrypt(v))
+                            setattr(em, col, fiscal_cripto.encrypt(v))
                 db.commit()
                 self.send_json({"ok": True})
             except Exception:
@@ -4467,17 +4472,18 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                 if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                pf = db.query(PerfilFiscal).filter_by(loja_id=loja.id).first()
-                if not pf:
-                    pf = PerfilFiscal(loja_id=loja.id); db.add(pf)
+                em = db.get(Emitente, loja.emitente_id) if loja.emitente_id else None
+                if not em:
+                    em = Emitente(ambiente_ativo="homologacao", rede_id=loja.rede_id)
+                    db.add(em); db.flush(); loja.emitente_id = em.id
                 if amb == "producao":
-                    placeholders = json.loads(pf.placeholders_json or "[]")
+                    placeholders = json.loads(em.placeholders_json or "[]")
                     if not mod_fiscal.pode_ativar_producao(placeholders):
                         self.send_json({"ok": False,
                                         "erro": "Não é possível ativar produção com valores de teste pendentes: "
                                                 + ", ".join(placeholders)}, code=400)
                         return
-                pf.ambiente_ativo = amb
+                em.ambiente_ativo = amb
                 db.commit()
                 self.send_json({"ok": True, "ambiente_ativo": amb})
             finally:
