@@ -1308,7 +1308,10 @@ emite). Subagent-driven, TDD, suíte **532 → 545**. Spec/plano: `docs/superpow
 > `feat/fiscal-painel-emitente`, suíte 561): o **Painel Fiscal agora opera o `Emitente` da loja**
 > (`loja.emitente_id`, cria se faltar) com **endereço + CSOSN contribuinte** editáveis; o modelo
 > `PerfilFiscal` + `focus_client_para_loja` foram **removidos** (tabela `perfil_fiscal` mantida como legado).
-> Editar o painel volta a afetar a emissão. Falta só a **US-37** (UI do Perfil de Emissão loja/rede ↔ emitentes).
+> Editar o painel volta a afetar a emissão. ~~Falta só a US-37.~~ **✅ US-37 IMPLEMENTADA** (branch
+> `feat/fiscal-perfil-emissao-ui`, suíte 578): **painel Fiscal da rede** (Emitente central) + **Perfil de
+> Emissão em 2 níveis** (default da rede + override da loja: produto/serviço → self|central, via selects).
+> A configuração multi-CNPJ agora é 100% pela tela. Resta a **NFS-e de serviço** (US-38/US-32).
 
 - **Pendente:** merge desta branch; migração do painel de config → Emitente (EP-11); NFS-e (US-32). O smoke
   real (cert A1) pode rodar nesta branch (usa o `Emitente`) ou na `main` atual (usa `PerfilFiscal`) — **decidir
@@ -1318,13 +1321,13 @@ emite). Subagent-driven, TDD, suíte **532 → 545**. Spec/plano: `docs/superpow
 
 **Módulo Fiscal / NF-e essencialmente completo e na `main`** (suíte **561**, tudo mergeado+pushado):
 Fase 5 (etapa 15) · **multi-CNPJ** (Emitente 1ª classe, DocumentoFiscal) · **destinatário 3 tipos**
-(contribuinte/isento/não-contribuinte) · **painel de config → Emitente** (US-36, gap fechado). **🎉 SMOKE REAL
-AUTORIZADO** em homologação (NF-e da INSPIRIUM emitida pela SEFAZ). Branch aberta: `feat/fiscal-painel-emitente`
-(US-36, 561) aguardando merge.
-Pendências fiscais: **US-37** (UI do Perfil de Emissão loja/rede ↔ emitentes) · **US-38/US-32** (NFS-e de
-serviço) · refinamentos (CSOSN por operação; não-contribuinte PJ) · **dados reais** (CPFs válidos dos clientes)
-· verificação manual dos painéis no navegador. O smoke pode ser re-rodado a qualquer momento (Emitente da
-INSPIRIUM completo no `orizon.db`).
+(contribuinte/isento/não-contribuinte) · **painel de config → Emitente** (US-36) · **UI do Perfil de Emissão**
+(US-37: painel Fiscal da rede + política produto/serviço → self|central em 2 níveis). **🎉 SMOKE REAL
+AUTORIZADO** em homologação (NF-e da INSPIRIUM emitida pela SEFAZ). Branch aberta: `feat/fiscal-perfil-emissao-ui`
+(US-37, **578**) aguardando merge.
+Pendências fiscais: **US-38/US-32** (NFS-e de serviço) · refinamentos (CSOSN por operação; não-contribuinte
+PJ) · **dados reais** (CPFs válidos dos clientes) · verificação manual dos painéis no navegador. O smoke pode
+ser re-rodado a qualquer momento (Emitente da INSPIRIUM completo no `orizon.db`).
 
 ### 🧾 Módulo Fiscal / Integração NF-e (Fábrica→Loja via Focus NFe) — mapa e continuação (Sessão 47)
 

@@ -1,9 +1,11 @@
 # Fiscal — UI do Perfil de Emissão (US-37) — Design
 
 > Spec de design · 2026-07-06 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Fecha a configuração multi-CNPJ pela tela:
-> **painel Fiscal da rede** (Emitente central) + **Perfil de Emissão em 2 níveis** (default da rede + override
-> da loja). O motor (`Emitente`, `PerfilEmissao`, `resolver_emitente`) já existe; falta a UI/config.
+> Status: **IMPLEMENTADO (branch `feat/fiscal-perfil-emissao-ui`, suíte 578)** — **painel Fiscal da rede**
+> (Emitente central; endpoints `…/redes/<id>/perfil-fiscal[/segredos|/ambiente]`, gate `gerir_lojas`+tenancy)
+> + **Perfil de Emissão em 2 níveis** (`GET/PUT …/{redes|lojas}/<id>/perfil-emissao` com `opcoes` e
+> upsert/delete validado) + UI (painel da rede + selects Produto/Serviço na loja e na rede). Fecha a
+> configuração multi-CNPJ pela tela.
 
 ## 1. Motivação
 

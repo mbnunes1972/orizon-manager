@@ -633,7 +633,12 @@
 
 ---
 
-### US-37 — UI do Perfil de Emissão (loja/rede ↔ emitentes) `[PLANEJADO]`
+### US-37 — UI do Perfil de Emissão (loja/rede ↔ emitentes) `[IMPLEMENTADO]`
+
+> **Feito (2026-07-06, branch `feat/fiscal-perfil-emissao-ui`):** painel Fiscal da **rede** (configura o
+> Emitente central) + **Perfil de Emissão em 2 níveis** — default da rede + override da loja, com selects
+> Produto/Serviço → self|central (`GET/PUT …/{redes|lojas}/<id>/perfil-emissao`, resolução loja→rede→self).
+
 
 **Como** administrador de rede,
 **quero** associar, por loja/rede, qual **Emitente** assina o produto e qual assina o serviço,
