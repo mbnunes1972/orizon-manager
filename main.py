@@ -14,7 +14,8 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
-                       CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente)
+                       CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente,
+                       PerfilEmissao)
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -1528,6 +1529,45 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
                     em, _attr = _emitente_do_dono(db, "rede", rede)
                     self.send_json(_fiscal_get(em))
+                finally:
+                    db.close()
+                return
+
+            # GET /api/admin/redes/<id>/perfil-emissao — default de emissão da rede
+            m = _re.match(r'^/api/admin/redes/(\d+)/perfil-emissao$', path)
+            if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    rid = int(m.group(1))
+                    rede = db.get(Rede, rid)
+                    if not rede:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    if not mod_tenancy.pode_ver_rede(ator, rid):
+                        self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                    self.send_json(_perfil_emissao_get(db, "rede", rid, rede))
+                finally:
+                    db.close()
+                return
+
+            # GET /api/admin/lojas/<id>/perfil-emissao — override de emissão da loja
+            m = _re.match(r'^/api/admin/lojas/(\d+)/perfil-emissao$', path)
+            if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja = db.get(Loja, int(m.group(1)))
+                    if not loja:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                        self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                    self.send_json(_perfil_emissao_get(db, "loja", loja.id, loja))
                 finally:
                     db.close()
                 return
@@ -4563,6 +4603,55 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        # ── PUT /api/admin/redes/<id>/perfil-emissao — default de emissão da rede ──
+        m_pemr = re.match(r"^/api/admin/redes/(\d+)/perfil-emissao$", path)
+        if m_pemr:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            try:
+                req = json.loads(body) if body else {}
+            except Exception:
+                self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                rid = int(m_pemr.group(1))
+                rede = db.get(Rede, rid)
+                if not rede:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                if not mod_tenancy.pode_ver_rede(ator, rid):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                payload, code = _perfil_emissao_put(db, "rede", rid, rede, req)
+                self.send_json(payload, code=code)
+            finally:
+                db.close()
+            return
+
+        # ── PUT /api/admin/lojas/<id>/perfil-emissao — override de emissão da loja ──
+        m_peml = re.match(r"^/api/admin/lojas/(\d+)/perfil-emissao$", path)
+        if m_peml:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            try:
+                req = json.loads(body) if body else {}
+            except Exception:
+                self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja = db.get(Loja, int(m_peml.group(1)))
+                if not loja:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                payload, code = _perfil_emissao_put(db, "loja", loja.id, loja, req)
+                self.send_json(payload, code=code)
+            finally:
+                db.close()
+            return
+
         # ── PUT /projetos/<nome_safe>/orcamentos/<oid> — renomear orçamento ───
         m = re.match(r"^/projetos/([^/]+)/orcamentos/(\d+)$", path)
         if m:
@@ -5725,6 +5814,76 @@ def _projeto_da_loja(db, nome_safe, loja_id):
 # ── Perfil fiscal: lógica comum entre o dono LOJA (loja.emitente_id) e o dono
 #    REDE (rede.emitente_central_id). Os handlers só resolvem o Emitente do dono
 #    (via _emitente_do_dono) e delegam a estas funções puras. ────────────────────
+def _opcoes_emitente(db, kind, obj):
+    """Opções de Emitente que um dono (loja|rede) pode escolher no Perfil de Emissão.
+    Loja: o próprio CNPJ (self) + a central da rede (se houver). Rede: só a central."""
+    ops = []
+    if kind == "loja":
+        if getattr(obj, "emitente_id", None):
+            e = db.get(Emitente, obj.emitente_id)
+            if e:
+                ops.append({"id": e.id,
+                            "label": "Este CNPJ — " + (e.razao_social or e.cnpj or str(e.id)),
+                            "papel": "self"})
+        if getattr(obj, "rede_id", None):
+            r = db.get(Rede, obj.rede_id)
+            if r and r.emitente_central_id:
+                c = db.get(Emitente, r.emitente_central_id)
+                if c:
+                    ops.append({"id": c.id,
+                                "label": "Central da rede — " + (c.razao_social or c.cnpj or str(c.id)),
+                                "papel": "central"})
+    else:
+        if getattr(obj, "emitente_central_id", None):
+            c = db.get(Emitente, obj.emitente_central_id)
+            if c:
+                ops.append({"id": c.id,
+                            "label": "Central da rede — " + (c.razao_social or c.cnpj or str(c.id)),
+                            "papel": "central"})
+    return ops
+
+
+def _perfil_emissao_get(db, kind, owner_id, obj):
+    """Estado do Perfil de Emissão do dono: emitente_id de cada tipo_doc + opções."""
+    out = {"ok": True, "opcoes": _opcoes_emitente(db, kind, obj)}
+    for tipo in ("produto", "servico"):
+        pe = (db.query(PerfilEmissao)
+                .filter_by(owner_tipo=kind, owner_id=owner_id, tipo_doc=tipo).first())
+        out[tipo] = pe.emitente_id if pe else None
+    return out
+
+
+def _perfil_emissao_put(db, kind, owner_id, obj, req):
+    """Upsert/delete das linhas de PerfilEmissao conforme {produto, servico}.
+    Só toca um tipo se a chave estiver presente no corpo. Valida contra as opções.
+    Retorna (payload_ou_erro, code)."""
+    opcoes_ids = [o["id"] for o in _opcoes_emitente(db, kind, obj)]
+    for tipo in ("produto", "servico"):
+        if tipo not in req:
+            continue
+        val = req.get(tipo)
+        pe = (db.query(PerfilEmissao)
+                .filter_by(owner_tipo=kind, owner_id=owner_id, tipo_doc=tipo).first())
+        if val is None:
+            if pe:
+                db.delete(pe)
+            continue
+        try:
+            val = int(val)
+        except (TypeError, ValueError):
+            return {"ok": False, "erro": "emitente_id inválido"}, 400
+        if val not in opcoes_ids:
+            return {"ok": False,
+                    "erro": "emitente %s não é opção válida para este dono" % val}, 400
+        if pe:
+            pe.emitente_id = val
+        else:
+            db.add(PerfilEmissao(owner_tipo=kind, owner_id=owner_id,
+                                 tipo_doc=tipo, emitente_id=val))
+    db.commit()
+    return _perfil_emissao_get(db, kind, owner_id, obj), 200
+
+
 def _emitente_do_dono(db, kind, obj):
     """Devolve (Emitente|None, nome_do_atributo_FK) do dono (loja/rede)."""
     attr = "emitente_id" if kind == "loja" else "emitente_central_id"
