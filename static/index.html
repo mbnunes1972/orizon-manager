@@ -6864,6 +6864,18 @@ async function adminRenderRede(box){
         </tbody></table>
       </div>`);
   }
+  if (podeAdmins) {
+    box.insertAdjacentHTML('beforeend', `
+      <div class="card" style="padding:14px 16px">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px">
+          <strong style="color:var(--dalm-gold,#c8a84b)">🧾 Fiscal da rede — Emitente central</strong>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px"
+            onclick="adminFiscalCarregar('rede', ${rid})">Configurar</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Configuração fiscal do CNPJ central da rede e o perfil de emissão padrão.</div>
+        <div id="rede-panel-fiscal"><em style="color:var(--muted);font-size:12px">Clique em “Configurar” para carregar.</em></div>
+      </div>`);
+  }
 }
 
 async function adminLojaNova(redeId){
@@ -6983,13 +6995,23 @@ async function adminFinanceiroSalvar(lid){
 
 // ── Painel de Configuração Fiscal (PerfilFiscal, Sub-frente I) ──────────────
 let _cfgFisc = null;
+let _fiscCtx = { kind: 'loja', id: null };   // dono do painel Fiscal atualmente carregado
 const _FISC_INP = 'width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px';
 
-async function adminFiscalCarregar(){
-  const panel = document.getElementById('loja-panel-fiscal');
-  const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+// base REST do perfil fiscal conforme o dono (loja|rede)
+function _fiscBase(kind, id){ return '/api/admin/'+(kind==='rede'?'redes':'lojas')+'/'+id+'/perfil-fiscal'; }
+// painel-alvo do DOM conforme o dono
+function _fiscPanel(kind){ return document.getElementById(kind==='rede' ? 'rede-panel-fiscal' : 'loja-panel-fiscal'); }
+
+async function adminFiscalCarregar(kind, id){
+  kind = kind || 'loja';
+  if (kind === 'loja' && id == null) id = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  if (kind === 'rede' && id == null) id = _adminNav.rede?.id;
+  _fiscCtx = { kind, id };
+  const panel = _fiscPanel(kind);
+  const lid = id;
   if (!panel || !lid) return;
-  const r = await fetch('/api/admin/lojas/'+lid+'/perfil-fiscal', {credentials:'same-origin'});
+  const r = await fetch(_fiscBase(kind, lid), {credentials:'same-origin'});
   if (r.status === 403){ panel.innerHTML = '<em style="color:var(--muted)">Sem acesso.</em>'; return; }
   const d = await r.json().catch(()=>({}));
   if (!d.ok){ panel.innerHTML = '<em style="color:var(--muted)">'+esc(d.erro||'Erro ao carregar.')+'</em>'; return; }
@@ -7011,8 +7033,8 @@ async function adminFiscalCarregar(){
     ? '<span style="background:#3a1a1a;color:#e57373;padding:2px 10px;border-radius:6px;font-weight:700;font-size:12px">PRODUÇÃO</span>'
     : '<span style="background:#2a2a1a;color:var(--warn,#c8a84b);padding:2px 10px;border-radius:6px;font-weight:700;font-size:12px">HOMOLOGAÇÃO</span>';
   const btnAmb = amb === 'producao'
-    ? `<button class="btn btn-ghost btn-sm" onclick="adminFiscalAtivarAmbiente(${lid},'homologacao')">Voltar para Homologação</button>`
-    : `<button class="btn btn-primary btn-sm" ${podeProd?'':'disabled'} title="${podeProd?'':'Confirme todos os campos de teste e defina o token de produção antes de ativar.'}" onclick="adminFiscalAtivarAmbiente(${lid},'producao')">Ativar Produção</button>`;
+    ? `<button class="btn btn-ghost btn-sm" onclick="adminFiscalAtivarAmbiente('homologacao')">Voltar para Homologação</button>`
+    : `<button class="btn btn-primary btn-sm" ${podeProd?'':'disabled'} title="${podeProd?'':'Confirme todos os campos de teste e defina o token de produção antes de ativar.'}" onclick="adminFiscalAtivarAmbiente('producao')">Ativar Produção</button>`;
   const tokH = d.token_homolog_definido ? '✓ definido — deixe em branco para manter' : 'não definido';
   const tokP = d.token_prod_definido ? '✓ definido — deixe em branco para manter' : 'não definido';
   panel.innerHTML =
@@ -7035,20 +7057,24 @@ async function adminFiscalCarregar(){
        <div><label class="field-label">CNPJ do certificado</label><input value="${esc(d.cert_cnpj||'—')}" disabled style="${_FISC_INP};opacity:.7"></div></div>` +
     sec('Perfil de emissão') +
     `<div class="grid2" style="gap:14px">${sel('papel_cnpj','Papel deste CNPJ',[['central_produto','Central de Produto'],['loja_servico','Loja com Serviço'],['loja_produto_servico','Loja com Produto e Serviço'],['avulso','Avulso']])}</div>` +
-    `<div style="margin-top:14px"><button class="btn btn-primary btn-sm" onclick="adminFiscalSalvar(${lid})">Salvar configuração fiscal</button></div>` +
+    `<div style="margin-top:14px"><button class="btn btn-primary btn-sm" onclick="adminFiscalSalvar()">Salvar configuração fiscal</button></div>` +
     sec('Credenciais Focus NFe') +
     `<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Os tokens são gravados criptografados e nunca exibidos.</div>
      <div class="grid2" style="gap:14px">
        <div><label class="field-label">Token de homologação</label><input id="pf-token-homolog" type="password" placeholder="${tokH}" style="${_FISC_INP}"></div>
        <div><label class="field-label">Token de produção</label><input id="pf-token-prod" type="password" placeholder="${tokP}" style="${_FISC_INP}"></div></div>
-     <div style="margin-top:10px"><button class="btn btn-primary btn-sm" onclick="adminFiscalSalvarSegredos(${lid})">Salvar credenciais Focus</button></div>` +
+     <div style="margin-top:10px"><button class="btn btn-primary btn-sm" onclick="adminFiscalSalvarSegredos()">Salvar credenciais Focus</button></div>` +
     sec('Ambiente de emissão') +
     `<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
        <span style="font-size:12px;color:var(--muted)">Ambiente ativo:</span> ${ambBadge} ${btnAmb}
-     </div>`;
+     </div>` +
+    sec('Perfil de emissão — qual CNPJ emite cada tipo de documento') +
+    `<div id="perfil-emissao-${kind}"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>`;
+  adminPerfilEmissaoCarregar(kind, lid);
 }
 
-async function adminFiscalSalvar(lid){
+async function adminFiscalSalvar(){
+  const { kind, id: lid } = _fiscCtx;
   const v = k => { const el = document.getElementById('pf-'+k); return el ? el.value : undefined; };
   const iss = v('aliquota_iss');
   const payload = {
@@ -7069,41 +7095,82 @@ async function adminFiscalSalvar(lid){
     const cb = document.getElementById('pf-conf-'+k);
     return !(cb && cb.checked);
   });
-  const r = await fetch('/api/admin/lojas/'+lid+'/perfil-fiscal', {method:'PUT', credentials:'same-origin',
+  const r = await fetch(_fiscBase(kind, lid), {method:'PUT', credentials:'same-origin',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
   const d = await r.json();
   if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Configuração fiscal'}); return; }
   showToast('Configuração fiscal salva.', false);
-  adminFiscalCarregar();
+  adminFiscalCarregar(kind, lid);
 }
 
-async function adminFiscalSalvarSegredos(lid){
+async function adminFiscalSalvarSegredos(){
+  const { kind, id: lid } = _fiscCtx;
   const h = document.getElementById('pf-token-homolog').value;
   const p = document.getElementById('pf-token-prod').value;
   const body = {};
   if (h) body.focus_token_homolog = h;
   if (p) body.focus_token_prod = p;
   if (!Object.keys(body).length){ showToast('Nada para salvar (campos vazios).', false); return; }
-  const r = await fetch('/api/admin/lojas/'+lid+'/perfil-fiscal/segredos', {method:'PUT', credentials:'same-origin',
+  const r = await fetch(_fiscBase(kind, lid)+'/segredos', {method:'PUT', credentials:'same-origin',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
   const d = await r.json();
   if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Credenciais Focus'}); return; }
   showToast('Credenciais Focus salvas.', false);
-  adminFiscalCarregar();
+  adminFiscalCarregar(kind, lid);
 }
 
-async function adminFiscalAtivarAmbiente(lid, ambiente){
+async function adminFiscalAtivarAmbiente(ambiente){
+  const { kind, id: lid } = _fiscCtx;
   if (ambiente === 'producao'){
     const ok = await confirmarPopup('Ativar PRODUÇÃO faz a loja emitir notas fiscais REAIS na SEFAZ. Confirma?',
       {titulo:'Ativar Produção', okLabel:'Ativar Produção', cancelLabel:'Cancelar', perigo:true});
     if (!ok) return;
   }
-  const r = await fetch('/api/admin/lojas/'+lid+'/perfil-fiscal/ambiente', {method:'PUT', credentials:'same-origin',
+  const r = await fetch(_fiscBase(kind, lid)+'/ambiente', {method:'PUT', credentials:'same-origin',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify({ambiente})});
   const d = await r.json();
   if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Ambiente de emissão'}); return; }
   showToast('Ambiente alterado para '+ambiente+'.', false);
-  adminFiscalCarregar();
+  adminFiscalCarregar(kind, lid);
+}
+
+// ── Perfil de Emissão: selects Produto/Serviço (loja e rede) ────────────────
+async function adminPerfilEmissaoCarregar(kind, id){
+  const box = document.getElementById('perfil-emissao-'+kind);
+  if (!box || id == null) return;
+  const base = '/api/admin/'+(kind==='rede'?'redes':'lojas')+'/'+id+'/perfil-emissao';
+  const r = await fetch(base, {credentials:'same-origin'});
+  if (r.status === 403){ box.innerHTML = '<em style="color:var(--muted)">Sem acesso.</em>'; return; }
+  const d = await r.json().catch(()=>({}));
+  if (!d.ok){ box.innerHTML = '<em style="color:var(--muted)">'+esc(d.erro||'Erro ao carregar.')+'</em>'; return; }
+  const heranca = kind==='rede'
+    ? {value:'', label:'A própria loja (self)'}
+    : {value:'', label:'Herdar da rede'};
+  const ops = [heranca].concat((d.opcoes||[]).map(o=>({value:String(o.id), label:o.label})));
+  const sel = (tipo, lbl) => {
+    const cur = d[tipo]==null ? '' : String(d[tipo]);
+    return `<div><label class="field-label">${lbl}</label>
+      <select id="pe-${kind}-${tipo}" style="${_FISC_INP}">${
+        ops.map(o=>`<option value="${esc(o.value)}" ${o.value===cur?'selected':''}>${esc(o.label)}</option>`).join('')
+      }</select></div>`;
+  };
+  box.innerHTML =
+    `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Define qual CNPJ (Emitente) emite cada tipo de documento fiscal.</div>` +
+    `<div class="grid2" style="gap:14px">${sel('produto','NF-e de Produto')}${sel('servico','NFS-e de Serviço')}</div>` +
+    `<div style="margin-top:12px"><button class="btn btn-primary btn-sm" onclick="adminPerfilEmissaoSalvar('${kind}',${id})">Salvar perfil de emissão</button></div>`;
+}
+
+async function adminPerfilEmissaoSalvar(kind, id){
+  const conv = tipo => { const el = document.getElementById('pe-'+kind+'-'+tipo);
+    const v = el ? el.value : ''; return v==='' ? null : Number(v); };
+  const base = '/api/admin/'+(kind==='rede'?'redes':'lojas')+'/'+id+'/perfil-emissao';
+  const r = await fetch(base, {method:'PUT', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({produto: conv('produto'), servico: conv('servico')})});
+  const d = await r.json();
+  if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Perfil de emissão'}); return; }
+  showToast('Perfil de emissão salvo.', false);
+  adminPerfilEmissaoCarregar(kind, id);
 }
 
 function _cvLinha(cells, onRemove){
