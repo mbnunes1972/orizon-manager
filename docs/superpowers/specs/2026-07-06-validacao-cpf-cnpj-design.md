@@ -1,7 +1,8 @@
 # Validação de CPF/CNPJ nos cadastros — Design
 
 > Spec de design · 2026-07-06 · Orizon Manager | Dalmóbile
-> Status: **APROVADO (brainstorming)** — a implementar. Rejeita **CPF/CNPJ falso** (dígito verificador) em
+> Status: **✅ IMPLEMENTADO** (2026-07-07, branch `feat/validacao-cpf-cnpj`, suíte 624). Backend nos 5 cadastros
+> + inline no modal de cliente. Rejeita **CPF/CNPJ falso** (dígito verificador) em
 > todos os cadastros. O documento **segue opcional** no cadastro (cliente/parceiro etc.) — valida-se **só se
 > informado**; obrigatório mesmo só na geração do contrato (já existente).
 

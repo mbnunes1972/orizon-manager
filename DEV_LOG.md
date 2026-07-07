@@ -1317,7 +1317,29 @@ emite). Subagent-driven, TDD, suíte **532 → 545**. Spec/plano: `docs/superpow
   real (cert A1) pode rodar nesta branch (usa o `Emitente`) ou na `main` atual (usa `PerfilFiscal`) — **decidir
   em qual trilho** antes de rodar (recomendado: mergear esta branch e rodar no trilho novo).
 
-## ⏸️ ESTADO ATUAL (2026-07-06) — retomar aqui
+## Sessão 50 — Validação de CPF/CNPJ nos cadastros (rejeita número falso) — branch `feat/validacao-cpf-cnpj`
+
+Nenhum cadastro validava o **dígito verificador** — números falsos (o placeholder `012.021.345-01`, `123.123.123-00`)
+entravam e só quebravam na SEFAZ (o smoke da NF-e revelou "CPF inválido"). Agora se **rejeita CPF/CNPJ falso** na
+origem, em **todos os cadastros**. Documento **segue opcional** (cliente/parceiro): valida-se **só se informado**;
+vazio é OK (obrigatório mesmo só na geração do contrato, já existente). Subagent-driven, TDD, suíte **613 → 624**.
+Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
+
+- **`validacao_doc.py`** (novo, puro, offline — só DV, não consulta a Receita): `valida_cpf`/`valida_cnpj` (módulo 11,
+  rejeita repetidos), `doc_valido` (11→CPF, 14→CNPJ), `erro_doc(valor, rótulo, tipo)` → mensagem se informado e
+  inválido, `None` se vazio/válido. Aceita com/sem pontuação.
+- **Backend autoritativo (400):** validação antes de persistir em **Cliente** (`cpf`/`cnpj`), **Parceiro** (`cpf_cnpj`,
+  auto por tamanho), **Usuário** (`cpf`), **Rede** (`cnpj`), **Loja** (`cnpj`) — nos create **e** edit (no edit, só se
+  o campo veio no payload). Unicidade de CPF do cliente preservada (roda depois da validação).
+- **Frontend inline (UX) no modal de cliente:** `_docValidoCPF`/`_docValidoCNPJ` (espelham o util); aviso `cli-aviso-cnpj`
+  (novo) + `cli-aviso-cpf` (agora também DV, antes só duplicata); `cliFormatarCNPJ` (máscara); `cliSalvar` **bloqueia**
+  doc falso antes de enviar. Demais cadastros mostram o erro do backend.
+- **Não retroativo:** placeholders já gravados só somem via edição. Testes existentes que criavam cadastro via endpoint
+  com CPF placeholder inválido foram trocados por **docs válidos** preservando a intenção (ex.: teste de colisão de CPF
+  ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
+- **Pendente:** merge desta branch na `main` + re-ingerir MCP.
+
+## ⏸️ ESTADO ATUAL (2026-07-07) — retomar aqui
 
 **Módulo Fiscal / NF-e completo e na `main`** (suíte **600**, tudo mergeado+pushado):
 Fase 5 (etapa 15) · **multi-CNPJ** (Emitente 1ª classe, DocumentoFiscal) · **destinatário 3 tipos**
@@ -1332,6 +1354,11 @@ processando), prefeitura rejeitou por **DADO**: **E70 — Inscrição Municipal 
 (item LC 116) — ambos editáveis no painel Fiscal. Re-rodar após preencher.
 Pendências fiscais: preencher **IM + código de serviço** e re-rodar smoke NFS-e · refinamentos (CSOSN por
 operação; não-contribuinte PJ) · **dados reais** (CPFs válidos dos clientes) · verificação manual dos painéis.
+
+**Validação de CPF/CNPJ (Sessão 50, branch `feat/validacao-cpf-cnpj`, suíte 624):** todos os cadastros
+(Cliente/Parceiro/Usuário/Rede/Loja) **rejeitam número falso** (dígito verificador) no backend + inline no
+modal de cliente; documento segue **opcional** (valida só se informado). **Pendente:** mergear na `main` +
+re-ingerir MCP.
 
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
