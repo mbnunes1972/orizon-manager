@@ -1167,19 +1167,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="admin-breadcrumb" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
     <!-- container único; adminRender() injeta o nível N1/N2/N3 -->
     <div id="admin-console"><em style="color:var(--muted);font-size:12px">Carregando&hellip;</em></div>
-    <!-- mantém a fila Omie existente (não mexer) -->
-    <div class="page-sub" style="margin-top:24px">Monitoramento e sincroniza&ccedil;&atilde;o Omie</div>
-    <div id="admin-omie-fila">
-      <div class="card" style="margin-bottom:16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px">Fila Omie &mdash; Clientes pendentes / com erro</div>
-          <button class="btn btn-ghost btn-sm" onclick="adminCarregar()" style="font-size:11px">&#x21BA; Atualizar</button>
-        </div>
-        <div id="admin-sync-lista">
-          <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">Carregando...</div>
-        </div>
-      </div>
-    </div>
+    <!-- Fila Omie removida (Omie em descontinuação; auto-sync de cliente desligado) -->
   </div>
 
   <!-- Modal: Cadastro / Edição de Parceiro -->
@@ -2298,7 +2286,7 @@ function goPage(n){
   if(n===0) projCarregar();
   if(n===5) cliCarregar();
   if(n===6) parCarregar();
-  if(n===7){ adminCarregarConsole(); adminCarregar(); } // page-07: console + fila Omie
+  if(n===7){ adminCarregarConsole(); } // page-07: console
   if(n===9) cfgRenderizarPerfis();
 }
 function unlockNav(n){
@@ -7308,39 +7296,6 @@ async function adminLojaSalvar(lid){
   showToast('Dados da loja salvos.', false);
 }
 
-async function adminCarregar() {
-  const lista = document.getElementById('admin-sync-lista');
-  if (!lista) return;
-  lista.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">Carregando...</div>';
-  try {
-    const r = await fetch('/api/admin/omie-sync');
-    const d = await r.json();
-    if (!d.ok) { lista.innerHTML = `<div style="color:var(--err);padding:12px">${esc(d.erro||'Erro')}</div>`; return; }
-    if (!d.clientes.length) {
-      lista.innerHTML = '<div style="color:var(--ok);font-size:12px;text-align:center;padding:20px">&#x2713; Nenhum pendente — todos sincronizados.</div>';
-      return;
-    }
-    lista.innerHTML = d.clientes.map(c => `
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;
-                  padding:10px 0;border-bottom:1px solid var(--border);gap:12px" id="admin-row-${c.id}">
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600;font-size:13px">${esc(c.nome)}</div>
-          <div style="font-size:11px;color:var(--muted)">CPF: ${esc(c.cpf||'—')} &nbsp;|&nbsp; Status:
-            <span style="color:${c.omie_sync_status==='erro'?'var(--err)':'var(--warn)'}">
-              ${esc(c.omie_sync_status||'—')}
-            </span>
-          </div>
-          ${c.omie_sync_erro ? `<div style="font-size:10px;color:var(--err);margin-top:2px;word-break:break-word">${esc(c.omie_sync_erro)}</div>` : ''}
-          ${c.omie_sync_at  ? `<div style="font-size:10px;color:var(--muted)">${esc(c.omie_sync_at.substring(0,19).replace('T',' '))}</div>` : ''}
-        </div>
-        <button class="btn btn-ghost btn-sm" onclick="adminRetry(${c.id})"
-                style="font-size:11px;white-space:nowrap" id="admin-btn-${c.id}">&#x21BA; Tentar</button>
-      </div>`).join('');
-  } catch(e) {
-    lista.innerHTML = `<div style="color:var(--err);padding:12px">Erro de conexão: ${esc(String(e))}</div>`;
-  }
-}
-
 async function adminUsuariosCarregar() {
   const box = document.getElementById('admin-usuarios-lista');
   if (!box) return;
@@ -7466,32 +7421,6 @@ async function salvarModalUsuario(){
   showToast(ctx.modo === 'editar' ? 'Usuário atualizado.' : 'Usuário criado.', false);
   fecharModalUsuario();
   if (ctx.onSaved) ctx.onSaved();
-}
-
-async function adminRetry(id) {
-  const btn = document.getElementById('admin-btn-'+id);
-  if (btn) { btn.disabled = true; btn.textContent = '...'; }
-  try {
-    const r = await fetch('/api/admin/omie-sync/'+id+'/retry', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
-    const d = await r.json();
-    if (!d.ok) { showToast('Erro: '+esc(d.erro||'falha'), true); if(btn){btn.disabled=false;btn.textContent='↺ Tentar';} return; }
-    if (d.cliente.omie_sync_status === 'ok') {
-      const row = document.getElementById('admin-row-'+id);
-      if (row) row.remove();
-      showToast('Cliente sincronizado com Omie ✓');
-      const lista = document.getElementById('admin-sync-lista');
-      if (lista && !lista.querySelector('[id^="admin-row-"]')) {
-        lista.innerHTML = '<div style="color:var(--ok);font-size:12px;text-align:center;padding:20px">✓ Nenhum pendente — todos sincronizados.</div>';
-      }
-    } else {
-      showToast('Ainda com erro: '+esc(d.cliente.omie_sync_erro||'—'), true);
-      if (btn) { btn.disabled=false; btn.textContent='↺ Tentar'; }
-      adminCarregar();
-    }
-  } catch(e) {
-    showToast('Erro: '+esc(String(e)), true);
-    if (btn) { btn.disabled=false; btn.textContent='↺ Tentar'; }
-  }
 }
 
 // ---- Init --------------------------------------------------------------------
