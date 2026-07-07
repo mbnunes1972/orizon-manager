@@ -13,7 +13,13 @@
 > rebaixa). **A10** — RET da NFS-e por regime (MEI=5, ME/EPP=6). **A11** — backfill de IBGE alinha cidade/UF à mesma
 > fonte (ViaCEP). **A8** (idempotência) fica mitigado: NFS-e resolvida por A4; produto recuperável por novo upload
 > (novo `doc_id` → novo ref) e a prontidão A2/A5 evita o caso comum (dado faltante) antes de gerar rejeição.
-> **Restam só 🟡 Baixos:** A12 (unicidade do PerfilEmissao), A13 (2º clique → 500), A14 (NFS-e não conclui a etapa 15).
+>
+> **⏱ Atualização 2026-07-07 — 🟡 Baixos corrigidos** (branch `feat/fiscal-baixos-auditoria`, suíte 650):
+> **A12** — `PerfilEmissao` ganha unicidade `(owner_tipo, owner_id, tipo_doc)` (constraint no modelo + índice
+> único com dedup na migração + `order_by` defensivo no resolver). **A13** — `emitir` trata `IntegrityError` de
+> ref concorrente → devolve o registro vencedor idempotente (não 500, não duplica). **A14** — NFS-e autorizada
+> conclui a etapa 15 (`emitida`), simétrico à NF-e de produto. **✅ Auditoria 100% endereçada** (Altos + Médios
+> corrigidos; A8 mitigado; Baixos corrigidos).
 
 
 > Auditoria **adversarial** (4 frentes independentes, só leitura) do módulo fiscal. Objetivo: achar furos reais

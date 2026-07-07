@@ -1389,8 +1389,10 @@ sem IM/IBGE/cód-serviço/alíquota — A2/A3/A5), **US-41** (NFS-e rejeitada re
 **🟠 Médios corrigidos** (branch `feat/fiscal-medios-auditoria`, suíte 648): **A6** (config da rede exige
 `pode_editar_dados_rede`), **A7** (justificativa NFS-e 15-255 no backend), **A9** (atomicidade: autorização
 persiste antes de baixar XML/DANFE — `consultar` rebaixa), **A10** (RET MEI=5/ME-EPP=6), **A11** (backfill IBGE
-alinha cidade/UF). A8 mitigado. **Restam só 🟡 Baixos** (A12 unicidade PerfilEmissao; A13 2º clique→500; A14
-NFS-e não conclui etapa 15). Ver `docs/avaliacao/2026-07-07-auditoria-fiscal.md`.
+alinha cidade/UF). A8 mitigado.
+**🟡 Baixos corrigidos** (branch `feat/fiscal-baixos-auditoria`, suíte 650): **A12** (unicidade do PerfilEmissao —
+constraint + índice + dedup), **A13** (2º clique concorrente → idempotente, não 500), **A14** (NFS-e autorizada
+conclui a etapa 15). **✅ Auditoria fiscal 100% endereçada.** Ver `docs/avaliacao/2026-07-07-auditoria-fiscal.md`.
 
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
