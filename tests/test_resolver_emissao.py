@@ -66,3 +66,17 @@ def test_focus_client_para_emitente_usa_token_do_ambiente(app_db):
     client = mod_fiscal.focus_client_para_emitente(db, e.id)
     assert client.token == "TOKHOMOLOG" and "homologacao" in client.base_url
     db.close()
+
+
+def test_perfil_emissao_unicidade(app_db):
+    """Auditoria A12: (owner_tipo, owner_id, tipo_doc) é único — não há política ambígua."""
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+    db = app_db.get_session()
+    e1 = app_db.Emitente(cnpj="UQ1"); e2 = app_db.Emitente(cnpj="UQ2"); db.add_all([e1, e2]); db.flush()
+    db.add(app_db.PerfilEmissao(owner_tipo="loja", owner_id=999, tipo_doc="produto", emitente_id=e1.id))
+    db.commit()
+    db.add(app_db.PerfilEmissao(owner_tipo="loja", owner_id=999, tipo_doc="produto", emitente_id=e2.id))
+    with pytest.raises(IntegrityError):
+        db.commit()
+    db.rollback(); db.close()

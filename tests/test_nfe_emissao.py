@@ -322,3 +322,27 @@ def test_emitir_autorizado_persiste_mesmo_se_baixa_falha(app_db, seed, projetos_
     reg2 = db2.query(app_db.DocumentoFiscal).filter_by(ref="R-A9").first()
     assert reg2.xml_doc_id and reg2.danfe_doc_id
     db2.close()
+
+
+def test_emitir_corrida_ref_idempotente(app_db, seed, projetos_dir):
+    """Auditoria A13: se outro request gravar o mesmo ref durante a emissão, o 2º devolve o
+    registro vencedor de forma idempotente (não 500 / não duplica)."""
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    _reset(app_db, "R-RACE", proj); eid = _perfil(app_db, lid, "homologacao")
+
+    class _RaceEmissor(FakeEmissor):
+        def emitir_nfe_produto(self, nota):
+            # simula um request concorrente que grava o mesmo ref primeiro
+            db2 = app_db.get_session()
+            db2.add(app_db.DocumentoFiscal(ref="R-RACE", projeto_nome=proj, loja_id=lid,
+                                           etapa_codigo="15", tipo_documento="produto",
+                                           emitente_id=eid, status="autorizado", chave_nfe="WIN"))
+            db2.commit(); db2.close()
+            return super().emitir_nfe_produto(nota)
+
+    db = app_db.get_session()
+    res = nfe_emissao.emitir(db, lid, proj, _nota("R-RACE"), emitente_id=eid, emissor=_RaceEmissor())
+    assert res.status == StatusNota.AUTORIZADO and res.chave == "WIN"     # idempotente, devolve o vencedor
+    n = db.query(app_db.DocumentoFiscal).filter_by(ref="R-RACE").count()
+    assert n == 1                                                          # não duplicou
+    db.close()

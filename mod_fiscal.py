@@ -88,6 +88,7 @@ def resolver_emitente(db, loja, tipo_doc):
             return None
         pe = (db.query(PerfilEmissao)
                 .filter_by(owner_tipo=owner_tipo, owner_id=owner_id, tipo_doc=tipo_doc)
+                .order_by(PerfilEmissao.id.desc())   # defensivo: a mais recente vence (A12)
                 .first())
         return pe.emitente_id if pe else None
 

@@ -543,8 +543,11 @@ class Emitente(Base):
 
 
 class PerfilEmissao(Base):
-    """Política: qual Emitente assina cada tipo de documento, por owner (loja|rede)."""
+    """Política: qual Emitente assina cada tipo de documento, por owner (loja|rede).
+    Unicidade (owner_tipo, owner_id, tipo_doc) — um único emitente por política (auditoria A12).
+    Para DBs existentes, o índice único é criado em `_migrar_colunas`."""
     __tablename__ = "perfil_emissao"
+    __table_args__ = (UniqueConstraint("owner_tipo", "owner_id", "tipo_doc", name="uq_perfil_emissao"),)
     id = Column(Integer, primary_key=True, autoincrement=True)
     owner_tipo = Column(Text, nullable=False)   # "loja" | "rede"
     owner_id = Column(Integer, nullable=False)
@@ -769,6 +772,14 @@ def _migrar_colunas():
             rede_cols = {c[1] for c in cur.execute("PRAGMA table_info(redes)").fetchall()}
             if "emitente_central_id" not in rede_cols:
                 cur.execute("ALTER TABLE redes ADD COLUMN emitente_central_id INTEGER")
+
+        # ── perfil_emissao: unicidade (owner_tipo, owner_id, tipo_doc) — auditoria A12 ──
+        # Dedup defensivo (mantém a linha mais recente por chave) + índice único p/ DBs existentes.
+        if _tabela_existe(cur, "perfil_emissao"):
+            cur.execute("DELETE FROM perfil_emissao WHERE id NOT IN "
+                        "(SELECT MAX(id) FROM perfil_emissao GROUP BY owner_tipo, owner_id, tipo_doc)")
+            cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_perfil_emissao "
+                        "ON perfil_emissao(owner_tipo, owner_id, tipo_doc)")
 
         conn.commit()
     except Exception:

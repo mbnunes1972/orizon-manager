@@ -411,6 +411,11 @@ def test_emitir_nfse_autoriza_e_estado_no_get(http_client_factory, seed, app_db,
     reg = db.query(app_db.DocumentoFiscal).filter_by(projeto_nome=proj, tipo_documento="servico").first()
     assert reg is not None and reg.ref == f"NFSE-{proj}-1"
     db.close()
+    # NFS-e autorizada conclui a etapa 15 (A14), como a NF-e de produto
+    db = app_db.get_session()
+    et = db.query(app_db.CicloEtapa).filter_by(projeto_nome=proj, etapa_codigo="15").first()
+    assert et.status == "emitida"
+    db.close()
     # GET expõe o estado da NFS-e
     st2, g = c.get(f"/api/projetos/{proj}/ciclo/15/nfe")
     assert st2 == 200 and g["ok"] is True

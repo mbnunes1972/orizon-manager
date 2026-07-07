@@ -4425,6 +4425,8 @@ class Handler(BaseHTTPRequestHandler):
                     # antes de a 1ª resolver). Só rejeitada/cancelada libera uma nova tentativa.
                     if nfse_regs and nfse_regs[-1].status in ("autorizado", "processando"):
                         reg = nfse_regs[-1]
+                        if reg.status == "autorizado":   # NFS-e autorizada conclui a etapa 15 (A14)
+                            _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
                         self.send_json({"ok": True, "ref": reg.ref, "status": reg.status,
                                         "chave": reg.chave_nfe, "numero": reg.numero, "serie": reg.serie,
                                         "mensagem_sefaz": reg.mensagem_sefaz,
@@ -4436,6 +4438,9 @@ class Handler(BaseHTTPRequestHandler):
                     nota = mapa_fiscal.montar_nota_nfse(emitente, cliente, round(valor, 2), ref, data_emissao, discriminacao)
                     res = nfe_emissao.emitir(db, loja_id, nome_safe, nota, tipo_documento="servico",
                                              emitente_id=emitente.id)
+                    # NFS-e autorizada conclui a etapa 15, como a NF-e de produto (auditoria A14).
+                    if res.status.value == "autorizado":
+                        _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
                     reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
                     self.send_json({"ok": True, "ref": ref,
                                     "status": res.status.value, "chave": res.chave, "numero": res.numero,

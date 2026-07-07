@@ -6,6 +6,8 @@ import json
 import uuid
 from datetime import datetime
 
+from sqlalchemy.exc import IntegrityError
+
 import storage
 from database import DocumentoFiscal, Emitente, CicloDocumento
 from emissor_fiscal import StatusNota, ResultadoEmissao, resultado_de_focus
@@ -105,7 +107,16 @@ def emitir(db, loja_id, projeto_nome, nota, tipo_documento="produto", emitente_i
     # Atomicidade (auditoria A9): persiste a autorização/rejeição ANTES de baixar os binários.
     # Se a baixa de XML/DANFE (rede) falhar depois, a nota — que JÁ foi autorizada de verdade na
     # SEFAZ/prefeitura — não é desfeita; `consultar` rebaixa os documentos numa próxima chamada.
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Corrida (auditoria A13): outro request gravou este `ref` primeiro (a Focus deduplica por
+        # ref → é a mesma nota). Responde idempotente com o registro vencedor, em vez de 500.
+        db.rollback()
+        vencedor = db.query(DocumentoFiscal).filter_by(ref=ref).first()
+        if vencedor is not None:
+            return _resultado_de_registro(vencedor)
+        raise
     if res.status == StatusNota.AUTORIZADO:
         try:
             _guardar_docs_autorizado(db, reg, res, emissor.client)
