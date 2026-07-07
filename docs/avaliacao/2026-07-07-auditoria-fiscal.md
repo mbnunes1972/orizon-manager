@@ -1,5 +1,12 @@
 # Auditoria do módulo Fiscal (NF-e / NFS-e) — 2026-07-07
 
+> **⏱ Atualização 2026-07-07 — 🔴 Altos corrigidos** (branch `feat/fiscal-altos-auditoria`, suíte 641):
+> **A1** — chave Fernet + segredos agora no `.gitignore` versionado. **A2/A3/A5** — `mod_fiscal.prontidao_emitente`
+> barra com 400 claro: NF-e de produto fora do Simples, UF do emitente vazia (+ normalização do CFOP), e NFS-e sem
+> IM/IBGE/cód-serviço/alíquota. **A4** — NFS-e usa ref por tentativa (`NFSE-<projeto>-<n>`); rejeitada/cancelada
+> libera nova emissão; a UI reexibe a form com o motivo anterior. Restam os 🟠 Médios / 🟡 Baixos abaixo.
+
+
 > Auditoria **adversarial** (4 frentes independentes, só leitura) do módulo fiscal. Objetivo: achar furos reais
 > antes de produção. Companheiro de `2026-07-07-revisao-por-frente.md`.
 > **Veredito geral:** o **isolamento multi-tenant e o tratamento de segredos estão sólidos** (sem furo
