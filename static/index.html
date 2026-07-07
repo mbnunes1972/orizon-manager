@@ -8928,7 +8928,35 @@ function _renderCardEmissaoNfe(dados, bloqueada) {
       </div>`;
   }).join('') || `<p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">Nenhuma NF-e da fábrica carregada.</p>`;
   const upload = podeEmitir ? `<label class="btn-ciclo" style="font-size:.82rem;cursor:pointer">📎 Carregar NF-e da Fábrica<input type="file" accept=".xml" style="display:none" onchange="enviarNfeFabrica(this)"></label>` : '';
-  return `<div style="margin-bottom:10px">${linhas}</div>${upload}${concluido ? '<p style="color:var(--ok);margin:8px 0 0">✓ NF-e emitida.</p>' : ''}`;
+  let secaoNfse = '';
+  if (podeEmitir) {
+    const dlN = (id, rot) => id ? `<a class="btn-ciclo" style="font-size:.75rem;text-decoration:none" target="_blank" rel="noopener" href="/api/projetos/${encodeURIComponent(proj)}/ciclo/documento/${id}">${rot}</a>` : '';
+    const nfse = _nfe15.nfse;
+    let corpoNfse;
+    if (nfse) {
+      const cor = nfse.status === 'autorizado' ? 'var(--ok)' : nfse.status === 'erro' ? 'var(--warn)' : nfse.status === 'cancelado' ? 'var(--muted)' : 'var(--dalm-gold)';
+      corpoNfse = `<div style="border:1px solid var(--border);border-radius:6px;padding:8px;font-size:.82rem">
+        <div>🧾 NFS-e — <span style="color:${cor};font-weight:700">${esc(nfse.status || '')}</span>${nfse.chave ? ' · ' + esc(nfse.chave) : ''}</div>
+        ${nfse.emitente_cnpj ? `<div style="color:var(--muted);font-size:.72rem">Emitente: ${esc(nfse.emitente_razao || '')} · ${esc(nfse.emitente_cnpj)}</div>` : ''}
+        ${nfse.mensagem_sefaz ? `<div style="color:var(--muted);font-size:.75rem">${esc(nfse.mensagem_sefaz)}</div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+          ${dlN(nfse.xml_doc_id, 'XML')} ${dlN(nfse.danfe_doc_id, 'PDF')}
+          <button class="btn-ciclo" style="font-size:.75rem" onclick="consultarNfeLoja('${esc(nfse.ref)}')">Consultar</button>
+          ${nfse.status === 'autorizado' ? `<button class="btn-ciclo" style="font-size:.75rem" onclick="cancelarNfeLoja('${esc(nfse.ref)}')">Cancelar</button>` : ''}
+        </div></div>`;
+    } else {
+      corpoNfse = `<div style="display:flex;gap:8px;align-items:center;font-size:.82rem;flex-wrap:wrap">
+        <span>Valor do serviço</span>
+        <input id="nfse-valor" type="number" step="0.01" min="0" placeholder="0,00" style="width:120px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:.8rem">
+        <button class="btn-ciclo" style="font-size:.8rem" onclick="emitirNfseServico()">Emitir NFS-e</button>
+      </div>`;
+    }
+    secaoNfse = `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+      <div style="font-weight:700;font-size:.85rem;margin-bottom:8px">NFS-e de Serviço (montagem)</div>
+      ${corpoNfse}
+    </div>`;
+  }
+  return `<div style="margin-bottom:10px">${linhas}</div>${upload}${secaoNfse}${concluido ? '<p style="color:var(--ok);margin:8px 0 0">✓ NF-e emitida.</p>' : ''}`;
 }
 
 async function enviarNfeFabrica(inputFile) {
@@ -8941,6 +8969,21 @@ async function enviarNfeFabrica(inputFile) {
     if (!j.ok) { await avisoPopup(j.erro || 'Falha ao carregar.', {titulo:'NF-e — Fábrica'}); return; }
     showToast('NF-e da fábrica carregada!', false); await carregarCiclo();
   } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'NF-e — Fábrica'}); }
+}
+
+async function emitirNfseServico() {
+  if (!projetoAtivo) return;
+  const el = document.getElementById('nfse-valor');
+  const valor = parseFloat((el && el.value) || '0') || 0;
+  if (valor <= 0) { await avisoPopup('Informe o valor do serviço (montagem).', {titulo:'NFS-e'}); return; }
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/15/emitir-nfse`,
+      { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ valor_servico: valor }) });
+    const j = await r.json();
+    if (!j.ok) { await avisoPopup(esc(j.erro || 'Falha na emissão.'), {titulo:'Emitir NFS-e'}); return; }
+    showToast('NFS-e: ' + esc(j.status), false); await carregarCiclo();
+  } catch(e) { await avisoPopup('Erro de rede: ' + esc(e.message), {titulo:'Emitir NFS-e'}); }
 }
 
 async function emitirNfeLoja(docId) {
