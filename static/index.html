@@ -1296,7 +1296,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         </div>
         <div id="cli-cnpj-wrap" style="display:none">
           <label class="field-label">CNPJ</label>
-          <input type="text" id="cli-cnpj" placeholder="00.000.000/0000-00">
+          <input type="text" id="cli-cnpj" placeholder="00.000.000/0000-00"
+                 oninput="cliFormatarCNPJ(this)" onblur="cliChecarCNPJ(this.value)">
+          <div id="cli-aviso-cnpj" style="display:none;font-size:10px;color:var(--err);margin-top:4px"></div>
         </div>
         <div id="cli-ie-wrap" style="display:none">
           <label class="field-label">Inscrição Estadual</label>
@@ -5996,6 +5998,52 @@ function cliFormatarCPF(el){
   el.value = v;
 }
 
+function cliFormatarCNPJ(el){
+  let v = el.value.replace(/\D/g,'').slice(0,14);
+  if(v.length > 12)      v = v.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})/,'$1.$2.$3/$4-$5');
+  else if(v.length > 8)  v = v.replace(/(\d{2})(\d{3})(\d{3})(\d{0,4})/,'$1.$2.$3/$4');
+  else if(v.length > 5)  v = v.replace(/(\d{2})(\d{3})(\d{0,3})/,'$1.$2.$3');
+  else if(v.length > 2)  v = v.replace(/(\d{2})(\d{0,3})/,'$1.$2');
+  el.value = v;
+}
+
+// Dígito verificador de CPF/CNPJ (espelha validacao_doc.py — o backend é a trava; isto é UX)
+function _docValidoCPF(v){
+  const d = (v || '').replace(/\D/g,'');
+  if(d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  for(const i of [9,10]){
+    let s = 0;
+    for(let j=0;j<i;j++) s += parseInt(d[j],10) * ((i+1)-j);
+    const dv = (s*10) % 11 % 10;
+    if(dv !== parseInt(d[i],10)) return false;
+  }
+  return true;
+}
+function _docValidoCNPJ(v){
+  const d = (v || '').replace(/\D/g,'');
+  if(d.length !== 14 || /^(\d)\1{13}$/.test(d)) return false;
+  const p1 = [5,4,3,2,9,8,7,6,5,4,3,2], p2 = [6,...p1];
+  for(const [pesos,i] of [[p1,12],[p2,13]]){
+    let s = 0;
+    for(let j=0;j<i;j++) s += parseInt(d[j],10) * pesos[j];
+    const r = s % 11, dv = r < 2 ? 0 : 11 - r;
+    if(dv !== parseInt(d[i],10)) return false;
+  }
+  return true;
+}
+
+// Valida DV do CNPJ ao sair do campo (aviso inline; só se informado e completo)
+function cliChecarCNPJ(val){
+  const aviso = document.getElementById('cli-aviso-cnpj');
+  aviso.style.display = 'none';
+  const d = (val || '').replace(/\D/g,'');
+  if(d.length !== 14) return;              // incompleto/vazio → não incomoda
+  if(!_docValidoCNPJ(d)){
+    aviso.textContent = 'CNPJ inválido (dígito verificador não confere).';
+    aviso.style.display = 'block';
+  }
+}
+
 function cliMascaraTel(el){
   let v = el.value.replace(/\D/g,'').slice(0,11);
   if(v.length === 0){ el.value=''; return; }
@@ -6046,6 +6094,7 @@ async function cliAbrirModal(id){
   document.getElementById('cli-cep-erro').style.display = 'none';
   document.getElementById('cli-aviso-nome').style.display = 'none';
   document.getElementById('cli-aviso-cpf').style.display  = 'none';
+  document.getElementById('cli-aviso-cnpj').style.display = 'none';
   _cliHomonimoConfirmado = false;
   ['nome','cpf','cnpj','ie','email','tel','wpp','cep','logradouro','numero','complemento','bairro','cidade','estado','obs'].forEach(f => {
     const el = document.getElementById('cli-'+f);
@@ -6119,6 +6168,7 @@ function cliFecharModal(){
   document.getElementById('modal-cliente').style.display = 'none';
   document.getElementById('cli-aviso-nome').style.display = 'none';
   document.getElementById('cli-aviso-cpf').style.display  = 'none';
+  document.getElementById('cli-aviso-cnpj').style.display = 'none';
   _cliHomonimoConfirmado = false;
   _npCadastrandoCliente  = false;
 }
@@ -6140,6 +6190,11 @@ async function cliChecarCPF(val){
   aviso.style.display = 'none';
   const digitos = val.replace(/\D/g, '');
   if(digitos.length !== 11) return;
+  if(!_docValidoCPF(digitos)){
+    aviso.textContent = 'CPF inválido (dígito verificador não confere).';
+    aviso.style.display = 'block';
+    return;                                // número falso → nem checa duplicata
+  }
   try {
     const r = await fetch('/api/clientes?q=' + encodeURIComponent(val.trim()));
     const d = await r.json();
@@ -6287,6 +6342,22 @@ async function cliSalvar(){
   }
 
   const tipoDest = document.getElementById('cli-tipo-dest').value || 'nao_contribuinte';
+
+  // Bloqueia doc falso antes de enviar (o backend também barra — isto é UX). Só se informado.
+  if(tipoDest === 'nao_contribuinte'){
+    const cpfVal = document.getElementById('cli-cpf').value.trim();
+    if(cpfVal && !_docValidoCPF(cpfVal)){
+      erro.textContent = 'CPF inválido (dígito verificador não confere).';
+      document.getElementById('cli-cpf').focus(); return;
+    }
+  } else {
+    const cnpjVal = document.getElementById('cli-cnpj').value.trim();
+    if(cnpjVal && !_docValidoCNPJ(cnpjVal)){
+      erro.textContent = 'CNPJ inválido (dígito verificador não confere).';
+      document.getElementById('cli-cnpj').focus(); return;
+    }
+  }
+
   const payload = {
     nome,
     tipo_dest:          tipoDest,
