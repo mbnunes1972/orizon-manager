@@ -1497,7 +1497,6 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                import mod_fiscal, fiscal_cripto
                 db = get_session()
                 try:
                     ator = _ator_dict(db, usuario)
@@ -1506,28 +1505,29 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                         self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                    em = db.get(Emitente, loja.emitente_id) if loja.emitente_id else None
-                    if not em:
-                        padrao = mod_fiscal.emitente_padrao_teste()
-                        placeholders = padrao.pop("placeholders")
-                        self.send_json({"ok": True, "existe": False, "perfil": padrao,
-                                        "placeholders": placeholders, "ambiente_ativo": "homologacao",
-                                        "token_homolog_definido": False, "token_prod_definido": False,
-                                        "cert_validade": None, "cert_cnpj": None})
-                        return
-                    perfil = {c: getattr(em, c) for c in (
-                        "razao_social", "inscricao_estadual", "inscricao_municipal", "regime_tributario",
-                        "csosn_padrao", "csosn_contribuinte", "cfop_dentro_uf", "cfop_fora_uf",
-                        "serie_nfe", "discrimina_impostos", "cnae_servico", "cod_servico_municipio",
-                        "aliquota_iss", "retencao_json", "municipio_ibge", "papel_cnpj",
-                        "logradouro", "numero", "bairro", "cidade", "uf", "cep")}
-                    self.send_json({"ok": True, "existe": True, "perfil": perfil,
-                                    "placeholders": json.loads(em.placeholders_json or "[]"),
-                                    "ambiente_ativo": em.ambiente_ativo,
-                                    "token_homolog_definido": fiscal_cripto.token_definido(em.focus_token_homolog_enc),
-                                    "token_prod_definido": fiscal_cripto.token_definido(em.focus_token_prod_enc),
-                                    "cert_validade": em.cert_validade.isoformat() if em.cert_validade else None,
-                                    "cert_cnpj": em.cert_cnpj})
+                    em, _attr = _emitente_do_dono(db, "loja", loja)
+                    self.send_json(_fiscal_get(em))
+                finally:
+                    db.close()
+                return
+
+            # GET /api/admin/redes/<id>/perfil-fiscal — config do Emitente central da rede
+            m = _re.match(r'^/api/admin/redes/(\d+)/perfil-fiscal$', path)
+            if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    rid = int(m.group(1))
+                    rede = db.get(Rede, rid)
+                    if not rede:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    if not mod_tenancy.pode_ver_rede(ator, rid):
+                        self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                    em, _attr = _emitente_do_dono(db, "rede", rede)
+                    self.send_json(_fiscal_get(em))
                 finally:
                     db.close()
                 return
@@ -4390,20 +4390,43 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                 if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                em = db.get(Emitente, loja.emitente_id) if loja.emitente_id else None
+                em, attr = _emitente_do_dono(db, "loja", loja)
                 if not em:
-                    em = Emitente(ambiente_ativo="homologacao", rede_id=loja.rede_id)
-                    db.add(em); db.flush(); loja.emitente_id = em.id
-                for c in ("razao_social", "inscricao_estadual", "inscricao_municipal", "regime_tributario",
-                          "csosn_padrao", "csosn_contribuinte", "cfop_dentro_uf", "cfop_fora_uf",
-                          "serie_nfe", "discrimina_impostos", "cnae_servico", "cod_servico_municipio",
-                          "aliquota_iss", "retencao_json", "municipio_ibge", "papel_cnpj",
-                          "logradouro", "numero", "bairro", "cidade", "uf", "cep",
-                          "cert_validade", "cert_cnpj"):
-                    if c in req:
-                        setattr(em, c, req[c])
-                if "placeholders" in req:
-                    em.placeholders_json = json.dumps(req["placeholders"], ensure_ascii=False)
+                    em = _fiscal_criar_emitente(db, loja, attr, loja.rede_id)
+                _fiscal_put_config(em, req)
+                db.commit()
+                self.send_json({"ok": True})
+            finally:
+                db.close()
+            return
+
+        # ── PUT /api/admin/redes/<id>/perfil-fiscal — config do Emitente central ──
+        m_rpf = re.match(r"^/api/admin/redes/(\d+)/perfil-fiscal$", path)
+        if m_rpf:
+            import mod_fiscal
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            try:
+                req = json.loads(body) if body else {}
+            except Exception:
+                self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+            ok, erro = mod_fiscal.validar_config(req)
+            if not ok:
+                self.send_json({"ok": False, "erro": erro}, code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                rid = int(m_rpf.group(1))
+                rede = db.get(Rede, rid)
+                if not rede:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                if not mod_tenancy.pode_ver_rede(ator, rid):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                em, attr = _emitente_do_dono(db, "rede", rede)
+                if not em:
+                    em = _fiscal_criar_emitente(db, rede, attr, rede.id)
+                _fiscal_put_config(em, req)
                 db.commit()
                 self.send_json({"ok": True})
             finally:
@@ -4413,7 +4436,6 @@ class Handler(BaseHTTPRequestHandler):
         # ── PUT /api/admin/lojas/<id>/perfil-fiscal/segredos — write-only, cifrado ──
         m_seg = re.match(r"^/api/admin/lojas/(\d+)/perfil-fiscal/segredos$", path)
         if m_seg:
-            import fiscal_cripto
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
@@ -4429,18 +4451,42 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                 if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                em = db.get(Emitente, loja.emitente_id) if loja.emitente_id else None
+                em, attr = _emitente_do_dono(db, "loja", loja)
                 if not em:
-                    em = Emitente(ambiente_ativo="homologacao", rede_id=loja.rede_id)
-                    db.add(em); db.flush(); loja.emitente_id = em.id
-                for campo, col in (("focus_token_homolog", "focus_token_homolog_enc"),
-                                   ("focus_token_prod", "focus_token_prod_enc")):
-                    if campo in req:
-                        v = req[campo]
-                        if v is None:
-                            setattr(em, col, None)
-                        elif v != "":
-                            setattr(em, col, fiscal_cripto.encrypt(v))
+                    em = _fiscal_criar_emitente(db, loja, attr, loja.rede_id)
+                _fiscal_put_segredos(em, req)
+                db.commit()
+                self.send_json({"ok": True})
+            except Exception:
+                db.rollback()
+                self.send_json({"ok": False, "erro": "Falha ao salvar segredos"}, code=500)
+            finally:
+                db.close()
+            return
+
+        # ── PUT /api/admin/redes/<id>/perfil-fiscal/segredos — write-only, cifrado ──
+        m_rseg = re.match(r"^/api/admin/redes/(\d+)/perfil-fiscal/segredos$", path)
+        if m_rseg:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            try:
+                req = json.loads(body) if body else {}
+            except Exception:
+                self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                rid = int(m_rseg.group(1))
+                rede = db.get(Rede, rid)
+                if not rede:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                if not mod_tenancy.pode_ver_rede(ator, rid):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                em, attr = _emitente_do_dono(db, "rede", rede)
+                if not em:
+                    em = _fiscal_criar_emitente(db, rede, attr, rede.id)
+                _fiscal_put_segredos(em, req)
                 db.commit()
                 self.send_json({"ok": True})
             except Exception:
@@ -4453,7 +4499,6 @@ class Handler(BaseHTTPRequestHandler):
         # ── PUT /api/admin/lojas/<id>/perfil-fiscal/ambiente — troca explícita ──
         m_amb = re.match(r"^/api/admin/lojas/(\d+)/perfil-fiscal/ambiente$", path)
         if m_amb:
-            import mod_fiscal
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
@@ -4472,18 +4517,46 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                 if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                em = db.get(Emitente, loja.emitente_id) if loja.emitente_id else None
+                em, attr = _emitente_do_dono(db, "loja", loja)
                 if not em:
-                    em = Emitente(ambiente_ativo="homologacao", rede_id=loja.rede_id)
-                    db.add(em); db.flush(); loja.emitente_id = em.id
-                if amb == "producao":
-                    placeholders = json.loads(em.placeholders_json or "[]")
-                    if not mod_fiscal.pode_ativar_producao(placeholders):
-                        self.send_json({"ok": False,
-                                        "erro": "Não é possível ativar produção com valores de teste pendentes: "
-                                                + ", ".join(placeholders)}, code=400)
-                        return
-                em.ambiente_ativo = amb
+                    em = _fiscal_criar_emitente(db, loja, attr, loja.rede_id)
+                ok, erro = _fiscal_put_ambiente(em, amb)
+                if not ok:
+                    self.send_json({"ok": False, "erro": erro}, code=400); return
+                db.commit()
+                self.send_json({"ok": True, "ambiente_ativo": amb})
+            finally:
+                db.close()
+            return
+
+        # ── PUT /api/admin/redes/<id>/perfil-fiscal/ambiente — troca explícita ──
+        m_ramb = re.match(r"^/api/admin/redes/(\d+)/perfil-fiscal/ambiente$", path)
+        if m_ramb:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            try:
+                req = json.loads(body) if body else {}
+            except Exception:
+                self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+            amb = req.get("ambiente")
+            if amb not in ("homologacao", "producao"):
+                self.send_json({"ok": False, "erro": "ambiente inválido"}, code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                rid = int(m_ramb.group(1))
+                rede = db.get(Rede, rid)
+                if not rede:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                if not mod_tenancy.pode_ver_rede(ator, rid):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                em, attr = _emitente_do_dono(db, "rede", rede)
+                if not em:
+                    em = _fiscal_criar_emitente(db, rede, attr, rede.id)
+                ok, erro = _fiscal_put_ambiente(em, amb)
+                if not ok:
+                    self.send_json({"ok": False, "erro": erro}, code=400); return
                 db.commit()
                 self.send_json({"ok": True, "ambiente_ativo": amb})
             finally:
@@ -5647,6 +5720,88 @@ def _projeto_da_loja(db, nome_safe, loja_id):
     Ponto de escopo das entidades 'por projeto' (pool/medição/ciclo/contrato).
     Delega em _obj_da_loja para manter uma única fonte da regra de escopo."""
     return _obj_da_loja(db, Projeto, nome_safe, loja_id)
+
+
+# ── Perfil fiscal: lógica comum entre o dono LOJA (loja.emitente_id) e o dono
+#    REDE (rede.emitente_central_id). Os handlers só resolvem o Emitente do dono
+#    (via _emitente_do_dono) e delegam a estas funções puras. ────────────────────
+def _emitente_do_dono(db, kind, obj):
+    """Devolve (Emitente|None, nome_do_atributo_FK) do dono (loja/rede)."""
+    attr = "emitente_id" if kind == "loja" else "emitente_central_id"
+    eid = getattr(obj, attr, None)
+    return (db.get(Emitente, eid) if eid else None), attr
+
+
+def _fiscal_criar_emitente(db, obj, attr, rede_id):
+    """Cria um Emitente novo (homologação) e o linka ao dono. Retorna o Emitente."""
+    em = Emitente(ambiente_ativo="homologacao", rede_id=rede_id)
+    db.add(em); db.flush()
+    setattr(obj, attr, em.id)
+    return em
+
+
+def _fiscal_get(em):
+    """Payload do GET do perfil fiscal. NUNCA vaza token (só *_definido)."""
+    import mod_fiscal, fiscal_cripto
+    if not em:
+        padrao = mod_fiscal.emitente_padrao_teste()
+        placeholders = padrao.pop("placeholders")
+        return {"ok": True, "existe": False, "perfil": padrao,
+                "placeholders": placeholders, "ambiente_ativo": "homologacao",
+                "token_homolog_definido": False, "token_prod_definido": False,
+                "cert_validade": None, "cert_cnpj": None}
+    perfil = {c: getattr(em, c) for c in (
+        "razao_social", "inscricao_estadual", "inscricao_municipal", "regime_tributario",
+        "csosn_padrao", "csosn_contribuinte", "cfop_dentro_uf", "cfop_fora_uf",
+        "serie_nfe", "discrimina_impostos", "cnae_servico", "cod_servico_municipio",
+        "aliquota_iss", "retencao_json", "municipio_ibge", "papel_cnpj",
+        "logradouro", "numero", "bairro", "cidade", "uf", "cep")}
+    return {"ok": True, "existe": True, "perfil": perfil,
+            "placeholders": json.loads(em.placeholders_json or "[]"),
+            "ambiente_ativo": em.ambiente_ativo,
+            "token_homolog_definido": fiscal_cripto.token_definido(em.focus_token_homolog_enc),
+            "token_prod_definido": fiscal_cripto.token_definido(em.focus_token_prod_enc),
+            "cert_validade": em.cert_validade.isoformat() if em.cert_validade else None,
+            "cert_cnpj": em.cert_cnpj}
+
+
+def _fiscal_put_config(em, req):
+    """Aplica a allowlist de config não-secreta no Emitente (já resolvido/criado)."""
+    for c in ("razao_social", "inscricao_estadual", "inscricao_municipal", "regime_tributario",
+              "csosn_padrao", "csosn_contribuinte", "cfop_dentro_uf", "cfop_fora_uf",
+              "serie_nfe", "discrimina_impostos", "cnae_servico", "cod_servico_municipio",
+              "aliquota_iss", "retencao_json", "municipio_ibge", "papel_cnpj",
+              "logradouro", "numero", "bairro", "cidade", "uf", "cep",
+              "cert_validade", "cert_cnpj"):
+        if c in req:
+            setattr(em, c, req[c])
+    if "placeholders" in req:
+        em.placeholders_json = json.dumps(req["placeholders"], ensure_ascii=False)
+
+
+def _fiscal_put_segredos(em, req):
+    """Grava tokens cifrados (write-only). None limpa; "" mantém."""
+    import fiscal_cripto
+    for campo, col in (("focus_token_homolog", "focus_token_homolog_enc"),
+                       ("focus_token_prod", "focus_token_prod_enc")):
+        if campo in req:
+            v = req[campo]
+            if v is None:
+                setattr(em, col, None)
+            elif v != "":
+                setattr(em, col, fiscal_cripto.encrypt(v))
+
+
+def _fiscal_put_ambiente(em, amb):
+    """Troca o ambiente ativo. Retorna (ok, erro). Guarda produção via placeholders."""
+    import mod_fiscal
+    if amb == "producao":
+        placeholders = json.loads(em.placeholders_json or "[]")
+        if not mod_fiscal.pode_ativar_producao(placeholders):
+            return False, ("Não é possível ativar produção com valores de teste pendentes: "
+                           + ", ".join(placeholders))
+    em.ambiente_ativo = amb
+    return True, None
 
 
 def _enriquecer_cliente_do_projeto(proj, db):
