@@ -394,25 +394,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="sb-proj-cli" style="font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
   </div>
 
-  <!-- Credenciais -->
-  <div class="sb-creds" id="sb-creds-block">
-    <div class="sb-creds-title" style="display:flex;justify-content:space-between;align-items:center">
-      <span>Credenciais Omie</span>
-      <span id="sb-creds-lock" style="font-size:10px;color:var(--muted);cursor:default" title="Visivel apenas para Diretoria">&#x1F512;</span>
-    </div>
-    <div id="sb-creds-fields" style="display:none">
-      <label>APP KEY</label>
-      <input type="text" id="app_key" placeholder="App Key">
-      <label>APP SECRET</label>
-      <input type="password" id="app_secret" placeholder="App Secret">
-      <label>INTERVALO (s)</label>
-      <input type="number" id="intervalo" min="0.3" max="10" step="0.1" value="0.5">
-      <button class="sb-save-btn" onclick="saveConfig()">Salvar credenciais</button>
-    </div>
-    <div id="sb-creds-oculto" style="font-size:10px;color:var(--muted);padding:4px 0">&#x1F512; Acesso restrito</div>
-    <div class="sb-save-hint" id="save-hint"></div>
-  </div>
-
   <!-- Navegação -->
   <nav class="sb-nav">
     <div class="sb-nav-title">Menu</div>
@@ -1964,10 +1945,13 @@ async function _onDescIndBlur(el, key, isEP07){
 
 // ---- Config ------------------------------------------------------------------
 async function loadConfig(){
+  // Os inputs vivem na seção "Credenciais e Tokens" do Admin (só super_admin) — pode não existir.
+  const elKey = document.getElementById('app_key');
+  if(!elKey) return;
   try{
     const r = await fetch('/config');
     const d = await r.json();
-    document.getElementById('app_key').value    = d.app_key||'';
+    elKey.value = d.app_key||'';
     document.getElementById('app_secret').value = d.app_secret||'';
     document.getElementById('intervalo').value  = d.intervalo||0.5;
   }catch(e){}
@@ -2181,19 +2165,10 @@ async function carregarPerfil(){
 function aplicarRestricoesPerfil(){
   const cfg = _perfilAtivo.config || {};
   const nomePerfil = (_perfilAtivo.perfil_ativo || 'consultor').toLowerCase();
-  const isDiretoria = nomePerfil === 'diretoria';
 
   // Indicador na página de configurações
   const label = document.getElementById('cfg-perfil-ativo-label');
   if(label) label.textContent = '✓ Perfil ativo: ' + (cfg.nome || nomePerfil);
-
-  // Credenciais: visíveis apenas para diretoria
-  const credsFields = document.getElementById('sb-creds-fields');
-  const credsOculto = document.getElementById('sb-creds-oculto');
-  const credsLock   = document.getElementById('sb-creds-lock');
-  if(credsFields) credsFields.style.display = isDiretoria ? 'block' : 'none';
-  if(credsOculto) credsOculto.style.display = isDiretoria ? 'none'  : 'block';
-  if(credsLock)   credsLock.textContent     = isDiretoria ? '🔓' : '🔒';
 
   // Botão de editar total
   const elTot = document.getElementById('neg-total-final');
@@ -6944,6 +6919,22 @@ async function adminRenderPlataforma(box){
           || '<tr><td colspan="3" style="color:var(--muted)">Nenhum gestor geral.</td></tr>'}
         </tbody></table>
       </div>`);
+    // Credenciais e Tokens — Núcleo/Plataforma; só Administrador do Sistema (super_admin) enxerga.
+    box.insertAdjacentHTML('beforeend', `
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">Credenciais e Tokens</div>
+        <div style="max-width:420px">
+          <label class="field-label">Omie — App Key</label>
+          <input type="text" id="app_key" placeholder="App Key">
+          <label class="field-label" style="margin-top:10px">Omie — App Secret</label>
+          <input type="password" id="app_secret" placeholder="App Secret">
+          <label class="field-label" style="margin-top:10px">Intervalo (s)</label>
+          <input type="number" id="intervalo" min="0.3" max="10" step="0.1" value="0.5">
+          <div class="actions"><button class="btn btn-primary btn-sm" onclick="saveConfig()">Salvar credenciais</button></div>
+          <div class="sb-save-hint" id="save-hint" style="text-align:left"></div>
+        </div>
+      </div>`);
+    loadConfig();  // preenche os inputs recém-inseridos com os valores salvos
   }
 }
 
@@ -7843,7 +7834,6 @@ function fecharModalExportar() {
 }
 
 carregarUsuarioAutenticado();
-loadConfig();
 
 // ── Esc fecha o modal visível mais ao topo (sem salvar) ───────────────────────
 document.addEventListener('keydown', function(e){
