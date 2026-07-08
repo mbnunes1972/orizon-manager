@@ -89,6 +89,22 @@ def _enriquecer_projetos_com_status(projetos):
     finally:
         db.close()
 
+def _enriquecer_projetos_com_parceiro(projetos):
+    """Resolve o nome do parceiro (arquiteto) de cada projeto a partir do parceiro_id já presente no item."""
+    if not projetos:
+        return
+    ids = {p.get("parceiro_id") for p in projetos if p.get("parceiro_id")}
+    if not ids:
+        return
+    db = get_session()
+    try:
+        nomes = {pr.id: pr.nome for pr in db.query(Parceiro).filter(Parceiro.id.in_(ids)).all()}
+        for p in projetos:
+            pid = p.get("parceiro_id")
+            p["parceiro_nome"] = nomes.get(pid) if pid else None
+    finally:
+        db.close()
+
 def _enriquecer_projetos_com_pool(projetos):
     """Para projetos EP-07, sobrescreve n_ambientes/n_selecionados com contagens do pool."""
     nomes = [p['nome_safe'] for p in projetos if p.get('nome_safe')]
@@ -340,6 +356,7 @@ class Handler(BaseHTTPRequestHandler):
                 projetos = _filtrar_projetos_por_loja(projetos, db, loja_id, ator=usuario)
                 _enriquecer_projetos_com_pool(projetos)
                 _enriquecer_projetos_com_status(projetos)
+                _enriquecer_projetos_com_parceiro(projetos)
                 self.send_json({"ok": True, "projetos": projetos})
             except Exception as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -365,6 +382,7 @@ class Handler(BaseHTTPRequestHandler):
                 for p in locais: p['origem'] = 'local'
                 _enriquecer_projetos_com_pool(locais)
                 _enriquecer_projetos_com_status(locais)
+                _enriquecer_projetos_com_parceiro(locais)
                 omie_res = _buscar_projetos_omie(q)
                 nomes_locais = {p['nome_projeto'].lower() for p in locais}
                 omie_unicos = [p for p in omie_res if p['nome_projeto'].lower() not in nomes_locais]
