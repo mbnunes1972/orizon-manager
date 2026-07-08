@@ -1470,6 +1470,24 @@ visual (doc 3 §5, itens 1–7 — tema claro/escuro petróleo/dourado, aposenta
 templates de diagramação (doc 4 Parte 1) conforme as telas forem tocadas. `Modulos_Orizon.docx` ainda não está no repo.
 **Pendente:** passos 2 e 3 do alinhamento · **Fase 2** (extração física piloto = Fiscal) e domínios novos.
 
+**Alinhamento front-end — passo 2, itens 1-2: paleta claro/escuro + fim da tinta laranja (2026-07-08, branch
+`feat/design-paleta`, suíte 681):** migração visual mais transversal, feita primeiro. **Item 1** — o `:root` do
+`static/index.html` deixou o dark-terminal verde-menta e passou aos **tokens claro/escuro do
+`Padrao_Design_Orizon_v2.docx`** (accent **petróleo** `#4FA89E` escuro / `#1F4B4B` claro; **dourado** como accent
+secundário de marca). Tema **dual**: padrão = escuro; `:root[data-theme="light"]` já definido, aguardando o toggle
+(item 7). Estratégia de **aliases** — os nomes antigos (`--card→--surface-2`, `--ok→--accent`, `--dalm-gold→--gold`,
+`--border2→--border-strong`, `--section→--info`, `--sb-bg→--surface`) apontam para os novos, então as ~250 referências
+`var(--…)` herdam a paleta **sem editar cada linha**. A auditoria de tokens pegou dois **indefinidos pré-existentes**
+usados por inputs de modais: `--fg` (herdava o texto, ok) e `--input` (caía no fallback `#0d1a0d` **verde** → destoaria
+da superfície petróleo) — resolvidos com `--fg:var(--text)` e `--input:var(--surface)`. **Item 2** — as **8 ocorrências**
+da tinta laranja legada `rgba(232,97,26,…)` (hover/ativo do menu, hover de card/linha/drop-zone, card destacado) foram
+trocadas por `var(--accent-tint)` (fundos) / `var(--accent)` (borda) → grep = 0. Frontend puro (backend intocado, suíte
+681); **sem teste visual → conferência no navegador (Ctrl+F5) fica com o usuário**. Cores hardcoded remanescentes
+(status `#f05a50`… e cartões teal/amber/coral) **persistem de propósito** (itens 4/futuro). Plano:
+`docs/superpowers/plans/2026-07-08-migracao-design-itens-1-2.md`; checklist derivado (fonte = `.docx`):
+`docs/design/backlog-migracao-design.md` (itens 1-2 = ✅). **Pendente do passo 2:** itens 3 (unificar `login.html`),
+4 (tokenizar status), 5 (`btn-primary` sem `.btn`), 6 (tipografia única + mono só em números), 7 (toggle persistido).
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:
