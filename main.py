@@ -1548,7 +1548,11 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                         self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                    self.send_json({"ok": True, "ativos": sorted(mod_tenancy.modulos_ativos_da_loja(loja))})
+                    import modulos as _mod
+                    ativos = mod_tenancy.modulos_ativos_da_loja(loja)
+                    dominios = [{"id": x["id"], "rotulo": x["rotulo"], "depende_de": x["depende_de"],
+                                 "ativo": x["id"] in ativos} for x in _mod.dominios_com_rotulo()]
+                    self.send_json({"ok": True, "ativos": sorted(ativos), "dominios": dominios})
                 finally:
                     db.close()
                 return
@@ -4341,6 +4345,9 @@ class Handler(BaseHTTPRequestHandler):
                         invalidos = [x for x in ativos if x not in _mod.DOMINIOS]
                         if invalidos:
                             self.send_json({"ok": False, "erro": "Módulo(s) inválido(s): %s" % ", ".join(map(str, invalidos))}, code=400); return
+                        _ok, _msg = _mod.topologia_valida(ativos)
+                        if not _ok:
+                            self.send_json({"ok": False, "erro": _msg}, code=400); return
                         loja.modulos_ativos = json.dumps(list(ativos))
                     db.commit()
                     self.send_json({"ok": True})

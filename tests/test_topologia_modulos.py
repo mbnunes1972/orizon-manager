@@ -54,3 +54,22 @@ def test_guard_bloqueia_modulo_desligado(http_client_factory, seed, app_db):
     c.post(f"/api/admin/lojas/{lid}/modulos", {"ativos": None})
     st2, _ = dc.get(f"/api/projetos/{proj}/ciclo/15/nfe")
     assert st2 in (200, 404)
+
+
+def test_get_modulos_lista_dominios_com_rotulo(http_client_factory, seed, app_db):
+    c = http_client_factory(); c.login("super", "senha123")
+    lid = seed["loja1_id"]
+    st, d = c.get(f"/api/admin/lojas/{lid}/modulos")
+    assert st == 200
+    ids = [x["id"] for x in d["dominios"]]
+    assert "cadastro" in ids and "fiscal" in ids
+    cad = next(x for x in d["dominios"] if x["id"] == "cadastro")
+    assert cad["rotulo"] and cad["ativo"] is True
+
+
+def test_post_modulos_rejeita_topologia_quebrada(http_client_factory, seed, app_db):
+    c = http_client_factory(); c.login("super", "senha123")
+    lid = seed["loja1_id"]
+    st, d = c.post(f"/api/admin/lojas/{lid}/modulos", {"ativos": ["comercial"]})
+    assert st == 400 and "depende" in (d.get("erro", "")).lower()
+    c.post(f"/api/admin/lojas/{lid}/modulos", {"ativos": None})   # religa (não contamina)
