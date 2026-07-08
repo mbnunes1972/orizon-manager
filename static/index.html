@@ -664,6 +664,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="home-tabs" style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin-bottom:12px;">
       <button id="tab-btn-projetos" class="home-tab ativo" onclick="homeMostrarTab('projetos')">Projetos</button>
       <button id="tab-btn-clientes" class="home-tab" onclick="homeMostrarTab('clientes')">Clientes</button>
+      <button id="tab-btn-parceiros" class="home-tab" onclick="homeMostrarTab('parceiros')">Parceiros</button>
     </div>
     <div id="home-clientes-panel" style="display:none;">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
@@ -684,6 +685,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           </tr>
         </thead>
         <tbody id="cli-home-tbody"></tbody>
+      </table>
+    </div>
+    <div id="home-parceiros-panel" style="display:none;">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+        <input id="par-busca-home" type="text" placeholder="Buscar parceiro por nome ou CPF/CNPJ..."
+               style="flex:1;padding:8px 12px;border:1px solid var(--dalm-gold);border-radius:6px;background:var(--card);color:var(--text);"
+               oninput="parHomeCarregar()">
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--dalm-gold);">
+            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">Parceiro</th>
+            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">CPF/CNPJ</th>
+            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">Tipo</th>
+            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">Projetos relacionados</th>
+          </tr>
+        </thead>
+        <tbody id="par-home-tbody"></tbody>
       </table>
     </div>
     <div id="home-projetos-panel">
@@ -10303,11 +10322,14 @@ async function salvarAdendo(confirmarLojaIncompleta = false) {
 
 // ── Home tabs ──────────────────────────────────────────────────────────────
 function homeMostrarTab(tab) {
-  document.getElementById('home-projetos-panel').style.display = tab === 'projetos' ? '' : 'none';
-  document.getElementById('home-clientes-panel').style.display = tab === 'clientes'  ? '' : 'none';
+  document.getElementById('home-projetos-panel').style.display  = tab === 'projetos'  ? '' : 'none';
+  document.getElementById('home-clientes-panel').style.display  = tab === 'clientes'  ? '' : 'none';
+  document.getElementById('home-parceiros-panel').style.display = tab === 'parceiros' ? '' : 'none';
   document.getElementById('tab-btn-projetos').classList.toggle('ativo', tab === 'projetos');
   document.getElementById('tab-btn-clientes').classList.toggle('ativo', tab === 'clientes');
-  if (tab === 'clientes') cliHomeCarregar();
+  document.getElementById('tab-btn-parceiros').classList.toggle('ativo', tab === 'parceiros');
+  if (tab === 'clientes')  cliHomeCarregar();
+  if (tab === 'parceiros') parHomeCarregar();
 }
 
 async function cliHomeCarregar() {
@@ -10343,6 +10365,37 @@ async function cliHomeCarregar() {
   } catch(e) {
     console.error('cliHomeCarregar:', e);
   }
+}
+
+async function parHomeCarregar(){
+  const tb = document.getElementById('par-home-tbody');
+  if(!tb) return;
+  try {
+    const [rp, rj] = await Promise.all([
+      fetch('/api/parceiros', {credentials:'same-origin'}).then(r=>r.json()),
+      fetch('/projetos',      {credentials:'same-origin'}).then(r=>r.json()),
+    ]);
+    const parceiros = (rp.parceiros || []);
+    const projetos  = (rj.projetos  || []);
+    const porParceiro = {};
+    projetos.forEach(p => { if(p.parceiro_id){ (porParceiro[p.parceiro_id] = porParceiro[p.parceiro_id] || []).push(p); } });
+    const q = (document.getElementById('par-busca-home')?.value || '').toLowerCase().trim();
+    const filtrados = parceiros.filter(pc =>
+      !q || (pc.nome||'').toLowerCase().includes(q) || (pc.cpf_cnpj||'').toLowerCase().includes(q));
+    tb.innerHTML = filtrados.map(pc => {
+      const projs = porParceiro[pc.id] || [];
+      const projHtml = projs.length
+        ? projs.map(p => `<a onclick="abrirProjeto('${esc(p.nome_safe)}')" style="color:var(--accent);cursor:pointer;text-decoration:underline;margin-right:8px">${esc(p.nome_safe)}</a>`).join('')
+          + `<span style="color:var(--muted);font-size:11px">(${projs.length})</span>`
+        : '<span style="color:var(--muted)">—</span>';
+      return `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px">${esc(pc.nome||'')}</td>
+        <td style="padding:8px">${esc(pc.cpf_cnpj||'')}</td>
+        <td style="padding:8px">${esc(pc.tipo||'')}</td>
+        <td style="padding:8px">${projHtml}</td>
+      </tr>`;
+    }).join('') || `<tr><td colspan="4" style="padding:12px;color:var(--muted)">Nenhum parceiro.</td></tr>`;
+  } catch(e){ tb.innerHTML = `<tr><td colspan="4" style="padding:12px;color:var(--err)">Erro ao carregar: ${esc(e.message)}</td></tr>`; }
 }
 
 // Aliases for home tab client buttons
