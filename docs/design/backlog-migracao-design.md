@@ -1,5 +1,9 @@
 # Backlog de migração de design — Orizon Studio
 
+> ⚠️ **Este arquivo é um checklist operacional DERIVADO.** A **fonte de verdade** é o
+> **`Padrao_Design_Orizon_v2.docx`** (seção 5). Se o backlog mudar, a alteração volta **primeiro para o .docx** e
+> depois se reflete aqui — não editar este `.md` como se fosse a especificação.
+>
 > Da **seção 5** do `padrao-design-orizon-v2.md`. **Paralelo e não-bloqueante** — cada item é incremental e
 > independente das mudanças de navegação (Cadastro em abas, sidebar, hub). Base do estado atual:
 > `docs/design-tokens.md` (extração do que existe hoje). Alvo: `padrao-design-orizon-v2.md` (tokens claro/escuro,
