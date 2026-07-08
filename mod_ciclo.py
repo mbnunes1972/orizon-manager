@@ -147,6 +147,27 @@ def exige_aprovacao_financeira(codigo):
     return codigo in ETAPAS_APROVACAO_FINANCEIRA
 
 
+# Faixas de titularidade do Ciclo (ARQUITETURA-MODULOS.md §Governança). Cada trecho de etapas pertence
+# a uma faixa/equipe; as transições entre faixas são os gates de controle (8, 11d). Mapa explícito —
+# antes a titularidade estava só implícita nas capabilities/constantes.
+FAIXA_POR_ETAPA = {
+    "1": "vendas", "2": "vendas", "3": "vendas", "4": "vendas", "7": "vendas",
+    "8": "gate_financeiro_1",
+    "9": "execucao_projeto", "10": "execucao_projeto",
+    "11": "execucao_projeto", "11a": "execucao_projeto", "11b": "execucao_projeto",
+    "11c": "execucao_projeto", "11e": "execucao_projeto",
+    "11d": "gate_financeiro_2",
+    "12": "expedicao", "13": "expedicao", "14": "expedicao", "15": "expedicao", "16": "expedicao",
+    "17": "montagem", "18": "montagem", "19": "montagem", "20": "montagem",
+}
+
+
+def faixa_da_etapa(codigo):
+    """Faixa de titularidade (dono operacional) da etapa, ou None se desconhecida.
+    Faixas 'gate_*' são transições de controle (aprovação financeira). Ver Governança do Ciclo."""
+    return FAIXA_POR_ETAPA.get(str(codigo))
+
+
 def _parse_codigo(codigo):
     """'11a' -> (11, 'a'); '2' -> (2, ''). Para ordenação e agrupamento por pai."""
     num, suf = "", ""
