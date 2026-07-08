@@ -1436,6 +1436,18 @@ lateral e virou **"Credenciais e Tokens" dentro do Admin (Plataforma)**, **só s
 renderizada** (não é cadeado) para os demais; **Diretor deixou de ver**. Subagent-driven, 5 tasks, revisão
 frontend combinada aprovada (sintaxe + invisibilidade real + refs limpas). Plano:
 `docs/superpowers/plans/2026-07-08-hub-modulos-credenciais.md`.
+
+**Navegação Orizon v1 — Cadastro em abas + sidebar (2026-07-08, branch `feat/nav-cadastro-sidebar`, suíte 680):**
+aplicadas as ações imediatas dos docs de spec oficial (`docs/design/navegacao-orizon-v1.md` + `padrao-design-orizon-v2.md`).
+**Clientes e Parceiros saíram da sidebar** e viraram **abas do módulo Cadastro** (`page-10`: Clientes/Fornecedores/
+Parceiros/Funcionários/Terceiros — 3 stubs "em breve"); o conteúdo foi **movido preservando os IDs internos**
+(`cli-*`/`par-*`), então renders/modais seguem intactos; `goPage` ajustado para `n≥10` (senão `page-010`). **Sidebar
+em 3 seções:** Módulos (topo→Hub) · **Atalhos** (Projetos, divisor, máx. 2) · Admin (último). **Faixa do hub
+confirmada autoritativa** (5 grupos, Fiscal na Logística) — versão simplificada do design v2 superada. Specs
+versionadas em `docs/design/`; **backlog de migração de design** (tema claro/escuro, tinta laranja legada, fonte
+única, tokenizar status) em `docs/design/backlog-migracao-design.md` — **paralelo, não bloqueia**. Subagent-driven,
+3 tasks, revisão frontend combinada aprovada (`node --check` OK). Plano:
+`docs/superpowers/plans/2026-07-08-navegacao-cadastro-abas-sidebar.md`.
 **Pendente:** **Fase 2** (extração física piloto = Fiscal) e domínios novos — cada um seu brainstorm→spec→plano.
 
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não

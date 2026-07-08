@@ -38,6 +38,20 @@
 >    renderizada no DOM** (não é bloqueio visual) para quem não a tem; o Diretor deixou de ver. Credenciais/Tokens
 >    são **Núcleo/Plataforma**, não módulo de negócio.
 >
+> **🧭 Navegação Orizon v1 (2026-07-08, suíte 680) — 3 níveis: Hub → Sidebar → Abas do módulo** (specs oficiais em
+> `docs/design/navegacao-orizon-v1.md` + `padrao-design-orizon-v2.md`):
+> - **Clientes e Parceiros deixaram de ser itens de menu** e viraram **abas do módulo Cadastro** (`page-10`:
+>   Clientes · Fornecedores · Parceiros · Funcionários · Terceiros — os 3 últimos "em breve"). Eliminou o caminho
+>   duplo (sidebar ⨯ Hub) para o mesmo dado. Hub → card Cadastro abre aqui.
+> - **Sidebar em seções:** **Módulos** (topo → Hub) · **Atalhos** (separada por divisor, **Projetos**, máx. 2 itens)
+>   · **Admin** (por último, contém Credenciais e Tokens). Critério de atalho: consultado o dia todo por quase todo
+>   perfil **e** que não seja a aba padrão de um módulo — um 3º candidato = falta um card no Hub, não mais um atalho.
+> - **Faixa do hub confirmada como autoritativa:** o agrupamento de **5 faixas** (Vendas / Execução do Projeto /
+>   Logística-Expedição *(Fiscal, etapa 15)* / Pós-venda-Montagem / Financeiro transversal) permanece — alinhado a
+>   `mod_ciclo.FAIXA_POR_ETAPA`. A versão simplificada "Comercial/Logística/Pós-venda" (§ nav. lateral do design v2)
+>   está **superada**. Migração de tokens de design (tema claro/escuro etc.) = backlog paralelo
+>   (`docs/design/backlog-migracao-design.md`), não bloqueia navegação.
+>
 > A **extração física** em pacotes (desmembrar o monólito) é **Fase 2+** — ver "Roadmap de extração" no fim.
 
 ## Por que existe
