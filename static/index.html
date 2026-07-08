@@ -1997,10 +1997,21 @@ async function carregarUsuarioAutenticado(){
     if (_navAdmin) _navAdmin.style.display =
       (_usuarioAtual && (_usuarioAtual.pode_gerir_usuarios
         || _usuarioAtual.pode_gerir_redes || _usuarioAtual.pode_gerir_lojas)) ? '' : 'none';
+    _aplicarModulosNoMenu();
     _atualizarUIUsuario();
     _carregarDadosExtrasUsuario();
     _aterrissarPorPapel();
   } catch(e){ console.warn('[AUTH] Erro ao carregar usuário:', e); }
+}
+
+// Esconde itens de menu conforme os módulos ativos da loja do usuário.
+// Sem info (modulos_ativos ausente/null) -> não esconde nada (default tudo-ligado).
+function _aplicarModulosNoMenu(){
+  const mods = (_usuarioAtual && _usuarioAtual.modulos_ativos) || null;
+  const ativo = (m) => !mods || mods.indexOf(m) !== -1;
+  const setNav = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  setNav('nav-05', ativo('cadastro'));   // Clientes
+  setNav('nav-06', ativo('cadastro'));   // Parceiros
 }
 
 function _atualizarUIUsuario(){
@@ -6807,7 +6818,16 @@ function adminIrNivel(n){
 }
 
 function adminEntrarRede(id, nome){ _adminNav.rede = { id, nome }; _adminNav.nivel = 2; _adminNav.loja = null; adminRender(); }
-function adminEntrarLoja(id, nome){ _adminNav.loja = { id, nome }; _adminNav.nivel = 3; adminRender(); }
+async function adminEntrarLoja(id, nome){
+  _adminNav.loja = { id, nome };
+  _adminNav.nivel = 3;
+  try {
+    const r = await fetch(`/api/admin/lojas/${id}/modulos`, { credentials:'same-origin' });
+    const d = await r.json();
+    _adminNav.loja.modulos = d.ok ? d.ativos : null;   // null -> mostra tudo (nunca esconde por erro)
+  } catch(e){ _adminNav.loja.modulos = null; }
+  adminRender();
+}
 
 function adminRender(){
   adminBreadcrumb();
@@ -6956,13 +6976,19 @@ async function adminLojaNova(redeId){
 
 async function adminRenderLoja(box){
   const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  const modsLoja = (_adminNav.loja && _adminNav.loja.modulos) || null;   // null -> mostra tudo
+  const abaAtiva = (m) => !modsLoja || modsLoja.indexOf(m) !== -1;
+  const tabFinanceiro = abaAtiva('financeiro')
+    ? '<button class="home-tab" id="loja-tab-financeiro" onclick="adminLojaTab(\'financeiro\')">Financeiro</button>' : '';
+  const tabFiscal = abaAtiva('fiscal')
+    ? '<button class="home-tab" id="loja-tab-fiscal" onclick="adminLojaTab(\'fiscal\')">Fiscal</button>' : '';
   box.innerHTML = `
     <div style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin-bottom:12px">
       <button class="home-tab ativo" id="loja-tab-dados" onclick="adminLojaTab('dados')">Dados da loja</button>
       <button class="home-tab" id="loja-tab-usuarios" onclick="adminLojaTab('usuarios')">Usuários da loja</button>
       <button class="home-tab" id="loja-tab-projetos" onclick="adminLojaTab('projetos')">Projetos</button>
-      <button class="home-tab" id="loja-tab-financeiro" onclick="adminLojaTab('financeiro')">Financeiro</button>
-      <button class="home-tab" id="loja-tab-fiscal" onclick="adminLojaTab('fiscal')">Fiscal</button>
+      ${tabFinanceiro}
+      ${tabFiscal}
       <button class="home-tab" id="loja-tab-modulos" onclick="adminLojaTab('modulos')">Módulos</button>
     </div>
     <div id="loja-panel-dados"></div>
@@ -7116,8 +7142,13 @@ async function adminModulosSalvar() {
     const d = await r.json();
     if (!d.ok) { await avisoPopup(esc(d.erro || 'Falha ao salvar.'), {titulo:'Módulos'}); return; }
     showToast('Módulos atualizados!', false);
+    // reflete as abas Fiscal/Financeiro da loja administrada na hora
+    if (_adminNav.loja && String(_adminNav.loja.id) === String(lid)) {
+      _adminNav.loja.modulos = Array.isArray(d.ativos) ? d.ativos : ativos;
+    }
     if (String(lid) === String(_usuarioAtual && _usuarioAtual.loja_id)) { await carregarUsuarioAutenticado(); }
-    adminModulosCarregar();
+    adminRender();          // reconstrói a barra de abas (some/aparece Fiscal/Financeiro)
+    adminLojaTab('modulos'); // mantém o usuário na aba Módulos e recarrega o painel
   } catch(e) { await avisoPopup('Erro de rede: ' + esc(e.message), {titulo:'Módulos'}); }
 }
 
