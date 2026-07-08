@@ -1463,6 +1463,9 @@ class Handler(BaseHTTPRequestHandler):
                     loja_id, _err = mod_tenancy.escopo_operacional(ator)
                     if _err:
                         self.send_json({"ok": False, "erro": _err}, code=403); return
+                    _bloq, _msg = _bloqueio_modulo(path, db.get(Loja, loja_id) if loja_id else None)
+                    if _bloq:
+                        self.send_json({"ok": False, "erro": _msg}, code=403); return
                     if _projeto_da_loja(db, nome_safe, loja_id) is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     docs = (db.query(CicloDocumento)
@@ -1527,6 +1530,25 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
                     em, _attr = _emitente_do_dono(db, "loja", loja)
                     self.send_json(_fiscal_get(em))
+                finally:
+                    db.close()
+                return
+
+            # GET /api/admin/lojas/<id>/modulos — domínios ativos (topologia)
+            m = _re.match(r'^/api/admin/lojas/(\d+)/modulos$', path)
+            if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja = db.get(Loja, int(m.group(1)))
+                    if not loja:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                        self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                    self.send_json({"ok": True, "ativos": sorted(mod_tenancy.modulos_ativos_da_loja(loja))})
                 finally:
                     db.close()
                 return
@@ -4290,6 +4312,42 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # POST /api/admin/lojas/<id>/modulos — grava topologia (domínios ativos).
+            # ativos=None religa tudo; senão valida cada item ∈ modulos.DOMINIOS. Gated como o GET.
+            m = _re.match(r'^/api/admin/lojas/(\d+)/modulos$', path)
+            if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                try:
+                    req = json.loads(body) if body else {}
+                except Exception:
+                    self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
+                import modulos as _mod
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja = db.get(Loja, int(m.group(1)))
+                    if not loja:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
+                        self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                    ativos = req.get("ativos")
+                    if ativos is None:
+                        loja.modulos_ativos = None
+                    else:
+                        if not isinstance(ativos, list):
+                            self.send_json({"ok": False, "erro": "ativos deve ser lista ou null"}, code=400); return
+                        invalidos = [x for x in ativos if x not in _mod.DOMINIOS]
+                        if invalidos:
+                            self.send_json({"ok": False, "erro": "Módulo(s) inválido(s): %s" % ", ".join(map(str, invalidos))}, code=400); return
+                        loja.modulos_ativos = json.dumps(list(ativos))
+                    db.commit()
+                    self.send_json({"ok": True})
+                finally:
+                    db.close()
+                return
+
             # POST /api/projetos/<nome>/ciclo/15/emitir-nfe — emite a NF-e da loja
             m = _re.match(r'^/api/projetos/([^/]+)/ciclo/15/emitir-nfe$', path)
             if m:
@@ -5439,6 +5497,18 @@ def _ibge_por_cep(cep):
     clientes antigos sem `municipio_ibge`."""
     end = _endereco_por_cep(cep)
     return end["ibge"] if end else None
+
+
+def _bloqueio_modulo(path, loja):
+    """(True, msg) se o path pertence a um módulo de domínio DESLIGADO para a loja; senão (False, None).
+    Default tudo-ligado → nunca bloqueia sem config explícita. Topologia (ARQUITETURA-MODULOS.md)."""
+    import modulos as _mod
+    mod = _mod.modulo_do_path(path)
+    if mod is None or loja is None:
+        return (False, None)
+    if mod_tenancy.modulo_ativo(loja, mod):
+        return (False, None)
+    return (True, "Módulo '%s' não está habilitado para esta loja." % mod)
 
 
 def _cliente_dict(c) -> dict:
