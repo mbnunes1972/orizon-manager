@@ -1425,6 +1425,17 @@ Cadastro off; esconde abas Fiscal/Financeiro conforme o módulo na loja administ
 todos os caminhos (revisado: nunca esconde por ausência/erro de rede). Frontend sem teste JS → verificado por
 balanço + revisão. **Nota honesta:** domínios sem tela (Comercial/Produção/Estoque/Pós-venda/Expedição) têm toggle
 mas reagem só no backend. Plano: `docs/superpowers/plans/2026-07-08-painel-modulos-menu-reativo.md`.
+
+**Modularização — Hub de módulos (aterrissagem) + Credenciais no Admin (2026-07-08, branch `feat/hub-modulos`,
+suíte 680):** a aterrissagem do usuário operacional deixou de abrir na lista de Projetos e virou um **hub de
+módulos** — cards agrupados por **faixa de titularidade do ciclo** (Vendas · Execução do Projeto · Logística/
+Expedição *(Fiscal aqui)* · Pós-venda/Montagem · Financeiro transversal), consistente com `mod_ciclo.FAIXA_POR_ETAPA`.
+`modulos.py` ganhou `faixa` por domínio + `hub_layout()`; `/api/auth/me` inclui `usuario["hub"]`. Só **Comercial→
+Projetos** e **Cadastro→Clientes** navegam; o resto é card **"em breve"** (honesto). **Credenciais** saiu do menu
+lateral e virou **"Credenciais e Tokens" dentro do Admin (Plataforma)**, **só super_admin** — a seção **não é
+renderizada** (não é cadeado) para os demais; **Diretor deixou de ver**. Subagent-driven, 5 tasks, revisão
+frontend combinada aprovada (sintaxe + invisibilidade real + refs limpas). Plano:
+`docs/superpowers/plans/2026-07-08-hub-modulos-credenciais.md`.
 **Pendente:** **Fase 2** (extração física piloto = Fiscal) e domínios novos — cada um seu brainstorm→spec→plano.
 
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não

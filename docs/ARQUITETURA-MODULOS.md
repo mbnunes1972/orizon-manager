@@ -24,6 +24,20 @@
 > Domínios sem tela própria (Comercial/Produção/Estoque/Pós-venda/Expedição) têm toggle mas **reagem só no
 > backend** (o guard bloqueia as rotas) — a superfície de menu cresce quando ganharem tela.
 >
+> **🖥️ Hub de módulos + Credenciais no Admin (2026-07-08, suíte 680):** duas decisões de apresentação sobre a
+> mesma topologia:
+> 1. **A aterrissagem pós-login do operacional deixou de abrir na lista de Projetos** e passou a ser um **hub de
+>    módulos** — cards de domínio **agrupados por faixa de titularidade do ciclo** (Vendas · Execução do Projeto ·
+>    **Logística/Expedição — onde mora o Fiscal, etapa 15** · Pós-venda/Montagem · **Financeiro transversal**),
+>    consistente com a Governança do Ciclo (`mod_ciclo.FAIXA_POR_ETAPA`). `modulos.hub_layout()` monta o layout;
+>    `/api/auth/me` expõe `usuario["hub"]` (já filtrado por `modulos_ativos`). Domínios sem tela = card **"em
+>    breve"**; só **Comercial→Projetos** e **Cadastro→Clientes** navegam hoje. super_admin/admin_rede seguem
+>    aterrissando no Admin.
+> 2. **"Credenciais e Tokens" migrou do menu lateral para dentro do Admin (Plataforma)**, com visibilidade
+>    condicionada à capability de **Administrador do Sistema (`super_admin`/`gerir_redes`)** — a seção **não é
+>    renderizada no DOM** (não é bloqueio visual) para quem não a tem; o Diretor deixou de ver. Credenciais/Tokens
+>    são **Núcleo/Plataforma**, não módulo de negócio.
+>
 > A **extração física** em pacotes (desmembrar o monólito) é **Fase 2+** — ver "Roadmap de extração" no fim.
 
 ## Por que existe
