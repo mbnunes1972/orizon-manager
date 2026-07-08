@@ -116,12 +116,12 @@ input:focus{border-color:var(--accent)}
 .proj-table tr.proj-row:hover td{background:var(--accent-tint);cursor:pointer}
 .proj-table tr.proj-row td.cell-status{cursor:default}
 .proj-status-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
-.proj-status-badge.quente{background:rgba(240,90,80,.12);color:#f05a50}
-.proj-status-badge.morno{background:rgba(251,191,36,.12);color:#d4a017}
-.proj-status-badge.frio{background:rgba(96,165,250,.12);color:var(--section)}
-.proj-status-badge.convertido{background:rgba(25,201,160,.12);color:var(--ok)}
-.proj-status-badge.fechado{background:rgba(180,140,40,.16);color:#c8a84b}
-.proj-status-badge.perdido{background:rgba(120,120,120,.12);color:var(--muted)}
+.proj-status-badge.quente{background:rgba(240,90,80,.12);color:var(--st-quente)}
+.proj-status-badge.morno{background:rgba(251,191,36,.12);color:var(--st-morno)}
+.proj-status-badge.frio{background:rgba(96,165,250,.12);color:var(--st-frio)}
+.proj-status-badge.convertido{background:rgba(25,201,160,.12);color:var(--st-convertido)}
+.proj-status-badge.fechado{background:rgba(180,140,40,.16);color:var(--st-fechado)}
+.proj-status-badge.perdido{background:rgba(120,120,120,.12);color:var(--st-perdido)}
 .proj-status-badge.sem{background:transparent;color:var(--muted)}
 .proj-status-dd{position:absolute;top:100%;left:0;z-index:300;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);min-width:140px;overflow:hidden;display:none}
 .proj-status-dd.open{display:block}
@@ -2572,12 +2572,12 @@ function negAtualizarStatusBtn(){
   const labels = { quente:'🔥 Quente', morno:'● Morno', frio:'❄ Frio',
                    convertido:'✓ Convertido', perdido:'✗ Perdido', fechado:'🔒 Fechado' };
   btn.textContent = (s && labels[s] ? labels[s] : '— Status') + ' ▾';
-  btn.style.color = s === 'quente' ? '#f05a50'
-                  : s === 'morno'  ? '#d4a017'
-                  : s === 'frio'   ? 'var(--section)'
-                  : s === 'convertido' ? 'var(--ok)'
-                  : s === 'perdido'    ? 'var(--muted)'
-                  : s === 'fechado'    ? '#c8a84b'
+  btn.style.color = s === 'quente' ? 'var(--st-quente)'
+                  : s === 'morno'  ? 'var(--st-morno)'
+                  : s === 'frio'   ? 'var(--st-frio)'
+                  : s === 'convertido' ? 'var(--st-convertido)'
+                  : s === 'perdido'    ? 'var(--st-perdido)'
+                  : s === 'fechado'    ? 'var(--st-fechado)'
                   : '';
   // Oculta dropdown se projeto bloqueado (convertido ou fechado)
   const dd = document.getElementById('neg-status-dd');
