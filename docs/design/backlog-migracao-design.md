@@ -39,8 +39,15 @@ Ordem sugerida (independentes, incrementais):
    **um** infrator: o botão **"+ Novo Cliente"** (`cli-busca-home`), corrigido para `class="btn btn-primary"`. Varredura
    confirmou que **todos os demais** usos de `btn-primary`/`btn-ghost`/`btn-danger` (estáticos e dinâmicos, incl. o
    ternário `btn btn-sm ${ativo?'btn-primary':'btn-ghost'}`) já traziam a base `.btn` — nenhum outro pendente.
-6. **Unificar tipografia** — remover Epilogue, migrar para família sans única (Inter/system-ui) + **mono só em
-   números** (valores monetários/numéricos em tabela).
+6. ✅ **feito 2026-07-08** — **Unificar tipografia** — remover Epilogue, migrar para família sans única
+   (Inter/system-ui) + **mono só em números**. O estado estava **invertido**: o `body` usava `IBM Plex Mono` como
+   default (corpo/labels/tabelas herdavam mono) e a Epilogue era aplicada explicitamente ao display. Migração: fontes
+   **tokenizadas** (`--font-sans:'Inter',system-ui,…` / `--font-mono:'IBM Plex Mono',…` no `:root`); **`body` virou
+   sans**; as **65** `font-family:'Epilogue',sans-serif` → `var(--font-sans)` (hierarquia por peso/tamanho, intactos);
+   as **40** declarações de valor/`<td>` → `var(--font-mono)`. Link Google Fonts: **Epilogue→Inter** (mantém IBM Plex
+   Mono); `login.html` (standalone) idem, com a stack Inter literal. Como o mono explícito era **100% numérico**
+   (campos `mp-a-*` + `<td>` alinhadas à direita) e o default virou sans, "mono só em números" fica satisfeito por
+   construção. *(Copy "Promob → Omie" no `<title>` do `index.html` + logo do login segue obsoleta — fora do escopo.)*
 7. **Toggle de tema claro/escuro**, persistido **por usuário** (não por preferência do SO).
 8. (Já feito na navegação) hub de módulos agrupado por faixa — **implementado** com a faixa autoritativa de 5
    grupos (Vendas/Execução/Logística-Expedição/Pós-venda/Financeiro), mais fiel que a versão simplificada do doc.

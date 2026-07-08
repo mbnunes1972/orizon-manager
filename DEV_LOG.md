@@ -1517,6 +1517,24 @@ achou **um** infrator: o botão **"+ Novo Cliente"** (`cli-busca-home`), corrigi
 'btn-ghost'}`). Uma linha de HTML; backend intocado (suíte 681). **Pendente do passo 2:** itens 6 (tipografia única +
 mono só em números), 7 (toggle persistido).
 
+**Alinhamento front-end — passo 2, item 6: tipografia única Inter + mono só em números (2026-07-08, branch
+`feat/design-tipografia`, suíte 681):** o estado estava **invertido** vs. a spec — o `body` (`index.html:46`) usava
+**`IBM Plex Mono` como default** (corpo/inputs/labels/tabelas herdavam mono) e a **Epilogue** era aplicada
+explicitamente ao display (títulos/nav/botões, 65×). Migração (subagent-driven, 2 tasks + docs): fontes **tokenizadas**
+no `:root` (`--font-sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif` e
+`--font-mono:'IBM Plex Mono',ui-monospace,…`); **`body` virou `var(--font-sans)`**; as **65** `font-family:'Epilogue',
+sans-serif` → `var(--font-sans)` (pesos/tamanhos intocados → hierarquia preservada); as **40** declarações mono de
+valor/`<td>` → `var(--font-mono)`. Link do Google Fonts trocou **Epilogue→Inter** (mantém IBM Plex Mono 400/500 e
+carrega Inter 400/500/600/700/900). **`login.html`** (standalone, não herda o `:root`): `@import` e as 3
+`font-family` → **Inter** (stack literal). **"mono só em números" por construção:** auditoria confirmou que todo mono
+explícito era numérico (13 campos `mp-a-*` + 9 `<td>` alinhadas à direita + demais spans de valor; **zero** em texto),
+então virar o default para sans + preservar o mono explícito satisfaz a regra sem demoções. Contagens pós-migração:
+Epilogue 0 (ambos arquivos), `var(--font-sans)` 66 (65+body), `var(--font-mono)` 40, `'IBM Plex Mono'` restante 1 (o
+token). Só frontend (backend intocado, suíte 681); **sem teste visual → conferência no navegador com o usuário**.
+**Achado de copy (re)sinalizado:** "Promob → Omie" está no **`<title>` do `index.html:6`** *e* na logo do `login.html`
+(Omie aposentado; produto = Orizon Manager) — correção aguardando decisão. **Passo 2 quase completo — resta só o
+item 7** (toggle de tema claro/escuro persistido por usuário).
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:
