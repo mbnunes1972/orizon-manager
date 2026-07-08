@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Promob &#x2192; Omie</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Epilogue:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
 /* Tokens de design — Padrao_Design_Orizon_v2 (fonte: .docx). Tema dual; PADRÃO = escuro.
    Os "aliases dos tokens antigos" mantêm as ~250 referências var(--…) existentes funcionando com a paleta nova. */
@@ -27,6 +27,9 @@
   --sb-bg:var(--surface);
   /* usados por inputs de modais (antes indefinidos: --fg herdava, --input caía em #0d1a0d verde) */
   --fg:var(--text); --input:var(--surface);
+  /* Tipografia — família sans única (Inter) + mono reservado a números (Padrao_Design_Orizon_v2 §3) */
+  --font-sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
   /* Cartões teal/amber/coral — NÃO cobertos pela paleta v2; mantidos p/ frente futura */
   --teal-bg:#04342C; --teal-brd:#0F6E56; --teal-text:#9FE1CB; --teal-lbl:#5DCAA5;
   --amber-bg:#412402; --amber-brd:#854F0B; --amber-text:#FAC775; --amber-lbl:#EF9F27;
@@ -43,25 +46,25 @@
   --st-convertido:var(--accent); --st-fechado:var(--gold); --st-perdido:var(--muted);
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospace;height:100vh;display:flex;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:100vh;display:flex;overflow:hidden}
 .sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto}
 .sb-logo{padding:24px 20px 20px;border-bottom:1px solid var(--border)}
-.sb-logo-mark{width:36px;height:36px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Epilogue',sans-serif;font-weight:900;font-size:14px;color:#fff;margin-bottom:12px}
-.sb-app-name{font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px;letter-spacing:-.3px}
+.sb-logo-mark{width:36px;height:36px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--font-sans);font-weight:900;font-size:14px;color:#fff;margin-bottom:12px}
+.sb-app-name{font-family:var(--font-sans);font-weight:900;font-size:15px;letter-spacing:-.3px}
 .sb-app-name span{color:var(--accent)}
 .sb-version{font-size:9px;color:var(--muted);letter-spacing:1px;margin-top:2px}
 .sb-creds{padding:16px 20px;border-bottom:1px solid var(--border)}
-.sb-creds-title{font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-family:'Epilogue',sans-serif;margin-bottom:10px}
+.sb-creds-title{font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-family:var(--font-sans);margin-bottom:10px}
 .sb-creds label{font-size:9px;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:4px;margin-top:8px}
-.sb-creds input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;outline:none}
+.sb-creds input{width:100%;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:7px 10px;color:var(--text);font-family:var(--font-mono);font-size:11px;outline:none}
 .sb-creds input:focus{border-color:var(--accent)}
-.sb-save-btn{width:100%;margin-top:12px;padding:7px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-family:'Epilogue',sans-serif;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:.15s}
+.sb-save-btn{width:100%;margin-top:12px;padding:7px;background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-family:var(--font-sans);font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:.15s}
 .sb-save-btn:hover{border-color:var(--accent);color:var(--accent)}
 .sb-save-hint{font-size:10px;color:var(--ok);text-align:center;height:14px;margin-top:4px}
 .sb-nav{padding:16px 12px;flex:1}
-.sb-nav-title{font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-family:'Epilogue',sans-serif;padding:0 8px;margin-bottom:8px}
+.sb-nav-title{font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-family:var(--font-sans);padding:0 8px;margin-bottom:8px}
 .sb-secao{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:.15s;position:relative;margin-bottom:2px;font-family:'Epilogue',sans-serif;font-size:12px;font-weight:600;color:var(--muted)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:.15s;position:relative;margin-bottom:2px;font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--muted)}
 .nav-item::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0}
 .nav-item:hover{background:var(--accent-tint);color:var(--text)}
 .nav-item.active{background:var(--accent-tint);color:var(--accent);border-left:2px solid var(--accent);padding-left:8px}
@@ -73,24 +76,24 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospac
 .content{flex:1;overflow-y:auto;padding:28px 32px}
 .page{display:none}
 .page.active{display:block}
-.page-title{font-family:'Epilogue',sans-serif;font-weight:900;font-size:22px;letter-spacing:-.5px;margin-bottom:4px}
+.page-title{font-family:var(--font-sans);font-weight:900;font-size:22px;letter-spacing:-.5px;margin-bottom:4px}
 .page-sub{font-size:11px;color:var(--muted);margin-bottom:24px;letter-spacing:.3px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px}
-.card-title{font-family:'Epilogue',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px}
+.card-title{font-family:var(--font-sans);font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px}
 .hub-faixa{margin-bottom:22px}
-.hub-faixa-title{font-family:'Epilogue',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+.hub-faixa-title{font-family:var(--font-sans);font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
 .hub-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 .hub-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;cursor:pointer;transition:.15s;display:flex;flex-direction:column;gap:6px}
 .hub-card:hover{border-color:var(--accent)}
 .hub-card.soon{opacity:.5;cursor:default}
 .hub-card.soon:hover{border-color:var(--border)}
-.hub-card-nome{font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px;color:var(--text)}
+.hub-card-nome{font-family:var(--font-sans);font-weight:700;font-size:14px;color:var(--text)}
 .hub-card-tag{font-size:9px;letter-spacing:.5px;color:var(--muted);text-transform:uppercase}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 label.field-label{font-size:10px;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:5px}
-input[type=text],input[type=password],input[type=number]{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;transition:.15s}
+input[type=text],input[type=password],input[type=number]{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none;transition:.15s}
 input:focus{border-color:var(--accent)}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:8px;font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;cursor:pointer;border:none;transition:.15s;letter-spacing:.2px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:8px;font-family:var(--font-sans);font-weight:700;font-size:13px;cursor:pointer;border:none;transition:.15s;letter-spacing:.2px}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-primary:hover{opacity:.88}
 .btn-primary:disabled{opacity:.35;cursor:not-allowed}
@@ -105,7 +108,7 @@ input:focus{border-color:var(--accent)}
 .proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
 .proj-card-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;cursor:pointer;transition:.15s;margin-bottom:8px}
 .proj-card-item:hover{border-color:var(--accent);background:var(--accent-tint)}
-.proj-card-nome{font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px}
+.proj-card-nome{font-family:var(--font-sans);font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px}
 .proj-card-cli{font-size:11px;color:var(--muted);margin-bottom:6px}
 .proj-card-meta{display:flex;gap:12px;font-size:10px;color:var(--muted)}
 .proj-card-meta span{color:var(--section)}
@@ -145,10 +148,10 @@ input:focus{border-color:var(--accent)}
 .badge-origem.omie  { background:rgba(96,165,250,.15); color:var(--section); }
 /* Ambientes page */
 .proj-header{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
-.proj-header-nome{font-family:'Epilogue',sans-serif;font-weight:900;font-size:20px}
+.proj-header-nome{font-family:var(--font-sans);font-weight:900;font-size:20px}
 .proj-header-cli{font-size:12px;color:var(--muted)}
 .banner{display:flex;align-items:center;gap:20px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 22px;margin-bottom:20px;flex-wrap:wrap}
-.banner-val{font-family:'Epilogue',sans-serif;font-weight:900;font-size:22px;color:var(--ok)}
+.banner-val{font-family:var(--font-sans);font-weight:900;font-size:22px;color:var(--ok)}
 .banner-label{font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px}
 .banner-sep{width:1px;height:40px;background:var(--border);margin:0 4px}
 /* Drop zone */
@@ -156,7 +159,7 @@ input:focus{border-color:var(--accent)}
 .drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:var(--accent-tint)}
 .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .drop-icon{font-size:28px;margin-bottom:8px}
-.drop-text{font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;margin-bottom:3px}
+.drop-text{font-family:var(--font-sans);font-weight:700;font-size:13px;margin-bottom:3px}
 .drop-sub{font-size:11px;color:var(--muted)}
 /* Ambiente cards */
 .amb-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;transition:.15s}
@@ -164,18 +167,18 @@ input:focus{border-color:var(--accent)}
 .amb-card-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer}
 .amb-check{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
 .amb-info{flex:1;min-width:0}
-.amb-nome{font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px;color:var(--text)}
+.amb-nome{font-family:var(--font-sans);font-weight:700;font-size:14px;color:var(--text)}
 .amb-file{font-size:10px;color:var(--muted);margin-top:2px}
-.amb-total{font-family:'Epilogue',sans-serif;font-weight:700;font-size:15px;color:var(--ok);white-space:nowrap}
+.amb-total{font-family:var(--font-sans);font-weight:700;font-size:15px;color:var(--ok);white-space:nowrap}
 .amb-grupos-count{font-size:10px;color:var(--muted);text-align:right;margin-top:2px;white-space:nowrap}
 .amb-actions{display:flex;gap:6px;flex-shrink:0}
-.amb-expand-btn{background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:11px;padding:5px 10px;cursor:pointer;transition:.15s;font-family:'Epilogue',sans-serif;font-weight:700}
+.amb-expand-btn{background:transparent;border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:11px;padding:5px 10px;cursor:pointer;transition:.15s;font-family:var(--font-sans);font-weight:700}
 .amb-expand-btn:hover{border-color:var(--accent);color:var(--accent)}
 .amb-body{display:none;border-top:1px solid var(--border);padding:0}
 .amb-body.open{display:block}
 .amb-table-wrap{overflow-x:auto}
 .amb-table{width:100%;border-collapse:collapse;font-size:11px}
-.amb-table th{text-align:left;padding:8px 14px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'Epilogue',sans-serif;background:var(--card);border-bottom:1px solid var(--border)}
+.amb-table th{text-align:left;padding:8px 14px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:var(--font-sans);background:var(--card);border-bottom:1px solid var(--border)}
 .amb-table td{padding:8px 14px;border-bottom:1px solid var(--border)}
 .amb-table tr:last-child td{border-bottom:none}
 .amb-table .td-val{text-align:right;color:var(--ok);white-space:nowrap}
@@ -183,16 +186,16 @@ input:focus{border-color:var(--accent)}
 .amb-update-wrap input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .fb-row{display:flex;align-items:center;gap:10px;padding:10px 18px;background:var(--accent-tint);border-top:1px solid var(--border);flex-wrap:wrap}
 /* Feedback toast */
-.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 20px;font-size:12px;color:var(--ok);z-index:200;display:none;font-family:'Epilogue',sans-serif;font-weight:700;box-shadow:0 4px 24px rgba(0,0,0,.4)}
+.toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 20px;font-size:12px;color:var(--ok);z-index:200;display:none;font-family:var(--font-sans);font-weight:700;box-shadow:0 4px 24px rgba(0,0,0,.4)}
 .toast.err{color:var(--err)}
 /* Coming soon */
 .coming-soon{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px;opacity:.5}
 .coming-soon-icon{font-size:40px}
-.coming-soon-text{font-family:'Epilogue',sans-serif;font-weight:700;font-size:18px;color:var(--muted)}
+.coming-soon-text{font-family:var(--font-sans);font-weight:700;font-size:18px;color:var(--muted)}
 .coming-soon-sub{font-size:12px;color:var(--muted)}
 /* == Pagina 02 - Negociacao == */
 .neg-section{margin-bottom:20px}
-.neg-section-title{font-family:'Epilogue',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.neg-section-title{font-family:var(--font-sans);font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px}
 .neg-section-title::after{content:'';flex:1;height:1px;background:var(--border)}
 .toggle-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
 .toggle-row:last-child{border-bottom:none}
@@ -208,30 +211,30 @@ input:focus{border-color:var(--accent)}
 .sw input:checked+.sw-slider::before{transform:translateX(16px);background:#fff}
 .sim-table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
 .sim-table{width:100%;border-collapse:collapse;font-size:11px;min-width:720px}
-.sim-table th{padding:9px 12px;background:var(--surface);color:var(--muted);font-size:9px;letter-spacing:.8px;text-transform:uppercase;text-align:right;border-bottom:1px solid var(--border);font-family:'Epilogue',sans-serif}
+.sim-table th{padding:9px 12px;background:var(--surface);color:var(--muted);font-size:9px;letter-spacing:.8px;text-transform:uppercase;text-align:right;border-bottom:1px solid var(--border);font-family:var(--font-sans)}
 .sim-table th:first-child{text-align:left}
 .sim-table td{padding:9px 12px;border-bottom:1px solid var(--border);text-align:right;color:var(--text)}
 .sim-table td:first-child{text-align:left;font-weight:600}
 .sim-table .td-bruto{color:var(--muted)}
 .sim-table .td-final{color:var(--ok);font-weight:700}
-.sim-table tfoot td{font-family:'Epilogue',sans-serif;font-weight:700;font-size:12px;background:var(--surface);border-top:2px solid var(--border2);border-bottom:none}
+.sim-table tfoot td{font-family:var(--font-sans);font-weight:700;font-size:12px;background:var(--surface);border-top:2px solid var(--border2);border-bottom:none}
 .sim-table tfoot td.td-final{color:var(--ok)}
 .resumo-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;margin-top:16px}
 .resumo-row{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
 .resumo-row:last-child{border:none;padding-top:14px}
 .resumo-label{color:var(--muted)}
-.resumo-val{font-weight:600;color:var(--text);font-family:'Epilogue',sans-serif}
+.resumo-val{font-weight:600;color:var(--text);font-family:var(--font-sans)}
 .resumo-val.ok{color:var(--ok);font-size:18px}
 .resumo-val.warn{color:var(--warn)}
 .placeholder-note{font-size:11px;color:var(--muted);font-style:italic;padding:10px 14px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;margin-top:10px}
-select.neg-select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;cursor:pointer}
+select.neg-select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none;cursor:pointer}
 /* Tabela limpa do cliente */
 .cli-table{width:100%;border-collapse:collapse;font-size:13px}
-.cli-table th{text-align:left;padding:10px 14px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'Epilogue',sans-serif;border-bottom:2px solid var(--border)}
+.cli-table th{text-align:left;padding:10px 14px;font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:var(--font-sans);border-bottom:2px solid var(--border)}
 .cli-table th:last-child{text-align:right}
 .cli-table td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)}
 .cli-table td:last-child{text-align:right;font-weight:700;color:var(--ok)}
-.cli-table tfoot td{font-family:'Epilogue',sans-serif;font-weight:900;font-size:14px;border-top:2px solid var(--border2);border-bottom:none;background:var(--surface)}
+.cli-table tfoot td{font-family:var(--font-sans);font-weight:900;font-size:14px;border-top:2px solid var(--border2);border-bottom:none;background:var(--surface)}
 .cli-table tfoot td:last-child{color:var(--ok);text-align:right}
 /* Remove setas dos inputs numéricos em todos os navegadores */
 input[type=number]::-webkit-inner-spin-button,
@@ -243,10 +246,10 @@ body{overflow:hidden}
 .content{flex:1;overflow-y:auto;padding:24px 28px}
 /* Sidebar params */
 .sb-params{padding:12px 0;border-top:1px solid var(--border);margin-top:8px}
-.sb-param-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-family:'Epilogue',sans-serif}
+.sb-param-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-family:var(--font-sans)}
 .sb-label{display:block;font-size:9px;letter-spacing:.5px;color:var(--muted);margin-bottom:3px}
-.sb-select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;outline:none;cursor:pointer;margin-bottom:8px}
-.sb-input-sm{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;margin-bottom:8px}
+.sb-select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:var(--font-mono);font-size:11px;outline:none;cursor:pointer;margin-bottom:8px}
+.sb-input-sm{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none;margin-bottom:8px}
 .sb-input-sm:focus{border-color:var(--accent)}
 /* Cards teal/amber para contrato */
 .contrato-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
@@ -254,7 +257,7 @@ body{overflow:hidden}
 .card-amber{background:var(--amber-bg);border:1px solid var(--amber-brd);border-radius:10px;padding:16px}
 .c-label{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--teal-lbl);margin-bottom:8px}
 .card-amber .c-label{color:var(--amber-lbl)}
-.c-value{font-size:20px;font-weight:900;color:var(--teal-text);font-family:'Epilogue',sans-serif}
+.c-value{font-size:20px;font-weight:900;color:var(--teal-text);font-family:var(--font-sans)}
 .card-amber .c-value{color:var(--amber-text)}
 .c-sub{font-size:10px;color:var(--teal-lbl);margin-top:4px}
 .card-amber .c-sub{color:var(--amber-lbl)}
@@ -262,13 +265,13 @@ body{overflow:hidden}
 .cards-3x2{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
 .c-card{background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:12px}
 .c-card-lbl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-.c-card-val{font-size:15px;font-weight:900;font-family:'Epilogue',sans-serif;color:var(--text)}
+.c-card-val{font-size:15px;font-weight:900;font-family:var(--font-sans);color:var(--text)}
 .c-card-val.ok{color:var(--ok)} .c-card-val.warn{color:var(--warn)}
 /* Header negociação */
 .neg-hdr{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;margin-bottom:16px;flex-wrap:wrap}
 .neg-hdr-arrow{color:var(--muted);font-size:16px}
 .neg-hdr-lbl{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
-.neg-hdr-val{font-size:18px;font-weight:900;font-family:'Epilogue',sans-serif}
+.neg-hdr-val{font-size:18px;font-weight:900;font-family:var(--font-sans)}
 .neg-hdr-val.ok{color:var(--ok)} .neg-hdr-val.warn{color:var(--warn)}
 .neg-locked { opacity: .6; cursor: not-allowed; }
 /* Painel modalidade */
@@ -276,7 +279,7 @@ body{overflow:hidden}
 .mod-panel-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:14px}
 .mod-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
 .mod-grid label{display:block;font-size:10px;color:var(--muted);margin-bottom:4px}
-.mod-grid input,.mod-grid select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none}
+.mod-grid input,.mod-grid select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none}
 .mod-grid input:focus{border-color:var(--accent)}
 /* Plano de pagamento */
 .plano-wrap{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin:12px 0}
@@ -287,7 +290,7 @@ body{overflow:hidden}
 /* Total contrato */
 .total-contract{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;margin:14px 0 8px}
 .total-contract span{font-size:11px;color:var(--muted)}
-.total-contract input{background:transparent;border:none;color:var(--ok);font-size:22px;font-weight:900;font-family:'Epilogue',sans-serif;text-align:right;outline:none;width:200px;cursor:pointer}
+.total-contract input{background:transparent;border:none;color:var(--ok);font-size:22px;font-weight:900;font-family:var(--font-sans);text-align:right;outline:none;width:200px;cursor:pointer}
 /* Botões de ação */
 .action-row{display:flex;gap:10px;margin-top:16px;padding-bottom:40px;flex-wrap:wrap}
 .btn-ok{background:var(--teal-bg);color:var(--ok);border:1px solid var(--teal-brd)}
@@ -299,13 +302,13 @@ body{overflow:hidden}
 .p00-form{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:20px;margin-bottom:20px}
 .p00-form label{display:block;font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;margin-top:12px}
 .p00-form label:first-of-type{margin-top:0}
-.p00-form input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none}
+.p00-form input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none}
 .p00-form input:focus{border-color:var(--accent)}
 /* Modal novo ambiente */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:center;justify-content:center}
 .modal-box{background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:500px;width:92%}
 .modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
-.modal-title{font-weight:700;font-size:15px;font-family:'Epilogue',sans-serif}
+.modal-title{font-weight:700;font-size:15px;font-family:var(--font-sans)}
 .modal-close{cursor:pointer;color:var(--muted);font-size:18px;line-height:1}
 .modal-close:hover{color:var(--text)}
 @keyframes mIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
@@ -314,7 +317,7 @@ body{overflow:hidden}
 .bloqueio-banner.ativo{display:flex}
 .bloqueio-icon{font-size:18px;flex-shrink:0}
 .bloqueio-txt{font-size:11px;color:var(--ok);line-height:1.5}
-.bloqueio-txt strong{font-family:'Epilogue',sans-serif;font-weight:700;display:block;margin-bottom:2px}
+.bloqueio-txt strong{font-family:var(--font-sans);font-weight:700;display:block;margin-bottom:2px}
 /* Cadeado gerencial */
 .lock-btn{cursor:pointer;font-size:12px;opacity:.65;transition:.15s;user-select:none}
 .lock-btn:hover{opacity:1}
@@ -409,8 +412,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <aside class="sidebar">
   <!-- Projeto ativo -->
   <div class="sb-logo" style="padding:16px 14px 12px">
-    <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-family:'Epilogue',sans-serif">Projeto</div>
-    <div id="sb-proj-nome" style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
+    <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-family:var(--font-sans)">Projeto</div>
+    <div id="sb-proj-nome" style="font-family:var(--font-sans);font-weight:700;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
     <div id="sb-proj-cli" style="font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
   </div>
 
@@ -447,7 +450,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <span style="color:var(--muted);font-size:12px">%</span>
       <button id="neg-desc-confirmar" onclick="negConfirmarDesconto()"
               style="display:none;padding:3px 7px;background:var(--err);color:#fff;border:none;
-                     border-radius:5px;font-family:'Epilogue',sans-serif;font-weight:700;
+                     border-radius:5px;font-family:var(--font-sans);font-weight:700;
                      font-size:9px;cursor:pointer;letter-spacing:.3px;transition:.15s;white-space:nowrap"
               title="Solicitar autorização para este desconto">
         ✓ OK
@@ -503,13 +506,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <div id="sb-user-avatar"
            style="width:30px;height:30px;border-radius:50%;background:var(--accent);
                   display:flex;align-items:center;justify-content:center;
-                  font-family:'Epilogue',sans-serif;font-weight:700;font-size:12px;
+                  font-family:var(--font-sans);font-weight:700;font-size:12px;
                   color:#0d160d;flex-shrink:0;overflow:hidden">
         <span id="sb-user-inicial">?</span>
         <img id="sb-user-foto" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%">
       </div>
       <div style="flex:1;min-width:0">
-        <div id="sb-user-nome" style="font-family:'Epilogue',sans-serif;font-size:11px;font-weight:700;
+        <div id="sb-user-nome" style="font-family:var(--font-sans);font-size:11px;font-weight:700;
                                        color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
         <div id="sb-user-nivel" style="font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">—</div>
       </div>
@@ -527,7 +530,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <button onclick="fecharModalPerfil()"
             style="position:absolute;top:16px;right:16px;background:transparent;border:none;
                    color:var(--muted);font-size:18px;cursor:pointer;line-height:1">✕</button>
-    <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:16px;margin-bottom:24px">
+    <div style="font-family:var(--font-sans);font-weight:700;font-size:16px;margin-bottom:24px">
       Meu Perfil
     </div>
     <!-- Avatar -->
@@ -536,7 +539,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div id="mp-avatar-circle"
              style="width:64px;height:64px;border-radius:50%;background:var(--accent);
                     display:flex;align-items:center;justify-content:center;
-                    font-family:'Epilogue',sans-serif;font-weight:700;font-size:22px;
+                    font-family:var(--font-sans);font-weight:700;font-size:22px;
                     color:#0d160d;overflow:hidden">
           <span id="mp-avatar-inicial">?</span>
           <img id="mp-avatar-foto" src="" alt=""
@@ -551,7 +554,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                onchange="mpTrocarFoto(event)">
       </div>
       <div>
-        <div id="mp-nome-display" style="font-family:'Epilogue',sans-serif;font-weight:700;
+        <div id="mp-nome-display" style="font-family:var(--font-sans);font-weight:700;
                                           font-size:15px;color:var(--text)">—</div>
         <div id="mp-nivel-display" style="font-size:10px;color:var(--muted);
                                            text-transform:uppercase;letter-spacing:.8px;margin-top:2px">—</div>
@@ -565,7 +568,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                        display:block;margin-bottom:5px">Telefone</label>
         <input type="tel" id="mp-telefone" placeholder="(11) 99999-9999"
                style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;
-                      padding:10px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;
+                      padding:10px 12px;color:var(--text);font-family:var(--font-mono);
                       font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'"
                onblur="this.style.borderColor='var(--border)'">
@@ -575,7 +578,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                        display:block;margin-bottom:5px">WhatsApp</label>
         <input type="tel" id="mp-whatsapp" placeholder="(11) 99999-9999"
                style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;
-                      padding:10px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;
+                      padding:10px 12px;color:var(--text);font-family:var(--font-mono);
                       font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'"
                onblur="this.style.borderColor='var(--border)'">
@@ -585,7 +588,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                        display:block;margin-bottom:5px">E-mail</label>
         <input type="email" id="mp-email" placeholder="seu@email.com"
                style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;
-                      padding:10px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;
+                      padding:10px 12px;color:var(--text);font-family:var(--font-mono);
                       font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'"
                onblur="this.style.borderColor='var(--border)'">
@@ -595,14 +598,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div style="display:flex;gap:10px;margin-top:24px">
       <button onclick="mpSalvarPerfil()"
               style="flex:1;padding:11px;background:var(--accent);color:#0d160d;border:none;
-                     border-radius:9px;font-family:'Epilogue',sans-serif;font-weight:700;
+                     border-radius:9px;font-family:var(--font-sans);font-weight:700;
                      font-size:13px;cursor:pointer;transition:.15s"
               onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
         Salvar
       </button>
       <button onclick="mpLogout()"
               style="padding:11px 18px;background:transparent;border:1px solid var(--border);
-                     border-radius:9px;color:var(--muted);font-family:'Epilogue',sans-serif;
+                     border-radius:9px;color:var(--muted);font-family:var(--font-sans);
                      font-weight:700;font-size:13px;cursor:pointer;transition:.15s"
               onmouseover="this.style.borderColor='var(--err)';this.style.color='var(--err)'"
               onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">
@@ -624,7 +627,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     </div>
     <div id="form-novo-projeto" class="p00-form" style="display:none">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-        <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px">Novo Projeto</div>
+        <div style="font-family:var(--font-sans);font-weight:700;font-size:14px">Novo Projeto</div>
         <span onclick="esconderFormNovoProjeto()" style="cursor:pointer;color:var(--muted);font-size:18px">&#x2715;</span>
       </div>
       <label>NOME DO PROJETO *</label>
@@ -858,9 +861,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         </tbody>
         <tfoot>
           <tr style="border-top:2px solid var(--border2)">
-            <td colspan="3" style="padding:12px 14px;font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px">Total</td>
-            <td id="neg-total-avista" style="padding:12px 14px;text-align:right;font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px;color:var(--muted);white-space:nowrap">—</td>
-            <td id="neg-total" style="padding:12px 14px;text-align:right;font-family:'Epilogue',sans-serif;font-weight:900;font-size:18px;color:var(--ok);white-space:nowrap">—</td>
+            <td colspan="3" style="padding:12px 14px;font-family:var(--font-sans);font-weight:700;font-size:13px">Total</td>
+            <td id="neg-total-avista" style="padding:12px 14px;text-align:right;font-family:var(--font-sans);font-weight:700;font-size:14px;color:var(--muted);white-space:nowrap">—</td>
+            <td id="neg-total" style="padding:12px 14px;text-align:right;font-family:var(--font-sans);font-weight:900;font-size:18px;color:var(--ok);white-space:nowrap">—</td>
           </tr>
         </tfoot>
       </table>
@@ -1106,7 +1109,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Resumo e total -->
     <div class="card" style="margin-bottom:14px">
       <div class="total-contract">
-        <span style="font-family:'Epilogue',sans-serif;font-weight:700">Total do Contrato</span>
+        <span style="font-family:var(--font-sans);font-weight:700">Total do Contrato</span>
         <div style="display:flex;align-items:center;gap:6px">
           <span style="font-size:13px;font-weight:700;color:var(--muted)">R$</span>
           <input id="neg-total-final" type="text" value="—" readonly
@@ -1116,7 +1119,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                  onkeydown="if(event.key==='Enter')this.blur()">
         </div>
       </div>
-      <div id="neg-resumo-parcelas" style="display:none;text-align:right;font-family:'Epilogue',sans-serif;font-weight:700;font-size:15px;color:var(--muted);margin-top:8px;padding-right:2px"></div>
+      <div id="neg-resumo-parcelas" style="display:none;text-align:right;font-family:var(--font-sans);font-weight:700;font-size:15px;color:var(--muted);margin-top:8px;padding-right:2px"></div>
     </div>
 
     <!-- Acoes -->
@@ -1241,7 +1244,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div id="modal-parceiro" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:520px;width:92%;animation:mIn .18s ease;max-height:90vh;overflow-y:auto">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:16px" id="par-modal-titulo">Novo Parceiro</div>
+        <div style="font-family:var(--font-sans);font-weight:900;font-size:16px" id="par-modal-titulo">Novo Parceiro</div>
         <span onclick="parFecharModal()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
       </div>
       <input type="hidden" id="par-edit-id">
@@ -1313,7 +1316,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="grid-column:1/-1">
           <label class="field-label">Observações</label>
           <textarea id="par-obs" rows="2" placeholder="Observações opcionais"
-                    style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;resize:vertical"></textarea>
+                    style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none;resize:vertical"></textarea>
         </div>
       </div>
       <div style="font-size:11px;color:var(--err);min-height:16px;margin-bottom:12px" id="par-modal-erro"></div>
@@ -1328,7 +1331,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div id="modal-cliente" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:520px;width:92%;animation:mIn .18s ease;max-height:90vh;overflow-y:auto">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:16px" id="cli-modal-titulo">Novo Cliente</div>
+        <div style="font-family:var(--font-sans);font-weight:900;font-size:16px" id="cli-modal-titulo">Novo Cliente</div>
         <span onclick="cliFecharModal()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
       </div>
       <input type="hidden" id="cli-edit-id">
@@ -1385,7 +1388,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         </div>
         <!-- Endereço -->
         <div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:12px;margin-top:2px">
-          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px;font-family:'Epilogue',sans-serif">Endereço</div>
+          <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px;font-family:var(--font-sans)">Endereço</div>
           <div class="grid2" style="gap:12px">
             <div>
               <label class="field-label" style="display:flex;align-items:center;gap:6px">
@@ -1427,7 +1430,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="grid-column:1/-1">
           <label class="field-label">Observações</label>
           <textarea id="cli-obs" rows="2" placeholder="Observações opcionais"
-                    style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;resize:vertical"></textarea>
+                    style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none;resize:vertical"></textarea>
         </div>
         <!-- Endereço de instalação -->
         <div style="grid-column:1/-1;margin-top:16px;padding-top:12px;border-top:1px solid rgba(156,122,60,.2);">
@@ -1496,7 +1499,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div id="modal-cli-encontrado" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:480px;width:92%;max-height:90vh;overflow-y:auto;animation:mIn .18s ease">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-        <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px">Cliente encontrado</div>
+        <div style="font-family:var(--font-sans);font-weight:900;font-size:15px">Cliente encontrado</div>
         <span onclick="mceFechar()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
       </div>
       <!-- Info do cliente -->
@@ -1505,7 +1508,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="font-size:11px;color:var(--muted)" id="mce-detalhe"></div>
       </div>
       <!-- Projetos -->
-      <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-family:'Epilogue',sans-serif">Projetos deste cliente</div>
+      <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-family:var(--font-sans)">Projetos deste cliente</div>
       <div id="mce-projetos" style="margin-bottom:18px;max-height:240px;overflow-y:auto">
         <div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Carregando...</div>
       </div>
@@ -1768,8 +1771,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <div id="modal-params" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
   <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:598px;width:92%;max-height:90vh;overflow-y:auto;animation:mIn .18s ease">
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;gap:12px">
-      <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:16px">Parametros da negociacao <span id="mp-ro-badge" style="display:none;font-size:11px;font-weight:600;color:var(--muted)">🔒 somente leitura</span></div>
-      <div id="mp-total-ambientes" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ok);background:rgba(25,201,160,.08);border:1px solid rgba(25,201,160,.2);border-radius:6px;padding:3px 10px;white-space:nowrap">—</div>
+      <div style="font-family:var(--font-sans);font-weight:900;font-size:16px">Parametros da negociacao <span id="mp-ro-badge" style="display:none;font-size:11px;font-weight:600;color:var(--muted)">🔒 somente leitura</span></div>
+      <div id="mp-total-ambientes" style="font-family:var(--font-mono);font-size:11px;color:var(--ok);background:rgba(25,201,160,.08);border:1px solid rgba(25,201,160,.2);border-radius:6px;padding:3px 10px;white-space:nowrap">—</div>
     </div>
 
     <!-- Toggle: Incluir custos adicionais ao valor bruto -->
@@ -1827,21 +1830,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="mp-apoio" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;display:none">
       <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px">Apoio à negociação</div>
       <div style="font-size:12px;line-height:2">
-        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Valor bruto total</span><span id="mp-a-bruto" style="font-family:'IBM Plex Mono',monospace">—</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Desconto (<span id="mp-a-desc-pct">0</span>%)</span><span id="mp-a-desc" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
-        <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px"><span style="color:var(--muted)">Valor à vista</span><span id="mp-a-avista" style="font-family:'IBM Plex Mono',monospace">—</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Comissão arquiteto</span><span id="mp-a-arq" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Programa de fidelidade</span><span id="mp-a-fid" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Custo de viagem</span><span id="mp-a-viagem" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
-        <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px"><span style="color:var(--muted)">− Brinde</span><span id="mp-a-brinde" style="font-family:'IBM Plex Mono',monospace;color:var(--warn)">—</span></div>
-        <div style="display:flex;justify-content:space-between"><span style="font-weight:700">Valor líquido final</span><span id="mp-a-liq" style="font-family:'IBM Plex Mono',monospace;font-weight:700;color:var(--ok)">—</span></div>
-        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Desconto Total</span><span id="mp-a-margem" style="font-family:'IBM Plex Mono',monospace;color:var(--warn);font-weight:700">—</span></div>
-        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Custo Variável</span><span id="mp-a-cust-var" style="font-family:'IBM Plex Mono',monospace">—</span></div>
-        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Margem de Contribuição</span><span id="mp-a-marg-cont" style="font-family:'IBM Plex Mono',monospace">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Valor bruto total</span><span id="mp-a-bruto" style="font-family:var(--font-mono)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Desconto (<span id="mp-a-desc-pct">0</span>%)</span><span id="mp-a-desc" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px"><span style="color:var(--muted)">Valor à vista</span><span id="mp-a-avista" style="font-family:var(--font-mono)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Comissão arquiteto</span><span id="mp-a-arq" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Programa de fidelidade</span><span id="mp-a-fid" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Custo de viagem</span><span id="mp-a-viagem" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px"><span style="color:var(--muted)">− Brinde</span><span id="mp-a-brinde" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="font-weight:700">Valor líquido final</span><span id="mp-a-liq" style="font-family:var(--font-mono);font-weight:700;color:var(--ok)">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Desconto Total</span><span id="mp-a-margem" style="font-family:var(--font-mono);color:var(--warn);font-weight:700">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Custo Variável</span><span id="mp-a-cust-var" style="font-family:var(--font-mono)">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Margem de Contribuição</span><span id="mp-a-marg-cont" style="font-family:var(--font-mono)">—</span></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
           <label for="mp-out-forn" style="color:var(--muted)">Outros fornecedores (R$)</label>
           <input id="mp-out-forn" type="number" min="0" step="0.01" value="0"
-            style="width:110px;padding:3px 6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'IBM Plex Mono',monospace;text-align:right"
+            style="width:110px;padding:3px 6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);text-align:right"
             onchange="mpSalvarOutForn(this.value)">
         </div>
       </div>
@@ -1859,7 +1862,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 <div id="modal-liberar-impostos" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9600;align-items:center;justify-content:center">
   <div style="background:#111d11;border:1px solid #1e2e1e;border-radius:14px;padding:28px;width:100%;max-width:380px">
-    <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Liberar impostos</div>
+    <div style="font-family:var(--font-sans);font-weight:700;font-size:15px;margin-bottom:8px">Liberar impostos</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">Senha de Diretor ou Gerente Administrativo-Financeiro.</div>
     <input id="li-login" placeholder="Usuário" autocomplete="off" style="width:100%;margin-bottom:8px;padding:9px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);box-sizing:border-box">
     <input id="li-senha" type="password" placeholder="Senha" autocomplete="off" onkeydown="if(event.key==='Enter')confirmarLiberarImpostos()" style="width:100%;margin-bottom:8px;padding:9px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);box-sizing:border-box">
@@ -1872,29 +1875,29 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 </div>
 <div id="modal-autorizacao" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9500;align-items:center;justify-content:center">
   <div style="background:#111d11;border:1px solid #1e2e1e;border-radius:14px;padding:28px;width:100%;max-width:380px">
-    <div style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:15px;margin-bottom:8px">Autorização Necessária</div>
+    <div style="font-family:var(--font-sans);font-weight:700;font-size:15px;margin-bottom:8px">Autorização Necessária</div>
     <div id="auth-modal-msg" style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6"></div>
     <div style="font-size:11px;color:var(--text);margin-bottom:14px">Informe as credenciais de um Gerente ou Diretor:</div>
     <div style="display:grid;gap:12px;margin-bottom:16px">
       <div>
         <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Usuário autorizador</label>
         <input type="text" id="auth-modal-login" placeholder="login.autorizador"
-               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none"
+               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
                onkeydown="if(event.key==='Enter') document.getElementById('auth-modal-senha').focus()">
       </div>
       <div>
         <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Senha</label>
         <input type="password" id="auth-modal-senha" placeholder="••••••••"
-               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none"
+               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
                onkeydown="if(event.key==='Enter') confirmarAutorizacao()">
       </div>
     </div>
     <div id="auth-modal-erro" style="font-size:12px;color:var(--err);min-height:18px;margin-bottom:12px"></div>
     <div style="display:flex;gap:10px">
-      <button onclick="fecharModalAutorizacao(false)" style="flex:1;padding:11px;background:transparent;border:1px solid var(--border);border-radius:9px;color:var(--muted);font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;cursor:pointer">Cancelar</button>
-      <button onclick="confirmarAutorizacao()" style="flex:1;padding:11px;background:var(--accent);color:#0d160d;border:none;border-radius:9px;font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;cursor:pointer">Autorizar</button>
+      <button onclick="fecharModalAutorizacao(false)" style="flex:1;padding:11px;background:transparent;border:1px solid var(--border);border-radius:9px;color:var(--muted);font-family:var(--font-sans);font-weight:700;font-size:13px;cursor:pointer">Cancelar</button>
+      <button onclick="confirmarAutorizacao()" style="flex:1;padding:11px;background:var(--accent);color:#0d160d;border:none;border-radius:9px;font-family:var(--font-sans);font-weight:700;font-size:13px;cursor:pointer">Autorizar</button>
     </div>
   </div>
 </div>
@@ -2328,7 +2331,7 @@ function cfgRenderizarPerfis(){
             value="${cfg.desconto_max_pct||0}" min="0" max="100" step="0.5"
             style="width:70px;text-align:right;padding:5px 8px;font-size:13px;
               background:var(--bg);border:1px solid var(--border);border-radius:6px;
-              color:var(--text);font-family:'IBM Plex Mono',monospace;outline:none">
+              color:var(--text);font-family:var(--font-mono);outline:none">
           <span style="color:var(--muted);font-size:12px">%</span>
         </div>
       </div>
@@ -2522,7 +2525,7 @@ function renderProjResultados(lista){
           <td>${fmtData(p.atualizado_em||p.criado_em||'')}</td>
           <td style="font-weight:600">${esc(p.nome_projeto||'—')}</td>
           <td style="color:var(--muted)">${esc(p.cliente_nome||'—')}</td>
-          <td style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12px">${fmt(p.ultimo_orcamento_valor)}</td>
+          <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt(p.ultimo_orcamento_valor)}</td>
           <td style="text-align:center">
             <button class="btn btn-ghost btn-sm" onclick="abrirProjeto('${esc(p.nome_safe||'')}')"
                     style="font-size:11px;padding:3px 10px">Abrir &#x2192;</button>
@@ -5799,7 +5802,7 @@ function _mpRenderSombra(liquidoHoje, margemHoje) {
   box.innerHTML = `
     <div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:8px;font-size:11px">
       <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Validação — HOJE × NOVO (sombra)</div>
-      <table style="width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace">
+      <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono)">
         <thead><tr>
           <td style="color:var(--muted);padding-bottom:4px"></td>
           <td style="text-align:right;color:var(--muted);padding-bottom:4px">HOJE</td>
@@ -8532,7 +8535,7 @@ async function abrirProvisoes(oid) {
   let trows = _PROV_RUBRICAS.map(rb => {
     let tds = cols.map(c => {
       const v = c.ver && c.ver.itens ? c.ver.itens[rb.key] : null;
-      return `<td style="text-align:right;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem">${_fmtR(v)}</td>`;
+      return `<td style="text-align:right;padding:4px 10px;font-family:var(--font-mono);font-size:.82rem">${_fmtR(v)}</td>`;
     }).join('');
     return `<tr><td style="padding:4px 10px;font-size:.82rem">${esc(rb.label)}</td>${tds}</tr>`;
   }).join('');
@@ -8540,21 +8543,21 @@ async function abrirProvisoes(oid) {
   // Cust_Var and Marg_Cont rows
   let custVarRow = '<tr style="border-top:1px solid var(--border,#2a3f33)">' +
     `<td style="padding:6px 10px;font-size:.82rem;font-weight:600">Custo Variável</td>` +
-    cols.map(c => `<td style="text-align:right;padding:6px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem">${_fmtR(c.ver ? c.ver.cust_var : null)}</td>`).join('') +
+    cols.map(c => `<td style="text-align:right;padding:6px 10px;font-family:var(--font-mono);font-size:.82rem">${_fmtR(c.ver ? c.ver.cust_var : null)}</td>`).join('') +
     '</tr>';
   let margContRow = '<tr>' +
     `<td style="padding:4px 10px;font-size:.82rem;font-weight:600">Margem Contribuição</td>` +
-    cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem;color:var(--ok)">${_fmtPct(c.ver ? c.ver.marg_cont * 100 : null)}</td>`).join('') +
+    cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:var(--font-mono);font-size:.82rem;color:var(--ok)">${_fmtPct(c.ver ? c.ver.marg_cont * 100 : null)}</td>`).join('') +
     '</tr>';
   // Val_liq row
   let valLiqRow = '<tr>' +
     `<td style="padding:4px 10px;font-size:.82rem;font-weight:600">Val. Líquido</td>` +
-    cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem">${_fmtR(c.ver ? c.ver.val_liq : null)}</td>`).join('') +
+    cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:var(--font-mono);font-size:.82rem">${_fmtR(c.ver ? c.ver.val_liq : null)}</td>`).join('') +
     '</tr>';
   // CFO (custo de fábrica) — primeiro item da lista de provisões
   let cfoRow = '<tr style="border-bottom:1px solid var(--border,#2a3f33)">' +
     `<td style="padding:4px 10px;font-size:.82rem;font-weight:600">Custo de Fábrica (CFO)</td>` +
-    cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:'IBM Plex Mono',monospace;font-size:.82rem">${_fmtR(c.ver ? c.ver.cfo : null)}</td>`).join('') +
+    cols.map(c => `<td style="text-align:right;padding:4px 10px;font-family:var(--font-mono);font-size:.82rem">${_fmtR(c.ver ? c.ver.cfo : null)}</td>`).join('') +
     '</tr>';
 
   // Action section: Revisa inputs (hidden by default)
@@ -8629,7 +8632,7 @@ async function abrirProvisoes(oid) {
 
   // Custos adicionais — destacados após a margem (já descontados do Val. Líquido).
   const _caLinha = (lbl, v) => `<span style="color:var(--muted)">${lbl}</span>` +
-    `<span style="text-align:right;font-family:'IBM Plex Mono',monospace">${_fmtR(v)}</span>`;
+    `<span style="text-align:right;font-family:var(--font-mono)">${_fmtR(v)}</span>`;
   const custosAdBlock = `
     <div style="margin-top:14px;padding:10px 12px;background:rgba(239,159,39,.06);border:1px solid rgba(239,159,39,.25);border-radius:6px">
       <div style="font-size:.78rem;color:var(--warn,#c8a84b);font-weight:600;margin-bottom:6px">
@@ -8641,9 +8644,9 @@ async function abrirProvisoes(oid) {
         ${_caLinha('Viagem', custosAd.cust_via)}
         ${_caLinha('Brinde', custosAd.brinde)}
         <span style="font-weight:600;border-top:1px solid var(--border);padding-top:3px">Total</span>
-        <span style="text-align:right;font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--warn);border-top:1px solid var(--border);padding-top:3px">${_fmtR(custosAd.total)}</span>
+        <span style="text-align:right;font-family:var(--font-mono);font-weight:600;color:var(--warn);border-top:1px solid var(--border);padding-top:3px">${_fmtR(custosAd.total)}</span>
         <span style="color:var(--muted);margin-top:5px;border-top:1px dashed var(--border);padding-top:5px">Custo financeiro <span style="font-size:10px">(informativo)</span></span>
-        <span style="text-align:right;font-family:'IBM Plex Mono',monospace;margin-top:5px;border-top:1px dashed var(--border);padding-top:5px">${_fmtR(custosAd.cust_fin)}</span>
+        <span style="text-align:right;font-family:var(--font-mono);margin-top:5px;border-top:1px dashed var(--border);padding-top:5px">${_fmtR(custosAd.cust_fin)}</span>
       </div>
     </div>`;
 
@@ -10598,7 +10601,7 @@ function bfFechar() {
                     background:rgba(240,165,0,.12);border:1px solid rgba(240,165,0,.3);
                     display:flex;align-items:center;justify-content:center;font-size:17px">&#x2B06;</div>
         <div>
-          <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:14px">Aprovacao de Orcamento</div>
+          <div style="font-family:var(--font-sans);font-weight:900;font-size:14px">Aprovacao de Orcamento</div>
           <div style="font-size:10px;color:var(--muted);margin-top:1px">Exportando para o Omie</div>
         </div>
       </div>
@@ -10616,7 +10619,7 @@ function bfFechar() {
     <!-- Log box -->
     <div id="exp-log-box"
          style="height:220px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);
-                border-radius:8px;padding:10px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px">
+                border-radius:8px;padding:10px 12px;font-family:var(--font-mono);font-size:11px">
       <div style="color:var(--muted)">Aguardando...</div>
     </div>
 
@@ -10625,7 +10628,7 @@ function bfFechar() {
          style="display:none;background:rgba(239,159,39,.07);border:1px solid rgba(239,159,39,.25);
                 border-radius:10px;padding:14px">
       <div id="exp-confirm-titulo"
-           style="font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;margin-bottom:6px"></div>
+           style="font-family:var(--font-sans);font-weight:700;font-size:13px;margin-bottom:6px"></div>
       <div id="exp-confirm-corpo"
            style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6"></div>
       <div style="display:flex;gap:8px">
@@ -10657,7 +10660,7 @@ function bfFechar() {
                   background:rgba(93,202,165,.12);border:1px solid rgba(93,202,165,.25);
                   display:flex;align-items:center;justify-content:center;font-size:18px">&#x1F511;</div>
       <div>
-        <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:14px;color:var(--text)">Liberacao Gerencial</div>
+        <div style="font-family:var(--font-sans);font-weight:900;font-size:14px;color:var(--text)">Liberacao Gerencial</div>
         <div id="modal-senha-subtitulo" style="font-size:10px;color:var(--muted);margin-top:2px"></div>
       </div>
       <span onclick="tfFecharModalSenha()" style="cursor:pointer;color:var(--muted);font-size:18px;margin-left:auto;line-height:1">&#x2715;</span>
@@ -10665,7 +10668,7 @@ function bfFechar() {
     <label style="font-size:9px;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:6px">SENHA DO GERENTE</label>
     <input type="password" id="modal-senha-input" placeholder="Digite a senha"
            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
-                  padding:9px 12px;color:var(--text);font-family:'IBM Plex Mono',monospace;
+                  padding:9px 12px;color:var(--text);font-family:var(--font-mono);
                   font-size:13px;outline:none;margin-bottom:6px"
            onfocus="this.style.borderColor='var(--accent)'"
            onblur="this.style.borderColor='var(--border)'"
@@ -10692,7 +10695,7 @@ function bfFechar() {
         &#x26A0;
       </div>
       <div>
-        <div style="font-family:'Epilogue',sans-serif;font-weight:900;font-size:15px;
+        <div style="font-family:var(--font-sans);font-weight:900;font-size:15px;
                     color:var(--err);letter-spacing:-.2px">Valor inválido</div>
         <div style="font-size:10px;color:var(--muted);margin-top:2px;letter-spacing:.5px">
           TOTAL FLEX
@@ -10705,7 +10708,7 @@ function bfFechar() {
     </div>
     <button onclick="tfFecharAviso()"
             style="width:100%;padding:11px;border-radius:9px;border:none;cursor:pointer;
-                   background:var(--err);color:#fff;font-family:'Epilogue',sans-serif;
+                   background:var(--err);color:#fff;font-family:var(--font-sans);
                    font-weight:700;font-size:13px;letter-spacing:.3px;transition:.15s"
             onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
       Entendi
