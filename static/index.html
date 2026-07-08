@@ -41,6 +41,7 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospac
 .sb-save-hint{font-size:10px;color:var(--ok);text-align:center;height:14px;margin-top:4px}
 .sb-nav{padding:16px 12px;flex:1}
 .sb-nav-title{font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-family:'Epilogue',sans-serif;padding:0 8px;margin-bottom:8px}
+.sb-secao{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:.15s;position:relative;margin-bottom:2px;font-family:'Epilogue',sans-serif;font-size:12px;font-weight:600;color:var(--muted)}
 .nav-item::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0}
 .nav-item:hover{background:rgba(232,97,26,.06);color:var(--text)}
@@ -396,12 +397,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   <!-- Navegação -->
   <nav class="sb-nav">
-    <div class="sb-nav-title">Menu</div>
+    <div class="sb-nav-title">Módulos</div>
     <div class="nav-item" id="nav-08" onclick="goPage(8)">&#x1F3E0; Módulos</div>
-    <div class="nav-item active" id="nav-00" onclick="goPage(0)">&#x25C8; Projetos</div>
-    <div class="nav-item" id="nav-05" onclick="goPage(5)">&#x1F465; Clientes</div>
-    <div class="nav-item" id="nav-06" onclick="goPage(6)">&#x1F91D; Parceiros</div>
-    <div class="nav-item" id="nav-07" onclick="goPage(7)" style="display:none">&#x2699;&#xFE0F; Admin</div>
+
+    <div class="sb-secao">
+      <div class="sb-nav-title">Atalhos</div>
+      <div class="nav-item" id="nav-00" onclick="goPage(0)">&#x25C8; Projetos</div>
+    </div>
+
+    <div class="sb-secao">
+      <div class="sb-nav-title">Admin</div>
+      <div class="nav-item" id="nav-07" onclick="goPage(7)" style="display:none">&#x2699;&#xFE0F; Admin</div>
+    </div>
   </nav>
 
   <!-- Parâmetros de negociação (visível apenas na page-02) -->
@@ -2022,8 +2029,7 @@ function _aplicarModulosNoMenu(){
   const mods = (_usuarioAtual && _usuarioAtual.modulos_ativos) || null;
   const ativo = (m) => !mods || mods.indexOf(m) !== -1;
   const setNav = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
-  setNav('nav-05', ativo('cadastro'));   // Clientes
-  setNav('nav-06', ativo('cadastro'));   // Parceiros
+  // Cadastro (Clientes/Parceiros) saiu da sidebar -> virou aba do módulo Cadastro; gating por módulo é feito no Hub.
 }
 
 function _atualizarUIUsuario(){
@@ -2073,9 +2079,9 @@ function _renderSeletorLoja(){
 
 function _aterrissarPorPapel(){
   const u = _usuarioAtual || {};
-  // super_admin: esconde o menu operacional (Projetos/Clientes/Parceiros)
+  // super_admin: esconde o menu operacional (Projetos)
   if (u.pode_gerir_redes && !u.loja_id) {
-    ['nav-00','nav-05','nav-06'].forEach(id => {
+    ['nav-00'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = 'none';
     });
