@@ -35,7 +35,10 @@ Ordem sugerida (independentes, incrementais):
    status (mesmo valor renderizado, mas single-source; segue o tema no claro/escuro). Os **fundos rgba** dos badges
    (padrão uniforme do bloco) e o `#c8a84b` **decorativo** (separador "→"/rótulo do valor do contrato, linhas
    ~829/831 — dourado, não status) ficam fora deste item.
-5. **Corrigir `class="btn-primary"` sem a base `.btn`** (perde padding/fonte — ex.: "+ Novo Cliente").
+5. ✅ **feito 2026-07-08** — **Corrigir `class="btn-primary"` sem a base `.btn`** (perde padding/fonte). Havia
+   **um** infrator: o botão **"+ Novo Cliente"** (`cli-busca-home`), corrigido para `class="btn btn-primary"`. Varredura
+   confirmou que **todos os demais** usos de `btn-primary`/`btn-ghost`/`btn-danger` (estáticos e dinâmicos, incl. o
+   ternário `btn btn-sm ${ativo?'btn-primary':'btn-ghost'}`) já traziam a base `.btn` — nenhum outro pendente.
 6. **Unificar tipografia** — remover Epilogue, migrar para família sans única (Inter/system-ui) + **mono só em
    números** (valores monetários/numéricos em tabela).
 7. **Toggle de tema claro/escuro**, persistido **por usuário** (não por preferência do SO).

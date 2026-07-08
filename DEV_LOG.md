@@ -1509,6 +1509,14 @@ item — este último é hardcode de **marca** (deveria virar `var(--dalm-gold)`
 frontend (backend intocado, suíte 681); diff = troca de valores (ternário intacto). **Pendente do passo 2:** itens 5
 (`btn-primary` sem `.btn`), 6 (tipografia única + mono só em números), 7 (toggle persistido).
 
+**Alinhamento front-end — passo 2, item 5: `btn-primary` sem `.btn` (2026-07-08, branch `feat/design-btn`, suíte
+681):** `.btn` dá a base (padding/fonte/display) e `.btn-primary/-ghost/-danger` só trocam cor → quem tiver só o
+modificador perde padding/fonte. Varredura (estáticos + dinâmicos: aspas simples, template literals, `classList`)
+achou **um** infrator: o botão **"+ Novo Cliente"** (`cli-busca-home`), corrigido `class="btn-primary"` →
+`class="btn btn-primary"`. Todos os demais já tinham a base (incl. o ternário `btn btn-sm ${ativo?'btn-primary':
+'btn-ghost'}`). Uma linha de HTML; backend intocado (suíte 681). **Pendente do passo 2:** itens 6 (tipografia única +
+mono só em números), 7 (toggle persistido).
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:
