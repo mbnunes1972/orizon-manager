@@ -221,3 +221,26 @@ def resolver_loja_ativa(memberships, header_loja_id, default_loja_id):
     if len(acessiveis) == 1:
         return next(iter(acessiveis))
     return None
+
+
+def modulos_ativos_da_loja(loja):
+    """Conjunto de módulos de DOMÍNIO ativos na loja. NULL/"" em `modulos_ativos` = todos ligados.
+    O Núcleo é sempre ativo (não entra na lista). Topologia por cliente (ARQUITETURA-MODULOS.md)."""
+    import json as _json
+    import modulos as _mod
+    bruto = getattr(loja, "modulos_ativos", None)
+    if not (bruto or "").strip():
+        return set(_mod.DOMINIOS)
+    try:
+        lista = _json.loads(bruto)
+    except (ValueError, TypeError):
+        return set(_mod.DOMINIOS)
+    return {d for d in _mod.DOMINIOS if d in set(lista)}
+
+
+def modulo_ativo(loja, modulo):
+    """True se o módulo está ativo para a loja. Núcleo é sempre True; domínio depende da topologia."""
+    import modulos as _mod
+    if not _mod.desligavel(modulo):
+        return True
+    return modulo in modulos_ativos_da_loja(loja)

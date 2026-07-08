@@ -222,6 +222,7 @@ class Loja(Base):
     ativo       = Column(Integer,  default=1)
     criado_em   = Column(DateTime, default=datetime.utcnow)
     config_financeira_json = Column(Text, nullable=True)   # config financeira da loja (JSON)
+    modulos_ativos = Column(Text, nullable=True)   # JSON: domínios ativos; NULL/"" = todos ligados (topologia)
 
 
 class ParceiroLoja(Base):
@@ -768,6 +769,8 @@ def _migrar_colunas():
             loja_cols = {c[1] for c in cur.execute("PRAGMA table_info(lojas)").fetchall()}
             if "emitente_id" not in loja_cols:
                 cur.execute("ALTER TABLE lojas ADD COLUMN emitente_id INTEGER")
+            if "modulos_ativos" not in loja_cols:
+                cur.execute("ALTER TABLE lojas ADD COLUMN modulos_ativos TEXT")
         if _tabela_existe(cur, "redes"):
             rede_cols = {c[1] for c in cur.execute("PRAGMA table_info(redes)").fetchall()}
             if "emitente_central_id" not in rede_cols:
