@@ -1448,6 +1448,15 @@ versionadas em `docs/design/`; **backlog de migração de design** (tema claro/e
 única, tokenizar status) em `docs/design/backlog-migracao-design.md` — **paralelo, não bloqueia**. Subagent-driven,
 3 tasks, revisão frontend combinada aprovada (`node --check` OK). Plano:
 `docs/superpowers/plans/2026-07-08-navegacao-cadastro-abas-sidebar.md`.
+
+**Aba Parceiros na página Projetos + rename "Financeiro"→"Provisões" (2026-07-08, suíte 681):**
+(a) a página Projetos ganhou uma **3ª aba "Parceiros"** (ao lado de Projetos|Clientes) — lista os parceiros da loja e,
+para cada um, os **projetos relacionados** (via `parceiro_id` de cada projeto; nomes clicáveis → `abrirProjeto`). Backend:
+a lista `/projetos` passou a expor **`parceiro_nome`** (enricher `_enriquecer_projetos_com_parceiro`, resolve do
+`parceiro_id`). Rota real da lista é **`/projetos`** (não `/api/projetos`). Branch `feat/aba-parceiros`, subagent-driven.
+(b) a sub-aba **"Financeiro" do Admin da loja** foi renomeada para **"Provisões"** (edita %s de provisão/custo-padrão =
+domínio Financeiro; evita confusão com o módulo Financeiro do hub). Gate por `financeiro` mantido (correto); destino
+final = dentro do módulo Financeiro quando tiver tela (registrado no `ARQUITETURA-MODULOS.md` §6).
 **Pendente:** **Fase 2** (extração física piloto = Fiscal) e domínios novos — cada um seu brainstorm→spec→plano.
 
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
