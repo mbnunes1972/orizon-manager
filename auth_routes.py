@@ -82,6 +82,13 @@ def handle_auth_get(handler, path: str) -> bool:
                          for l in lojas_obj]
                 usuario["lojas"] = lojas
                 usuario["loja_ativa_id"] = usuario.get("loja_id")
+                # módulos ativos da loja ativa (topologia) — default tudo-ligado se sem loja/config
+                import mod_tenancy, modulos as _mod
+                _lid = usuario.get("loja_ativa_id") or usuario.get("loja_id")
+                _loja_ativa = db.get(Loja, _lid) if _lid else None
+                usuario["modulos_ativos"] = sorted(
+                    mod_tenancy.modulos_ativos_da_loja(_loja_ativa)
+                    if _loja_ativa else _mod.DOMINIOS)
             finally:
                 db.close()
             _send_json(handler, {"ok": True, "usuario": usuario})
