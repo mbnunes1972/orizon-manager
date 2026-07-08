@@ -1094,68 +1094,79 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div id="page-01" style="display:none"></div>
 
 
-  <!-- PAGE 05: Clientes -->
-  <div class="page" id="page-05">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
-      <div>
-        <div class="page-title">Clientes</div>
+  <!-- PAGE 10: Cadastro (módulo com abas) -->
+  <div class="page" id="page-10">
+    <div class="page-title">Cadastro</div>
+    <div class="home-tabs" style="display:flex;gap:6px;margin:12px 0 18px;flex-wrap:wrap">
+      <button class="home-tab active" data-cadtab="clientes"     onclick="cadTab('clientes')">Clientes</button>
+      <button class="home-tab"        data-cadtab="fornecedores" onclick="cadTab('fornecedores')">Fornecedores</button>
+      <button class="home-tab"        data-cadtab="parceiros"    onclick="cadTab('parceiros')">Parceiros</button>
+      <button class="home-tab"        data-cadtab="funcionarios" onclick="cadTab('funcionarios')">Funcionários</button>
+      <button class="home-tab"        data-cadtab="terceiros"    onclick="cadTab('terceiros')">Terceiros</button>
+    </div>
+
+    <!-- Painel: Clientes (conteúdo movido de page-05) -->
+    <div id="cad-panel-clientes">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
         <div class="page-sub">Cadastro de clientes vinculados a projetos</div>
+        <button class="btn btn-primary btn-sm" onclick="cliAbrirModal()">+ Novo Cliente</button>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="cliAbrirModal()">+ Novo Cliente</button>
+
+      <!-- Busca -->
+      <div class="search-wrap" style="max-width:420px;margin-bottom:16px">
+        <input type="text" id="cli-busca" placeholder="Buscar por nome ou CPF..."
+               oninput="cliAgendarBusca()" class="sb-input-sm"
+               style="width:100%;padding:9px 36px 9px 12px;font-size:12px">
+        <div class="search-spinner" id="cli-spinner"><div class="spinner"></div></div>
+      </div>
+
+      <!-- Lista -->
+      <div class="card" style="padding:0;overflow:hidden">
+        <table class="cli-table">
+          <thead>
+            <tr>
+              <th>Nome</th><th>CPF</th><th>Telefone</th><th>Cidade/UF</th><th style="width:80px"></th>
+            </tr>
+          </thead>
+          <tbody id="cli-tbody">
+            <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="cli-hint" style="font-size:11px;color:var(--muted);margin-top:8px;height:16px"></div>
     </div>
 
-    <!-- Busca -->
-    <div class="search-wrap" style="max-width:420px;margin-bottom:16px">
-      <input type="text" id="cli-busca" placeholder="Buscar por nome ou CPF..."
-             oninput="cliAgendarBusca()" class="sb-input-sm"
-             style="width:100%;padding:9px 36px 9px 12px;font-size:12px">
-      <div class="search-spinner" id="cli-spinner"><div class="spinner"></div></div>
-    </div>
-
-    <!-- Lista -->
-    <div class="card" style="padding:0;overflow:hidden">
-      <table class="cli-table">
-        <thead>
-          <tr>
-            <th>Nome</th><th>CPF</th><th>Telefone</th><th>Cidade/UF</th><th style="width:80px"></th>
-          </tr>
-        </thead>
-        <tbody id="cli-tbody">
-          <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Carregando...</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div id="cli-hint" style="font-size:11px;color:var(--muted);margin-top:8px;height:16px"></div>
-  </div>
-
-  <!-- PAGE 06: Parceiros -->
-  <div class="page" id="page-06">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
-      <div>
-        <div class="page-title">Parceiros</div>
+    <!-- Painel: Parceiros (conteúdo movido de page-06) -->
+    <div id="cad-panel-parceiros" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
         <div class="page-sub">Arquitetos, designers, corretores e outros parceiros</div>
+        <button class="btn btn-primary btn-sm" onclick="parAbrirModal()">+ Novo Parceiro</button>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="parAbrirModal()">+ Novo Parceiro</button>
+      <div class="search-wrap" style="max-width:420px;margin-bottom:16px">
+        <input type="text" id="par-busca" placeholder="Buscar por nome ou CPF/CNPJ..."
+               oninput="parAgendarBusca()" class="sb-input-sm"
+               style="width:100%;padding:9px 36px 9px 12px;font-size:12px">
+        <div class="search-spinner" id="par-spinner"><div class="spinner"></div></div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <table class="cli-table">
+          <thead>
+            <tr>
+              <th>Nome</th><th>Tipo</th><th>CPF/CNPJ</th><th>Comissão</th><th style="width:80px"></th>
+            </tr>
+          </thead>
+          <tbody id="par-tbody">
+            <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="par-hint" style="font-size:11px;color:var(--muted);margin-top:8px;height:16px"></div>
     </div>
-    <div class="search-wrap" style="max-width:420px;margin-bottom:16px">
-      <input type="text" id="par-busca" placeholder="Buscar por nome ou CPF/CNPJ..."
-             oninput="parAgendarBusca()" class="sb-input-sm"
-             style="width:100%;padding:9px 36px 9px 12px;font-size:12px">
-      <div class="search-spinner" id="par-spinner"><div class="spinner"></div></div>
-    </div>
-    <div class="card" style="padding:0;overflow:hidden">
-      <table class="cli-table">
-        <thead>
-          <tr>
-            <th>Nome</th><th>Tipo</th><th>CPF/CNPJ</th><th>Comissão</th><th style="width:80px"></th>
-          </tr>
-        </thead>
-        <tbody id="par-tbody">
-          <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted)">Carregando...</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div id="par-hint" style="font-size:11px;color:var(--muted);margin-top:8px;height:16px"></div>
+
+    <!-- Painéis stub -->
+    <div id="cad-panel-fornecedores" style="display:none"><p style="color:var(--muted)">Fornecedores — em breve.</p></div>
+    <div id="cad-panel-funcionarios" style="display:none"><p style="color:var(--muted)">Funcionários — em breve.</p></div>
+    <div id="cad-panel-terceiros"    style="display:none"><p style="color:var(--muted)">Terceiros — em breve.</p></div>
   </div>
 
   <!-- PAGE 07: Admin -->
@@ -2280,8 +2291,8 @@ function cfgRenderizarPerfis(){
 }
 
 function goPage(n){
-  const navId  = n === 9 ? 'nav-cfg' : 'nav-0'+n;
-  const pageId = n === 9 ? 'page-09' : 'page-0'+n;
+  const navId  = n === 9 ? 'nav-cfg' : (n >= 10 ? 'nav-'+n : 'nav-0'+n);
+  const pageId = n === 9 ? 'page-09' : (n >= 10 ? 'page-'+n : 'page-0'+n);
   const navEl  = document.getElementById(navId);
   if(navEl && navEl.classList.contains('locked')) return;
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -2293,17 +2304,30 @@ function goPage(n){
   if(sbParams) sbParams.style.display = n===2 ? 'block' : 'none';
   if(n===2 && projetoAtivo) carregarMargensSalvas();
   if(n===0) projCarregar();
-  if(n===5) cliCarregar();
-  if(n===6) parCarregar();
   if(n===7){ adminCarregarConsole(); } // page-07: console
   if(n===8) hubRender();
   if(n===9) cfgRenderizarPerfis();
+  if(n===10) cadRender();
 }
+
+// Módulo Cadastro: troca de aba + lazy-load do painel ativo
+function cadTab(qual){
+  document.querySelectorAll('#page-10 .home-tab').forEach(b =>
+    b.classList.toggle('active', b.getAttribute('data-cadtab') === qual));
+  ['clientes','parceiros','fornecedores','funcionarios','terceiros'].forEach(k => {
+    const p = document.getElementById('cad-panel-'+k);
+    if(p) p.style.display = (k === qual) ? 'block' : 'none';
+  });
+  if(qual === 'clientes')  cliCarregar();
+  if(qual === 'parceiros') parCarregar();
+}
+
+function cadRender(){ cadTab('clientes'); }   // aba padrão = Clientes
 
 // módulo -> ação de navegação (só os que têm tela real); ausentes = "em breve"
 const _HUB_DESTINO = {
   comercial: () => goPage(0),   // Projetos
-  cadastro:  () => goPage(5),   // Clientes
+  cadastro:  () => goPage(10),  // Cadastro (Clientes/Parceiros + stubs)
 };
 
 function hubRender(){
