@@ -135,6 +135,24 @@ def handle_auth_post(handler, path: str, body: bytes) -> bool:
         _send_json(handler, {"ok": True})
         return True
 
+    if path == "/api/auth/preferencias":
+        usuario = get_usuario_sessao(handler)
+        if not usuario:
+            _send_json(handler, {"ok": False, "erro": "Não autenticado."}, 401)
+            return True
+        try:
+            dados = json.loads(body)
+        except Exception:
+            _send_json(handler, {"ok": False, "erro": "JSON inválido."}, 400)
+            return True
+        tema = dados.get("tema")
+        import auth as _auth
+        if not _auth.set_tema(usuario["id"], tema):
+            _send_json(handler, {"ok": False, "erro": "tema inválido."}, 400)
+            return True
+        _send_json(handler, {"ok": True, "tema": tema})
+        return True
+
     if path == "/api/auth/verificar_desconto":
         try:
             dados = json.loads(body)

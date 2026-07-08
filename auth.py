@@ -170,6 +170,7 @@ def _usuario_dict(u: Usuario) -> dict:
         "nome":              u.nome,
         "login":             u.login,
         "nivel":             u.nivel,
+        "tema":              getattr(u, "tema", None) or "escuro",
         "loja_id":           u.loja_id,
         "rede_id":           u.rede_id,
         "limite_desconto":   u.limite_desconto,
@@ -180,3 +181,19 @@ def _usuario_dict(u: Usuario) -> dict:
         "pode_gerir_lojas":    perfis.pode(u.nivel, "gerir_lojas"),
         "pode_editar_dados_loja": perfis.pode(u.nivel, "editar_dados_loja"),
     }
+
+
+def set_tema(usuario_id: int, tema: str) -> bool:
+    """Persiste a preferência de tema do usuário. False p/ tema inválido ou usuário inexistente."""
+    if tema not in ("claro", "escuro"):
+        return False
+    db = get_session()
+    try:
+        u = db.get(Usuario, usuario_id)
+        if not u:
+            return False
+        u.tema = tema
+        db.commit()
+        return True
+    finally:
+        db.close()

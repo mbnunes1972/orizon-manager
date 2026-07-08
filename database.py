@@ -39,6 +39,7 @@ class Usuario(Base):
     cpf           = Column(String(20),  nullable=True)
     whatsapp      = Column(String(20),  nullable=True)
     ativo         = Column(Integer,     default=1)
+    tema          = Column(String(10),  default="escuro")   # 'claro' | 'escuro'
     criado_em     = Column(DateTime,    default=datetime.utcnow)
     loja_id       = Column(Integer,     ForeignKey("lojas.id"), nullable=True)  # usuário de loja
     rede_id       = Column(Integer,     ForeignKey("redes.id"), nullable=True)  # admin de rede (loja_id NULL)
@@ -659,6 +660,8 @@ def _migrar_colunas():
                           ("whatsapp", "VARCHAR(20)")]:
             if col not in usr_cols:
                 cur.execute(f"ALTER TABLE usuarios ADD COLUMN {col} {tipo}")
+        if "tema" not in usr_cols:
+            cur.execute("ALTER TABLE usuarios ADD COLUMN tema VARCHAR(10) DEFAULT 'escuro'")
 
         # ── projetos_meta ─────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(projetos_meta)")
