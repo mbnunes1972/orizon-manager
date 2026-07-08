@@ -22,7 +22,12 @@ Ordem sugerida (independentes, incrementais):
 2. ✅ **feito 2026-07-08** — **Aposentar a tinta laranja legada** `rgba(232,97,26,…)` de hover/ativo →
    usar `--accent-tint`. As 8 ocorrências foram trocadas (grep = 0); fundos de hover/ativo agora usam o tint
    único do accent petróleo (perdem a variação de alpha, como o padrão manda).
-3. **Unificar `login.html`** ao mesmo `:root` do app (hoje tem paleta própria e divergente — ver §5.6 do design-tokens).
+3. ✅ **feito 2026-07-08** — **Unificar `login.html`** ao mesmo `:root` do app. Como é página **standalone**
+   (servida antes do app, não herda o `<style>` do `index.html`), os tokens do tema escuro foram **replicados**
+   inline (`--bg #171B1C`, `--card #20262A`, `--accent #4FA89E` petróleo, `--text #EDEFEE`, `--err #E2876C`,
+   `--input-bg #1D2224`) e os hardcodes verdes/mint (`#0d160d`, `rgba(224,92,92…)`) trocados por `var(--…)`. A
+   **fonte Epilogue permanece** (troca p/ Inter = item 6). *(Copy "Promob → Omie" na logo segue obsoleta — fora do
+   escopo de paleta; sinalizado ao usuário.)*
 4. **Tokenizar as cores de status** hoje hardcoded (`#f05a50`, `#d4a017`, `#c8a84b`) para `--st-*`.
 5. **Corrigir `class="btn-primary"` sem a base `.btn`** (perde padding/fonte — ex.: "+ Novo Cliente").
 6. **Unificar tipografia** — remover Epilogue, migrar para família sans única (Inter/system-ui) + **mono só em

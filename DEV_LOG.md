@@ -1488,6 +1488,16 @@ trocadas por `var(--accent-tint)` (fundos) / `var(--accent)` (borda) → grep = 
 `docs/design/backlog-migracao-design.md` (itens 1-2 = ✅). **Pendente do passo 2:** itens 3 (unificar `login.html`),
 4 (tokenizar status), 5 (`btn-primary` sem `.btn`), 6 (tipografia única + mono só em números), 7 (toggle persistido).
 
+**Alinhamento front-end — passo 2, item 3: unificar `login.html` (2026-07-08, branch `feat/design-login`, suíte 681):**
+o `login.html` tinha `:root` próprio verde-menta (`--bg #0d160d`, `--card #111d11`, `--accent #9FE1CB`, `--input-bg
+#0a120a`) + hardcodes (`#0d160d` no botão/spinner, `rgba(224,92,92,…)` no erro). Como é **página standalone**
+(servida antes do app → **não** herda o `<style>` do `index.html`), os tokens do **tema escuro do app** foram
+**replicados inline** (`--bg #171B1C`, `--card #20262A`, `--border #2C3335`, `--accent #4FA89E` petróleo, `--text
+#EDEFEE`, `--muted #8C979A`, `--err #E2876C`, `--input-bg #1D2224`) e os hardcodes trocados por `var(--…)`. Só CSS
+mudou (JS intocado, confirmado por diff); backend intocado (suíte 681). **Fonte Epilogue mantida** (troca p/ Inter =
+item 6). **Achado sinalizado (fora de escopo):** a logo do login ainda diz **"Promob → Omie"** (Omie foi aposentado;
+produto é Orizon Manager) — correção de copy aguardando decisão do usuário. **Pendente do passo 2:** itens 4-7.
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:
