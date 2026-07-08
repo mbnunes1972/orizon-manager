@@ -61,7 +61,7 @@ MODULOS = {
 }
 
 # Arquivos que NÃO são módulo (shell/compositor e utilitários). O teste de cobertura os ignora.
-SHELL = {"main.py", "seed.py", "reset_ep07.py"}
+SHELL = {"main.py", "seed.py", "reset_ep07.py", "modulos.py"}
 
 # mod_nfe é COMPARTILHADO (parser=produção, pricing=fiscal): lotado em 'fiscal' no manifesto, mas
 # 'producao' também pode importá-lo. Declarado aqui para o teste de fronteira aceitar ambos.
