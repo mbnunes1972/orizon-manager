@@ -27,36 +27,36 @@ MODULOS = {
                     "arquivos": ["database.py", "storage.py"],
                     "tabelas": [], "rotas": []},
     # ── DOMÍNIOS ───────────────────────────────────────────────────────────
-    "cadastro":    {"camada": "dominio", "depende_de": [], "rotulo": "Cadastro",
+    "cadastro":    {"camada": "dominio", "depende_de": [], "rotulo": "Cadastro", "faixa": "vendas",
                     "arquivos": ["validacao_doc.py"],
                     "tabelas": ["clientes", "parceiros"],
                     "rotas": ["/api/clientes", "/api/parceiros"]},
-    "comercial":   {"camada": "dominio", "depende_de": ["cadastro"], "rotulo": "Comercial (Vendas)",
+    "comercial":   {"camada": "dominio", "depende_de": ["cadastro"], "rotulo": "Comercial (Vendas)", "faixa": "vendas",
                     "arquivos": ["mod_orcamento_params.py", "mod_margens.py", "mod_negociacao.py",
                                  "mod_proposta.py", "mod_contrato.py", "mod_arvore.py",
                                  "contrato_editar.py", "_ler_aymore.py", "mod_fin"],
                     "tabelas": ["projetos_meta", "briefings", "pool_ambientes", "orcamentos",
                                 "orcamento_ambientes", "contratos", "contratos_assinaturas"],
                     "rotas": ["/api/orcamentos", "/api/contratos"]},
-    "producao":    {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Produção / Projetos",
+    "producao":    {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Produção / Projetos", "faixa": "execucao_projeto",
                     "arquivos": ["mod_medicao.py", "mod_qualidade_xml.py"],
                     "tabelas": ["medicoes"],
                     "rotas": ["/api/medicoes"]},
-    "fiscal":      {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Fiscal (NF-e/NFS-e)",
+    "fiscal":      {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Fiscal (NF-e/NFS-e)", "faixa": "expedicao",
                     "arquivos": ["mod_fiscal.py", "mapa_fiscal.py", "emissor_focus.py",
                                  "fiscal_cripto.py", "nfe_emissao.py", "mod_nfe.py"],
                     "tabelas": ["emitente", "perfil_emissao", "documento_fiscal"],
                     "rotas": ["/api/projetos/", "/api/admin/lojas/", "/api/admin/redes/"]},
-    "financeiro":  {"camada": "dominio", "depende_de": ["comercial"], "rotulo": "Financeiro",
+    "financeiro":  {"camada": "dominio", "depende_de": ["comercial"], "rotulo": "Financeiro", "faixa": "financeiro",
                     "arquivos": ["mod_provisoes.py"],
                     "tabelas": ["provisao_registro"],
                     "rotas": ["/api/provisoes"]},
     # domínios NOVOS — fronteira só (stub, sem código/tabela hoje)
-    "estoque":     {"camada": "dominio", "depende_de": ["cadastro", "producao"], "rotulo": "Estoque",
+    "estoque":     {"camada": "dominio", "depende_de": ["cadastro", "producao"], "rotulo": "Estoque", "faixa": "expedicao",
                     "arquivos": [], "tabelas": [], "rotas": []},
-    "posvenda":    {"camada": "dominio", "depende_de": ["cadastro", "fiscal", "estoque"], "rotulo": "Pós-venda",
+    "posvenda":    {"camada": "dominio", "depende_de": ["cadastro", "fiscal", "estoque"], "rotulo": "Pós-venda", "faixa": "montagem",
                     "arquivos": [], "tabelas": [], "rotas": []},
-    "expedicao":   {"camada": "dominio", "depende_de": ["producao", "estoque", "fiscal"], "rotulo": "Expedição / Logística",
+    "expedicao":   {"camada": "dominio", "depende_de": ["producao", "estoque", "fiscal"], "rotulo": "Expedição / Logística", "faixa": "expedicao",
                     "arquivos": [], "tabelas": [], "rotas": []},
 }
 
@@ -129,3 +129,28 @@ def topologia_valida(ativos):
             if dep in DOMINIOS and dep not in ativos:
                 return (False, "Módulo '%s' depende de '%s', que precisa estar ativo." % (mod, dep))
     return (True, "")
+
+
+# Faixas de titularidade para o hub de módulos (ordem de exibição). As 4 primeiras espelham
+# mod_ciclo.FAIXA_POR_ETAPA (Governança do Ciclo); "financeiro" é transversal (dono dos gates 8/11d).
+FAIXAS = [
+    ("vendas",           "Vendas"),
+    ("execucao_projeto", "Execução do Projeto"),
+    ("expedicao",        "Logística / Expedição"),
+    ("montagem",         "Pós-venda / Montagem"),
+    ("financeiro",       "Financeiro"),
+]
+
+
+def hub_layout(ativos):
+    """Layout do hub: domínios ATIVOS agrupados por faixa, na ordem de FAIXAS/DOMINIOS_ORDEM.
+    Só inclui faixas com ≥1 domínio ativo. [{'faixa','rotulo','modulos':[{'id','rotulo'}]}]."""
+    ativos = set(ativos)
+    grupos = []
+    for fid, frot in FAIXAS:
+        mods = [{"id": d, "rotulo": MODULOS[d]["rotulo"]}
+                for d in DOMINIOS_ORDEM
+                if d in ativos and MODULOS[d].get("faixa") == fid]
+        if mods:
+            grupos.append({"faixa": fid, "rotulo": frot, "modulos": mods})
+    return grupos

@@ -48,6 +48,29 @@ def test_rotulo_e_ordem_dos_dominios():
     assert ids[0] == "cadastro"
 
 
+def test_faixa_por_dominio():
+    assert m.MODULOS["fiscal"]["faixa"] == "expedicao"
+    assert m.MODULOS["comercial"]["faixa"] == "vendas"
+    assert m.MODULOS["financeiro"]["faixa"] == "financeiro"
+    for d in m.DOMINIOS:
+        assert m.MODULOS[d].get("faixa"), f"{d} sem faixa"
+
+
+def test_hub_layout_agrupa_por_faixa():
+    g = m.hub_layout(list(m.DOMINIOS))
+    faixas = [x["faixa"] for x in g]
+    assert faixas == ["vendas", "execucao_projeto", "expedicao", "montagem", "financeiro"]
+    vendas = next(x for x in g if x["faixa"] == "vendas")
+    ids = [mm["id"] for mm in vendas["modulos"]]
+    assert ids == ["cadastro", "comercial"] and vendas["rotulo"] == "Vendas"
+
+
+def test_hub_layout_so_ativos_e_sem_faixa_vazia():
+    g = m.hub_layout(["cadastro", "comercial"])
+    assert [x["faixa"] for x in g] == ["vendas"]
+    assert m.hub_layout([]) == []
+
+
 def test_topologia_valida_fecho_de_dependencia():
     ok, _ = m.topologia_valida(["comercial"])
     assert ok is False
