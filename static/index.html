@@ -517,6 +517,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div id="sb-user-nivel" style="font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">—</div>
       </div>
     </div>
+    <div id="sb-tema-btn" onclick="alternarTema()" title="Alternar tema claro/escuro"
+         style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer;
+                margin-top:6px;font-size:11px;color:var(--muted);border:1px solid var(--border);transition:.15s"
+         onmouseover="this.style.borderColor='var(--accent)'"
+         onmouseout="this.style.borderColor='var(--border)'">
+      <span id="sb-tema-icone">&#x1F319;</span><span id="sb-tema-label">Tema escuro</span>
+    </div>
     <div id="seletor-loja-wrap" style="display:none;align-items:center;margin:8px 0"></div>
   </div>
 </aside>
@@ -2054,6 +2061,30 @@ let _perfisConfig = null;
 // ── Usuário autenticado ───────────────────────────────────────
 let _usuarioAtual = null;
 
+function aplicarTema(tema){
+  // 'claro' => paleta clara (:root[data-theme="light"]); 'escuro' => default do :root (sem atributo)
+  const root = document.documentElement;
+  if(tema === 'claro') root.setAttribute('data-theme','light');
+  else                  root.removeAttribute('data-theme');
+  const ic = document.getElementById('sb-tema-icone');
+  const lb = document.getElementById('sb-tema-label');
+  if(ic) ic.innerHTML  = (tema === 'claro') ? '&#x2600;' : '&#x1F319;';   // sol / lua
+  if(lb) lb.textContent = (tema === 'claro') ? 'Tema claro' : 'Tema escuro';
+}
+
+async function alternarTema(){
+  const atual = (_usuarioAtual && _usuarioAtual.tema) || 'escuro';
+  const novo  = (atual === 'claro') ? 'escuro' : 'claro';
+  if(_usuarioAtual) _usuarioAtual.tema = novo;
+  aplicarTema(novo);
+  try {
+    await fetch('/api/auth/preferencias', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ tema: novo })
+    });
+  } catch(e){ /* persistência best-effort; a UI já mudou */ }
+}
+
 async function carregarUsuarioAutenticado(){
   try {
     const r = await fetch('/api/auth/me');
@@ -2061,6 +2092,7 @@ async function carregarUsuarioAutenticado(){
     const d = await r.json();
     if(!d.ok){ window.location.href = '/login'; return; }
     _usuarioAtual = d.usuario;
+    aplicarTema(_usuarioAtual.tema || 'escuro');
     const _lojas = _usuarioAtual.lojas || [];
     const _salva = parseInt(localStorage.getItem('loja_ativa') || '', 10);
     const _idsValidos = _lojas.map(l => l.id);
