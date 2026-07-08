@@ -1195,6 +1195,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="cad-panel-terceiros"    style="display:none"><p style="color:var(--muted)">Terceiros — em breve.</p></div>
   </div>
 
+  <!-- PAGE 11: Fiscal (config do módulo — Emitente/NF-e) -->
+  <div class="page" id="page-11">
+    <div class="page-title">Fiscal</div>
+    <div class="page-sub">Configuração fiscal da sua loja (Emitente, tokens, NF-e/NFS-e).</div>
+    <div id="loja-panel-fiscal" style="margin-top:12px"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+  </div>
+  <!-- PAGE 12: Financeiro (config — Provisões/custos-padrão) -->
+  <div class="page" id="page-12">
+    <div class="page-title">Financeiro</div>
+    <div class="page-sub">Provisões e custos-padrão da sua loja (alimentam o orçamento).</div>
+    <div id="loja-panel-financeiro" style="margin-top:12px"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+  </div>
+
   <!-- PAGE 07: Admin -->
   <div class="page" id="page-07">
     <div class="page-title">&#x2699;&#xFE0F; Administra&ccedil;&atilde;o</div>
@@ -2333,6 +2346,8 @@ function goPage(n){
   if(n===8) hubRender();
   if(n===9) cfgRenderizarPerfis();
   if(n===10) cadRender();
+  if(n===11){ if(_adminNav) _adminNav.loja = null; adminFiscalCarregar(); }
+  if(n===12){ if(_adminNav) _adminNav.loja = null; adminFinanceiroCarregar(); }
 }
 
 // Módulo Cadastro: troca de aba + lazy-load do painel ativo
@@ -2353,6 +2368,8 @@ function cadRender(){ cadTab('clientes'); }   // aba padrão = Clientes
 const _HUB_DESTINO = {
   comercial: () => goPage(0),   // Projetos
   cadastro:  () => goPage(10),  // Cadastro (Clientes/Parceiros + stubs)
+  fiscal:     () => goPage(11), // Fiscal (config Emitente/NF-e)
+  financeiro: () => goPage(12), // Financeiro (config provisões/custos-padrão)
 };
 
 function hubRender(){
@@ -7065,21 +7082,10 @@ async function adminLojaNova(redeId){
 
 async function adminRenderLoja(box){
   const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
-  const modsLoja = (_adminNav.loja && _adminNav.loja.modulos) || null;   // null -> mostra tudo
-  const abaAtiva = (m) => !modsLoja || modsLoja.indexOf(m) !== -1;
-  // "Provisões" (não "Financeiro") — edita os %s de provisão/custo-padrão da loja (domínio Financeiro);
-  // o rótulo evita confusão com o módulo Financeiro do hub. Destino final: dentro do módulo Financeiro (backlog).
-  const tabFinanceiro = abaAtiva('financeiro')
-    ? '<button class="home-tab" id="loja-tab-financeiro" onclick="adminLojaTab(\'financeiro\')">Provisões</button>' : '';
-  const tabFiscal = abaAtiva('fiscal')
-    ? '<button class="home-tab" id="loja-tab-fiscal" onclick="adminLojaTab(\'fiscal\')">Fiscal</button>' : '';
   box.innerHTML = `
     <div style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin-bottom:12px">
       <button class="home-tab ativo" id="loja-tab-dados" onclick="adminLojaTab('dados')">Dados da loja</button>
       <button class="home-tab" id="loja-tab-usuarios" onclick="adminLojaTab('usuarios')">Usuários da loja</button>
-      <button class="home-tab" id="loja-tab-projetos" onclick="adminLojaTab('projetos')">Projetos</button>
-      ${tabFinanceiro}
-      ${tabFiscal}
       <button class="home-tab" id="loja-tab-modulos" onclick="adminLojaTab('modulos')">Módulos</button>
     </div>
     <div id="loja-panel-dados"></div>
@@ -7087,24 +7093,18 @@ async function adminRenderLoja(box){
       <button class="btn btn-ghost btn-sm" onclick="abrirModalUsuario({modo:'novo', escopo:'loja', loja_id:(_adminNav.loja&&_adminNav.loja.id)||(_usuarioAtual&&_usuarioAtual.loja_id), onSaved:adminUsuariosCarregar})" style="font-size:11px">+ Novo usuário</button>
       <div id="admin-usuarios-lista" style="margin-top:10px"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     </div>
-    <div id="loja-panel-projetos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
-    <div id="loja-panel-financeiro" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
-    <div id="loja-panel-fiscal" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     <div id="loja-panel-modulos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>`;
   adminLojaCarregarDados(lid);
   adminUsuariosCarregar();   // popula #admin-usuarios-lista (função já existente)
 }
 
 function adminLojaTab(qual){
-  ['dados','usuarios','projetos','financeiro','fiscal','modulos'].forEach(q => {
+  ['dados','usuarios','modulos'].forEach(q => {
     const tab   = document.getElementById('loja-tab-'+q);
     const panel = document.getElementById('loja-panel-'+q);
     if (tab)   tab.classList.toggle('ativo', q===qual);
     if (panel) panel.style.display = q===qual ? '' : 'none';
   });
-  if (qual==='projetos') adminLojaProjetosCarregar();
-  if (qual==='financeiro') adminFinanceiroCarregar();
-  if (qual==='fiscal') adminFiscalCarregar();
   if (qual==='modulos') adminModulosCarregar();
 }
 
