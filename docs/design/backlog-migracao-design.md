@@ -48,7 +48,13 @@ Ordem sugerida (independentes, incrementais):
    Mono); `login.html` (standalone) idem, com a stack Inter literal. Como o mono explícito era **100% numérico**
    (campos `mp-a-*` + `<td>` alinhadas à direita) e o default virou sans, "mono só em números" fica satisfeito por
    construção. *(Copy "Promob → Omie" no `<title>` do `index.html` + logo do login segue obsoleta — fora do escopo.)*
-7. **Toggle de tema claro/escuro**, persistido **por usuário** (não por preferência do SO).
+7. ✅ **feito 2026-07-08** — **Toggle de tema claro/escuro**, persistido **por usuário** (não por preferência do SO).
+   Coluna `Usuario.tema` (`'claro'|'escuro'`, default escuro, migração idempotente) + `tema` no `_usuario_dict` (chega
+   ao front via `/api/auth/me`) + `POST /api/auth/preferencias` (auth-scoped, valida) chamando `auth.set_tema()`.
+   Frontend: `aplicarTema()` seta/remove `data-theme="light"` (a paleta clara já vinha do item 1); aplicado no **boot**
+   e por um **toggle na sidebar**; `alternarTema()` grava no backend. Persistência **por usuário** (backend), não
+   localStorage/SO. Testes: 3 unit (`set_tema`/dict/coluna) + 3 HTTP (endpoint 200/400/401 + round-trip no `me`).
+   **✅ Passo 2 (migração visual) 100% concluído — itens 1 a 7.**
 8. (Já feito na navegação) hub de módulos agrupado por faixa — **implementado** com a faixa autoritativa de 5
    grupos (Vendas/Execução/Logística-Expedição/Pós-venda/Financeiro), mais fiel que a versão simplificada do doc.
 9. (Já feito) **Credenciais e Tokens** dentro de Admin, visibilidade por capability (super_admin).

@@ -1535,6 +1535,23 @@ token). Só frontend (backend intocado, suíte 681); **sem teste visual → conf
 (Omie aposentado; produto = Orizon Manager) — correção aguardando decisão. **Passo 2 quase completo — resta só o
 item 7** (toggle de tema claro/escuro persistido por usuário).
 
+**Alinhamento front-end — passo 2, item 7: toggle de tema persistido por usuário (2026-07-08, branch
+`feat/design-toggle-tema`, suíte 687):** último item do passo 2 — e o único que **mexe em Python**. **Backend:** coluna
+`Usuario.tema` (`'claro'|'escuro'`, default escuro, migração idempotente em `_migrar_colunas`); `tema` no
+`auth._usuario_dict` (serializador único → chega ao front por login **e** `/api/auth/me`); função testável
+`auth.set_tema(id, tema)`; **`POST /api/auth/preferencias`** (auth-scoped, valida 'claro'/'escuro'). **Frontend
+(index.html):** `aplicarTema()` seta/remove `data-theme="light"` no `<html>` (a paleta clara já vinha do item 1),
+aplicado no **boot** (após `_usuarioAtual = d.usuario`) e por um **toggle na sidebar** (rodapé, sol/lua); `alternarTema()`
+inverte + grava via fetch. Persistência **por usuário no backend** (coluna), **não** localStorage/SO → acompanha o
+usuário em qualquer máquina; custo aceito = "flash" curto de escuro antes do `/me` p/ quem usa claro. **Testes (suíte
+681→687):** 3 unit (coluna/dict-default/`set_tema` válido-inválido-inexistente) + 3 HTTP end-to-end (endpoint
+200+persistência, 400 inválido, 401 sem auth). Subagent-driven (backend TDD + frontend), revisado. **Mudança em Python
+→ servidor precisa de restart** para valer localmente. **✅ PASSO 2 (migração visual) 100% CONCLUÍDO — itens 1 a 7.**
+**Follow-ups de higiene (fora dos itens, aguardando decisão):** copy "Promob → Omie" (`<title>` do index + logo do
+login); `#c8a84b` decorativo (~L829/831); e **hardcodes verdes** descobertos nesta frente — avatar `color:#0d160d`
+(~L510) e `#modal-perfil` (`#111d11`/`#1e2e1e`, ~L527) — resíduos que o item 1 (aliases só no `:root`) não cobriu.
+**Próximo do alinhamento = passo 3** (templates de diagramação, doc 4 Parte 1, conforme as telas forem tocadas).
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:
