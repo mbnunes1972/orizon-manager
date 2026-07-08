@@ -6963,6 +6963,7 @@ async function adminRenderLoja(box){
       <button class="home-tab" id="loja-tab-projetos" onclick="adminLojaTab('projetos')">Projetos</button>
       <button class="home-tab" id="loja-tab-financeiro" onclick="adminLojaTab('financeiro')">Financeiro</button>
       <button class="home-tab" id="loja-tab-fiscal" onclick="adminLojaTab('fiscal')">Fiscal</button>
+      <button class="home-tab" id="loja-tab-modulos" onclick="adminLojaTab('modulos')">Módulos</button>
     </div>
     <div id="loja-panel-dados"></div>
     <div id="loja-panel-usuarios" style="display:none">
@@ -6971,13 +6972,14 @@ async function adminRenderLoja(box){
     </div>
     <div id="loja-panel-projetos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     <div id="loja-panel-financeiro" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
-    <div id="loja-panel-fiscal" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>`;
+    <div id="loja-panel-fiscal" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+    <div id="loja-panel-modulos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>`;
   adminLojaCarregarDados(lid);
   adminUsuariosCarregar();   // popula #admin-usuarios-lista (função já existente)
 }
 
 function adminLojaTab(qual){
-  ['dados','usuarios','projetos','financeiro','fiscal'].forEach(q => {
+  ['dados','usuarios','projetos','financeiro','fiscal','modulos'].forEach(q => {
     const tab   = document.getElementById('loja-tab-'+q);
     const panel = document.getElementById('loja-panel-'+q);
     if (tab)   tab.classList.toggle('ativo', q===qual);
@@ -6986,6 +6988,7 @@ function adminLojaTab(qual){
   if (qual==='projetos') adminLojaProjetosCarregar();
   if (qual==='financeiro') adminFinanceiroCarregar();
   if (qual==='fiscal') adminFiscalCarregar();
+  if (qual==='modulos') adminModulosCarregar();
 }
 
 async function adminLojaProjetosCarregar(){
@@ -7055,6 +7058,67 @@ async function adminFinanceiroSalvar(lid){
   const d = await r.json();
   if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Config financeira'}); return; }
   showToast('Config financeira salva.', false);
+}
+
+// ── Painel de Módulos por loja (liga/desliga domínios) ──────────────────────
+let _modsCfg = null;
+
+async function adminModulosCarregar() {
+  const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  const box = document.getElementById('loja-panel-modulos');
+  if (!lid || !box) return;
+  try {
+    const r = await fetch(`/api/admin/lojas/${lid}/modulos`, { credentials: 'same-origin' });
+    const d = await r.json();
+    if (!d.ok) { box.innerHTML = `<p style="color:var(--muted)">${esc(d.erro || 'Sem acesso.')}</p>`; return; }
+    _modsCfg = d;
+    const linhas = d.dominios.map(m => `
+      <label style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <input type="checkbox" data-mod="${esc(m.id)}" ${m.ativo ? 'checked' : ''} onchange="adminModulosMudou()">
+        <span style="flex:1">${esc(m.rotulo)}</span>
+        ${m.depende_de.length ? `<span style="color:var(--muted);font-size:.72rem">depende de: ${esc(m.depende_de.join(', '))}</span>` : ''}
+      </label>`).join('');
+    box.innerHTML = `
+      <p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">Ligue/desligue os módulos desta loja.
+        Desligar um módulo esconde suas telas e bloqueia suas ações. O núcleo (login, ciclo) é sempre ativo.</p>
+      ${linhas}
+      <div id="mods-aviso" style="display:none;color:var(--err);font-size:.78rem;margin-top:8px"></div>
+      <button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="adminModulosSalvar()">Salvar módulos</button>`;
+  } catch(e) { box.innerHTML = `<p style="color:var(--err)">Erro de rede: ${esc(e.message)}</p>`; }
+}
+
+function _modsSelecionados() {
+  return Array.from(document.querySelectorAll('#loja-panel-modulos input[data-mod]:checked'))
+              .map(i => i.getAttribute('data-mod'));
+}
+
+function adminModulosMudou() {
+  const ativos = new Set(_modsSelecionados());
+  const aviso = document.getElementById('mods-aviso');
+  for (const m of _modsCfg.dominios) {
+    if (!ativos.has(m.id)) continue;
+    const falta = m.depende_de.filter(dep => _modsCfg.dominios.some(x => x.id === dep) && !ativos.has(dep));
+    if (falta.length) {
+      aviso.textContent = `"${m.rotulo}" depende de: ${falta.join(', ')} — ligue esses módulos.`;
+      aviso.style.display = 'block'; return;
+    }
+  }
+  aviso.style.display = 'none';
+}
+
+async function adminModulosSalvar() {
+  const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  const ativos = _modsSelecionados();
+  try {
+    const r = await fetch(`/api/admin/lojas/${lid}/modulos`, {
+      method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ ativos }) });
+    const d = await r.json();
+    if (!d.ok) { await avisoPopup(esc(d.erro || 'Falha ao salvar.'), {titulo:'Módulos'}); return; }
+    showToast('Módulos atualizados!', false);
+    if (String(lid) === String(_usuarioAtual && _usuarioAtual.loja_id)) { await carregarUsuarioAutenticado(); }
+    adminModulosCarregar();
+  } catch(e) { await avisoPopup('Erro de rede: ' + esc(e.message), {titulo:'Módulos'}); }
 }
 
 // ── Painel de Configuração Fiscal (PerfilFiscal, Sub-frente I) ──────────────
