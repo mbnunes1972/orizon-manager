@@ -27,36 +27,36 @@ MODULOS = {
                     "arquivos": ["database.py", "storage.py"],
                     "tabelas": [], "rotas": []},
     # ── DOMÍNIOS ───────────────────────────────────────────────────────────
-    "cadastro":    {"camada": "dominio", "depende_de": [],
+    "cadastro":    {"camada": "dominio", "depende_de": [], "rotulo": "Cadastro",
                     "arquivos": ["validacao_doc.py"],
                     "tabelas": ["clientes", "parceiros"],
                     "rotas": ["/api/clientes", "/api/parceiros"]},
-    "comercial":   {"camada": "dominio", "depende_de": ["cadastro"],
+    "comercial":   {"camada": "dominio", "depende_de": ["cadastro"], "rotulo": "Comercial (Vendas)",
                     "arquivos": ["mod_orcamento_params.py", "mod_margens.py", "mod_negociacao.py",
                                  "mod_proposta.py", "mod_contrato.py", "mod_arvore.py",
                                  "contrato_editar.py", "_ler_aymore.py", "mod_fin"],
                     "tabelas": ["projetos_meta", "briefings", "pool_ambientes", "orcamentos",
                                 "orcamento_ambientes", "contratos", "contratos_assinaturas"],
                     "rotas": ["/api/orcamentos", "/api/contratos"]},
-    "producao":    {"camada": "dominio", "depende_de": ["cadastro", "comercial"],
+    "producao":    {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Produção / Projetos",
                     "arquivos": ["mod_medicao.py", "mod_qualidade_xml.py"],
                     "tabelas": ["medicoes"],
                     "rotas": ["/api/medicoes"]},
-    "fiscal":      {"camada": "dominio", "depende_de": ["cadastro", "comercial"],
+    "fiscal":      {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Fiscal (NF-e/NFS-e)",
                     "arquivos": ["mod_fiscal.py", "mapa_fiscal.py", "emissor_focus.py",
                                  "fiscal_cripto.py", "nfe_emissao.py", "mod_nfe.py"],
                     "tabelas": ["emitente", "perfil_emissao", "documento_fiscal"],
                     "rotas": ["/api/projetos/", "/api/admin/lojas/", "/api/admin/redes/"]},
-    "financeiro":  {"camada": "dominio", "depende_de": ["comercial"],
+    "financeiro":  {"camada": "dominio", "depende_de": ["comercial"], "rotulo": "Financeiro",
                     "arquivos": ["mod_provisoes.py"],
                     "tabelas": ["provisao_registro"],
                     "rotas": ["/api/provisoes"]},
     # domínios NOVOS — fronteira só (stub, sem código/tabela hoje)
-    "estoque":     {"camada": "dominio", "depende_de": ["cadastro", "producao"],
+    "estoque":     {"camada": "dominio", "depende_de": ["cadastro", "producao"], "rotulo": "Estoque",
                     "arquivos": [], "tabelas": [], "rotas": []},
-    "posvenda":    {"camada": "dominio", "depende_de": ["cadastro", "fiscal", "estoque"],
+    "posvenda":    {"camada": "dominio", "depende_de": ["cadastro", "fiscal", "estoque"], "rotulo": "Pós-venda",
                     "arquivos": [], "tabelas": [], "rotas": []},
-    "expedicao":   {"camada": "dominio", "depende_de": ["producao", "estoque", "fiscal"],
+    "expedicao":   {"camada": "dominio", "depende_de": ["producao", "estoque", "fiscal"], "rotulo": "Expedição / Logística",
                     "arquivos": [], "tabelas": [], "rotas": []},
 }
 
@@ -107,3 +107,25 @@ def modulo_do_path(path):
         return None
     candidatos.sort(reverse=True)
     return candidatos[0][1]
+
+
+# Ordem estável dos domínios para a UI (DOMINIOS é frozenset, sem ordem).
+DOMINIOS_ORDEM = ["cadastro", "comercial", "producao", "fiscal", "financeiro",
+                  "estoque", "posvenda", "expedicao"]
+
+
+def dominios_com_rotulo():
+    """Lista ordenada dos domínios: [{'id','rotulo','depende_de'}]. Para o painel de módulos."""
+    return [{"id": d, "rotulo": MODULOS[d].get("rotulo", d),
+             "depende_de": list(MODULOS[d]["depende_de"])} for d in DOMINIOS_ORDEM]
+
+
+def topologia_valida(ativos):
+    """(True, "") se o conjunto `ativos` é coerente: todo módulo ativo tem seus depende_de (que são
+    domínios) também ativos — senão (False, msg). Núcleo é sempre ativo (ignorado)."""
+    ativos = set(ativos)
+    for mod in ativos:
+        for dep in MODULOS.get(mod, {}).get("depende_de", []):
+            if dep in DOMINIOS and dep not in ativos:
+                return (False, "Módulo '%s' depende de '%s', que precisa estar ativo." % (mod, dep))
+    return (True, "")

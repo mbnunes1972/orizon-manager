@@ -38,3 +38,22 @@ def test_modulo_do_path():
     assert m.modulo_do_path("/api/clientes") == "cadastro"
     assert m.modulo_do_path("/api/orcamentos/9/margens") == "comercial"
     assert m.modulo_do_path("/api/login") is None
+
+
+def test_rotulo_e_ordem_dos_dominios():
+    ordem = m.dominios_com_rotulo()
+    ids = [d["id"] for d in ordem]
+    assert set(ids) == set(m.DOMINIOS)
+    assert all(d["rotulo"] for d in ordem)
+    assert ids[0] == "cadastro"
+
+
+def test_topologia_valida_fecho_de_dependencia():
+    ok, _ = m.topologia_valida(["comercial"])
+    assert ok is False
+    ok2, _ = m.topologia_valida(["cadastro", "comercial"])
+    assert ok2 is True
+    ok3, _ = m.topologia_valida(list(m.DOMINIOS))
+    assert ok3 is True
+    ok4, _ = m.topologia_valida([])
+    assert ok4 is True
