@@ -134,6 +134,10 @@ Status: **EXISTE** (implementado) · **PARCIAL** (parte feita) · **NOVO** (a mo
 
 ### 6. Financeiro — Plano de contas / DRE / Financeiras
 - **Hoje (PARCIAL):** `mod_provisoes` + `provisao_registro`; Total Flex (motor).
+- **Config de provisões (UI):** os %s de provisão/custo-padrão da loja (frete fábrica, comissões, insumos…) são
+  editados hoje na **aba "Provisões" do Admin da loja** (renomeada de "Financeiro" em 2026-07-08 para não confundir
+  com o módulo). É config do **domínio Financeiro** — gate por `financeiro`. **Destino final:** migrar para a tela
+  própria do **módulo Financeiro** quando ele for construído (a aba do Admin é ponte temporária).
 - **Lacuna (NOVO):** plano de contas, contas a pagar/receber, conciliação bancária, DRE, Balanço.
   Contratos → recebíveis; movimentações → DRE.
 

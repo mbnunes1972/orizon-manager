@@ -7048,8 +7048,10 @@ async function adminRenderLoja(box){
   const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
   const modsLoja = (_adminNav.loja && _adminNav.loja.modulos) || null;   // null -> mostra tudo
   const abaAtiva = (m) => !modsLoja || modsLoja.indexOf(m) !== -1;
+  // "Provisões" (não "Financeiro") — edita os %s de provisão/custo-padrão da loja (domínio Financeiro);
+  // o rótulo evita confusão com o módulo Financeiro do hub. Destino final: dentro do módulo Financeiro (backlog).
   const tabFinanceiro = abaAtiva('financeiro')
-    ? '<button class="home-tab" id="loja-tab-financeiro" onclick="adminLojaTab(\'financeiro\')">Financeiro</button>' : '';
+    ? '<button class="home-tab" id="loja-tab-financeiro" onclick="adminLojaTab(\'financeiro\')">Provisões</button>' : '';
   const tabFiscal = abaAtiva('fiscal')
     ? '<button class="home-tab" id="loja-tab-fiscal" onclick="adminLojaTab(\'fiscal\')">Fiscal</button>' : '';
   box.innerHTML = `
@@ -7140,7 +7142,7 @@ async function adminFinanceiroCarregar(){
       ${campo('fin-ins','% Insumos locais',prov.ins_loc_pct)}
     </div>
     <div style="display:flex;gap:8px;margin-top:0;flex-wrap:wrap">
-      <button class="btn btn-primary btn-sm" onclick="adminFinanceiroSalvar(${lid})">Salvar config financeira</button>
+      <button class="btn btn-primary btn-sm" onclick="adminFinanceiroSalvar(${lid})">Salvar provisões</button>
       <button class="btn btn-ghost btn-sm" onclick="abrirModalComissao(${lid})">Configurar comissão de vendas</button>
     </div>`;
 }
