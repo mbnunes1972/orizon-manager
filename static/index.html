@@ -61,8 +61,8 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospac
 .sb-secao{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:.15s;position:relative;margin-bottom:2px;font-family:'Epilogue',sans-serif;font-size:12px;font-weight:600;color:var(--muted)}
 .nav-item::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0}
-.nav-item:hover{background:rgba(232,97,26,.06);color:var(--text)}
-.nav-item.active{background:rgba(232,97,26,.1);color:var(--accent);border-left:2px solid var(--accent);padding-left:8px}
+.nav-item:hover{background:var(--accent-tint);color:var(--text)}
+.nav-item.active{background:var(--accent-tint);color:var(--accent);border-left:2px solid var(--accent);padding-left:8px}
 .nav-item.active::before{background:var(--accent)}
 .nav-item.done::before{background:var(--ok)}
 .nav-item.done{color:var(--text)}
@@ -102,7 +102,7 @@ input:focus{border-color:var(--accent)}
 /* Projetos page */
 .proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
 .proj-card-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;cursor:pointer;transition:.15s;margin-bottom:8px}
-.proj-card-item:hover{border-color:var(--accent);background:rgba(232,97,26,.04)}
+.proj-card-item:hover{border-color:var(--accent);background:var(--accent-tint)}
 .proj-card-nome{font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px}
 .proj-card-cli{font-size:11px;color:var(--muted);margin-bottom:6px}
 .proj-card-meta{display:flex;gap:12px;font-size:10px;color:var(--muted)}
@@ -111,7 +111,7 @@ input:focus{border-color:var(--accent)}
 .proj-table{width:100%;border-collapse:collapse;font-size:13px}
 .proj-table th{text-align:left;padding:7px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600}
 .proj-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
-.proj-table tr.proj-row:hover td{background:rgba(232,97,26,.04);cursor:pointer}
+.proj-table tr.proj-row:hover td{background:var(--accent-tint);cursor:pointer}
 .proj-table tr.proj-row td.cell-status{cursor:default}
 .proj-status-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
 .proj-status-badge.quente{background:rgba(240,90,80,.12);color:#f05a50}
@@ -151,7 +151,7 @@ input:focus{border-color:var(--accent)}
 .banner-sep{width:1px;height:40px;background:var(--border);margin:0 4px}
 /* Drop zone */
 .drop-zone{border:2px dashed var(--border2);border-radius:10px;padding:28px;text-align:center;transition:.15s;cursor:pointer;position:relative;margin-bottom:16px}
-.drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:rgba(232,97,26,.03)}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:var(--accent-tint)}
 .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .drop-icon{font-size:28px;margin-bottom:8px}
 .drop-text{font-family:'Epilogue',sans-serif;font-weight:700;font-size:13px;margin-bottom:3px}
@@ -179,7 +179,7 @@ input:focus{border-color:var(--accent)}
 .amb-table .td-val{text-align:right;color:var(--ok);white-space:nowrap}
 .amb-update-wrap{position:relative;display:inline-block}
 .amb-update-wrap input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.fb-row{display:flex;align-items:center;gap:10px;padding:10px 18px;background:rgba(232,97,26,.04);border-top:1px solid var(--border);flex-wrap:wrap}
+.fb-row{display:flex;align-items:center;gap:10px;padding:10px 18px;background:var(--accent-tint);border-top:1px solid var(--border);flex-wrap:wrap}
 /* Feedback toast */
 .toast{position:fixed;bottom:24px;right:24px;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 20px;font-size:12px;color:var(--ok);z-index:200;display:none;font-family:'Epilogue',sans-serif;font-weight:700;box-shadow:0 4px 24px rgba(0,0,0,.4)}
 .toast.err{color:var(--err)}
@@ -1568,7 +1568,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     </div>
 
     <!-- Card: Nota sobre nuvem -->
-    <div class="card" style="background:rgba(232,97,26,.04);border-color:rgba(232,97,26,.2)">
+    <div class="card" style="background:var(--accent-tint);border-color:var(--accent)">
       <div class="card-title" style="color:var(--accent)">&#x2601; Preparacao para Nuvem</div>
       <div style="font-size:12px;color:var(--muted);line-height:1.8">
         <div>&#x2022; Os perfis aqui configurados serao migrados para um banco de dados de usuarios.</div>
@@ -2312,7 +2312,7 @@ function cfgRenderizarPerfis(){
     <div style="display:grid;grid-template-columns:200px 120px 1fr;gap:12px;
       align-items:center;padding:12px 14px;margin-bottom:8px;border-radius:8px;
       border:1px solid ${key===ativo?'var(--accent)':'var(--border)'};
-      background:${key===ativo?'rgba(232,97,26,.06)':'var(--surface)'}">
+      background:${key===ativo?'var(--accent-tint)':'var(--surface)'}">
       <div>
         <div style="font-weight:700;font-size:13px;color:${key===ativo?'var(--accent)':'var(--text)'}">
           ${cfg.nome||key}</div>
