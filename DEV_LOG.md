@@ -1457,7 +1457,18 @@ a lista `/projetos` passou a expor **`parceiro_nome`** (enricher `_enriquecer_pr
 (b) a sub-aba **"Financeiro" do Admin da loja** foi renomeada para **"Provisões"** (edita %s de provisão/custo-padrão =
 domínio Financeiro; evita confusão com o módulo Financeiro do hub). Gate por `financeiro` mantido (correto); destino
 final = dentro do módulo Financeiro quando tiver tela (registrado no `ARQUITETURA-MODULOS.md` §6).
-**Pendente:** **Fase 2** (extração física piloto = Fiscal) e domínios novos — cada um seu brainstorm→spec→plano.
+
+**Alinhamento front-end — passo 1: escopo do Admin (2026-07-08, branch `feat/escopo-admin`, suíte 681):** correção
+estrutural derivada dos docs de spec (`docs/design/`). O **Admin é Núcleo** (administra conta/loja, não domínios).
+As abas **Projetos, Fiscal e Provisões saíram do Admin** (não tinham respaldo em doc — escolha fora do alinhamento);
+**Admin da loja = Dados · Usuários · Módulos**; **Credenciais e Tokens** fica na Plataforma (super_admin). Para não
+orfanar a config, os cards **Fiscal** (Emitente/NF-e) e **Financeiro** (Provisões/custos) do **Hub deixaram de ser
+"em breve"** e abrem esses painéis (pages 11/12), reaproveitando `adminFiscalCarregar`/`adminFinanceiroCarregar` para
+a loja do próprio usuário, gateados por `pode_editar_dados_loja` **dentro do módulo** (evita o erro de fronteira da
+Expedição). Frontend puro (`node --check` OK), backend intocado. **Próximos passos do alinhamento:** (2) migração
+visual (doc 3 §5, itens 1–7 — tema claro/escuro petróleo/dourado, aposentar tinta laranja legada, etc.); (3)
+templates de diagramação (doc 4 Parte 1) conforme as telas forem tocadas. `Modulos_Orizon.docx` ainda não está no repo.
+**Pendente:** passos 2 e 3 do alinhamento · **Fase 2** (extração física piloto = Fiscal) e domínios novos.
 
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam

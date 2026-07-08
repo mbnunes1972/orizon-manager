@@ -52,6 +52,16 @@
 >   está **superada**. Migração de tokens de design (tema claro/escuro etc.) = backlog paralelo
 >   (`docs/design/backlog-migracao-design.md`), não bloqueia navegação.
 >
+> **🔧 Escopo do Admin corrigido (2026-07-08, suíte 681) — Admin é Núcleo, administra conta/loja, NÃO domínios:**
+> o Admin da loja tinha abas Projetos/Fiscal/Provisões que **não têm respaldo em doc** (escolha fora do alinhamento).
+> Corrigido: **Admin da loja = Dados · Usuários · Módulos**; **Credenciais e Tokens** na **Plataforma** (super_admin,
+> global). **Projetos, Fiscal e Provisões saíram do Admin** — são **domínios** com tela própria: os cards **Fiscal**
+> (config Emitente/NF-e) e **Financeiro** (Provisões/custos-padrão) do Hub deixaram de ser "em breve" e abrem esses
+> painéis, gateados por `pode_editar_dados_loja` **dentro do módulo** (quem não tem → "Sem acesso"). Isso evita o
+> **erro de fronteira** já mapeado (módulo absorvendo escopo alheio — risco da Expedição): uma visão administrativa
+> de rede desses dados é **permissão elevada dentro do módulo**, não aba no Admin (tarefa futura). *(Nota:
+> `Modulos_Orizon.docx` ainda não está no repo — revalidar quando entrar.)*
+>
 > A **extração física** em pacotes (desmembrar o monólito) é **Fase 2+** — ver "Roadmap de extração" no fim.
 
 ## Por que existe
