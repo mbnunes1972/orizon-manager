@@ -1406,6 +1406,17 @@ alinha cidade/UF). A8 mitigado.
 constraint + índice + dedup), **A13** (2º clique concorrente → idempotente, não 500), **A14** (NFS-e autorizada
 conclui a etapa 15). **✅ Auditoria fiscal 100% endereçada.** Ver `docs/avaliacao/2026-07-07-auditoria-fiscal.md`.
 
+**Modularização — Fase 1 (fundação) implementada (2026-07-07, branch `feat/modularizacao-fase1`, suíte 670):** o
+mapa lógico de `docs/ARQUITETURA-MODULOS.md` virou **executável e imposto**, sem mover código. **`modulos.py`**
+(manifesto: camada/arquivos/tabelas/rotas/depende_de/desligável por módulo); **`tests/test_arquitetura_modulos.py`**
+impõe a fronteira via `ast` (Núcleo não importa domínio; domínio só o que declara; tudo classificado) — **nasceu
+verde** (acoplamento real já respeita a arquitetura) e foi **provado não-vacuoso** (4 mutações A/B/C/D falham como
+esperado); **`mod_ciclo.faixa_da_etapa`** (titularidade do ciclo explícita); **`Loja.modulos_ativos` +
+`mod_tenancy.modulo_ativo`** + endpoints `/api/admin/lojas/<id>/modulos` + guard no dispatch (piloto no fiscal
+etapa 15) — liga/desliga domínio por loja, **default tudo-ligado** (zero mudança de comportamento). Subagent-driven,
+6 tasks, cada uma revisada (spec+qualidade). **Pendente:** **Fase 2** (extração física piloto = Fiscal) e demais —
+cada domínio novo seu brainstorm→spec→plano. Plano: `docs/superpowers/plans/2026-07-07-modularizacao-fase1.md`.
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:

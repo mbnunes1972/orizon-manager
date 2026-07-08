@@ -1,9 +1,22 @@
 # Arquitetura de Módulos — Orizon Manager | Dalmóbile
 
 > **Documento vivo · 2026-07-06.** Mapa lógico dos módulos do sistema — a taxonomia de "onde mora cada
-> coisa" e "onde mora código novo". **Não é um plano de refatoração:** nada de código se move por causa
-> deste doc; ele nomeia fronteiras sobre o código que já existe (monolito `main.py` + `database.py` de
-> schema único + `~20 mod_*.py`) e guia o que vem. Atualize-o ao criar/mover um módulo.
+> coisa" e "onde mora código novo". Nomeia fronteiras sobre o código que já existe (monolito `main.py` +
+> `database.py` de schema único + `~20 mod_*.py`) e guia o que vem. Atualize-o ao criar/mover um módulo.
+>
+> **🔒 Fase 1 implementada (2026-07-07) — o mapa agora é EXECUTÁVEL e IMPOSTO** (branch `feat/modularizacao-fase1`,
+> suíte 670). O que antes era só prosa virou código, **sem mover nenhum arquivo** (segue "zero split físico"):
+> - **`modulos.py`** — manifesto declarativo: cada módulo com camada (núcleo|domínio), arquivos, tabelas, rotas,
+>   `depende_de`, desligável. Fonte da verdade de "onde mora cada coisa".
+> - **`tests/test_arquitetura_modulos.py`** — **impõe a fronteira** (via `ast`): Núcleo não importa domínio;
+>   domínio só importa o que declara; todo `.py`/tabela classificado. Nasceu **verde** (o acoplamento real já
+>   respeita a arquitetura) — é a **rede de segurança da extração física futura**.
+> - **`mod_ciclo.faixa_da_etapa`** — titularidade das etapas explícita (Governança do Ciclo: vendas/gates/
+>   execução/expedição/montagem), antes só implícita.
+> - **`Loja.modulos_ativos` + `mod_tenancy.modulo_ativo`** + endpoints `/api/admin/lojas/<id>/modulos` + guard no
+>   dispatch — **liga/desliga domínio por loja** (venda por topologia). Default **tudo-ligado** (zero mudança).
+>
+> A **extração física** em pacotes (desmembrar o monólito) é **Fase 2+** — ver "Roadmap de extração" no fim.
 
 ## Por que existe
 
@@ -181,6 +194,27 @@ domínio**.
 - Design **interno** de Estoque, Pós-venda e do Financeiro completo — entram aqui só como **fronteira**;
   aprofundar quando forem construídos (cada um vira seu próprio ciclo brainstorming → spec → plano).
 
+## Roadmap de extração física (Fase 2+)
+
+A Fase 1 (acima) não move código — cria o manifesto + a fronteira imposta que **tornam a extração segura**.
+As fases seguintes desmembram o monólito em pacotes de verdade, cada uma seu próprio ciclo brainstorm→spec→plano:
+
+- **Fase 2 (piloto): extrair o Fiscal** para um pacote `fiscal/` — é o cluster mais isolado (`mod_fiscal`,
+  `mapa_fiscal`, `emissor_focus`, `fiscal_cripto`, `nfe_emissao`, `mod_nfe` pricing). Pré-condição já satisfeita:
+  o teste de fronteira garante que só `cadastro`/`comercial`/núcleo entram nele. Prova o padrão de split (imports,
+  rotas, tabelas) com blast radius controlado.
+- **Fase 3+: demais domínios existentes** (Comercial, Produção, Financeiro), na ordem de **menor acoplamento**
+  (`depende_de` mais curto no manifesto). Um módulo só é candidato quando seu `depende_de` está minimizado e o
+  teste de fronteira está verde sem exceções acumuladas.
+- **Domínios NOVOS** (Estoque, Financeiro completo, Pós-venda, Expedição): cada um **brainstorm→spec→plano
+  próprio** — a fronteira/stub já existe no manifesto (`modulos.py`), então nascem no lugar certo.
+- **Reconciliação 38↔20 etapas** (o CONFLITO ABERTO acima): tarefa própria, pré-requisito de amadurecer as faixas
+  antes de decidir operação por número de etapa.
+
+**Regra de saída Fase 1→2:** extrair só com o teste de fronteira verde e o `depende_de` do módulo minimizado — o
+manifesto é o mapa de corte; o teste é a rede de segurança.
+
 ## Manutenção
-Ao adicionar/mover módulo ou tabela: atualize a tabela da camada correspondente e o mapa do fluxo. Este
-doc é a fonte da taxonomia; o `DEV_LOG.md` segue sendo a narrativa de estado/decisões.
+Ao adicionar/mover módulo ou tabela: atualize `modulos.py` (o manifesto — o teste de fronteira vai cobrar) **e** a
+tabela da camada correspondente aqui. Este doc é a fonte da taxonomia; o `DEV_LOG.md` segue sendo a narrativa de
+estado/decisões.
