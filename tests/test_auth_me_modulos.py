@@ -18,3 +18,14 @@ def test_me_reflete_modulo_desligado(http_client_factory, seed, app_db):
     st, d = c.get("/api/auth/me")
     assert "fiscal" not in d["usuario"]["modulos_ativos"]
     adm.post(f"/api/admin/lojas/{lid}/modulos", {"ativos": None})   # religa
+
+
+def test_me_traz_hub_agrupado(http_client_factory, seed, app_db):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.get("/api/auth/me")
+    assert st == 200
+    hub = d["usuario"]["hub"]
+    faixas = [g["faixa"] for g in hub]
+    assert "vendas" in faixas                       # loja default -> tudo ativo -> todas as faixas
+    vendas = next(g for g in hub if g["faixa"] == "vendas")
+    assert any(mm["id"] == "comercial" for mm in vendas["modulos"])

@@ -89,6 +89,7 @@ def handle_auth_get(handler, path: str) -> bool:
                 usuario["modulos_ativos"] = sorted(
                     mod_tenancy.modulos_ativos_da_loja(_loja_ativa)
                     if _loja_ativa else _mod.DOMINIOS)
+                usuario["hub"] = _mod.hub_layout(usuario["modulos_ativos"])
             finally:
                 db.close()
             _send_json(handler, {"ok": True, "usuario": usuario})
