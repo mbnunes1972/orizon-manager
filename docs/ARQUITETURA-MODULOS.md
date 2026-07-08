@@ -16,6 +16,14 @@
 > - **`Loja.modulos_ativos` + `mod_tenancy.modulo_ativo`** + endpoints `/api/admin/lojas/<id>/modulos` + guard no
 >   dispatch — **liga/desliga domínio por loja** (venda por topologia). Default **tudo-ligado** (zero mudança).
 >
+> **🖥️ UI da topologia (2026-07-08, suíte 676):** a Fase 1 ganhou **cara visível**. **Painel "Módulos"** no Admin
+> da loja (liga/desliga os 8 domínios, com aviso de dependência); `GET /api/admin/lojas/<id>/modulos` devolve os
+> domínios com rótulo/ativo/dependências e o `POST` valida o **fecho de dependência** (`modulos.topologia_valida`);
+> `/api/auth/me` expõe `modulos_ativos` da loja do usuário; e o **menu reage** — o menu lateral esconde
+> Clientes/Parceiros (Cadastro off) e o Admin da loja esconde as abas Fiscal/Financeiro conforme o módulo.
+> Domínios sem tela própria (Comercial/Produção/Estoque/Pós-venda/Expedição) têm toggle mas **reagem só no
+> backend** (o guard bloqueia as rotas) — a superfície de menu cresce quando ganharem tela.
+>
 > A **extração física** em pacotes (desmembrar o monólito) é **Fase 2+** — ver "Roadmap de extração" no fim.
 
 ## Por que existe

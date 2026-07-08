@@ -1414,8 +1414,18 @@ verde** (acoplamento real já respeita a arquitetura) e foi **provado não-vacuo
 esperado); **`mod_ciclo.faixa_da_etapa`** (titularidade do ciclo explícita); **`Loja.modulos_ativos` +
 `mod_tenancy.modulo_ativo`** + endpoints `/api/admin/lojas/<id>/modulos` + guard no dispatch (piloto no fiscal
 etapa 15) — liga/desliga domínio por loja, **default tudo-ligado** (zero mudança de comportamento). Subagent-driven,
-6 tasks, cada uma revisada (spec+qualidade). **Pendente:** **Fase 2** (extração física piloto = Fiscal) e demais —
-cada domínio novo seu brainstorm→spec→plano. Plano: `docs/superpowers/plans/2026-07-07-modularizacao-fase1.md`.
+6 tasks, cada uma revisada (spec+qualidade). Plano: `docs/superpowers/plans/2026-07-07-modularizacao-fase1.md`.
+
+**Modularização — Painel + Menu reativo (2026-07-08, branch `feat/painel-modulos`, suíte 676):** deu **cara
+visível** à Fase 1. `modulos.py` ganhou rótulos/ordem + `topologia_valida` (fecho de dependência); `GET
+/api/admin/lojas/<id>/modulos` devolve os domínios com rótulo/ativo/deps e o `POST` rejeita topologia quebrada
+(ex.: Comercial sem Cadastro → 400); `/api/auth/me` expõe `modulos_ativos` da loja do usuário; **painel "Módulos"**
+no Admin da loja (checkboxes liga/desliga, aviso de dependência) + **menu reativo** (esconde Clientes/Parceiros se
+Cadastro off; esconde abas Fiscal/Financeiro conforme o módulo na loja administrada). Default **tudo-ligado** em
+todos os caminhos (revisado: nunca esconde por ausência/erro de rede). Frontend sem teste JS → verificado por
+balanço + revisão. **Nota honesta:** domínios sem tela (Comercial/Produção/Estoque/Pós-venda/Expedição) têm toggle
+mas reagem só no backend. Plano: `docs/superpowers/plans/2026-07-08-painel-modulos-menu-reativo.md`.
+**Pendente:** **Fase 2** (extração física piloto = Fiscal) e domínios novos — cada um seu brainstorm→spec→plano.
 
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
