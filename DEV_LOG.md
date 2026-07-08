@@ -1498,6 +1498,17 @@ mudou (JS intocado, confirmado por diff); backend intocado (suíte 681). **Fonte
 item 6). **Achado sinalizado (fora de escopo):** a logo do login ainda diz **"Promob → Omie"** (Omie foi aposentado;
 produto é Orizon Manager) — correção de copy aguardando decisão do usuário. **Pendente do passo 2:** itens 4-7.
 
+**Alinhamento front-end — passo 2, item 4: tokenizar cores de status (2026-07-08, branch `feat/design-status`, suíte
+681):** os hexes hardcoded dos badges de status (`#f05a50` quente, `#d4a017` morno, `#c8a84b` fechado) foram trocados
+por `var(--st-*)` nos **6 badges** (`.proj-status-badge.quente/morno/frio/convertido/fechado/perdido`) **e** no **JS do
+botão** (`negAtualizarStatusBtn`, ternário de cor). Também normalizados `frio`/`convertido`/`perdido`, que liam dos
+aliases antigos (`--section`/`--ok`/`--muted`), para o token semântico `--st-*` (mesmo valor hoje, mas single-source e
+segue o tema claro/escuro — os `--st-*` já existiam no `:root` desde o item 1). Fundos rgba dos badges (padrão uniforme)
+e o `#c8a84b` **decorativo** (separador "→"/rótulo do valor do contrato ~L829/831 = dourado, não status) ficam fora do
+item — este último é hardcode de **marca** (deveria virar `var(--dalm-gold)`), sinalizado p/ limpeza futura. Só
+frontend (backend intocado, suíte 681); diff = troca de valores (ternário intacto). **Pendente do passo 2:** itens 5
+(`btn-primary` sem `.btn`), 6 (tipografia única + mono só em números), 7 (toggle persistido).
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:

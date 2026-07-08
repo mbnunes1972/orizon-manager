@@ -28,7 +28,13 @@ Ordem sugerida (independentes, incrementais):
    `--input-bg #1D2224`) e os hardcodes verdes/mint (`#0d160d`, `rgba(224,92,92…)`) trocados por `var(--…)`. A
    **fonte Epilogue permanece** (troca p/ Inter = item 6). *(Copy "Promob → Omie" na logo segue obsoleta — fora do
    escopo de paleta; sinalizado ao usuário.)*
-4. **Tokenizar as cores de status** hoje hardcoded (`#f05a50`, `#d4a017`, `#c8a84b`) para `--st-*`.
+4. ✅ **feito 2026-07-08** — **Tokenizar as cores de status** hoje hardcoded (`#f05a50`, `#d4a017`, `#c8a84b`)
+   para `--st-*`. Os **6 badges** (`.proj-status-badge.quente/morno/frio/convertido/fechado/perdido`) e o **JS do
+   botão de status** (`negAtualizarStatusBtn`) passaram a ler de `var(--st-*)` — inclusive `frio`/`convertido`/
+   `perdido`, que usavam os aliases antigos (`--section`/`--ok`/`--muted`); agora todos fluem do token semântico de
+   status (mesmo valor renderizado, mas single-source; segue o tema no claro/escuro). Os **fundos rgba** dos badges
+   (padrão uniforme do bloco) e o `#c8a84b` **decorativo** (separador "→"/rótulo do valor do contrato, linhas
+   ~829/831 — dourado, não status) ficam fora deste item.
 5. **Corrigir `class="btn-primary"` sem a base `.btn`** (perde padding/fonte — ex.: "+ Novo Cliente").
 6. **Unificar tipografia** — remover Epilogue, migrar para família sans única (Inter/system-ui) + **mono só em
    números** (valores monetários/numéricos em tabela).
