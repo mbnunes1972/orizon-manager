@@ -29,3 +29,22 @@ def test_set_tema_atualiza_e_valida(app_db):
     assert db3.get(app_db.Usuario, uid).tema == "claro"
     db3.close()
     assert auth.set_tema(999999, "escuro") is False
+
+
+def test_endpoint_preferencias_persiste_e_reflete_no_me(http_client_factory, seed, app_db):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/auth/preferencias", {"tema": "claro"})
+    assert st == 200 and d["ok"] is True and d["tema"] == "claro"
+    # round-trip: /api/auth/me reflete a preferência gravada
+    st2, me = c.get("/api/auth/me")
+    assert st2 == 200 and me["usuario"]["tema"] == "claro"
+
+def test_endpoint_preferencias_rejeita_tema_invalido(http_client_factory, seed, app_db):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/auth/preferencias", {"tema": "roxo"})
+    assert st == 400 and d["ok"] is False
+
+def test_endpoint_preferencias_exige_autenticacao(http_client_factory, seed, app_db):
+    c = http_client_factory()   # sem login
+    st, d = c.post("/api/auth/preferencias", {"tema": "claro"})
+    assert st == 401
