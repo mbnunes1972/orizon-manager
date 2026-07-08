@@ -57,6 +57,15 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Mono',monospac
 .page-sub{font-size:11px;color:var(--muted);margin-bottom:24px;letter-spacing:.3px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:16px}
 .card-title{font-family:'Epilogue',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px}
+.hub-faixa{margin-bottom:22px}
+.hub-faixa-title{font-family:'Epilogue',sans-serif;font-weight:700;font-size:11px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+.hub-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.hub-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px 18px;cursor:pointer;transition:.15s;display:flex;flex-direction:column;gap:6px}
+.hub-card:hover{border-color:var(--accent)}
+.hub-card.soon{opacity:.5;cursor:default}
+.hub-card.soon:hover{border-color:var(--border)}
+.hub-card-nome{font-family:'Epilogue',sans-serif;font-weight:700;font-size:14px;color:var(--text)}
+.hub-card-tag{font-size:9px;letter-spacing:.5px;color:var(--muted);text-transform:uppercase}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 label.field-label{font-size:10px;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:5px}
 input[type=text],input[type=password],input[type=number]{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none;transition:.15s}
@@ -407,6 +416,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <!-- Navegação -->
   <nav class="sb-nav">
     <div class="sb-nav-title">Menu</div>
+    <div class="nav-item" id="nav-08" onclick="goPage(8)">&#x1F3E0; Módulos</div>
     <div class="nav-item active" id="nav-00" onclick="goPage(0)">&#x25C8; Projetos</div>
     <div class="nav-item" id="nav-05" onclick="goPage(5)">&#x1F465; Clientes</div>
     <div class="nav-item" id="nav-06" onclick="goPage(6)">&#x1F91D; Parceiros</div>
@@ -714,6 +724,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="proj-search-hint" style="font-size:11px;color:var(--muted);height:16px;margin-bottom:8px"></div>
     <div id="proj-resultados"></div>
     </div>
+  </div>
+
+  <!-- PAGE 08: Hub de Modulos -->
+  <div class="page" id="page-08">
+    <div class="page-title">Módulos</div>
+    <div class="page-sub" id="hub-sub">Selecione um módulo para começar.</div>
+    <div id="hub-grupos"></div>
   </div>
 
   <!-- PAGE 02: Negociacao (novo layout) -->
@@ -2073,6 +2090,8 @@ function _aterrissarPorPapel(){
   if (u.pode_gerir_redes || u.nivel === 'admin_rede') {
     goPage(7);
   }
+  const ehAdmin = u.pode_gerir_redes || u.nivel === 'admin_rede';
+  if(!ehAdmin) goPage(8);   // operacional aterrissa no Hub de Módulos
 }
 
 function _carregarDadosExtrasUsuario(){
@@ -2302,8 +2321,38 @@ function goPage(n){
   if(n===5) cliCarregar();
   if(n===6) parCarregar();
   if(n===7){ adminCarregarConsole(); } // page-07: console
+  if(n===8) hubRender();
   if(n===9) cfgRenderizarPerfis();
 }
+
+// módulo -> ação de navegação (só os que têm tela real); ausentes = "em breve"
+const _HUB_DESTINO = {
+  comercial: () => goPage(0),   // Projetos
+  cadastro:  () => goPage(5),   // Clientes
+};
+
+function hubRender(){
+  const box = document.getElementById('hub-grupos');
+  if(!box) return;
+  const grupos = (_usuarioAtual && _usuarioAtual.hub) || null;
+  if(!grupos){ box.innerHTML = ''; return; }   // sem info -> não renderiza (compat)
+  box.innerHTML = grupos.map(g => `
+    <div class="hub-faixa">
+      <div class="hub-faixa-title">${esc(g.rotulo)}</div>
+      <div class="hub-cards">
+        ${g.modulos.map(m => {
+          const tem = !!_HUB_DESTINO[m.id];
+          return `<div class="hub-card${tem?'':' soon'}" ${tem?`onclick="_hubIr('${esc(m.id)}')"`:''}>
+            <span class="hub-card-nome">${esc(m.rotulo)}</span>
+            <span class="hub-card-tag">${tem?'Abrir →':'Em breve'}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function _hubIr(id){ const f = _HUB_DESTINO[id]; if(f) f(); }
+
 function unlockNav(n){
   const el = document.getElementById('nav-0'+n);
   if(el) el.classList.remove('locked');
