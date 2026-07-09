@@ -7327,6 +7327,18 @@ async function reconFechar(){
   if(d.ok) showToast('Período fechado (snapshot registrado)'); else showToast((d&&d.erro)||'Falha', true);
 }
 
+async function provVendaVer(){
+  const proj = (document.getElementById('pv-proj').value||'').trim();
+  const out = document.getElementById('pv-out');
+  if(!proj){ out.innerHTML=''; return; }
+  const r = await fetch('/api/financeiro/provisoes-venda?projeto='+encodeURIComponent(proj), {credentials:'same-origin'});
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ out.innerHTML='<em style="color:var(--muted);font-size:11px">'+esc((d&&d.erro)||'Falha')+'</em>'; return; }
+  const pv = d.provisoes_venda;
+  out.innerHTML = '<div style="max-width:420px;border:1px solid var(--border);border-radius:8px;padding:8px 10px">'
+    + pv.provisoes.map(l=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span>'+esc(l.nome)+'</span><span style="font-family:var(--font-mono)">'+_fBRL(l.saldo_em_aberto)+'</span></div>').join('')
+    + '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;border-top:1px solid var(--border-strong);padding-top:4px;margin-top:4px"><span>Total em aberto</span><span style="font-family:var(--font-mono);color:var(--accent)">'+_fBRL(pv.total_em_aberto)+'</span></div></div>';
+}
 async function projDreCarregar(){
   const box = document.getElementById('proj-dre-box');
   if(!box) return;
@@ -7346,7 +7358,13 @@ async function projDreCarregar(){
     +cel(p.receita)+cel(p.custo_produto,true)+cel(p.prov_montagem,true)+cel(p.prov_assistencia,true)+cel(p.prov_garantia,true)+cel(p.comissao,true)
     +'<td style="text-align:right;padding:5px 8px;font-family:var(--font-mono);font-weight:700;color:'+(p.margem_contribuicao<0?'var(--st-quente)':'var(--accent)')+'">'+_fBRL(p.margem_contribuicao)+'</td></tr>'
     ).join('');
-  box.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Margem de contribuição por projeto (não inclui rateio de custo fixo — isso é a Auditoria).</div>'
+  box.innerHTML =
+     '<div style="display:flex;gap:8px;align-items:end;margin-bottom:12px">'
+    +'<div style="flex:1"><label class="field-label">Provisões em aberto de um projeto (Montagem/Assistência/Garantia)</label>'
+    +'<input id="pv-proj" type="text" placeholder="projeto (nome_safe)" style="'+_finInput+'"></div>'
+    +'<button class="btn btn-ghost btn-sm" onclick="provVendaVer()">Ver provisões</button></div>'
+    +'<div id="pv-out" style="margin-bottom:14px"></div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Margem de contribuição por projeto (não inclui rateio de custo fixo — isso é a Auditoria).</div>'
     + '<table style="width:100%;border-collapse:collapse">'+head+linhas+'</table>';
 }
 
@@ -7547,6 +7565,14 @@ async function adminFinanceiroCarregar(){
       ${campo('fin-assist','% Assistências',prov.assist_pct)}
       ${campo('fin-ins','% Insumos locais',prov.ins_loc_pct)}
     </div>
+    <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:14px 0 4px">Provisões contábeis (constituídas no fechamento da venda — v6 §6.4)</div>
+    <div class="grid2" style="gap:14px;margin-bottom:14px">
+      ${campo('fin-prov-mont','% Provisão de Montagem',(_cfgFin.provisoes_contabeis||{}).montagem_pct)}
+      ${campo('fin-prov-gar','% Provisão de Garantia',(_cfgFin.provisoes_contabeis||{}).garantia_pct)}
+      <div><label class="field-label">% Provisão de Assistência (herda "% Assistências")</label>
+        <input type="number" value="${prov.assist_pct||0}" disabled
+         style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--muted);font-size:12px"></div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:0;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" onclick="adminFinanceiroSalvar(${lid})">Salvar provisões</button>
       <button class="btn btn-ghost btn-sm" onclick="abrirModalComissao(${lid})">Configurar comissão de vendas</button>
@@ -7557,6 +7583,7 @@ async function adminFinanceiroSalvar(lid){
   _cfgFin.defaults_negociacao = {comissao_arq_pct:n('fin-com-arq'), fidelidade_pct:n('fin-fid'), carga_trib_pct:n('fin-trib')};
   _cfgFin.provisoes = {frete_fab_pct:n('fin-frete-fab'), com_adm_pct:n('fin-com-adm'), com_med_pct:n('fin-com-med'),
     com_proj_exec_pct:n('fin-com-pe'), frete_loc_pct:n('fin-frete-loc'), assist_pct:n('fin-assist'), ins_loc_pct:n('fin-ins')};
+  _cfgFin.provisoes_contabeis = {montagem_pct:n('fin-prov-mont'), garantia_pct:n('fin-prov-gar')};
   const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {method:'PUT', credentials:'same-origin',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify(_cfgFin)});
   const d = await r.json();

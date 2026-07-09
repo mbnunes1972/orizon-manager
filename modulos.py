@@ -53,7 +53,8 @@ MODULOS = {
                     "rotas": ["/api/provisoes", "/api/financeiro/contas", "/api/financeiro/lancamentos",
                               "/api/financeiro/eventos", "/api/financeiro/dre", "/api/financeiro/projetos-dre",
                               "/api/financeiro/reconciliar", "/api/financeiro/periodos", "/api/financeiro/balanco",
-                              "/api/financeiro/repasse-fabrica", "/api/financeiro/sugerir-conta"]},
+                              "/api/financeiro/repasse-fabrica", "/api/financeiro/sugerir-conta",
+                              "/api/financeiro/provisoes-venda"]},
     # domínios NOVOS — fronteira só (stub, sem código/tabela hoje)
     "estoque":     {"camada": "dominio", "depende_de": ["cadastro", "producao"], "rotulo": "Estoque", "faixa": "expedicao",
                     "arquivos": [], "tabelas": [], "rotas": []},

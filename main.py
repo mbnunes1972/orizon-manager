@@ -327,6 +327,27 @@ def _fin_evento_seguro(loja_id, tipo_evento, valor, projeto_id, ref):
         logging.getLogger(__name__).warning("wiring financeiro (%s, ref=%s) falhou: %s", tipo_evento, ref, e)
 
 
+def _fin_provisoes_venda_seguro(loja_id, projeto_id, valor_venda, ref_base):
+    """Auto-constitui as 3 provisões contábeis no fechamento da venda (v6 §6.4), a partir do %
+    configurado no Financeiro da loja. **Fail-soft/isolado/idempotente** — não aborta o contrato."""
+    try:
+        if not loja_id or not valor_venda or float(valor_venda) <= 0:
+            return
+        import mod_contabil, mod_tenancy
+        db = get_session()
+        try:
+            loja = db.get(Loja, loja_id)
+            if loja is None or not mod_tenancy.modulo_ativo(loja, "financeiro"):
+                return
+            cfg = json.loads(loja.config_financeira_json) if loja.config_financeira_json else {}
+            ot, oid = mod_contabil.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+            mod_contabil.constituir_provisoes_venda(db, ot, oid, projeto_id, float(valor_venda), cfg, ref_base)
+        finally:
+            db.close()
+    except Exception as e:
+        logging.getLogger(__name__).warning("wiring provisões da venda (ref=%s) falhou: %s", ref_base, e)
+
+
 _REQ_LOJA_ATIVA = None   # header X-Loja-Ativa da requisição atual (HTTPServer single-thread)
 
 def _ler_loja_ativa_header(handler):
@@ -458,6 +479,21 @@ class Handler(BaseHTTPRequestHandler):
             ini = _parse_data((qs.get("ini") or [None])[0]); fim = _parse_data((qs.get("fim") or [None])[0])
             try:
                 self.send_json({"ok": True, "repasse": mod_contabil.total_a_cobrar_fabrica(db, ot, oid, ini=ini, fim=fim)})
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/provisoes-venda":
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            from urllib.parse import parse_qs
+            usuario, db, ot, oid = ctx
+            proj = (parse_qs(urlparse(self.path).query).get("projeto") or [None])[0]
+            try:
+                if not proj:
+                    self.send_json({"ok": False, "erro": "informe ?projeto="}, code=400)
+                else:
+                    self.send_json({"ok": True, "provisoes_venda": mod_contabil.provisoes_da_venda(db, ot, oid, proj)})
             finally:
                 db.close()
             return
@@ -4188,9 +4224,13 @@ class Handler(BaseHTTPRequestHandler):
                         db.add(etapa7)
                     etapa7.status = "em_andamento"
                     db.commit()
-                    _registrar_provisao_venda(db, db.get(Orcamento, contrato.orcamento_id),
+                    _orc_venda = db.get(Orcamento, contrato.orcamento_id)
+                    _registrar_provisao_venda(db, _orc_venda,
                                               por_id=(usuario.get("id") if usuario else None))
                     db.commit()
+                    # v6 §6.4: auto-constitui as 3 provisões contábeis (% × valor da venda), fail-soft
+                    _fin_provisoes_venda_seguro(getattr(_orc_venda, "loja_id", None), nome_safe,
+                                                getattr(_orc_venda, "valor_total", 0), "prov:" + str(contrato.id))
                     resp = {"ok": True, "contrato_id": contrato.id, "status": "para_assinatura"}
                     self.send_json(resp)
                 except Exception as e:

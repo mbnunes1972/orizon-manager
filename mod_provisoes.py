@@ -22,6 +22,9 @@ def config_financeira_default():
     return {
         "defaults_negociacao": {"comissao_arq_pct": 0.0, "fidelidade_pct": 0.0, "carga_trib_pct": 0.0},
         "provisoes": {k: 0.0 for k in _PROV_KEYS},
+        # v6 §6.4: % contábil das provisões constituídas no fechamento (Financeiro, desacoplado do preço).
+        # assistencia herda provisoes.assist_pct → não fica aqui; só montagem/garantia são config nova.
+        "provisoes_contabeis": {"montagem_pct": 0.0, "garantia_pct": 0.0},
         "comissao_vendas": {
             "meta_mensal": 0.0,
             "faixas_comissao": [{"venda_ate": None, "pct": 0.0}],
@@ -44,6 +47,10 @@ def validar_config_financeira(dados):
             erros.append(f"Default {k} não pode ser negativo.")
         elif _f(v) > 100:
             erros.append(f"Default {k} não pode passar de 100%.")
+    for k in ("montagem_pct", "garantia_pct"):     # provisões contábeis (v6 §6.4)
+        v = (d.get("provisoes_contabeis", {}) or {}).get(k)
+        if _f(v) < 0 or _f(v) > 100:
+            erros.append(f"Provisão contábil {k} deve estar entre 0 e 100%.")
     cv = d.get("comissao_vendas", {}) or {}
     faixas = cv.get("faixas_comissao", [])
     if not faixas:

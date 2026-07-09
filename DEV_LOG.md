@@ -1850,3 +1850,18 @@ Front 3 — **DRE Analítico×Resumido (v5 §3.1, branch `feat/fin-v5-dre-toggle
 Front 4b — **Controle de Repasse à Fábrica (v5 §6.2, branch `feat/fin-v5-repasse`, suíte 733→736):** `Lancamento` ganhou `motivo` (‘defeito_fabrica’|‘outro’, migração idempotente) — dimensão do reparo em garantia, no padrão do projeto_id. `registrar_evento(motivo=)` propaga; `total_a_cobrar_fabrica()` soma os `execucao_reparo_garantia` marcados defeito de fábrica. API `GET /api/financeiro/repasse-fabrica`; aba **Repasse Fábrica** (total + registrar reparo com motivo). **Não** cria Contas a Receber (só fase 2, se a fábrica reembolsar). TDD (2 unit + 1 HTTP).
 
 Front 4c — **IA de apoio à classificação (v5 §6.3, branch `feat/fin-v5-ia`, suíte 736→740):** `sugerir_conta(owner, texto)` — **heurística sem LLM externo**: sobreposição de tokens (sem acento) entre o texto e o nome da conta + histórico de lançamentos, **ponderada por IDF** (token raro como ‘aluguel’ pesa mais que comum como ‘loja’). API `POST /api/financeiro/sugerir-conta`; na aba Lançamentos, campo “descreva o evento” → pré-preenche o Débito. **Nunca lança sozinha** — funcionário confirma/troca; a **sugestão + a escolhida** ficam registradas em `Lancamento.ia_sugestao` (mesmo princípio de snapshot dos gates). Arquitetura plugável p/ LLM depois. TDD (3 unit + 1 HTTP). **✅ ATUALIZAÇÃO v2→v5 COMPLETA** — 5 fronts (selo de posição §2.3 · DRE Analítico×Resumido §3.1 · Balanço Patrimonial §4 · 3 provisões §5/§6 · Repasse à Fábrica §6.2 · IA §6.3). Suíte 730→740. **Follow-up:** painel de provisões DA VENDA + wiring `fechamento_venda_*` no contrato.
+
+**Módulo Financeiro — v5→v6 + integração das Provisões da Venda (`Especificacao_Financeiro_Orizon_v6.docx` agora é a
+FONTE DE VERDADE; branch `feat/fin-v6-provisoes-venda`, suíte 740→744):** a v6 = v5 + **§6.4** (origem do valor das
+provisões = **percentual configurável**) e **§6.5** (conexão com o Gate I). Implementado: **config `provisoes_contabeis`
+{montagem_pct, garantia_pct}** no painel de Provisões do Financeiro (default + validação 0–100; UI com 3 campos), e
+**assistência HERDA `provisoes.assist_pct`** (não recria o dado). `mod_contabil.pcts_provisao_venda(cfg)` +
+`constituir_provisoes_venda(...)` (valor = % × valor da venda; idempotente por ref; só constitui % > 0) — **wirada na
+criação do contrato** (`_fin_provisoes_venda_seguro`, fail-soft/isolado, após `_registrar_provisao_venda`, valor =
+`orc.valor_total`). **Fronteira preservada:** os % ficam no Financeiro, desacoplados do motor de preço do Comercial
+(§6.4). **Painel de Provisões da venda:** `provisoes_da_venda(owner, projeto)` = as 3 provisões com **saldo em aberto**
+(constituído − revertido = saldo credor da conta 2.1.04.x por projeto); API `GET /api/financeiro/provisoes-venda?
+projeto=` + lookup na aba Margem/Projeto. TDD (4 unit). **§6.5 (Gate I):** os valores das 3 provisões já ficam
+**queryáveis** (via `provisoes_da_venda`) para compor o snapshot do Gate I — as regras do gate não mudam (aprovação
+humana, IA só apresenta, snapshot auditável); **surfacing na tela de revisão do gate = conexão a fazer** quando o Gate
+I for tocado. **✅ v6 completa.**

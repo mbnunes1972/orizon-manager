@@ -354,6 +354,59 @@ def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=No
                   historico=historico or hist_pad, ref=ref, motivo=motivo)
 
 
+# ── Provisões da venda: % configurável + auto-constituição no fechamento (v6 §6.4) ──
+_PROV_VENDA = {   # chave -> (evento de constituição, código da conta de Provisão no Passivo)
+    "montagem":    ("fechamento_venda_montagem",    "2.1.04.02"),
+    "assistencia": ("fechamento_venda_assistencia", "2.1.04.05"),
+    "garantia":    ("fechamento_venda_garantia",    "2.1.04.03"),
+}
+
+
+def _cfg_f(v):
+    try:
+        return float(v or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def pcts_provisao_venda(cfg):
+    """% das 3 provisões (v6 §6.4): montagem/garantia da config nova `provisoes_contabeis`;
+    **assistência herda** `provisoes.assist_pct` da negociação (não recria o dado)."""
+    cfg = cfg or {}
+    pc = cfg.get("provisoes_contabeis", {}) or {}
+    return {"montagem": _cfg_f(pc.get("montagem_pct")),
+            "assistencia": _cfg_f((cfg.get("provisoes", {}) or {}).get("assist_pct")),
+            "garantia": _cfg_f(pc.get("garantia_pct"))}
+
+
+def constituir_provisoes_venda(db, owner_tipo, owner_id, projeto_id, valor_venda, cfg, ref_base):
+    """Auto-constitui as 3 provisões no fechamento da venda (v6 §6.4): valor = % × valor_venda.
+    Idempotente por `ref` (ref_base:<chave>). Só constitui as com % > 0. Retorna os lançamentos."""
+    pcts = pcts_provisao_venda(cfg)
+    out = []
+    for chave, (evento, _cod) in _PROV_VENDA.items():
+        val = round(_cfg_f(valor_venda) * pcts[chave] / 100.0, 2)
+        if val > 0:
+            out.append(registrar_evento(db, owner_tipo, owner_id, evento, val,
+                                        projeto_id=projeto_id, ref=ref_base + ":" + chave))
+    return out
+
+
+def provisoes_da_venda(db, owner_tipo, owner_id, projeto_id, ini=None, fim=None):
+    """Painel de Provisões da venda (v6 §6): as 3 provisões do projeto com o saldo EM ABERTO
+    (constituído − revertido) = saldo da conta de Provisão (credora) filtrado pelo projeto."""
+    linhas = []
+    for chave, (_ev, cod) in _PROV_VENDA.items():
+        c = db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, codigo=cod).first()
+        saldo = 0.0
+        if c is not None:
+            saldo = _mov(db, owner_tipo, owner_id, cod, "credor", ini, fim, projeto_id=projeto_id)
+        linhas.append({"chave": chave, "codigo": cod, "nome": c.nome if c else chave,
+                       "saldo_em_aberto": saldo})
+    return {"projeto_id": projeto_id, "provisoes": linhas,
+            "total_em_aberto": round(sum(l["saldo_em_aberto"] for l in linhas), 2)}
+
+
 def _norm_tokens(s):
     import re as _re, unicodedata as _u
     s = _u.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
