@@ -1341,11 +1341,11 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 
 ## ⏸️ ESTADO ATUAL (2026-07-07) — retomar aqui
 
-> **🚀 Deploy no VPS (2026-07-09):** servidor online `http://167.88.33.121:8765` atualizado para **`7ff3cf0`** —
-> **Módulo Financeiro completo (sub-projetos #1–#6)** + os ajustes de design (hub/sidebar/abas). As **3 tabelas novas**
-> (`conta`/`lancamento`/`periodo_contabil`) foram **criadas no start** (create_all), **banco preservado**, HTTP 302
-> local / **200 externo**, sem erros. _(Deploy anterior 2026-07-08 → `f36b72b`: modularização Fase 1 + hub de módulos +
-> navegação + parceiros + escopo do Admin + passo 2 de design 1–7. App em screen `orizon-manager`, bind `0.0.0.0`.)_ **Banco PRESERVADO desta vez** (a pedido): NÃO houve
+> **🚀 Deploy no VPS (2026-07-09, mais recente = `3d60a43`):** servidor online `http://167.88.33.121:8765` — **Módulo
+> Financeiro completo (#1–#6) + wiring do faturamento + atualização v2→v5 (5 fronts)**. Migrações idempotentes rodaram
+> no start (colunas `lancamento.ref/motivo/ia_sugestao`; backfill das 3 provisões no 1º acesso ao Plano de Contas por
+> owner). **Banco preservado**, HTTP 302 local / **200 externo**, sem erros. _(Antes → `7ff3cf0`: Financeiro #1–#6 +
+> tabelas conta/lancamento/periodo_contabil criadas no start; e `f36b72b`: modularização + design.)_ **Banco PRESERVADO desta vez** (a pedido): NÃO houve
 > `rm orizon.db`/seed — as **migrações idempotentes rodaram no start** e adicionaram as colunas novas
 > (`Loja.modulos_ativos`, `Usuario.tema` → confirmado presente). Dados de teste do VPS mantidos. **Contexto:** o VPS
 > é ambiente **de dev/teste aberto a pessoas remotas**, ainda **não** há produção operacional; dados são falsos.
