@@ -7323,7 +7323,7 @@ async function lancamentosCarregar(){
   const dc = await rc.json().catch(()=>({}));
   const flat=[]; (function walk(ns){(ns||[]).forEach(n=>{ if(n.tipo==='analitica') flat.push(n); walk(n.filhos); });})(dc.contas);
   const byId={}; flat.forEach(n=>byId[n.id]=n.codigo);
-  const opts = flat.map(n=>'<option value="'+n.id+'">'+esc(n.codigo+' — '+n.nome)+'</option>').join('');
+  const opts = flat.map(n=>'<option value="'+n.id+'">'+esc('['+_finSelo(n.grupo)+'] '+n.codigo+' — '+n.nome)+'</option>').join('');
   const dl = await (await fetch('/api/financeiro/lancamentos', {credentials:'same-origin'})).json().catch(()=>({}));
   const lista = (dl.lancamentos||[]).map(l=>
      '<div style="display:flex;gap:10px;padding:5px 8px;border-bottom:1px solid var(--border);font-size:11px">'
@@ -7368,11 +7368,19 @@ async function planoContasCarregar(){
     + d.contas.map(c => _pcNode(c, 0)).join('');
 }
 
+// Selo de posição no Balanço (§2.3): grupo 1–5 -> Ativo/Passivo/PL/Receita/Despesa
+const _FIN_SELO = {1:'Ativo', 2:'Passivo', 3:'PL', 4:'Receita', 5:'Despesa'};
+function _finSelo(grupo){ return _FIN_SELO[grupo] || '—'; }
+function _finSeloBadge(grupo){
+  return '<span style="font-size:8px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);'
+    +'border:1px solid var(--border);border-radius:6px;padding:1px 5px;margin-left:8px">'+esc(_finSelo(grupo))+'</span>';
+}
+
 function _pcNode(c, nivel){
   const pad = 12 + nivel*18;
   const sint = c.tipo === 'sintetica';
   const cod  = '<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-right:8px">'+esc(c.codigo)+'</span>';
-  const nome = '<span style="font-weight:'+(sint?700:400)+';color:var(--text)">'+esc(c.nome)+'</span>';
+  const nome = '<span style="font-weight:'+(sint?700:400)+';color:var(--text)">'+esc(c.nome)+'</span>'+_finSeloBadge(c.grupo);
   const acoes = '<span style="margin-left:auto;display:flex;gap:6px">'
     + '<button class="btn btn-ghost btn-sm" onclick="pcNovo('+c.id+')">+ filho</button>'
     + '<button class="btn btn-ghost btn-sm" onclick="pcRenomear('+c.id+')">renomear</button>'
