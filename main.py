@@ -497,6 +497,16 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/financeiro/dashboard":
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                self.send_json({"ok": True, "dashboard": mod_contabil.dashboard_financeiro(db, ot, oid)})
+            finally:
+                db.close()
+            return
         if path == "/":
             usuario = get_usuario_sessao(self)
             if not usuario:

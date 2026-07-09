@@ -392,6 +392,34 @@ def constituir_provisoes_venda(db, owner_tipo, owner_id, projeto_id, valor_venda
     return out
 
 
+def dashboard_financeiro(db, owner_tipo, owner_id, ini=None, fim=None):
+    """Dashboard do Financeiro (Padrao_Design_Orizon_v4 §5): saldo em aberto das 3 provisões
+    (nível owner), resumo do DRE e indicador de cobertura de caixa (v6 §6.1: caixa vs provisões)."""
+    seed_plano(db, owner_tipo, owner_id)
+    prov_meta = [
+        ("2.1.04.02", "Provisão de Montagem",           "Custo direto da venda · reverte na execução"),
+        ("2.1.04.05", "Provisão de Assistência Técnica", "Custo da loja · reverte no atendimento"),
+        ("2.1.04.03", "Provisão de Garantia",            "Repasse à fábrica · controle de cobrança"),
+    ]
+    provs = []
+    for cod, nome, sub in prov_meta:
+        c = db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, codigo=cod).first()
+        saldo = saldo_conta(db, owner_tipo, owner_id, c.id, ini, fim) if c else 0.0
+        provs.append({"codigo": cod, "nome": nome, "sub": sub, "saldo_em_aberto": saldo})
+    total_prov = round(sum(p["saldo_em_aberto"] for p in provs), 2)
+    d = dre(db, owner_tipo, owner_id, ini, fim)
+    caixa_c = db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, codigo="1.1.01").first()
+    caixa = saldo_conta(db, owner_tipo, owner_id, caixa_c.id, None, fim) if caixa_c else 0.0
+    indice = round(caixa / total_prov, 2) if total_prov > 0 else None
+    return {
+        "provisoes": provs,
+        "total_provisoes_abertas": total_prov,
+        "dre_resumo": {"receita_liquida": d["receita_liquida"], "ebitda": d["ebitda"],
+                       "lucro_liquido": d["lucro_liquido"]},
+        "cobertura_caixa": {"caixa": caixa, "provisoes_abertas": total_prov, "indice": indice},
+    }
+
+
 def provisoes_da_venda(db, owner_tipo, owner_id, projeto_id, ini=None, fim=None):
     """Painel de Provisões da venda (v6 §6): as 3 provisões do projeto com o saldo EM ABERTO
     (constituído − revertido) = saldo da conta de Provisão (credora) filtrado pelo projeto."""

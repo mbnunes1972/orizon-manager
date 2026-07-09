@@ -7215,7 +7215,7 @@ async function adminLojaProjetosCarregar(){
 
 // ── Financeiro: seções no SUBMENU da sidebar (v4 §4) — não mais tabs no conteúdo ──
 const _FIN_SECOES = [
-  {id:'prov',    lbl:'Provisões',       load:()=>adminFinanceiroCarregar()},
+  {id:'prov',    lbl:'Provisões',       load:()=>finDashboardCarregar()},
   {id:'plano',   lbl:'Plano de Contas', load:()=>planoContasCarregar()},
   {id:'lanc',    lbl:'Lançamentos',     load:()=>lancamentosCarregar()},
   {id:'dre',     lbl:'DRE',             load:()=>dreCarregar()},
@@ -7232,6 +7232,35 @@ function finSubmenuRender(){
     + _FIN_SECOES.map(s => '<div class="nav-item nav-sub'+(s.id===_finSecaoAtual?' active':'')
         +'" onclick="finTab(\''+s.id+'\')"><span class="nav-dot"></span>'+esc(s.lbl)+'</div>').join('');
   box.style.display = '';
+}
+async function finDashboardCarregar(){
+  const box = document.getElementById('loja-panel-financeiro');
+  if(!box) return;
+  const r = await fetch('/api/financeiro/dashboard', {credentials:'same-origin'});
+  if(r.status===403){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Módulo financeiro inativo ou sem acesso.</em>'; return; }
+  const d = (await r.json().catch(()=>({}))).dashboard;
+  if(!d){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Falha ao carregar o dashboard.</em>'; return; }
+  const card = inner => '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:16px 20px;margin-bottom:12px">'+inner+'</div>';
+  const provs = d.provisoes.map(p => card(
+     '<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+    +'<div><div style="font-weight:700;color:var(--text);font-size:14px">'+esc(p.nome)+'</div>'
+    +'<div style="font-size:12px;color:var(--muted);margin-top:2px">'+esc(p.sub)+'</div></div>'
+    +'<div style="text-align:right"><div style="font-family:var(--font-mono);font-weight:700;font-size:15px;color:var(--text)">'+_fBRL(p.saldo_em_aberto)+'</div>'
+    +'<div style="font-size:11px;color:var(--muted)">saldo em aberto</div></div></div>')).join('');
+  const dre=d.dre_resumo, cob=d.cobertura_caixa;
+  const mini=(lbl,val,cor)=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--muted)">'+lbl+'</span><span style="font-family:var(--font-mono);color:'+(cor||'var(--text)')+'">'+val+'</span></div>';
+  const apoio='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+    +card('<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Resumo do DRE</div>'
+        +mini('Receita líquida',_fBRL(dre.receita_liquida))+mini('EBITDA',_fBRL(dre.ebitda))+mini('Lucro líquido',_fBRL(dre.lucro_liquido),'var(--accent)'))
+    +card('<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Cobertura de caixa</div>'
+        +mini('Caixa/Bancos',_fBRL(cob.caixa))+mini('Provisões em aberto',_fBRL(cob.provisoes_abertas))
+        +mini('Índice de cobertura', cob.indice==null?'—':(Number(cob.indice).toFixed(2)+'×'), (cob.indice!=null&&cob.indice<1)?'var(--warn)':'var(--accent)'))
+    +'</div>';
+  box.innerHTML =
+     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    +'<span style="font-size:13px;color:var(--muted)">'+d.provisoes.length+' provisões monitoradas · total em aberto <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(d.total_provisoes_abertas)+'</strong></span>'
+    +'<button class="btn btn-ghost btn-sm" onclick="adminFinanceiroCarregar()">Configurar %</button></div>'
+    + provs + apoio;
 }
 function finTab(t){
   _finSecaoAtual = t;
