@@ -1605,6 +1605,17 @@ tem a sua) — espelha o Emitente. Manifesto `modulos.py` atualizado (financeiro
 para valer localmente. Spec/plano: `docs/superpowers/specs|plans/2026-07-09-plano-de-contas*`; **fonte de verdade do
 plano de contas = o `.docx`**. **Próximo:** #2 Livro de Lançamentos (introduz `projeto_id` e ativa `_tem_lancamentos`).
 
+**Módulo Financeiro — sub-projeto #2: Livro de Lançamentos (2026-07-09, branch `feat/financeiro-lancamentos`, suíte
+699→707):** modelo **`Lancamento`** (partida dobrada: `conta_debito_id`/`conta_credito_id`, `valor`, `data` de
+competência, **`projeto_id`** = nome_safe da dimensão gerencial, `origem`, `historico`) + motor em `mod_contabil`:
+`lancar` (valida valor>0, contas distintas, **ambas analíticas ativas do mesmo owner**), `saldo_conta` (na natureza:
+devedora D−C / credora C−D), `razao` (extrato com saldo corrido), `listar_lancamentos`; e **`_tem_lancamentos` agora é
+real** → conta com lançamento **não apaga, inativa** (fecha a regra do #1). API: `POST /api/financeiro/lancamentos`,
+`GET /api/financeiro/lancamentos?projeto=&ini=&fim=`, `GET /api/financeiro/contas/<id>/razao`. UI: **aba Lançamentos**
+na page-12 (form débito/crédito/valor/projeto/histórico + lista). Manifesto += `lancamento`/rota. TDD (5 unit + 3 HTTP);
+**app_db é module-scoped** → cada teste do livro usa contas distintas (isolamento). **Corte:** o motor evento→lançamento
+que **popula** o livro é o #3; entrada manual existe via UI/API. **Próximo:** #3 (as 5 regras evento→lançamento).
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:

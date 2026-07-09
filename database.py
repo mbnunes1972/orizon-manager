@@ -451,6 +451,23 @@ class Conta(Base):
     __table_args__ = (UniqueConstraint("owner_tipo", "owner_id", "codigo", name="uq_conta_owner_codigo"),)
 
 
+class Lancamento(Base):
+    """Lançamento contábil (partida dobrada) do Livro. Módulo Financeiro sub-projeto #2.
+    Carrega projeto_id (dimensão gerencial, = nome_safe). `data` = competência."""
+    __tablename__ = "lancamento"
+    id               = Column(Integer, primary_key=True, autoincrement=True)
+    owner_tipo       = Column(String(10), nullable=False)
+    owner_id         = Column(Integer,    nullable=False)
+    data             = Column(DateTime,   nullable=False, default=datetime.utcnow)
+    conta_debito_id  = Column(Integer, ForeignKey("conta.id"), nullable=False)
+    conta_credito_id = Column(Integer, ForeignKey("conta.id"), nullable=False)
+    valor            = Column(Float,      nullable=False)
+    projeto_id       = Column(String,     nullable=True)    # nome_safe (dimensão gerencial)
+    origem           = Column(String(30), nullable=False, default="manual")   # 'manual' | tipo de evento
+    historico        = Column(Text,       nullable=True)
+    criado_em        = Column(DateTime,   default=datetime.utcnow)
+
+
 class Contrato(Base):
     """Contrato gerado a partir do orçamento aprovado."""
     __tablename__ = "contratos"

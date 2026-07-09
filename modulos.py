@@ -49,8 +49,8 @@ MODULOS = {
                     "rotas": ["/api/projetos/", "/api/admin/lojas/", "/api/admin/redes/"]},
     "financeiro":  {"camada": "dominio", "depende_de": ["comercial"], "rotulo": "Financeiro", "faixa": "financeiro",
                     "arquivos": ["mod_provisoes.py", "mod_contabil.py"],
-                    "tabelas": ["provisao_registro", "conta"],
-                    "rotas": ["/api/provisoes", "/api/financeiro/contas"]},
+                    "tabelas": ["provisao_registro", "conta", "lancamento"],
+                    "rotas": ["/api/provisoes", "/api/financeiro/contas", "/api/financeiro/lancamentos"]},
     # domínios NOVOS — fronteira só (stub, sem código/tabela hoje)
     "estoque":     {"camada": "dominio", "depende_de": ["cadastro", "producao"], "rotulo": "Estoque", "faixa": "expedicao",
                     "arquivos": [], "tabelas": [], "rotas": []},

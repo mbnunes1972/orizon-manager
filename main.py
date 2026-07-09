@@ -290,6 +290,20 @@ def _contabil_ctx(handler, exige_edicao):
     return usuario, db, ot, oid
 
 
+def _parse_data(s):
+    """String ISO ('2026-07-09' ou datetime completo) -> datetime, ou None."""
+    if not s:
+        return None
+    from datetime import datetime as _dt
+    try:
+        return _dt.fromisoformat(s)
+    except ValueError:
+        try:
+            return _dt.strptime(s, "%Y-%m-%d")
+        except ValueError:
+            return None
+
+
 _REQ_LOJA_ATIVA = None   # header X-Loja-Ativa da requisição atual (HTTPServer single-thread)
 
 def _ler_loja_ativa_header(handler):
@@ -324,6 +338,40 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 contas = mod_contabil.listar_contas(db, ot, oid, incluir_inativas=inc)
                 self.send_json({"ok": True, "contas": contas})
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/lancamentos":
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            from urllib.parse import parse_qs
+            usuario, db, ot, oid = ctx
+            qs = parse_qs(urlparse(self.path).query)
+            proj = (qs.get("projeto") or [None])[0]
+            ini = _parse_data((qs.get("ini") or [None])[0])
+            fim = _parse_data((qs.get("fim") or [None])[0])
+            try:
+                lans = mod_contabil.listar_lancamentos(db, ot, oid, projeto_id=proj, ini=ini, fim=fim)
+                self.send_json({"ok": True, "lancamentos": lans})
+            finally:
+                db.close()
+            return
+        m_razao = re.match(r"^/api/financeiro/contas/(\d+)/razao$", path)
+        if m_razao:
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            from urllib.parse import parse_qs
+            usuario, db, ot, oid = ctx
+            qs = parse_qs(urlparse(self.path).query)
+            ini = _parse_data((qs.get("ini") or [None])[0])
+            fim = _parse_data((qs.get("fim") or [None])[0])
+            try:
+                r = mod_contabil.razao(db, ot, oid, int(m_razao.group(1)), ini=ini, fim=fim)
+                self.send_json({"ok": True, "razao": r})
+            except (ValueError, PermissionError) as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400 if isinstance(e, ValueError) else 403)
             finally:
                 db.close()
             return
@@ -1695,6 +1743,29 @@ class Handler(BaseHTTPRequestHandler):
             except PermissionError as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=403)
             except ValueError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/lancamentos":
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                lan = mod_contabil.lancar(
+                    db, ot, oid,
+                    conta_debito_id=dd.get("conta_debito_id"),
+                    conta_credito_id=dd.get("conta_credito_id"),
+                    valor=dd.get("valor"),
+                    data=_parse_data(dd.get("data")),
+                    projeto_id=dd.get("projeto_id"),
+                    historico=dd.get("historico", ""))
+                self.send_json({"ok": True, "lancamento": lan}, code=201)
+            except PermissionError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=403)
+            except (ValueError, TypeError) as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=400)
             finally:
                 db.close()

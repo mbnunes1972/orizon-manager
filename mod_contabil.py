@@ -1,6 +1,6 @@
 """mod_contabil.py — motor contábil (domínio financeiro). Sub-projeto #1: Plano de Contas.
 Fonte de verdade: Especificacao_Financeiro_Orizon_v2.docx §2/§2.1."""
-from database import get_session, Conta, Loja
+from database import get_session, Conta, Loja, Lancamento
 
 # Plano-padrão (codigo, nome) — pai = prefixo; tipo/natureza derivados. Ordem = ordem contábil.
 PLANO_PADRAO = [
@@ -154,7 +154,10 @@ def _tem_filhos(db, conta):
 
 
 def _tem_lancamentos(db, conta):
-    return False   # sub-projeto #2 (Livro de Lançamentos) implementa de verdade
+    from sqlalchemy import or_
+    return db.query(Lancamento).filter_by(owner_tipo=conta.owner_tipo, owner_id=conta.owner_id).filter(
+        or_(Lancamento.conta_debito_id == conta.id,
+            Lancamento.conta_credito_id == conta.id)).first() is not None
 
 
 def _proximo_codigo(db, pai):
@@ -208,3 +211,81 @@ def remover_conta(db, owner_tipo, owner_id, conta_id):
     c.ativa = 0
     db.commit()
     return {"acao": "inativada", "id": conta_id}
+
+
+# ── Livro de Lançamentos (sub-projeto #2) ────────────────────────────────────
+def _lanc_serial(l):
+    return {"id": l.id, "data": l.data.isoformat() if l.data else None, "valor": l.valor,
+            "conta_debito_id": l.conta_debito_id, "conta_credito_id": l.conta_credito_id,
+            "projeto_id": l.projeto_id, "origem": l.origem, "historico": l.historico}
+
+
+def lancar(db, owner_tipo, owner_id, conta_debito_id, conta_credito_id, valor,
+           data=None, projeto_id=None, origem="manual", historico=""):
+    """Registra um lançamento de partida dobrada. Débito e crédito devem ser contas
+    ANALÍTICAS ativas do mesmo owner; valor > 0; contas distintas."""
+    if valor is None or float(valor) <= 0:
+        raise ValueError("valor deve ser > 0")
+    if conta_debito_id == conta_credito_id:
+        raise ValueError("débito e crédito não podem ser a mesma conta")
+    cd = _get_own(db, owner_tipo, owner_id, conta_debito_id)
+    cc = _get_own(db, owner_tipo, owner_id, conta_credito_id)
+    for c in (cd, cc):
+        if c.tipo != "analitica":
+            raise ValueError("conta %s é sintética; só analítica recebe lançamento" % c.codigo)
+        if not c.ativa:
+            raise ValueError("conta %s está inativa" % c.codigo)
+    from datetime import datetime as _dt
+    lan = Lancamento(owner_tipo=owner_tipo, owner_id=owner_id, data=data or _dt.utcnow(),
+                     conta_debito_id=conta_debito_id, conta_credito_id=conta_credito_id,
+                     valor=round(float(valor), 2), projeto_id=projeto_id, origem=origem,
+                     historico=historico or "")
+    db.add(lan)
+    db.commit()
+    return _lanc_serial(lan)
+
+
+def _filtra_periodo(q, ini, fim):
+    if ini:
+        q = q.filter(Lancamento.data >= ini)
+    if fim:
+        q = q.filter(Lancamento.data <= fim)
+    return q
+
+
+def saldo_conta(db, owner_tipo, owner_id, conta_id, ini=None, fim=None):
+    """Saldo da conta na natureza dela (devedora: D−C; credora: C−D)."""
+    c = _get_own(db, owner_tipo, owner_id, conta_id)
+    base = db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id)
+    deb = sum(l.valor for l in _filtra_periodo(base.filter(Lancamento.conta_debito_id == conta_id), ini, fim).all())
+    cred = sum(l.valor for l in _filtra_periodo(base.filter(Lancamento.conta_credito_id == conta_id), ini, fim).all())
+    return round(deb - cred if c.natureza == "devedora" else cred - deb, 2)
+
+
+def razao(db, owner_tipo, owner_id, conta_id, ini=None, fim=None):
+    """Extrato (razão) de uma conta: linhas D/C com saldo corrido na natureza da conta."""
+    from sqlalchemy import or_
+    c = _get_own(db, owner_tipo, owner_id, conta_id)
+    q = db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id).filter(
+        or_(Lancamento.conta_debito_id == conta_id, Lancamento.conta_credito_id == conta_id))
+    lans = _filtra_periodo(q, ini, fim).order_by(Lancamento.data, Lancamento.id).all()
+    saldo = 0.0
+    linhas = []
+    for l in lans:
+        deb = l.conta_debito_id == conta_id
+        mov = l.valor if (deb == (c.natureza == "devedora")) else -l.valor
+        saldo = round(saldo + mov, 2)
+        linhas.append({"id": l.id, "data": l.data.isoformat() if l.data else None,
+                       "dc": "D" if deb else "C", "valor": l.valor,
+                       "contrapartida_id": l.conta_credito_id if deb else l.conta_debito_id,
+                       "projeto_id": l.projeto_id, "historico": l.historico, "saldo": saldo})
+    return {"conta_id": conta_id, "codigo": c.codigo, "nome": c.nome, "natureza": c.natureza,
+            "linhas": linhas, "saldo_final": saldo}
+
+
+def listar_lancamentos(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None, limite=500):
+    q = db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id)
+    if projeto_id:
+        q = q.filter(Lancamento.projeto_id == projeto_id)
+    q = _filtra_periodo(q, ini, fim).order_by(Lancamento.data.desc(), Lancamento.id.desc())
+    return [_lanc_serial(l) for l in q.limit(limite).all()]
