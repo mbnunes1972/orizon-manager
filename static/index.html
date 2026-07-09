@@ -7569,10 +7569,8 @@ async function adminFinanceiroCarregar(){
     <div class="grid2" style="gap:14px;margin-bottom:14px">
       ${campo('fin-prov-mont','% Provisão de Montagem',(_cfgFin.provisoes_contabeis||{}).montagem_pct)}
       ${campo('fin-prov-gar','% Provisão de Garantia',(_cfgFin.provisoes_contabeis||{}).garantia_pct)}
-      <div><label class="field-label">% Provisão de Assistência (herda "% Assistências")</label>
-        <input type="number" value="${prov.assist_pct||0}" disabled
-         style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--muted);font-size:12px"></div>
     </div>
+    <div style="font-size:10px;color:var(--muted);margin:-8px 0 12px">A provisão de Assistência usa o "% Assistências" acima (herança automática).</div>
     <div style="display:flex;gap:8px;margin-top:0;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" onclick="adminFinanceiroSalvar(${lid})">Salvar provisões</button>
       <button class="btn btn-ghost btn-sm" onclick="abrirModalComissao(${lid})">Configurar comissão de vendas</button>
