@@ -1844,3 +1844,5 @@ etapa Orçamento como hub + Imprimir Orçamento (proposta = 1º doc do banco #8)
 > funciona nesta máquina (Git Credential Manager do usuário). Remote:
 > `https://github.com/mbnunes1972/orizon-manager.git`. Se algum dia falhar por credencial, peça ao
 > usuário rodar `!git push origin main` no próprio shell.
+
+Front 3 — **DRE Analítico×Resumido (v5 §3.1, branch `feat/fin-v5-dre-toggle`, suíte 732→733):** `dre()` passou a devolver `detalhe` (composição nível 3 por linha, só contas com movimento); UI ganhou toggle **Resumido** (padrão, nível 2) / **Analítico** (expande nível 3 sob cada linha). Sem dado novo. TDD (1 unit).

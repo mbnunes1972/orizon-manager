@@ -7314,6 +7314,8 @@ async function projDreCarregar(){
 }
 
 function _fBRL(v){ return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+let _dreModo = 'resumido';   // 'resumido' | 'analitico' (v5 §3.1)
+function dreSetModo(m){ _dreModo = m; dreCarregar(); }
 async function dreCarregar(){
   const box = document.getElementById('dre-box');
   if(!box) return;
@@ -7321,24 +7323,34 @@ async function dreCarregar(){
   if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Módulo financeiro inativo ou sem acesso.</em>'; return; }
   const d = (await r.json().catch(()=>({}))).dre;
   if(!d){ box.innerHTML='<em style="color:var(--muted)">Falha ao carregar a DRE.</em>'; return; }
+  const det = d.detalhe || {};
   const linha=(lbl,val,opts)=>{ opts=opts||{};
     const cor = opts.total ? 'var(--accent)' : (val<0?'var(--st-quente)':'var(--text)');
-    return '<div style="display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border);'
+    let html = '<div style="display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border);'
       +(opts.total?'font-weight:700;border-top:1px solid var(--border-strong)':'')+(opts.sub?'padding-left:26px;color:var(--muted)':'')+'">'
-      +'<span>'+lbl+'</span><span style="font-family:var(--font-mono);color:'+cor+'">'+_fBRL(val)+'</span></div>'; };
+      +'<span>'+lbl+'</span><span style="font-family:var(--font-mono);color:'+cor+'">'+_fBRL(val)+'</span></div>';
+    if(_dreModo==='analitico' && opts.chave && (det[opts.chave]||[]).length){
+      html += (det[opts.chave]||[]).map(c =>
+        '<div style="display:flex;justify-content:space-between;padding:3px 10px 3px 44px;font-size:11px;color:var(--muted)">'
+        +'<span><span style="font-family:var(--font-mono);font-size:9px;margin-right:6px">'+esc(c.codigo)+'</span>'+esc(c.nome)+'</span>'
+        +'<span style="font-family:var(--font-mono)">'+_fBRL(c.valor)+'</span></div>').join('');
+    }
+    return html; };
+  const btn=(m,lbl)=>'<button class="btn '+(_dreModo===m?'btn-primary':'btn-ghost')+' btn-sm" onclick="dreSetModo(\''+m+'\')">'+lbl+'</button>';
   box.innerHTML = '<div style="max-width:560px">'
-    + linha('Receita Bruta (produto + serviço)', d.receita_bruta)
-    + linha('(−) Deduções', -d.deducoes, {sub:true})
+    + '<div style="display:flex;gap:6px;margin-bottom:10px">'+btn('resumido','Resumido')+btn('analitico','Analítico')+'</div>'
+    + linha('Receita Bruta (produto + serviço)', d.receita_bruta, {chave:'receita_bruta'})
+    + linha('(−) Deduções', -d.deducoes, {sub:true, chave:'deducoes'})
     + linha('= Receita Líquida', d.receita_liquida, {total:true})
-    + linha('(−) CMV / Custo de Serviço', -d.cmv_csp, {sub:true})
+    + linha('(−) CMV / Custo de Serviço', -d.cmv_csp, {sub:true, chave:'cmv_csp'})
     + linha('= Lucro Bruto', d.lucro_bruto, {total:true})
-    + linha('(−) Despesas Comerciais', -d.despesas_comerciais, {sub:true})
-    + linha('(−) Despesas Administrativas', -d.despesas_administrativas, {sub:true})
-    + linha('(−) Constituição de Provisões', -d.constituicao_provisoes, {sub:true})
+    + linha('(−) Despesas Comerciais', -d.despesas_comerciais, {sub:true, chave:'despesas_comerciais'})
+    + linha('(−) Despesas Administrativas', -d.despesas_administrativas, {sub:true, chave:'despesas_administrativas'})
+    + linha('(−) Constituição de Provisões', -d.constituicao_provisoes, {sub:true, chave:'constituicao_provisoes'})
     + linha('= EBITDA', d.ebitda, {total:true})
     + linha('(−) Depreciação', -d.depreciacao, {sub:true})
     + linha('= EBIT', d.ebit, {total:true})
-    + linha('(±) Resultado Financeiro', d.resultado_financeiro, {sub:true})
+    + linha('(±) Resultado Financeiro', d.resultado_financeiro, {sub:true, chave:'resultado_financeiro'})
     + linha('= Resultado antes de impostos', d.resultado_antes_impostos, {total:true})
     + linha('(−) Impostos', -d.impostos, {sub:true})
     + linha('= Lucro Líquido', d.lucro_liquido, {total:true})

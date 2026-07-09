@@ -374,9 +374,28 @@ def _mov(db, ot, oid, prefixo, sentido, ini, fim, projeto_id=None):
     return round(cred - deb if sentido == "credor" else deb - cred, 2)
 
 
+def _detalhe_grupo(db, ot, oid, prefixos, sentido, ini, fim):
+    """Composição nível 3 (analíticas com movimento) de um ou mais prefixos, no sentido pedido.
+    Alimenta o modo Analítico da DRE (v5 §3.1) — Resumido usa só os totais de nível 2."""
+    if isinstance(prefixos, str):
+        prefixos = [prefixos]
+    contas = db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid, tipo="analitica").all()
+    linhas = []
+    for c in sorted(contas, key=lambda x: x.codigo):
+        if not any(c.codigo == p or c.codigo.startswith(p + ".") for p in prefixos):
+            continue
+        d, cr = _totais_conta(db, ot, oid, c.id, ini, fim)
+        val = round(cr - d if sentido == "credor" else d - cr, 2)
+        if val:
+            linhas.append({"codigo": c.codigo, "nome": c.nome, "valor": val})
+    return linhas
+
+
 def dre(db, owner_tipo, owner_id, ini=None, fim=None):
-    """DRE societário (competência) a partir do livro (.docx §3). Deduções/despesas já com o sinal certo."""
+    """DRE societário (competência) a partir do livro (.docx §3). Deduções/despesas já com o sinal certo.
+    Inclui `detalhe` (composição nível 3 por linha) p/ o toggle Analítico×Resumido (v5 §3.1)."""
     m = lambda pref, sen: _mov(db, owner_tipo, owner_id, pref, sen, ini, fim)
+    det = lambda prefs, sen: _detalhe_grupo(db, owner_tipo, owner_id, prefs, sen, ini, fim)
     receita_bruta = round(m("4.1", "credor") + m("4.2", "credor"), 2)
     deducoes = m("4.3", "devedor")
     receita_liquida = round(receita_bruta - deducoes, 2)
@@ -402,6 +421,15 @@ def dre(db, owner_tipo, owner_id, ini=None, fim=None):
         "resultado_financeiro": resultado_financeiro, "resultado_antes_impostos": resultado_antes_impostos,
         "impostos": impostos, "lucro_liquido": lucro_liquido,
         "obs": "Depreciação e Impostos = 0 (sem conta dedicada no seed; Simples/DAS já em Deduções). Refinar com contador.",
+        "detalhe": {   # composição nível 3 por linha (modo Analítico)
+            "receita_bruta": det(["4.1", "4.2"], "credor"),
+            "deducoes": det("4.3", "devedor"),
+            "cmv_csp": det(["5.1", "5.2"], "devedor"),
+            "despesas_comerciais": det("5.3", "devedor"),
+            "despesas_administrativas": det("5.4", "devedor"),
+            "constituicao_provisoes": det("5.6", "devedor"),
+            "resultado_financeiro": det("5.5", "devedor"),
+        },
     }
 
 
