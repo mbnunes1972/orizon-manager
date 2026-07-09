@@ -405,6 +405,32 @@ def dre(db, owner_tipo, owner_id, ini=None, fim=None):
     }
 
 
+# ── Balanço Patrimonial (v5 §4) ──────────────────────────────────────────────
+def balanco(db, owner_tipo, owner_id, data_corte=None):
+    """Posição patrimonial num instante: saldo ACUMULADO (do início até `data_corte`) dos grupos
+    1/2/3. O resultado do exercício (Receitas − Despesas acumuladas) entra no PL → fecha por
+    partida dobrada (Ativo = Passivo + PL). `data_corte` = fim; ini=None (desde o começo)."""
+    s = lambda pref, sen: _mov(db, owner_tipo, owner_id, pref, sen, None, data_corte)
+    ativo_circ = s("1.1", "devedor")
+    ativo_ncirc = s("1.2", "devedor")
+    total_ativo = round(ativo_circ + ativo_ncirc, 2)
+    passivo_circ = s("2.1", "credor")
+    passivo_ncirc = s("2.2", "credor")
+    total_passivo = round(passivo_circ + passivo_ncirc, 2)
+    pl_contas = s("3", "credor")
+    resultado = round(s("4", "credor") - s("5", "devedor"), 2)   # lucro/prejuízo acumulado do período
+    total_pl = round(pl_contas + resultado, 2)
+    total_passivo_pl = round(total_passivo + total_pl, 2)
+    return {
+        "data_corte": data_corte.isoformat() if data_corte else None,
+        "ativo": {"circulante": ativo_circ, "nao_circulante": ativo_ncirc, "total": total_ativo},
+        "passivo": {"circulante": passivo_circ, "nao_circulante": passivo_ncirc, "total": total_passivo},
+        "patrimonio_liquido": {"contas": pl_contas, "resultado_exercicio": resultado, "total": total_pl},
+        "total_passivo_mais_pl": total_passivo_pl,
+        "confere": abs(total_ativo - total_passivo_pl) < 0.01,
+    }
+
+
 # ── DRE por projeto / margem de contribuição (sub-projeto #5) ─────────────────
 def margem_projeto(db, owner_tipo, owner_id, projeto_id, ini=None, fim=None):
     """Margem de contribuição de um projeto (v5 §5): receita − custo direto de produto −

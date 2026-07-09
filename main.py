@@ -436,6 +436,18 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/financeiro/balanco":
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            from urllib.parse import parse_qs
+            usuario, db, ot, oid = ctx
+            data = _parse_data((parse_qs(urlparse(self.path).query).get("data") or [None])[0])
+            try:
+                self.send_json({"ok": True, "balanco": mod_contabil.balanco(db, ot, oid, data_corte=data)})
+            finally:
+                db.close()
+            return
         if path == "/":
             usuario = get_usuario_sessao(self)
             if not usuario:

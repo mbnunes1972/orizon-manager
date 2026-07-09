@@ -1692,6 +1692,10 @@ controle à parte, §6.2). Códigos **estáveis** (rename não muda código) →
 Margem/Projeto atualizada. Testes de evento/DRE/margem migrados. **Follow-up:** o **painel de provisões DA VENDA**
 (as 3 linhas por venda desde o fechamento) e o **wiring `fechamento_venda_*` na criação do contrato** exigem a fonte
 dos valores (negociação) — próximo passo da integração.
+Front 2 — **Balanço Patrimonial (v5 §4, branch `feat/fin-v5-balanco`, suíte 730→732):** `balanco(owner, data_corte)`
+= saldo **acumulado** (do início até a data) dos grupos 1/2/3; o **resultado do exercício** (Receitas−Despesas
+acumuladas) entra no PL → **fecha por partida dobrada** (`Ativo = Passivo + PL`, flag `confere`). Diferente do DRE (é
+posição num instante, não fluxo). API `GET /api/financeiro/balanco?data=`; **aba Balanço** na page-12. TDD (2 unit).
 
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam

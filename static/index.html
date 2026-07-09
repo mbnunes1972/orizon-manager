@@ -1237,6 +1237,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <button class="home-tab" id="fintab-plano" onclick="finTab('plano')">Plano de Contas</button>
       <button class="home-tab" id="fintab-lanc" onclick="finTab('lanc')">Lançamentos</button>
       <button class="home-tab" id="fintab-dre" onclick="finTab('dre')">DRE</button>
+      <button class="home-tab" id="fintab-bal" onclick="finTab('bal')">Balanço</button>
       <button class="home-tab" id="fintab-proj" onclick="finTab('proj')">Margem/Projeto</button>
       <button class="home-tab" id="fintab-recon" onclick="finTab('recon')">Reconciliação</button>
     </div>
@@ -1244,6 +1245,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="fin-panel-plano" style="display:none"><div id="plano-contas-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-lanc" style="display:none"><div id="lancamentos-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-dre" style="display:none"><div id="dre-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
+    <div id="fin-panel-bal" style="display:none"><div id="bal-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-proj" style="display:none"><div id="proj-dre-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-recon" style="display:none"><div id="recon-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
   </div>
@@ -7207,8 +7209,37 @@ function finTab(t){
   if(t==='plano') planoContasCarregar();
   if(t==='lanc')  lancamentosCarregar();
   if(t==='dre')   dreCarregar();
+  if(t==='bal')   balancoCarregar();
   if(t==='proj')  projDreCarregar();
   if(t==='recon') reconInit();
+}
+
+async function balancoCarregar(){
+  const box = document.getElementById('bal-box');
+  if(!box) return;
+  const r = await fetch('/api/financeiro/balanco', {credentials:'same-origin'});
+  if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Módulo financeiro inativo ou sem acesso.</em>'; return; }
+  const b = (await r.json().catch(()=>({}))).balanco;
+  if(!b){ box.innerHTML='<em style="color:var(--muted)">Falha ao carregar o balanço.</em>'; return; }
+  const ln=(lbl,val,opts)=>{ opts=opts||{};
+    return '<div style="display:flex;justify-content:space-between;padding:5px 10px;'
+      +(opts.total?'font-weight:700;border-top:1px solid var(--border-strong)':'border-bottom:1px solid var(--border)')
+      +(opts.sub?';padding-left:24px;color:var(--muted)':'')+'">'
+      +'<span>'+lbl+'</span><span style="font-family:var(--font-mono);color:'+(opts.total?'var(--accent)':'var(--text)')+'">'+_fBRL(val)+'</span></div>'; };
+  const ativo = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Ativo</div>'
+    + ln('Circulante', b.ativo.circulante, {sub:true}) + ln('Não Circulante', b.ativo.nao_circulante, {sub:true})
+    + ln('Total do Ativo', b.ativo.total, {total:true});
+  const passivo = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:12px 0 4px">Passivo + Patrimônio Líquido</div>'
+    + ln('Passivo Circulante', b.passivo.circulante, {sub:true}) + ln('Passivo Não Circulante', b.passivo.nao_circulante, {sub:true})
+    + ln('Patrimônio Líquido', b.patrimonio_liquido.contas, {sub:true})
+    + ln('Resultado do Exercício', b.patrimonio_liquido.resultado_exercicio, {sub:true})
+    + ln('Total Passivo + PL', b.total_passivo_mais_pl, {total:true});
+  const confere = b.confere
+    ? '<div style="font-size:10px;color:var(--accent);margin-top:8px">✓ Ativo = Passivo + PL (fecha por partida dobrada)</div>'
+    : '<div style="font-size:10px;color:var(--warn);margin-top:8px">⚠ Ativo ≠ Passivo + PL — verificar lançamentos</div>';
+  box.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Posição patrimonial acumulada'
+    +(b.data_corte?(' até '+esc(b.data_corte.slice(0,10))):' (data atual)')+'.</div>'
+    + '<div style="max-width:520px">'+ativo+passivo+confere+'</div>';
 }
 
 function reconInit(){
