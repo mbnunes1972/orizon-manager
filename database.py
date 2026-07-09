@@ -431,6 +431,26 @@ class ProvisaoRegistro(Base):
     __table_args__ = (UniqueConstraint("orcamento_id", "versao", name="uq_provisao_orc_versao"),)
 
 
+class Conta(Base):
+    """Conta do Plano de Contas (árvore hierárquica), por owner (rede|loja).
+    Módulo Financeiro sub-projeto #1. Fonte: Especificacao_Financeiro_Orizon_v2.docx §2/§2.1."""
+    __tablename__ = "conta"
+    id         = Column(Integer, primary_key=True, autoincrement=True)
+    owner_tipo = Column(String(10), nullable=False)   # 'rede' | 'loja'
+    owner_id   = Column(Integer,    nullable=False)
+    codigo     = Column(String(20), nullable=False)   # hierárquico: '5', '5.4', '5.4.01'
+    nome       = Column(Text,       nullable=False)
+    grupo      = Column(Integer,    nullable=False)    # 1..5 (Ativo/Passivo/PL/Receita/Despesa)
+    tipo       = Column(String(10), nullable=False)    # 'sintetica' (agrupa) | 'analitica' (folha)
+    natureza   = Column(String(8),  nullable=False)    # 'devedora' | 'credora'
+    pai_id     = Column(Integer, ForeignKey("conta.id"), nullable=True)
+    ativa      = Column(Integer, default=1)
+    ordem      = Column(Integer, default=0)
+    criado_em     = Column(DateTime, default=datetime.utcnow)
+    atualizado_em = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (UniqueConstraint("owner_tipo", "owner_id", "codigo", name="uq_conta_owner_codigo"),)
+
+
 class Contrato(Base):
     """Contrato gerado a partir do orçamento aprovado."""
     __tablename__ = "contratos"
