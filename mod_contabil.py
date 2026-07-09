@@ -322,3 +322,55 @@ def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=No
     return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor,
                   data=data, projeto_id=projeto_id, origem=tipo_evento,
                   historico=historico or hist_pad)
+
+
+# ── DRE societário (sub-projeto #4) ──────────────────────────────────────────
+def _totais_conta(db, ot, oid, conta_id, ini, fim):
+    base = db.query(Lancamento).filter_by(owner_tipo=ot, owner_id=oid)
+    deb = sum(l.valor for l in _filtra_periodo(base.filter(Lancamento.conta_debito_id == conta_id), ini, fim).all())
+    cred = sum(l.valor for l in _filtra_periodo(base.filter(Lancamento.conta_credito_id == conta_id), ini, fim).all())
+    return deb, cred
+
+
+def _mov(db, ot, oid, prefixo, sentido, ini, fim):
+    """Movimento das analíticas sob `prefixo`, no sentido pedido ('credor' = C−D p/ receitas;
+    'devedor' = D−C p/ deduções/despesas). Resolve o sinal correto independente da natureza cadastrada."""
+    contas = [c for c in db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid, tipo="analitica").all()
+              if c.codigo == prefixo or c.codigo.startswith(prefixo + ".")]
+    deb = cred = 0.0
+    for c in contas:
+        d, cr = _totais_conta(db, ot, oid, c.id, ini, fim)
+        deb += d
+        cred += cr
+    return round(cred - deb if sentido == "credor" else deb - cred, 2)
+
+
+def dre(db, owner_tipo, owner_id, ini=None, fim=None):
+    """DRE societário (competência) a partir do livro (.docx §3). Deduções/despesas já com o sinal certo."""
+    m = lambda pref, sen: _mov(db, owner_tipo, owner_id, pref, sen, ini, fim)
+    receita_bruta = round(m("4.1", "credor") + m("4.2", "credor"), 2)
+    deducoes = m("4.3", "devedor")
+    receita_liquida = round(receita_bruta - deducoes, 2)
+    cmv_csp = round(m("5.1", "devedor") + m("5.2", "devedor"), 2)
+    lucro_bruto = round(receita_liquida - cmv_csp, 2)
+    desp_com = m("5.3", "devedor")
+    desp_adm = m("5.4", "devedor")
+    const_prov = m("5.6", "devedor")
+    ebitda = round(lucro_bruto - desp_com - desp_adm - const_prov, 2)
+    depreciacao = 0.0                                  # sem conta dedicada no seed
+    ebit = round(ebitda - depreciacao, 2)
+    resultado_financeiro = round(-m("5.5", "devedor"), 2)
+    resultado_antes_impostos = round(ebit + resultado_financeiro, 2)
+    impostos = 0.0                                     # Simples/DAS já em Deduções (4.3)
+    lucro_liquido = round(resultado_antes_impostos - impostos, 2)
+    return {
+        "periodo": {"ini": ini.isoformat() if ini else None, "fim": fim.isoformat() if fim else None},
+        "receita_bruta": receita_bruta, "deducoes": deducoes, "receita_liquida": receita_liquida,
+        "cmv_csp": cmv_csp, "lucro_bruto": lucro_bruto,
+        "despesas_comerciais": desp_com, "despesas_administrativas": desp_adm,
+        "constituicao_provisoes": const_prov, "ebitda": ebitda,
+        "depreciacao": depreciacao, "ebit": ebit,
+        "resultado_financeiro": resultado_financeiro, "resultado_antes_impostos": resultado_antes_impostos,
+        "impostos": impostos, "lucro_liquido": lucro_liquido,
+        "obs": "Depreciação e Impostos = 0 (sem conta dedicada no seed; Simples/DAS já em Deduções). Refinar com contador.",
+    }

@@ -1627,6 +1627,17 @@ API: `POST /api/financeiro/eventos {tipo,valor,projeto_id,data?}`. TDD (5 unit +
 assistência) **não** foi feito — toca contrato/emissão e exige idempotência; o motor+endpoint estão prontos p/ plugar.
 **Próximo:** #4 DRE societário (relatório do livro por competência).
 
+**Módulo Financeiro — sub-projeto #4: DRE societário (2026-07-09, branch `feat/financeiro-dre`, suíte 714→718):**
+`mod_contabil.dre(owner, ini, fim)` monta a DRE do `.docx` §3 a partir do livro por **competência**: Receita Bruta
+(4.1+4.2) − Deduções (4.3) = Receita Líquida − CMV/CSP (5.1+5.2) = Lucro Bruto − Comerciais (5.3) − Administrativas
+(5.4) − Constituição de Provisões (5.6) = EBITDA − Depreciação = EBIT ± Resultado Financeiro (5.5) = Resultado antes
+de impostos − Impostos = Lucro Líquido. **Resolvido o corte de sinal do #1**: `_mov(prefixo, sentido)` computa cada
+linha no sentido natural (receita = C−D; deduções/despesas = D−C, sempre positivas) e a estrutura aplica o sinal —
+então **dedução reduz** a receita corretamente, independentemente da `natureza` cadastrada. Depreciação e Impostos = 0
+(sem conta dedicada; Simples/DAS já em Deduções) — anotado p/ refinar com contador. API: `GET /api/financeiro/dre?
+ini=&fim=`. UI: **aba DRE** na page-12 (demonstrativo formatado, subtotais destacados). TDD (3 unit + 1 HTTP; owner
+distinto por teste pelo escopo de módulo). **Próximo:** #5 DRE por projeto (margem de contribuição via `projeto_id`).
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:

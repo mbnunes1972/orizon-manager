@@ -1236,10 +1236,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <button class="home-tab ativo" id="fintab-prov" onclick="finTab('prov')">Provisões</button>
       <button class="home-tab" id="fintab-plano" onclick="finTab('plano')">Plano de Contas</button>
       <button class="home-tab" id="fintab-lanc" onclick="finTab('lanc')">Lançamentos</button>
+      <button class="home-tab" id="fintab-dre" onclick="finTab('dre')">DRE</button>
     </div>
     <div id="fin-panel-prov"><div id="loja-panel-financeiro"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-plano" style="display:none"><div id="plano-contas-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-lanc" style="display:none"><div id="lancamentos-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
+    <div id="fin-panel-dre" style="display:none"><div id="dre-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
   </div>
 
   <!-- PAGE 07: Admin -->
@@ -7194,12 +7196,45 @@ async function adminLojaProjetosCarregar(){
 
 // ── Financeiro: abas Provisões / Plano de Contas ────────────────────────────
 function finTab(t){
-  ['prov','plano','lanc'].forEach(x => {
+  ['prov','plano','lanc','dre'].forEach(x => {
     document.getElementById('fin-panel-'+x).style.display = (x===t) ? '' : 'none';
     document.getElementById('fintab-'+x).classList.toggle('ativo', x===t);
   });
   if(t==='plano') planoContasCarregar();
   if(t==='lanc')  lancamentosCarregar();
+  if(t==='dre')   dreCarregar();
+}
+
+function _fBRL(v){ return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+async function dreCarregar(){
+  const box = document.getElementById('dre-box');
+  if(!box) return;
+  const r = await fetch('/api/financeiro/dre', {credentials:'same-origin'});
+  if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Módulo financeiro inativo ou sem acesso.</em>'; return; }
+  const d = (await r.json().catch(()=>({}))).dre;
+  if(!d){ box.innerHTML='<em style="color:var(--muted)">Falha ao carregar a DRE.</em>'; return; }
+  const linha=(lbl,val,opts)=>{ opts=opts||{};
+    const cor = opts.total ? 'var(--accent)' : (val<0?'var(--st-quente)':'var(--text)');
+    return '<div style="display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border);'
+      +(opts.total?'font-weight:700;border-top:1px solid var(--border-strong)':'')+(opts.sub?'padding-left:26px;color:var(--muted)':'')+'">'
+      +'<span>'+lbl+'</span><span style="font-family:var(--font-mono);color:'+cor+'">'+_fBRL(val)+'</span></div>'; };
+  box.innerHTML = '<div style="max-width:560px">'
+    + linha('Receita Bruta (produto + serviço)', d.receita_bruta)
+    + linha('(−) Deduções', -d.deducoes, {sub:true})
+    + linha('= Receita Líquida', d.receita_liquida, {total:true})
+    + linha('(−) CMV / Custo de Serviço', -d.cmv_csp, {sub:true})
+    + linha('= Lucro Bruto', d.lucro_bruto, {total:true})
+    + linha('(−) Despesas Comerciais', -d.despesas_comerciais, {sub:true})
+    + linha('(−) Despesas Administrativas', -d.despesas_administrativas, {sub:true})
+    + linha('(−) Constituição de Provisões', -d.constituicao_provisoes, {sub:true})
+    + linha('= EBITDA', d.ebitda, {total:true})
+    + linha('(−) Depreciação', -d.depreciacao, {sub:true})
+    + linha('= EBIT', d.ebit, {total:true})
+    + linha('(±) Resultado Financeiro', d.resultado_financeiro, {sub:true})
+    + linha('= Resultado antes de impostos', d.resultado_antes_impostos, {total:true})
+    + linha('(−) Impostos', -d.impostos, {sub:true})
+    + linha('= Lucro Líquido', d.lucro_liquido, {total:true})
+    + '<div style="font-size:10px;color:var(--muted);margin-top:8px">'+esc(d.obs||'')+'</div></div>';
 }
 
 const _finInput = 'width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 9px;color:var(--text);font-size:12px';
