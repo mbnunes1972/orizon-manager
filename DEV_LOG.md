@@ -1572,6 +1572,20 @@ e **não há nenhuma cor arroxeada hardcoded** no arquivo — não é resíduo n
 houve mudança** (evitar no-op); se o tom ainda incomodar, opções = hard-refresh (cache) ou ajustar o token `--muted`
 escuro levemente mais quente (afeta todo texto muted) — decisão do usuário.
 
+**Passo 3 (diagramação) — sidebar/abas + projeto no cabeçalho (2026-07-08, branch `feat/design-sidebar-tabs`, suíte
+687):** 3 ajustes estéticos guiados pelo usuário. **(a) Realce ativo mais leve** — `.nav-item.active` deixou de usar
+`background:var(--accent-tint)` (o "botão" que no escuro puxava pro verde-petróleo e no claro era o único item com
+fundo, destoando): agora é só `color:var(--text)` + `font-weight:700` + borda-esquerda fina `--accent`. Vale p/ todo
+item ativo. **(b) Abas Projetos/Clientes/Parceiros sem dourado** — `.home-tab` usava `--dalm-gold`/`-light` (amarelo
+que destoava): inativo → `--muted`, ativo → `--text` + sublinhado `--accent`, hover → `--text`; a borda do `#home-tabs`
+dourada virou `--border`. O seletor passou a cobrir **`.ativo` E `.active`** → as abas do **Cadastro (page-10)**, que
+não tinham realce ativo (usavam `.active`, sem regra), agora também destacam. **(c) Nome do projeto saiu da sidebar**
+— removido o widget "Projeto ativo" do topo (a sidebar fica só navegação/acesso) e o **nome+cliente** foram para o
+**cabeçalho da page-02 (Negociação)**, acima do título (novos `#proj-ctx-nome`/`#proj-ctx-cli`; o JS de `abrirProjeto`
+e de criação de projeto passou a escrever neles — antes só a sidebar exibia o nome; o `.proj-header-nome` do CSS era
+morto). Frontend puro (suíte 687; um e2e de NF-e piscou flaky e passou no re-run). **Pendências de higiene seguem**
+(Promob→Omie, `#c8a84b`, hardcodes verdes do avatar/modal-perfil, e o `--muted` escuro se o tom ainda incomodar).
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:
