@@ -7413,7 +7413,13 @@ async function lancamentosCarregar(){
     +(l.projeto_id?'<span style="color:var(--muted)">'+esc(l.projeto_id)+'</span>':'')+'</div>'
     ).join('') || '<em style="color:var(--muted);font-size:11px">Nenhum lançamento ainda.</em>';
   box.innerHTML =
-     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
+     '<div style="display:grid;grid-template-columns:2fr auto;gap:8px;align-items:end;margin-bottom:8px">'
+    +'<div><label class="field-label">Descreva o evento e a IA sugere a conta (você confirma)</label>'
+    +'<input id="lan-ia-txt" type="text" placeholder="ex.: pagamento do aluguel da loja" style="'+_finInput+'"></div>'
+    +'<button class="btn btn-ghost btn-sm" onclick="finSugerir()">Sugerir conta</button>'
+    +'</div>'
+    +'<div id="lan-ia-out" style="font-size:11px;color:var(--muted);min-height:16px;margin-bottom:8px"></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'
     +'<div><label class="field-label">Débito</label><select id="lan-deb" style="'+_finInput+'">'+opts+'</select></div>'
     +'<div><label class="field-label">Crédito</label><select id="lan-cred" style="'+_finInput+'">'+opts+'</select></div>'
     +'</div>'
@@ -7425,16 +7431,34 @@ async function lancamentosCarregar(){
     +'</div>'
     +'<div style="font-size:11px;color:var(--muted);margin-bottom:4px">Últimos lançamentos</div>'+lista;
 }
+let _finSugestao = null;   // sugestão da IA registrada junto do lançamento (§6.3)
+async function finSugerir(){
+  const texto = document.getElementById('lan-ia-txt').value.trim();
+  const out = document.getElementById('lan-ia-out');
+  if(!texto){ out.textContent = 'Descreva o evento primeiro.'; return; }
+  const r = await fetch('/api/financeiro/sugerir-conta', {method:'POST', headers:{'Content-Type':'application/json'},
+    credentials:'same-origin', body: JSON.stringify({texto})});
+  const s = (await r.json().catch(()=>({}))).sugestao;
+  if(!s){ _finSugestao=null; out.innerHTML = '<span style="color:var(--muted)">Sem sugestão — escolha manualmente.</span>'; return; }
+  _finSugestao = {texto, sugerida: s.codigo+' '+s.nome};
+  const sel = document.getElementById('lan-deb');
+  sel.value = String(s.conta_id);   // pré-preenche o Débito; funcionário confirma ou troca
+  out.innerHTML = 'Sugestão: <strong style="color:var(--accent)">'+esc(s.codigo+' — '+s.nome)+'</strong> (débito). '
+    +'<span style="color:var(--muted)">Confirme ou troque antes de lançar — a IA nunca lança sozinha.</span>';
+}
 async function finLancar(){
   const deb=+document.getElementById('lan-deb').value, cred=+document.getElementById('lan-cred').value;
   const valor=parseFloat(document.getElementById('lan-valor').value||'0');
   if(!valor||valor<=0){ showToast('Informe um valor > 0', true); return; }
+  // registra a sugestão só se o funcionário manteve o débito sugerido (auditoria: sugerido vs escolhido)
+  const ia = _finSugestao ? {...(_finSugestao), escolhida_id: deb} : null;
   const r = await fetch('/api/financeiro/lancamentos', {method:'POST', headers:{'Content-Type':'application/json'},
     credentials:'same-origin', body: JSON.stringify({conta_debito_id:deb, conta_credito_id:cred, valor,
-      projeto_id: document.getElementById('lan-proj').value||null, historico: document.getElementById('lan-hist').value||''})});
+      projeto_id: document.getElementById('lan-proj').value||null, historico: document.getElementById('lan-hist').value||'',
+      ia_sugestao: ia})});
   const d = await r.json().catch(()=>({}));
   if(!d.ok){ showToast(d.erro||'Falha ao lançar', true); return; }
-  showToast('Lançamento registrado'); lancamentosCarregar();
+  _finSugestao = null; showToast('Lançamento registrado'); lancamentosCarregar();
 }
 
 async function planoContasCarregar(){

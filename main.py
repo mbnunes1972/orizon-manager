@@ -1833,6 +1833,17 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/financeiro/sugerir-conta":
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                self.send_json({"ok": True, "sugestao": mod_contabil.sugerir_conta(db, ot, oid, dd.get("texto", ""))})
+            finally:
+                db.close()
+            return
         if path == "/api/financeiro/lancamentos":
             ctx = _contabil_ctx(self, exige_edicao=True)
             if ctx is None: return
@@ -1840,6 +1851,7 @@ class Handler(BaseHTTPRequestHandler):
             usuario, db, ot, oid = ctx
             try:
                 dd = json.loads(body or b'{}')
+                _ia = json.dumps(dd["ia_sugestao"]) if dd.get("ia_sugestao") else None
                 lan = mod_contabil.lancar(
                     db, ot, oid,
                     conta_debito_id=dd.get("conta_debito_id"),
@@ -1847,7 +1859,8 @@ class Handler(BaseHTTPRequestHandler):
                     valor=dd.get("valor"),
                     data=_parse_data(dd.get("data")),
                     projeto_id=dd.get("projeto_id"),
-                    historico=dd.get("historico", ""))
+                    historico=dd.get("historico", ""),
+                    ia_sugestao=_ia)
                 self.send_json({"ok": True, "lancamento": lan}, code=201)
             except PermissionError as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=403)

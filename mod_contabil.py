@@ -354,6 +354,53 @@ def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=No
                   historico=historico or hist_pad, ref=ref, motivo=motivo)
 
 
+def _norm_tokens(s):
+    import re as _re, unicodedata as _u
+    s = _u.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
+    return set(_re.findall(r"[a-z0-9]{3,}", s))   # tokens de 3+ chars (sem acento)
+
+
+def sugerir_conta(db, owner_tipo, owner_id, texto):
+    """IA de apoio à classificação (v5 §6.3) — HEURÍSTICA (sem LLM externo): sugere uma conta
+    ANALÍTICA para `texto` por sobreposição de palavras com o nome da conta + histórico de
+    lançamentos similares. **NUNCA lança** — só sugere; o funcionário confirma/troca."""
+    import math
+    from collections import Counter
+    seed_plano(db, owner_tipo, owner_id)
+    toks = _norm_tokens(texto)
+    if not toks:
+        return None
+    contas = db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id,
+                                       tipo="analitica", ativa=1).all()
+    conta_toks = {c.id: _norm_tokens(c.nome) for c in contas}
+    # IDF: token raro (ex.: 'aluguel') pesa mais que comum (ex.: 'loja', 'conta')
+    df = Counter()
+    for ts in conta_toks.values():
+        for t in ts:
+            df[t] += 1
+    n = len(contas) or 1
+    idf = lambda t: math.log((n + 1) / (df.get(t, 0) + 1)) + 1.0
+    peso = lambda ts: sum(idf(t) for t in (toks & ts))
+    scores = {}
+    for cid, ts in conta_toks.items():
+        w = peso(ts)
+        if w:
+            scores[cid] = scores.get(cid, 0) + w * 2.0           # nome da conta
+    for l in (db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id)
+              .order_by(Lancamento.id.desc()).limit(300).all()):   # histórico recente
+        w = peso(_norm_tokens(l.historico))
+        if w:
+            for cid in (l.conta_debito_id, l.conta_credito_id):
+                scores[cid] = scores.get(cid, 0) + w             # histórico similar
+    if not scores:
+        return None
+    best_id = max(scores, key=scores.get)
+    c = db.get(Conta, best_id)
+    return {"conta_id": c.id, "codigo": c.codigo, "nome": c.nome, "grupo": c.grupo,
+            "score": scores[best_id],
+            "motivo": "heurística: sobreposição com nome da conta + histórico similar"}
+
+
 def total_a_cobrar_fabrica(db, owner_tipo, owner_id, ini=None, fim=None):
     """Repasse à Fábrica (§6.2): soma dos reparos em GARANTIA marcados 'defeito_fabrica' — o custo
     que deveria ser da Dal Mobile. Ferramenta de negociação; NÃO é Contas a Receber (só fase 2)."""
