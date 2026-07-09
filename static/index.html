@@ -759,6 +759,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <label class="proj-status-filter-item"><input type="checkbox" value="sem"        checked onchange="projAplicarFiltros()"> — Sem status</label>
         </div>
       </div>
+      <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:8px;padding:3px;box-shadow:var(--shadow)">
+        <button id="projview-lista" onclick="projSetView('lista')" style="border:none;background:var(--surface);color:var(--accent);box-shadow:var(--shadow);font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s">Lista</button>
+        <button id="projview-funil" onclick="projSetView('funil')" style="border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s">Funil</button>
+      </div>
     </div>
     <div id="proj-search-hint" style="font-size:11px;color:var(--muted);height:16px;margin-bottom:8px"></div>
     <div id="proj-resultados"></div>
@@ -2715,7 +2719,46 @@ function projAplicarFiltros(){
     btn.textContent = todosAtivos ? 'Status ▾' : `Status (${n}) ▾`;
   }
 
-  renderProjResultados(lista);
+  if(_projView === 'funil') renderProjKanban(lista);
+  else renderProjResultados(lista);
+}
+
+// ── Comercial: Kanban (funil por status) — Diagramacao_v2 §1.4 ──────────────
+let _projView = 'lista';   // 'lista' | 'funil'
+const _KANBAN_COLS = ['quente','morno','frio','convertido','fechado','perdido'];
+function projSetView(v){
+  _projView = v;
+  const bl = document.getElementById('projview-lista'), bf = document.getElementById('projview-funil');
+  const on='background:var(--surface);color:var(--accent);box-shadow:var(--shadow)', off='background:transparent;color:var(--muted);box-shadow:none';
+  if(bl) bl.style.cssText='border:none;font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s;'+(v==='lista'?on:off);
+  if(bf) bf.style.cssText='border:none;font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s;'+(v==='funil'?on:off);
+  projAplicarFiltros();
+}
+function _kanbanLabel(s){ return ((_PROJ_STATUS_LABEL[s]||{label:s}).label).replace(/^\S+\s/,''); }
+function renderProjKanban(lista){
+  const box = document.getElementById('proj-resultados');
+  if(!box) return;
+  const porStatus = {}; _KANBAN_COLS.forEach(s=>porStatus[s]=[]);
+  lista.forEach(p=>{ if(_KANBAN_COLS.includes(p.status)) porStatus[p.status].push(p); });
+  const cols = _KANBAN_COLS.map(s=>{
+    const cards = porStatus[s].map(p=>_kanbanCard(p,s)).join('')
+      || '<div style="font-size:11px;color:var(--muted);padding:8px 4px">—</div>';
+    return '<div style="flex:1;min-width:190px">'
+      +'<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:10px;border-bottom:2px solid var(--st-'+s+')">'
+      +'<span style="font-size:12px;font-weight:600;color:var(--st-'+s+')">'+esc(_kanbanLabel(s))+'</span>'
+      +'<span style="font-size:11px;color:var(--muted)">('+porStatus[s].length+')</span></div>'+cards+'</div>';
+  }).join('');
+  box.innerHTML = '<div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">'+cols+'</div>';
+}
+function _kanbanCard(p, s){
+  const ns = esc(p.nome_safe||'');
+  const menu = _KANBAN_COLS.filter(x=>x!==s).map(x =>
+    '<div onclick="event.stopPropagation();projStatusSet(\''+ns+'\',\''+x+'\')" style="padding:5px 9px;font-size:11px;cursor:pointer;color:var(--st-'+x+')">&rarr; '+esc(_kanbanLabel(x))+'</div>').join('');
+  return '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer" onclick="abrirProjeto(\''+ns+'\')">'
+    +'<div style="font-weight:500;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.nome_projeto||p.nome_safe||'—')+'</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.cliente_nome||'—')+'</div>'
+    +'<div style="margin-top:6px"><span onclick="event.stopPropagation();var m=this.nextElementSibling;m.style.display=m.style.display===\'block\'?\'none\':\'block\'" style="font-size:10px;color:var(--accent);cursor:pointer">mover &#9662;</span>'
+    +'<div style="display:none;margin-top:4px;background:var(--surface);border-radius:6px;box-shadow:var(--shadow);overflow:hidden">'+menu+'</div></div></div>';
 }
 
 async function abrirProjeto(nome_safe){
