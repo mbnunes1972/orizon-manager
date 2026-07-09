@@ -67,7 +67,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:.15s;position:relative;margin-bottom:2px;font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--muted)}
 .nav-item::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0}
 .nav-item:hover{background:var(--accent-tint);color:var(--text)}
-.nav-item.active{background:var(--accent-tint);color:var(--accent);border-left:2px solid var(--accent);padding-left:8px}
+.nav-item.active{color:var(--text);font-weight:700;border-left:2px solid var(--accent);padding-left:8px}
 .nav-item.active::before{background:var(--accent)}
 .nav-item.done::before{background:var(--ok)}
 .nav-item.done{color:var(--text)}
@@ -395,9 +395,9 @@ body{overflow:hidden}
   border-top: 1px solid var(--border, #2a3a2a);
 }
 .ciclo-card-body.aberto { display: block; }
-.home-tab { padding:8px 20px;background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--dalm-gold-light);font-size:14px;transition:color .15s; }
-.home-tab.ativo { color:var(--dalm-gold);border-bottom-color:var(--dalm-gold);font-weight:600; }
-.home-tab:hover { color:var(--dalm-gold); }
+.home-tab { padding:8px 20px;background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--muted);font-size:14px;transition:color .15s; }
+.home-tab.ativo, .home-tab.active { color:var(--text);border-bottom-color:var(--accent);font-weight:600; }
+.home-tab:hover { color:var(--text); }
 
 /* Calendário: ícone visível e campo inteiro clicável */
 input[type="date"] { cursor: pointer; }
@@ -411,13 +411,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <body>
 
 <aside class="sidebar">
-  <!-- Projeto ativo -->
-  <div class="sb-logo" style="padding:16px 14px 12px">
-    <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;font-family:var(--font-sans)">Projeto</div>
-    <div id="sb-proj-nome" style="font-family:var(--font-sans);font-weight:700;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
-    <div id="sb-proj-cli" style="font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">—</div>
-  </div>
-
   <!-- Navegação -->
   <nav class="sb-nav">
     <div class="sb-nav-title">Módulos</div>
@@ -691,7 +684,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       </div>
     </div>
     <!-- ── Home tabs: Projetos | Clientes ─────────────────────── -->
-    <div id="home-tabs" style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin-bottom:12px;">
+    <div id="home-tabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:12px;">
       <button id="tab-btn-projetos" class="home-tab ativo" onclick="homeMostrarTab('projetos')">Projetos</button>
       <button id="tab-btn-clientes" class="home-tab" onclick="homeMostrarTab('clientes')">Clientes</button>
       <button id="tab-btn-parceiros" class="home-tab" onclick="homeMostrarTab('parceiros')">Parceiros</button>
@@ -783,6 +776,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px">
+          <span id="proj-ctx-nome" style="font-family:var(--font-sans);font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px">—</span>
+          <span id="proj-ctx-cli" style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px"></span>
+        </div>
         <div class="page-title">Negociacao</div>
         <div class="page-sub" id="neg-orc-nome-hdr">Valores finais apresentados ao cliente</div>
       </div>
@@ -2705,8 +2702,8 @@ async function abrirProjeto(nome_safe){
     // Reset orçamento ao trocar de projeto
     _orcamentos = []; _orcamentoAtivoId = null; _orcAmbientesAtivos = null;
     // Atualizar sidebar com nome do projeto e cliente
-    const elNome = document.getElementById('sb-proj-nome');
-    const elCli  = document.getElementById('sb-proj-cli');
+    const elNome = document.getElementById('proj-ctx-nome');
+    const elCli  = document.getElementById('proj-ctx-cli');
     if(elNome) elNome.textContent = projetoAtivo.nome_projeto || '—';
     if(elCli)  elCli.textContent  = (projetoAtivo.cliente||{}).nome || '—';
     // Carregar parceiro do projeto (para auto-fill de comissão)
@@ -3105,8 +3102,8 @@ async function criarProjeto(){
     projetoAtivo = d.projeto;
     st.textContent = 'Projeto criado!'; st.style.color = 'var(--ok)';
     setTimeout(() => st.textContent = '', 3000);
-    const elNome = document.getElementById('sb-proj-nome');
-    const elCli  = document.getElementById('sb-proj-cli');
+    const elNome = document.getElementById('proj-ctx-nome');
+    const elCli  = document.getElementById('proj-ctx-cli');
     if(elNome) elNome.textContent = projetoAtivo.nome_projeto || '—';
     if(elCli)  elCli.textContent  = (projetoAtivo.cliente||{}).nome || '—';
     // Reset e carga de orçamentos (igual a abrirProjeto)
