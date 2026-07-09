@@ -1348,8 +1348,13 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > `rm orizon.db`/seed — as **migrações idempotentes rodaram no start** e adicionaram as colunas novas
 > (`Loja.modulos_ativos`, `Usuario.tema` → confirmado presente). Dados de teste do VPS mantidos. **Contexto:** o VPS
 > é ambiente **de dev/teste aberto a pessoas remotas**, ainda **não** há produção operacional; dados são falsos.
-> **Atenção:** o banco do VPS **não** tem config fiscal/token Focus (vive só no banco local) — testar emissão no VPS
-> exige configurar o Emitente primeiro. Senhas são acessíveis de fora. **Nota:** este commit de doc (o próprio banner)
+> **Emitente configurado no VPS (2026-07-08):** o Emitente INSPIRIUM (CNPJ 19.152.134/0001-56, homologação, IM/IBGE/
+> cód-serviço/ISS/CSOSN/endereço = espelho do local) foi replicado e `lojas.id=1.emitente_id=1` apontado → `prontidao`
+> **pronta p/ produto e serviço** e `resolver_emitente` OK (igual ao localhost). **Segredo tratado com cuidado:** o
+> token Focus **homologação** foi decifrado no local, enviado **pelo canal SSH** (nunca no transcript) e **re-cifrado
+> com a chave própria do VPS** — a `config/fiscal.key` **local (chave-mestra) NÃO** foi exportada; o VPS gerou a sua
+> (perm 600). Temporários (`tok_tmp`) apagados. Token de **produção** segue indefinido. Senhas são acessíveis de fora.
+> **Nota:** este commit de doc (o próprio banner)
 > fica 1 à frente do VPS — doc-only, não exige re-deploy. **Runbook via arquivo** (`bash /root/deploy_once.sh`, deixado
 > no VPS): evita o self-kill do `pkill -f main.py` (o argv inline conteria `main.py`); ver `DEV_RULES.md`.
 > _(Deploy anterior: 2026-07-07, `ca05a61`→`ce209ad`, com banco recriado limpo.)_
