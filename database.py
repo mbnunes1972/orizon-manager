@@ -465,6 +465,7 @@ class Lancamento(Base):
     projeto_id       = Column(String,     nullable=True)    # nome_safe (dimensão gerencial)
     origem           = Column(String(30), nullable=False, default="manual")   # 'manual' | tipo de evento
     historico        = Column(Text,       nullable=True)
+    ref              = Column(String(80), nullable=True)   # idempotência do wiring (ex.: 'fat:NFE-<proj>-<id>')
     criado_em        = Column(DateTime,   default=datetime.utcnow)
 
 
@@ -841,6 +842,12 @@ def _migrar_colunas():
                         "(SELECT MAX(id) FROM perfil_emissao GROUP BY owner_tipo, owner_id, tipo_doc)")
             cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_perfil_emissao "
                         "ON perfil_emissao(owner_tipo, owner_id, tipo_doc)")
+
+        # ── lancamento: coluna ref (idempotência do wiring evento→lançamento) ──
+        if _tabela_existe(cur, "lancamento"):
+            cur.execute("PRAGMA table_info(lancamento)")
+            if "ref" not in {row[1] for row in cur.fetchall()}:
+                cur.execute("ALTER TABLE lancamento ADD COLUMN ref VARCHAR(80)")
 
         conn.commit()
     except Exception:

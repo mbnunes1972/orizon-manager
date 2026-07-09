@@ -217,11 +217,11 @@ def remover_conta(db, owner_tipo, owner_id, conta_id):
 def _lanc_serial(l):
     return {"id": l.id, "data": l.data.isoformat() if l.data else None, "valor": l.valor,
             "conta_debito_id": l.conta_debito_id, "conta_credito_id": l.conta_credito_id,
-            "projeto_id": l.projeto_id, "origem": l.origem, "historico": l.historico}
+            "projeto_id": l.projeto_id, "origem": l.origem, "historico": l.historico, "ref": l.ref}
 
 
 def lancar(db, owner_tipo, owner_id, conta_debito_id, conta_credito_id, valor,
-           data=None, projeto_id=None, origem="manual", historico=""):
+           data=None, projeto_id=None, origem="manual", historico="", ref=None):
     """Registra um lançamento de partida dobrada. Débito e crédito devem ser contas
     ANALÍTICAS ativas do mesmo owner; valor > 0; contas distintas."""
     if valor is None or float(valor) <= 0:
@@ -239,10 +239,18 @@ def lancar(db, owner_tipo, owner_id, conta_debito_id, conta_credito_id, valor,
     lan = Lancamento(owner_tipo=owner_tipo, owner_id=owner_id, data=data or _dt.utcnow(),
                      conta_debito_id=conta_debito_id, conta_credito_id=conta_credito_id,
                      valor=round(float(valor), 2), projeto_id=projeto_id, origem=origem,
-                     historico=historico or "")
+                     historico=historico or "", ref=ref)
     db.add(lan)
     db.commit()
     return _lanc_serial(lan)
+
+
+def lancamento_por_ref(db, owner_tipo, owner_id, ref):
+    """Idempotência do wiring: retorna o serial do lançamento com este `ref` (ou None)."""
+    if not ref:
+        return None
+    l = db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, ref=ref).first()
+    return _lanc_serial(l) if l else None
 
 
 def _filtra_periodo(q, ini, fim):
@@ -310,18 +318,21 @@ def _conta_por_codigo(db, owner_tipo, owner_id, codigo):
     return c
 
 
-def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=None, data=None, historico=""):
+def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=None, data=None, historico="", ref=None):
     """Gera o lançamento de partida dobrada correspondente a um evento de negócio (.docx §5).
-    Carrega projeto_id (dimensão gerencial). origem = tipo_evento (idempotência/rastreio é do chamador)."""
+    Carrega projeto_id (dimensão gerencial). Se `ref` já foi lançado, é **idempotente** (não duplica)."""
     if tipo_evento not in EVENTOS:
         raise ValueError("evento desconhecido: %s" % tipo_evento)
+    ja = lancamento_por_ref(db, owner_tipo, owner_id, ref)
+    if ja is not None:
+        return ja                          # idempotente: já lançado com este ref
     seed_plano(db, owner_tipo, owner_id)   # garante o plano-padrão
     cod_d, cod_c, hist_pad = EVENTOS[tipo_evento]
     cd = _conta_por_codigo(db, owner_tipo, owner_id, cod_d)
     cc = _conta_por_codigo(db, owner_tipo, owner_id, cod_c)
     return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor,
                   data=data, projeto_id=projeto_id, origem=tipo_evento,
-                  historico=historico or hist_pad)
+                  historico=historico or hist_pad, ref=ref)
 
 
 # ── DRE societário (sub-projeto #4) ──────────────────────────────────────────

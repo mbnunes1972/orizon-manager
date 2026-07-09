@@ -586,3 +586,22 @@ def test_emitir_nfse_processando_idempotente(http_client_factory, seed, app_db, 
     n = db.query(app_db.DocumentoFiscal).filter_by(projeto_nome=proj, tipo_documento="servico").count()
     db.close()
     assert n == 1
+
+
+def test_wiring_faturamento_lancado_apos_nfe_produto(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    """Wiring #3: NF-e de produto autorizada gera um lançamento de `faturamento` no livro (idempotente por ref)."""
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    c = _login(http_client_factory, "dir_l2")
+    _, up = _upload_xml(c, proj, _fixture_xml())
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe",
+                  {"fabrica_doc_id": up["documento_id"], "markup_pct": 30})
+    assert st == 200 and b["status"] == "autorizado", b
+    # o wiring (fail-soft, idempotente por ref) lança o faturamento DESTA emissão.
+    # app_db é module-scoped (outras emissões do módulo também lançam) -> checar o ref específico.
+    esperado_ref = f"fat:NFE-{proj}-{up['documento_id']}"
+    st2, d = c.get(f"/api/financeiro/lancamentos?projeto={proj}")
+    assert st2 == 200, d
+    fats = [l for l in d["lancamentos"] if l["ref"] == esperado_ref]
+    assert len(fats) == 1 and fats[0]["origem"] == "faturamento" and fats[0]["valor"] > 0

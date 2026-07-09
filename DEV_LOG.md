@@ -1664,6 +1664,21 @@ projeto · Auditoria/Reconciliação). **Follow-ups conscientes** (registrados a
 vivos (contrato/NF-e), "mover conta" (reparent), Depreciação/Impostos com conta dedicada, e refino contábil/tributário
 com contador antes de produção (aviso do `.docx`). Suíte 687→726 (+39 testes). **Fonte de verdade = o `.docx`.**
 
+**Módulo Financeiro — wiring do motor de eventos nos fluxos vivos (2026-07-09, branch `feat/financeiro-wiring`,
+suíte 726→730):** o motor evento→lançamento (#3) passou a ser **disparado automaticamente** pela emissão fiscal.
+`Lancamento` ganhou coluna **`ref`** (idempotência; migração idempotente p/ DBs existentes) e `registrar_evento(ref=)`
+ficou **idempotente** (mesmo `ref` não duplica; `lancamento_por_ref`). Helper `_fin_evento_seguro(loja_id, tipo, valor,
+projeto_id, ref)` no `main.py` (SHELL): **sessão própria + fail-soft** (contabilidade NUNCA aborta a emissão; try/except
+que só loga), resolve owner da loja, respeita o **gate do módulo financeiro**. Wirado o evento **`faturamento`** na
+**NF-e de produto autorizada** (D Contas a Receber / C Receita, valor = venda do preview, `ref=fat:NFE-<proj>-<doc>`) e
+na **NFS-e de serviço autorizada** (valor do serviço, `ref=fat:NFSE-<proj>-<n>`). **Arquitetura:** o wiring vai no
+`main.py` (SHELL) porque `nfe_emissao` é domínio **fiscal** e não pode importar `mod_contabil` (financeiro) — fronteira.
+Prova **end-to-end**: teste que emite NF-e produto (emissor fake) e confirma o lançamento de `faturamento` com o `ref`
+esperado. TDD (3 unit + 1 e2e). **Follow-ups conscientes (ainda não wirados — sem gatilho/valor claro no app):**
+`fechamento_venda` (na criação do contrato — falta definir o valor da provisão de garantia), `recebimento`,
+`pagamento_comissao`, `execucao_assistencia` (não há fluxos de pagamento/pós-venda ainda) — entram por lançamento
+manual / API de eventos por ora. Suíte **687→730** no módulo Financeiro inteiro.
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:

@@ -4,6 +4,7 @@ Ponto de entrada da aplicação: python main.py
 """
 import os, io, json, time, re, threading, webbrowser, hashlib, uuid
 import sys
+import logging
 import email
 from email import policy as _email_policy
 from datetime import datetime, date, timedelta
@@ -302,6 +303,28 @@ def _parse_data(s):
             return _dt.strptime(s, "%Y-%m-%d")
         except ValueError:
             return None
+
+
+def _fin_evento_seguro(loja_id, tipo_evento, valor, projeto_id, ref):
+    """Wiring evento→lançamento a partir de um fluxo de negócio (contrato/NF-e).
+    **Fail-soft e isolado**: usa sessão própria e NUNCA levanta — contabilidade não pode abortar o
+    fluxo. **Idempotente** por `ref`. Só dispara se o módulo financeiro está ativo na loja."""
+    try:
+        if not loja_id or valor is None or float(valor) <= 0:
+            return
+        import mod_contabil, mod_tenancy
+        db = get_session()
+        try:
+            loja = db.get(Loja, loja_id)
+            if loja is None or not mod_tenancy.modulo_ativo(loja, "financeiro"):
+                return
+            ot, oid = mod_contabil.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+            mod_contabil.registrar_evento(db, ot, oid, tipo_evento, float(valor),
+                                          projeto_id=projeto_id, ref=ref)
+        finally:
+            db.close()
+    except Exception as e:
+        logging.getLogger(__name__).warning("wiring financeiro (%s, ref=%s) falhou: %s", tipo_evento, ref, e)
 
 
 _REQ_LOJA_ATIVA = None   # header X-Loja-Ativa da requisição atual (HTTPServer single-thread)
@@ -4662,6 +4685,9 @@ class Handler(BaseHTTPRequestHandler):
                                              emitente_id=emitente.id, fabrica_doc_id=doc.id)
                     if res.status.value == "autorizado":
                         _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
+                        # wiring: NF-e produto autorizada = faturamento (D Contas a Receber / C Receita)
+                        _fin_evento_seguro(loja_id, "faturamento", preview.get("totais", {}).get("venda_total"),
+                                           nome_safe, "fat:" + ref)
                     reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
                     self.send_json({"ok": True, "ref": ref,
                                     "status": res.status.value, "chave": res.chave, "numero": res.numero,
@@ -4753,6 +4779,8 @@ class Handler(BaseHTTPRequestHandler):
                     # NFS-e autorizada conclui a etapa 15, como a NF-e de produto (auditoria A14).
                     if res.status.value == "autorizado":
                         _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
+                        # wiring: NFS-e (serviço) autorizada = faturamento de serviço
+                        _fin_evento_seguro(loja_id, "faturamento", round(valor, 2), nome_safe, "fat:" + ref)
                     reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
                     self.send_json({"ok": True, "ref": ref,
                                     "status": res.status.value, "chave": res.chave, "numero": res.numero,
