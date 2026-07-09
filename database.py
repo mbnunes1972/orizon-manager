@@ -468,6 +468,24 @@ class Lancamento(Base):
     criado_em        = Column(DateTime,   default=datetime.utcnow)
 
 
+class PeriodoContabil(Base):
+    """Snapshot de Auditoria/Reconciliação de um período (Módulo Financeiro sub-projeto #6).
+    Rateia a despesa fixa aos projetos (margem plena) e registra a divergência vs. o resultado societário."""
+    __tablename__ = "periodo_contabil"
+    id                   = Column(Integer, primary_key=True, autoincrement=True)
+    owner_tipo           = Column(String(10), nullable=False)
+    owner_id             = Column(Integer,    nullable=False)
+    inicio               = Column(DateTime, nullable=True)
+    fim                  = Column(DateTime, nullable=True)
+    status               = Column(String(10), default="fechado")   # 'aberto' | 'fechado'
+    metodologia          = Column(String(30), nullable=False)      # base de rateio (vigência)
+    resultado_societario = Column(Float, default=0.0)
+    soma_margem_plena    = Column(Float, default=0.0)
+    divergencia_residual = Column(Float, default=0.0)
+    dados_json           = Column(Text, nullable=True)             # alocacao_por_projeto serializada
+    criado_em            = Column(DateTime, default=datetime.utcnow)
+
+
 class Contrato(Base):
     """Contrato gerado a partir do orçamento aprovado."""
     __tablename__ = "contratos"

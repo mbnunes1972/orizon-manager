@@ -1238,12 +1238,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <button class="home-tab" id="fintab-lanc" onclick="finTab('lanc')">Lançamentos</button>
       <button class="home-tab" id="fintab-dre" onclick="finTab('dre')">DRE</button>
       <button class="home-tab" id="fintab-proj" onclick="finTab('proj')">Margem/Projeto</button>
+      <button class="home-tab" id="fintab-recon" onclick="finTab('recon')">Reconciliação</button>
     </div>
     <div id="fin-panel-prov"><div id="loja-panel-financeiro"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-plano" style="display:none"><div id="plano-contas-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-lanc" style="display:none"><div id="lancamentos-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-dre" style="display:none"><div id="dre-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-proj" style="display:none"><div id="proj-dre-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
+    <div id="fin-panel-recon" style="display:none"><div id="recon-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
   </div>
 
   <!-- PAGE 07: Admin -->
@@ -7206,6 +7208,55 @@ function finTab(t){
   if(t==='lanc')  lancamentosCarregar();
   if(t==='dre')   dreCarregar();
   if(t==='proj')  projDreCarregar();
+  if(t==='recon') reconInit();
+}
+
+function reconInit(){
+  const box = document.getElementById('recon-box');
+  if(!box) return;
+  box.innerHTML =
+     '<div style="display:flex;gap:8px;align-items:end;margin-bottom:12px">'
+    +'<div><label class="field-label">Base de rateio</label>'
+    +'<select id="recon-metodo" style="'+_finInput+'">'
+    +'<option value="proporcional_receita">Proporcional à receita</option>'
+    +'<option value="proporcional_custo_direto">Proporcional ao custo direto</option>'
+    +'<option value="linear_por_projeto">Linear por projeto</option></select></div>'
+    +'<button class="btn btn-ghost btn-sm" onclick="reconRodar()">Reconciliar</button>'
+    +'<button class="btn btn-primary btn-sm" onclick="reconFechar()">Fechar período</button>'
+    +'</div><div id="recon-result"></div>';
+  reconRodar();
+}
+async function reconRodar(){
+  const metodologia = document.getElementById('recon-metodo').value;
+  const r = await fetch('/api/financeiro/reconciliar', {method:'POST', headers:{'Content-Type':'application/json'},
+    credentials:'same-origin', body: JSON.stringify({metodologia})});
+  const d = await r.json().catch(()=>({}));
+  const out = document.getElementById('recon-result');
+  if(!d.ok){ out.innerHTML='<em style="color:var(--muted)">'+esc((d&&d.erro)||'Falha')+'</em>'; return; }
+  const rec = d.reconciliacao;
+  const rows = rec.alocacao_por_projeto.map(a=>
+     '<tr style="border-top:1px solid var(--border);font-size:12px"><td style="padding:5px 8px">'+esc(a.projeto_id)+'</td>'
+    +'<td style="text-align:right;padding:5px 8px;font-family:var(--font-mono)">'+_fBRL(a.margem_contribuicao)+'</td>'
+    +'<td style="text-align:right;padding:5px 8px;font-family:var(--font-mono);color:var(--st-quente)">'+_fBRL(-a.valor_rateado)+'</td>'
+    +'<td style="text-align:right;padding:5px 8px;font-family:var(--font-mono);font-weight:700;color:'+(a.margem_plena<0?'var(--st-quente)':'var(--accent)')+'">'+_fBRL(a.margem_plena)+'</td></tr>'
+    ).join('');
+  out.innerHTML =
+     '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Despesa fixa do período (grupo 5.4): <strong style="color:var(--text)">'+_fBRL(rec.despesas_fixas_periodo)+'</strong></div>'
+    +'<table style="width:100%;border-collapse:collapse;margin-bottom:10px"><tr style="font-size:10px;color:var(--muted);text-transform:uppercase">'
+    +'<th style="text-align:left;padding:5px 8px">Projeto</th><th style="text-align:right;padding:5px 8px">Margem contrib.</th>'
+    +'<th style="text-align:right;padding:5px 8px">Rateio</th><th style="text-align:right;padding:5px 8px">Margem plena</th></tr>'+rows+'</table>'
+    +'<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 8px"><span>Soma margem plena</span><span style="font-family:var(--font-mono)">'+_fBRL(rec.soma_margem_plena)+'</span></div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 8px"><span>Resultado societário (DRE)</span><span style="font-family:var(--font-mono)">'+_fBRL(rec.resultado_societario_oficial)+'</span></div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:12px;padding:4px 8px;font-weight:700;border-top:1px solid var(--border-strong)"><span>Divergência residual</span><span style="font-family:var(--font-mono);color:var(--warn)">'+_fBRL(rec.divergencia_residual)+'</span></div>'
+    +'<div style="font-size:10px;color:var(--muted);margin-top:8px">'+esc(rec.nota_explicativa||'')+'</div>';
+}
+async function reconFechar(){
+  const metodologia = document.getElementById('recon-metodo').value;
+  if(!confirm('Fechar o período com esta base de rateio? (registra um snapshot)')) return;
+  const r = await fetch('/api/financeiro/periodos', {method:'POST', headers:{'Content-Type':'application/json'},
+    credentials:'same-origin', body: JSON.stringify({metodologia})});
+  const d = await r.json().catch(()=>({}));
+  if(d.ok) showToast('Período fechado (snapshot registrado)'); else showToast((d&&d.erro)||'Falha', true);
 }
 
 async function projDreCarregar(){

@@ -1,6 +1,6 @@
 """mod_contabil.py — motor contábil (domínio financeiro). Sub-projeto #1: Plano de Contas.
 Fonte de verdade: Especificacao_Financeiro_Orizon_v2.docx §2/§2.1."""
-from database import get_session, Conta, Loja, Lancamento
+from database import get_session, Conta, Loja, Lancamento, PeriodoContabil
 
 # Plano-padrão (codigo, nome) — pai = prefixo; tipo/natureza derivados. Ordem = ordem contábil.
 PLANO_PADRAO = [
@@ -405,3 +405,74 @@ def margem_todos_projetos(db, owner_tipo, owner_id, ini=None, fim=None):
     res = [margem_projeto(db, owner_tipo, owner_id, p, ini, fim)
            for p in projetos_com_lancamento(db, owner_tipo, owner_id)]
     return sorted(res, key=lambda r: r["margem_contribuicao"], reverse=True)
+
+
+# ── Auditoria / Reconciliação periódica (sub-projeto #6) ─────────────────────
+BASES_RATEIO = ("proporcional_receita", "proporcional_custo_direto", "linear_por_projeto")
+
+
+def reconciliar(db, owner_tipo, owner_id, ini=None, fim=None, metodologia="proporcional_receita"):
+    """Rateia a despesa fixa do período (grupo 5.4) aos projetos → margem plena (full cost),
+    e calcula a divergência residual vs. o resultado societário (DRE). Não persiste (ver fechar_periodo)."""
+    if metodologia not in BASES_RATEIO:
+        raise ValueError("metodologia de rateio inválida: %s" % metodologia)
+    margens = margem_todos_projetos(db, owner_tipo, owner_id, ini, fim)
+    despesas_fixas = _mov(db, owner_tipo, owner_id, "5.4", "devedor", ini, fim)
+
+    def _peso(m):
+        if metodologia == "proporcional_receita":
+            return max(m["receita"], 0.0)
+        if metodologia == "proporcional_custo_direto":
+            return max(m["custo_produto"] + m["custo_servico"], 0.0)
+        return 1.0   # linear_por_projeto
+
+    total_peso = sum(_peso(m) for m in margens)
+    alocacao = []
+    for m in margens:
+        w = _peso(m)
+        rateado = round(despesas_fixas * (w / total_peso), 2) if total_peso > 0 else 0.0
+        alocacao.append({
+            "projeto_id": m["projeto_id"],
+            "margem_contribuicao": m["margem_contribuicao"],
+            "valor_rateado": rateado,
+            "margem_plena": round(m["margem_contribuicao"] - rateado, 2),
+        })
+    soma_margem_plena = round(sum(a["margem_plena"] for a in alocacao), 2)
+    resultado_societario = dre(db, owner_tipo, owner_id, ini, fim)["lucro_liquido"]
+    divergencia = round(resultado_societario - soma_margem_plena, 2)
+    return {
+        "metodologia": metodologia,
+        "despesas_fixas_periodo": despesas_fixas,
+        "alocacao_por_projeto": alocacao,
+        "soma_margem_plena": soma_margem_plena,
+        "resultado_societario_oficial": resultado_societario,
+        "divergencia_residual": divergencia,
+        "nota_explicativa": (
+            "%d projeto(s) no período; despesa fixa (grupo 5.4) R$ %.2f rateada por %s. "
+            "A divergência é estrutural (itens não alocados a projeto: deduções, resultado financeiro, "
+            "custos sem projeto, provisões ainda não realizadas) — tende a um piso pequeno, não a zero."
+            % (len(alocacao), despesas_fixas, metodologia)),
+    }
+
+
+def fechar_periodo(db, owner_tipo, owner_id, ini=None, fim=None, metodologia="proporcional_receita"):
+    """Calcula a reconciliação e persiste um PeriodoContabil (status='fechado')."""
+    import json as _json
+    rec = reconciliar(db, owner_tipo, owner_id, ini, fim, metodologia)
+    p = PeriodoContabil(owner_tipo=owner_tipo, owner_id=owner_id, inicio=ini, fim=fim, status="fechado",
+                        metodologia=metodologia, resultado_societario=rec["resultado_societario_oficial"],
+                        soma_margem_plena=rec["soma_margem_plena"], divergencia_residual=rec["divergencia_residual"],
+                        dados_json=_json.dumps(rec["alocacao_por_projeto"]))
+    db.add(p)
+    db.commit()
+    return {"id": p.id, **rec}
+
+
+def listar_periodos(db, owner_tipo, owner_id):
+    ps = (db.query(PeriodoContabil).filter_by(owner_tipo=owner_tipo, owner_id=owner_id)
+          .order_by(PeriodoContabil.criado_em.desc()).all())
+    return [{"id": p.id, "inicio": p.inicio.isoformat() if p.inicio else None,
+             "fim": p.fim.isoformat() if p.fim else None, "status": p.status,
+             "metodologia": p.metodologia, "resultado_societario": p.resultado_societario,
+             "soma_margem_plena": p.soma_margem_plena, "divergencia_residual": p.divergencia_residual}
+            for p in ps]

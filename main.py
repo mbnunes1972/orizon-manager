@@ -403,6 +403,16 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/financeiro/periodos":
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                self.send_json({"ok": True, "periodos": mod_contabil.listar_periodos(db, ot, oid)})
+            finally:
+                db.close()
+            return
         if path == "/":
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -1794,6 +1804,38 @@ class Handler(BaseHTTPRequestHandler):
             except PermissionError as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=403)
             except (ValueError, TypeError) as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/reconciliar":
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                rec = mod_contabil.reconciliar(db, ot, oid, ini=_parse_data(dd.get("ini")),
+                                               fim=_parse_data(dd.get("fim")),
+                                               metodologia=dd.get("metodologia", "proporcional_receita"))
+                self.send_json({"ok": True, "reconciliacao": rec})
+            except ValueError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/periodos":
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                r = mod_contabil.fechar_periodo(db, ot, oid, ini=_parse_data(dd.get("ini")),
+                                                fim=_parse_data(dd.get("fim")),
+                                                metodologia=dd.get("metodologia", "proporcional_receita"))
+                self.send_json({"ok": True, "periodo": r}, code=201)
+            except ValueError as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=400)
             finally:
                 db.close()

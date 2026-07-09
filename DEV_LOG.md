@@ -1648,6 +1648,21 @@ alerta). API: `GET /api/financeiro/projetos-dre?ini=&fim=`. UI: **aba Margem/Pro
 projeto). TDD (2 unit + 1 HTTP). **Próximo:** #6 Auditoria/Reconciliação (rateio de custo fixo → margem plena +
 divergência residual).
 
+**Módulo Financeiro — sub-projeto #6: Auditoria/Reconciliação (2026-07-09, branch `feat/financeiro-reconciliacao`,
+suíte 721→726):** modelo **`PeriodoContabil`** (snapshot: inicio/fim/status/metodologia/resultado_societario/
+soma_margem_plena/divergencia_residual/dados_json) + `mod_contabil.reconciliar(owner, ini, fim, metodologia)` (do
+`.docx` §6): rateia a **despesa fixa do período (grupo 5.4)** aos projetos por uma **base de vigência** —
+`proporcional_receita` | `proporcional_custo_direto` | `linear_por_projeto` — gerando **margem plena** (full cost) =
+margem de contribuição − rateio; e a **divergência residual** = resultado societário (DRE) − soma das margens plenas
+(estrutural: itens não alocados a projeto + provisões não realizadas; tende a um piso, não a zero). `fechar_periodo`
+persiste o snapshot; `listar_periodos`. API: `POST /api/financeiro/reconciliar` (preview), `POST /api/financeiro/
+periodos` (fecha), `GET /api/financeiro/periodos`. UI: **aba Reconciliação** (base de rateio + tabela margem→rateio→
+margem plena + soma/societário/divergência + fechar período). TDD (3 unit + 2 HTTP). **✅ MÓDULO FINANCEIRO COMPLETO —
+sub-projetos 1 a 6** (Plano de Contas · Livro de Lançamentos · Motor evento→lançamento · DRE societário · DRE por
+projeto · Auditoria/Reconciliação). **Follow-ups conscientes** (registrados ao longo): wiring dos eventos nos fluxos
+vivos (contrato/NF-e), "mover conta" (reparent), Depreciação/Impostos com conta dedicada, e refino contábil/tributário
+com contador antes de produção (aviso do `.docx`). Suíte 687→726 (+39 testes). **Fonte de verdade = o `.docx`.**
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:
