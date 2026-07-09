@@ -67,11 +67,15 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
 .sb-nav{padding:16px 12px;flex:1}
 .sb-nav-title{font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-family:var(--font-sans);padding:0 8px;margin-bottom:8px}
 .sb-secao{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:.15s;position:relative;margin-bottom:2px;font-family:var(--font-sans);font-size:12px;font-weight:600;color:var(--muted)}
-.nav-item::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--border2);flex-shrink:0}
-.nav-item:hover{background:var(--accent-tint);color:var(--text)}
-.nav-item.active{color:var(--text);font-weight:700;border-left:2px solid var(--accent);padding-left:8px}
-.nav-item.active::before{background:var(--accent)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:all .15s;position:relative;margin-bottom:2px;font-family:var(--font-sans);font-size:13px;font-weight:500;color:var(--muted)}
+.nav-item::before{content:'';width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border-strong);flex-shrink:0}
+.nav-item:hover{color:var(--text)}
+/* v4 §4: item ativo = fundo --surface-2 + sombra (não borda) + texto --accent, peso 500 */
+.nav-item.active{color:var(--accent);font-weight:500;background:var(--surface-2);box-shadow:var(--shadow)}
+.nav-item.active::before{border-color:var(--accent)}
+.nav-item.nav-sub{padding-left:22px;font-size:12.5px}   /* submenu do módulo — indentado */
+.nav-item.nav-sub::before{width:12px;height:12px}
+.nav-item .nav-dot{display:none}   /* o ::before já é o marcador circular */
 .nav-item.done::before{background:var(--ok)}
 .nav-item.done{color:var(--text)}
 .nav-item.locked{opacity:.35;cursor:not-allowed}
@@ -426,6 +430,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <div class="nav-item" id="nav-00" onclick="goPage(0)">&#x25C8; Projetos</div>
     </div>
 
+    <!-- Submenu do módulo aberto (v4 §4) — as seções do módulo vivem AQUI, não como tabs no conteúdo -->
+    <div class="sb-secao" id="sb-submodulo" style="display:none"></div>
+
     <div class="sb-secao">
       <div class="sb-nav-title">Admin</div>
       <div class="nav-item" id="nav-07" onclick="goPage(7)" style="display:none">&#x2699;&#xFE0F; Admin</div>
@@ -516,12 +523,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div id="sb-user-nivel" style="font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">—</div>
       </div>
     </div>
-    <div id="sb-tema-btn" onclick="alternarTema()" title="Alternar tema claro/escuro"
-         style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer;
-                margin-top:6px;font-size:11px;color:var(--muted);border:1px solid var(--border);transition:.15s"
-         onmouseover="this.style.borderColor='var(--accent)'"
-         onmouseout="this.style.borderColor='var(--border)'">
-      <span id="sb-tema-icone">&#x1F319;</span><span id="sb-tema-label">Tema escuro</span>
+    <div style="display:flex;gap:4px;margin-top:8px;background:var(--surface-2);border-radius:8px;padding:3px;box-shadow:var(--shadow)">
+      <button id="tema-claro"  onclick="setTema('claro')"  title="Tema claro"  style="flex:1;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s">&#x2600; Claro</button>
+      <button id="tema-escuro" onclick="setTema('escuro')" title="Tema escuro" style="flex:1;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s">&#x1F319; Escuro</button>
     </div>
     <div id="seletor-loja-wrap" style="display:none;align-items:center;margin:8px 0"></div>
   </div>
@@ -1233,20 +1237,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div class="page-sub">Configuração fiscal da sua loja (Emitente, tokens, NF-e/NFS-e).</div>
     <div id="loja-panel-fiscal" style="margin-top:12px"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
   </div>
-  <!-- PAGE 12: Financeiro (config — Provisões/custos-padrão) -->
+  <!-- PAGE 12: Financeiro — seções vivem no SUBMENU da sidebar (v4 §4), não como tabs aqui -->
   <div class="page" id="page-12">
-    <div class="page-title">Financeiro</div>
-    <div class="page-sub">Configuração financeira: provisões/custos-padrão e plano de contas.</div>
-    <div class="home-tabs" style="display:flex;gap:6px;margin:12px 0 14px;flex-wrap:wrap">
-      <button class="home-tab ativo" id="fintab-prov" onclick="finTab('prov')">Provisões</button>
-      <button class="home-tab" id="fintab-plano" onclick="finTab('plano')">Plano de Contas</button>
-      <button class="home-tab" id="fintab-lanc" onclick="finTab('lanc')">Lançamentos</button>
-      <button class="home-tab" id="fintab-dre" onclick="finTab('dre')">DRE</button>
-      <button class="home-tab" id="fintab-bal" onclick="finTab('bal')">Balanço</button>
-      <button class="home-tab" id="fintab-proj" onclick="finTab('proj')">Margem/Projeto</button>
-      <button class="home-tab" id="fintab-recon" onclick="finTab('recon')">Reconciliação</button>
-      <button class="home-tab" id="fintab-repasse" onclick="finTab('repasse')">Repasse Fábrica</button>
-    </div>
+    <div class="page-title" id="fin-page-title">Financeiro</div>
+    <div class="page-sub" id="fin-page-sub">Configuração financeira: provisões/custos-padrão e plano de contas.</div>
+    <div style="height:8px"></div>
     <div id="fin-panel-prov"><div id="loja-panel-financeiro"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-plano" style="display:none"><div id="plano-contas-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-lanc" style="display:none"><div id="lancamentos-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
@@ -2086,12 +2081,21 @@ function aplicarTema(tema){
   const root = document.documentElement;
   if(tema === 'claro') root.setAttribute('data-theme','light');
   else                  root.removeAttribute('data-theme');
-  const ic = document.getElementById('sb-tema-icone');
-  const lb = document.getElementById('sb-tema-label');
-  if(ic) ic.innerHTML  = (tema === 'claro') ? '&#x2600;' : '&#x1F319;';   // sol / lua
-  if(lb) lb.textContent = (tema === 'claro') ? 'Tema claro' : 'Tema escuro';
+  // controle segmentado no rodapé da sidebar (v4 §4)
+  const bc = document.getElementById('tema-claro'), be = document.getElementById('tema-escuro');
+  const on = 'background:var(--surface);color:var(--accent);box-shadow:var(--shadow)';
+  const off = 'background:transparent;color:var(--muted);box-shadow:none';
+  if(bc) bc.style.cssText = 'flex:1;border:none;font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s;'+(tema==='claro'?on:off);
+  if(be) be.style.cssText = 'flex:1;border:none;font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s;'+(tema==='escuro'?on:off);
 }
 
+async function setTema(t){
+  if(_usuarioAtual) _usuarioAtual.tema = t;
+  aplicarTema(t);
+  try {
+    await fetch('/api/auth/preferencias', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ tema: t })});
+  } catch(e){ /* best-effort */ }
+}
 async function alternarTema(){
   const atual = (_usuarioAtual && _usuarioAtual.tema) || 'escuro';
   const novo  = (atual === 'claro') ? 'escuro' : 'claro';
@@ -2414,6 +2418,8 @@ function goPage(n){
   if(navEl) navEl.classList.add('active');
   const sbParams = document.getElementById('sb-params');
   if(sbParams) sbParams.style.display = n===2 ? 'block' : 'none';
+  const _sm = document.getElementById('sb-submodulo');   // submenu do módulo só quando o módulo está aberto (v4 §4)
+  if(_sm && n!==12) _sm.style.display = 'none';
   if(n===2 && projetoAtivo) carregarMargensSalvas();
   if(n===0) projCarregar();
   if(n===7){ adminCarregarConsole(); } // page-07: console
@@ -2421,7 +2427,7 @@ function goPage(n){
   if(n===9) cfgRenderizarPerfis();
   if(n===10) cadRender();
   if(n===11){ if(_adminNav) _adminNav.loja = null; adminFiscalCarregar(); }
-  if(n===12){ if(_adminNav) _adminNav.loja = null; adminFinanceiroCarregar(); }
+  if(n===12){ if(_adminNav) _adminNav.loja = null; finTab('prov'); }   // seções no submenu da sidebar
 }
 
 // Módulo Cadastro: troca de aba + lazy-load do painel ativo
@@ -7207,19 +7213,37 @@ async function adminLojaProjetosCarregar(){
     </tbody></table>`;
 }
 
-// ── Financeiro: abas Provisões / Plano de Contas ────────────────────────────
+// ── Financeiro: seções no SUBMENU da sidebar (v4 §4) — não mais tabs no conteúdo ──
+const _FIN_SECOES = [
+  {id:'prov',    lbl:'Provisões',       load:()=>adminFinanceiroCarregar()},
+  {id:'plano',   lbl:'Plano de Contas', load:()=>planoContasCarregar()},
+  {id:'lanc',    lbl:'Lançamentos',     load:()=>lancamentosCarregar()},
+  {id:'dre',     lbl:'DRE',             load:()=>dreCarregar()},
+  {id:'bal',     lbl:'Balanço',         load:()=>balancoCarregar()},
+  {id:'proj',    lbl:'Margem/Projeto',  load:()=>projDreCarregar()},
+  {id:'recon',   lbl:'Reconciliação',   load:()=>reconInit()},
+  {id:'repasse', lbl:'Repasse Fábrica', load:()=>repasseCarregar()},
+];
+let _finSecaoAtual = 'prov';
+function finSubmenuRender(){
+  const box = document.getElementById('sb-submodulo');
+  if(!box) return;
+  box.innerHTML = '<div class="sb-nav-title">Financeiro</div>'
+    + _FIN_SECOES.map(s => '<div class="nav-item nav-sub'+(s.id===_finSecaoAtual?' active':'')
+        +'" onclick="finTab(\''+s.id+'\')"><span class="nav-dot"></span>'+esc(s.lbl)+'</div>').join('');
+  box.style.display = '';
+}
 function finTab(t){
-  ['prov','plano','lanc','dre'].forEach(x => {
-    document.getElementById('fin-panel-'+x).style.display = (x===t) ? '' : 'none';
-    document.getElementById('fintab-'+x).classList.toggle('ativo', x===t);
+  _finSecaoAtual = t;
+  _FIN_SECOES.forEach(s => {
+    const p = document.getElementById('fin-panel-'+s.id);
+    if(p) p.style.display = (s.id===t) ? '' : 'none';
   });
-  if(t==='plano') planoContasCarregar();
-  if(t==='lanc')  lancamentosCarregar();
-  if(t==='dre')   dreCarregar();
-  if(t==='bal')   balancoCarregar();
-  if(t==='proj')  projDreCarregar();
-  if(t==='recon') reconInit();
-  if(t==='repasse') repasseCarregar();
+  const sec = _FIN_SECOES.find(s => s.id===t);
+  const tt = document.getElementById('fin-page-title');
+  if(tt && sec) tt.textContent = 'Financeiro / ' + sec.lbl;
+  finSubmenuRender();
+  if(sec && sec.load) sec.load();
 }
 
 async function repasseCarregar(){
