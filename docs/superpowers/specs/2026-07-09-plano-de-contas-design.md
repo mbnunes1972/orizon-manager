@@ -1,5 +1,10 @@
 # Plano de Contas — Design (Módulo Financeiro, sub-projeto #1)
 
+> **Status: ✅ IMPLEMENTADO (2026-07-09)** — branch `feat/financeiro-plano-contas`, suíte 687→699. Modelo `Conta`
+> (99 contas no seed padrão: 78 analíticas + 21 sintéticas), CRUD por owner (inativar-não-apagar), API
+> `/api/financeiro/contas`, aba na page-12. **Corte consciente:** "mover conta" (reparent/recodificar subárvore) **não**
+> entrou no #1 — `editar_conta` cobre **nome + ordem**; reparent fica para o #2/futuro (evita recodificar subárvores agora).
+
 > **Fonte de verdade:** `Especificacao_Financeiro_Orizon_v2.docx` (§2 Plano de Contas e §2.1 contas analíticas).
 > Este documento é o **design derivado** do 1º sub-projeto. Se a regra de negócio mudar, a alteração volta primeiro
 > para o `.docx`. Tratamento contábil/tributário exige validação de contador antes de produção (aviso do `.docx`).

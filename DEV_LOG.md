@@ -1586,6 +1586,25 @@ e de criação de projeto passou a escrever neles — antes só a sidebar exibia
 morto). Frontend puro (suíte 687; um e2e de NF-e piscou flaky e passou no re-run). **Pendências de higiene seguem**
 (Promob→Omie, `#c8a84b`, hardcodes verdes do avatar/modal-perfil, e o `--muted` escuro se o tom ainda incomodar).
 
+**Módulo Financeiro — sub-projeto #1: Plano de Contas (2026-07-09, branch `feat/financeiro-plano-contas`, suíte
+687→699):** início da **camada contábil nova** (a spec `Especificacao_Financeiro_Orizon_v2.docx` é greenfield sobre o
+financeiro atual, que era só provisões/custos). O módulo vai em **6 sub-projetos** (Plano de Contas → Livro de
+Lançamentos → Motor evento→lançamento → DRE societário → DRE por projeto → Auditoria/Reconciliação); este é o #1.
+**Entregue:** modelo **`Conta`** (árvore por `pai_id`, `owner_tipo/owner_id`, `codigo`, `grupo` 1–5, `tipo`
+sintética/analítica, `natureza`, `ativa`); **`mod_contabil.py`** com `PLANO_PADRAO` (**99 contas**: grupos 1–5 +
+subgrupos + 78 analíticas nível 3 do Pontta — tudo do `.docx` §2/§2.1), `resolver_owner` (loja→rede; loja avulsa =
+própria), `seed_plano` idempotente (seed-on-first-access), `listar_contas` (árvore) e **CRUD** (`criar_conta` torna o
+pai sintético; `editar_conta` nome+ordem; `remover_conta` = **apaga folha sem lançamento / inativa o resto** — regra
+"inativar-não-apagar"; `_tem_lancamentos` é stub `False` até o #2); **API** `/api/financeiro/contas` (GET árvore /
+POST criar / PUT editar / **POST /remover** — o dispatch não tem `do_DELETE`) com gate do módulo financeiro +
+capability (`aprovar_financeiro` OU `editar_dados_loja`) e barra **cross-owner**; **UI** = aba **Plano de Contas** na
+page-12 (árvore add/renomear/inativar), ao lado de **Provisões**. **Tenancy por owner** (rede compartilha; loja avulsa
+tem a sua) — espelha o Emitente. Manifesto `modulos.py` atualizado (financeiro += `mod_contabil.py`/`conta`/rota) →
+`test_arquitetura_modulos` verde. **Executado inline** (a infra de subagente deu 529), TDD, 8+4 testes novos.
+**Cortes conscientes:** "mover conta" (reparent) fica p/ o #2; sinal de dedução na DRE = #4. **Restart do servidor**
+para valer localmente. Spec/plano: `docs/superpowers/specs|plans/2026-07-09-plano-de-contas*`; **fonte de verdade do
+plano de contas = o `.docx`**. **Próximo:** #2 Livro de Lançamentos (introduz `projeto_id` e ativa `_tem_lancamentos`).
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:
