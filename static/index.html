@@ -6,15 +6,17 @@
 <title>Promob &#x2192; Omie</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
-/* Tokens de design — Padrao_Design_Orizon_v2 (fonte: .docx). Tema dual; PADRÃO = escuro.
-   Os "aliases dos tokens antigos" mantêm as ~250 referências var(--…) existentes funcionando com a paleta nova. */
+/* Tokens de design — Padrao_Design_Orizon_v4 (fonte: .docx; substitui v2/v3). Tema dual; PADRÃO = escuro.
+   §2: contraste corrigido, escuro menos "terminal", --shadow novo (profundidade por sombra, não borda).
+   Os "aliases dos tokens antigos" mantêm as ~250 referências var(--…) existentes funcionando. */
 :root{
-  /* superfícies e texto (escuro) */
-  --bg:#171B1C; --surface:#1D2224; --surface-2:#20262A;
-  --border:#2C3335; --border-strong:#3A4245;
-  --text:#EDEFEE; --muted:#8C979A;
+  /* superfícies e texto (escuro) — Padrao_Design_Orizon_v4 §2 (recalibrado, menos "terminal") */
+  --bg:#181C1E; --surface:#1D2224; --surface-2:#232A2C;
+  --border:#2A3234; --border-strong:#3A4548;
+  --text:#E8EAE9; --muted:#8C979A;
+  --shadow:0 2px 6px rgba(0,0,0,.35);   /* elevação — substitui borda como fonte de profundidade */
   /* accent (petróleo) e marca (dourado) — escuro */
-  --accent:#4FA89E; --accent-tint:rgba(79,168,158,.14);
+  --accent:#5BB8AC; --accent-tint:rgba(91,184,172,.14);
   --gold:#D4B348; --gold-tint:rgba(212,179,72,.16);
   /* semânticas de sistema — escuro */
   --warn:#EF9F27; --err:#E2876C; --info:#7DB3E8;
@@ -37,8 +39,9 @@
 }
 :root[data-theme="light"]{
   --bg:#FFFFFF; --surface:#F7F7F5; --surface-2:#FFFFFF;
-  --border:#E4E2DC; --border-strong:#D3D1C7;
+  --border:#DDDAD2; --border-strong:#C9C6BC;
   --text:#2A2A28; --muted:#6B6860;
+  --shadow:0 1px 2px rgba(0,0,0,.06);
   --accent:#1F4B4B; --accent-tint:rgba(31,75,75,.10);
   --gold:#9C7A0C; --gold-tint:rgba(184,150,12,.14);
   --warn:#EF9F27; --err:#D64A3C; --info:#2266A8;
