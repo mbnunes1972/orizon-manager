@@ -1341,17 +1341,18 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 
 ## ⏸️ ESTADO ATUAL (2026-07-07) — retomar aqui
 
-> **🚀 Deploy no VPS (2026-07-07):** servidor online `http://167.88.33.121:8765` atualizado de `ca05a61`
-> (Sessão 44) → **`ce209ad`** (Sessão 50 + auditoria fiscal 100%). `origin/main`, VPS e local **em sincronia
-> (ce209ad)**. Banco **recriado limpo** (`rm orizon.db && python3 seed.py`, 10 usuários de exemplo, loja seed
-> id=1 — dados de teste anteriores do VPS foram descartados, conforme combinado: tudo é falso). App em screen
-> `orizon-manager`, bind `0.0.0.0`, `app.log` sem erros, HTTP **302** local **e externo**. **Contexto:** o VPS
-> é ambiente **de dev/teste aberto a pessoas remotas**, ainda **não** há produção operacional; todos os dados
-> são falsos. **Atenção:** o banco novo **não** tem config fiscal/token Focus (vive só no banco local) — testar
-> emissão no VPS exige configurar o Emitente primeiro. Senhas seed são de exemplo (fracas) e agora acessíveis de
-> fora. **Gotcha do runbook** (anotado no `DEV_RULES.md`): rodar o deploy **colado como comando SSH único** faz
-> o `pkill -f main.py` casar com a própria shell e se auto-matar; rodar via **arquivo** (`bash deploy_once.sh`,
-> deixado em `/root/`) ou numa sessão SSH interativa.
+> **🚀 Deploy no VPS (2026-07-08):** servidor online `http://167.88.33.121:8765` atualizado de `ec42ee5`
+> → **`f36b72b`** (modularização Fase 1 + painel/hub de módulos + navegação + parceiros + escopo do Admin +
+> **passo 2 de design completo, itens 1–7**). App em screen `orizon-manager`, bind `0.0.0.0` (pid novo), `app.log`
+> sem erros, HTTP **302** local / **200** externo em `/login`. **Banco PRESERVADO desta vez** (a pedido): NÃO houve
+> `rm orizon.db`/seed — as **migrações idempotentes rodaram no start** e adicionaram as colunas novas
+> (`Loja.modulos_ativos`, `Usuario.tema` → confirmado presente). Dados de teste do VPS mantidos. **Contexto:** o VPS
+> é ambiente **de dev/teste aberto a pessoas remotas**, ainda **não** há produção operacional; dados são falsos.
+> **Atenção:** o banco do VPS **não** tem config fiscal/token Focus (vive só no banco local) — testar emissão no VPS
+> exige configurar o Emitente primeiro. Senhas são acessíveis de fora. **Nota:** este commit de doc (o próprio banner)
+> fica 1 à frente do VPS — doc-only, não exige re-deploy. **Runbook via arquivo** (`bash /root/deploy_once.sh`, deixado
+> no VPS): evita o self-kill do `pkill -f main.py` (o argv inline conteria `main.py`); ver `DEV_RULES.md`.
+> _(Deploy anterior: 2026-07-07, `ca05a61`→`ce209ad`, com banco recriado limpo.)_
 
 **Módulo Fiscal / NF-e completo e na `main`** (suíte **650**, tudo mergeado+pushado; auditoria fiscal 100% endereçada):
 Fase 5 (etapa 15) · **multi-CNPJ** (Emitente 1ª classe, DocumentoFiscal) · **destinatário 3 tipos**
