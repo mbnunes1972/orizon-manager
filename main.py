@@ -448,6 +448,19 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/financeiro/repasse-fabrica":
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            from urllib.parse import parse_qs
+            usuario, db, ot, oid = ctx
+            qs = parse_qs(urlparse(self.path).query)
+            ini = _parse_data((qs.get("ini") or [None])[0]); fim = _parse_data((qs.get("fim") or [None])[0])
+            try:
+                self.send_json({"ok": True, "repasse": mod_contabil.total_a_cobrar_fabrica(db, ot, oid, ini=ini, fim=fim)})
+            finally:
+                db.close()
+            return
         if path == "/":
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -1885,7 +1898,7 @@ class Handler(BaseHTTPRequestHandler):
                 lan = mod_contabil.registrar_evento(
                     db, ot, oid, dd.get("tipo"), dd.get("valor"),
                     projeto_id=dd.get("projeto_id"), data=_parse_data(dd.get("data")),
-                    historico=dd.get("historico", ""))
+                    historico=dd.get("historico", ""), motivo=dd.get("motivo"))
                 self.send_json({"ok": True, "lancamento": lan}, code=201)
             except PermissionError as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=403)

@@ -1846,3 +1846,5 @@ etapa Orçamento como hub + Imprimir Orçamento (proposta = 1º doc do banco #8)
 > usuário rodar `!git push origin main` no próprio shell.
 
 Front 3 — **DRE Analítico×Resumido (v5 §3.1, branch `feat/fin-v5-dre-toggle`, suíte 732→733):** `dre()` passou a devolver `detalhe` (composição nível 3 por linha, só contas com movimento); UI ganhou toggle **Resumido** (padrão, nível 2) / **Analítico** (expande nível 3 sob cada linha). Sem dado novo. TDD (1 unit).
+
+Front 4b — **Controle de Repasse à Fábrica (v5 §6.2, branch `feat/fin-v5-repasse`, suíte 733→736):** `Lancamento` ganhou `motivo` (‘defeito_fabrica’|‘outro’, migração idempotente) — dimensão do reparo em garantia, no padrão do projeto_id. `registrar_evento(motivo=)` propaga; `total_a_cobrar_fabrica()` soma os `execucao_reparo_garantia` marcados defeito de fábrica. API `GET /api/financeiro/repasse-fabrica`; aba **Repasse Fábrica** (total + registrar reparo com motivo). **Não** cria Contas a Receber (só fase 2, se a fábrica reembolsar). TDD (2 unit + 1 HTTP).

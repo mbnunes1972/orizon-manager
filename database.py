@@ -466,6 +466,8 @@ class Lancamento(Base):
     origem           = Column(String(30), nullable=False, default="manual")   # 'manual' | tipo de evento
     historico        = Column(Text,       nullable=True)
     ref              = Column(String(80), nullable=True)   # idempotência do wiring (ex.: 'fat:NFE-<proj>-<id>')
+    motivo           = Column(String(30), nullable=True)   # dimensão do reparo em garantia: 'defeito_fabrica'|'outro' (§6.2)
+    ia_sugestao      = Column(Text,       nullable=True)    # snapshot da sugestão da IA de classificação (§6.3)
     criado_em        = Column(DateTime,   default=datetime.utcnow)
 
 
@@ -843,11 +845,13 @@ def _migrar_colunas():
             cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_perfil_emissao "
                         "ON perfil_emissao(owner_tipo, owner_id, tipo_doc)")
 
-        # ── lancamento: coluna ref (idempotência do wiring evento→lançamento) ──
+        # ── lancamento: ref (idempotência wiring) + motivo (§6.2) + ia_sugestao (§6.3) ──
         if _tabela_existe(cur, "lancamento"):
             cur.execute("PRAGMA table_info(lancamento)")
-            if "ref" not in {row[1] for row in cur.fetchall()}:
-                cur.execute("ALTER TABLE lancamento ADD COLUMN ref VARCHAR(80)")
+            lanc_cols = {row[1] for row in cur.fetchall()}
+            for col, tipo in [("ref", "VARCHAR(80)"), ("motivo", "VARCHAR(30)"), ("ia_sugestao", "TEXT")]:
+                if col not in lanc_cols:
+                    cur.execute(f"ALTER TABLE lancamento ADD COLUMN {col} {tipo}")
 
         conn.commit()
     except Exception:

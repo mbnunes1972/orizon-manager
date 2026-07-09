@@ -1240,6 +1240,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <button class="home-tab" id="fintab-bal" onclick="finTab('bal')">Balanço</button>
       <button class="home-tab" id="fintab-proj" onclick="finTab('proj')">Margem/Projeto</button>
       <button class="home-tab" id="fintab-recon" onclick="finTab('recon')">Reconciliação</button>
+      <button class="home-tab" id="fintab-repasse" onclick="finTab('repasse')">Repasse Fábrica</button>
     </div>
     <div id="fin-panel-prov"><div id="loja-panel-financeiro"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-plano" style="display:none"><div id="plano-contas-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
@@ -1248,6 +1249,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="fin-panel-bal" style="display:none"><div id="bal-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-proj" style="display:none"><div id="proj-dre-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-recon" style="display:none"><div id="recon-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
+    <div id="fin-panel-repasse" style="display:none"><div id="repasse-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
   </div>
 
   <!-- PAGE 07: Admin -->
@@ -7212,6 +7214,41 @@ function finTab(t){
   if(t==='bal')   balancoCarregar();
   if(t==='proj')  projDreCarregar();
   if(t==='recon') reconInit();
+  if(t==='repasse') repasseCarregar();
+}
+
+async function repasseCarregar(){
+  const box = document.getElementById('repasse-box');
+  if(!box) return;
+  const r = await fetch('/api/financeiro/repasse-fabrica', {credentials:'same-origin'});
+  if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Módulo financeiro inativo ou sem acesso.</em>'; return; }
+  const rep = (await r.json().catch(()=>({}))).repasse || {total:0, qtd:0, itens:[]};
+  const itens = rep.itens.map(i=>
+     '<div style="display:flex;gap:10px;padding:5px 8px;border-bottom:1px solid var(--border);font-size:11px">'
+    +'<span style="font-family:var(--font-mono);color:var(--muted)">'+esc((i.data||'').slice(0,10))+'</span>'
+    +'<span>'+esc(i.projeto_id||'—')+'</span>'
+    +'<span style="margin-left:auto;font-family:var(--font-mono)">'+_fBRL(i.valor)+'</span></div>'
+    ).join('') || '<em style="color:var(--muted);font-size:11px">Nenhum reparo de defeito de fábrica registrado.</em>';
+  box.innerHTML =
+     '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Reparos em garantia por <strong style="color:var(--text)">defeito de fábrica</strong> — custo que deveria ser repassado à Dal Mobile (ferramenta de negociação; não é Contas a Receber).</div>'
+    +'<div style="display:flex;justify-content:space-between;padding:8px 10px;border:1px solid var(--border-strong);border-radius:8px;margin-bottom:12px;font-weight:700">'
+    +'<span>Total a Cobrar da Fábrica ('+rep.qtd+' reparo(s))</span><span style="font-family:var(--font-mono);color:var(--warn)">'+_fBRL(rep.total)+'</span></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:12px">'
+    +'<div><label class="field-label">Valor do reparo</label><input id="rep-valor" type="number" step="0.01" style="'+_finInput+'"></div>'
+    +'<div><label class="field-label">Projeto</label><input id="rep-proj" type="text" style="'+_finInput+'"></div>'
+    +'<div><label class="field-label">Motivo</label><select id="rep-motivo" style="'+_finInput+'"><option value="defeito_fabrica">Defeito de fábrica</option><option value="outro">Outro</option></select></div>'
+    +'<button class="btn btn-primary btn-sm" onclick="repasseRegistrar()">Registrar reparo</button>'
+    +'</div>'+itens;
+}
+async function repasseRegistrar(){
+  const valor = parseFloat(document.getElementById('rep-valor').value||'0');
+  if(!valor||valor<=0){ showToast('Informe o valor do reparo', true); return; }
+  const r = await fetch('/api/financeiro/eventos', {method:'POST', headers:{'Content-Type':'application/json'},
+    credentials:'same-origin', body: JSON.stringify({tipo:'execucao_reparo_garantia', valor,
+      projeto_id: document.getElementById('rep-proj').value||null, motivo: document.getElementById('rep-motivo').value})});
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ showToast(d.erro||'Falha ao registrar', true); return; }
+  showToast('Reparo em garantia registrado'); repasseCarregar();
 }
 
 async function balancoCarregar(){

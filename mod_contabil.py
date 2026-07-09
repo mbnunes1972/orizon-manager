@@ -230,7 +230,8 @@ def _lanc_serial(l):
 
 
 def lancar(db, owner_tipo, owner_id, conta_debito_id, conta_credito_id, valor,
-           data=None, projeto_id=None, origem="manual", historico="", ref=None):
+           data=None, projeto_id=None, origem="manual", historico="", ref=None,
+           motivo=None, ia_sugestao=None):
     """Registra um lançamento de partida dobrada. Débito e crédito devem ser contas
     ANALÍTICAS ativas do mesmo owner; valor > 0; contas distintas."""
     if valor is None or float(valor) <= 0:
@@ -248,7 +249,7 @@ def lancar(db, owner_tipo, owner_id, conta_debito_id, conta_credito_id, valor,
     lan = Lancamento(owner_tipo=owner_tipo, owner_id=owner_id, data=data or _dt.utcnow(),
                      conta_debito_id=conta_debito_id, conta_credito_id=conta_credito_id,
                      valor=round(float(valor), 2), projeto_id=projeto_id, origem=origem,
-                     historico=historico or "", ref=ref)
+                     historico=historico or "", ref=ref, motivo=motivo, ia_sugestao=ia_sugestao)
     db.add(lan)
     db.commit()
     return _lanc_serial(lan)
@@ -334,9 +335,11 @@ def _conta_por_codigo(db, owner_tipo, owner_id, codigo):
     return c
 
 
-def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=None, data=None, historico="", ref=None):
-    """Gera o lançamento de partida dobrada correspondente a um evento de negócio (.docx §5).
-    Carrega projeto_id (dimensão gerencial). Se `ref` já foi lançado, é **idempotente** (não duplica)."""
+def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=None, data=None,
+                     historico="", ref=None, motivo=None):
+    """Gera o lançamento de partida dobrada correspondente a um evento de negócio (.docx §5/§6).
+    Carrega projeto_id (dimensão gerencial) e, p/ reparo em garantia, `motivo` (§6.2).
+    Se `ref` já foi lançado, é **idempotente** (não duplica)."""
     if tipo_evento not in EVENTOS:
         raise ValueError("evento desconhecido: %s" % tipo_evento)
     ja = lancamento_por_ref(db, owner_tipo, owner_id, ref)
@@ -348,7 +351,18 @@ def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=No
     cc = _conta_por_codigo(db, owner_tipo, owner_id, cod_c)
     return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor,
                   data=data, projeto_id=projeto_id, origem=tipo_evento,
-                  historico=historico or hist_pad, ref=ref)
+                  historico=historico or hist_pad, ref=ref, motivo=motivo)
+
+
+def total_a_cobrar_fabrica(db, owner_tipo, owner_id, ini=None, fim=None):
+    """Repasse à Fábrica (§6.2): soma dos reparos em GARANTIA marcados 'defeito_fabrica' — o custo
+    que deveria ser da Dal Mobile. Ferramenta de negociação; NÃO é Contas a Receber (só fase 2)."""
+    q = db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id,
+                                       origem="execucao_reparo_garantia", motivo="defeito_fabrica")
+    lans = _filtra_periodo(q, ini, fim).order_by(Lancamento.data.desc()).all()
+    itens = [{"id": l.id, "data": l.data.isoformat() if l.data else None, "valor": l.valor,
+              "projeto_id": l.projeto_id, "historico": l.historico} for l in lans]
+    return {"total": round(sum(l.valor for l in lans), 2), "qtd": len(itens), "itens": itens}
 
 
 # ── DRE societário (sub-projeto #4) ──────────────────────────────────────────
