@@ -1770,6 +1770,25 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/financeiro/eventos":
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                lan = mod_contabil.registrar_evento(
+                    db, ot, oid, dd.get("tipo"), dd.get("valor"),
+                    projeto_id=dd.get("projeto_id"), data=_parse_data(dd.get("data")),
+                    historico=dd.get("historico", ""))
+                self.send_json({"ok": True, "lancamento": lan}, code=201)
+            except PermissionError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=403)
+            except (ValueError, TypeError) as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
         m_conta_rm = re.match(r"^/api/financeiro/contas/(\d+)/remover$", path)
         if m_conta_rm:
             ctx = _contabil_ctx(self, exige_edicao=True)

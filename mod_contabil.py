@@ -289,3 +289,36 @@ def listar_lancamentos(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=
         q = q.filter(Lancamento.projeto_id == projeto_id)
     q = _filtra_periodo(q, ini, fim).order_by(Lancamento.data.desc(), Lancamento.id.desc())
     return [_lanc_serial(l) for l in q.limit(limite).all()]
+
+
+# ── Motor evento → lançamento (sub-projeto #3) ───────────────────────────────
+# As 5 regras do .docx §5. Contas resolvidas por CÓDIGO (estável: rename não muda o
+# código; reparent/recodificar foi adiado no #1). (codigo_debito, codigo_credito, historico)
+EVENTOS = {
+    "fechamento_venda":     ("5.6.01",    "2.1.04.03", "Constituição de provisão de garantia (fechamento de venda)"),
+    "faturamento":          ("1.1.02",    "4.1.01",    "Faturamento (NF-e emitida)"),
+    "recebimento":          ("1.1.01",    "1.1.02",    "Recebimento do cliente"),
+    "pagamento_comissao":   ("2.1.04.01", "1.1.01",    "Pagamento de comissão (baixa da provisão)"),
+    "execucao_assistencia": ("2.1.04.03", "1.1.01",    "Execução de assistência técnica (baixa da provisão)"),
+}
+
+
+def _conta_por_codigo(db, owner_tipo, owner_id, codigo):
+    c = db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, codigo=codigo).first()
+    if c is None:
+        raise ValueError("conta %s ausente no plano de contas do owner" % codigo)
+    return c
+
+
+def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=None, data=None, historico=""):
+    """Gera o lançamento de partida dobrada correspondente a um evento de negócio (.docx §5).
+    Carrega projeto_id (dimensão gerencial). origem = tipo_evento (idempotência/rastreio é do chamador)."""
+    if tipo_evento not in EVENTOS:
+        raise ValueError("evento desconhecido: %s" % tipo_evento)
+    seed_plano(db, owner_tipo, owner_id)   # garante o plano-padrão
+    cod_d, cod_c, hist_pad = EVENTOS[tipo_evento]
+    cd = _conta_por_codigo(db, owner_tipo, owner_id, cod_d)
+    cc = _conta_por_codigo(db, owner_tipo, owner_id, cod_c)
+    return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor,
+                  data=data, projeto_id=projeto_id, origem=tipo_evento,
+                  historico=historico or hist_pad)

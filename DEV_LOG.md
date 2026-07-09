@@ -1616,6 +1616,17 @@ na page-12 (form débito/crédito/valor/projeto/histórico + lista). Manifesto +
 **app_db é module-scoped** → cada teste do livro usa contas distintas (isolamento). **Corte:** o motor evento→lançamento
 que **popula** o livro é o #3; entrada manual existe via UI/API. **Próximo:** #3 (as 5 regras evento→lançamento).
 
+**Módulo Financeiro — sub-projeto #3: Motor evento→lançamento (2026-07-09, branch `feat/financeiro-eventos`, suíte
+707→714):** as **5 regras do `.docx` §5** viraram `mod_contabil.EVENTOS` + `registrar_evento(...)`: `fechamento_venda`
+(D 5.6.01 Constituição de Provisão / C 2.1.04.03 Provisão de Garantia — segue o pareamento 5.6↔2.1.x do próprio plano),
+`faturamento` (D 1.1.02 Contas a Receber / C 4.1.01 Receita), `recebimento` (D 1.1.01 Caixa / C 1.1.02),
+`pagamento_comissao` (D 2.1.04.01 / C 1.1.01), `execucao_assistencia` (D 2.1.04.03 / C 1.1.01). Contas resolvidas por
+**código** (estável: rename não muda código; reparent adiado); o evento gera lançamento com `origem=tipo` + `projeto_id`.
+API: `POST /api/financeiro/eventos {tipo,valor,projeto_id,data?}`. TDD (5 unit + 2 HTTP). **Follow-up consciente:** o
+**wiring nos fluxos vivos** (fechar contrato → `fechamento_venda`; NF-e emitida → `faturamento`; recebimento/comissão/
+assistência) **não** foi feito — toca contrato/emissão e exige idempotência; o motor+endpoint estão prontos p/ plugar.
+**Próximo:** #4 DRE societário (relatório do livro por competência).
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:
