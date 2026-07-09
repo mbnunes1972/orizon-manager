@@ -325,21 +325,23 @@ def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=No
 
 
 # ── DRE societário (sub-projeto #4) ──────────────────────────────────────────
-def _totais_conta(db, ot, oid, conta_id, ini, fim):
+def _totais_conta(db, ot, oid, conta_id, ini, fim, projeto_id=None):
     base = db.query(Lancamento).filter_by(owner_tipo=ot, owner_id=oid)
+    if projeto_id is not None:
+        base = base.filter(Lancamento.projeto_id == projeto_id)
     deb = sum(l.valor for l in _filtra_periodo(base.filter(Lancamento.conta_debito_id == conta_id), ini, fim).all())
     cred = sum(l.valor for l in _filtra_periodo(base.filter(Lancamento.conta_credito_id == conta_id), ini, fim).all())
     return deb, cred
 
 
-def _mov(db, ot, oid, prefixo, sentido, ini, fim):
+def _mov(db, ot, oid, prefixo, sentido, ini, fim, projeto_id=None):
     """Movimento das analíticas sob `prefixo`, no sentido pedido ('credor' = C−D p/ receitas;
-    'devedor' = D−C p/ deduções/despesas). Resolve o sinal correto independente da natureza cadastrada."""
+    'devedor' = D−C p/ deduções/despesas). `projeto_id` filtra a dimensão gerencial."""
     contas = [c for c in db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid, tipo="analitica").all()
               if c.codigo == prefixo or c.codigo.startswith(prefixo + ".")]
     deb = cred = 0.0
     for c in contas:
-        d, cr = _totais_conta(db, ot, oid, c.id, ini, fim)
+        d, cr = _totais_conta(db, ot, oid, c.id, ini, fim, projeto_id=projeto_id)
         deb += d
         cred += cr
     return round(cred - deb if sentido == "credor" else deb - cred, 2)
@@ -374,3 +376,32 @@ def dre(db, owner_tipo, owner_id, ini=None, fim=None):
         "impostos": impostos, "lucro_liquido": lucro_liquido,
         "obs": "Depreciação e Impostos = 0 (sem conta dedicada no seed; Simples/DAS já em Deduções). Refinar com contador.",
     }
+
+
+# ── DRE por projeto / margem de contribuição (sub-projeto #5) ─────────────────
+def margem_projeto(db, owner_tipo, owner_id, projeto_id, ini=None, fim=None):
+    """Margem de contribuição de um projeto (.docx §4): receita − custo direto produto/serviço −
+    comercial (comissão) − provisão de garantia. NÃO aloca despesa fixa (isso é o rateio do #6)."""
+    m = lambda pref, sen: _mov(db, owner_tipo, owner_id, pref, sen, ini, fim, projeto_id=projeto_id)
+    receita = round(m("4.1", "credor") + m("4.2", "credor"), 2)
+    custo_produto = m("5.1", "devedor")
+    custo_servico = m("5.2", "devedor")
+    comercial = m("5.3", "devedor")          # comissão do consultor + demais comerciais tagueados ao projeto
+    provisao_garantia = m("5.6", "devedor")
+    margem = round(receita - custo_produto - custo_servico - comercial - provisao_garantia, 2)
+    return {"projeto_id": projeto_id, "receita": receita, "custo_produto": custo_produto,
+            "custo_servico": custo_servico, "comercial": comercial,
+            "provisao_garantia": provisao_garantia, "margem_contribuicao": margem}
+
+
+def projetos_com_lancamento(db, owner_tipo, owner_id):
+    rows = (db.query(Lancamento.projeto_id).filter_by(owner_tipo=owner_tipo, owner_id=owner_id)
+            .filter(Lancamento.projeto_id.isnot(None)).distinct().all())
+    return sorted(r[0] for r in rows if r[0])
+
+
+def margem_todos_projetos(db, owner_tipo, owner_id, ini=None, fim=None):
+    """Margem de contribuição de cada projeto com lançamento (ordenado por margem desc)."""
+    res = [margem_projeto(db, owner_tipo, owner_id, p, ini, fim)
+           for p in projetos_com_lancamento(db, owner_tipo, owner_id)]
+    return sorted(res, key=lambda r: r["margem_contribuicao"], reverse=True)

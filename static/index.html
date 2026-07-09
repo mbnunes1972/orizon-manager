@@ -1237,11 +1237,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <button class="home-tab" id="fintab-plano" onclick="finTab('plano')">Plano de Contas</button>
       <button class="home-tab" id="fintab-lanc" onclick="finTab('lanc')">Lançamentos</button>
       <button class="home-tab" id="fintab-dre" onclick="finTab('dre')">DRE</button>
+      <button class="home-tab" id="fintab-proj" onclick="finTab('proj')">Margem/Projeto</button>
     </div>
     <div id="fin-panel-prov"><div id="loja-panel-financeiro"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-plano" style="display:none"><div id="plano-contas-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-lanc" style="display:none"><div id="lancamentos-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-dre" style="display:none"><div id="dre-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
+    <div id="fin-panel-proj" style="display:none"><div id="proj-dre-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
   </div>
 
   <!-- PAGE 07: Admin -->
@@ -7203,6 +7205,30 @@ function finTab(t){
   if(t==='plano') planoContasCarregar();
   if(t==='lanc')  lancamentosCarregar();
   if(t==='dre')   dreCarregar();
+  if(t==='proj')  projDreCarregar();
+}
+
+async function projDreCarregar(){
+  const box = document.getElementById('proj-dre-box');
+  if(!box) return;
+  const r = await fetch('/api/financeiro/projetos-dre', {credentials:'same-origin'});
+  if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Módulo financeiro inativo ou sem acesso.</em>'; return; }
+  const ps = (await r.json().catch(()=>({}))).projetos || [];
+  if(!ps.length){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Nenhum lançamento com projeto ainda.</em>'; return; }
+  const cel = (v,neg)=>'<td style="text-align:right;padding:5px 8px;font-family:var(--font-mono);color:'+(neg&&v?'var(--st-quente)':'var(--text)')+'">'+_fBRL(v)+'</td>';
+  const head = '<tr style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">'
+    +'<th style="text-align:left;padding:5px 8px">Projeto</th><th style="text-align:right;padding:5px 8px">Receita</th>'
+    +'<th style="text-align:right;padding:5px 8px">Cust. Produto</th><th style="text-align:right;padding:5px 8px">Cust. Serviço</th>'
+    +'<th style="text-align:right;padding:5px 8px">Comercial</th><th style="text-align:right;padding:5px 8px">Prov. Garantia</th>'
+    +'<th style="text-align:right;padding:5px 8px">Margem</th></tr>';
+  const linhas = ps.map(p =>
+     '<tr style="border-top:1px solid var(--border);font-size:12px">'
+    +'<td style="padding:5px 8px">'+esc(p.projeto_id)+'</td>'
+    +cel(p.receita)+cel(p.custo_produto,true)+cel(p.custo_servico,true)+cel(p.comercial,true)+cel(p.provisao_garantia,true)
+    +'<td style="text-align:right;padding:5px 8px;font-family:var(--font-mono);font-weight:700;color:'+(p.margem_contribuicao<0?'var(--st-quente)':'var(--accent)')+'">'+_fBRL(p.margem_contribuicao)+'</td></tr>'
+    ).join('');
+  box.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Margem de contribuição por projeto (não inclui rateio de custo fixo — isso é a Auditoria).</div>'
+    + '<table style="width:100%;border-collapse:collapse">'+head+linhas+'</table>';
 }
 
 function _fBRL(v){ return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }

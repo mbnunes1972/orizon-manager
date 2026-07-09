@@ -1638,6 +1638,16 @@ então **dedução reduz** a receita corretamente, independentemente da `naturez
 ini=&fim=`. UI: **aba DRE** na page-12 (demonstrativo formatado, subtotais destacados). TDD (3 unit + 1 HTTP; owner
 distinto por teste pelo escopo de módulo). **Próximo:** #5 DRE por projeto (margem de contribuição via `projeto_id`).
 
+**Módulo Financeiro — sub-projeto #5: DRE por projeto / margem de contribuição (2026-07-09, branch
+`feat/financeiro-dre-projeto`, suíte 718→721):** `margem_projeto(owner, projeto_id, ...)` (do `.docx` §4) = receita
+(4.1+4.2) − custo direto produto (5.1) − custo direto serviço (5.2) − comercial/comissão (5.3) − provisão de garantia
+(5.6), tudo **filtrado por `projeto_id`** (a dimensão gerencial do #2). `_totais_conta`/`_mov` ganharam o filtro de
+projeto (a DRE societária segue sem projeto = total). `projetos_com_lancamento` + `margem_todos_projetos` (ordenada por
+margem desc). **NÃO aloca custo fixo** — isso é o rateio do #6 (a soma das margens ≠ Lucro Líquido, como o `.docx`
+alerta). API: `GET /api/financeiro/projetos-dre?ini=&fim=`. UI: **aba Margem/Projeto** (tabela receita/custos/margem por
+projeto). TDD (2 unit + 1 HTTP). **Próximo:** #6 Auditoria/Reconciliação (rateio de custo fixo → margem plena +
+divergência residual).
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:

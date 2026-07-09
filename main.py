@@ -389,6 +389,20 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/financeiro/projetos-dre":
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            from urllib.parse import parse_qs
+            usuario, db, ot, oid = ctx
+            qs = parse_qs(urlparse(self.path).query)
+            ini = _parse_data((qs.get("ini") or [None])[0])
+            fim = _parse_data((qs.get("fim") or [None])[0])
+            try:
+                self.send_json({"ok": True, "projetos": mod_contabil.margem_todos_projetos(db, ot, oid, ini=ini, fim=fim)})
+            finally:
+                db.close()
+            return
         if path == "/":
             usuario = get_usuario_sessao(self)
             if not usuario:
