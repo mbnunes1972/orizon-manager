@@ -136,3 +136,75 @@ def listar_contas(db, owner_tipo, owner_id, incluir_inativas=False):
         else:
             raizes.append(nodes[c.id])
     return raizes
+
+
+# ── CRUD ────────────────────────────────────────────────────────────────────
+def _get_own(db, owner_tipo, owner_id, conta_id):
+    c = db.get(Conta, conta_id)
+    if c is None:
+        raise ValueError("conta inexistente")
+    if c.owner_tipo != owner_tipo or c.owner_id != owner_id:
+        raise PermissionError("conta de outro owner")
+    return c
+
+
+def _tem_filhos(db, conta):
+    return db.query(Conta).filter_by(owner_tipo=conta.owner_tipo, owner_id=conta.owner_id,
+                                     pai_id=conta.id).first() is not None
+
+
+def _tem_lancamentos(db, conta):
+    return False   # sub-projeto #2 (Livro de Lançamentos) implementa de verdade
+
+
+def _proximo_codigo(db, pai):
+    filhos = db.query(Conta).filter_by(owner_tipo=pai.owner_tipo, owner_id=pai.owner_id,
+                                       pai_id=pai.id).all()
+    usados = set()
+    for f in filhos:
+        try:
+            usados.add(int(f.codigo.rsplit(".", 1)[-1]))
+        except ValueError:
+            pass
+    seq = 1
+    while seq in usados:
+        seq += 1
+    return f"{pai.codigo}.{seq:02d}"
+
+
+def criar_conta(db, owner_tipo, owner_id, pai_id, nome):
+    pai = _get_own(db, owner_tipo, owner_id, pai_id)
+    if not (nome or "").strip():
+        raise ValueError("nome obrigatório")
+    if pai.tipo == "analitica":
+        pai.tipo = "sintetica"                            # pai passa a agrupar
+    c = Conta(owner_tipo=owner_tipo, owner_id=owner_id, codigo=_proximo_codigo(db, pai),
+              nome=nome.strip(), grupo=pai.grupo, tipo="analitica", natureza=_natureza(pai.grupo),
+              pai_id=pai.id, ativa=1, ordem=999)
+    db.add(c)
+    db.commit()
+    return _serial(c)
+
+
+def editar_conta(db, owner_tipo, owner_id, conta_id, nome=None, ordem=None):
+    c = _get_own(db, owner_tipo, owner_id, conta_id)
+    if nome is not None:
+        if not nome.strip():
+            raise ValueError("nome obrigatório")
+        c.nome = nome.strip()
+    if ordem is not None:
+        c.ordem = int(ordem)
+    db.commit()
+    return _serial(c)
+
+
+def remover_conta(db, owner_tipo, owner_id, conta_id):
+    """Folha sem lançamento -> apaga; senão inativa (regra do .docx)."""
+    c = _get_own(db, owner_tipo, owner_id, conta_id)
+    if not _tem_filhos(db, c) and not _tem_lancamentos(db, c):
+        db.delete(c)
+        db.commit()
+        return {"acao": "apagada", "id": conta_id}
+    c.ativa = 0
+    db.commit()
+    return {"acao": "inativada", "id": conta_id}

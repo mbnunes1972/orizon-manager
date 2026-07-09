@@ -40,3 +40,45 @@ def test_resolver_owner_loja_com_rede(seed, app_db):
     # loja pertencente a uma rede -> owner é a REDE (contabilidade compartilhada)
     assert mc.resolver_owner(db, {"loja_id": seed["loja1_id"], "rede_id": None}) == ("rede", seed["rede_id"])
     db.close()
+
+
+def test_criar_filho_torna_pai_sintetica(app_db):
+    db = app_db.get_session(); mc.seed_plano(db, "loja", 1)
+    aluguel = db.query(app_db.Conta).filter_by(owner_tipo="loja", owner_id=1, codigo="5.4.01").first()
+    assert aluguel.tipo == "analitica"
+    nova = mc.criar_conta(db, "loja", 1, pai_id=aluguel.id, nome="Aluguel Matriz")
+    db.refresh(aluguel)
+    assert aluguel.tipo == "sintetica"                    # virou pai
+    assert nova["codigo"].startswith("5.4.01.") and nova["grupo"] == 5
+    assert nova["natureza"] == "devedora" and nova["tipo"] == "analitica"
+    db.close()
+
+
+def test_editar_renomeia(app_db):
+    db = app_db.get_session(); mc.seed_plano(db, "loja", 1)
+    c = db.query(app_db.Conta).filter_by(owner_tipo="loja", owner_id=1, codigo="5.4.05").first()
+    r = mc.editar_conta(db, "loja", 1, c.id, nome="Contabilidade e Auditoria")
+    db.refresh(c); assert c.nome == "Contabilidade e Auditoria" and r["nome"] == c.nome
+    db.close()
+
+
+def test_remover_folha_apaga_pai_inativa(app_db):
+    db = app_db.get_session(); mc.seed_plano(db, "loja", 1)
+    folha = db.query(app_db.Conta).filter_by(owner_tipo="loja", owner_id=1, codigo="5.4.18").first()
+    r1 = mc.remover_conta(db, "loja", 1, folha.id)
+    assert r1["acao"] == "apagada"
+    assert db.get(app_db.Conta, folha.id) is None
+    grupo5 = db.query(app_db.Conta).filter_by(owner_tipo="loja", owner_id=1, codigo="5").first()
+    r2 = mc.remover_conta(db, "loja", 1, grupo5.id)        # tem filhos -> inativa
+    db.refresh(grupo5)
+    assert r2["acao"] == "inativada" and grupo5.ativa == 0
+    db.close()
+
+
+def test_cross_owner_barrado(app_db):
+    import pytest
+    db = app_db.get_session(); mc.seed_plano(db, "loja", 1)
+    c = db.query(app_db.Conta).filter_by(owner_tipo="loja", owner_id=1, codigo="5").first()
+    with pytest.raises(PermissionError):
+        mc.editar_conta(db, "loja", 999, c.id, nome="hack")   # owner diferente
+    db.close()
