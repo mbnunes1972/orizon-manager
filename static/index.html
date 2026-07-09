@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Promob &#x2192; Omie</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" rel="stylesheet">
 <style>
 /* Tokens de design — Padrao_Design_Orizon_v4 (fonte: .docx; substitui v2/v3). Tema dual; PADRÃO = escuro.
    §2: contraste corrigido, escuro menos "terminal", --shadow novo (profundidade por sombra, não borda).
@@ -69,6 +70,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
 .sb-secao{margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;transition:all .15s;position:relative;margin-bottom:2px;font-family:var(--font-sans);font-size:13px;font-weight:500;color:var(--muted)}
 .nav-item::before{content:'';width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border-strong);flex-shrink:0}
+.nav-item:has(> .ti)::before{display:none}   /* item com ícone Tabler: sem o marcador circular */
+.nav-item > .ti{font-size:16px;width:16px;text-align:center;flex-shrink:0;line-height:1}
+.nav-item.nav-sub > .ti{font-size:15px;width:15px}
 .nav-item:hover{color:var(--text)}
 /* v4 §4: item ativo = fundo --surface-2 + sombra (não borda) + texto --accent, peso 500 */
 .nav-item.active{color:var(--accent);font-weight:500;background:var(--surface-2);box-shadow:var(--shadow)}
@@ -423,11 +427,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <!-- Navegação -->
   <nav class="sb-nav">
     <div class="sb-nav-title">Módulos</div>
-    <div class="nav-item" id="nav-08" onclick="goPage(8)">&#x1F3E0; Módulos</div>
+    <div class="nav-item" id="nav-08" onclick="goPage(8)"><i class="ti ti-layout-grid"></i>Módulos</div>
 
     <div class="sb-secao">
       <div class="sb-nav-title">Atalhos</div>
-      <div class="nav-item" id="nav-00" onclick="goPage(0)">&#x25C8; Projetos</div>
+      <div class="nav-item" id="nav-00" onclick="goPage(0)"><i class="ti ti-diamond"></i>Projetos</div>
     </div>
 
     <!-- Submenu do módulo aberto (v4 §4) — as seções do módulo vivem AQUI, não como tabs no conteúdo -->
@@ -435,7 +439,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
     <div class="sb-secao">
       <div class="sb-nav-title">Admin</div>
-      <div class="nav-item" id="nav-07" onclick="goPage(7)" style="display:none">&#x2699;&#xFE0F; Admin</div>
+      <div class="nav-item" id="nav-07" onclick="goPage(7)" style="display:none"><i class="ti ti-settings"></i>Admin</div>
     </div>
   </nav>
 
@@ -502,7 +506,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <!-- Espaçador + Config -->
   <div style="flex:1"></div>
   <div style="padding:12px 14px;border-top:1px solid var(--border)">
-    <div class="nav-item" id="nav-cfg" onclick="goPage(9)" style="opacity:.6;padding:6px 8px">&#x2699; Config</div>
+    <div class="nav-item" id="nav-cfg" onclick="goPage(9)" style="opacity:.6;padding:6px 8px"><i class="ti ti-adjustments"></i>Config</div>
     <!-- Botão de perfil do usuário -->
     <div id="sb-user-btn" onclick="abrirModalPerfil()"
          style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;
@@ -7293,14 +7297,14 @@ async function adminLojaProjetosCarregar(){
 
 // ── Financeiro: seções no SUBMENU da sidebar (v4 §4) — não mais tabs no conteúdo ──
 const _FIN_SECOES = [
-  {id:'prov',    lbl:'Provisões',       load:()=>finDashboardCarregar()},
-  {id:'plano',   lbl:'Plano de Contas', load:()=>planoContasCarregar()},
-  {id:'lanc',    lbl:'Lançamentos',     load:()=>lancamentosCarregar()},
-  {id:'dre',     lbl:'DRE',             load:()=>dreCarregar()},
-  {id:'bal',     lbl:'Balanço',         load:()=>balancoCarregar()},
-  {id:'proj',    lbl:'Margem/Projeto',  load:()=>projDreCarregar()},
-  {id:'recon',   lbl:'Reconciliação',   load:()=>reconInit()},
-  {id:'repasse', lbl:'Repasse Fábrica', load:()=>repasseCarregar()},
+  {id:'prov',    lbl:'Provisões',       ic:'shield-dollar',   load:()=>finDashboardCarregar()},
+  {id:'plano',   lbl:'Plano de Contas', ic:'list-tree',       load:()=>planoContasCarregar()},
+  {id:'lanc',    lbl:'Lançamentos',     ic:'receipt',         load:()=>lancamentosCarregar()},
+  {id:'dre',     lbl:'DRE',             ic:'report-money',    load:()=>dreCarregar()},
+  {id:'bal',     lbl:'Balanço',         ic:'scale',           load:()=>balancoCarregar()},
+  {id:'proj',    lbl:'Margem/Projeto',  ic:'chart-dots',      load:()=>projDreCarregar()},
+  {id:'recon',   lbl:'Reconciliação',   ic:'refresh',         load:()=>reconInit()},
+  {id:'repasse', lbl:'Repasse Fábrica', ic:'truck-delivery',  load:()=>repasseCarregar()},
 ];
 let _finSecaoAtual = 'prov';
 function finSubmenuRender(){
@@ -7308,7 +7312,7 @@ function finSubmenuRender(){
   if(!box) return;
   box.innerHTML = '<div class="sb-nav-title">Financeiro</div>'
     + _FIN_SECOES.map(s => '<div class="nav-item nav-sub'+(s.id===_finSecaoAtual?' active':'')
-        +'" onclick="finTab(\''+s.id+'\')"><span class="nav-dot"></span>'+esc(s.lbl)+'</div>').join('');
+        +'" onclick="finTab(\''+s.id+'\')"><i class="ti ti-'+s.ic+'"></i>'+esc(s.lbl)+'</div>').join('');
   box.style.display = '';
 }
 async function finDashboardCarregar(){
