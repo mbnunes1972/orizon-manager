@@ -1558,6 +1558,20 @@ login); `#c8a84b` decorativo (~L829/831); e **hardcodes verdes** descobertos nes
 (~L510) e `#modal-perfil` (`#111d11`/`#1e2e1e`, ~L527) — resíduos que o item 1 (aliases só no `:root`) não cobriu.
 **Próximo do alinhamento = passo 3** (templates de diagramação, doc 4 Parte 1, conforme as telas forem tocadas).
 
+**Passo 3 (diagramação) — 1ºs ajustes do hub + tema claro (2026-07-08, branch `feat/design-hub-ajustes`, suíte 687):**
+guiado por observação do usuário sobre o hub no tema claro. **(1) Contraste** — `--muted` do **tema claro** escurecido
+`#8A8880`→`#6B6860`: contraste vs. fundo subiu de **3.55/3.31:1 → 5.56/5.19:1** (passa WCAG **AA** 4.5:1; antes falhava,
+sobretudo sobre `--surface`). Só o bloco `:root[data-theme="light"]` (dark intocado). **(2) "Abrir →" em `--accent`** —
+nova regra `.hub-card:not(.soon) .hub-card-tag{color:var(--accent)}`: os cards ativos passam a mostrar "Abrir →" em
+petróleo, distinto de "Em breve" (`--muted`, que competia visualmente). **(3) Distribuição do grid** — `.hub-cards`
+passou de `minmax(200px,1fr)` (esticava) para **card fixo `280px` + `max-width:1280px`**: grupos com 1–2 cards (ex.
+Financeiro) não espalham em telas largas; card quebra linha. Frontend puro (suíte 687). **Achado sobre a sidebar
+(ponto reportado como "labels arroxeados"):** varredura exaustiva confirmou que **`.sb-nav-title` já usa `var(--muted)`**
+e **não há nenhuma cor arroxeada hardcoded** no arquivo — não é resíduo não-migrado. O tom lavanda percebido é o próprio
+`--muted` **escuro** `#8C979A` (cinza-frio) sob **contraste simultâneo** com o petróleo. Como já é o token correto, **não
+houve mudança** (evitar no-op); se o tom ainda incomodar, opções = hard-refresh (cache) ou ajustar o token `--muted`
+escuro levemente mais quente (afeta todo texto muted) — decisão do usuário.
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:
