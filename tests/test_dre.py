@@ -29,7 +29,7 @@ def test_dre_com_cmv_e_provisao(app_db):
     db = app_db.get_session(); mc.seed_plano(db, "loja", 11); c = _q(db, 11)
     mc.registrar_evento(db, "loja", 11, "faturamento", 500.0, projeto_id="P2")   # receita 500
     mc.lancar(db, "loja", 11, conta_debito_id=c("5.1.01"), conta_credito_id=c("2.1.01"), valor=150.0)  # CMV 150
-    mc.registrar_evento(db, "loja", 11, "fechamento_venda", 30.0, projeto_id="P2")  # constitui provisão 30 (5.6)
+    mc.registrar_evento(db, "loja", 11, "fechamento_venda_garantia", 30.0, projeto_id="P2")  # constitui provisão 30 (5.6)
     d = mc.dre(db, "loja", 11)
     db.close()
     assert d["receita_liquida"] == 500.0

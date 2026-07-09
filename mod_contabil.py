@@ -19,7 +19,8 @@ PLANO_PADRAO = [
     ("2.1.03", "Obrigações Tributárias"),
     ("2.1.04", "Provisões"),
     ("2.1.04.01", "Provisão de Comissão"), ("2.1.04.02", "Provisão de Montagem"),
-    ("2.1.04.03", "Provisão de Garantia Técnica"), ("2.1.04.04", "Provisão de Devolução"),
+    ("2.1.04.03", "Provisão de Garantia"), ("2.1.04.04", "Provisão de Devolução"),
+    ("2.1.04.05", "Provisão de Assistência Técnica"),
     ("2.1.05", "Financiamento Total Flex a Pagar"),
     ("2.2", "Não Circulante"),
     ("2.2.01", "Financiamentos de Longo Prazo (principal)"),
@@ -65,7 +66,9 @@ PLANO_PADRAO = [
     ("5.5.01", "Tarifas Bancárias"), ("5.5.02", "Juros de Empréstimos"),
     ("5.5.03", "Custo de Antecipação de Recebíveis"),
     ("5.6", "Constituição de Provisões"),
-    ("5.6.01", "Constituição de Provisão"),
+    ("5.6.01", "Constituição — Provisão de Garantia"),
+    ("5.6.02", "Constituição — Provisão de Montagem"),
+    ("5.6.03", "Constituição — Provisão de Assistência Técnica"),
 ]
 
 
@@ -93,18 +96,23 @@ def resolver_owner(db, usuario):
 
 
 def seed_plano(db, owner_tipo, owner_id):
-    """Materializa o plano-padrão para o owner se ele ainda não tiver contas.
-    Retorna nº de contas criadas (0 se já existia)."""
-    existe = db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id).first()
-    if existe:
-        return 0
+    """Materializa/atualiza o plano-padrão do owner: cria as contas de PLANO_PADRAO que ainda
+    faltam — **backfill idempotente** (planos já existentes ganham contas novas, ex.: as 3 provisões
+    da v5). Retorna nº de contas criadas (0 se nada faltava)."""
+    existentes = {c.codigo: c for c in db.query(Conta)
+                  .filter_by(owner_tipo=owner_tipo, owner_id=owner_id).all()}
     codigos = {c for c, _ in PLANO_PADRAO}
-    id_por_codigo = {}
+    id_por_codigo = {cod: c.id for cod, c in existentes.items()}
     criadas = 0
     for ordem, (codigo, nome) in enumerate(PLANO_PADRAO):
+        if codigo in existentes:
+            continue
         grupo = int(codigo.split(".")[0])
         tipo = "sintetica" if any(o.startswith(codigo + ".") for o in codigos) else "analitica"
         pai_cod = _pai_codigo(codigo)
+        pai_exist = existentes.get(pai_cod)
+        if pai_exist is not None and pai_exist.tipo == "analitica":
+            pai_exist.tipo = "sintetica"          # pai que era folha vira agrupador ao ganhar filho
         c = Conta(owner_tipo=owner_tipo, owner_id=owner_id, codigo=codigo, nome=nome,
                   grupo=grupo, tipo=tipo, natureza=_natureza(grupo),
                   pai_id=id_por_codigo.get(pai_cod), ativa=1, ordem=ordem)
@@ -112,7 +120,8 @@ def seed_plano(db, owner_tipo, owner_id):
         db.flush()
         id_por_codigo[codigo] = c.id
         criadas += 1
-    db.commit()
+    if criadas:
+        db.commit()
     return criadas
 
 
@@ -303,11 +312,18 @@ def listar_lancamentos(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=
 # As 5 regras do .docx §5. Contas resolvidas por CÓDIGO (estável: rename não muda o
 # código; reparent/recodificar foi adiado no #1). (codigo_debito, codigo_credito, historico)
 EVENTOS = {
-    "fechamento_venda":     ("5.6.01",    "2.1.04.03", "Constituição de provisão de garantia (fechamento de venda)"),
-    "faturamento":          ("1.1.02",    "4.1.01",    "Faturamento (NF-e emitida)"),
-    "recebimento":          ("1.1.01",    "1.1.02",    "Recebimento do cliente"),
-    "pagamento_comissao":   ("2.1.04.01", "1.1.01",    "Pagamento de comissão (baixa da provisão)"),
-    "execucao_assistencia": ("2.1.04.03", "1.1.01",    "Execução de assistência técnica (baixa da provisão)"),
+    # Fechamento de venda — 3 provisões INDEPENDENTES: abre Despesa (5.6.x) × Provisão (2.1.04.x)
+    "fechamento_venda_montagem":    ("5.6.02", "2.1.04.02", "Constituição — Provisão de Montagem (fechamento de venda)"),
+    "fechamento_venda_assistencia": ("5.6.03", "2.1.04.05", "Constituição — Provisão de Assistência Técnica (fechamento de venda)"),
+    "fechamento_venda_garantia":    ("5.6.01", "2.1.04.03", "Constituição — Provisão de Garantia (fechamento de venda)"),
+    # Ciclo de caixa
+    "faturamento":                  ("1.1.02", "4.1.01",    "Faturamento (NF-e emitida)"),
+    "recebimento":                  ("1.1.01", "1.1.02",    "Recebimento do cliente"),
+    "pagamento_comissao":           ("2.1.04.01", "1.1.01",  "Pagamento de comissão (baixa da provisão)"),
+    # Execução — reverte a provisão respectiva: Provisão (2.1.04.x) × Caixa/Fornecedor
+    "execucao_montagem":            ("2.1.04.02", "1.1.01",  "Execução da montagem (baixa da provisão)"),
+    "execucao_assistencia":         ("2.1.04.05", "1.1.01",  "Execução de assistência técnica (baixa da provisão)"),
+    "execucao_reparo_garantia":     ("2.1.04.03", "1.1.01",  "Execução de reparo em garantia (baixa da provisão)"),
 }
 
 
@@ -391,18 +407,21 @@ def dre(db, owner_tipo, owner_id, ini=None, fim=None):
 
 # ── DRE por projeto / margem de contribuição (sub-projeto #5) ─────────────────
 def margem_projeto(db, owner_tipo, owner_id, projeto_id, ini=None, fim=None):
-    """Margem de contribuição de um projeto (.docx §4): receita − custo direto produto/serviço −
-    comercial (comissão) − provisão de garantia. NÃO aloca despesa fixa (isso é o rateio do #6)."""
+    """Margem de contribuição de um projeto (v5 §5): receita − custo direto de produto −
+    Provisão de Montagem − Provisão de Assistência Técnica − Provisão de Garantia − comissão.
+    Garantia entra pelo **valor bruto** (custo real da loja); repasse à fábrica é controle à parte (§6.2).
+    NÃO aloca despesa fixa (isso é o rateio da Auditoria)."""
     m = lambda pref, sen: _mov(db, owner_tipo, owner_id, pref, sen, ini, fim, projeto_id=projeto_id)
     receita = round(m("4.1", "credor") + m("4.2", "credor"), 2)
     custo_produto = m("5.1", "devedor")
-    custo_servico = m("5.2", "devedor")
-    comercial = m("5.3", "devedor")          # comissão do consultor + demais comerciais tagueados ao projeto
-    provisao_garantia = m("5.6", "devedor")
-    margem = round(receita - custo_produto - custo_servico - comercial - provisao_garantia, 2)
+    prov_montagem = m("5.6.02", "devedor")
+    prov_assistencia = m("5.6.03", "devedor")
+    prov_garantia = m("5.6.01", "devedor")
+    comissao = m("5.3", "devedor")           # comissão do consultor + demais comerciais tagueados ao projeto
+    margem = round(receita - custo_produto - prov_montagem - prov_assistencia - prov_garantia - comissao, 2)
     return {"projeto_id": projeto_id, "receita": receita, "custo_produto": custo_produto,
-            "custo_servico": custo_servico, "comercial": comercial,
-            "provisao_garantia": provisao_garantia, "margem_contribuicao": margem}
+            "prov_montagem": prov_montagem, "prov_assistencia": prov_assistencia,
+            "prov_garantia": prov_garantia, "comissao": comissao, "margem_contribuicao": margem}
 
 
 def projetos_com_lancamento(db, owner_tipo, owner_id):

@@ -1679,6 +1679,20 @@ esperado. TDD (3 unit + 1 e2e). **Follow-ups conscientes (ainda não wirados —
 `pagamento_comissao`, `execucao_assistencia` (não há fluxos de pagamento/pós-venda ainda) — entram por lançamento
 manual / API de eventos por ora. Suíte **687→730** no módulo Financeiro inteiro.
 
+**Módulo Financeiro — atualização v2→v5 (`Especificacao_Financeiro_Orizon_v5.docx` agora é a FONTE DE VERDADE).**
+Front 4 — **três provisões distintas (v5 §5/§6, branch `feat/fin-v5-provisoes`, suíte 730):** o seed ganhou
+`2.1.04.05 Provisão de Assistência Técnica` (e `2.1.04.03` "Garantia Técnica"→"Garantia"), e `5.6` passou a ter 3
+filhos de constituição (`5.6.01` Garantia, `5.6.02` Montagem, `5.6.03` Assistência). **`seed_plano` virou backfill
+idempotente** — planos já existentes (ex.: local/VPS) ganham as contas novas no próximo acesso, sem recriar. Os
+**EVENTOS** foram reestruturados em 3 provisões **independentes**: abre `fechamento_venda_{montagem,assistencia,
+garantia}` (D 5.6.x / C 2.1.04.x) e reverte `execucao_{montagem,assistencia,reparo_garantia}` (D 2.1.04.x / C Caixa) —
+partida dobrada de duas pontas, sem conta de "Reserva" no Ativo (§6.1). `margem_projeto` (§5) agora subtrai
+produto(5.1) + as 3 provisões(5.6.x) + comissão(5.3); **Garantia entra pelo valor bruto** (repasse à fábrica é
+controle à parte, §6.2). Códigos **estáveis** (rename não muda código) → não quebra lançamentos existentes. UI
+Margem/Projeto atualizada. Testes de evento/DRE/margem migrados. **Follow-up:** o **painel de provisões DA VENDA**
+(as 3 linhas por venda desde o fechamento) e o **wiring `fechamento_venda_*` na criação do contrato** exigem a fonte
+dos valores (negociação) — próximo passo da integração.
+
 > **⚠ Incidente (2026-07-06) — servidor obsoleto:** durante a conferência manual, o painel Fiscal "não
 > persistia" — causa: o `main.py` na 8765 era um processo de **ontem** (pré US-36/37/38; rotas novas davam
 > 404). **Fix:** matar os `main.py` presos e subir fresco (`pythoncore-3.14-64\python.exe main.py`). **SOP:

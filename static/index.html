@@ -7269,13 +7269,13 @@ async function projDreCarregar(){
   const cel = (v,neg)=>'<td style="text-align:right;padding:5px 8px;font-family:var(--font-mono);color:'+(neg&&v?'var(--st-quente)':'var(--text)')+'">'+_fBRL(v)+'</td>';
   const head = '<tr style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">'
     +'<th style="text-align:left;padding:5px 8px">Projeto</th><th style="text-align:right;padding:5px 8px">Receita</th>'
-    +'<th style="text-align:right;padding:5px 8px">Cust. Produto</th><th style="text-align:right;padding:5px 8px">Cust. Serviço</th>'
-    +'<th style="text-align:right;padding:5px 8px">Comercial</th><th style="text-align:right;padding:5px 8px">Prov. Garantia</th>'
-    +'<th style="text-align:right;padding:5px 8px">Margem</th></tr>';
+    +'<th style="text-align:right;padding:5px 8px">Cust. Produto</th><th style="text-align:right;padding:5px 8px">Prov. Montagem</th>'
+    +'<th style="text-align:right;padding:5px 8px">Prov. Assist.</th><th style="text-align:right;padding:5px 8px">Prov. Garantia</th>'
+    +'<th style="text-align:right;padding:5px 8px">Comissão</th><th style="text-align:right;padding:5px 8px">Margem</th></tr>';
   const linhas = ps.map(p =>
      '<tr style="border-top:1px solid var(--border);font-size:12px">'
     +'<td style="padding:5px 8px">'+esc(p.projeto_id)+'</td>'
-    +cel(p.receita)+cel(p.custo_produto,true)+cel(p.custo_servico,true)+cel(p.comercial,true)+cel(p.provisao_garantia,true)
+    +cel(p.receita)+cel(p.custo_produto,true)+cel(p.prov_montagem,true)+cel(p.prov_assistencia,true)+cel(p.prov_garantia,true)+cel(p.comissao,true)
     +'<td style="text-align:right;padding:5px 8px;font-family:var(--font-mono);font-weight:700;color:'+(p.margem_contribuicao<0?'var(--st-quente)':'var(--accent)')+'">'+_fBRL(p.margem_contribuicao)+'</td></tr>'
     ).join('');
   box.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Margem de contribuição por projeto (não inclui rateio de custo fixo — isso é a Auditoria).</div>'

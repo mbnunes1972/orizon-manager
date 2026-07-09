@@ -11,12 +11,12 @@ def test_margem_projeto(app_db):
     mc.registrar_evento(db, "loja", 20, "faturamento", 1000.0, projeto_id="A")
     mc.lancar(db, "loja", 20, conta_debito_id=c("5.1.01"), conta_credito_id=c("2.1.01"), valor=400.0, projeto_id="A")
     mc.lancar(db, "loja", 20, conta_debito_id=c("5.3.01"), conta_credito_id=c("1.1.01"), valor=100.0, projeto_id="A")
-    mc.registrar_evento(db, "loja", 20, "fechamento_venda", 30.0, projeto_id="A")
+    mc.registrar_evento(db, "loja", 20, "fechamento_venda_garantia", 30.0, projeto_id="A")
     r = mc.margem_projeto(db, "loja", 20, "A")
     db.close()
     assert r["receita"] == 1000.0 and r["custo_produto"] == 400.0
-    assert r["comercial"] == 100.0 and r["provisao_garantia"] == 30.0
-    assert r["margem_contribuicao"] == 470.0     # 1000-400-0-100-30
+    assert r["comissao"] == 100.0 and r["prov_garantia"] == 30.0
+    assert r["margem_contribuicao"] == 470.0     # 1000-400-30(garantia)-100(comissao)
 
 
 def test_margem_isola_por_projeto(app_db):
