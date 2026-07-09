@@ -1231,8 +1231,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <!-- PAGE 12: Financeiro (config — Provisões/custos-padrão) -->
   <div class="page" id="page-12">
     <div class="page-title">Financeiro</div>
-    <div class="page-sub">Provisões e custos-padrão da sua loja (alimentam o orçamento).</div>
-    <div id="loja-panel-financeiro" style="margin-top:12px"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+    <div class="page-sub">Configuração financeira: provisões/custos-padrão e plano de contas.</div>
+    <div class="home-tabs" style="display:flex;gap:6px;margin:12px 0 14px;flex-wrap:wrap">
+      <button class="home-tab ativo" id="fintab-prov" onclick="finTab('prov')">Provisões</button>
+      <button class="home-tab" id="fintab-plano" onclick="finTab('plano')">Plano de Contas</button>
+    </div>
+    <div id="fin-panel-prov"><div id="loja-panel-financeiro"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
+    <div id="fin-panel-plano" style="display:none"><div id="plano-contas-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
   </div>
 
   <!-- PAGE 07: Admin -->
@@ -7183,6 +7188,67 @@ async function adminLojaProjetosCarregar(){
         onclick='adminEntrarProjeto(${JSON.stringify(p.nome_safe)}, ${JSON.stringify(p.status||"")})'>Abrir ›</button></td>
     </tr>`).join('') || '<tr><td colspan="5" style="color:var(--muted)">Nenhum projeto nesta loja.</td></tr>'}
     </tbody></table>`;
+}
+
+// ── Financeiro: abas Provisões / Plano de Contas ────────────────────────────
+function finTab(t){
+  const prov = t === 'prov';
+  document.getElementById('fin-panel-prov').style.display  = prov ? '' : 'none';
+  document.getElementById('fin-panel-plano').style.display = prov ? 'none' : '';
+  document.getElementById('fintab-prov').classList.toggle('ativo', prov);
+  document.getElementById('fintab-plano').classList.toggle('ativo', !prov);
+  if(!prov) planoContasCarregar();
+}
+
+async function planoContasCarregar(){
+  const box = document.getElementById('plano-contas-box');
+  if(!box) return;
+  const r = await fetch('/api/financeiro/contas', {credentials:'same-origin'});
+  if(r.status === 403){ box.innerHTML = '<em style="color:var(--muted)">Módulo financeiro inativo ou sem acesso.</em>'; return; }
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ box.innerHTML = '<em style="color:var(--muted)">Falha ao carregar o plano.</em>'; return; }
+  box.innerHTML = '<div style="margin-bottom:8px;font-size:11px;color:var(--muted)">Adicione filho, renomeie ou inative uma conta. Contas com lançamento nunca são apagadas — só inativadas.</div>'
+    + d.contas.map(c => _pcNode(c, 0)).join('');
+}
+
+function _pcNode(c, nivel){
+  const pad = 12 + nivel*18;
+  const sint = c.tipo === 'sintetica';
+  const cod  = '<span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-right:8px">'+esc(c.codigo)+'</span>';
+  const nome = '<span style="font-weight:'+(sint?700:400)+';color:var(--text)">'+esc(c.nome)+'</span>';
+  const acoes = '<span style="margin-left:auto;display:flex;gap:6px">'
+    + '<button class="btn btn-ghost btn-sm" onclick="pcNovo('+c.id+')">+ filho</button>'
+    + '<button class="btn btn-ghost btn-sm" onclick="pcRenomear('+c.id+')">renomear</button>'
+    + '<button class="btn btn-ghost btn-sm" onclick="pcRemover('+c.id+')">inativar/apagar</button>'
+    + '</span>';
+  const linha = '<div style="display:flex;align-items:center;padding:5px 10px 5px '+pad+'px;border-bottom:1px solid var(--border);font-size:12px">'+cod+nome+acoes+'</div>';
+  const filhos = (c.filhos||[]).map(f => _pcNode(f, nivel+1)).join('');
+  return linha + filhos;
+}
+
+async function pcNovo(paiId){
+  const nome = prompt('Nome da nova conta:');
+  if(!nome) return;
+  const r = await fetch('/api/financeiro/contas', {method:'POST', headers:{'Content-Type':'application/json'},
+    credentials:'same-origin', body: JSON.stringify({pai_id: paiId, nome})});
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok) showToast(d.erro || 'Falha ao criar', true);
+  planoContasCarregar();
+}
+async function pcRenomear(id){
+  const nome = prompt('Novo nome da conta:');
+  if(!nome) return;
+  await fetch('/api/financeiro/contas/'+id, {method:'PUT', headers:{'Content-Type':'application/json'},
+    credentials:'same-origin', body: JSON.stringify({nome})});
+  planoContasCarregar();
+}
+async function pcRemover(id){
+  if(!confirm('Remover esta conta? (com filhos/lançamento será apenas inativada)')) return;
+  const r = await fetch('/api/financeiro/contas/'+id+'/remover', {method:'POST', headers:{'Content-Type':'application/json'},
+    credentials:'same-origin', body:'{}'});
+  const d = await r.json().catch(()=>({}));
+  if(d.ok) showToast(d.acao === 'apagada' ? 'Conta apagada' : 'Conta inativada');
+  planoContasCarregar();
 }
 
 let _cfgFin = null;
