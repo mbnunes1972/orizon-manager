@@ -1256,6 +1256,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="fin-panel-repasse" style="display:none"><div id="repasse-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
   </div>
 
+  <!-- PAGE 13: Expedição / Logística — Kanban (pedidos por etapa) -->
+  <div class="page" id="page-13">
+    <div class="page-title">Expedição / Logística</div>
+    <div class="page-sub">Pedidos por etapa do ciclo (produção · recebimento · entrega).</div>
+    <div style="height:8px"></div>
+    <div id="exp-kanban-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+  </div>
+
   <!-- PAGE 07: Admin -->
   <div class="page" id="page-07">
     <div class="page-title">&#x2699;&#xFE0F; Administra&ccedil;&atilde;o</div>
@@ -2432,6 +2440,32 @@ function goPage(n){
   if(n===10) cadRender();
   if(n===11){ if(_adminNav) _adminNav.loja = null; adminFiscalCarregar(); }
   if(n===12){ if(_adminNav) _adminNav.loja = null; finTab('prov'); }   // seções no submenu da sidebar
+  if(n===13) expedicaoKanbanCarregar();
+}
+
+// ── Expedição: Kanban de pedidos por etapa (Diagramacao_v2 §1.4) ─────────────
+async function expedicaoKanbanCarregar(){
+  const box = document.getElementById('exp-kanban-box');
+  if(!box) return;
+  const r = await fetch('/api/expedicao/kanban', {credentials:'same-origin'});
+  if(r.status===403){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Módulo Expedição inativo ou sem acesso.</em>'; return; }
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Falha ao carregar.</em>'; return; }
+  const total = d.colunas.reduce((a,c)=>a+c.cards.length,0);
+  if(!total){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Nenhum pedido em etapa de expedição no momento.</em>'; return; }
+  const cols = d.colunas.map(c=>{
+    const cards = c.cards.map(p=>
+       '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer" onclick="abrirProjeto(\''+esc(p.nome_safe)+'\')">'
+      +'<div style="font-weight:500;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.nome_safe)+'</div>'
+      +(p.cliente?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(p.cliente)+'</div>':'')+'</div>'
+      ).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 4px">—</div>';
+    return '<div style="flex:1;min-width:190px">'
+      +'<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:10px;border-bottom:2px solid var(--accent)">'
+      +'<span style="font-size:12px;font-weight:600;color:var(--text)">'+esc(c.nome)+'</span>'
+      +'<span style="font-size:11px;color:var(--muted)">('+c.cards.length+')</span></div>'+cards+'</div>';
+  }).join('');
+  box.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Pedido aparece na etapa em andamento; clique num card para abrir o projeto e avançar a etapa no ciclo.</div>'
+    + '<div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">'+cols+'</div>';
 }
 
 // Módulo Cadastro: troca de aba + lazy-load do painel ativo
@@ -2454,6 +2488,7 @@ const _HUB_DESTINO = {
   cadastro:  () => goPage(10),  // Cadastro (Clientes/Parceiros + stubs)
   fiscal:     () => goPage(11), // Fiscal (config Emitente/NF-e)
   financeiro: () => goPage(12), // Financeiro (config provisões/custos-padrão)
+  expedicao:  () => goPage(13), // Expedição / Logística (Kanban de pedidos por etapa)
 };
 
 function hubRender(){

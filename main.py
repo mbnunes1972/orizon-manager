@@ -507,6 +507,41 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/expedicao/kanban":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return
+            db = get_session()
+            try:
+                lid = usuario.get("loja_id")
+                loja = db.get(Loja, lid) if lid else None
+                if loja is not None and not mod_tenancy.modulo_ativo(loja, "expedicao"):
+                    self.send_json({"ok": False, "erro": "Módulo Expedição inativo."}, code=403); return
+                _exp = [("12", "Implantação"), ("13", "Produção"), ("14", "Entrega no depósito"),
+                        ("15", "Emissão NF-e"), ("16", "Entrega no cliente")]
+                cods = [c for c, _ in _exp]
+                projs = {p.nome_safe: p for p in db.query(Projeto).filter_by(loja_id=lid).all()}
+                por_proj = {}   # nome_safe -> etapa em andamento mais avançada (12–16)
+                for e in (db.query(CicloEtapa)
+                          .filter(CicloEtapa.etapa_codigo.in_(cods), CicloEtapa.status == "em_andamento").all()):
+                    if e.projeto_nome not in projs:
+                        continue
+                    cur = por_proj.get(e.projeto_nome)
+                    if cur is None or int(e.etapa_codigo) > int(cur):
+                        por_proj[e.projeto_nome] = e.etapa_codigo
+                clientes = {c.id: c.nome for c in db.query(Cliente).filter_by(loja_id=lid).all()}
+                idx = {c: i for i, (c, _) in enumerate(_exp)}
+                colunas = [{"codigo": c, "nome": n, "cards": []} for c, n in _exp]
+                for nome_safe, etp in por_proj.items():
+                    p = projs[nome_safe]
+                    colunas[idx[etp]]["cards"].append({
+                        "nome_safe": nome_safe,
+                        "cliente": clientes.get(getattr(p, "cliente_id", None), ""),
+                    })
+                self.send_json({"ok": True, "colunas": colunas})
+            finally:
+                db.close()
+            return
         if path == "/":
             usuario = get_usuario_sessao(self)
             if not usuario:

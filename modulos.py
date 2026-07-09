@@ -61,7 +61,7 @@ MODULOS = {
     "posvenda":    {"camada": "dominio", "depende_de": ["cadastro", "fiscal", "estoque"], "rotulo": "Pós-venda", "faixa": "montagem",
                     "arquivos": [], "tabelas": [], "rotas": []},
     "expedicao":   {"camada": "dominio", "depende_de": ["producao", "estoque", "fiscal"], "rotulo": "Expedição / Logística", "faixa": "expedicao",
-                    "arquivos": [], "tabelas": [], "rotas": []},
+                    "arquivos": [], "tabelas": [], "rotas": ["/api/expedicao/kanban"]},
 }
 
 # Arquivos que NÃO são módulo (shell/compositor e utilitários). O teste de cobertura os ignora.
