@@ -266,6 +266,30 @@ def _aprovador_financeiro(db, login, senha):
         return None
     return u
 
+
+def _contabil_ctx(handler, exige_edicao):
+    """(usuario, db, owner_tipo, owner_id) ou envia erro via handler.send_json e retorna None.
+    Gate: módulo financeiro ativo na loja; edição exige aprovar_financeiro OU editar_dados_loja.
+    O chamador é responsável por db.close()."""
+    import mod_contabil, mod_tenancy
+    usuario = get_usuario_sessao(handler)
+    if not usuario:
+        handler.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return None
+    db = get_session()
+    loja = db.get(Loja, usuario.get("loja_id")) if usuario.get("loja_id") else None
+    if loja is not None and not mod_tenancy.modulo_ativo(loja, "financeiro"):
+        db.close(); handler.send_json({"ok": False, "erro": "Módulo financeiro inativo."}, code=403); return None
+    if exige_edicao:
+        niv = usuario.get("nivel")
+        if not (perfis.pode(niv, "aprovar_financeiro") or perfis.pode(niv, "editar_dados_loja")):
+            db.close(); handler.send_json({"ok": False, "erro": "Sem permissão."}, code=403); return None
+    try:
+        ot, oid = mod_contabil.resolver_owner(db, usuario)
+    except ValueError as e:
+        db.close(); handler.send_json({"ok": False, "erro": str(e)}, code=400); return None
+    return usuario, db, ot, oid
+
+
 _REQ_LOJA_ATIVA = None   # header X-Loja-Ativa da requisição atual (HTTPServer single-thread)
 
 def _ler_loja_ativa_header(handler):
@@ -290,6 +314,19 @@ class Handler(BaseHTTPRequestHandler):
         _REQ_LOJA_ATIVA = _ler_loja_ativa_header(self)
         path = urlparse(self.path).path
         if handle_auth_get(self, path): return
+        if path == "/api/financeiro/contas":
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            from urllib.parse import parse_qs
+            usuario, db, ot, oid = ctx
+            inc = (parse_qs(urlparse(self.path).query).get("incluir_inativas") or ["0"])[0] == "1"
+            try:
+                contas = mod_contabil.listar_contas(db, ot, oid, incluir_inativas=inc)
+                self.send_json({"ok": True, "contas": contas})
+            finally:
+                db.close()
+            return
         if path == "/":
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -1646,6 +1683,38 @@ class Handler(BaseHTTPRequestHandler):
         body   = self.rfile.read(length) if length else b'{}'
 
         if handle_auth_post(self, path, body): return
+        if path == "/api/financeiro/contas":
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                nova = mod_contabil.criar_conta(db, ot, oid, dd.get("pai_id"), dd.get("nome", ""))
+                self.send_json({"ok": True, "conta": nova}, code=201)
+            except PermissionError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=403)
+            except ValueError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+        m_conta_rm = re.match(r"^/api/financeiro/contas/(\d+)/remover$", path)
+        if m_conta_rm:
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                r = mod_contabil.remover_conta(db, ot, oid, int(m_conta_rm.group(1)))
+                self.send_json({"ok": True, **r})
+            except PermissionError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=403)
+            except ValueError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
         if path == "/config":
             config_salvar(json.loads(body))
             self.send_json({"ok": True})
@@ -4626,6 +4695,26 @@ class Handler(BaseHTTPRequestHandler):
         path   = urlparse(self.path).path
         length = int(self.headers.get("Content-Length", 0))
         body   = self.rfile.read(length)
+
+        # ── PUT /api/financeiro/contas/<id> (renomear/reordenar) ──────────────
+        m_conta = re.match(r"^/api/financeiro/contas/(\d+)$", path)
+        if m_conta:
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body) if body else {}
+                r = mod_contabil.editar_conta(db, ot, oid, int(m_conta.group(1)),
+                                              nome=dd.get("nome"), ordem=dd.get("ordem"))
+                self.send_json({"ok": True, "conta": r})
+            except PermissionError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=403)
+            except ValueError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
 
         # ── PUT /api/admin/lojas/<id>/config-financeira ───────────────────────
         m_cfg = re.match(r"^/api/admin/lojas/(\d+)/config-financeira$", path)
