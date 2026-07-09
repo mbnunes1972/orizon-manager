@@ -73,6 +73,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
 .nav-item:has(> .ti)::before{display:none}   /* item com ícone Tabler: sem o marcador circular */
 .nav-item > .ti{font-size:16px;width:16px;text-align:center;flex-shrink:0;line-height:1}
 .nav-item.nav-sub > .ti{font-size:15px;width:15px}
+/* Acordeão de módulos na sidebar (Diagramacao_v4 §2) */
+.sb-faixa{margin-top:14px}
+.nav-item.sb-mod .sb-mod-lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-item > .ti.sb-chev{margin-left:auto;width:auto;font-size:14px;color:var(--muted)}
+.nav-item.sb-soon{opacity:.4;cursor:default}
+.nav-item.sb-soon:hover{color:var(--muted)}
+.sb-soon-tag{font-size:8.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-left:auto}
 .nav-item:hover{color:var(--text)}
 /* v4 §4: item ativo = fundo --surface-2 + sombra (não borda) + texto --accent, peso 500 */
 .nav-item.active{color:var(--accent);font-weight:500;background:var(--surface-2);box-shadow:var(--shadow)}
@@ -434,8 +441,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <div class="nav-item" id="nav-00" onclick="goPage(0)"><i class="ti ti-diamond"></i>Projetos</div>
     </div>
 
-    <!-- Submenu do módulo aberto (v4 §4) — as seções do módulo vivem AQUI, não como tabs no conteúdo -->
-    <div class="sb-secao" id="sb-submodulo" style="display:none"></div>
+    <!-- Acordeão dos 8 módulos de domínio, agrupados por faixa (Diagramacao_v4 §2). As seções de
+         cada módulo vivem AQUI (submenu indentado), nunca como tabs no conteúdo. Render: sbNavRender() -->
+    <div id="sb-modulos"></div>
 
     <div class="sb-secao">
       <div class="sb-nav-title">Admin</div>
@@ -1167,7 +1175,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <!-- PAGE 10: Cadastro (módulo com abas) -->
   <div class="page" id="page-10">
     <div class="page-title">Cadastro</div>
-    <div class="home-tabs" style="display:flex;gap:6px;margin:12px 0 18px;flex-wrap:wrap">
+    <!-- Abas movidas para o submenu do módulo Cadastro na sidebar (Diagramacao_v4 §2.5): não duplicar
+         a navegação em sidebar E tabs. Mantido oculto só para o cadTab() continuar alternando os painéis. -->
+    <div class="home-tabs" id="cad-tabs" style="display:none;gap:6px;margin:12px 0 18px;flex-wrap:wrap">
       <button class="home-tab active" data-cadtab="clientes"     onclick="cadTab('clientes')">Clientes</button>
       <button class="home-tab"        data-cadtab="fornecedores" onclick="cadTab('fornecedores')">Fornecedores</button>
       <button class="home-tab"        data-cadtab="parceiros"    onclick="cadTab('parceiros')">Parceiros</button>
@@ -2143,6 +2153,7 @@ async function carregarUsuarioAutenticado(){
       (_usuarioAtual && (_usuarioAtual.pode_gerir_usuarios
         || _usuarioAtual.pode_gerir_redes || _usuarioAtual.pode_gerir_lojas)) ? '' : 'none';
     _aplicarModulosNoMenu();
+    sbNavRender();               // monta o acordeão dos módulos (usa _usuarioAtual.hub)
     _atualizarUIUsuario();
     _carregarDadosExtrasUsuario();
     _aterrissarPorPapel();
@@ -2434,8 +2445,6 @@ function goPage(n){
   if(navEl) navEl.classList.add('active');
   const sbParams = document.getElementById('sb-params');
   if(sbParams) sbParams.style.display = n===2 ? 'block' : 'none';
-  const _sm = document.getElementById('sb-submodulo');   // submenu do módulo só quando o módulo está aberto (v4 §4)
-  if(_sm && n!==12) _sm.style.display = 'none';
   if(n===2 && projetoAtivo) carregarMargensSalvas();
   if(n===0) projCarregar();
   if(n===7){ adminCarregarConsole(); } // page-07: console
@@ -2445,6 +2454,22 @@ function goPage(n){
   if(n===11){ if(_adminNav) _adminNav.loja = null; adminFiscalCarregar(); }
   if(n===12){ if(_adminNav) _adminNav.loja = null; finTab('prov'); }   // seções no submenu da sidebar
   if(n===13) expedicaoKanbanCarregar();
+  sbSyncActive(n);   // realça/expande o módulo correspondente no acordeão da sidebar
+}
+
+// Página -> módulo de domínio que ela representa (para realçar/expandir no acordeão).
+// page-00 (Projetos) fica com o Atalho, não realça o módulo Comercial (evita realce duplicado).
+const _PAGE_MODULO = {10:'cadastro', 11:'fiscal', 12:'financeiro', 13:'expedicao'};
+function sbSyncActive(n){
+  const mod = _PAGE_MODULO[n] || null;
+  if(mod){
+    _sbModuloAberto = mod;
+    const cfg = _SB_MODULOS[mod] || {};
+    if(!(cfg.secoes && cfg.secoes.length)) _sbSecaoAtiva = null;  // módulo-folha: sem seção ativa
+  } else {
+    _sbModuloAberto = null; _sbSecaoAtiva = null;   // Hub/Config/Admin/Projetos: nenhum módulo expandido
+  }
+  sbNavRender();
 }
 
 // ── Expedição: Kanban de pedidos por etapa (Diagramacao_v2 §1.4) ─────────────
@@ -2482,9 +2507,11 @@ function cadTab(qual){
   });
   if(qual === 'clientes')  cliCarregar();
   if(qual === 'parceiros') parCarregar();
+  _sbSecaoAtiva = qual;                                   // reflete a seção ativa no acordeão
+  if(_sbModuloAberto === 'cadastro') sbNavRender();
 }
 
-function cadRender(){ cadTab('clientes'); }   // aba padrão = Clientes
+function cadRender(){ cadTab('clientes'); }   // seção padrão = Clientes
 
 // módulo -> ação de navegação (só os que têm tela real); ausentes = "em breve"
 const _HUB_DESTINO = {
@@ -7307,13 +7334,98 @@ const _FIN_SECOES = [
   {id:'repasse', lbl:'Repasse Fábrica', ic:'truck-delivery',  load:()=>repasseCarregar()},
 ];
 let _finSecaoAtual = 'prov';
-function finSubmenuRender(){
-  const box = document.getElementById('sb-submodulo');
+
+// ── Sidebar em acordeão: os 8 módulos de domínio sempre visíveis, agrupados pelas mesmas faixas do
+//    Hub; um só expandido por vez, mostrando suas seções indentadas logo abaixo (Diagramacao_v4 §2).
+let _sbModuloAberto = null;   // id do módulo expandido (só um por vez)
+let _sbSecaoAtiva   = null;   // id da seção ativa dentro do módulo aberto
+
+// Config por módulo: ícone Tabler distinto + (opcional) seções do submenu. Sem `go` nem `secoes`
+// => módulo "em breve" (sem tela). Seções com `secoes` são folhas navegáveis (nível 3, sem sub-submenu).
+const _SB_MODULOS = {
+  cadastro:   {ic:'address-book', secoes:[
+                 {id:'clientes',     lbl:'Clientes',     ic:'user',           go:()=>cadIr('clientes')},
+                 {id:'parceiros',    lbl:'Parceiros',    ic:'users-group',    go:()=>cadIr('parceiros')},
+                 {id:'fornecedores', lbl:'Fornecedores', ic:'building-store', go:()=>cadIr('fornecedores')},
+                 {id:'funcionarios', lbl:'Funcionários', ic:'id-badge',       go:()=>cadIr('funcionarios')},
+                 {id:'terceiros',    lbl:'Terceiros',    ic:'user-cog',       go:()=>cadIr('terceiros')},
+              ]},
+  comercial:  {ic:'shopping-cart', go:()=>goPage(0)},     // folha: abre Projetos
+  producao:   {ic:'tools'},                               // em breve
+  fiscal:     {ic:'file-invoice',  go:()=>goPage(11)},    // folha: Emitente/NF-e
+  estoque:    {ic:'packages'},                            // em breve
+  posvenda:   {ic:'lifebuoy'},                            // em breve
+  expedicao:  {ic:'truck',         go:()=>goPage(13)},    // folha: Kanban de expedição
+  financeiro: {ic:'cash', secoes: _FIN_SECOES.map(s => ({id:s.id, lbl:s.lbl, ic:s.ic, go:()=>finIrSecao(s.id)}))},
+};
+
+function _sbTemTela(cfg){ return !!(cfg && (cfg.go || (cfg.secoes && cfg.secoes.length))); }
+
+function sbNavRender(){
+  const box = document.getElementById('sb-modulos');
   if(!box) return;
-  box.innerHTML = '<div class="sb-nav-title">Financeiro</div>'
-    + _FIN_SECOES.map(s => '<div class="nav-item nav-sub'+(s.id===_finSecaoAtual?' active':'')
-        +'" onclick="finTab(\''+s.id+'\')"><i class="ti ti-'+s.ic+'"></i>'+esc(s.lbl)+'</div>').join('');
-  box.style.display = '';
+  const grupos = (_usuarioAtual && _usuarioAtual.hub) || null;
+  if(!grupos){ box.innerHTML = ''; return; }      // sem info do hub -> nada (compat)
+  box.innerHTML = grupos.map(g => {
+    const linhas = g.modulos.map(m => {
+      const cfg = _SB_MODULOS[m.id] || {};
+      const ic  = cfg.ic || 'point';
+      const temTela = _sbTemTela(cfg);
+      const temSec  = !!(cfg.secoes && cfg.secoes.length);
+      const aberto  = _sbModuloAberto === m.id;
+      const cls = 'nav-item sb-mod' + (aberto ? ' active' : '') + (temTela ? '' : ' sb-soon');
+      let html = '<div class="' + cls + '"'
+        + (temTela ? ' onclick="sbModuloClick(\'' + m.id + '\')"' : '')
+        + '><i class="ti ti-' + ic + '"></i><span class="sb-mod-lbl">' + esc(m.rotulo) + '</span>'
+        + (temTela ? '' : '<span class="sb-soon-tag">em breve</span>')
+        + (temSec ? '<i class="ti ti-chevron-' + (aberto ? 'down' : 'right') + ' sb-chev"></i>' : '')
+        + '</div>';
+      if(aberto && temSec){
+        html += cfg.secoes.map((s, i) =>
+          '<div class="nav-item nav-sub' + (_sbSecaoAtiva === s.id ? ' active' : '') + '"'
+          + ' onclick="sbSecaoClick(\'' + m.id + '\',' + i + ')"><i class="ti ti-' + s.ic + '"></i>'
+          + esc(s.lbl) + '</div>'
+        ).join('');
+      }
+      return html;
+    }).join('');
+    return '<div class="sb-nav-title sb-faixa">' + esc(g.rotulo) + '</div>' + linhas;
+  }).join('');
+}
+
+function sbModuloClick(id){
+  const cfg = _SB_MODULOS[id] || {};
+  const temSec = !!(cfg.secoes && cfg.secoes.length);
+  if(temSec){
+    if(_sbModuloAberto === id){ _sbModuloAberto = null; sbNavRender(); return; }  // já aberto -> colapsa
+    _sbModuloAberto = id; _sbSecaoAtiva = cfg.secoes[0].id;
+    sbNavRender();
+    cfg.secoes[0].go();          // expandiu -> abre a 1ª seção do módulo
+  } else if(cfg.go){
+    _sbModuloAberto = id; _sbSecaoAtiva = null;
+    cfg.go();                    // módulo-folha -> navega direto (o realce vem do sbSyncActive)
+  }
+}
+
+function sbSecaoClick(id, i){
+  const cfg = _SB_MODULOS[id] || {};
+  const s = cfg.secoes && cfg.secoes[i];
+  if(!s) return;
+  _sbModuloAberto = id; _sbSecaoAtiva = s.id;
+  s.go();
+}
+
+// Navega até uma seção do módulo garantindo que a página do módulo esteja ativa (evita recarregar
+// a seção default duas vezes: goPage(10)/goPage(12) já caem em 'clientes'/'prov').
+function cadIr(tab){
+  const p = document.getElementById('page-10');
+  if(p && p.classList.contains('active')) cadTab(tab);
+  else { goPage(10); if(tab !== 'clientes') cadTab(tab); }
+}
+function finIrSecao(id){
+  const p = document.getElementById('page-12');
+  if(p && p.classList.contains('active')) finTab(id);
+  else { goPage(12); if(id !== 'prov') finTab(id); }
 }
 async function finDashboardCarregar(){
   const box = document.getElementById('loja-panel-financeiro');
@@ -7353,7 +7465,7 @@ function finTab(t){
   const sec = _FIN_SECOES.find(s => s.id===t);
   const tt = document.getElementById('fin-page-title');
   if(tt && sec) tt.textContent = 'Financeiro / ' + sec.lbl;
-  finSubmenuRender();
+  _sbModuloAberto = 'financeiro'; _sbSecaoAtiva = t; sbNavRender();   // reflete no acordeão
   if(sec && sec.load) sec.load();
 }
 

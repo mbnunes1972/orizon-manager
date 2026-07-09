@@ -361,6 +361,24 @@ _PROV_VENDA = {   # chave -> (evento de constituição, código da conta de Prov
     "garantia":    ("fechamento_venda_garantia",    "2.1.04.03"),
 }
 
+# ── Painel de Provisões (dashboard) — DATA-DRIVEN pelo Plano de Contas (Diagramacao_v4 §1.3) ──
+# Regra: um card por conta ANALÍTICA do grupo de Provisões que existir no plano — NUNCA hardcodar
+# os 3 nomes como componentes fixos. Criar uma provisão nova no Plano de Contas faz surgir um card
+# automaticamente, sem tocar no painel. Duas contas do grupo ficam de fora por terem tratamento
+# próprio (documentado abaixo), de modo que "hoje são 3" (Montagem/Assistência/Garantia) continua
+# valendo — mas por exclusão explícita, não por lista fixa das 3.
+GRUPO_PROVISOES = "2.1.04"
+_PROV_PAINEL_EXCLUI = {
+    "2.1.04.01",   # Comissão — despesa de venda; baixa via pagamento_comissao, não é set-aside de custo
+    "2.1.04.04",   # Devolução — sem evento/percentual de constituição hoje (saldo sempre 0)
+}
+# Descrição opcional por conta (enriquece o card; cai num texto genérico se a conta não estiver aqui):
+_PROV_PAINEL_SUB = {
+    "2.1.04.02": "Custo direto da venda · reverte na execução",
+    "2.1.04.05": "Custo da loja · reverte no atendimento",
+    "2.1.04.03": "Repasse à fábrica · controle de cobrança",
+}
+
 
 def _cfg_f(v):
     try:
@@ -393,19 +411,22 @@ def constituir_provisoes_venda(db, owner_tipo, owner_id, projeto_id, valor_venda
 
 
 def dashboard_financeiro(db, owner_tipo, owner_id, ini=None, fim=None):
-    """Dashboard do Financeiro (Padrao_Design_Orizon_v4 §5): saldo em aberto das 3 provisões
-    (nível owner), resumo do DRE e indicador de cobertura de caixa (v6 §6.1: caixa vs provisões)."""
+    """Dashboard do Financeiro (Padrao_Design_Orizon_v4 §5 / Diagramacao_v4 §1.3): um card por
+    provisão que EXISTIR no Plano de Contas (grupo GRUPO_PROVISOES), data-driven — nunca lista fixa
+    de 3. Mais o resumo do DRE e o indicador de cobertura de caixa (v6 §6.1: caixa vs provisões)."""
     seed_plano(db, owner_tipo, owner_id)
-    prov_meta = [
-        ("2.1.04.02", "Provisão de Montagem",           "Custo direto da venda · reverte na execução"),
-        ("2.1.04.05", "Provisão de Assistência Técnica", "Custo da loja · reverte no atendimento"),
-        ("2.1.04.03", "Provisão de Garantia",            "Repasse à fábrica · controle de cobrança"),
-    ]
+    contas_prov = (db.query(Conta)
+                   .filter_by(owner_tipo=owner_tipo, owner_id=owner_id, tipo="analitica")
+                   .filter(Conta.codigo.like(GRUPO_PROVISOES + ".%"))
+                   .order_by(Conta.codigo).all())
     provs = []
-    for cod, nome, sub in prov_meta:
-        c = db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, codigo=cod).first()
-        saldo = saldo_conta(db, owner_tipo, owner_id, c.id, ini, fim) if c else 0.0
-        provs.append({"codigo": cod, "nome": nome, "sub": sub, "saldo_em_aberto": saldo})
+    for c in contas_prov:
+        if c.codigo in _PROV_PAINEL_EXCLUI:
+            continue
+        saldo = saldo_conta(db, owner_tipo, owner_id, c.id, ini, fim)
+        provs.append({"codigo": c.codigo, "nome": c.nome,
+                      "sub": _PROV_PAINEL_SUB.get(c.codigo, "Saldo provisionado em aberto"),
+                      "saldo_em_aberto": saldo})
     total_prov = round(sum(p["saldo_em_aberto"] for p in provs), 2)
     d = dre(db, owner_tipo, owner_id, ini, fim)
     caixa_c = db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, codigo="1.1.01").first()
