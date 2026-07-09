@@ -1341,10 +1341,11 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 
 ## ⏸️ ESTADO ATUAL (2026-07-07) — retomar aqui
 
-> **🚀 Deploy no VPS (2026-07-08):** servidor online `http://167.88.33.121:8765` atualizado de `ec42ee5`
-> → **`f36b72b`** (modularização Fase 1 + painel/hub de módulos + navegação + parceiros + escopo do Admin +
-> **passo 2 de design completo, itens 1–7**). App em screen `orizon-manager`, bind `0.0.0.0` (pid novo), `app.log`
-> sem erros, HTTP **302** local / **200** externo em `/login`. **Banco PRESERVADO desta vez** (a pedido): NÃO houve
+> **🚀 Deploy no VPS (2026-07-09):** servidor online `http://167.88.33.121:8765` atualizado para **`7ff3cf0`** —
+> **Módulo Financeiro completo (sub-projetos #1–#6)** + os ajustes de design (hub/sidebar/abas). As **3 tabelas novas**
+> (`conta`/`lancamento`/`periodo_contabil`) foram **criadas no start** (create_all), **banco preservado**, HTTP 302
+> local / **200 externo**, sem erros. _(Deploy anterior 2026-07-08 → `f36b72b`: modularização Fase 1 + hub de módulos +
+> navegação + parceiros + escopo do Admin + passo 2 de design 1–7. App em screen `orizon-manager`, bind `0.0.0.0`.)_ **Banco PRESERVADO desta vez** (a pedido): NÃO houve
 > `rm orizon.db`/seed — as **migrações idempotentes rodaram no start** e adicionaram as colunas novas
 > (`Loja.modulos_ativos`, `Usuario.tema` → confirmado presente). Dados de teste do VPS mantidos. **Contexto:** o VPS
 > é ambiente **de dev/teste aberto a pessoas remotas**, ainda **não** há produção operacional; dados são falsos.
