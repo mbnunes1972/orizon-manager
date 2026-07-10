@@ -128,7 +128,11 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   transition:background-color 9999s ease-out 0s}   /* mata o flash de fundo do autofill */
 /* Botões — Padrao_Design_Orizon_v4 §4: profundidade por --shadow, não por borda (corrige "terminal") */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 18px;height:36px;border-radius:8px;font-family:var(--font-sans);font-weight:500;font-size:13px;cursor:pointer;border:none;transition:all .15s;letter-spacing:.2px;white-space:nowrap}
-.btn-primary{background:var(--accent);color:#fff;box-shadow:var(--shadow)}
+/* Primário (Padrao_Design_v9 §4): cor SEMPRE do token --accent (nunca hex literal → não vaza entre
+   temas). Contraste por sombra + borda sutil 1px no MESMO matiz do accent, ~15% mais escura (color-mix
+   com preto) — resolve por tema sozinho, sem saturação extra. */
+.btn-primary{background:var(--accent);color:#fff;box-shadow:var(--shadow);
+  border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}
 .btn-primary:hover{opacity:.90;box-shadow:0 3px 10px rgba(0,0,0,.18)}
 .btn-primary:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
 .btn-ghost{background:var(--surface-2);color:var(--muted);box-shadow:var(--shadow)}   /* secundário */
