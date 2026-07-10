@@ -312,6 +312,9 @@ class Terceiro(Base):
     banco_codigo = Column(String(6),   nullable=True)
     agencia      = Column(String(12),  nullable=True)
     conta        = Column(String(20),  nullable=True)
+    # Conta de login OPCIONAL restrita (Regras_Funcoes_Perfis_Atribuicoes §10): com conta, o Terceiro
+    # ganha visão de Montagem/Assistência dos ambientes atribuídos. Coluna só; fluxo em passe seguinte.
+    usuario_id      = Column(Integer,     ForeignKey("usuarios.id"), nullable=True)
     status          = Column(String(10),  nullable=False, default="ativo")
     criado_em       = Column(DateTime,    default=datetime.utcnow)
 
@@ -549,6 +552,29 @@ class CicloEtapa(Base):
     __table_args__ = (UniqueConstraint("projeto_nome", "etapa_codigo", name="uq_ciclo_etapa"),)
 
     responsavel = relationship("Usuario", foreign_keys=[responsavel_id])
+
+
+class AtribuicaoAmbiente(Base):
+    """Mapa de Atribuições (Regras_Funcoes_Perfis_Atribuicoes §4/§5): quem executa cada papel
+    operacional (PE/Medição/Montagem/Assistência) por ambiente do projeto. A atribuição CONCEDE
+    visibilidade escopada ao Usuário vinculado ao profissional. pool_ambiente_id NULL = 'projeto
+    inteiro' (default que vale para os ambientes sem atribuição própria). Um profissional por
+    papel/ambiente (UniqueConstraint). Trocas ficam em LogAcaoGerencial (sem versionar a tabela)."""
+    __tablename__ = "atribuicoes_ambiente"
+
+    id               = Column(Integer,  primary_key=True, autoincrement=True)
+    loja_id          = Column(Integer,  ForeignKey("lojas.id"), nullable=False)   # isolamento F4
+    projeto_nome     = Column(Text,     nullable=False)                            # nome_safe
+    pool_ambiente_id = Column(Integer,  ForeignKey("pool_ambientes.id"), nullable=True)  # NULL = projeto inteiro
+    papel            = Column(Text,     nullable=False)   # projeto_executivo|medicao|montagem|assistencia
+    funcionario_id   = Column(Integer,  ForeignKey("funcionarios.id"), nullable=True)
+    terceiro_id      = Column(Integer,  ForeignKey("terceiros.id"), nullable=True)
+    atribuido_por_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    criado_em        = Column(DateTime, default=datetime.utcnow)
+    atualizado_em    = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("projeto_nome", "pool_ambiente_id", "papel",
+                                       name="uq_atribuicao_papel_ambiente"),)
 
 
 class CicloLogistico(Base):
@@ -1078,6 +1104,8 @@ def _migrar_colunas():
         _add_cols("fornecedores", _ENDERECO + _BANCO)
         _add_cols("terceiros",    [("funcao_id","INTEGER")] + _ENDERECO + _BANCO)
         _add_cols("parceiros",    [("pix","VARCHAR(140)")])
+        # Mapa de Atribuições (Regras_Funcoes_Perfis §5): conta opcional do Terceiro
+        _add_cols("terceiros",    [("usuario_id","INTEGER")])
         # Cronograma do Ciclo (Modulos_Orizon_v11): data prevista de conclusão por etapa
         # + Responsável por função (Modulos_Orizon_v12): função exigida + funcionário escolhido
         _add_cols("ciclo_etapas", [("data_prevista_conclusao","DATETIME"),

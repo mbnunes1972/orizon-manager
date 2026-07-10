@@ -17,11 +17,13 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
                        CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente,
                        PerfilEmissao, CicloLogistico, CicloLogisticoTransicao, AssistenciaCaso,
-                       Funcionario, Fornecedor, Terceiro, Funcao, FolhaPagamento)
+                       Funcionario, Fornecedor, Terceiro, Funcao, FolhaPagamento,
+                       AtribuicaoAmbiente)
 import mod_expedicao
 import mod_assistencias
 import mod_cadastro
 import mod_folha
+import mod_escopo
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -1438,7 +1440,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": _err}, code=403)
                         return
                     _meta = _projeto_da_loja(db, nome_safe, loja_id)
-                    if _meta is None or not _projeto_visivel_ao_ator(_meta, usuario):
+                    if _meta is None or not _projeto_visivel_ao_ator(_meta, usuario, db):
                         # escopo por projetista: consultor não abre projeto de outro
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
@@ -1634,6 +1636,31 @@ class Handler(BaseHTTPRequestHandler):
                                     "contrato_totalmente_assinado": total_assinado})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # GET /api/projetos/<nome>/atribuicoes — Mapa de Atribuições (Regras §4). Abrir/editar só
+            # Gerência+ e Supervisor de Montagem.
+            m = _re.match(r'^/api/projetos/([^/]+)/atribuicoes$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    if not _pode_editar_mapa(ator.get("nivel")):
+                        self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                    self.send_json({"ok": True, "papeis": list(mod_escopo.PAPEIS),
+                                    "atribuicoes": _serializar_atribuicoes(db, nome_safe),
+                                    "ambientes": _ambientes_do_projeto(db, nome_safe)})
                 finally:
                     db.close()
                 return
@@ -4513,6 +4540,89 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # POST /api/projetos/<nome>/atribuicoes — upsert de uma atribuição do Mapa (Regras §4/§5).
+            # Body: {papel, pool_ambiente_id|null, funcionario_id|null, terceiro_id|null}. Alvo vazio
+            # limpa a linha. Alvo tem de pertencer à loja E ter Função compatível com o papel (§7).
+            # 1:1 por (papel, ambiente) — substitui. Auditado em LogAcaoGerencial. Só Gerência+/Supervisor.
+            m = _re.match(r'^/api/projetos/([^/]+)/atribuicoes$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    if not _pode_editar_mapa(ator.get("nivel")):
+                        self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                    req = json.loads(body or b'{}')
+                    papel = (req.get("papel") or "").strip()
+                    if papel not in mod_escopo.PAPEIS:
+                        self.send_json({"ok": False, "erro": "Papel inválido"}, code=400); return
+                    amb_id = req.get("pool_ambiente_id")
+                    amb_id = int(amb_id) if amb_id not in (None, "", 0, "0") else None
+                    # ambiente, se informado, tem de ser do projeto
+                    if amb_id is not None:
+                        pa = db.get(PoolAmbiente, amb_id)
+                        if pa is None or pa.projeto_id != nome_safe:
+                            self.send_json({"ok": False, "erro": "Ambiente não encontrado"}, code=404); return
+                    fio_id = req.get("funcionario_id") or None
+                    ter_id = req.get("terceiro_id") or None
+                    # localiza a linha vigente (projeto, ambiente, papel)
+                    reg = (db.query(AtribuicaoAmbiente)
+                           .filter_by(projeto_nome=nome_safe, papel=papel)
+                           .filter(AtribuicaoAmbiente.pool_ambiente_id.is_(None) if amb_id is None
+                                   else AtribuicaoAmbiente.pool_ambiente_id == amb_id).first())
+                    antigo = None
+                    if reg is not None:
+                        antigo = reg.funcionario_id or (("t%d" % reg.terceiro_id) if reg.terceiro_id else None)
+                    # alvo vazio → limpar
+                    if not fio_id and not ter_id:
+                        if reg is not None:
+                            db.delete(reg)
+                        novo = None
+                    else:
+                        # resolve alvo, valida loja + função compatível com o papel (§7)
+                        if fio_id:
+                            alvo = db.get(Funcionario, int(fio_id)); ter_id = None
+                        else:
+                            alvo = db.get(Terceiro, int(ter_id)); fio_id = None
+                        if alvo is None or alvo.loja_id != loja_id:
+                            self.send_json({"ok": False, "erro": "Profissional não encontrado"}, code=404); return
+                        fnome = ""
+                        if getattr(alvo, "funcao_id", None):
+                            _fn = db.get(Funcao, alvo.funcao_id); fnome = _fn.nome if _fn else ""
+                        if not mod_escopo.funcao_compativel(papel, fnome):
+                            self.send_json({"ok": False,
+                                            "erro": "Profissional não tem função compatível com este papel"}, code=400)
+                            return
+                        if reg is None:
+                            reg = AtribuicaoAmbiente(loja_id=loja_id, projeto_nome=nome_safe,
+                                                     pool_ambiente_id=amb_id, papel=papel)
+                            db.add(reg)
+                        reg.funcionario_id = int(fio_id) if fio_id else None
+                        reg.terceiro_id    = int(ter_id) if ter_id else None
+                        reg.atribuido_por_id = usuario["id"]
+                        novo = reg.funcionario_id or (("t%d" % reg.terceiro_id) if reg.terceiro_id else None)
+                    db.add(LogAcaoGerencial(
+                        solicitante_id=usuario["id"], autorizador_id=usuario["id"],
+                        acao="atribuir_mapa", projeto_nome=nome_safe, etapa_alvo=papel,
+                        contexto=json.dumps({"papel": papel, "pool_ambiente_id": amb_id,
+                                             "alvo_antigo": antigo, "alvo_novo": novo})))
+                    db.commit()
+                    self.send_json({"ok": True, "atribuicoes": _serializar_atribuicoes(db, nome_safe)})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
             # POST /api/projetos/<nome>/parceiro — associa/remove o parceiro (arquiteto) do
             # projeto (etapa "Criação do Projeto"). Editável só ATÉ a assinatura do contrato.
             m = _re.match(r'^/api/projetos/([^/]+)/parceiro$', path)
@@ -4530,7 +4640,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": _err}, code=403)
                         return
                     _meta = _projeto_da_loja(db, nome_safe, loja_id)
-                    if _meta is None or not _projeto_visivel_ao_ator(_meta, usuario):
+                    if _meta is None or not _projeto_visivel_ao_ator(_meta, usuario, db):
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
                     if _contrato_totalmente_assinado(nome_safe, db):
@@ -4579,7 +4689,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": _err}, code=403)
                         return
                     _meta = _projeto_da_loja(db, nome_safe, loja_id)
-                    if _meta is None or not _projeto_visivel_ao_ator(_meta, usuario):
+                    if _meta is None or not _projeto_visivel_ao_ator(_meta, usuario, db):
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
                     proj = _carregar_projeto(nome_safe)
@@ -7134,6 +7244,54 @@ def _projeto_da_loja(db, nome_safe, loja_id):
     return _obj_da_loja(db, Projeto, nome_safe, loja_id)
 
 
+# ── Mapa de Atribuições (Regras_Funcoes_Perfis_Atribuicoes §4/§5) — helpers de I/O; a REGRA pura
+#    mora em mod_escopo. ────────────────────────────────────────────────────────────────────────
+def _pode_editar_mapa(nivel):
+    """Abrir/editar o Mapa: Gerência+ (autorizar/aprovar_financeiro) ou Supervisor de Montagem."""
+    return bool(nivel) and (perfis.pode(nivel, "autorizar") or perfis.pode(nivel, "aprovar_financeiro")
+                            or nivel == "supervisor_montagem")
+
+
+def _ambientes_do_projeto(db, nome_safe):
+    """[{id, nome}] dos PoolAmbiente do projeto (para a grade do Mapa)."""
+    return [{"id": pa.id, "nome": pa.nome_exibicao or pa.nome}
+            for pa in db.query(PoolAmbiente).filter_by(projeto_id=nome_safe)
+                        .order_by(PoolAmbiente.id.asc()).all()]
+
+
+def _atribuicoes_dicts(db, nome_safe):
+    """Atribuições vigentes do projeto como dicts puros (para mod_escopo)."""
+    return [{"id": a.id, "papel": a.papel, "pool_ambiente_id": a.pool_ambiente_id,
+             "funcionario_id": a.funcionario_id, "terceiro_id": a.terceiro_id}
+            for a in db.query(AtribuicaoAmbiente).filter_by(projeto_nome=nome_safe).all()]
+
+
+def _serializar_atribuicoes(db, nome_safe):
+    """Atribuições do projeto com nomes resolvidos (funcionário/terceiro, função, ambiente)."""
+    regs = db.query(AtribuicaoAmbiente).filter_by(projeto_nome=nome_safe).all()
+    fio = {f.id: f for f in db.query(Funcionario).filter(Funcionario.id.in_(
+        [r.funcionario_id for r in regs if r.funcionario_id])).all()} if regs else {}
+    ter = {t.id: t for t in db.query(Terceiro).filter(Terceiro.id.in_(
+        [r.terceiro_id for r in regs if r.terceiro_id])).all()} if regs else {}
+    fnc = {}
+    fids = {o.funcao_id for o in list(fio.values()) + list(ter.values()) if getattr(o, "funcao_id", None)}
+    if fids:
+        fnc = {f.id: f.nome for f in db.query(Funcao).filter(Funcao.id.in_(fids)).all()}
+    amb = {pa.id: (pa.nome_exibicao or pa.nome)
+           for pa in db.query(PoolAmbiente).filter_by(projeto_id=nome_safe).all()}
+    out = []
+    for r in regs:
+        alvo = fio.get(r.funcionario_id) if r.funcionario_id else ter.get(r.terceiro_id)
+        out.append({
+            "id": r.id, "papel": r.papel, "pool_ambiente_id": r.pool_ambiente_id,
+            "ambiente_nome": amb.get(r.pool_ambiente_id, "(projeto inteiro)") if r.pool_ambiente_id else "(projeto inteiro)",
+            "funcionario_id": r.funcionario_id, "terceiro_id": r.terceiro_id,
+            "responsavel_nome": (alvo.nome if alvo else ""),
+            "funcao_nome": fnc.get(getattr(alvo, "funcao_id", None), "") if alvo else "",
+        })
+    return out
+
+
 # ── Perfil fiscal: lógica comum entre o dono LOJA (loja.emitente_id) e o dono
 #    REDE (rede.emitente_central_id). Os handlers só resolvem o Emitente do dono
 #    (via _emitente_do_dono) e delegam a estas funções puras. ────────────────────
@@ -7329,20 +7487,59 @@ def _ve_apenas_proprios_projetos(nivel):
     return nivel in _PERFIS_ESCOPO_PROPRIO
 
 
-def _projeto_visivel_ao_ator(meta, ator):
-    """True se o projetos_meta `meta` é visível ao ator. Perfis de escopo próprio só veem
-    o que criaram (criado_por_id == ator.id) ou os legados sem criador (criado_por_id NULL)."""
+def _usuario_ids_atribuidos_projeto(db, nome_safe):
+    """Conjunto de usuario_id com QUALQUER atribuição no projeto (Mapa) — resolve
+    Funcionario.usuario_id / Terceiro.usuario_id. Alimenta mod_escopo (Regras §5)."""
+    regs = db.query(AtribuicaoAmbiente).filter_by(projeto_nome=nome_safe).all()
+    if not regs:
+        return set()
+    fids = {r.funcionario_id for r in regs if r.funcionario_id}
+    tids = {r.terceiro_id for r in regs if r.terceiro_id}
+    uids = set()
+    if fids:
+        uids |= {u for (u,) in db.query(Funcionario.usuario_id).filter(Funcionario.id.in_(fids)).all() if u}
+    if tids:
+        uids |= {u for (u,) in db.query(Terceiro.usuario_id).filter(Terceiro.id.in_(tids)).all() if u}
+    return uids
+
+
+def _projetos_atribuidos_ao_usuario(db, usuario_id, loja_id):
+    """Nomes dos projetos (na loja) onde o login `usuario_id` está atribuído no Mapa (via
+    Funcionário/Terceiro vinculado). Vazio se o login não tem vínculo/atribuição."""
+    if not usuario_id:
+        return set()
+    from sqlalchemy import or_
+    fids = [r[0] for r in db.query(Funcionario.id).filter(Funcionario.usuario_id == usuario_id).all()]
+    tids = [r[0] for r in db.query(Terceiro.id).filter(Terceiro.usuario_id == usuario_id).all()]
+    conds = []
+    if fids:
+        conds.append(AtribuicaoAmbiente.funcionario_id.in_(fids))
+    if tids:
+        conds.append(AtribuicaoAmbiente.terceiro_id.in_(tids))
+    if not conds:
+        return set()
+    return {r[0] for r in db.query(AtribuicaoAmbiente.projeto_nome).filter(
+        AtribuicaoAmbiente.loja_id == loja_id, or_(*conds)).all()}
+
+
+def _projeto_visivel_ao_ator(meta, ator, db=None):
+    """Visibilidade DENTRO da loja (Regras §3/§6), via mod_escopo. Gerência+ tudo; Consultor por
+    posse; operacional (PE/Medidor/Montagem) só o atribuído no Mapa; admin nada. `db` é necessário
+    só para os operacionais (resolver o Mapa)."""
     if meta is None:
         return False
-    if not _ve_apenas_proprios_projetos((ator or {}).get("nivel")):
-        return True
-    cpid = getattr(meta, "criado_por_id", None)
-    return cpid is None or cpid == (ator or {}).get("id")
+    if not mod_escopo.escopo_por_atribuicao(ator):
+        return mod_escopo.pode_ver_projeto(ator, meta, set())     # fast path — sem consulta ao Mapa
+    if db is None:
+        return False                                              # conservador: operacional sem Mapa não vê
+    atribuidos = _usuario_ids_atribuidos_projeto(db, getattr(meta, "nome_safe", None))
+    return mod_escopo.pode_ver_projeto(ator, meta, atribuidos)
 
 
 def _filtrar_projetos_por_loja(projetos, db, loja_id, ator=None):
-    """Mantém só os projetos cujo projetos_meta.loja_id == loja_id. Se `ator` for de escopo
-    próprio (ex.: Consultor), mantém ainda só os que ele criou ou os legados sem criador."""
+    """Mantém só os projetos da loja (F4) e, dentro dela, o que o ator pode ver (Regras §3):
+    Consultor → os que criou/legados; operacional (PE/Medidor/Montagem) → só os atribuídos no Mapa;
+    demais → tudo na loja."""
     from sqlalchemy import or_
     nomes = [p.get("nome_safe") for p in projetos if p.get("nome_safe")]
     if not nomes:
@@ -7353,6 +7550,9 @@ def _filtrar_projetos_por_loja(projetos, db, loja_id, ator=None):
         q = q.filter(or_(Projeto.criado_por_id == ator.get("id"),
                          Projeto.criado_por_id.is_(None)))
     permitidos = {r[0] for r in q.all()}
+    if ator and mod_escopo.escopo_por_atribuicao(ator):
+        atrib = _projetos_atribuidos_ao_usuario(db, ator.get("id"), loja_id)
+        permitidos &= atrib
     return [p for p in projetos if p.get("nome_safe") in permitidos]
 
 
