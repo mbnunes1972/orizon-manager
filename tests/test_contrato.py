@@ -263,23 +263,55 @@ def test_email_fallback_consultor():
 def test_gerar_num_contrato_formato():
     from datetime import datetime
     from mod_contrato import gerar_num_contrato
+    # sigla (3 letras) + AAAAMMDD + 5 dígitos sequenciais
     n = gerar_num_contrato([], "INS", data=datetime(2026, 6, 17))
-    assert n == "INS-2026-06-17-001"
+    assert n == "INS2026061700001"
 
 
 def test_gerar_num_contrato_sequencia_continua():
     from datetime import datetime
     from mod_contrato import gerar_num_contrato
-    existentes = ["INS-2026-06-15-001", "INS-2026-06-16-002", "ORZ-2026-06-16-009"]
+    existentes = ["INS2026061500001", "INS2026061600002", "ORZ2026061600009"]
     n = gerar_num_contrato(existentes, "INS", data=datetime(2026, 6, 17))
-    assert n == "INS-2026-06-17-003"
+    assert n == "INS2026061700003"   # contínuo por prefixo INS (ignora ORZ)
 
 
 def test_gerar_num_contrato_loja_customizada():
     from datetime import datetime
     from mod_contrato import gerar_num_contrato
     n = gerar_num_contrato([], "ORZ", data=datetime(2026, 1, 5))
-    assert n == "ORZ-2026-01-05-001"
+    assert n == "ORZ2026010500001"
+
+
+def test_gerar_num_contrato_ignora_formato_antigo():
+    from datetime import datetime
+    from mod_contrato import gerar_num_contrato
+    # números no formato antigo (com traços) não contaminam o novo sequencial
+    n = gerar_num_contrato(["INS-2026-06-15-050"], "INS", data=datetime(2026, 6, 17))
+    assert n == "INS2026061700001"
+
+
+def test_gerar_num_proposta_prefixo_pv():
+    from datetime import datetime
+    from mod_contrato import gerar_num_proposta
+    assert gerar_num_proposta([], data=datetime(2026, 6, 17)) == "PV2026061700001"
+    # a data é sempre a da emissão; só o SEQ continua (contínuo por 'PV')
+    assert gerar_num_proposta(["PV2026061500007"], data=datetime(2026, 6, 17)) == "PV2026061700008"
+
+
+def test_proposta_html_e_capa_do_contrato_com_pv():
+    from mod_contrato import construir_contexto, montar_html_proposta
+    cliente = {"nome": "Fulano", "cpf": "111.111.111-11", "logradouro": "Rua X",
+               "numero": "10", "cidade": "São Paulo", "estado": "SP"}
+    ctx = construir_contexto(cliente, {"nome": "Consultor"}, "", {"nome": "Loja", "codigo": "INS"})
+    ctx["_ambientes"] = [("Cozinha", 1000.0)]
+    ctx["num_contrato"] = "PV2026071000001"     # nº da proposta ocupa o marcador da capa
+    html = montar_html_proposta(ctx)
+    assert "PV2026071000001" in html            # numeração PV aparece
+    assert "[NUM_CONTRATO]" not in html         # marcador foi substituído
+    assert "Identificação do Cliente" in html   # é a capa (primeira página) do contrato
+    assert "quebra-capa" not in html            # sem quebra -> uma página só
+    assert "<!--CORPO-->" not in html and "Cozinha" in html
 
 
 # ── Valores das parcelas ───────────────────────────────────────────────────────

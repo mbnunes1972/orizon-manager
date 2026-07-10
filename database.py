@@ -352,6 +352,7 @@ class Orcamento(Base):
     negociacao_json = Column(Text,     nullable=True)   # snapshot das entradas da negociação (JSON)
     valor_total     = Column(Float,    default=0.0)
     valor_liquido   = Column(Float,    default=0.0)
+    num_proposta    = Column(String,   nullable=True)   # nº da proposta comercial 'PV<AAAAMMDD><SEQ>' (gerado 1x)
     # ── derivados do motor de negociação (modo sombra — spec §5) ──
     vbvo         = Column(Float, default=0.0)
     cfo          = Column(Float, default=0.0)
@@ -823,6 +824,7 @@ def _migrar_colunas():
             ("updated_at",      "DATETIME"),
             ("negociacao_json", "TEXT"),
             ("loja_id",         "INTEGER"),
+            ("num_proposta",    "TEXT"),
         ]:
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")

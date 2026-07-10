@@ -1282,22 +1282,29 @@ class Handler(BaseHTTPRequestHandler):
                     usuario_ctx = {"nome": usuario.get("nome", ""),
                                    "telefone": _get_usuario_telefone(usuario["id"], db),
                                    "email": usuario.get("email", "") or ""}
-                    d = _negociacao_breakdown(orc, db)
-                    variaveis = _mprop.contexto_proposta(
-                        cliente_dict, usuario_ctx, loja_dict, orcamento_dict, d, orc.forma_pagamento or "")
+                    # Proposta = PRIMEIRA PÁGINA do contrato (capa) via WeasyPrint, numerada com 'PV...'.
+                    from mod_contrato import (construir_contexto as _cc,
+                                              gerar_num_proposta as _gnp, gerar_pdf_proposta as _gpp)
+                    ctx = _cc(cliente_dict, usuario_ctx, orc.forma_pagamento or "", loja_dict)
+                    ctx["_ambientes"] = _ambientes_valor_para_contrato(oid, db)
+                    # Número da proposta gerado uma vez e persistido no orçamento (sequencial por 'PV').
+                    if not orc.num_proposta:
+                        _existing = [o.num_proposta for o in db.query(Orcamento)
+                                     .filter(Orcamento.num_proposta.isnot(None)).all()]
+                        orc.num_proposta = _gnp(_existing)
+                        db.commit()
+                    ctx["num_contrato"] = orc.num_proposta   # marcador [NUM_CONTRATO] da capa
                     outdir = tempfile.mkdtemp(prefix="proposta_")
                     try:
-                        caminho, eh_pdf = _mprop.gerar_proposta(variaveis, outdir)
-                        with open(caminho, "rb") as fh:
+                        pdf_path = os.path.join(outdir, "proposta_%d.pdf" % oid)
+                        _gpp(ctx, pdf_path)
+                        with open(pdf_path, "rb") as fh:
                             data = fh.read()
-                        ct = "application/pdf" if eh_pdf else \
-                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        ext = "pdf" if eh_pdf else "docx"
                         self.send_response(200)
-                        self.send_header("Content-Type", ct)
+                        self.send_header("Content-Type", "application/pdf")
                         self.send_header("Content-Length", len(data))
                         self.send_header("Content-Disposition",
-                                         'inline; filename="proposta_%d.%s"' % (oid, ext))
+                                         'inline; filename="proposta_%d.pdf"' % oid)
                         self.end_headers()
                         self.wfile.write(data)
                     finally:

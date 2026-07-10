@@ -26,23 +26,30 @@ _TRACO = "--------"  # preenche slots de parcela inexistentes
 # ── Utilitários ───────────────────────────────────────────────────────────────
 
 
-def gerar_num_contrato(existing_nums, loja_codigo: str, data=None) -> str:
-    """Próximo número de contrato no formato 'LOJA-AAAA-MM-DD-SEQ'.
+def gerar_num_contrato(existing_nums, loja_codigo: str, data=None, prefixo=None) -> str:
+    """Próximo número no formato '<PREFIXO><AAAAMMDD><SEQ:05d>': a sigla da loja (3 letras) — ou um
+    `prefixo` dado (ex.: 'PV' na proposta comercial) — seguida da data (ano-mês-dia) e de 5 dígitos
+    sequenciais. A sequência é CONTÍNUA por prefixo (maior existente + 1).
 
-    `existing_nums`: iterável com os num_contrato já existentes (qualquer loja).
-    `loja_codigo`: código (3 letras) da loja — vem da tabela `lojas` (F3).
-    A sequência (SEQ) é CONTÍNUA por código (máximo existente + 1).
+    `existing_nums`: iterável com os números já existentes do MESMO prefixo (num_contrato/num_proposta).
+    `loja_codigo`: código (3 letras) da loja — vem da tabela `lojas` (F3). Ignorado se `prefixo` vier.
     """
     data = data or datetime.now()
-    cod = (loja_codigo or "").strip()
-    pref = f"{cod}-"
+    pref = (prefixo if prefixo is not None else (loja_codigo or "")).strip().upper()
     maxseq = 0
     for n in (existing_nums or []):
-        if n and n.startswith(pref):
-            tail = n.rsplit("-", 1)[-1]
-            if tail.isdigit():
-                maxseq = max(maxseq, int(tail))
-    return f"{cod}-{data:%Y-%m-%d}-{maxseq + 1:03d}"
+        if not n or not n.startswith(pref):
+            continue
+        resto = n[len(pref):]
+        if len(resto) >= 13 and resto[:8].isdigit() and resto[-5:].isdigit():
+            maxseq = max(maxseq, int(resto[-5:]))
+    return f"{pref}{data:%Y%m%d}{maxseq + 1:05d}"
+
+
+def gerar_num_proposta(existing_nums, data=None) -> str:
+    """Número da proposta comercial: prefixo fixo 'PV' + data + 5 dígitos sequenciais.
+    Mesmo formato do contrato (gerar_num_contrato), mas com 'PV' no lugar da sigla da loja."""
+    return gerar_num_contrato(existing_nums, "", data=data, prefixo="PV")
 
 
 def calcular_hash_assinatura(nome: str, cpf: str, contrato_id: int, timestamp: str) -> str:
@@ -822,6 +829,27 @@ def gerar_pdf_contrato(contrato_id: int, ctx: dict, destino: str = None) -> str:
     pdf_path = os.path.join(destino, f"contrato_{contrato_id}.pdf")
     HTML(string=html, base_url=CONTRATO_TEMPLATE_DIR).write_pdf(pdf_path)
     return pdf_path
+
+
+def montar_html_proposta(ctx):
+    """HTML da proposta comercial = PRIMEIRA PÁGINA do contrato (capa), sem as cláusulas do corpo.
+    O número no canto superior direito usa ctx['num_contrato'] (deve conter o num_proposta 'PV...')."""
+    from html import escape
+    mapping = {k: escape(str(v)) for k, v in _montar_mapping(ctx, ctx.get("_pag", {})).items()}
+    shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"), encoding="utf-8").read()
+    capa = _html_capa(ctx).replace('<div class="quebra-capa"></div>', "")   # uma página só
+    html = shell.replace("<!--CAPA-->", capa).replace("<!--CORPO-->", "")
+    return _substituir_marcadores_html(html, mapping)
+
+
+def gerar_pdf_proposta(ctx: dict, destino_pdf: str) -> str:
+    """Renderiza a proposta comercial (capa do contrato) em PDF via WeasyPrint. Retorna o caminho."""
+    from weasyprint import HTML
+    _dir = os.path.dirname(destino_pdf)
+    if _dir:
+        os.makedirs(_dir, exist_ok=True)
+    HTML(string=montar_html_proposta(ctx), base_url=CONTRATO_TEMPLATE_DIR).write_pdf(destino_pdf)
+    return destino_pdf
 
 
 # ── LibreOffice (legado — usado por mod_proposta para converter proposta.docx) ─
