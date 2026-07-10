@@ -16,9 +16,11 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
                        CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente,
-                       PerfilEmissao, CicloLogistico, CicloLogisticoTransicao, AssistenciaCaso)
+                       PerfilEmissao, CicloLogistico, CicloLogisticoTransicao, AssistenciaCaso,
+                       Funcionario, Fornecedor, Terceiro)
 import mod_expedicao
 import mod_assistencias
+import mod_cadastro
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -158,6 +160,14 @@ def _usuarios_atribuiveis_da_loja(db, loja_id):
     us = (db.query(Usuario).filter(Usuario.ativo == 1).filter(or_(*conds)).all())
     us = [u for u in us if u.nivel in _NIVEIS_ATRIBUIVEIS]
     return sorted(us, key=lambda u: (u.nome or "").lower())
+
+# Cadastro (Modulos_Orizon_v9): entidade -> (Model, serialize, aplicar) para dispatch genérico
+def _cad_ent(nome):
+    return {
+        "funcionarios": (Funcionario, mod_cadastro.func_serialize, mod_cadastro.func_aplicar),
+        "fornecedores": (Fornecedor,  mod_cadastro.forn_serialize, mod_cadastro.forn_aplicar),
+        "terceiros":    (Terceiro,    mod_cadastro.terc_serialize, mod_cadastro.terc_aplicar),
+    }[nome]
 
 # HTML servido como arquivo estático
 _STATIC_DIR = os.path.join(_BASE_DIR, "static")
@@ -604,6 +614,29 @@ class Handler(BaseHTTPRequestHandler):
                                 "casos": mod_assistencias.listar(db, lid, tipo or None),
                                 "a_cobrar_fabrica": mod_assistencias.a_cobrar_fabrica(db, lid),
                                 "meta": mod_assistencias.meta()})
+            finally:
+                db.close()
+            return
+
+        # ── Cadastro (Modulos_Orizon_v9): listas Funcionários/Fornecedores/Terceiros ──────
+        m = re.match(r'^/api/(funcionarios|fornecedores|terceiros)$', path)
+        if m:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                Model, ser, _ = _cad_ent(m.group(1))
+                from urllib.parse import parse_qs
+                qs = parse_qs(urlparse(self.path).query)
+                q = (qs.get("q") or [""])[0].strip()
+                status = (qs.get("status") or [""])[0].strip()
+                self.send_json({"ok": True, "meta": mod_cadastro.META,
+                                "itens": mod_cadastro.listar(db, Model, ser, loja_id, q or None, status or None)})
             finally:
                 db.close()
             return
@@ -2107,6 +2140,45 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": err}, code=400); return
                 db.commit()
                 self.send_json({"ok": True})
+            except Exception as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        # ── Cadastro (Modulos_Orizon_v9): criar/editar Funcionário/Fornecedor/Terceiro ──────
+        m = re.match(r'^/api/(funcionarios|fornecedores|terceiros)(?:/(\d+))?$', path)
+        if m:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                ent = m.group(1); rid = m.group(2)
+                Model, ser, apl = _cad_ent(ent)
+                req = json.loads(body or b'{}')
+                if rid:
+                    obj = db.query(Model).filter_by(id=int(rid), loja_id=loja_id).first()
+                    if obj is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                else:
+                    obj = Model(loja_id=loja_id); db.add(obj)
+                if not ((req.get("nome") or "").strip() or (rid and obj.nome)):
+                    self.send_json({"ok": False, "erro": "Nome é obrigatório."}, code=400); return
+                apl(db, obj, req, loja_id)
+                db.flush()
+                if ent == "funcionarios":   # fronteira: sincroniza a conta de login vinculada
+                    okc, errc = mod_cadastro.func_sync_acesso(db, obj, req)
+                    if not okc:
+                        db.rollback(); self.send_json({"ok": False, "erro": errc}, code=400); return
+                db.commit()
+                self.send_json({"ok": True, "id": obj.id, "item": ser(obj, db)}, code=(200 if rid else 201))
+            except ValueError as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=400)
             except Exception as e:
                 db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
             finally:

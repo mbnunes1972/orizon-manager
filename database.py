@@ -39,6 +39,7 @@ class Usuario(Base):
     cpf           = Column(String(20),  nullable=True)
     whatsapp      = Column(String(20),  nullable=True)
     ativo         = Column(Integer,     default=1)
+    funcionario_id = Column(Integer,    ForeignKey("funcionarios.id"), nullable=True)  # RH (Cadastro) que esta conta representa
     tema          = Column(String(10),  default="escuro")   # 'claro' | 'escuro'
     criado_em     = Column(DateTime,    default=datetime.utcnow)
     loja_id       = Column(Integer,     ForeignKey("lojas.id"), nullable=True)  # usuário de loja
@@ -183,6 +184,62 @@ class Parceiro(Base):
     criado_em           = Column(DateTime,     default=datetime.utcnow)
     rede_id             = Column(Integer,      ForeignKey("redes.id"), nullable=True)
     abrangencia         = Column(String(10),   default="loja")   # loja | rede
+
+
+class Funcionario(Base):
+    """Cadastro de RH (Modulos_Orizon_v9, módulo 2). NÃO é conta de login — o Usuário (Admin/Núcleo)
+    referencia o Funcionário via usuario_id/funcionario_id, sem duplicar dado pessoal."""
+    __tablename__ = "funcionarios"
+
+    id                 = Column(Integer,     primary_key=True, autoincrement=True)
+    loja_id            = Column(Integer,     ForeignKey("lojas.id"), nullable=True)
+    nome               = Column(String(150), nullable=False)
+    cpf                = Column(String(20),  nullable=True)
+    telefone           = Column(String(20),  nullable=True)
+    email              = Column(String(120), nullable=True)
+    cargo              = Column(String(80),  nullable=True)
+    remuneracao_tipo   = Column(String(20),  nullable=True)   # fixa | fixa_variavel
+    remuneracao_fixa   = Column(Float,       nullable=True)
+    remuneracao_var    = Column(Float,       nullable=True)   # parte variável (se fixa_variavel)
+    status             = Column(String(10),  nullable=False, default="ativo")   # ativo | inativo
+    usuario_id         = Column(Integer,     ForeignKey("usuarios.id"), nullable=True)  # conta de login (se houver)
+    criado_em          = Column(DateTime,    default=datetime.utcnow)
+
+
+class Fornecedor(Base):
+    """Fornecedor PJ/PF (Modulos_Orizon_v9). Referenciado por 'Fornecedores a Pagar' (Financeiro 2.1)."""
+    __tablename__ = "fornecedores"
+
+    id              = Column(Integer,     primary_key=True, autoincrement=True)
+    loja_id         = Column(Integer,     ForeignKey("lojas.id"), nullable=True)
+    tipo_pessoa     = Column(String(2),   nullable=False, default="pj")   # pj | pf
+    nome            = Column(String(180), nullable=False)                 # razão social / nome
+    cnpj_cpf        = Column(String(18),  nullable=True)
+    telefone        = Column(String(20),  nullable=True)
+    email           = Column(String(120), nullable=True)
+    categoria       = Column(String(20),  nullable=True)   # materia_prima | transportadora | servicos | outro
+    prazo_pagamento = Column(Integer,     nullable=True)   # dias
+    dados_bancarios = Column(Text,        nullable=True)
+    status          = Column(String(10),  nullable=False, default="ativo")
+    criado_em       = Column(DateTime,    default=datetime.utcnow)
+
+
+class Terceiro(Base):
+    """Prestador Pessoa Física (Modulos_Orizon_v9): sempre PF (PJ vira Fornecedor). O Montador é a mesma
+    pessoa da 'Execução da Montagem' (Financeiro) — referência, nunca cadastro duplicado."""
+    __tablename__ = "terceiros"
+
+    id              = Column(Integer,     primary_key=True, autoincrement=True)
+    loja_id         = Column(Integer,     ForeignKey("lojas.id"), nullable=True)
+    nome            = Column(String(150), nullable=False)
+    cpf             = Column(String(20),  nullable=True)
+    telefone        = Column(String(20),  nullable=True)
+    tipo_servico    = Column(String(20),  nullable=False, default="montador")   # montador | outros
+    pix             = Column(String(140), nullable=True)
+    dados_bancarios = Column(Text,        nullable=True)
+    condicao        = Column(String(12),  nullable=True)   # mei | autonomo
+    status          = Column(String(10),  nullable=False, default="ativo")
+    criado_em       = Column(DateTime,    default=datetime.utcnow)
 
 
 class Rede(Base):
@@ -786,6 +843,8 @@ def _migrar_colunas():
                 cur.execute(f"ALTER TABLE usuarios ADD COLUMN {col} {tipo}")
         if "tema" not in usr_cols:
             cur.execute("ALTER TABLE usuarios ADD COLUMN tema VARCHAR(10) DEFAULT 'escuro'")
+        if "funcionario_id" not in usr_cols:
+            cur.execute("ALTER TABLE usuarios ADD COLUMN funcionario_id INTEGER")   # boundary Funcionário↔Usuário (v9)
 
         # ── projetos_meta ─────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(projetos_meta)")
