@@ -10,7 +10,7 @@ Legenda: ✅ Migrada · 🟡 Parcial · 🔴 Não migrada · ⚪ Stub/N-A
 |---|---|---|---|
 | **Login** (entrada) | `static/login.html` | ✅ | Página nova do usuário (v4). O card de login é token-based; a seção "marketing" tem cores próprias por design. |
 | **Orçamentos** (atalho) | page-00 | ✅ | Migrada na frente v6 (tokens, filtros, sem abas duplicadas). |
-| **Negociação/Orçamento** | page-02 | 🟡 | **Corrigida**: cards de resumo, Seletor de Status (Fechado **e** "Orçamento N"), plano de pagamento em tokens; rodapé com hierarquia certa (Aprovar=primário único, Salvar/Imprimir=secundários, rótulos sem "Orçamento"); botão secundário com borda no tema claro (§4 v5). Painéis das modalidades já eram token-based. **Resta**: painel **Etapas do Projeto (Ciclo)** — badges `.badge-*` com cores escuras fixas. |
+| **Negociação/Orçamento** | page-02 | ✅ | **Corrigida**: cards de resumo, Seletor de Status (Fechado **e** "Orçamento N"), plano de pagamento em tokens; rodapé com hierarquia certa (Aprovar=primário único, Salvar/Imprimir=secundários, rótulos sem "Orçamento"); botão secundário com borda no tema claro (§4 v5). Painéis das modalidades já eram token-based. Plano de Pagamento (4 modalidades) e Etapas do Projeto (Indicador de Conclusão) agora em tokens. Migrada. |
 | **Em Construção** (genérica) | page-08 | ✅ | Construída com tokens. |
 | **Config** (Provisões/Comissão/Documentos) | page-09 | ✅ | Construída com tokens (frente v8). |
 | **Cadastro** (Clientes/Parceiros/…) | page-10 | 🟡 | Token-based, mas estética **dourada antiga** (tabelas com `--dalm-gold-light`, sublinhado de aba `--dalm-gold`) em vez do accent teal v4. |
@@ -27,7 +27,7 @@ Legenda: ✅ Migrada · 🟡 Parcial · 🔴 Não migrada · ⚪ Stub/N-A
 |---|---|---|
 | Editar projeto, Novo pedido (Expedição), Detalhe (Expedição), Novo caso (Assistências) | ✅ | Construídos com tokens. |
 | Comissão de vendas (`modal-comissao`), Parâmetros (`modal-params`), Novo ambiente, Parceiro (`modal-parceiro`), Briefing | 🟡 | Mistura tokens + alguns hex/dourado fixos. |
-| **Ciclo / Etapas do Projeto** (badges de etapa) | 🔴 | `.badge-*` com fundos escuros fixos (`#2a2a1a`, `#1a2a2a`…) — quebram no tema claro. |
+| **Ciclo / Etapas do Projeto** | ✅ | Badges de etapa substituídos pelo **Indicador de Conclusão** (círculo --accent+check / contorno --border), sem texto, theme-aware (Padrao_Design_v6 §4). |
 | Contrato/Proposta (PDF) | — | `contrato_template/contrato.css` é o **PDF** (WeasyPrint), fora do escopo do design da app. |
 
 ## Prioridade sugerida das próximas correções

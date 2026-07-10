@@ -18,7 +18,7 @@
   --shadow:0 2px 6px rgba(0,0,0,.35);   /* elevação — substitui borda como fonte de profundidade */
   /* accent (petróleo) e marca (dourado) — escuro */
   --accent:#5BB8AC; --accent-tint:rgba(91,184,172,.14);
-  --gold:#D4B348; --gold-tint:rgba(212,179,72,.16);
+  --gold:#D4B348; --gold-tint:rgba(212,179,72,.16); --warn-tint:rgba(239,159,39,.14);
   /* semânticas de sistema — escuro */
   --warn:#EF9F27; --err:#E2876C; --info:#7DB3E8;
   /* status de negócio — escuro (aplicados aos badges no item 4; definidos aqui já como parte da paleta) */
@@ -44,7 +44,7 @@
   --text:#2A2A28; --muted:#6B6860;
   --shadow:0 1px 2px rgba(0,0,0,.06);
   --accent:#1F4B4B; --accent-tint:rgba(31,75,75,.10);
-  --gold:#9C7A0C; --gold-tint:rgba(184,150,12,.14);
+  --gold:#9C7A0C; --gold-tint:rgba(184,150,12,.14); --warn-tint:rgba(239,159,39,.16);
   --warn:#EF9F27; --err:#D64A3C; --info:#2266A8;
   --st-quente:#B1452A; --st-morno:#B87A1E; --st-frio:var(--info);
   --st-convertido:var(--accent); --st-fechado:var(--gold); --st-perdido:var(--muted);
@@ -139,6 +139,16 @@ input:focus{border-color:var(--accent)}
   font-size:11px;padding:6px 12px;border-radius:20px;border:none;cursor:pointer;transition:all .15s;line-height:1;
   background:var(--surface-2);color:var(--muted);box-shadow:var(--shadow)}
 .status-selector:hover{filter:brightness(1.08)}
+/* Badge de status padrão (Padrao_Design_v6 §4): inline-flex, radius 10px, 11px/500 — sem pill customizada */
+.badge-plano{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:10px;
+  font-family:var(--font-sans);font-weight:500;font-size:11px;line-height:1;white-space:nowrap}
+/* Indicador de Conclusão (Padrao_Design_v6 §4): ícone isolado, sem texto — igual nos dois temas.
+   Concluído: círculo cheio --accent + check branco. Pendente: só contorno --border. */
+.ind-conclusao{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;flex-shrink:0}
+.ind-conclusao.feito{background:var(--accent);color:#fff}
+.ind-conclusao.feito .ti{font-size:12px;stroke-width:2.5px}
+.ind-conclusao.andamento{border:1.5px solid var(--accent);background:transparent}   /* em andamento */
+.ind-conclusao.pendente{border:1.5px solid var(--border);background:transparent}
 .proj-card-nome{font-family:var(--font-sans);font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px}
 .proj-card-cli{font-size:11px;color:var(--muted);margin-bottom:6px}
 .proj-card-meta{display:flex;gap:12px;font-size:10px;color:var(--muted)}
@@ -4313,6 +4323,29 @@ function atualizarResumoParcelas(entrada, n_parcelas, valor_parcela, total_clien
 }
 
 // Faixa superior: célula "Contrato Parcelado" (à direita do Valor à Vista).
+// Linha padrão do Plano de Pagamento (Padrao_Design_v6): Assinatura = linha de agrupamento (--surface);
+// Entrada = --warn-tint; parcelas = --accent-tint; rótulo no Badge de status padrão (.badge-plano), sem
+// pill customizada. Compartilhado por todas as modalidades (Aymoré/Cartão/VP), theme-aware.
+const _PLANO_LINHA = {
+  contrato: ['var(--surface)', 'var(--surface-2)',   'var(--muted)',  'Assinatura'],
+  entrada:  ['transparent',    'var(--warn-tint)',   'var(--warn)',   'Entrada'],
+  primeira: ['transparent',    'var(--accent-tint)', 'var(--accent)', '1ª Parcela'],
+  parcela:  ['transparent',    'var(--accent-tint)', 'var(--accent)', 'Parcela'],
+};
+function _planoLinha(p, valorReal){
+  const [rowBg, bg, color, label] = _PLANO_LINHA[p.tipo] || _PLANO_LINHA.parcela;
+  const numCell = p.num > 0 ? p.num : '—';
+  const valCell = (valorReal !== null && valorReal !== undefined)
+    ? `<span style="color:${color};font-weight:700">R$ ${fmt(valorReal)}</span>`
+    : `<span style="color:var(--muted)">—</span>`;
+  return `<tr style="background:${rowBg}">
+    <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
+    <td style="padding:8px 12px"><span class="badge-plano" style="background:${bg};color:${color}">${label}</span></td>
+    <td style="padding:8px 12px;color:var(--muted);font-size:11px">${p.data}</td>
+    <td style="padding:8px 12px;text-align:right">${valCell}</td>
+  </tr>`;
+}
+
 function negMostrarParcelado(valor){
   const cell = document.getElementById('neg-parcelado-cell');
   const sep  = document.getElementById('neg-parcelado-sep');
@@ -4668,27 +4701,9 @@ async function atualizarAymore() {
   agendarSalvarPagamento();   // auto-save da modalidade → motor recalcula Val_Cont
 
   const tbody = document.getElementById('ay-parc-body');
-  // Tokens semânticos por tipo de linha (theme-aware via color-mix): Assinatura=neutro,
-  // Entrada=--warn (âmbar), 1a Parcela/Parcela=--accent. (Padrao_Design_Orizon_v4)
-  const BADGE = {
-    contrato: ['color-mix(in srgb, var(--muted) 8%, transparent)',   'var(--muted)',  'Assinatura'],
-    entrada:  ['color-mix(in srgb, var(--warn) 14%, transparent)',   'var(--warn)',   'Entrada'],
-    primeira: ['color-mix(in srgb, var(--accent) 14%, transparent)', 'var(--accent)', '1a Parcela'],
-    parcela:  ['color-mix(in srgb, var(--accent) 8%, transparent)',  'var(--accent)', 'Parcela'],
-  };
   tbody.innerHTML = d.parcelas.map(p => {
-    const [bg,color,label] = BADGE[p.tipo] || BADGE.parcela;
-    const numCell = p.num > 0 ? p.num : '—';
     const valorReal = p.tipo === 'contrato' ? null : p.tipo === 'entrada' ? p.valor : d.valor_parcela;
-    const valCell = valorReal !== null
-      ? `<span style="color:${color};font-weight:700">R$ ${fmt(valorReal)}</span>`
-      : `<span style="color:var(--muted)">—</span>`;
-    return `<tr style="background:${bg}">
-      <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
-      <td style="padding:8px 12px"><span style="background:${bg};color:${color};border-radius:4px;padding:2px 8px;font-size:10px;border:1px solid color-mix(in srgb, ${color} 35%, transparent)">${label}</span></td>
-      <td style="padding:8px 12px;color:var(--muted);font-size:11px">${p.data}</td>
-      <td style="padding:8px 12px;text-align:right">${valCell}</td>
-    </tr>`;
+    return _planoLinha(p, valorReal);
   }).join('');
   tbody.innerHTML += `<tr style="border-top:1px solid var(--border2)">
     <td colspan="3" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
@@ -4787,14 +4802,12 @@ async function atualizarCartao() {
 
   const tbody = document.getElementById('cc-parc-body');
   tbody.innerHTML = d.parcelas.map(p => {
-    const bg    = p.tipo==='contrato'?'#0d1e0d':p.tipo==='entrada'?'rgba(239,159,39,.12)':p.num===1?'rgba(93,202,165,.15)':'rgba(93,202,165,.08)';
-    const color = p.tipo==='contrato'?'var(--muted)':p.tipo==='entrada'?'var(--warn)':'var(--ok)';
-    const label = p.tipo==='contrato'?'Assinatura':p.tipo==='entrada'?'Entrada':p.num===1?'1a Parcela':'Parcela '+p.num;
+    const [rowBg, bg, color, label] = _PLANO_LINHA[p.tipo] || _PLANO_LINHA.parcela;
     const valorReal = p.tipo==='contrato'?null:p.tipo==='entrada'?p.valor:d.valor_parcela;
     const numCell = p.num > 0 ? p.num : '—';
-    return `<tr style="background:${bg}">
+    return `<tr style="background:${rowBg}">
       <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
-      <td style="padding:8px 12px"><span style="background:${bg};color:${color};border-radius:4px;padding:2px 8px;font-size:10px;border:1px solid color-mix(in srgb, ${color} 35%, transparent)">${label}</span></td>
+      <td style="padding:8px 12px"><span class="badge-plano" style="background:${bg};color:${color}">${label}</span></td>
       <td style="display:none">${esc(p.data)}</td>
       <td style="padding:8px 12px;text-align:right;font-weight:700;color:${valorReal?color:'var(--muted)'}">
         ${valorReal !== null ? 'R$ '+fmt(valorReal) : '—'}
@@ -4972,25 +4985,16 @@ async function atualizarVP() {
 
 function vpRenderTabela(d) {
   const limIso = document.getElementById('vp-data-limite').dataset.iso || '';
-  const BADGE  = {
-    contrato: ['color-mix(in srgb, var(--muted) 8%, transparent)',   'var(--muted)',  'Assinatura'],
-    entrada:  ['color-mix(in srgb, var(--warn) 14%, transparent)',   'var(--warn)',   'Entrada'],
-    primeira: ['color-mix(in srgb, var(--accent) 14%, transparent)', 'var(--accent)', '1a Parcela'],
-    parcela:  ['color-mix(in srgb, var(--accent) 8%, transparent)',  'var(--accent)', 'Parcela'],
-  };
   const tbody = document.getElementById('vp-parc-body');
 
   tbody.innerHTML = d.parcelas.map(p => {
-    const [bg, color] = BADGE[p.tipo] || BADGE.parcela;
+    const [rowBg, bg, color, lblPadrao] = _PLANO_LINHA[p.tipo] || _PLANO_LINHA.parcela;
     const numCell = p.num > 0 ? p.num : '—';
-    const label   = p.tipo === 'contrato' ? 'Assinatura'
-                  : p.tipo === 'entrada'  ? 'Entrada'
-                  : p.num  === 1          ? '1a Parcela'
-                  : 'Parcela ' + p.num;
-    const badge = `<span style="background:${bg};color:${color};border-radius:4px;padding:2px 8px;font-size:10px;border:1px solid ${color}40">${label}</span>`;
+    const label   = (p.tipo === 'parcela' || p.tipo === 'primeira') ? ('Parcela ' + p.num) : lblPadrao;
+    const badge = `<span class="badge-plano" style="background:${bg};color:${color}">${label}</span>`;
 
     if (p.tipo === 'contrato') {
-      return `<tr style="background:${bg}">
+      return `<tr style="background:${rowBg}">
         <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
         <td style="padding:8px 12px">${badge}</td>
         <td style="padding:8px 12px;color:var(--muted);font-size:11px">${esc(p.data)}</td>
@@ -4998,7 +5002,7 @@ function vpRenderTabela(d) {
       </tr>`;
     }
     if (p.tipo === 'entrada') {
-      return `<tr style="background:${bg}">
+      return `<tr style="background:${rowBg}">
         <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
         <td style="padding:8px 12px">${badge}</td>
         <td style="padding:8px 12px;color:var(--muted);font-size:11px">${esc(p.data)}</td>
@@ -5011,7 +5015,7 @@ function vpRenderTabela(d) {
     const excede = limIso && p.data_iso > limIso;
     const bColor = excede ? 'var(--err)' : 'var(--border)';
     const tColor = excede ? 'var(--err)' : 'var(--text)';
-    return `<tr style="background:${bg}">
+    return `<tr style="background:${rowBg}">
       <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
       <td style="padding:8px 12px">${badge}</td>
       <td style="padding:4px 8px">
@@ -5549,8 +5553,8 @@ function tfRenderTabela(d, valorAvista, entrada) {
     const excedeDt = limIso && p.data_iso > limIso;
 
     const statusLabel = isUltima
-      ? '<span style="background:rgba(93,202,165,.18);color:var(--ok);border-radius:4px;padding:2px 6px;font-size:10px;border:1px solid rgba(93,202,165,.4)">&#9664; ULTIMA</span>'
-      : '<span style="background:rgba(93,202,165,.08);color:var(--ok);border-radius:4px;padding:2px 6px;font-size:10px;border:1px solid rgba(93,202,165,.25)">&#x2713; Ativa</span>';
+      ? '<span class="badge-plano" style="background:var(--accent-tint);color:var(--accent)">&#9664; Última</span>'
+      : '<span class="badge-plano" style="background:var(--accent-tint);color:var(--accent)">&#x2713; Ativa</span>';
 
     const dataBg  = isUltima ? 'rgba(93,202,165,.06)' : 'transparent';
     const rowBg   = isUltima ? 'rgba(93,202,165,.06)' : 'transparent';
@@ -9424,26 +9428,26 @@ function renderCiclo() {
     const dados     = _cicloData[etapa.codigo] || {};
     const bloqueada = _etapaBloqueada(etapa.codigo) && !STATUS_CONCLUSIVOS.has(dados.status);
     const etStatus  = bloqueada ? 'bloqueado' : (dados.status || "pendente");
-    const etIcone  = etStatus === 'concluido'    ? '&#x2713;' :
-                     etStatus === 'em_andamento'  ? '&#x25C9;' :
-                     etStatus === 'bloqueado'     ? '&#x1F512;' : '&#x25CB;';
-    const etCor    = etStatus === 'concluido'    ? 'var(--ok, #50c878)' :
-                     etStatus === 'em_andamento'  ? 'var(--dalm-gold)' : 'var(--muted)';
+    // Indicador de Conclusão (Padrao_Design_v6 §4): ícone isolado, sem texto repetido, igual nos 2 temas.
+    const indConcl = etStatus === 'concluido'
+        ? '<span class="ind-conclusao feito" title="Concluído"><i class="ti ti-check"></i></span>'
+      : etStatus === 'em_andamento'
+        ? '<span class="ind-conclusao andamento" title="Em andamento"></span>'
+      : etStatus === 'bloqueado'
+        ? '<span class="ind-conclusao pendente" title="Bloqueado"><i class="ti ti-lock" style="font-size:10px;color:var(--muted)"></i></span>'
+        : '<span class="ind-conclusao pendente" title="Pendente"></span>';
     const andamentoLabel = (etStatus === 'em_andamento' && etapa.codigo === '7')
-      ? ' <span style="font-size:11px;color:var(--dalm-gold);font-style:italic">(aguardando assinatura)</span>' : '';
+      ? ' <span style="font-size:11px;color:var(--muted);font-style:italic">(aguardando assinatura)</span>' : '';
     // Para etapa 11 (pai do PE) mostrar indicador de progresso das subfases
     const peProgressLabel = (etapa.codigo === '11') ? _renderEtapa11Progress() : '';
-    const status = etStatus;
-    const badge  = `<span class="etapa-badge badge-${status}" style="color:${etCor}">${etIcone} ${status}${andamentoLabel}</span>`;
     const indent = etapa.sub ? 'margin-left:24px;' : '';
     const card   = document.createElement('div');
     card.className = 'ciclo-card';
     card.style.cssText = indent;
     card.innerHTML = `
       <div class="ciclo-card-header"${bloqueada ? '' : ` onclick="toggleCicloCard('${etapa.codigo}')"`}>
-        <span class="etapa-num" style="color:${etCor}">${etIcone}</span>
+        ${indConcl}
         <span class="etapa-nome">${etapa.nome}${andamentoLabel}${peProgressLabel}</span>
-        ${badge}
       </div>
       <div class="ciclo-card-body" id="ciclo-body-${etapa.codigo}">
         ${etapa.acao === 'contrato'
