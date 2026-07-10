@@ -6,7 +6,7 @@ def test_default_tem_estrutura_completa():
     c = mod_provisoes.config_financeira_default()
     assert set(c.keys()) == {"defaults_negociacao", "provisoes", "provisoes_contabeis", "comissao_vendas"}
     assert c["provisoes"]["frete_fab_pct"] == 0.0
-    assert c["provisoes_contabeis"] == {"montagem_pct": 0.0, "garantia_pct": 0.0}   # v6 §6.4
+    assert c["provisoes_contabeis"] == {"montagem_pct": 0.0, "garantia_pct": 0.0, "comissao_pct": 0.0}   # v6 §6.4 / v8 Config
     assert c["comissao_vendas"]["limitador_desconto"]["ativo"] is False
 
 

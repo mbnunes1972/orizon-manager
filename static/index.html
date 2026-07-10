@@ -1716,59 +1716,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     </div>
   </div>
 
-  <!-- PAGE 09: Configurações / Limites de Perfil -->
+  <!-- PAGE 09: Config — parâmetros de negócio (Modulos_Orizon_v8: Núcleo, distinto de Admin) -->
   <div class="page" id="page-09">
-    <div class="page-title">Configuracoes</div>
-    <div class="page-sub">Limites de desconto por perfil de acesso</div>
-
-    <!-- Card: Perfil Ativo -->
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-title">Perfil Ativo (sessao local)</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:12px">
-        Em producao na nuvem, o perfil sera definido por autenticacao de usuario.
-        Localmente, selecione o perfil para testar os limites.
-      </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap" id="cfg-perfil-btns">
-        <button class="btn btn-ghost btn-sm" id="cfg-btn-consultor" onclick="cfgSetPerfil('consultor')">
-          Consultor de Vendas
-        </button>
-        <button class="btn btn-ghost btn-sm" id="cfg-btn-gerente" onclick="cfgSetPerfil('gerente')">
-          Gerente de Vendas
-        </button>
-        <button class="btn btn-ghost btn-sm" id="cfg-btn-diretoria" onclick="cfgSetPerfil('diretoria')">
-          Diretoria
-        </button>
-      </div>
-      <div style="margin-top:12px;font-size:12px;color:var(--ok)" id="cfg-perfil-ativo-label"></div>
+    <div class="page-title" style="margin:0">Config</div>
+    <div class="page-sub">Parâmetros de regra de negócio da loja.</div>
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin:12px 0 16px;flex-wrap:wrap">
+      <button class="home-tab ativo" id="cfg-tab-provisoes"  onclick="cfgTab('provisoes')">Provisões</button>
+      <button class="home-tab"       id="cfg-tab-comissao"   onclick="cfgTab('comissao')">Comissão de Vendas</button>
+      <button class="home-tab"       id="cfg-tab-documentos" onclick="cfgTab('documentos')">Documentos</button>
     </div>
-
-    <!-- Card: Limites por perfil -->
-    <div class="card" style="margin-bottom:16px">
-      <div class="card-title">Limites de Desconto por Perfil</div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:16px">
-        O desconto total (global + individuais) nao pode ultrapassar o limite do perfil ativo.
-        Ao tentar exceder o limite, o sistema bloqueia e exibe aviso.
-      </div>
-
-      <div id="cfg-perfis-lista"></div>
-
-      <div style="margin-top:16px">
-        <button class="btn btn-primary btn-sm" onclick="cfgSalvarLimites()">Salvar limites</button>
-        <span id="cfg-save-hint" style="font-size:11px;color:var(--ok);margin-left:10px"></span>
-      </div>
-    </div>
-
-    <!-- Card: Nota sobre nuvem -->
-    <div class="card" style="background:var(--accent-tint);border-color:var(--accent)">
-      <div class="card-title" style="color:var(--accent)">&#x2601; Preparacao para Nuvem</div>
-      <div style="font-size:12px;color:var(--muted);line-height:1.8">
-        <div>&#x2022; Os perfis aqui configurados serao migrados para um banco de dados de usuarios.</div>
-        <div>&#x2022; Cada usuario tera um perfil associado via autenticacao (JWT/OAuth).</div>
-        <div>&#x2022; O arquivo <code style="color:var(--ok)">perfis_config.json</code> e a fonte local — equivalente ao banco em nuvem.</div>
-        <div>&#x2022; A funcao <code style="color:var(--ok)">perfil_ativo_get()</code> sera substituida por leitura do token do usuario.</div>
-        <div>&#x2022; O limite e verificado no backend (Python) — nao apenas no frontend.</div>
-      </div>
-    </div>
+    <div id="cfg-panel-provisoes"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+    <div id="cfg-panel-comissao" style="display:none"></div>
+    <div id="cfg-panel-documentos" style="display:none"></div>
   </div>
 
 </main>
@@ -2530,6 +2489,65 @@ async function cfgSalvarLimites(){
   }
 }
 
+// ── Config (Modulos_Orizon_v8): parâmetros de negócio — Provisões · Comissão · Documentos ────
+let _cfgTabAtual = 'provisoes';
+function cfgRender(){ cfgTab(_cfgTabAtual || 'provisoes'); }
+function cfgTab(qual){
+  _cfgTabAtual = qual;
+  ['provisoes','comissao','documentos'].forEach(q => {
+    const tab = document.getElementById('cfg-tab-'+q);
+    const panel = document.getElementById('cfg-panel-'+q);
+    if(tab) tab.classList.toggle('ativo', q===qual);
+    if(panel) panel.style.display = q===qual ? '' : 'none';
+  });
+  if(qual==='provisoes')  adminFinanceiroCarregar();   // % das provisões (montagem/assist/garantia/comissão)
+  if(qual==='comissao')   cfgComissaoRender();
+  if(qual==='documentos') cfgDocumentosRender();
+}
+function cfgComissaoRender(){
+  const box = document.getElementById('cfg-panel-comissao'); if(!box) return;
+  const lid = (_usuarioAtual && _usuarioAtual.loja_id);
+  box.innerHTML = '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:640px">'
+    +'Comissão de vendas por metas: faixas de % por faixa de venda mensal + limitador conforme o desconto concedido.</div>'
+    +'<button class="btn btn-primary btn-sm" onclick="abrirModalComissao('+(lid||'null')+')">Configurar comissão de vendas</button>';
+}
+function cfgDocumentosRender(){
+  const box = document.getElementById('cfg-panel-documentos'); if(!box) return;
+  box.innerHTML =
+     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:640px">Modelos dos documentos de processo.</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,220px);gap:12px">'
+    + [['Contrato','ti-file-text','HTML + Markdown → PDF (WeasyPrint)'],
+       ['Proposta comercial','ti-file-invoice','modelo .docx'],
+       ['Demais documentos','ti-files','do processo']].map(d=>
+      '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 16px">'
+      +'<i class="ti '+d[1]+'" style="font-size:20px;color:var(--muted)"></i>'
+      +'<div style="font-weight:600;font-size:13px;color:var(--text);margin-top:6px">'+d[0]+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+d[2]+'</div>'
+      +'<div style="font-size:10px;color:var(--warn);margin-top:8px">edição de modelos — em construção</div></div>').join('')
+    +'</div>';
+}
+
+// Perfis de Usuário — movido para Admin (v8): render dentro de loja-panel-perfis (usa cfgRenderizarPerfis)
+function adminPerfisCarregar(){
+  const box = document.getElementById('loja-panel-perfis'); if(!box) return;
+  box.innerHTML =
+     '<div class="card" style="margin-bottom:16px">'
+    +'<div class="card-title">Perfil ativo (sessão local)</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Selecione o perfil para testar os limites; em produção vem da autenticação do usuário.</div>'
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap" id="cfg-perfil-btns">'
+    +'<button class="btn btn-ghost btn-sm" id="cfg-btn-consultor" onclick="cfgSetPerfil(\'consultor\')">Consultor de Vendas</button>'
+    +'<button class="btn btn-ghost btn-sm" id="cfg-btn-gerente" onclick="cfgSetPerfil(\'gerente\')">Gerente de Vendas</button>'
+    +'<button class="btn btn-ghost btn-sm" id="cfg-btn-diretoria" onclick="cfgSetPerfil(\'diretoria\')">Diretoria</button>'
+    +'</div><div style="margin-top:12px;font-size:12px;color:var(--ok)" id="cfg-perfil-ativo-label"></div></div>'
+    +'<div class="card" style="margin-bottom:16px">'
+    +'<div class="card-title">Permissões por perfil — limite de desconto</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-bottom:16px">Define O QUE cada perfil pode fazer (aqui, o desconto máximo). Distinto de "Usuários da loja", onde se atribui QUEM tem qual perfil.</div>'
+    +'<div id="cfg-perfis-lista"></div>'
+    +'<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="cfgSalvarLimites()">Salvar limites</button>'
+    +'<span id="cfg-save-hint" style="font-size:11px;color:var(--ok);margin-left:10px"></span></div></div>';
+  cfgRenderizarPerfis();
+}
+
 function cfgRenderizarPerfis(){
   if(!_perfisConfig) return;
   const lista = document.getElementById('cfg-perfis-lista');
@@ -2587,7 +2605,7 @@ function goPage(n){
   if(n===2 && projetoAtivo) carregarMargensSalvas();
   if(n===0) projCarregar();
   if(n===7){ adminCarregarConsole(); } // page-07: console
-  if(n===9) cfgRenderizarPerfis();
+  if(n===9) cfgRender();
   if(n===10) cadRender();
   if(n===11){ if(_adminNav) _adminNav.loja = null; adminFiscalCarregar(); }
   if(n===12){ if(_adminNav) _adminNav.loja = null; finTab('prov'); }   // seções no submenu da sidebar
@@ -7801,6 +7819,7 @@ async function adminRenderLoja(box){
     <div style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin-bottom:12px">
       <button class="home-tab ativo" id="loja-tab-dados" onclick="adminLojaTab('dados')">Dados da loja</button>
       <button class="home-tab" id="loja-tab-usuarios" onclick="adminLojaTab('usuarios')">Usuários da loja</button>
+      <button class="home-tab" id="loja-tab-perfis" onclick="adminLojaTab('perfis')">Perfis de Usuário</button>
       <button class="home-tab" id="loja-tab-modulos" onclick="adminLojaTab('modulos')">Módulos</button>
     </div>
     <div id="loja-panel-dados"></div>
@@ -7808,19 +7827,21 @@ async function adminRenderLoja(box){
       <button class="btn btn-ghost btn-sm" onclick="abrirModalUsuario({modo:'novo', escopo:'loja', loja_id:(_adminNav.loja&&_adminNav.loja.id)||(_usuarioAtual&&_usuarioAtual.loja_id), onSaved:adminUsuariosCarregar})" style="font-size:11px">+ Novo usuário</button>
       <div id="admin-usuarios-lista" style="margin-top:10px"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     </div>
+    <div id="loja-panel-perfis" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     <div id="loja-panel-modulos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>`;
   adminLojaCarregarDados(lid);
   adminUsuariosCarregar();   // popula #admin-usuarios-lista (função já existente)
 }
 
 function adminLojaTab(qual){
-  ['dados','usuarios','modulos'].forEach(q => {
+  ['dados','usuarios','perfis','modulos'].forEach(q => {
     const tab   = document.getElementById('loja-tab-'+q);
     const panel = document.getElementById('loja-panel-'+q);
     if (tab)   tab.classList.toggle('ativo', q===qual);
     if (panel) panel.style.display = q===qual ? '' : 'none';
   });
   if (qual==='modulos') adminModulosCarregar();
+  if (qual==='perfis')  adminPerfisCarregar();
 }
 
 async function adminLojaProjetosCarregar(){
@@ -7976,10 +7997,10 @@ async function finDashboardCarregar(){
         +mini('Caixa/Bancos',_fBRL(cob.caixa))+mini('Provisões em aberto',_fBRL(cob.provisoes_abertas))
         +mini('Índice de cobertura', cob.indice==null?'—':(Number(cob.indice).toFixed(2)+'×'), (cob.indice!=null&&cob.indice<1)?'var(--warn)':'var(--accent)'))
     +'</div>';
+  // Só monitoramento (v8): a configuração de percentuais migrou p/ Config → Provisões.
   box.innerHTML =
-     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-    +'<span style="font-size:13px;color:var(--muted)">'+d.provisoes.length+' provisões monitoradas · total em aberto <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(d.total_provisoes_abertas)+'</strong></span>'
-    +'<button class="btn btn-ghost btn-sm" onclick="adminFinanceiroCarregar()">Configurar %</button></div>'
+     '<div style="margin-bottom:14px">'
+    +'<span style="font-size:13px;color:var(--muted)">'+d.provisoes.length+' provisões monitoradas · total em aberto <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(d.total_provisoes_abertas)+'</strong></span></div>'
     + provs + apoio;
 }
 function finTab(t){
@@ -8318,8 +8339,9 @@ async function pcRemover(id){
 
 let _cfgFin = null;
 async function adminFinanceiroCarregar(){
-  const panel = document.getElementById('loja-panel-financeiro');
-  const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  // v8: a configuração de % vive em Config → Provisões (#cfg-panel-provisoes), não mais no Financeiro/Admin.
+  const panel = document.getElementById('cfg-panel-provisoes');
+  const lid = (_adminNav && _adminNav.loja && _adminNav.loja.id) || (_usuarioAtual && _usuarioAtual.loja_id);
   if (!panel || !lid) return;
   const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {credentials:'same-origin'});
   if (r.status === 403){ panel.innerHTML = '<em style="color:var(--muted)">Sem acesso.</em>'; return; }
@@ -8347,11 +8369,11 @@ async function adminFinanceiroCarregar(){
     <div class="grid2" style="gap:14px;margin-bottom:14px">
       ${campo('fin-prov-mont','% Provisão de Montagem',(_cfgFin.provisoes_contabeis||{}).montagem_pct)}
       ${campo('fin-prov-gar','% Provisão de Garantia',(_cfgFin.provisoes_contabeis||{}).garantia_pct)}
+      ${campo('fin-prov-com','% Provisão de Comissão de Vendas',(_cfgFin.provisoes_contabeis||{}).comissao_pct)}
     </div>
     <div style="font-size:10px;color:var(--muted);margin:-8px 0 12px">A provisão de Assistência usa o "% Assistências" acima (herança automática).</div>
     <div style="display:flex;gap:8px;margin-top:0;flex-wrap:wrap">
       <button class="btn btn-primary btn-sm" onclick="adminFinanceiroSalvar(${lid})">Salvar provisões</button>
-      <button class="btn btn-ghost btn-sm" onclick="abrirModalComissao(${lid})">Configurar comissão de vendas</button>
     </div>`;
 }
 async function adminFinanceiroSalvar(lid){
@@ -8359,7 +8381,7 @@ async function adminFinanceiroSalvar(lid){
   _cfgFin.defaults_negociacao = {comissao_arq_pct:n('fin-com-arq'), fidelidade_pct:n('fin-fid'), carga_trib_pct:n('fin-trib')};
   _cfgFin.provisoes = {frete_fab_pct:n('fin-frete-fab'), com_adm_pct:n('fin-com-adm'), com_med_pct:n('fin-com-med'),
     com_proj_exec_pct:n('fin-com-pe'), frete_loc_pct:n('fin-frete-loc'), assist_pct:n('fin-assist'), ins_loc_pct:n('fin-ins')};
-  _cfgFin.provisoes_contabeis = {montagem_pct:n('fin-prov-mont'), garantia_pct:n('fin-prov-gar')};
+  _cfgFin.provisoes_contabeis = {montagem_pct:n('fin-prov-mont'), garantia_pct:n('fin-prov-gar'), comissao_pct:n('fin-prov-com')};
   const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {method:'PUT', credentials:'same-origin',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify(_cfgFin)});
   const d = await r.json();
