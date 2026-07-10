@@ -31,10 +31,9 @@ Legenda: ✅ Migrada · 🟡 Parcial · 🔴 Não migrada · ⚪ Stub/N-A
 | Contrato/Proposta (PDF) | — | `contrato_template/contrato.css` é o **PDF** (WeasyPrint), fora do escopo do design da app. |
 
 ## Prioridade sugerida das próximas correções
-1. **Ciclo / Etapas do Projeto** (badges `.badge-*`) — 🔴, quebra no claro, e é aberto direto da Negociação.
-2. **Admin** (page-07) — 🟡, migrar do dourado para o accent teal v4 (abas, títulos).
-3. **Cadastro** (page-10) e **Fiscal** (page-11) — 🟡, mesma estética dourada do Admin.
-4. Modais 🟡 (Comissão, Parâmetros, Parceiro, Briefing) — varredura de hex/dourado residual.
+1. **Admin** (page-07) — 🟡, migrar do dourado para o accent teal v4 (abas, títulos).
+2. **Cadastro** (page-10) e **Fiscal** (page-11) — 🟡, mesma estética dourada do Admin.
+3. Modais 🟡 (Comissão, Parâmetros, Parceiro, Briefing) — varredura de hex/dourado residual.
 
 > Método: `var(--…)` em vez de hex fixo; fundo `--surface-2` + `--shadow` (não borda dourada);
 > labels `--muted`, valores `--text`; cor semântica via token `--st-*`/`--warn`/`--err`/`--accent`
