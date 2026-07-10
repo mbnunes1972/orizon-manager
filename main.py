@@ -1018,6 +1018,16 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif path == "/api/admin/perfis-matriz":
+            # Admin › Perfis de Usuário: matriz perfil × capacidades, DERIVADA de perfis.py (read-only).
+            # Formaliza o que já roda; não configura nada. Gate: gerir_usuarios (mesma audiência de Usuários).
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
+                return
+            _m = perfis.matriz()
+            self.send_json({"ok": True, "perfis": _m["perfis"], "capacidades": _m["capacidades"]})
+
         elif path == "/api/admin/usuarios/perfis-permitidos":
             usuario = get_usuario_sessao(self)
             if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):

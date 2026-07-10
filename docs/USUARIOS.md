@@ -1,8 +1,16 @@
 # Perfis de Usuário — Orizon Manager
 
-> Fonte da verdade do código: `perfis.py`. Ao adicionar/alterar um perfil, atualize
-> `perfis.py` **e** este documento. Usuários são criados no Painel Admin (Diretor ou
-> Gerente Administrativo/Financeiro) ou via `seed.py`.
+> Fonte da verdade do código: `perfis.py` (fonte **única** desde a frente "Separar Função de
+> Perfil"). Ao adicionar/alterar um perfil, atualize `perfis.py` **e** este documento. Usuários são
+> criados no Painel Admin (Diretor ou Gerente Administrativo/Financeiro) ou via `seed.py`.
+>
+> **Admin › Perfis de Usuário** (tela, read-only): mostra a matriz **perfil × capacidades** derivada
+> de `perfis.py` (`GET /api/admin/perfis-matriz`, gate `gerir_usuarios`) — formaliza o que o sistema
+> já aplica. É distinta de **Usuários da loja** (atribui *quem* tem qual perfil).
+>
+> **Três eixos (não confundir):** **Perfil** (acesso, `perfis.py` / `Usuario.nivel`) × **Função**
+> (cargo, tabela `Funcao`, herdada do Funcionário) × **Escopo de visibilidade** (posse do projeto +
+> Mapa de Atribuições). Ver `docs/superpowers/specs/2026-07-10-fase1-mapa-atribuicoes-escopo.md`.
 
 ## Perfis e permissões
 

@@ -2691,25 +2691,35 @@ function cfgDocumentosRender(){
     +'</div>';
 }
 
-// Perfis de Usuário — movido para Admin (v8): render dentro de loja-panel-perfis (usa cfgRenderizarPerfis)
-function adminPerfisCarregar(){
+// Admin › Perfis de Usuário — matriz perfil × capacidades, DERIVADA de perfis.py (read-only).
+// Formaliza o que o sistema já aplica; distinto de "Usuários da loja" (atribui QUEM tem qual perfil).
+async function adminPerfisCarregar(){
   const box = document.getElementById('loja-panel-perfis'); if(!box) return;
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const d = await (await fetch('/api/admin/perfis-matriz',{credentials:'same-origin'})).json().catch(()=>({}));
+  if(!d.ok){ box.innerHTML = '<em style="color:var(--err);font-size:12px">'+esc(d.erro||'Sem acesso.')+'</em>'; return; }
+  const caps = d.capacidades || {};
+  const rotuloCap = s => (caps[s] && caps[s].rotulo) || s;
+  const grupos = {};
+  Object.keys(caps).forEach(s => { const g = caps[s].grupo || 'Outros'; (grupos[g] = grupos[g] || []).push(s); });
+  const legenda = Object.keys(grupos).map(g =>
+    '<div style="margin-bottom:10px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">'+esc(g)+'</div>'
+    + grupos[g].map(s => '<div style="font-size:12px;color:var(--text);margin-bottom:2px"><strong>'+esc(caps[s].rotulo)+'</strong> <span style="color:var(--muted)">— '+esc(caps[s].descricao)+'</span></div>').join('')
+    + '</div>').join('');
+  const linhas = (d.perfis || []).map(p => {
+    const chips = (p.capacidades || []).map(s =>
+      '<span style="display:inline-block;background:var(--accent-tint);color:var(--accent);border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 3px 0 0">'+esc(rotuloCap(s))+'</span>').join('')
+      || '<span style="color:var(--muted);font-size:11px">— nenhuma —</span>';
+    return '<tr class="proj-row"><td style="padding:8px 12px;color:var(--text);font-weight:600">'+esc(p.rotulo)
+      + '<div style="font-size:10px;color:var(--muted);font-weight:400">'+esc(p.slug)+'</div></td>'
+      + '<td style="padding:8px 12px;color:var(--muted);font-size:11px">'+(p.loja?'Loja':'Plataforma/Rede')+'</td>'
+      + '<td style="padding:8px 12px;text-align:right;font-family:var(--font-mono)">'+(p.desconto_max||0)+'%</td>'
+      + '<td style="padding:8px 12px">'+chips+'</td></tr>';
+  }).join('');
   box.innerHTML =
-     '<div class="card" style="margin-bottom:16px">'
-    +'<div class="card-title">Perfil ativo (sessão local)</div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Selecione o perfil para testar os limites; em produção vem da autenticação do usuário.</div>'
-    +'<div style="display:flex;gap:10px;flex-wrap:wrap" id="cfg-perfil-btns">'
-    +'<button class="btn btn-ghost btn-sm" id="cfg-btn-consultor" onclick="cfgSetPerfil(\'consultor\')">Consultor de Vendas</button>'
-    +'<button class="btn btn-ghost btn-sm" id="cfg-btn-gerente" onclick="cfgSetPerfil(\'gerente\')">Gerente de Vendas</button>'
-    +'<button class="btn btn-ghost btn-sm" id="cfg-btn-diretoria" onclick="cfgSetPerfil(\'diretoria\')">Diretoria</button>'
-    +'</div><div style="margin-top:12px;font-size:12px;color:var(--ok)" id="cfg-perfil-ativo-label"></div></div>'
-    +'<div class="card" style="margin-bottom:16px">'
-    +'<div class="card-title">Permissões por perfil — limite de desconto</div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-bottom:16px">Define O QUE cada perfil pode fazer (aqui, o desconto máximo). Distinto de "Usuários da loja", onde se atribui QUEM tem qual perfil.</div>'
-    +'<div id="cfg-perfis-lista"></div>'
-    +'<div style="margin-top:16px"><button class="btn btn-primary btn-sm" onclick="cfgSalvarLimites()">Salvar limites</button>'
-    +'<span id="cfg-save-hint" style="font-size:11px;color:var(--ok);margin-left:10px"></span></div></div>';
-  cfgRenderizarPerfis();
+     '<div style="font-size:12px;color:var(--muted);margin-bottom:14px;max-width:720px">Define <strong style="color:var(--text)">o que cada perfil pode fazer</strong> (capacidades e limite de desconto), refletindo o que o sistema já aplica. Distinto de <strong style="color:var(--text)">Usuários da loja</strong>, onde se atribui <strong style="color:var(--text)">quem</strong> tem qual perfil. Somente leitura (fonte: perfis.py).</div>'
+    +'<table class="proj-table" style="width:100%;margin-bottom:18px"><thead><tr><th>Perfil</th><th>Escopo</th><th style="text-align:right">Desc. máx</th><th>Capacidades</th></tr></thead><tbody>'+linhas+'</tbody></table>'
+    +'<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">O que cada capacidade significa</div>'+legenda;
 }
 
 function cfgRenderizarPerfis(){

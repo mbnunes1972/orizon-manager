@@ -57,3 +57,44 @@ def desconto_max(slug):
 
 def pode(slug, capacidade):
     return bool(PERFIS.get(slug, _DEFAULT).get(capacidade, False))
+
+
+# Metadados legíveis das capacidades — dão nome/descrição aos slugs para a tela Admin › Perfis de
+# Usuário FORMALIZAR o que perfis.py já governa. A fonte única de VERDADE continua sendo PERFIS; isto
+# é só a camada de apresentação. Toda capacidade booleana usada em PERFIS deve ter entrada aqui.
+CAPACIDADES = {
+    "ver_parametros":            {"rotulo": "Ver parâmetros",             "grupo": "Comercial",
+        "descricao": "Ver o painel de apoio da negociação (margens/custos internos)."},
+    "autorizar":                 {"rotulo": "Autorizar desconto",         "grupo": "Comercial",
+        "descricao": "Autorizar desconto acima do limite e ações que exigem gerência."},
+    "aprovar_financeiro":        {"rotulo": "Aprovar financeiro",         "grupo": "Financeiro",
+        "descricao": "Aprovar os gates financeiros e liberar impostos."},
+    "gerir_usuarios":            {"rotulo": "Gerir usuários",             "grupo": "Administração",
+        "descricao": "Criar/editar contas de usuário da loja."},
+    "registrar_medicao":         {"rotulo": "Registrar medição",          "grupo": "Execução",
+        "descricao": "Lançar a medição in loco (Medidor)."},
+    "aprovar_medicao_reprovada": {"rotulo": "Aprovar medição reprovada",  "grupo": "Execução",
+        "descricao": "Liberar medição reprovada (decisão comercial)."},
+    "editar_dados_loja":         {"rotulo": "Editar dados da loja",       "grupo": "Administração",
+        "descricao": "Editar o cadastro/dados da loja e emitir NF-e."},
+    "executar_pe":               {"rotulo": "Executar PE",                "grupo": "Execução",
+        "descricao": "Trabalhar nas subfases do Projeto Executivo."},
+    "revisar_pe":                {"rotulo": "Revisar PE",                 "grupo": "Execução",
+        "descricao": "Revisar/aprovar o Projeto Executivo."},
+    "gerir_redes":               {"rotulo": "Gerir redes",                "grupo": "Plataforma",
+        "descricao": "Criar/editar redes (plataforma)."},
+    "gerir_lojas":               {"rotulo": "Gerir lojas",                "grupo": "Plataforma",
+        "descricao": "Criar/editar lojas (rede/plataforma)."},
+}
+
+
+def matriz():
+    """Perfis com capacidades resolvidas (derivado de PERFIS) — alimenta Admin › Perfis de Usuário.
+    Read-only: reflete o que o código já faz, não configura nada."""
+    caps = list(CAPACIDADES.keys())
+    loja = set(slugs_loja())
+    perfis_out = [{
+        "slug": s, "rotulo": PERFIS[s]["rotulo"], "desconto_max": PERFIS[s].get("desconto_max", 0.0),
+        "loja": s in loja, "capacidades": [c for c in caps if PERFIS[s].get(c)],
+    } for s in slugs()]
+    return {"perfis": perfis_out, "capacidades": CAPACIDADES}
