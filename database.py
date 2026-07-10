@@ -184,6 +184,40 @@ class Parceiro(Base):
     criado_em           = Column(DateTime,     default=datetime.utcnow)
     rede_id             = Column(Integer,      ForeignKey("redes.id"), nullable=True)
     abrangencia         = Column(String(10),   default="loja")   # loja | rede
+    pix                 = Column(String(140),  nullable=True)    # chave PIX p/ pagamento de comissão (v10)
+
+
+class Funcao(Base):
+    """Tabela de Funções (Modulos_Orizon_v10, Config): catálogo único de funções/cargos referenciado
+    por Funcionário.funcao_id e Terceiro.funcao_id — substitui texto livre / listas separadas."""
+    __tablename__ = "funcoes"
+
+    id        = Column(Integer,     primary_key=True, autoincrement=True)
+    loja_id   = Column(Integer,     ForeignKey("lojas.id"), nullable=True)
+    nome      = Column(String(80),  nullable=False)
+    status    = Column(String(10),  nullable=False, default="ativo")   # ativo | inativo
+    criado_em = Column(DateTime,    default=datetime.utcnow)
+
+
+class FolhaPagamento(Base):
+    """Folha de Pagamento (Modulos_Orizon_v10, §2.1): um registro por Funcionário/competência.
+    Parte fixa vem do cadastro; parte variável = vendas do período × % da faixa de meta (auto-cálculo).
+    Despesa lançada nas contas existentes do Plano de Contas (5.3) — motor, não digitação."""
+    __tablename__ = "folha_pagamento"
+
+    id             = Column(Integer,     primary_key=True, autoincrement=True)
+    loja_id        = Column(Integer,     ForeignKey("lojas.id"), nullable=True)
+    funcionario_id = Column(Integer,     ForeignKey("funcionarios.id"), nullable=False)
+    competencia    = Column(String(7),   nullable=False)          # 'AAAA-MM'
+    parte_fixa     = Column(Float,       nullable=True, default=0.0)
+    vendas_liq     = Column(Float,       nullable=True, default=0.0)   # base da variável (valor líquido do período)
+    faixa_pct      = Column(Float,       nullable=True, default=0.0)   # % da faixa de meta atingida
+    parte_variavel = Column(Float,       nullable=True, default=0.0)
+    total          = Column(Float,       nullable=True, default=0.0)
+    status         = Column(String(10),  nullable=False, default="aberta")   # aberta | paga
+    ref_lancamento = Column(String(60),  nullable=True)           # ref idempotente do lançamento contábil
+    gerado_em      = Column(DateTime,    default=datetime.utcnow)
+    pago_em        = Column(DateTime,    nullable=True)
 
 
 class Funcionario(Base):
@@ -197,10 +231,24 @@ class Funcionario(Base):
     cpf                = Column(String(20),  nullable=True)
     telefone           = Column(String(20),  nullable=True)
     email              = Column(String(120), nullable=True)
-    cargo              = Column(String(80),  nullable=True)
+    cargo              = Column(String(80),  nullable=True)   # legado (texto) — ver funcao_id
+    funcao_id          = Column(Integer,     ForeignKey("funcoes.id"), nullable=True)  # → Tabela de Funções (v10)
     remuneracao_tipo   = Column(String(20),  nullable=True)   # fixa | fixa_variavel
     remuneracao_fixa   = Column(Float,       nullable=True)
     remuneracao_var    = Column(Float,       nullable=True)   # parte variável (se fixa_variavel)
+    # Endereço (mesmo bloco de Clientes) + Dados Bancários completos (v10)
+    cep          = Column(String(9),   nullable=True)
+    logradouro   = Column(String(200), nullable=True)
+    numero       = Column(String(20),  nullable=True)
+    complemento  = Column(String(100), nullable=True)
+    bairro       = Column(String(100), nullable=True)
+    cidade       = Column(String(80),  nullable=True)
+    uf           = Column(String(2),   nullable=True)
+    banco_nome   = Column(String(80),  nullable=True)
+    banco_codigo = Column(String(6),   nullable=True)
+    agencia      = Column(String(12),  nullable=True)
+    conta        = Column(String(20),  nullable=True)
+    pix          = Column(String(140), nullable=True)
     status             = Column(String(10),  nullable=False, default="ativo")   # ativo | inativo
     usuario_id         = Column(Integer,     ForeignKey("usuarios.id"), nullable=True)  # conta de login (se houver)
     criado_em          = Column(DateTime,    default=datetime.utcnow)
@@ -219,7 +267,20 @@ class Fornecedor(Base):
     email           = Column(String(120), nullable=True)
     categoria       = Column(String(20),  nullable=True)   # materia_prima | transportadora | servicos | outro
     prazo_pagamento = Column(Integer,     nullable=True)   # dias
-    dados_bancarios = Column(Text,        nullable=True)
+    dados_bancarios = Column(Text,        nullable=True)   # legado (texto livre)
+    # Endereço + Dados Bancários estruturados (v10)
+    cep          = Column(String(9),   nullable=True)
+    logradouro   = Column(String(200), nullable=True)
+    numero       = Column(String(20),  nullable=True)
+    complemento  = Column(String(100), nullable=True)
+    bairro       = Column(String(100), nullable=True)
+    cidade       = Column(String(80),  nullable=True)
+    uf           = Column(String(2),   nullable=True)
+    banco_nome   = Column(String(80),  nullable=True)
+    banco_codigo = Column(String(6),   nullable=True)
+    agencia      = Column(String(12),  nullable=True)
+    conta        = Column(String(20),  nullable=True)
+    pix          = Column(String(140), nullable=True)
     status          = Column(String(10),  nullable=False, default="ativo")
     criado_em       = Column(DateTime,    default=datetime.utcnow)
 
@@ -234,10 +295,23 @@ class Terceiro(Base):
     nome            = Column(String(150), nullable=False)
     cpf             = Column(String(20),  nullable=True)
     telefone        = Column(String(20),  nullable=True)
-    tipo_servico    = Column(String(20),  nullable=False, default="montador")   # montador | outros
+    tipo_servico    = Column(String(20),  nullable=True)   # legado — ver funcao_id
+    funcao_id       = Column(Integer,     ForeignKey("funcoes.id"), nullable=True)  # → Tabela de Funções (v10)
     pix             = Column(String(140), nullable=True)
-    dados_bancarios = Column(Text,        nullable=True)
+    dados_bancarios = Column(Text,        nullable=True)   # legado (texto livre)
     condicao        = Column(String(12),  nullable=True)   # mei | autonomo
+    # Endereço + Dados Bancários completos (v10)
+    cep          = Column(String(9),   nullable=True)
+    logradouro   = Column(String(200), nullable=True)
+    numero       = Column(String(20),  nullable=True)
+    complemento  = Column(String(100), nullable=True)
+    bairro       = Column(String(100), nullable=True)
+    cidade       = Column(String(80),  nullable=True)
+    uf           = Column(String(2),   nullable=True)
+    banco_nome   = Column(String(80),  nullable=True)
+    banco_codigo = Column(String(6),   nullable=True)
+    agencia      = Column(String(12),  nullable=True)
+    conta        = Column(String(20),  nullable=True)
     status          = Column(String(10),  nullable=False, default="ativo")
     criado_em       = Column(DateTime,    default=datetime.utcnow)
 
@@ -978,6 +1052,24 @@ def _migrar_colunas():
             for col, tipo in [("ref", "VARCHAR(80)"), ("motivo", "VARCHAR(30)"), ("ia_sugestao", "TEXT")]:
                 if col not in lanc_cols:
                     cur.execute(f"ALTER TABLE lancamento ADD COLUMN {col} {tipo}")
+
+        # ── Cadastro v10: Endereço + Dados Bancários + funcao_id + PIX ──────────
+        _ENDERECO = [("cep","VARCHAR(9)"), ("logradouro","VARCHAR(200)"), ("numero","VARCHAR(20)"),
+                     ("complemento","VARCHAR(100)"), ("bairro","VARCHAR(100)"), ("cidade","VARCHAR(80)"),
+                     ("uf","VARCHAR(2)")]
+        _BANCO = [("banco_nome","VARCHAR(80)"), ("banco_codigo","VARCHAR(6)"), ("agencia","VARCHAR(12)"),
+                  ("conta","VARCHAR(20)"), ("pix","VARCHAR(140)")]
+        def _add_cols(tabela, cols):
+            existentes = {r[1] for r in cur.execute(f"PRAGMA table_info({tabela})")}
+            if not existentes:   # tabela ainda não existe (será criada pelo create_all)
+                return
+            for col, tipo in cols:
+                if col not in existentes:
+                    cur.execute(f"ALTER TABLE {tabela} ADD COLUMN {col} {tipo}")
+        _add_cols("funcionarios", [("funcao_id","INTEGER")] + _ENDERECO + _BANCO)
+        _add_cols("fornecedores", _ENDERECO + _BANCO)
+        _add_cols("terceiros",    [("funcao_id","INTEGER")] + _ENDERECO + _BANCO)
+        _add_cols("parceiros",    [("pix","VARCHAR(140)")])
 
         conn.commit()
     except Exception:

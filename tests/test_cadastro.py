@@ -74,3 +74,28 @@ def test_terceiro_crud(http_client_factory, seed, app_db):
     _, lst = c.get("/api/terceiros?q=222")   # busca por documento
     it = next(x for x in lst["itens"] if x["id"] == d["id"])
     assert it["tipo_servico"] == "montador" and it["pix"] == "ze@pix" and it["condicao"] == "mei"
+
+
+def test_funcoes_catalogo_e_referencia(http_client_factory, seed, app_db):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/funcoes", {"nome": "Montador"})
+    assert st == 201, d
+    fid = d["id"]
+    _, lst = c.get("/api/funcoes")
+    assert any(x["id"] == fid and x["nome"] == "Montador" for x in lst["itens"])
+    # Funcionário referencia a função (não texto livre) e traz o nome resolvido
+    st2, d2 = c.post("/api/funcionarios", {"nome": "Fulano", "funcao_id": fid})
+    assert st2 == 201
+    _, fl = c.get("/api/funcionarios")
+    assert next(x for x in fl["itens"] if x["id"] == d2["id"])["funcao_nome"] == "Montador"
+
+
+def test_endereco_e_dados_bancarios_persistem(http_client_factory, seed, app_db):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/funcionarios", {"nome": "Endç", "cep": "01001-000", "logradouro": "Praça da Sé",
+        "numero": "10", "cidade": "São Paulo", "uf": "SP", "banco_nome": "Itaú", "banco_codigo": "341",
+        "agencia": "1234", "conta": "56789-0", "pix": "endc@pix"})
+    assert st == 201, d
+    _, lst = c.get("/api/funcionarios")
+    it = next(x for x in lst["itens"] if x["id"] == d["id"])
+    assert it["logradouro"] == "Praça da Sé" and it["uf"] == "SP" and it["banco_codigo"] == "341" and it["pix"] == "endc@pix"

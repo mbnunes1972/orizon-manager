@@ -327,6 +327,9 @@ EVENTOS = {
     "execucao_reparo_garantia":     ("2.1.04.03", "1.1.01",  "Execução de reparo em garantia (baixa da provisão)"),
     # Caso de Assistência — tipo de custo Paga: nova venda ao cliente, sem tocar provisão (v7 §6)
     "venda_assistencia":            ("1.1.02", "4.1.02",    "Venda de assistência (caso Paga — cobrança do cliente)"),
+    # Folha de Pagamento (v10 §2.1): despesa nas contas 5.3 existentes × Caixa (sem conta nova)
+    "folha_fixa":                   ("5.3.06", "1.1.01",    "Folha — parte fixa (Salários de Vendas)"),
+    "folha_variavel":               ("5.3.01", "1.1.01",    "Folha — parte variável (Comissão de Vendedor)"),
 }
 
 

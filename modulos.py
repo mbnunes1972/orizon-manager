@@ -31,9 +31,9 @@ MODULOS = {
                     "arquivos": [], "tabelas": [], "rotas": []},
     "cadastro":    {"camada": "dominio", "depende_de": [], "rotulo": "Cadastro", "faixa": "vendas",
                     "arquivos": ["validacao_doc.py", "mod_cadastro.py"],
-                    "tabelas": ["clientes", "parceiros", "funcionarios", "fornecedores", "terceiros"],
+                    "tabelas": ["clientes", "parceiros", "funcionarios", "fornecedores", "terceiros", "funcoes"],
                     "rotas": ["/api/clientes", "/api/parceiros", "/api/funcionarios",
-                              "/api/fornecedores", "/api/terceiros"]},
+                              "/api/fornecedores", "/api/terceiros", "/api/funcoes"]},
     "comercial":   {"camada": "dominio", "depende_de": ["cadastro"], "rotulo": "Comercial (Vendas)", "faixa": "vendas",
                     "arquivos": ["mod_orcamento_params.py", "mod_margens.py", "mod_negociacao.py",
                                  "mod_proposta.py", "mod_contrato.py", "mod_arvore.py",
@@ -68,6 +68,10 @@ MODULOS = {
                     "rotas": ["/api/expedicao"]},
     "montagem":    {"camada": "dominio", "depende_de": ["comercial"], "rotulo": "Montagem", "faixa": "montagem",
                     "arquivos": [], "tabelas": [], "rotas": []},
+    "folha":       {"camada": "dominio", "depende_de": ["cadastro", "comercial", "financeiro"], "rotulo": "Folha de Pagamento", "faixa": "financeiro",
+                    "arquivos": ["mod_folha.py"],
+                    "tabelas": ["folha_pagamento"],
+                    "rotas": ["/api/folha"]},
     "assistencias":{"camada": "dominio", "depende_de": ["comercial", "montagem", "financeiro"], "rotulo": "Assistências", "faixa": "montagem",
                     "arquivos": ["mod_assistencias.py"],
                     "tabelas": ["assistencia_caso"],
@@ -126,7 +130,7 @@ def modulo_do_path(path):
 # Ordem estável dos domínios para a UI (DOMINIOS é frozenset, sem ordem). Sidebar plana usa esta ordem
 # (achatada por faixa no hub_layout). Captação primeiro (entrada do funil); Montagem/Assistências ao fim.
 DOMINIOS_ORDEM = ["captacao", "cadastro", "comercial", "producao", "fiscal",
-                  "estoque", "expedicao", "montagem", "assistencias", "financeiro"]
+                  "estoque", "expedicao", "montagem", "assistencias", "financeiro", "folha"]
 
 
 def dominios_com_rotulo():

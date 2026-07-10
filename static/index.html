@@ -1282,6 +1282,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="fin-panel-proj" style="display:none"><div id="proj-dre-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-recon" style="display:none"><div id="recon-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-repasse" style="display:none"><div id="repasse-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
+    <div id="fin-panel-folha" style="display:none"><div id="folha-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
   </div>
 
   <!-- PAGE 13: Expedição — Kanban do CicloLogistico (Modulos_Orizon_v5, módulo 7) -->
@@ -1489,6 +1490,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div>
           <label class="field-label">Comissão padrão (%)</label>
           <input type="number" id="par-comissao" min="0" max="30" step="0.5" value="0"
+                 style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px;outline:none">
+        </div>
+        <div>
+          <label class="field-label">Chave PIX</label>
+          <input type="text" id="par-pix" placeholder="CPF/CNPJ, e-mail, telefone ou chave aleatória"
                  style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px;outline:none">
         </div>
         <div>
@@ -1731,10 +1737,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin:12px 0 16px;flex-wrap:wrap">
       <button class="home-tab ativo" id="cfg-tab-provisoes"  onclick="cfgTab('provisoes')">Provisões</button>
       <button class="home-tab"       id="cfg-tab-comissao"   onclick="cfgTab('comissao')">Comissão de Vendas</button>
+      <button class="home-tab"       id="cfg-tab-funcoes"    onclick="cfgTab('funcoes')">Funções</button>
       <button class="home-tab"       id="cfg-tab-documentos" onclick="cfgTab('documentos')">Documentos</button>
     </div>
     <div id="cfg-panel-provisoes"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     <div id="cfg-panel-comissao" style="display:none"></div>
+    <div id="cfg-panel-funcoes" style="display:none"></div>
     <div id="cfg-panel-documentos" style="display:none"></div>
   </div>
 
@@ -2502,7 +2510,7 @@ let _cfgTabAtual = 'provisoes';
 function cfgRender(){ cfgTab(_cfgTabAtual || 'provisoes'); }
 function cfgTab(qual){
   _cfgTabAtual = qual;
-  ['provisoes','comissao','documentos'].forEach(q => {
+  ['provisoes','comissao','funcoes','documentos'].forEach(q => {
     const tab = document.getElementById('cfg-tab-'+q);
     const panel = document.getElementById('cfg-panel-'+q);
     if(tab) tab.classList.toggle('ativo', q===qual);
@@ -2510,7 +2518,50 @@ function cfgTab(qual){
   });
   if(qual==='provisoes')  adminFinanceiroCarregar();   // % das provisões (montagem/assist/garantia/comissão)
   if(qual==='comissao')   cfgComissaoRender();
+  if(qual==='funcoes')    cfgFuncoesRender();
   if(qual==='documentos') cfgDocumentosRender();
+}
+// ── Config → Tabela de Funções (Modulos_Orizon_v10): catálogo usado por Funcionário/Terceiro ──
+let _cfgFuncoesItens = [];
+async function cfgFuncoesRender(){
+  const box = document.getElementById('cfg-panel-funcoes'); if(!box) return;
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const d = await (await fetch('/api/funcoes',{credentials:'same-origin'})).json().catch(()=>({}));
+  _cfgFuncoesItens = (d && d.ok && d.itens) ? d.itens : [];
+  const linhas = _cfgFuncoesItens.map(f =>
+     '<tr class="proj-row"><td style="padding:9px 12px;color:var(--text);font-weight:500">'+esc(f.nome)+'</td>'
+    +'<td style="padding:9px 12px;color:var(--muted)">'+(f.status==='inativo'?'Inativo':'Ativo')+'</td>'
+    +'<td style="text-align:right;padding:9px 12px">'
+    +'<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cfgFuncaoEditar('+f.id+')">Editar</button>'
+    +'<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cfgFuncaoToggle('+f.id+',\''+(f.status==='inativo'?'ativo':'inativo')+'\')">'+(f.status==='inativo'?'Reativar':'Inativar')+'</button>'
+    +'</td></tr>').join('') || '<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma função cadastrada.</td></tr>';
+  box.innerHTML =
+     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:640px">Catálogo de funções da loja — referenciado no cadastro de Funcionário e Terceiro (evita texto livre).</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:12px"><input type="text" id="cfg-funcao-nome" class="inp" placeholder="Nova função (ex.: Montador, Vendedor)" style="flex:1;max-width:320px" onkeydown="if(event.key===\'Enter\')cfgFuncaoNova()">'
+    +'<button class="btn btn-primary btn-sm" onclick="cfgFuncaoNova()">+ Adicionar</button></div>'
+    +'<table class="proj-table" style="max-width:640px"><thead><tr><th>Função</th><th style="width:90px">Status</th><th style="width:150px"></th></tr></thead><tbody>'+linhas+'</tbody></table>';
+}
+async function cfgFuncaoNova(){
+  const el = document.getElementById('cfg-funcao-nome'); const nome = (el.value||'').trim();
+  if(!nome){ el.focus(); return; }
+  const d = await (await fetch('/api/funcoes',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome})})).json().catch(()=>({}));
+  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+  _funcoesCache = null;                     // invalida cache dos selects
+  cfgFuncoesRender();
+}
+async function cfgFuncaoEditar(id){
+  const f = _cfgFuncoesItens.find(x=>x.id===id) || {};
+  const nome = prompt('Nome da função:', f.nome||'');
+  if(nome===null) return;
+  const t = nome.trim(); if(!t) return;
+  const d = await (await fetch('/api/funcoes/'+id,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:t})})).json().catch(()=>({}));
+  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+  _funcoesCache = null; cfgFuncoesRender();
+}
+async function cfgFuncaoToggle(id, novo){
+  const d = await (await fetch('/api/funcoes/'+id,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:novo})})).json().catch(()=>({}));
+  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+  _funcoesCache = null; cfgFuncoesRender();
 }
 function cfgComissaoRender(){
   const box = document.getElementById('cfg-panel-comissao'); if(!box) return;
@@ -2920,18 +2971,35 @@ function cadTab(qual){
 
 function cadRender(){ cadTab('clientes'); }   // seção padrão = Clientes
 
-// ── Cadastro: Funcionário / Fornecedor / Terceiro (Modulos_Orizon_v9) — Lista/Tabela + Detalhe ──
+// ── Cadastro: Funcionário / Fornecedor / Terceiro (Modulos_Orizon_v9\v10) — Lista/Tabela + Detalhe ──
+// Sub-entidades reutilizáveis (Modulos_Orizon_v10): Endereço (com ViaCEP) + Dados Bancários
+const _CAMPOS_ENDERECO = [
+  {tipo:'secao', lbl:'Endereço'},
+  {id:'cep', lbl:'CEP', tipo:'cep'},
+  {id:'logradouro', lbl:'Logradouro', tipo:'text', full:true},
+  {id:'numero', lbl:'Número', tipo:'text'}, {id:'complemento', lbl:'Complemento', tipo:'text'},
+  {id:'bairro', lbl:'Bairro', tipo:'text'}, {id:'cidade', lbl:'Cidade', tipo:'text'},
+  {id:'uf', lbl:'UF', tipo:'text'},
+];
+const _CAMPOS_BANCO = [
+  {tipo:'secao', lbl:'Dados Bancários'},
+  {id:'banco_nome', lbl:'Banco', tipo:'text'}, {id:'banco_codigo', lbl:'Código', tipo:'text'},
+  {id:'agencia', lbl:'Agência', tipo:'text'}, {id:'conta', lbl:'Conta', tipo:'text'},
+  {id:'pix', lbl:'Chave PIX', tipo:'text', full:true},
+];
 const _CAD_DEFS = {
   funcionarios: { titulo:'Funcionário',
-    colunas:[['nome','Nome'],['cargo','Cargo'],['cpf','CPF'],['status','Status']],
+    colunas:[['nome','Nome'],['funcao_nome','Função'],['cpf','CPF'],['status','Status']],
     campos:[
       {id:'nome', lbl:'Nome', tipo:'text', req:true, full:true},
       {id:'cpf', lbl:'CPF', tipo:'text'}, {id:'telefone', lbl:'Telefone', tipo:'text'},
-      {id:'email', lbl:'E-mail', tipo:'text', full:true}, {id:'cargo', lbl:'Cargo / função', tipo:'text'},
+      {id:'email', lbl:'E-mail', tipo:'text', full:true},
+      {id:'funcao_id', lbl:'Função', tipo:'select_funcoes'}, {id:'cargo', lbl:'Cargo (título)', tipo:'text'},
       {id:'remuneracao_tipo', lbl:'Remuneração', tipo:'select', ops:[['fixa','Fixa'],['fixa_variavel','Fixa + variável']]},
       {id:'remuneracao_fixa', lbl:'Remuneração fixa (R$)', tipo:'number'},
       {id:'remuneracao_var', lbl:'Parte variável (R$)', tipo:'number'},
       {id:'status', lbl:'Status', tipo:'select', ops:[['ativo','Ativo'],['inativo','Inativo']]},
+      ..._CAMPOS_ENDERECO, ..._CAMPOS_BANCO,
     ], acesso:true },
   fornecedores: { titulo:'Fornecedor',
     colunas:[['nome','Nome / Razão social'],['categoria','Categoria'],['cnpj_cpf','CNPJ/CPF'],['status','Status']],
@@ -2942,18 +3010,18 @@ const _CAD_DEFS = {
       {id:'categoria', lbl:'Categoria', tipo:'select', ops:[['materia_prima','Matéria-prima'],['transportadora','Transportadora'],['servicos','Serviços'],['outro','Outro']]},
       {id:'telefone', lbl:'Telefone', tipo:'text'}, {id:'email', lbl:'E-mail', tipo:'text'},
       {id:'prazo_pagamento', lbl:'Prazo de pagamento (dias)', tipo:'number'},
-      {id:'dados_bancarios', lbl:'Dados bancários', tipo:'text', full:true},
       {id:'status', lbl:'Status', tipo:'select', ops:[['ativo','Ativo'],['inativo','Inativo']]},
+      ..._CAMPOS_ENDERECO, ..._CAMPOS_BANCO,
     ] },
   terceiros: { titulo:'Terceiro (PF)',
-    colunas:[['nome','Nome'],['tipo_servico','Serviço'],['cpf','CPF'],['status','Status']],
+    colunas:[['nome','Nome'],['funcao_nome','Função'],['cpf','CPF'],['status','Status']],
     campos:[
       {id:'nome', lbl:'Nome', tipo:'text', req:true, full:true},
       {id:'cpf', lbl:'CPF', tipo:'text'}, {id:'telefone', lbl:'Telefone', tipo:'text'},
-      {id:'tipo_servico', lbl:'Tipo de serviço', tipo:'select', ops:[['montador','Montador'],['outros','Outros serviços']]},
+      {id:'funcao_id', lbl:'Tipo de serviço / função', tipo:'select_funcoes'},
       {id:'condicao', lbl:'Condição', tipo:'select', ops:[['','—'],['mei','MEI'],['autonomo','Autônomo']]},
-      {id:'pix', lbl:'PIX', tipo:'text'}, {id:'dados_bancarios', lbl:'Dados bancários', tipo:'text', full:true},
       {id:'status', lbl:'Status', tipo:'select', ops:[['ativo','Ativo'],['inativo','Inativo']]},
+      ..._CAMPOS_ENDERECO, ..._CAMPOS_BANCO,
     ] },
 };
 const _CAD_LABELS = {
@@ -2989,19 +3057,51 @@ async function cadEntCarregar(ent){
 }
 function cadEntBusca(ent,v){ _cadFiltro.q=v; clearTimeout(_cadBuscaTimer); _cadBuscaTimer=setTimeout(()=>cadEntCarregar(ent),300); }
 function cadEntStatus(ent,v){ _cadFiltro.status=v; cadEntCarregar(ent); }
-function cadEntNovo(ent){ _cadEntAtual=ent; _cadEntId=null; cadEntRender({}); }
-function cadEntEditar(ent,id){ _cadEntAtual=ent; _cadEntId=id; cadEntRender(_cadListaAtual.find(x=>x.id===id)||{}); }
+async function cadEntNovo(ent){ _cadEntAtual=ent; _cadEntId=null; await cadFuncoesGarantir(); cadEntRender({}); }
+async function cadEntEditar(ent,id){ _cadEntAtual=ent; _cadEntId=id; await cadFuncoesGarantir(); cadEntRender(_cadListaAtual.find(x=>x.id===id)||{}); }
+// Catálogo de Funções (cache) — usado nos selects de Funcionário/Terceiro (Modulos_Orizon_v10)
+let _funcoesCache = null;
+async function cadFuncoesGarantir(force){
+  if(_funcoesCache && !force) return _funcoesCache;
+  const d = await (await fetch('/api/funcoes?status=ativo',{credentials:'same-origin'})).json().catch(()=>({}));
+  _funcoesCache = (d && d.ok && d.itens) ? d.itens : [];
+  return _funcoesCache;
+}
+// ViaCEP nos cadastros: preenche logradouro/bairro/cidade/uf a partir do CEP
+let _cadCepTimer = null;
+function cadCepBuscar(el){
+  const v = el.value.replace(/\D/g,'').slice(0,8);
+  el.value = v.length>5 ? v.slice(0,5)+'-'+v.slice(5) : v;
+  clearTimeout(_cadCepTimer);
+  if(v.length===8) _cadCepTimer = setTimeout(async()=>{
+    try{
+      const d = await (await fetch('https://viacep.com.br/ws/'+v+'/json/')).json();
+      if(d.erro) return;
+      const setF=(id,val)=>{ const e=document.getElementById('cadf-'+id); if(e) e.value=val||''; };
+      setF('logradouro', d.logradouro); setF('bairro', d.bairro); setF('cidade', d.localidade); setF('uf', d.uf);
+    }catch(e){}
+  }, 400);
+}
 function cadEntFechar(){ document.getElementById('modal-cad').style.display='none'; }
 function cadEntRender(item){
   const def = _CAD_DEFS[_cadEntAtual];
   document.getElementById('modal-cad-titulo').textContent = (_cadEntId?'Editar ':'Novo ')+def.titulo;
   document.getElementById('modal-cad-status').textContent = '';
   const S = 'width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px';
+  const funcOps = (_funcoesCache||[]).map(f=>[String(f.id), f.nome]);
   const campoHtml = c => {
+    if(c.tipo==='secao')
+      return '<div style="grid-column:1/-1;border-top:1px solid var(--border);margin-top:6px;padding-top:10px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">'+esc(c.lbl)+'</div>';
     const val = item[c.id] != null ? item[c.id] : '';
-    const inner = c.tipo==='select'
-      ? '<select id="cadf-'+c.id+'" style="'+S+'">'+c.ops.map(([v,l])=>'<option value="'+esc(v)+'"'+(String(val)===v?' selected':'')+'>'+esc(l)+'</option>').join('')+'</select>'
-      : '<input type="'+(c.tipo==='number'?'number':'text')+'" id="cadf-'+c.id+'" value="'+esc(String(val))+'" '+(c.tipo==='number'?'step="0.01"':'')+' style="'+S+'">';
+    let inner;
+    if(c.tipo==='select')
+      inner = '<select id="cadf-'+c.id+'" style="'+S+'">'+c.ops.map(([v,l])=>'<option value="'+esc(v)+'"'+(String(val)===v?' selected':'')+'>'+esc(l)+'</option>').join('')+'</select>';
+    else if(c.tipo==='select_funcoes')
+      inner = '<select id="cadf-'+c.id+'" style="'+S+'">'+[['','—']].concat(funcOps).map(([v,l])=>'<option value="'+esc(v)+'"'+(String(val)===String(v)?' selected':'')+'>'+esc(l)+'</option>').join('')+'</select>';
+    else if(c.tipo==='cep')
+      inner = '<input type="text" id="cadf-'+c.id+'" value="'+esc(String(val))+'" maxlength="9" placeholder="00000-000" oninput="cadCepBuscar(this)" style="'+S+'">';
+    else
+      inner = '<input type="'+(c.tipo==='number'?'number':'text')+'" id="cadf-'+c.id+'" value="'+esc(String(val))+'" '+(c.tipo==='number'?'step="0.01"':'')+' style="'+S+'">';
     return '<div style="'+(c.full?'grid-column:1/-1':'')+'"><label style="font-size:11px;color:var(--muted)">'+esc(c.lbl)+(c.req?' *':'')+'</label>'+inner+'</div>';
   };
   let h = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 12px">'+def.campos.map(campoHtml).join('')+'</div>';
@@ -3024,7 +3124,7 @@ function cadAcessoToggle(){ const on=document.getElementById('cadf-acesso').chec
 async function cadEntSalvar(){
   const ent=_cadEntAtual, def=_CAD_DEFS[ent], st=document.getElementById('modal-cad-status');
   const payload={};
-  def.campos.forEach(c=>{ const el=document.getElementById('cadf-'+c.id); if(el) payload[c.id]=el.value; });
+  def.campos.forEach(c=>{ if(!c.id) return; const el=document.getElementById('cadf-'+c.id); if(el) payload[c.id]=el.value; });
   if(!(payload.nome||'').trim()){ st.textContent='Nome é obrigatório.'; st.style.color='var(--err)'; return; }
   if(def.acesso){
     payload.acesso = { tem_acesso:document.getElementById('cadf-acesso').checked,
@@ -7546,7 +7646,7 @@ async function parAbrirModal(id){
   document.getElementById('par-modal-erro').textContent = '';
   document.getElementById('par-aviso-nome').style.display = 'none';
   _parHomonimoConfirmado = false;
-  ['nome','cpf','email','tel','wpp','obs'].forEach(f => {
+  ['nome','cpf','email','tel','wpp','obs','pix'].forEach(f => {
     const el = document.getElementById('par-'+f);
     if(el) el.value = '';
   });
@@ -7571,6 +7671,7 @@ async function parAbrirModal(id){
         wppEl.value = p.whatsapp || ''; cliMascaraTel(wppEl);
         document.getElementById('par-comissao').value = p.comissao_padrao_pct || 0;
         document.getElementById('par-obs').value      = p.observacoes || '';
+        document.getElementById('par-pix').value      = p.pix || '';
       }
     } catch(e){ showToast('Erro ao carregar parceiro', true); return; }
   }
@@ -7663,6 +7764,7 @@ async function parSalvar(){
     whatsapp:             document.getElementById('par-wpp').value.trim(),
     comissao_padrao_pct:  parseFloat(document.getElementById('par-comissao').value) || 0,
     observacoes:          document.getElementById('par-obs').value.trim(),
+    pix:                  document.getElementById('par-pix').value.trim(),
   };
 
   const abrangencia = document.getElementById('par-abrangencia').value;
@@ -8027,6 +8129,7 @@ const _FIN_SECOES = [
   {id:'bal',     lbl:'Balanço',         ic:'scale',           load:()=>balancoCarregar()},
   {id:'proj',    lbl:'Margem/Projeto',  ic:'chart-dots',      load:()=>projDreCarregar()},
   {id:'recon',   lbl:'Reconciliação',   ic:'refresh',         load:()=>reconInit()},
+  {id:'folha',   lbl:'Folha de Pagamento', ic:'wallet',       load:()=>folhaCarregar()},   // Modulos_Orizon_v10 §2.1
   // "Repasse Fábrica" saiu do Financeiro (Modulos_Orizon_v4/§6.2): migra p/ o módulo Assistências
   // (filtro Loja/Fábrica/Paga nativo). O painel/endpoint segue existindo, só não é mais aba do submenu.
 ];
@@ -8163,6 +8266,64 @@ function finTab(t){
   if(tt && sec) tt.textContent = 'Financeiro / ' + sec.lbl;
   _sbModuloAberto = 'financeiro'; _sbSecaoAtiva = t; sbNavRender();   // reflete no acordeão
   if(sec && sec.load) sec.load();
+}
+
+// ── Folha de Pagamento (Modulos_Orizon_v10 §2.1): motor — parte fixa (cadastro) + variável (vendas) ──
+let _folhaComp = null;   // competência ativa (AAAA-MM)
+function _folhaCompDefault(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+async function folhaCarregar(){
+  const box = document.getElementById('folha-box'); if(!box) return;
+  if(!_folhaComp) _folhaComp = _folhaCompDefault();
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const d = await (await fetch('/api/folha?competencia='+encodeURIComponent(_folhaComp),{credentials:'same-origin'})).json().catch(()=>({}));
+  if(!d.ok){ box.innerHTML='<em style="color:var(--err);font-size:12px">'+esc(d.erro||'Módulo financeiro inativo ou sem acesso.')+'</em>'; return; }
+  folhaRender(d.folha);
+}
+function folhaMudarComp(v){ if(v){ _folhaComp = v; folhaCarregar(); } }
+async function folhaGerar(){
+  const d = await (await fetch('/api/folha/gerar',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({competencia:_folhaComp})})).json().catch(()=>({}));
+  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+  showToast('Folha gerada.', false); folhaRender(d.folha);
+}
+async function folhaPagar(id){
+  if(!confirm('Confirmar o pagamento desta folha? A despesa será lançada nas contas 5.3 (Salários / Comissão de Vendedor).')) return;
+  const d = await (await fetch('/api/folha/'+id+'/pagar',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'})).json().catch(()=>({}));
+  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+  showToast('Folha paga.', false); folhaCarregar();
+}
+function folhaRender(folha){
+  const box = document.getElementById('folha-box'); if(!box) return;
+  folha = folha || {itens:[]};
+  const linhas = (folha.itens||[]).map(it => {
+    const acao = it.status==='paga'
+      ? '<span style="color:var(--st-fechado);font-size:11px;font-weight:600">Paga</span>'
+      : '<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="folhaPagar('+it.id+')">Pagar</button>';
+    return '<tr class="proj-row">'
+      +'<td style="padding:8px 10px;color:var(--text);font-weight:500">'+esc(it.funcionario||'—')+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(it.parte_fixa||0)+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);color:var(--muted)">'+_fBRL(it.vendas_liq||0)+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;color:var(--muted)">'+(it.faixa_pct?(Number(it.faixa_pct).toFixed(2)+'%'):'—')+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(it.parte_variavel||0)+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);font-weight:700">'+_fBRL(it.total||0)+'</td>'
+      +'<td style="padding:8px 10px;font-size:11px;color:var(--muted)">'+esc(it.pagamento||'—')+'</td>'
+      +'<td style="padding:8px 10px;text-align:right">'+acao+'</td></tr>';
+  }).join('') || '<tr><td colspan="8" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma folha para esta competência. Clique em “Gerar folha”.</td></tr>';
+  box.innerHTML =
+     '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;max-width:720px">Motor de cálculo: a <strong style="color:var(--text)">parte fixa</strong> vem do cadastro do Funcionário; a <strong style="color:var(--text)">parte variável</strong> = vendas líquidas fechadas do consultor no mês × % da faixa de meta (Config → Comissão de Vendas). O pagamento lança a despesa nas contas 5.3 e usa os dados bancários/PIX cadastrados — nada é digitado.</div>'
+    +'<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">'
+    +'<label style="font-size:12px;color:var(--muted)">Competência</label>'
+    +'<input type="month" value="'+esc(folha.competencia||_folhaComp)+'" onchange="folhaMudarComp(this.value)" class="inp" style="width:auto">'
+    +'<button class="btn btn-primary btn-sm" onclick="folhaGerar()">Gerar folha</button></div>'
+    +'<table class="proj-table"><thead><tr>'
+    +'<th>Funcionário</th><th style="text-align:right">Parte fixa</th><th style="text-align:right">Vendas líq.</th>'
+    +'<th style="text-align:right">Faixa</th><th style="text-align:right">Parte variável</th><th style="text-align:right">Total</th>'
+    +'<th>Pagamento</th><th style="width:80px"></th></tr></thead><tbody>'+linhas+'</tbody>'
+    +'<tfoot><tr style="border-top:2px solid var(--border-strong);font-weight:700">'
+    +'<td style="padding:9px 10px">Totais</td>'
+    +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(folha.total_fixa||0)+'</td><td></td><td></td>'
+    +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(folha.total_variavel||0)+'</td>'
+    +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono);color:var(--accent)">'+_fBRL(folha.total_geral||0)+'</td>'
+    +'<td colspan="2"></td></tr></tfoot></table>';
 }
 
 async function repasseCarregar(){

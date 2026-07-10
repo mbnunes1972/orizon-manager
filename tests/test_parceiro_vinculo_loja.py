@@ -60,6 +60,21 @@ def test_consultor_nao_cadastra_parceiro_de_outra_rede(http_client_factory, seed
     assert body.get("ok") is False
 
 
+def test_parceiro_pix_persiste_e_edita(http_client_factory, seed):
+    """Modulos_Orizon_v10: o Parceiro guarda a Chave PIX (única sub-entidade bancária dele).
+    Deve voltar no create/serialize e poder ser editada."""
+    c = _login(http_client_factory, "cons_l1")
+    status, body = c.post("/api/parceiros", {"nome": "Arq. Ana", "abrangencia": "loja",
+                                             "pix": "ana@pix.com"})
+    assert status == 200 and body.get("ok") is True, body
+    pid = body["parceiro"]["id"]
+    assert body["parceiro"].get("pix") == "ana@pix.com"
+    # edição altera a chave
+    status, b2 = c.post("/api/parceiros/%d/editar" % pid, {"pix": "11999998888"})
+    assert status == 200 and b2.get("ok") is True, b2
+    assert b2["parceiro"].get("pix") == "11999998888"
+
+
 def test_auth_me_inclui_rede_da_loja(http_client_factory, seed):
     """/api/auth/me deve trazer rede_id (e rede_nome) de cada loja do usuário,
     para o front decidir se oferece a opção de abrangência 'rede'."""

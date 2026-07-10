@@ -17,10 +17,11 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
                        CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente,
                        PerfilEmissao, CicloLogistico, CicloLogisticoTransicao, AssistenciaCaso,
-                       Funcionario, Fornecedor, Terceiro)
+                       Funcionario, Fornecedor, Terceiro, Funcao, FolhaPagamento)
 import mod_expedicao
 import mod_assistencias
 import mod_cadastro
+import mod_folha
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -167,6 +168,7 @@ def _cad_ent(nome):
         "funcionarios": (Funcionario, mod_cadastro.func_serialize, mod_cadastro.func_aplicar),
         "fornecedores": (Fornecedor,  mod_cadastro.forn_serialize, mod_cadastro.forn_aplicar),
         "terceiros":    (Terceiro,    mod_cadastro.terc_serialize, mod_cadastro.terc_aplicar),
+        "funcoes":      (Funcao,      mod_cadastro.funcao_serialize, mod_cadastro.funcao_aplicar),
     }[nome]
 
 # HTML servido como arquivo estático
@@ -618,8 +620,28 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
-        # ── Cadastro (Modulos_Orizon_v9): listas Funcionários/Fornecedores/Terceiros ──────
-        m = re.match(r'^/api/(funcionarios|fornecedores|terceiros)$', path)
+        # ── Folha de Pagamento (Modulos_Orizon_v10 §2.1) — folha do período ──────────────
+        if path == "/api/folha":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                from urllib.parse import parse_qs
+                comp = (parse_qs(urlparse(self.path).query).get("competencia") or [""])[0].strip()
+                if not re.match(r'^\d{4}-\d{2}$', comp):
+                    self.send_json({"ok": False, "erro": "Informe a competência AAAA-MM."}, code=400); return
+                self.send_json({"ok": True, "folha": mod_folha.listar(db, loja_id, comp)})
+            finally:
+                db.close()
+            return
+
+        # ── Cadastro (Modulos_Orizon_v9/v10): listas Funcionários/Fornecedores/Terceiros/Funções ──
+        m = re.match(r'^/api/(funcionarios|fornecedores|terceiros|funcoes)$', path)
         if m:
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -2146,8 +2168,56 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
-        # ── Cadastro (Modulos_Orizon_v9): criar/editar Funcionário/Fornecedor/Terceiro ──────
-        m = re.match(r'^/api/(funcionarios|fornecedores|terceiros)(?:/(\d+))?$', path)
+        # ── Folha de Pagamento: gerar folha do período / pagar um registro ───────────────
+        if path == "/api/folha/gerar":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                comp = ((json.loads(body or b'{}')).get("competencia") or "").strip()
+                if not re.match(r'^\d{4}-\d{2}$', comp):
+                    self.send_json({"ok": False, "erro": "Informe a competência AAAA-MM."}, code=400); return
+                cfg = _cfg_financeira_loja(db, loja_id)
+                mod_folha.gerar_folha(db, loja_id, comp, cfg)
+                db.commit()
+                self.send_json({"ok": True, "folha": mod_folha.listar(db, loja_id, comp)})
+            except Exception as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        m = re.match(r'^/api/folha/(\d+)/pagar$', path)
+        if m:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            import mod_contabil
+            db = get_session()
+            try:
+                lid = usuario.get("loja_id")
+                reg = db.get(FolhaPagamento, int(m.group(1)))
+                if reg is None or (lid and reg.loja_id != lid):
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                ot, oid = mod_contabil.resolver_owner(db, usuario)
+                ok, err = mod_folha.pagar(db, ot, oid, reg)
+                if not ok:
+                    self.send_json({"ok": False, "erro": err}, code=400); return
+                db.commit()
+                self.send_json({"ok": True})
+            except Exception as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        # ── Cadastro (Modulos_Orizon_v9/v10): criar/editar Funcionário/Fornecedor/Terceiro/Função ──
+        m = re.match(r'^/api/(funcionarios|fornecedores|terceiros|funcoes)(?:/(\d+))?$', path)
         if m:
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -3040,6 +3110,7 @@ class Handler(BaseHTTPRequestHandler):
                     whatsapp            =(req.get("whatsapp")             or "").strip() or None,
                     comissao_padrao_pct =float(req.get("comissao_padrao_pct") or 0),
                     observacoes         =(req.get("observacoes")          or "").strip() or None,
+                    pix                 =(req.get("pix")                   or "").strip() or None,
                 )
                 db.add(p)
                 db.flush()        # atribui p.id sem efetivar — transação única e atômica
@@ -3085,7 +3156,7 @@ class Handler(BaseHTTPRequestHandler):
                     if _e:
                         self.send_json({"ok": False, "erro": _e}, code=400)
                         return
-                for f in ["nome","cpf_cnpj","tipo","email","telefone","whatsapp","observacoes"]:
+                for f in ["nome","cpf_cnpj","tipo","email","telefone","whatsapp","observacoes","pix"]:
                     if f in req:
                         setattr(p, f, (req[f] or "").strip() or None)
                 if "comissao_padrao_pct" in req:
@@ -6755,6 +6826,7 @@ def _parceiro_dict(p, db=None) -> dict:
         "whatsapp":            p.whatsapp             or "",
         "comissao_padrao_pct": p.comissao_padrao_pct  if p.comissao_padrao_pct is not None else 0.0,
         "observacoes":         p.observacoes          or "",
+        "pix":                 p.pix                  or "",
         "abrangencia":         p.abrangencia          or "loja",
         "rede_id":             p.rede_id,
         "criado_em":           p.criado_em.strftime("%Y-%m-%d") if p.criado_em else "",

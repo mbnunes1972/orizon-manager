@@ -4,7 +4,21 @@ Fronteira obrigatória: Funcionário (RH) ≠ Usuário (conta de login, Admin/N�
 referência (Usuario.funcionario_id / Funcionario.usuario_id), NUNCA duplicando dado pessoal.
 """
 import re
-from database import Funcionario, Fornecedor, Terceiro, Usuario
+from database import Funcionario, Fornecedor, Terceiro, Usuario, Funcao
+
+# Sub-entidades reutilizáveis (Modulos_Orizon_v10): Endereço + Dados Bancários
+ENDERECO_CAMPOS = ("cep", "logradouro", "numero", "complemento", "bairro", "cidade", "uf")
+BANCO_CAMPOS    = ("banco_nome", "banco_codigo", "agencia", "conta", "pix")
+
+
+def _aplicar_campos(obj, req, campos):
+    for c in campos:
+        if c in req:
+            setattr(obj, c, _s(req.get(c)))
+
+
+def _serial_campos(obj, campos):
+    return {c: (getattr(obj, c, None) or "") for c in campos}
 
 REMUNERACAO_TIPOS = ("fixa", "fixa_variavel")
 FORN_CATEGORIAS   = ("materia_prima", "transportadora", "servicos", "outro")
@@ -38,11 +52,14 @@ def _digitos(s):
 # ── Funcionário ──────────────────────────────────────────────────────────────
 def func_serialize(f, db=None):
     d = {"id": f.id, "nome": f.nome, "cpf": f.cpf or "", "telefone": f.telefone or "",
-         "email": f.email or "", "cargo": f.cargo or "",
+         "email": f.email or "", "cargo": f.cargo or "", "funcao_id": f.funcao_id,
          "remuneracao_tipo": f.remuneracao_tipo or "fixa",
          "remuneracao_fixa": f.remuneracao_fixa, "remuneracao_var": f.remuneracao_var,
          "status": f.status or "ativo", "usuario_id": f.usuario_id,
          "acesso": {"tem_acesso": False, "email": f.email or "", "perfil": "consultor"}}
+    d.update(_serial_campos(f, ENDERECO_CAMPOS + BANCO_CAMPOS))
+    if db is not None and f.funcao_id:
+        fn = db.get(Funcao, f.funcao_id); d["funcao_nome"] = fn.nome if fn else ""
     if db is not None and f.usuario_id:
         u = db.get(Usuario, f.usuario_id)
         if u and u.ativo:
@@ -58,6 +75,9 @@ def func_aplicar(db, f, req, loja_id):
     for campo in ("cpf", "telefone", "email", "cargo"):
         if campo in req:
             setattr(f, campo, _s(req.get(campo)))
+    if "funcao_id" in req:
+        f.funcao_id = _i(req.get("funcao_id"))
+    _aplicar_campos(f, req, ENDERECO_CAMPOS + BANCO_CAMPOS)
     if "remuneracao_tipo" in req:
         f.remuneracao_tipo = (_s(req.get("remuneracao_tipo")) or "fixa")
     if "remuneracao_fixa" in req:
@@ -107,10 +127,12 @@ def func_sync_acesso(db, f, req):
 
 # ── Fornecedor ───────────────────────────────────────────────────────────────
 def forn_serialize(f, db=None):
-    return {"id": f.id, "tipo_pessoa": f.tipo_pessoa or "pj", "nome": f.nome,
-            "cnpj_cpf": f.cnpj_cpf or "", "telefone": f.telefone or "", "email": f.email or "",
-            "categoria": f.categoria or "", "prazo_pagamento": f.prazo_pagamento,
-            "dados_bancarios": f.dados_bancarios or "", "status": f.status or "ativo"}
+    d = {"id": f.id, "tipo_pessoa": f.tipo_pessoa or "pj", "nome": f.nome,
+         "cnpj_cpf": f.cnpj_cpf or "", "telefone": f.telefone or "", "email": f.email or "",
+         "categoria": f.categoria or "", "prazo_pagamento": f.prazo_pagamento,
+         "dados_bancarios": f.dados_bancarios or "", "status": f.status or "ativo"}
+    d.update(_serial_campos(f, ENDERECO_CAMPOS + BANCO_CAMPOS))
+    return d
 
 
 def forn_aplicar(db, f, req, loja_id):
@@ -121,6 +143,7 @@ def forn_aplicar(db, f, req, loja_id):
     for campo in ("cnpj_cpf", "telefone", "email", "categoria", "dados_bancarios"):
         if campo in req:
             setattr(f, campo, _s(req.get(campo)))
+    _aplicar_campos(f, req, ENDERECO_CAMPOS + BANCO_CAMPOS)
     if "tipo_pessoa" in req:
         f.tipo_pessoa = (_s(req.get("tipo_pessoa")) or "pj")
     if "prazo_pagamento" in req:
@@ -131,10 +154,14 @@ def forn_aplicar(db, f, req, loja_id):
 
 # ── Terceiro (sempre PF) ─────────────────────────────────────────────────────
 def terc_serialize(t, db=None):
-    return {"id": t.id, "nome": t.nome, "cpf": t.cpf or "", "telefone": t.telefone or "",
-            "tipo_servico": t.tipo_servico or "montador", "pix": t.pix or "",
-            "dados_bancarios": t.dados_bancarios or "", "condicao": t.condicao or "",
-            "status": t.status or "ativo"}
+    d = {"id": t.id, "nome": t.nome, "cpf": t.cpf or "", "telefone": t.telefone or "",
+         "tipo_servico": t.tipo_servico or "", "funcao_id": t.funcao_id,
+         "dados_bancarios": t.dados_bancarios or "", "condicao": t.condicao or "",
+         "status": t.status or "ativo"}
+    d.update(_serial_campos(t, ENDERECO_CAMPOS + BANCO_CAMPOS))
+    if db is not None and t.funcao_id:
+        fn = db.get(Funcao, t.funcao_id); d["funcao_nome"] = fn.nome if fn else ""
+    return d
 
 
 def terc_aplicar(db, t, req, loja_id):
@@ -142,13 +169,36 @@ def terc_aplicar(db, t, req, loja_id):
         t.loja_id = loja_id
     if _s(req.get("nome")):
         t.nome = _s(req.get("nome"))
-    for campo in ("cpf", "telefone", "pix", "dados_bancarios", "condicao"):
+    for campo in ("cpf", "telefone", "dados_bancarios", "condicao", "tipo_servico"):
         if campo in req:
             setattr(t, campo, _s(req.get(campo)))
-    if "tipo_servico" in req:
-        t.tipo_servico = (_s(req.get("tipo_servico")) or "montador")
+    if "funcao_id" in req:
+        t.funcao_id = _i(req.get("funcao_id"))
+    _aplicar_campos(t, req, ENDERECO_CAMPOS + BANCO_CAMPOS)
     if "status" in req:
         t.status = (_s(req.get("status")) or "ativo")
+
+
+# ── Tabela de Funções (Config) ───────────────────────────────────────────────
+def funcao_serialize(f, db=None):
+    return {"id": f.id, "nome": f.nome, "status": f.status or "ativo"}
+
+
+def funcao_aplicar(db, f, req, loja_id):
+    if f.loja_id is None:
+        f.loja_id = loja_id
+    if _s(req.get("nome")):
+        f.nome = _s(req.get("nome"))
+    if "status" in req:
+        f.status = (_s(req.get("status")) or "ativo")
+
+
+def listar_funcoes(db, loja_id, ativos_only=False):
+    q = db.query(Funcao).filter_by(loja_id=loja_id)
+    rows = q.order_by(Funcao.nome.asc()).all()
+    if ativos_only:
+        rows = [r for r in rows if (r.status or "ativo") == "ativo"]
+    return [funcao_serialize(r) for r in rows]
 
 
 # ── Listagem genérica (Lista/Tabela: filtro por status + busca nome/documento) ─
