@@ -19,6 +19,10 @@
   --r-sm:6px; --r-md:8px; --r-lg:12px;  /* raios da escala (Padrao_Design_v7 §4) */
   /* accent (petróleo) e marca (dourado) — escuro */
   --accent:#5BB8AC; --accent-tint:rgba(91,184,172,.14);
+  /* Botão primário — paleta PRÓPRIA, deliberadamente fora do --accent (Padrao_Design_v10). Escuro:
+     fill perto do fundo, destaque vem da BORDA viva + sombra forte. */
+  --btn-primary-bg:#193430; --btn-primary-text:#EAF5F2;
+  --btn-primary-border:1.5px solid #59C0B2; --btn-primary-shadow:0 6px 20px rgba(0,0,0,.55);
   --gold:#D4B348; --gold-tint:rgba(212,179,72,.16); --warn-tint:rgba(239,159,39,.14);
   /* semânticas de sistema — escuro */
   --warn:#EF9F27; --err:#E2876C; --info:#7DB3E8;
@@ -45,6 +49,10 @@
   --text:#2A2A28; --muted:#6B6860;
   --shadow:0 1px 2px rgba(0,0,0,.06);
   --accent:#1F4B4B; --accent-tint:rgba(31,75,75,.10);
+  /* Botão primário — paleta própria (Padrao_Design_v10). Claro: cinza neutro (sem matiz de marca),
+     contraste só pelo valor tonal; sem borda. */
+  --btn-primary-bg:#666666; --btn-primary-text:#FFFFFF;
+  --btn-primary-border:none; --btn-primary-shadow:0 2px 8px rgba(0,0,0,.12);
   --gold:#9C7A0C; --gold-tint:rgba(184,150,12,.14); --warn-tint:rgba(239,159,39,.16);
   --warn:#EF9F27; --err:#D64A3C; --info:#2266A8;
   --st-quente:#B1452A; --st-morno:#B87A1E; --st-frio:var(--info);
@@ -128,12 +136,12 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
   transition:background-color 9999s ease-out 0s}   /* mata o flash de fundo do autofill */
 /* Botões — Padrao_Design_Orizon_v4 §4: profundidade por --shadow, não por borda (corrige "terminal") */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 18px;height:36px;border-radius:8px;font-family:var(--font-sans);font-weight:500;font-size:13px;cursor:pointer;border:none;transition:all .15s;letter-spacing:.2px;white-space:nowrap}
-/* Primário (Padrao_Design_v9 §4): cor SEMPRE do token --accent (nunca hex literal → não vaza entre
-   temas). Contraste por sombra + borda sutil 1px no MESMO matiz do accent, ~15% mais escura (color-mix
-   com preto) — resolve por tema sozinho, sem saturação extra. */
-.btn-primary{background:var(--accent);color:#fff;box-shadow:var(--shadow);
-  border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}
-.btn-primary:hover{opacity:.90;box-shadow:0 3px 10px rgba(0,0,0,.18)}
+/* Primário (Padrao_Design_v10 §4): paleta PRÓPRIA via var(--btn-primary-*), deliberadamente fora do
+   --accent (que segue valendo p/ nav ativo, links, foco, badges, sublinhado de aba). Nunca hex literal.
+   Claro: cinza neutro, contraste tonal. Escuro: fill perto do fundo, destaque pela BORDA viva + sombra. */
+.btn-primary{background:var(--btn-primary-bg);color:var(--btn-primary-text);
+  border:var(--btn-primary-border);box-shadow:var(--btn-primary-shadow)}
+.btn-primary:hover{filter:brightness(1.08)}
 .btn-primary:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
 .btn-ghost{background:var(--surface-2);color:var(--muted);box-shadow:var(--shadow)}   /* secundário */
 /* §4 (Padrao_Design_v5): borda condicional por tema — no claro --bg≈--surface-2, sombra sozinha
@@ -357,8 +365,10 @@ body{overflow:hidden}
 .btn-ok:hover{background:var(--teal-brd);color:#0d160d}
 /* "Aprovar" da Negociação = ação primária da tela (Padrao_Design_v9 §4: nunca dourado em botão;
    cor do token --accent). Mantém o nome .btn-amber (o JS o referencia) — só a aparência vira primária. */
-.btn-amber{background:var(--accent);color:#fff;border:1px solid color-mix(in srgb, var(--accent) 85%, #000);box-shadow:var(--shadow);font-weight:600}
-.btn-amber:hover{opacity:.90;box-shadow:0 3px 10px rgba(0,0,0,.18)}
+/* "Aprovar" da Negociação = primário da tela → mesma paleta própria do primário (Padrao_Design_v10).
+   Nome .btn-amber preservado (o JS o referencia). */
+.btn-amber{background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);box-shadow:var(--btn-primary-shadow);font-weight:600}
+.btn-amber:hover{filter:brightness(1.08)}
 /* Page-00 simplificada */
 .p00-btns{display:flex;gap:10px;margin-bottom:20px}
 .p00-form{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:20px;margin-bottom:20px}
@@ -662,7 +672,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Botões -->
     <div style="display:flex;gap:10px;margin-top:24px">
       <button onclick="mpSalvarPerfil()"
-              style="flex:1;padding:11px;background:var(--accent);color:#0d160d;border:none;
+              style="flex:1;padding:11px;background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);
                      border-radius:9px;font-family:var(--font-sans);font-weight:700;
                      font-size:13px;cursor:pointer;transition:.15s"
               onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
@@ -2074,7 +2084,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="li-erro" style="font-size:11px;color:var(--err);min-height:14px;margin-bottom:10px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="fecharModalLiberarImpostos()" style="padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer">Cancelar</button>
-      <button onclick="confirmarLiberarImpostos()" style="padding:8px 14px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-weight:700;cursor:pointer">Confirmar</button>
+      <button onclick="confirmarLiberarImpostos()" style="padding:8px 14px;background:var(--btn-primary-bg);border:var(--btn-primary-border);border-radius:6px;color:var(--btn-primary-text);font-weight:700;cursor:pointer">Confirmar</button>
     </div>
   </div>
 </div>
@@ -2102,7 +2112,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="auth-modal-erro" style="font-size:12px;color:var(--err);min-height:18px;margin-bottom:12px"></div>
     <div style="display:flex;gap:10px">
       <button onclick="fecharModalAutorizacao(false)" style="flex:1;padding:11px;background:transparent;border:1px solid var(--border);border-radius:9px;color:var(--muted);font-family:var(--font-sans);font-weight:700;font-size:13px;cursor:pointer">Cancelar</button>
-      <button onclick="confirmarAutorizacao()" style="flex:1;padding:11px;background:var(--accent);color:#0d160d;border:none;border-radius:9px;font-family:var(--font-sans);font-weight:700;font-size:13px;cursor:pointer">Autorizar</button>
+      <button onclick="confirmarAutorizacao()" style="flex:1;padding:11px;background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:9px;font-family:var(--font-sans);font-weight:700;font-size:13px;cursor:pointer">Autorizar</button>
     </div>
   </div>
 </div>
@@ -10016,7 +10026,7 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
     const btnLabel = concluido ? '↺ Reabrir' : '✓ Marcar como Concluída';
     const btnStyle = concluido
       ? 'border:1px solid var(--text);color:var(--text);background:none'
-      : 'background:var(--accent);color:#fff;border:none;font-weight:700';
+      : 'background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);font-weight:700';
     return `<button onclick="toggleSalvarEtapa('${etapa.codigo}')"
       style="${btnStyle};border-radius:5px;padding:6px 16px;font-size:.82rem;cursor:pointer;margin-top:10px">
       ${btnLabel}</button>`;
@@ -10080,7 +10090,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
     </p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <button onclick="concluirAprovacaoFinanceira('${codigo}')"
-        style="background:var(--accent);color:#fff;border:none;border-radius:6px;
+        style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:6px;
         padding:8px 18px;font-size:.9rem;font-weight:700;cursor:pointer">
         &#x2713; Aprovar (gerencial)
       </button>
@@ -10224,7 +10234,7 @@ async function abrirProvisoes(oid) {
         &#x270F; Revisa
       </button>
       <button id="_prov-btn-confirmar-revisa" onclick="_provAcao('${oid}','${pendingRev}','revisa')"
-        style="display:none;background:var(--accent);color:#fff;border:none;
+        style="display:none;background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);
         border-radius:5px;padding:6px 14px;font-size:.85rem;font-weight:700;cursor:pointer">
         &#x2713; Confirmar Revisão
       </button>
@@ -10388,7 +10398,7 @@ function _renderCardSolicitacaoMedicao(dados, bloqueada) {
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 10px">Anexe o arquivo de solicitação e confirme com a senha do medidor.</p>
     <input type="file" id="med-solic-file" style="font-size:.82rem;margin-bottom:10px"><br>
-    <button onclick="enviarSolicitacaoMedicao()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">&#x2713; Confirmar (medidor)</button>`;
+    <button onclick="enviarSolicitacaoMedicao()" style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">&#x2713; Confirmar (medidor)</button>`;
 }
 
 async function enviarSolicitacaoMedicao() {
@@ -10416,7 +10426,7 @@ function _renderCardMedicao(dados, bloqueada) {
       <p style="color:var(--warn,#c8a84b);margin:0 0 10px">Medição <strong>Reprovada</strong> — aguardando decisão comercial.</p>
       <p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">Anexe o documento de aprovação do cliente e libere com senha de Gerente de Vendas/Adm-Fin/Diretor.</p>
       <input type="file" id="med-doc-file" style="font-size:.82rem;margin-bottom:10px"><br>
-      <button onclick="enviarDecisaoReprovado()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">Liberar (decisão comercial)</button>`;
+      <button onclick="enviarDecisaoReprovado()" style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">Liberar (decisão comercial)</button>`;
   }
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 8px">Registre o parecer da medição, anexe a planta promob e confirme com a senha do medidor.</p>
@@ -10430,7 +10440,7 @@ function _renderCardMedicao(dados, bloqueada) {
       <textarea id="med-ambientes" placeholder="Ambientes aprovados..." style="width:100%;box-sizing:border-box;font-size:.82rem;min-height:48px"></textarea>
     </div>
     <div style="margin-top:8px"><input type="file" id="med-planta-file" style="font-size:.82rem"></div>
-    <button onclick="enviarParecerMedicao()" style="margin-top:10px;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">Registrar parecer (medidor)</button>`;
+    <button onclick="enviarParecerMedicao()" style="margin-top:10px;background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">Registrar parecer (medidor)</button>`;
 }
 
 async function enviarParecerMedicao() {
@@ -10556,7 +10566,7 @@ function _renderCardPE(codigo, dados, bloqueada) {
     : `<span style="font-size:.78rem;color:var(--muted)">&#x1F512; sem permissão para carregar</span>`;
 
   const btnFechar = (!concluido && podeExec)
-    ? `<button class="btn-ciclo" style="background:var(--accent);color:#fff;border-color:color-mix(in srgb, var(--accent) 85%, #000);font-weight:700"
+    ? `<button class="btn-ciclo" style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);font-weight:700"
          onclick="peConcluir('${codigo}')">&#x2713; ${esc(cfg.fechar)}</button>`
     : '';
 
@@ -10684,7 +10694,7 @@ function _renderCardProducao(dados, bloqueada) {
       : `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
            <button onclick="salvarNumerosPedidos()" class="btn-ciclo" style="font-size:.82rem">💾 Salvar Números dos Pedidos</button>
            <button onclick="producaoConcluida()"
-             style="background:var(--accent);color:#fff;border:none;font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:pointer">Produção Concluída</button>
+             style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:pointer">Produção Concluída</button>
          </div>`}`;
 }
 
@@ -10734,7 +10744,7 @@ function _renderCardEntrega(dados, bloqueada) {
       : `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
            <button onclick="salvarRelatorioEntrega()" class="btn-ciclo" style="font-size:.82rem">💾 Salvar Relatório de Entrega</button>
            <button onclick="concluirRelatorioEntrega()"
-             style="background:var(--accent);color:#fff;border:none;font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:pointer">Concluir Relatório de Entrega</button>
+             style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:pointer">Concluir Relatório de Entrega</button>
          </div>`}`;
 }
 
@@ -11040,7 +11050,7 @@ function mostrarErroComAcao(mensagem, labelAcao, fnAcao) {
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center';
   const btnAcao = labelAcao ? `
     <button id="erro-modal-btn-acao"
-      style="background:var(--accent);color:#fff;border:none;border-radius:6px;
+      style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:6px;
       padding:10px 28px;font-size:1rem;cursor:pointer;font-weight:600;margin-right:12px">
       ${labelAcao}</button>` : '';
   ov.innerHTML = `
@@ -11177,7 +11187,7 @@ function avisoPopup(mensagem, opts) {
       '<h4 style="margin:0 0 10px;color:var(--dalm-gold,#c8a84b);font-size:1rem">' + esc(titulo) + '</h4>' +
       '<p style="margin:0 0 16px;color:var(--fg,#e8efe9);font-size:.9rem;white-space:pre-line">' + esc(mensagem) + '</p>' +
       '<div style="display:flex;justify-content:flex-end">' +
-      '<button data-act="ok" style="background:var(--accent);color:#fff;border:none;border-radius:5px;' +
+      '<button data-act="ok" style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:5px;' +
       'padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">' + esc(okLabel) + '</button>' +
       '</div>');
     const fin = () => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(); };
@@ -11208,7 +11218,7 @@ function pedirCredenciaisGerente(opts) {
       '<div style="display:flex;gap:8px;justify-content:flex-end">' +
       '<button data-act="cancel" style="background:none;border:1px solid var(--muted);color:var(--muted);' +
       'border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">Cancelar</button>' +
-      '<button data-act="ok" style="background:var(--accent);color:#fff;border:none;border-radius:5px;' +
+      '<button data-act="ok" style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:5px;' +
       'padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">Confirmar</button>' +
       '</div>');
     const fin = (v) => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
@@ -11246,7 +11256,7 @@ function renderContratoUI(contrato) {
         Use o bot&atilde;o "Aprovar Or&ccedil;amento" na tela de negocia&ccedil;&atilde;o para iniciar o contrato.
       </p>
       <button onclick="fecharCiclo();abrirAprovacaoComDados()"
-        style="background:var(--accent);color:#fff;border:none;border-radius:6px;
+        style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:6px;
         padding:8px 18px;font-size:.9rem;font-weight:700;cursor:pointer">
         &#x2713; Aprovar Or&ccedil;amento
       </button>
@@ -11686,7 +11696,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
           style="background:none;border:1px solid var(--muted);color:var(--muted);
           border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">Cancelar</button>
         <button onclick="gerarContrato()"
-          style="background:var(--accent);color:#fff;border:none;border-radius:5px;
+          style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:5px;
           padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">
           Gerar Contrato
         </button>
@@ -11850,7 +11860,7 @@ async function coletarSignatarioOverride() {
         `).join('')}
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
           <button id="sig-cancel" style="background:none;border:1px solid var(--border);color:var(--muted);padding:7px 16px;border-radius:5px;cursor:pointer">Cancelar</button>
-          <button id="sig-ok" style="background:var(--accent);color:#fff;border:none;font-weight:600;padding:7px 18px;border-radius:5px;cursor:pointer">Usar estes dados</button>
+          <button id="sig-ok" style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);font-weight:600;padding:7px 18px;border-radius:5px;cursor:pointer">Usar estes dados</button>
         </div>
       </div>`;
     document.body.appendChild(ov);
