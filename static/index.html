@@ -355,8 +355,10 @@ body{overflow:hidden}
 .action-row{display:flex;gap:10px;margin-top:16px;padding-bottom:40px;flex-wrap:wrap}
 .btn-ok{background:var(--teal-bg);color:var(--ok);border:1px solid var(--teal-brd)}
 .btn-ok:hover{background:var(--teal-brd);color:#0d160d}
-.btn-amber{background:#1a1200;color:#f0c84a;border:1px solid #b8960c;font-weight:600}
-.btn-amber:hover{background:#b8960c;color:#000}
+/* "Aprovar" da Negociação = ação primária da tela (Padrao_Design_v9 §4: nunca dourado em botão;
+   cor do token --accent). Mantém o nome .btn-amber (o JS o referencia) — só a aparência vira primária. */
+.btn-amber{background:var(--accent);color:#fff;border:1px solid color-mix(in srgb, var(--accent) 85%, #000);box-shadow:var(--shadow);font-weight:600}
+.btn-amber:hover{opacity:.90;box-shadow:0 3px 10px rgba(0,0,0,.18)}
 /* Page-00 simplificada */
 .p00-btns{display:flex;gap:10px;margin-bottom:20px}
 .p00-form{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:20px;margin-bottom:20px}
@@ -387,19 +389,24 @@ body{overflow:hidden}
 .tf-tax-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--warn);margin-bottom:10px}
 
 /* ── Ciclo do Projeto ── */
+/* Componente utilitário do Ciclo (Baixar/Carregar/Consultar/Emitir…) = SECUNDÁRIO token-based
+   (Padrao_Design_v9 §4: sem cor literal, dourado nunca em botão). A ação primária de cada etapa
+   recebe .btn-primary/accent individualmente (1 primário por tela). */
 .btn-ciclo {
-  background: #1a1200;
-  color: #f0c84a;
-  border: 1px solid #b8960c;
-  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  border-radius: 6px;
   padding: 4px 12px;
   font-size: .85rem;
   cursor: pointer;
   margin-left: 8px;
   font-weight: 500;
   letter-spacing: .02em;
+  transition: .15s;
 }
-.btn-ciclo:hover { background: #b8960c; color: #000; }
+.btn-ciclo:hover { color: var(--accent); border-color: var(--accent); }
 
 #ciclo-panel {
   display: none;
@@ -9893,7 +9900,7 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
     const btnLabel = concluido ? '↺ Reabrir' : '✓ Marcar como Concluída';
     const btnStyle = concluido
       ? 'border:1px solid var(--text);color:var(--text);background:none'
-      : 'background:var(--dalm-gold);color:#1a1200;border:none;font-weight:700';
+      : 'background:var(--accent);color:#fff;border:none;font-weight:700';
     return `<button onclick="toggleSalvarEtapa('${etapa.codigo}')"
       style="${btnStyle};border-radius:5px;padding:6px 16px;font-size:.82rem;cursor:pointer;margin-top:10px">
       ${btnLabel}</button>`;
@@ -9957,7 +9964,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
     </p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <button onclick="concluirAprovacaoFinanceira('${codigo}')"
-        style="background:#b8960c;color:#000;border:none;border-radius:6px;
+        style="background:var(--accent);color:#fff;border:none;border-radius:6px;
         padding:8px 18px;font-size:.9rem;font-weight:700;cursor:pointer">
         &#x2713; Aprovar (gerencial)
       </button>
@@ -10101,7 +10108,7 @@ async function abrirProvisoes(oid) {
         &#x270F; Revisa
       </button>
       <button id="_prov-btn-confirmar-revisa" onclick="_provAcao('${oid}','${pendingRev}','revisa')"
-        style="display:none;background:#b8960c;color:#000;border:none;
+        style="display:none;background:var(--accent);color:#fff;border:none;
         border-radius:5px;padding:6px 14px;font-size:.85rem;font-weight:700;cursor:pointer">
         &#x2713; Confirmar Revisão
       </button>
@@ -10265,7 +10272,7 @@ function _renderCardSolicitacaoMedicao(dados, bloqueada) {
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 10px">Anexe o arquivo de solicitação e confirme com a senha do medidor.</p>
     <input type="file" id="med-solic-file" style="font-size:.82rem;margin-bottom:10px"><br>
-    <button onclick="enviarSolicitacaoMedicao()" style="background:#b8960c;color:#000;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">&#x2713; Confirmar (medidor)</button>`;
+    <button onclick="enviarSolicitacaoMedicao()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">&#x2713; Confirmar (medidor)</button>`;
 }
 
 async function enviarSolicitacaoMedicao() {
@@ -10293,7 +10300,7 @@ function _renderCardMedicao(dados, bloqueada) {
       <p style="color:var(--warn,#c8a84b);margin:0 0 10px">Medição <strong>Reprovada</strong> — aguardando decisão comercial.</p>
       <p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">Anexe o documento de aprovação do cliente e libere com senha de Gerente de Vendas/Adm-Fin/Diretor.</p>
       <input type="file" id="med-doc-file" style="font-size:.82rem;margin-bottom:10px"><br>
-      <button onclick="enviarDecisaoReprovado()" style="background:#b8960c;color:#000;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">Liberar (decisão comercial)</button>`;
+      <button onclick="enviarDecisaoReprovado()" style="background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">Liberar (decisão comercial)</button>`;
   }
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 8px">Registre o parecer da medição, anexe a planta promob e confirme com a senha do medidor.</p>
@@ -10307,7 +10314,7 @@ function _renderCardMedicao(dados, bloqueada) {
       <textarea id="med-ambientes" placeholder="Ambientes aprovados..." style="width:100%;box-sizing:border-box;font-size:.82rem;min-height:48px"></textarea>
     </div>
     <div style="margin-top:8px"><input type="file" id="med-planta-file" style="font-size:.82rem"></div>
-    <button onclick="enviarParecerMedicao()" style="margin-top:10px;background:#b8960c;color:#000;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">Registrar parecer (medidor)</button>`;
+    <button onclick="enviarParecerMedicao()" style="margin-top:10px;background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">Registrar parecer (medidor)</button>`;
 }
 
 async function enviarParecerMedicao() {
@@ -10433,7 +10440,7 @@ function _renderCardPE(codigo, dados, bloqueada) {
     : `<span style="font-size:.78rem;color:var(--muted)">&#x1F512; sem permissão para carregar</span>`;
 
   const btnFechar = (!concluido && podeExec)
-    ? `<button class="btn-ciclo" style="background:#b8960c;color:#000;border-color:#b8960c;font-weight:700"
+    ? `<button class="btn-ciclo" style="background:var(--accent);color:#fff;border-color:color-mix(in srgb, var(--accent) 85%, #000);font-weight:700"
          onclick="peConcluir('${codigo}')">&#x2713; ${esc(cfg.fechar)}</button>`
     : '';
 
@@ -10507,7 +10514,7 @@ function _renderCardImplantacao(dados, bloqueada) {
              <input type="file" accept=".xml" multiple style="display:none" onchange="enviarPedidosXml(this)">
            </label>
            <button onclick="encaminharPedidosFabrica()" ${_pedidosXml.length ? '' : 'disabled'}
-             style="background:${_pedidosXml.length ? 'var(--dalm-gold)' : 'var(--muted)'};color:#1a1200;border:none;font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:${_pedidosXml.length ? 'pointer' : 'not-allowed'}">
+             style="background:${_pedidosXml.length ? 'var(--accent)' : 'var(--muted)'};color:#fff;border:none;font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:${_pedidosXml.length ? 'pointer' : 'not-allowed'}">
              Encaminhar Pedidos à Fábrica</button>
          </div>`}`;
 }
@@ -10561,7 +10568,7 @@ function _renderCardProducao(dados, bloqueada) {
       : `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
            <button onclick="salvarNumerosPedidos()" class="btn-ciclo" style="font-size:.82rem">💾 Salvar Números dos Pedidos</button>
            <button onclick="producaoConcluida()"
-             style="background:var(--dalm-gold);color:#1a1200;border:none;font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:pointer">Produção Concluída</button>
+             style="background:var(--accent);color:#fff;border:none;font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:pointer">Produção Concluída</button>
          </div>`}`;
 }
 
@@ -10611,7 +10618,7 @@ function _renderCardEntrega(dados, bloqueada) {
       : `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
            <button onclick="salvarRelatorioEntrega()" class="btn-ciclo" style="font-size:.82rem">💾 Salvar Relatório de Entrega</button>
            <button onclick="concluirRelatorioEntrega()"
-             style="background:var(--dalm-gold);color:#1a1200;border:none;font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:pointer">Concluir Relatório de Entrega</button>
+             style="background:var(--accent);color:#fff;border:none;font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:pointer">Concluir Relatório de Entrega</button>
          </div>`}`;
 }
 
@@ -10917,7 +10924,7 @@ function mostrarErroComAcao(mensagem, labelAcao, fnAcao) {
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;display:flex;align-items:center;justify-content:center';
   const btnAcao = labelAcao ? `
     <button id="erro-modal-btn-acao"
-      style="background:var(--dalm-gold,#9C7A3C);color:#000;border:none;border-radius:6px;
+      style="background:var(--accent);color:#fff;border:none;border-radius:6px;
       padding:10px 28px;font-size:1rem;cursor:pointer;font-weight:600;margin-right:12px">
       ${labelAcao}</button>` : '';
   ov.innerHTML = `
@@ -11031,7 +11038,7 @@ function confirmarPopup(mensagem, opts) {
       '<div style="display:flex;gap:8px;justify-content:flex-end">' +
       '<button data-act="cancel" style="background:none;border:1px solid var(--muted);color:var(--muted);' +
       'border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">' + esc(cancelLabel) + '</button>' +
-      '<button data-act="ok" style="background:' + (perigo ? 'var(--err,#c0392b)' : '#b8960c') + ';color:#000;' +
+      '<button data-act="ok" style="background:' + (perigo ? 'var(--err)' : 'var(--accent)') + ';color:#fff;' +
       'border:none;border-radius:5px;padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">' + esc(okLabel) + '</button>' +
       '</div>');
     const fin = (v) => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
@@ -11054,7 +11061,7 @@ function avisoPopup(mensagem, opts) {
       '<h4 style="margin:0 0 10px;color:var(--dalm-gold,#c8a84b);font-size:1rem">' + esc(titulo) + '</h4>' +
       '<p style="margin:0 0 16px;color:var(--fg,#e8efe9);font-size:.9rem;white-space:pre-line">' + esc(mensagem) + '</p>' +
       '<div style="display:flex;justify-content:flex-end">' +
-      '<button data-act="ok" style="background:#b8960c;color:#000;border:none;border-radius:5px;' +
+      '<button data-act="ok" style="background:var(--accent);color:#fff;border:none;border-radius:5px;' +
       'padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">' + esc(okLabel) + '</button>' +
       '</div>');
     const fin = () => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(); };
@@ -11085,7 +11092,7 @@ function pedirCredenciaisGerente(opts) {
       '<div style="display:flex;gap:8px;justify-content:flex-end">' +
       '<button data-act="cancel" style="background:none;border:1px solid var(--muted);color:var(--muted);' +
       'border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">Cancelar</button>' +
-      '<button data-act="ok" style="background:#b8960c;color:#000;border:none;border-radius:5px;' +
+      '<button data-act="ok" style="background:var(--accent);color:#fff;border:none;border-radius:5px;' +
       'padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">Confirmar</button>' +
       '</div>');
     const fin = (v) => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
@@ -11123,7 +11130,7 @@ function renderContratoUI(contrato) {
         Use o bot&atilde;o "Aprovar Or&ccedil;amento" na tela de negocia&ccedil;&atilde;o para iniciar o contrato.
       </p>
       <button onclick="fecharCiclo();abrirAprovacaoComDados()"
-        style="background:#b8960c;color:#000;border:none;border-radius:6px;
+        style="background:var(--accent);color:#fff;border:none;border-radius:6px;
         padding:8px 18px;font-size:.9rem;font-weight:700;cursor:pointer">
         &#x2713; Aprovar Or&ccedil;amento
       </button>
@@ -11563,7 +11570,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
           style="background:none;border:1px solid var(--muted);color:var(--muted);
           border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">Cancelar</button>
         <button onclick="gerarContrato()"
-          style="background:#b8960c;color:#000;border:none;border-radius:5px;
+          style="background:var(--accent);color:#fff;border:none;border-radius:5px;
           padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">
           Gerar Contrato
         </button>
@@ -11727,7 +11734,7 @@ async function coletarSignatarioOverride() {
         `).join('')}
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
           <button id="sig-cancel" style="background:none;border:1px solid var(--border);color:var(--muted);padding:7px 16px;border-radius:5px;cursor:pointer">Cancelar</button>
-          <button id="sig-ok" style="background:#b8960c;color:#1a1200;border:none;font-weight:600;padding:7px 18px;border-radius:5px;cursor:pointer">Usar estes dados</button>
+          <button id="sig-ok" style="background:var(--accent);color:#fff;border:none;font-weight:600;padding:7px 18px;border-radius:5px;cursor:pointer">Usar estes dados</button>
         </div>
       </div>`;
     document.body.appendChild(ov);
