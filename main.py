@@ -132,6 +132,31 @@ def _enriquecer_projetos_com_pool(projetos):
     finally:
         db.close()
 
+# Consultor responsável do projeto (criado_por_id) — atribuição por gerente+ ------------------
+_NIVEIS_ATRIBUIVEIS = ("consultor", "gerente", "diretor")   # quem pode ser "consultor responsável"
+
+def _usuario_pertence_a_loja(db, u, loja_id):
+    """True se o usuário `u` está ligado à loja (loja_id direto ou vínculo UsuarioLoja)."""
+    if u is None or not loja_id:
+        return False
+    if u.loja_id == loja_id:
+        return True
+    return db.query(UsuarioLoja).filter_by(usuario_id=u.id, loja_id=loja_id).first() is not None
+
+def _usuarios_atribuiveis_da_loja(db, loja_id):
+    """Usuários ATIVOS da loja que podem ser consultor responsável (para o seletor). Ordenados por nome."""
+    if not loja_id:
+        return []
+    from sqlalchemy import or_
+    vinc_ids = {r[0] for r in db.query(UsuarioLoja.usuario_id)
+                .filter(UsuarioLoja.loja_id == loja_id).all()}
+    conds = [Usuario.loja_id == loja_id]
+    if vinc_ids:
+        conds.append(Usuario.id.in_(vinc_ids))
+    us = (db.query(Usuario).filter(Usuario.ativo == 1).filter(or_(*conds)).all())
+    us = [u for u in us if u.nivel in _NIVEIS_ATRIBUIVEIS]
+    return sorted(us, key=lambda u: (u.nome or "").lower())
+
 # HTML servido como arquivo estático
 _STATIC_DIR = os.path.join(_BASE_DIR, "static")
 
@@ -620,6 +645,26 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, "projetos": projetos})
             except Exception as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+
+        elif path == "/api/projetos/consultores":
+            # Seletor de consultor responsável (criação/edição). `pode_atribuir` = gerente+ (não escopo-próprio).
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                pode = not _ve_apenas_proprios_projetos(usuario.get("nivel"))
+                us = _usuarios_atribuiveis_da_loja(db, loja_id)
+                self.send_json({"ok": True, "pode_atribuir": pode,
+                                "consultores": [{"id": u.id, "nome": u.nome, "nivel": u.nivel} for u in us]})
             finally:
                 db.close()
 
@@ -2373,9 +2418,16 @@ class Handler(BaseHTTPRequestHandler):
                     p_meta = _db_ciclo.get(Projeto, proj['nome_safe'])
                     if not p_meta:
                         p_meta = Projeto(nome_safe=proj['nome_safe'])
-                        # criador do projeto (escopo por projetista): gravado só na criação
-                        p_meta.criado_por_id = (usuario.get("id") if usuario else None)
                         _db_ciclo.add(p_meta)
+                        # Consultor responsável (criado_por_id, gravado só na criação): por padrão o
+                        # usuário logado; gerente+ pode indicar outro consultor da loja.
+                        criador = usuario.get("id") if usuario else None
+                        cons_id = req.get("consultor_id")
+                        if cons_id and not _ve_apenas_proprios_projetos(usuario.get("nivel")):
+                            alvo = _db_ciclo.query(Usuario).filter_by(id=int(cons_id)).first()
+                            if _usuario_pertence_a_loja(_db_ciclo, alvo, loja_id):
+                                criador = int(cons_id)
+                        p_meta.criado_por_id = criador
                     p_meta.cliente_id = int(cliente_id)
                     p_meta.loja_id = loja_id
                     _db_ciclo.commit()
@@ -4044,6 +4096,93 @@ class Handler(BaseHTTPRequestHandler):
                     proj["parceiro_id"] = int(pid) if pid else None
                     _salvar_projeto(proj)
                     self.send_json({"ok": True, "parceiro": parceiro_dict})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # POST /api/projetos/<nome>/editar — altera os campos de criação (nome, cliente,
+            # parceiro, consultor). Cliente/parceiro travam após contrato assinado; nome e
+            # consultor seguem editáveis. Reatribuir consultor exige gerente+ (escopo não-próprio).
+            m = _re.match(r'^/api/projetos/([^/]+)/editar$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    _meta = _projeto_da_loja(db, nome_safe, loja_id)
+                    if _meta is None or not _projeto_visivel_ao_ator(_meta, usuario):
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    proj = _carregar_projeto(nome_safe)
+                    if not proj:
+                        self.send_json({"ok": False, "erro": "Projeto não encontrado"}, code=404)
+                        return
+                    req = json.loads(body or b'{}')
+                    assinado = _contrato_totalmente_assinado(nome_safe, db)
+                    pode_atribuir = not _ve_apenas_proprios_projetos(usuario.get("nivel"))
+
+                    # Nome exibido (a chave nome_safe é preservada) — sempre editável
+                    if "nome_projeto" in req:
+                        nv = (req.get("nome_projeto") or "").strip()
+                        if nv:
+                            proj["nome_projeto"] = nv
+
+                    # Consultor responsável — só gerente+; editável mesmo após o contrato
+                    if "consultor_id" in req:
+                        if not pode_atribuir:
+                            self.send_json({"ok": False, "erro": "Sem permissão para reatribuir o consultor"}, code=403)
+                            return
+                        cid = req.get("consultor_id")
+                        if cid:
+                            alvo = db.query(Usuario).filter_by(id=int(cid)).first()
+                            if not _usuario_pertence_a_loja(db, alvo, loja_id):
+                                self.send_json({"ok": False, "erro": "Consultor fora da loja"}, code=400)
+                                return
+                            _meta.criado_por_id = int(cid)
+
+                    # Cliente — travado após contrato assinado
+                    if "cliente_id" in req:
+                        if assinado:
+                            self.send_json({"ok": False, "erro": "Contrato assinado — cliente não pode ser alterado"}, code=400)
+                            return
+                        cid = req.get("cliente_id")
+                        if cid:
+                            c = _obj_da_loja(db, Cliente, int(cid), loja_id)
+                            if not c:
+                                self.send_json({"ok": False, "erro": "Cliente fora da loja"}, code=400)
+                                return
+                            proj["cliente_id"] = int(cid)
+                            proj["cliente"] = {"nome": c.nome, "cpf": c.cpf or "",
+                                               "email": c.email or "", "telefone": c.telefone or ""}
+                            _meta.cliente_id = int(cid)
+
+                    # Parceiro — travado após contrato assinado ("" / null remove)
+                    if "parceiro_id" in req:
+                        if assinado:
+                            self.send_json({"ok": False, "erro": "Contrato assinado — parceiro não pode ser alterado"}, code=400)
+                            return
+                        pid = req.get("parceiro_id")
+                        if pid:
+                            parc = db.get(Parceiro, int(pid))
+                            if parc is None or not _parceiro_visivel_loja(db, parc, loja_id):
+                                self.send_json({"ok": False, "erro": "Parceiro fora do seu escopo"}, code=400)
+                                return
+                        proj["parceiro_id"] = int(pid) if pid else None
+
+                    _salvar_projeto(proj)
+                    db.commit()
+                    self.send_json({"ok": True})
                 except Exception as e:
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)

@@ -699,6 +699,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                   style="font-size:11px;padding:4px 10px">+ Cadastrar novo parceiro</button>
         </div>
       </div>
+      <!-- Consultor responsável: só aparece para gerente+; o consultor cria sempre para si mesmo -->
+      <div id="np-consultor-wrap" style="display:none;margin-top:4px">
+        <label>CONSULTOR RESPONSÁVEL</label>
+        <select id="novo-proj-consultor"
+                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px"></select>
+      </div>
       <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
         <button class="btn btn-primary" onclick="criarProjeto()">Criar Projeto</button>
         <span id="novo-proj-status" style="font-size:11px;color:var(--muted)"></span>
@@ -1286,6 +1292,51 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- container único; adminRender() injeta o nível N1/N2/N3 -->
     <div id="admin-console"><em style="color:var(--muted);font-size:12px">Carregando&hellip;</em></div>
     <!-- Fila Omie removida (Omie em descontinuação; auto-sync de cliente desligado) -->
+  </div>
+
+  <!-- Modal: Editar campos de criação do projeto (nome, cliente, parceiro, consultor) -->
+  <div id="modal-proj-editar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:min(460px,92vw);max-height:90vh;overflow:auto;box-shadow:var(--shadow);animation:mIn .18s ease">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-family:var(--font-sans);font-weight:900;font-size:16px">Editar projeto</div>
+        <span onclick="projEditarFechar()" style="cursor:pointer;color:var(--muted);font-size:18px">&#x2715;</span>
+      </div>
+
+      <label style="font-size:11px;color:var(--muted)">NOME DO PROJETO</label>
+      <input type="text" id="pe-nome"
+             style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px">
+
+      <label style="font-size:11px;color:var(--muted)">CLIENTE</label>
+      <input type="hidden" id="pe-cli-id">
+      <div style="position:relative;margin:2px 0 12px">
+        <input type="text" id="pe-cli-busca" placeholder="Buscar cliente por nome ou CPF..." autocomplete="off"
+               oninput="peBuscarCliente(this.value)"
+               style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px">
+        <div id="pe-cli-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;z-index:410;max-height:180px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.4)"></div>
+      </div>
+
+      <label style="font-size:11px;color:var(--muted)">ESPECIFICADOR (PARCEIRO)</label>
+      <input type="hidden" id="pe-par-id">
+      <div style="position:relative;margin:2px 0 4px">
+        <input type="text" id="pe-par-busca" placeholder="Buscar parceiro... (vazio = sem especificador)" autocomplete="off"
+               oninput="peBuscarParceiro(this.value)"
+               style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px">
+        <div id="pe-par-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;z-index:410;max-height:180px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.4)"></div>
+      </div>
+      <div style="text-align:right;margin-bottom:12px"><span onclick="peRemoverParceiro()" style="font-size:11px;color:var(--muted);cursor:pointer">remover especificador</span></div>
+
+      <div id="pe-consultor-wrap" style="display:none">
+        <label style="font-size:11px;color:var(--muted)">CONSULTOR RESPONSÁVEL</label>
+        <select id="pe-consultor"
+                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px"></select>
+      </div>
+
+      <div id="pe-status" style="font-size:11px;color:var(--muted);min-height:14px;margin:2px 0 10px"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="projEditarFechar()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="projEditarSalvar()">Salvar</button>
+      </div>
+    </div>
   </div>
 
   <!-- Modal: Cadastro / Edição de Parceiro -->
@@ -2154,6 +2205,7 @@ async function carregarUsuarioAutenticado(){
         || _usuarioAtual.pode_gerir_redes || _usuarioAtual.pode_gerir_lojas)) ? '' : 'none';
     _aplicarModulosNoMenu();
     sbNavRender();               // monta o acordeão dos módulos (usa _usuarioAtual.hub)
+    carregarConsultores();       // seletor de consultor (criação/edição); só gerente+ atribui
     _atualizarUIUsuario();
     _carregarDadosExtrasUsuario();
     _aterrissarPorPapel();
@@ -2638,7 +2690,7 @@ function renderProjResultados(lista){
         <th style="width:130px">Consultor</th>
         <th style="width:110px;text-align:center">Especificador</th>
         <th style="width:140px;text-align:right">Último Orçamento</th>
-        <th style="width:70px"></th>
+        <th style="width:150px"></th>
       </tr></thead>
       <tbody>${lista.map(p=>`
         <tr class="proj-row" ondblclick="abrirProjeto('${esc(p.nome_safe||'')}')">
@@ -2660,7 +2712,9 @@ function renderProjResultados(lista){
               ? `<span title="${esc(p.parceiro_nome)}" style="color:var(--ok);cursor:help">Sim</span>`
               : `<span style="color:var(--muted)">Não</span>`}</td>
           <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt(p.ultimo_orcamento_valor)}</td>
-          <td style="text-align:center">
+          <td style="text-align:right;white-space:nowrap">
+            <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();projEditarAbrir('${esc(p.nome_safe||'')}')"
+                    style="font-size:11px;padding:3px 9px;margin-right:4px">Editar</button>
             <button class="btn btn-ghost btn-sm" onclick="abrirProjeto('${esc(p.nome_safe||'')}')"
                     style="font-size:11px;padding:3px 10px">Abrir &#x2192;</button>
           </td>
@@ -3229,12 +3283,15 @@ async function criarProjeto(){
   st.textContent = 'Criando...'; st.style.color = 'var(--muted)';
   try{
     const parceiroId = document.getElementById('novo-proj-parceiro-id').value.trim();
+    const consSel = document.getElementById('novo-proj-consultor');
+    const consId  = (_podeAtribuirConsultor && consSel && consSel.value) ? parseInt(consSel.value) : null;
     const r = await fetch('/projetos/novo', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         nome_projeto: nome,
         cliente_id:   parseInt(clienteId),
-        parceiro_id:  parceiroId ? parseInt(parceiroId) : null
+        parceiro_id:  parceiroId ? parseInt(parceiroId) : null,
+        consultor_id: consId
       })
     });
     const d = await r.json();
@@ -3258,6 +3315,141 @@ async function criarProjeto(){
     await carregarOrcamentos();
     // Briefing obrigatório por-projeto: abre o briefing deste projeto antes de negociar.
     abrirBriefingProjeto(projetoAtivo.nome_safe, (projetoAtivo.cliente||{}).nome || projetoAtivo.nome_projeto || '');
+  }catch(e){ st.textContent = 'Erro: '+e; st.style.color = 'var(--err)'; }
+}
+
+// ── Consultor responsável: seletor na criação/edição (só gerente+ atribui) ──────────────────
+let _consultoresCache = null, _podeAtribuirConsultor = false;
+async function carregarConsultores(){
+  try{
+    const r = await fetch('/api/projetos/consultores', {credentials:'same-origin'});
+    const d = await r.json();
+    if(d && d.ok){ _consultoresCache = d.consultores || []; _podeAtribuirConsultor = !!d.pode_atribuir; }
+  }catch(e){ _consultoresCache = []; }
+  _aplicarConsultorNoFormNovo();
+}
+function _optsConsultores(selId){
+  return (_consultoresCache||[]).map(u =>
+    `<option value="${u.id}"${String(u.id)===String(selId)?' selected':''}>${esc(u.nome)}</option>`).join('');
+}
+function _aplicarConsultorNoFormNovo(){
+  const wrap = document.getElementById('np-consultor-wrap');
+  const sel  = document.getElementById('novo-proj-consultor');
+  if(!wrap || !sel) return;
+  if(!_podeAtribuirConsultor){ wrap.style.display = 'none'; return; }   // consultor cria sempre p/ si
+  const meu = (_usuarioAtual && _usuarioAtual.id) || '';
+  sel.innerHTML = _optsConsultores(meu);   // default = próprio usuário; pode trocar
+  wrap.style.display = '';
+}
+
+// ── Editar campos de criação do projeto (nome, cliente, parceiro, consultor) ────────────────
+let _peNomeSafe = null, _peOrig = {}, _peBuscaTimer = null;
+function projEditarAbrir(nomeSafe){
+  const p = (_projListaBase||[]).find(x => x.nome_safe === nomeSafe) || {nome_safe:nomeSafe};
+  _peNomeSafe = nomeSafe;
+  _peOrig = {
+    nome: p.nome_projeto || '',
+    cliente_id:   p.cliente_id != null ? p.cliente_id : null,
+    parceiro_id:  p.parceiro_id != null ? p.parceiro_id : null,
+    consultor_id: p.consultor_id != null ? p.consultor_id : null,
+  };
+  document.getElementById('pe-nome').value = p.nome_projeto || '';
+  document.getElementById('pe-cli-id').value = p.cliente_id != null ? p.cliente_id : '';
+  document.getElementById('pe-cli-busca').value = p.cliente_nome || '';
+  document.getElementById('pe-cli-dd').style.display = 'none';
+  document.getElementById('pe-par-id').value = p.parceiro_id != null ? p.parceiro_id : '';
+  document.getElementById('pe-par-busca').value = p.parceiro_nome || '';
+  document.getElementById('pe-par-dd').style.display = 'none';
+  const cw = document.getElementById('pe-consultor-wrap');
+  if(_podeAtribuirConsultor){
+    document.getElementById('pe-consultor').innerHTML = _optsConsultores(p.consultor_id);
+    cw.style.display = '';
+  } else { cw.style.display = 'none'; }
+  document.getElementById('pe-status').textContent = '';
+  document.getElementById('modal-proj-editar').style.display = 'flex';
+}
+function projEditarFechar(){ document.getElementById('modal-proj-editar').style.display = 'none'; }
+
+function peBuscarCliente(q){
+  document.getElementById('pe-cli-id').value = '';
+  clearTimeout(_peBuscaTimer);
+  const dd = document.getElementById('pe-cli-dd');
+  if(!q || q.length < 2){ dd.style.display='none'; return; }
+  _peBuscaTimer = setTimeout(async () => {
+    try{
+      const r = await fetch('/api/clientes?q='+encodeURIComponent(q), {credentials:'same-origin'});
+      const lista = (await r.json()).clientes || [];
+      dd.innerHTML = lista.length ? lista.map(c =>
+        `<div onclick="peSelCliente(${c.id},'${esc(c.nome)}')"
+              style="padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
+              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+          <span style="font-weight:600">${esc(c.nome)}</span>${c.cpf?`<span style="color:var(--muted);margin-left:8px">${esc(c.cpf)}</span>`:''}
+        </div>`).join('') : '<div style="padding:9px 12px;font-size:11px;color:var(--muted)">Nenhum cliente.</div>';
+      dd.style.display = 'block';
+    }catch(e){}
+  }, 300);
+}
+function peSelCliente(id, nome){
+  document.getElementById('pe-cli-id').value = id;
+  document.getElementById('pe-cli-busca').value = nome;
+  document.getElementById('pe-cli-dd').style.display = 'none';
+}
+function peBuscarParceiro(q){
+  document.getElementById('pe-par-id').value = '';
+  clearTimeout(_peBuscaTimer);
+  const dd = document.getElementById('pe-par-dd');
+  if(!q || q.length < 2){ dd.style.display='none'; return; }
+  _peBuscaTimer = setTimeout(async () => {
+    try{
+      const r = await fetch('/api/parceiros?q='+encodeURIComponent(q), {credentials:'same-origin'});
+      const lista = (await r.json()).parceiros || [];
+      dd.innerHTML = lista.length ? lista.map(p =>
+        `<div onclick="peSelParceiro(${p.id},'${esc(p.nome)}')"
+              style="padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
+              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+          <span style="font-weight:600">${esc(p.nome)}</span>${p.tipo?`<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(p.tipo)}</span>`:''}
+        </div>`).join('') : '<div style="padding:9px 12px;font-size:11px;color:var(--muted)">Nenhum parceiro.</div>';
+      dd.style.display = 'block';
+    }catch(e){}
+  }, 300);
+}
+function peSelParceiro(id, nome){
+  document.getElementById('pe-par-id').value = id;
+  document.getElementById('pe-par-busca').value = nome;
+  document.getElementById('pe-par-dd').style.display = 'none';
+}
+function peRemoverParceiro(){
+  document.getElementById('pe-par-id').value = '';
+  document.getElementById('pe-par-busca').value = '';
+  document.getElementById('pe-par-dd').style.display = 'none';
+}
+async function projEditarSalvar(){
+  const st = document.getElementById('pe-status');
+  const payload = {};
+  const nome = document.getElementById('pe-nome').value.trim();
+  if(nome && nome !== _peOrig.nome) payload.nome_projeto = nome;
+  const cid = document.getElementById('pe-cli-id').value.trim();
+  if(cid && parseInt(cid) !== _peOrig.cliente_id) payload.cliente_id = parseInt(cid);
+  const pidRaw = document.getElementById('pe-par-id').value.trim();
+  const pidVal = pidRaw ? parseInt(pidRaw) : null;
+  if(pidVal !== _peOrig.parceiro_id) payload.parceiro_id = pidVal;
+  const consSel = document.getElementById('pe-consultor');
+  if(_podeAtribuirConsultor && consSel){
+    const cv = consSel.value ? parseInt(consSel.value) : null;
+    if(cv !== _peOrig.consultor_id) payload.consultor_id = cv;
+  }
+  if(!Object.keys(payload).length){ projEditarFechar(); return; }
+  st.textContent = 'Salvando...'; st.style.color = 'var(--muted)';
+  try{
+    const r = await fetch('/api/projetos/'+encodeURIComponent(_peNomeSafe)+'/editar', {
+      method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin',
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if(!d.ok){ st.textContent = 'Erro: '+(d.erro||'falha'); st.style.color = 'var(--err)'; return; }
+    projEditarFechar();
+    showToast('Projeto atualizado!', false);
+    projCarregar();
   }catch(e){ st.textContent = 'Erro: '+e; st.style.color = 'var(--err)'; }
 }
 
