@@ -129,6 +129,12 @@ input:focus{border-color:var(--accent)}
 .proj-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
 .proj-card-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 18px;cursor:pointer;transition:.15s;margin-bottom:8px}
 .proj-card-item:hover{border-color:var(--accent);background:var(--accent-tint)}
+/* Seletor de Status (Diagramacao_v6 §1.5): aparência de badge + chevron, cor do token --st-* atual.
+   Distinto de badge (só leitura) e de botão (ação). Cor/fundo setados por JS conforme o estado. */
+.status-selector{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-sans);font-weight:600;
+  font-size:11px;padding:6px 12px;border-radius:20px;border:none;cursor:pointer;transition:all .15s;line-height:1;
+  background:var(--surface-2);color:var(--muted);box-shadow:var(--shadow)}
+.status-selector:hover{filter:brightness(1.08)}
 .proj-card-nome{font-family:var(--font-sans);font-weight:700;font-size:14px;color:var(--text);margin-bottom:4px}
 .proj-card-cli{font-size:11px;color:var(--muted);margin-bottom:6px}
 .proj-card-meta{display:flex;gap:12px;font-size:10px;color:var(--muted)}
@@ -782,8 +788,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <div style="position:relative">
-          <button class="btn btn-ghost btn-sm" id="neg-status-btn"
-                  onclick="negStatusClick(event)" style="font-size:11px;min-width:90px">
+          <button class="status-selector" id="neg-status-btn"
+                  onclick="negStatusClick(event)" style="min-width:92px">
             — Status &#9660;
           </button>
           <div class="proj-status-dd" id="neg-status-dd" style="right:0;left:auto">
@@ -794,9 +800,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           </div>
         </div>
         <button id="btn-params" class="btn btn-ghost btn-sm" onclick="abrirModalParams()">&#x2699; Parametros</button>
-        <button id="btn-abrir-ciclo" class="btn-ciclo" onclick="abrirCiclo()" title="Etapas do Projeto">
-          Etapas do Projeto
-        </button>
+        <button id="btn-abrir-ciclo" class="btn btn-ghost btn-sm" onclick="abrirCiclo()" title="Etapas do Projeto">Etapas do Projeto</button>
       </div>
     </div>
 
@@ -817,29 +821,29 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
     <!-- Linha Bruto → Desconto → à Vista → Contrato Parcelado -->
     <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:8px;align-items:center;margin-bottom:16px">
-      <div style="background:#162016;border:0.5px solid #2a3a2a;border-radius:8px;padding:12px 14px">
-        <div style="font-size:9px;color:#4d7a4d;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Valor Bruto</div>
-        <div style="font-size:19px;font-weight:500;color:#9FE1CB" id="neg-subtotal">R$ 0,00</div>
+      <div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:8px;padding:12px 14px">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Valor Bruto</div>
+        <div style="font-size:19px;font-weight:500;color:var(--text)" id="neg-subtotal">R$ 0,00</div>
       </div>
-      <div style="text-align:center;color:#4d7a4d;font-size:16px">&#x2192;</div>
-      <div style="background:#162016;border:0.5px solid #2a3a2a;border-radius:8px;padding:12px 14px">
-        <div style="font-size:9px;color:#4d7a4d;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Desconto</div>
-        <div style="font-size:19px;font-weight:500;color:#F0997B" id="neg-desc-val">- R$ 0,00</div>
+      <div style="text-align:center;color:var(--muted);font-size:16px">&#x2192;</div>
+      <div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:8px;padding:12px 14px">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Desconto</div>
+        <div style="font-size:19px;font-weight:500;color:var(--err)" id="neg-desc-val">- R$ 0,00</div>
       </div>
-      <div style="text-align:center;color:#4d7a4d;font-size:16px">&#x2192;</div>
-      <div style="background:#04342C;border:0.5px solid #0F6E56;border-radius:8px;padding:12px 14px">
-        <div style="font-size:9px;color:#5DCAA5;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Valor à Vista</div>
-        <div style="font-size:19px;font-weight:500;color:#9FE1CB" id="neg-avista">R$ 0,00</div>
+      <div style="text-align:center;color:var(--muted);font-size:16px">&#x2192;</div>
+      <div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:8px;padding:12px 14px">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Valor à Vista</div>
+        <div style="font-size:19px;font-weight:500;color:var(--accent)" id="neg-avista">R$ 0,00</div>
       </div>
-      <div id="neg-parcelado-sep" style="text-align:center;color:#c8a84b;font-size:16px;display:none">&#x2192;</div>
-      <div id="neg-parcelado-cell" style="background:#1a1206;border:0.5px solid #6e5a0f;border-radius:8px;padding:12px 14px;display:none">
-        <div style="font-size:9px;color:#c8a84b;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Valor Total do Contrato <span style="text-transform:none;letter-spacing:0;opacity:.7">&#x270E;</span></div>
+      <div id="neg-parcelado-sep" style="text-align:center;color:var(--muted);font-size:16px;display:none">&#x2192;</div>
+      <div id="neg-parcelado-cell" style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:8px;padding:12px 14px;display:none">
+        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Valor Total do Contrato <span style="text-transform:none;letter-spacing:0;opacity:.7">&#x270E;</span></div>
         <input id="neg-parcelado" type="text" value="R$ 0,00" readonly
                title="Clique para editar — recalcula o desconto pelo valor"
                onclick="negValorTotalIniciarEdicao(this)"
                onblur="negValorTotalConfirmar(this.value)"
                onkeydown="if(event.key==='Enter'){this.blur();}else if(event.key==='Escape'){this._esc=true;this.blur();}"
-               style="font-size:19px;font-weight:500;color:#f0c84a;background:transparent;border:none;border-radius:6px;width:100%;padding:0;outline:none;cursor:pointer;font-family:inherit">
+               style="font-size:19px;font-weight:500;color:var(--text);background:transparent;border:none;border-radius:6px;width:100%;padding:0;outline:none;cursor:pointer;font-family:inherit">
       </div>
     </div>
     <span id="neg-desc-pct-lbl" style="display:none">0</span>
@@ -3075,13 +3079,16 @@ function negAtualizarStatusBtn(){
   const labels = { quente:'🔥 Quente', morno:'● Morno', frio:'❄ Frio',
                    convertido:'✓ Convertido', perdido:'✗ Perdido', fechado:'🔒 Fechado' };
   btn.textContent = (s && labels[s] ? labels[s] : '— Status') + ' ▾';
-  btn.style.color = s === 'quente' ? 'var(--st-quente)'
-                  : s === 'morno'  ? 'var(--st-morno)'
-                  : s === 'frio'   ? 'var(--st-frio)'
-                  : s === 'convertido' ? 'var(--st-convertido)'
-                  : s === 'perdido'    ? 'var(--st-perdido)'
-                  : s === 'fechado'    ? 'var(--st-fechado)'
-                  : '';
+  // Seletor de Status: fundo (tint) + texto no token do estado atual (ex. --st-fechado), theme-aware.
+  const tok = {quente:'--st-quente', morno:'--st-morno', frio:'--st-frio',
+               convertido:'--st-convertido', perdido:'--st-perdido', fechado:'--st-fechado'}[s];
+  if(tok){
+    btn.style.color = 'var(' + tok + ')';
+    btn.style.background = 'color-mix(in srgb, var(' + tok + ') 15%, transparent)';
+  } else {
+    btn.style.color = 'var(--muted)';
+    btn.style.background = 'var(--surface-2)';
+  }
   // Oculta dropdown se projeto bloqueado (convertido ou fechado)
   const dd = document.getElementById('neg-status-dd');
   if(dd) dd.style.display = (s === 'convertido' || s === 'fechado') ? 'none' : '';
@@ -4646,11 +4653,13 @@ async function atualizarAymore() {
   agendarSalvarPagamento();   // auto-save da modalidade → motor recalcula Val_Cont
 
   const tbody = document.getElementById('ay-parc-body');
+  // Tokens semânticos por tipo de linha (theme-aware via color-mix): Assinatura=neutro,
+  // Entrada=--warn (âmbar), 1a Parcela/Parcela=--accent. (Padrao_Design_Orizon_v4)
   const BADGE = {
-    contrato: ['#0d1e0d','var(--muted)','Assinatura'],
-    entrada:  ['rgba(239,159,39,.12)','var(--warn)','Entrada'],
-    primeira: ['rgba(93,202,165,.12)','var(--ok)','1a Parcela'],
-    parcela:  ['rgba(93,202,165,.08)','var(--ok)','Parcela'],
+    contrato: ['color-mix(in srgb, var(--muted) 8%, transparent)',   'var(--muted)',  'Assinatura'],
+    entrada:  ['color-mix(in srgb, var(--warn) 14%, transparent)',   'var(--warn)',   'Entrada'],
+    primeira: ['color-mix(in srgb, var(--accent) 14%, transparent)', 'var(--accent)', '1a Parcela'],
+    parcela:  ['color-mix(in srgb, var(--accent) 8%, transparent)',  'var(--accent)', 'Parcela'],
   };
   tbody.innerHTML = d.parcelas.map(p => {
     const [bg,color,label] = BADGE[p.tipo] || BADGE.parcela;
@@ -4661,7 +4670,7 @@ async function atualizarAymore() {
       : `<span style="color:var(--muted)">—</span>`;
     return `<tr style="background:${bg}">
       <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
-      <td style="padding:8px 12px"><span style="background:${bg};color:${color};border-radius:4px;padding:2px 8px;font-size:10px;border:1px solid ${color}40">${label}</span></td>
+      <td style="padding:8px 12px"><span style="background:${bg};color:${color};border-radius:4px;padding:2px 8px;font-size:10px;border:1px solid color-mix(in srgb, ${color} 35%, transparent)">${label}</span></td>
       <td style="padding:8px 12px;color:var(--muted);font-size:11px">${p.data}</td>
       <td style="padding:8px 12px;text-align:right">${valCell}</td>
     </tr>`;
@@ -4770,7 +4779,7 @@ async function atualizarCartao() {
     const numCell = p.num > 0 ? p.num : '—';
     return `<tr style="background:${bg}">
       <td style="padding:8px 12px;color:var(--muted);font-size:11px">${numCell}</td>
-      <td style="padding:8px 12px"><span style="background:${bg};color:${color};border-radius:4px;padding:2px 8px;font-size:10px;border:1px solid ${color}40">${label}</span></td>
+      <td style="padding:8px 12px"><span style="background:${bg};color:${color};border-radius:4px;padding:2px 8px;font-size:10px;border:1px solid color-mix(in srgb, ${color} 35%, transparent)">${label}</span></td>
       <td style="display:none">${esc(p.data)}</td>
       <td style="padding:8px 12px;text-align:right;font-weight:700;color:${valorReal?color:'var(--muted)'}">
         ${valorReal !== null ? 'R$ '+fmt(valorReal) : '—'}
@@ -4949,10 +4958,10 @@ async function atualizarVP() {
 function vpRenderTabela(d) {
   const limIso = document.getElementById('vp-data-limite').dataset.iso || '';
   const BADGE  = {
-    contrato: ['#0d1e0d',               'var(--muted)', 'Assinatura'],
-    entrada:  ['rgba(239,159,39,.12)',   'var(--warn)',  'Entrada'],
-    primeira: ['rgba(93,202,165,.12)',   'var(--ok)',    '1a Parcela'],
-    parcela:  ['rgba(93,202,165,.08)',   'var(--ok)',    'Parcela'],
+    contrato: ['color-mix(in srgb, var(--muted) 8%, transparent)',   'var(--muted)',  'Assinatura'],
+    entrada:  ['color-mix(in srgb, var(--warn) 14%, transparent)',   'var(--warn)',   'Entrada'],
+    primeira: ['color-mix(in srgb, var(--accent) 14%, transparent)', 'var(--accent)', '1a Parcela'],
+    parcela:  ['color-mix(in srgb, var(--accent) 8%, transparent)',  'var(--accent)', 'Parcela'],
   };
   const tbody = document.getElementById('vp-parc-body');
 
