@@ -1884,3 +1884,5 @@ I for tocado. **✅ v6 completa.**
 - (C1) '§2.4 Remover Clientes e Parceiros da sidebar': no build atual eles NÃO estavam como itens de topo da sidebar; agora existem só como submenu de Cadastro (caminho único ao dado), cumprindo a intenção.
 - (C1) Ordem do submenu de Cadastro: funcionais primeiro (Clientes, Parceiros) e depois os stubs (Fornecedores/Funcionários/Terceiros); o doc permite reordenar por frequência ('decisão de negócio').
 - (C1) Projetos segue como único Atalho; na page-0 realço o Atalho (nav-00), não o módulo Comercial, p/ evitar realce duplicado do mesmo destino.
+
+**Painel de Projetos — colunas Consultor e Especificador (lapidação):** a lista de projetos (`renderProjResultados`) ganhou duas colunas. **Consultor** = criador do projeto (`projetos_meta.criado_por_id`), resolvido no backend em `_enriquecer_projetos_com_status` (novo `consultor_id`/`consultor_nome` via `Usuario`). **Especificador** = 'Sim/Não' conforme houver parceiro cadastrado (`parceiro_nome`, já resolvido por `_enriquecer_projetos_com_parceiro`); no 'Sim' o nome do parceiro aparece no tooltip (atributo title). Teste e2e `test_lista_projetos_traz_consultor`.

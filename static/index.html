@@ -2635,6 +2635,8 @@ function renderProjResultados(lista){
         <th style="width:100px">Data</th>
         <th>Projeto</th>
         <th>Cliente</th>
+        <th style="width:130px">Consultor</th>
+        <th style="width:110px;text-align:center">Especificador</th>
         <th style="width:140px;text-align:right">Último Orçamento</th>
         <th style="width:70px"></th>
       </tr></thead>
@@ -2653,6 +2655,10 @@ function renderProjResultados(lista){
           <td>${fmtData(p.atualizado_em||p.criado_em||'')}</td>
           <td style="font-weight:600">${esc(p.nome_projeto||'—')}</td>
           <td style="color:var(--muted)">${esc(p.cliente_nome||'—')}</td>
+          <td style="color:var(--muted)">${esc(p.consultor_nome||'—')}</td>
+          <td style="text-align:center">${p.parceiro_nome
+              ? `<span title="${esc(p.parceiro_nome)}" style="color:var(--ok);cursor:help">Sim</span>`
+              : `<span style="color:var(--muted)">Não</span>`}</td>
           <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt(p.ultimo_orcamento_valor)}</td>
           <td style="text-align:center">
             <button class="btn btn-ghost btn-sm" onclick="abrirProjeto('${esc(p.nome_safe||'')}')"

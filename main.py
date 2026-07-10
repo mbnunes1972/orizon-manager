@@ -57,7 +57,7 @@ import mod_proposta
 from mod_qualidade_xml import avaliar_qualidade_xml
 
 def _enriquecer_projetos_com_status(projetos):
-    """Adiciona status e ultimo_orcamento_valor a cada projeto da lista."""
+    """Adiciona status, ultimo_orcamento_valor e o consultor (criador) a cada projeto da lista."""
     if not projetos:
         return
     nomes = [p['nome_safe'] for p in projetos if p.get('nome_safe')]
@@ -67,6 +67,11 @@ def _enriquecer_projetos_com_status(projetos):
     try:
         metas = db.query(Projeto).filter(Projeto.nome_safe.in_(nomes)).all()
         meta_map = {m.nome_safe: m for m in metas}
+
+        # Consultor = usuário que criou o projeto (projetos_meta.criado_por_id).
+        cons_ids = {m.criado_por_id for m in metas if getattr(m, "criado_por_id", None)}
+        cons_map = ({u.id: u.nome for u in db.query(Usuario).filter(Usuario.id.in_(cons_ids)).all()}
+                    if cons_ids else {})
 
         # Pega o orçamento mais recente por projeto (desempate por id desc)
         orc_map = {}
@@ -87,6 +92,9 @@ def _enriquecer_projetos_com_status(projetos):
             p['status_at']              = meta.status_at.isoformat() if meta and meta.status_at else None
             p['perdido_em']             = meta.perdido_em.isoformat() if meta and meta.perdido_em else None
             p['ultimo_orcamento_valor'] = orc_map.get(ns)
+            cpid = getattr(meta, "criado_por_id", None) if meta else None
+            p['consultor_id']           = cpid
+            p['consultor_nome']         = cons_map.get(cpid)
     finally:
         db.close()
 
