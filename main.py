@@ -1063,8 +1063,10 @@ class Handler(BaseHTTPRequestHandler):
                 loja = db.get(Loja, int(m.group(1)))
                 if not loja or not mod_tenancy.pode_ver_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                     self.send_json({"ok": False, "erro": "Loja fora do escopo"}, code=403); return
-                cfg = json.loads(loja.config_financeira_json) if loja.config_financeira_json \
-                    else mod_provisoes.config_financeira_default()
+                # Merge com o default preenche chaves novas (ex.: cronograma_padrao, v11) em lojas
+                # cujo config foi salvo antes da chave existir — sem apagar valores já configurados.
+                _stored = json.loads(loja.config_financeira_json) if loja.config_financeira_json else {}
+                cfg = {**mod_provisoes.config_financeira_default(), **_stored}
                 self.send_json({"ok": True, "config": cfg})
             finally:
                 db.close()
@@ -6699,7 +6701,9 @@ def _cfg_financeira_loja(db, loja_id):
     loja = db.get(Loja, loja_id) if loja_id else None
     if loja and loja.config_financeira_json:
         try:
-            return json.loads(loja.config_financeira_json)
+            # Merge com o default preenche chaves novas (ex.: cronograma_padrao, v11) em configs
+            # salvos antes da chave existir — o gatilho da assinatura usa esta função.
+            return {**mod_provisoes.config_financeira_default(), **json.loads(loja.config_financeira_json)}
         except Exception:
             pass
     return mod_provisoes.config_financeira_default()

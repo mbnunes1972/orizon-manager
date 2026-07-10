@@ -1757,13 +1757,37 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin:12px 0 16px;flex-wrap:wrap">
       <button class="home-tab ativo" id="cfg-tab-provisoes"  onclick="cfgTab('provisoes')">Provisões</button>
       <button class="home-tab"       id="cfg-tab-comissao"   onclick="cfgTab('comissao')">Comissão de Vendas</button>
+      <button class="home-tab"       id="cfg-tab-cronograma" onclick="cfgTab('cronograma')">Cronograma</button>
       <button class="home-tab"       id="cfg-tab-funcoes"    onclick="cfgTab('funcoes')">Funções</button>
       <button class="home-tab"       id="cfg-tab-documentos" onclick="cfgTab('documentos')">Documentos</button>
     </div>
     <div id="cfg-panel-provisoes"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     <div id="cfg-panel-comissao" style="display:none"></div>
+    <div id="cfg-panel-cronograma" style="display:none"></div>
     <div id="cfg-panel-funcoes" style="display:none"></div>
     <div id="cfg-panel-documentos" style="display:none"></div>
+  </div>
+
+  <!-- Modal: editar data prevista de conclusão (Cronograma do Ciclo, v11) — reautenticação Gerente+ -->
+  <div id="modal-crono" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:26px;max-width:400px;width:92%;animation:mIn .18s ease">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-family:var(--font-sans);font-weight:900;font-size:15px">Editar data prevista — etapa <span id="crono-etapa-cod"></span></div>
+        <span onclick="cronoFechar()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Alteração de prazo exige reautenticação (Gerente+) e fica registrada na auditoria (quem, quando, valor antigo → novo).</div>
+      <label style="font-size:11px;color:var(--muted)">Nova data prevista</label>
+      <input type="date" id="crono-nova-data" style="width:160px;box-sizing:border-box;margin-bottom:12px">
+      <label style="font-size:11px;color:var(--muted)">Login</label>
+      <input type="text" id="crono-login" style="width:100%;box-sizing:border-box;margin-bottom:10px">
+      <label style="font-size:11px;color:var(--muted)">Confirme sua senha</label>
+      <input type="password" id="crono-senha" onkeydown="if(event.key==='Enter')cronoSalvar()" style="width:100%;box-sizing:border-box">
+      <div id="crono-erro" style="font-size:11px;min-height:16px;margin:8px 0"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-sm" onclick="cronoFechar()" style="flex:1;justify-content:center">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="cronoSalvar()" style="flex:1;justify-content:center">Autorizar e salvar</button>
+      </div>
+    </div>
   </div>
 
 </main>
@@ -2530,7 +2554,7 @@ let _cfgTabAtual = 'provisoes';
 function cfgRender(){ cfgTab(_cfgTabAtual || 'provisoes'); }
 function cfgTab(qual){
   _cfgTabAtual = qual;
-  ['provisoes','comissao','funcoes','documentos'].forEach(q => {
+  ['provisoes','comissao','cronograma','funcoes','documentos'].forEach(q => {
     const tab = document.getElementById('cfg-tab-'+q);
     const panel = document.getElementById('cfg-panel-'+q);
     if(tab) tab.classList.toggle('ativo', q===qual);
@@ -2538,8 +2562,42 @@ function cfgTab(qual){
   });
   if(qual==='provisoes')  adminFinanceiroCarregar();   // % das provisões (montagem/assist/garantia/comissão)
   if(qual==='comissao')   cfgComissaoRender();
+  if(qual==='cronograma') cfgCronogramaRender();
   if(qual==='funcoes')    cfgFuncoesRender();
   if(qual==='documentos') cfgDocumentosRender();
+}
+// ── Config → Cronograma de Projeto Padrão (Modulos_Orizon_v11): prazo em dias/etapa a partir de D0 ──
+async function cfgCronogramaRender(){
+  const box = document.getElementById('cfg-panel-cronograma'); if(!box) return;
+  const lid = (_adminNav && _adminNav.loja && _adminNav.loja.id) || (_usuarioAtual && _usuarioAtual.loja_id);
+  if(!lid){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Loja não identificada.</em>'; return; }
+  box.innerHTML='<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {credentials:'same-origin'});
+  if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Sem acesso.</em>'; return; }
+  _cfgFin = (await r.json().catch(()=>({}))).config || {};
+  const fases = _cfgFin.cronograma_padrao || [];
+  const nome = c => { const e = ETAPAS_CICLO.find(x=>x.codigo===c); return e ? e.nome : ('Etapa '+c); };
+  const linhas = fases.map(f =>
+     '<tr class="proj-row"><td style="padding:8px 12px;color:var(--muted);width:56px">'+esc(f.codigo)+'</td>'
+    +'<td style="padding:8px 12px;color:var(--text)">'+esc(nome(f.codigo))+'</td>'
+    +'<td style="padding:8px 12px;text-align:right"><input type="number" min="0" step="1" id="crono-prazo-'+esc(f.codigo)+'" value="'+(parseInt(f.prazo_dias,10)||0)+'" style="width:90px;box-sizing:border-box;text-align:right"> <span style="font-size:11px;color:var(--muted)">dias</span></td></tr>'
+  ).join('') || '<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma fase configurada.</td></tr>';
+  box.innerHTML =
+     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:680px">Prazo (dias) de cada etapa a partir de <strong style="color:var(--text)">D0 = assinatura do contrato</strong>. Na assinatura, cada etapa do projeto recebe <strong style="color:var(--text)">data prevista = D0 + prazo</strong>.</div>'
+    +'<table class="proj-table" style="max-width:680px"><thead><tr><th>Etapa</th><th>Fase</th><th style="text-align:right;width:150px">Prazo (D0 + dias)</th></tr></thead><tbody>'+linhas+'</tbody></table>'
+    +'<div style="margin-top:14px"><button class="btn btn-primary btn-sm" onclick="cfgCronogramaSalvar('+lid+')">Salvar cronograma padrão</button></div>';
+}
+async function cfgCronogramaSalvar(lid){
+  const fases = (_cfgFin.cronograma_padrao || []).map(f => ({
+    codigo: f.codigo,
+    prazo_dias: parseInt((document.getElementById('crono-prazo-'+f.codigo)||{}).value, 10) || 0,
+  }));
+  _cfgFin.cronograma_padrao = fases;
+  const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {method:'PUT', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(_cfgFin)});
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+  showToast('Cronograma padrão salvo.', false);
 }
 // ── Config → Tabela de Funções (Modulos_Orizon_v10): catálogo usado por Funcionário/Terceiro ──
 let _cfgFuncoesItens = [];
@@ -9762,14 +9820,18 @@ function renderCiclo() {
       ? ' <span style="font-size:11px;color:var(--muted);font-style:italic">(aguardando assinatura)</span>' : '';
     // Para etapa 11 (pai do PE) mostrar indicador de progresso das subfases
     const peProgressLabel = (etapa.codigo === '11') ? _renderEtapa11Progress() : '';
+    // Cronograma do Ciclo (Modulos_Orizon_v11): data prevista (D0+prazo) e data de conclusão.
+    // Prevista editável só por Gerente+ (reautenticação) — a opção nem aparece p/ os demais.
+    const cronoLabel = _cronoLabelEtapa(etapa.codigo, dados);
     const indent = etapa.sub ? 'margin-left:24px;' : '';
     const card   = document.createElement('div');
     card.className = 'ciclo-card';
     card.style.cssText = indent;
     card.innerHTML = `
-      <div class="ciclo-card-header"${bloqueada ? '' : ` onclick="toggleCicloCard('${etapa.codigo}')"`}>
+      <div class="ciclo-card-header" onclick="toggleCicloCard('${etapa.codigo}')">
         ${indConcl}
         <span class="etapa-nome">${etapa.nome}${andamentoLabel}${peProgressLabel}</span>
+        ${cronoLabel}
       </div>
       <div class="ciclo-card-body" id="ciclo-body-${etapa.codigo}">
         ${etapa.acao === 'contrato'
@@ -9809,6 +9871,60 @@ function toggleCicloCard(codigo) {
   if (codigo === '7' && body && body.classList.contains('aberto')) {
     carregarDadosContrato();
   }
+}
+
+// ── Cronograma do Ciclo (Modulos_Orizon_v11): datas prevista/conclusão + edição reautenticada ──
+// Níveis que podem autorizar (= perfis.pode(nivel,"autorizar") no backend). Gerente+.
+const _NIVEIS_AUTORIZAR = new Set(["diretor", "gerente_vendas"]);
+function _podeAutorizarFront() {
+  return _NIVEIS_AUTORIZAR.has((_usuarioAtual && _usuarioAtual.nivel) || '');
+}
+function _fmtDataBR(s) {
+  if (!s) return '';
+  const d = new Date(s);
+  return isNaN(d) ? '' : d.toLocaleDateString('pt-BR');
+}
+function _cronoLabelEtapa(codigo, dados) {
+  const prev = _fmtDataBR(dados.data_prevista_conclusao);
+  const conc = _fmtDataBR(dados.data_conclusao);
+  if (!prev && !conc) return '';
+  const parts = [];
+  if (prev) {
+    const editar = _podeAutorizarFront()
+      ? ` <i class="ti ti-pencil" title="Editar data prevista (requer reautenticação)" style="cursor:pointer;font-size:12px;color:var(--muted)" onclick="event.stopPropagation();cronoAbrirEdicao('${codigo}','${dados.data_prevista_conclusao || ''}')"></i>`
+      : '';
+    parts.push(`<span title="Data prevista de conclusão"><i class="ti ti-calendar-event" style="font-size:11px"></i> ${prev}${editar}</span>`);
+  }
+  if (conc) parts.push(`<span style="color:var(--accent)" title="Concluída em"><i class="ti ti-check" style="font-size:11px"></i> ${conc}</span>`);
+  return `<span class="ciclo-crono" style="margin-left:auto;display:inline-flex;gap:12px;font-size:11px;color:var(--muted);align-items:center">${parts.join('')}</span>`;
+}
+
+let _cronoEtapa = null;
+function cronoAbrirEdicao(codigo, isoPrev) {
+  _cronoEtapa = codigo;
+  document.getElementById('crono-etapa-cod').textContent = codigo;
+  document.getElementById('crono-nova-data').value = (isoPrev || '').slice(0, 10);
+  document.getElementById('crono-login').value = (_usuarioAtual && _usuarioAtual.login) || '';
+  document.getElementById('crono-senha').value = '';
+  document.getElementById('crono-erro').textContent = '';
+  document.getElementById('modal-crono').style.display = 'flex';
+  setTimeout(() => document.getElementById('crono-senha').focus(), 60);
+}
+function cronoFechar() { document.getElementById('modal-crono').style.display = 'none'; }
+async function cronoSalvar() {
+  const cod = _cronoEtapa, st = document.getElementById('crono-erro');
+  const data_prevista = document.getElementById('crono-nova-data').value;
+  const login = document.getElementById('crono-login').value.trim();
+  const senha = document.getElementById('crono-senha').value;
+  if (!data_prevista) { st.textContent = 'Informe a nova data prevista.'; st.style.color = 'var(--err)'; return; }
+  if (!senha) { st.textContent = 'Confirme sua senha para autorizar.'; st.style.color = 'var(--err)'; return; }
+  st.textContent = 'Salvando…'; st.style.color = 'var(--muted)';
+  const url = `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${cod}/data-prevista`;
+  const d = await (await fetch(url, { method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ login, senha, data_prevista }) })).json().catch(() => ({}));
+  if (!d.ok) { st.textContent = 'Erro: ' + (d.erro || 'falha'); st.style.color = 'var(--err)'; return; }
+  cronoFechar(); showToast('Data prevista atualizada.', false); carregarCiclo();
 }
 
 function _renderCardGenerico(etapa, dados, bloqueada) {
