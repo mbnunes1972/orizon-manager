@@ -3123,6 +3123,7 @@ const _CAD_LABELS = {
   tipo_servico:{montador:'Montador',outros:'Outros serviços'},
 };
 let _cadEntAtual = null, _cadEntId = null, _cadListaAtual = [], _cadFiltro = {q:'', status:''}, _cadBuscaTimer = null;
+let _perfisAcessoOps = [];   // [{slug, rotulo}] do backend (perfis.py, fonte única) — dropdown de acesso do Funcionário
 
 async function cadEntCarregar(ent){
   const box = document.getElementById('cad-panel-'+ent); if(!box) return;
@@ -3132,6 +3133,7 @@ async function cadEntCarregar(ent){
   if(_cadFiltro.status) params.set('status', _cadFiltro.status);
   const d = await (await fetch('/api/'+ent+(params.toString()?('?'+params):''), {credentials:'same-origin'})).json().catch(()=>({}));
   if(!d.ok){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Falha ao carregar.</em>'; return; }
+  if(d.meta && Array.isArray(d.meta.perfis_acesso)) _perfisAcessoOps = d.meta.perfis_acesso;
   _cadListaAtual = d.itens;
   const linhas = d.itens.map(it => {
     const cels = def.colunas.map(([k]) => {
@@ -3206,7 +3208,7 @@ function cadEntRender(item){
       +'<div id="cadf-acesso-box" style="display:'+(ac.tem_acesso?'grid':'none')+';grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:10px">'
       +'<div style="grid-column:1/-1"><label style="font-size:11px;color:var(--muted)">E-mail de login</label><input type="text" id="cadf-acesso-email" value="'+esc(ac.email||item.email||'')+'" style="'+S+'"></div>'
       +'<div><label style="font-size:11px;color:var(--muted)">Perfil de Usuário</label><select id="cadf-acesso-perfil" style="'+S+'">'
-      + [['consultor','Consultor'],['gerente','Gerente'],['diretor','Diretor']].map(([v,l])=>'<option value="'+v+'"'+(ac.perfil===v?' selected':'')+'>'+l+'</option>').join('')+'</select></div>'
+      + (_perfisAcessoOps.length?_perfisAcessoOps:[{slug:'consultor',rotulo:'Consultor'}]).map(o=>'<option value="'+esc(o.slug)+'"'+(ac.perfil===o.slug?' selected':'')+'>'+esc(o.rotulo)+'</option>').join('')+'</select></div>'
       +'<div style="grid-column:1/-1;font-size:10px;color:var(--muted)">Cria/atualiza a conta de login (referência ao Admin). Conta nova entra com senha inicial = dígitos do CPF.</div>'
       +'</div></div>';
   }

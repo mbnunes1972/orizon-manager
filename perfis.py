@@ -34,6 +34,19 @@ def slugs():
     return list(PERFIS.keys())
 
 
+# Perfis (acesso) atribuíveis a um login de LOJA — exclui os de plataforma/rede. Fonte única do
+# "acesso" oferecido no cadastro de Funcionário (Regras_Funcoes_Perfis_Atribuicoes §8, frente irmã).
+_NAO_LOJA = frozenset({"super_admin", "admin_rede"})
+
+
+def slugs_loja():
+    return [s for s in PERFIS if s not in _NAO_LOJA]
+
+
+def opcoes_loja():
+    return [{"slug": s, "rotulo": PERFIS[s]["rotulo"]} for s in slugs_loja()]
+
+
 def rotulo(slug):
     return PERFIS.get(slug, _DEFAULT)["rotulo"]
 

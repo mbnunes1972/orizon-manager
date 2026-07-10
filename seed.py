@@ -6,7 +6,7 @@ Uso: python3 seed.py
 """
 
 import database
-from database import init_db, get_session, Usuario, loja_seed_id
+from database import init_db, get_session, Usuario, Funcao, loja_seed_id, FUNCOES_PADRAO
 
 USUARIOS = [
     {"nome": "Pedro da Mota",        "login": "pdm2026", "senha": "teste123", "nivel": "diretor"},
@@ -40,6 +40,22 @@ def criar_usuarios_seed(db, usuarios, loja_id):
     return criados
 
 
+def criar_funcoes_seed(db, loja_id):
+    """Semeia a Tabela de Funções da loja com os cargos padrão (Regras_Funcoes_Perfis §0b).
+    Idempotente por (loja_id, nome): pula os que já existem. Retorna o nº de funções criadas."""
+    if loja_id is None:
+        return 0
+    existentes = {f.nome for f in db.query(Funcao).filter_by(loja_id=loja_id).all()}
+    criadas = 0
+    for nome in FUNCOES_PADRAO:
+        if nome in existentes:
+            continue
+        db.add(Funcao(loja_id=loja_id, nome=nome, status="ativo"))
+        criadas += 1
+    db.commit()
+    return criadas
+
+
 def seed():
     init_db()                         # cria schema + tenancy_v1 (loja seed) + tenancy_v2 (super_admin)
     db = get_session()
@@ -56,8 +72,9 @@ def seed():
             print("  [aviso] loja seed nao encontrada; usuarios serao criados sem loja_id.")
         criados = criar_usuarios_seed(db, USUARIOS, loja_id)
         existentes = len(USUARIOS) - criados
+        funcoes = criar_funcoes_seed(db, loja_id)
         print(f"\n  OK: {criados} usuario(s) criado(s), {existentes} ja existia(m); "
-              f"loja seed id={loja_id}.")
+              f"{funcoes} funcao(oes) semeada(s); loja seed id={loja_id}.")
     finally:
         db.close()
 

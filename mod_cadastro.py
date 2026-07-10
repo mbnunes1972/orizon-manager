@@ -4,6 +4,7 @@ Fronteira obrigatória: Funcionário (RH) ≠ Usuário (conta de login, Admin/N�
 referência (Usuario.funcionario_id / Funcionario.usuario_id), NUNCA duplicando dado pessoal.
 """
 import re
+import perfis
 from database import Funcionario, Fornecedor, Terceiro, Usuario, Funcao
 
 # Sub-entidades reutilizáveis (Modulos_Orizon_v10): Endereço + Dados Bancários
@@ -23,7 +24,8 @@ def _serial_campos(obj, campos):
 REMUNERACAO_TIPOS = ("fixa", "fixa_variavel")
 FORN_CATEGORIAS   = ("materia_prima", "transportadora", "servicos", "outro")
 TERC_SERVICOS     = ("montador", "outros")
-PERFIS_ACESSO     = ("consultor", "gerente", "diretor")   # "Perfil de Usuário" (nivel)
+# "Perfil de Usuário" (nivel de acesso) do Funcionário: fonte única = perfis.py (aposenta o
+# 3-tuplo hardcoded que tinha o órfão "gerente"). Regras_Funcoes_Perfis_Atribuicoes §8.
 
 
 def _s(v):
@@ -103,7 +105,7 @@ def func_sync_acesso(db, f, req):
     perfil = _s(ac.get("perfil")) or "consultor"
     if not email:
         return False, "Informe o e-mail de acesso do funcionário."
-    if perfil not in PERFIS_ACESSO:
+    if perfil not in perfis.slugs_loja():
         return False, "Perfil de acesso inválido."
     # e-mail (login) não pode colidir com outro usuário
     conflito = (db.query(Usuario)
@@ -221,5 +223,5 @@ META = {
     "remuneracao_tipos": list(REMUNERACAO_TIPOS),
     "fornecedor_categorias": list(FORN_CATEGORIAS),
     "terceiro_servicos": list(TERC_SERVICOS),
-    "perfis_acesso": list(PERFIS_ACESSO),
+    "perfis_acesso": perfis.opcoes_loja(),   # [{slug, rotulo}] derivado de perfis.py
 }

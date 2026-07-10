@@ -4,6 +4,7 @@ Para migrar para nuvem: substituir apenas as funções storage_*() e session_*()
 """
 import os, json, re, hashlib, unicodedata
 import sys
+import perfis   # fonte única dos perfis de acesso (Regras_Funcoes_Perfis_Atribuicoes §8)
 
 # == CONSTANTES E CAMINHOS ==
 if getattr(sys, 'frozen', False):
@@ -120,16 +121,36 @@ PERFIS_PADRAO = {
     }
 }
 
+# Chaves legadas da UI (perfil "ativo" simulado) → slug real de perfis.py (fonte única). O legado
+# perfis_config.json deixa de ser fonte de verdade: as DEFINIÇÕES vêm de perfis.py; só o `perfil_ativo`
+# (estado de UI) é lido do arquivo, se existir. Sem senha embutida.
+_PERFIL_LEGADO_SLUG = {"consultor": "consultor", "gerente": "gerente_vendas", "diretoria": "diretor"}
+_PERFIL_LEGADO_COR  = {"consultor": "#19c9a0", "gerente": "#f0a500", "diretoria": "#e8611a"}
+
+
+def _perfis_derivado() -> dict:
+    out = {}
+    for leg, slug in _PERFIL_LEGADO_SLUG.items():
+        out[leg] = {
+            "nome":              perfis.rotulo(slug),
+            "desconto_max_pct":  perfis.desconto_max(slug),
+            "pode_editar_total": True,
+            "pode_ver_margens":  perfis.pode(slug, "ver_parametros"),
+            "cor":               _PERFIL_LEGADO_COR[leg],
+        }
+    return out
+
+
 def perfis_carregar() -> dict:
+    ativo = "consultor"
     if storage_existe(PERFIS_FILE):
-        dados = storage_ler_json(PERFIS_FILE)
-        # Merge com padrão para garantir que novos campos existam
-        for perfil, cfg in PERFIS_PADRAO["perfis"].items():
-            if perfil not in dados.get("perfis", {}):
-                dados.setdefault("perfis", {})[perfil] = cfg
-        return dados
-    storage_salvar_json(PERFIS_FILE, PERFIS_PADRAO)
-    return PERFIS_PADRAO.copy()
+        try:
+            ativo = (storage_ler_json(PERFIS_FILE) or {}).get("perfil_ativo", "consultor")
+        except Exception:
+            pass
+    if ativo not in _PERFIL_LEGADO_SLUG:
+        ativo = "consultor"
+    return {"perfil_ativo": ativo, "perfis": _perfis_derivado()}
 
 def perfis_salvar(dados: dict) -> None:
     storage_salvar_json(PERFIS_FILE, dados)

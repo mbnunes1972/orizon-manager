@@ -1110,6 +1110,14 @@ _SEED_SA_NOME  = "Administrador da Plataforma"
 _SEED_SA_LOGIN = "sad2026"
 _SEED_SA_SENHA = "trocar123"
 
+# Catálogo padrão da Tabela de Funções (Regras_Funcoes_Perfis_Atribuicoes §0b / §7). Cargos, não
+# perfis de acesso: os rótulos de cargo de perfis.py + "Montador" (Terceiro, sem perfil próprio).
+FUNCOES_PADRAO = [
+    "Consultor de Vendas", "Gerente de Vendas", "Gerente Administrativo/Financeiro", "Diretor",
+    "Assistente Logístico", "Conferente", "Supervisor de Montagem", "Assistente Administrativo",
+    "Projetista Executivo", "Medidor", "Montador",
+]
+
 def _tabela_existe(cur, nome):
     """True se a tabela existe (migração de tabela ausente é no-op — robusto a DBs parciais)."""
     cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (nome,))
@@ -1145,6 +1153,16 @@ def _run_migracoes(conn):
         cur.execute("UPDATE usuarios SET nivel='gerente_vendas' WHERE nivel='gerente'")
         cur.execute("UPDATE usuarios SET nivel='diretor'        WHERE nivel='admin'")
         cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v2_2026')")
+
+    # 2026-07-10: semeia a Tabela de Funções (Regras_Funcoes_Perfis §0b) nas lojas existentes,
+    # idempotente por (loja_id, nome). Backfill único; lojas novas semeiam na criação (follow-up).
+    if "funcoes_seed_v1" not in aplicadas and _tabela_existe(cur, "funcoes") and _tabela_existe(cur, "lojas"):
+        for (lid,) in cur.execute("SELECT id FROM lojas").fetchall():
+            existentes = {r[0] for r in cur.execute("SELECT nome FROM funcoes WHERE loja_id=?", (lid,)).fetchall()}
+            for nome in FUNCOES_PADRAO:
+                if nome not in existentes:
+                    cur.execute("INSERT INTO funcoes(loja_id, nome, status) VALUES(?,?,'ativo')", (lid, nome))
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('funcoes_seed_v1')")
 
     # 2026-06-20: F1 multi-tenant — loja seed (das constantes do contrato) + backfill.
     if "tenancy_v1_2026" not in aplicadas and _tabela_existe(cur, "lojas"):
