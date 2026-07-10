@@ -433,16 +433,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <aside class="sidebar">
   <!-- Navegação -->
   <nav class="sb-nav">
-    <div class="sb-nav-title">Módulos</div>
-    <div class="nav-item" id="nav-08" onclick="goPage(8)"><i class="ti ti-layout-grid"></i>Módulos</div>
-
     <div class="sb-secao">
       <div class="sb-nav-title">Atalhos</div>
       <div class="nav-item" id="nav-00" onclick="goPage(0)"><i class="ti ti-diamond"></i>Projetos</div>
     </div>
 
-    <!-- Acordeão dos 8 módulos de domínio, agrupados por faixa (Diagramacao_v4 §2). As seções de
-         cada módulo vivem AQUI (submenu indentado), nunca como tabs no conteúdo. Render: sbNavRender() -->
+    <!-- Lista PLANA dos módulos de domínio (Modulos_Orizon_v4): sem cabeçalho de faixa, todo módulo
+         clicável (os sem tela mostram "EM CONSTRUÇÃO"). As seções de cada módulo vivem AQUI. Render: sbNavRender() -->
     <div id="sb-modulos"></div>
 
     <div class="sb-secao">
@@ -787,11 +784,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     </div>
   </div>
 
-  <!-- PAGE 08: Hub de Modulos -->
+  <!-- PAGE 08: EM CONSTRUÇÃO (genérica — módulos sem tela ainda; Modulos_Orizon_v4) -->
   <div class="page" id="page-08">
-    <div class="page-title">Módulos</div>
-    <div class="page-sub" id="hub-sub">Selecione um módulo para começar.</div>
-    <div id="hub-grupos"></div>
+    <div class="page-title" id="emc-titulo">Em construção</div>
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:64px 20px;color:var(--muted);text-align:center">
+      <i class="ti ti-tools" style="font-size:52px;color:var(--muted);opacity:.7"></i>
+      <div style="font-size:16px;font-weight:600;color:var(--text)">🚧 Módulo em construção</div>
+      <div style="font-size:13px;max-width:420px">O módulo <strong id="emc-nome" style="color:var(--text)">—</strong> ainda não tem tela implementada. Está no mapa e será construído em breve.</div>
+    </div>
   </div>
 
   <!-- PAGE 02: Negociacao (novo layout) -->
@@ -2281,7 +2281,7 @@ function _aterrissarPorPapel(){
     goPage(7);
   }
   const ehAdmin = u.pode_gerir_redes || u.nivel === 'admin_rede';
-  if(!ehAdmin) goPage(8);   // operacional aterrissa no Hub de Módulos
+  if(!ehAdmin) goPage(0);   // Hub removido (Modulos_Orizon_v4): operacional aterrissa em Projetos
 }
 
 function _carregarDadosExtrasUsuario(){
@@ -2500,7 +2500,6 @@ function goPage(n){
   if(n===2 && projetoAtivo) carregarMargensSalvas();
   if(n===0) projCarregar();
   if(n===7){ adminCarregarConsole(); } // page-07: console
-  if(n===8) hubRender();
   if(n===9) cfgRenderizarPerfis();
   if(n===10) cadRender();
   if(n===11){ if(_adminNav) _adminNav.loja = null; adminFiscalCarregar(); }
@@ -2509,19 +2508,32 @@ function goPage(n){
   sbSyncActive(n);   // realça/expande o módulo correspondente no acordeão da sidebar
 }
 
-// Página -> módulo de domínio que ela representa (para realçar/expandir no acordeão).
+// Página -> módulo de domínio que ela representa (para realçar/expandir na sidebar).
 // page-00 (Projetos) fica com o Atalho, não realça o módulo Comercial (evita realce duplicado).
 const _PAGE_MODULO = {10:'cadastro', 11:'fiscal', 12:'financeiro', 13:'expedicao'};
 function sbSyncActive(n){
+  if(n===8) { sbNavRender(); return; }   // EM CONSTRUÇÃO: mantém o módulo clicado realçado (sbModuloClick já setou)
   const mod = _PAGE_MODULO[n] || null;
   if(mod){
     _sbModuloAberto = mod;
     const cfg = _SB_MODULOS[mod] || {};
     if(!(cfg.secoes && cfg.secoes.length)) _sbSecaoAtiva = null;  // módulo-folha: sem seção ativa
   } else {
-    _sbModuloAberto = null; _sbSecaoAtiva = null;   // Hub/Config/Admin/Projetos: nenhum módulo expandido
+    _sbModuloAberto = null; _sbSecaoAtiva = null;   // Config/Admin/Projetos: nenhum módulo realçado
   }
   sbNavRender();
+}
+
+// Rótulo do módulo (a partir do hub do usuário) + tela genérica "EM CONSTRUÇÃO".
+function _rotuloModulo(id){
+  const grupos = (_usuarioAtual && _usuarioAtual.hub) || [];
+  for(const g of grupos){ const m = (g.modulos||[]).find(x => x.id === id); if(m) return m.rotulo; }
+  return id;
+}
+function emConstrucao(rotulo){
+  const t = document.getElementById('emc-titulo'); if(t) t.textContent = rotulo || 'Em construção';
+  const n = document.getElementById('emc-nome');   if(n) n.textContent = rotulo || '—';
+  goPage(8);
 }
 
 // ── Expedição: Kanban de pedidos por etapa (Diagramacao_v2 §1.4) ─────────────
@@ -7529,7 +7541,8 @@ const _FIN_SECOES = [
   {id:'bal',     lbl:'Balanço',         ic:'scale',           load:()=>balancoCarregar()},
   {id:'proj',    lbl:'Margem/Projeto',  ic:'chart-dots',      load:()=>projDreCarregar()},
   {id:'recon',   lbl:'Reconciliação',   ic:'refresh',         load:()=>reconInit()},
-  {id:'repasse', lbl:'Repasse Fábrica', ic:'truck-delivery',  load:()=>repasseCarregar()},
+  // "Repasse Fábrica" saiu do Financeiro (Modulos_Orizon_v4/§6.2): migra p/ o módulo Assistências
+  // (filtro Loja/Fábrica/Paga nativo). O painel/endpoint segue existindo, só não é mais aba do submenu.
 ];
 let _finSecaoAtual = 'prov';
 
@@ -7539,8 +7552,10 @@ let _sbModuloAberto = null;   // id do módulo expandido (só um por vez)
 let _sbSecaoAtiva   = null;   // id da seção ativa dentro do módulo aberto
 
 // Config por módulo: ícone Tabler distinto + (opcional) seções do submenu. Sem `go` nem `secoes`
-// => módulo "em breve" (sem tela). Seções com `secoes` são folhas navegáveis (nível 3, sem sub-submenu).
+// => módulo sem tela -> clicar mostra "EM CONSTRUÇÃO" (Modulos_Orizon_v4). Seções com `secoes` são
+// folhas navegáveis (nível 3, sem sub-submenu).
 const _SB_MODULOS = {
+  captacao:   {ic:'target-arrow'},                        // NOVO — em construção
   cadastro:   {ic:'address-book', secoes:[
                  {id:'clientes',     lbl:'Clientes',     ic:'user',           go:()=>cadIr('clientes')},
                  {id:'parceiros',    lbl:'Parceiros',    ic:'users-group',    go:()=>cadIr('parceiros')},
@@ -7549,45 +7564,39 @@ const _SB_MODULOS = {
                  {id:'terceiros',    lbl:'Terceiros',    ic:'user-cog',       go:()=>cadIr('terceiros')},
               ]},
   comercial:  {ic:'shopping-cart', go:()=>goPage(0)},     // folha: abre Projetos
-  producao:   {ic:'tools'},                               // em breve
+  producao:   {ic:'ruler-measure'},                       // "Projetos" (PE/Medição) — em construção
   fiscal:     {ic:'file-invoice',  go:()=>goPage(11)},    // folha: Emitente/NF-e
-  estoque:    {ic:'packages'},                            // em breve
-  posvenda:   {ic:'lifebuoy'},                            // em breve
+  estoque:    {ic:'packages'},                            // em construção
   expedicao:  {ic:'truck',         go:()=>goPage(13)},    // folha: Kanban de expedição
+  montagem:   {ic:'hammer'},                              // NOVO — em construção
+  assistencias:{ic:'lifebuoy'},                           // NOVO — em construção (casos + repasse fábrica)
   financeiro: {ic:'cash', secoes: _FIN_SECOES.map(s => ({id:s.id, lbl:s.lbl, ic:s.ic, go:()=>finIrSecao(s.id)}))},
 };
-
-function _sbTemTela(cfg){ return !!(cfg && (cfg.go || (cfg.secoes && cfg.secoes.length))); }
 
 function sbNavRender(){
   const box = document.getElementById('sb-modulos');
   if(!box) return;
   const grupos = (_usuarioAtual && _usuarioAtual.hub) || null;
   if(!grupos){ box.innerHTML = ''; return; }      // sem info do hub -> nada (compat)
-  box.innerHTML = grupos.map(g => {
-    const linhas = g.modulos.map(m => {
-      const cfg = _SB_MODULOS[m.id] || {};
-      const ic  = cfg.ic || 'point';
-      const temTela = _sbTemTela(cfg);
-      const temSec  = !!(cfg.secoes && cfg.secoes.length);
-      const aberto  = _sbModuloAberto === m.id;
-      const cls = 'nav-item sb-mod' + (aberto ? ' active' : '') + (temTela ? '' : ' sb-soon');
-      let html = '<div class="' + cls + '"'
-        + (temTela ? ' onclick="sbModuloClick(\'' + m.id + '\')"' : '')
-        + '><i class="ti ti-' + ic + '"></i><span class="sb-mod-lbl">' + esc(m.rotulo) + '</span>'
-        + (temTela ? '' : '<span class="sb-soon-tag">em breve</span>')
-        + (temSec ? '<i class="ti ti-chevron-' + (aberto ? 'down' : 'right') + ' sb-chev"></i>' : '')
-        + '</div>';
-      if(aberto && temSec){
-        html += cfg.secoes.map((s, i) =>
-          '<div class="nav-item nav-sub' + (_sbSecaoAtiva === s.id ? ' active' : '') + '"'
-          + ' onclick="sbSecaoClick(\'' + m.id + '\',' + i + ')"><i class="ti ti-' + s.ic + '"></i>'
-          + esc(s.lbl) + '</div>'
-        ).join('');
-      }
-      return html;
-    }).join('');
-    return '<div class="sb-nav-title sb-faixa">' + esc(g.rotulo) + '</div>' + linhas;
+  const mods = grupos.flatMap(g => g.modulos || []);   // lista PLANA, sem cabeçalho de faixa
+  box.innerHTML = mods.map(m => {
+    const cfg = _SB_MODULOS[m.id] || {};
+    const ic  = cfg.ic || 'point';
+    const temSec = !!(cfg.secoes && cfg.secoes.length);
+    const aberto = _sbModuloAberto === m.id;
+    let html = '<div class="nav-item sb-mod' + (aberto ? ' active' : '') + '"'
+      + ' onclick="sbModuloClick(\'' + m.id + '\')">'          // todo módulo é clicável
+      + '<i class="ti ti-' + ic + '"></i><span class="sb-mod-lbl">' + esc(m.rotulo) + '</span>'
+      + (temSec ? '<i class="ti ti-chevron-' + (aberto ? 'down' : 'right') + ' sb-chev"></i>' : '')
+      + '</div>';
+    if(aberto && temSec){
+      html += cfg.secoes.map((s, i) =>
+        '<div class="nav-item nav-sub' + (_sbSecaoAtiva === s.id ? ' active' : '') + '"'
+        + ' onclick="sbSecaoClick(\'' + m.id + '\',' + i + ')"><i class="ti ti-' + s.ic + '"></i>'
+        + esc(s.lbl) + '</div>'
+      ).join('');
+    }
+    return html;
   }).join('');
 }
 
@@ -7602,6 +7611,9 @@ function sbModuloClick(id){
   } else if(cfg.go){
     _sbModuloAberto = id; _sbSecaoAtiva = null;
     cfg.go();                    // módulo-folha -> navega direto (o realce vem do sbSyncActive)
+  } else {
+    _sbModuloAberto = id; _sbSecaoAtiva = null;   // sem tela -> EM CONSTRUÇÃO (mantém realçado, ver sbSyncActive)
+    emConstrucao(_rotuloModulo(id));
   }
 }
 

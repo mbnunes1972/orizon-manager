@@ -27,6 +27,8 @@ MODULOS = {
                     "arquivos": ["database.py", "storage.py"],
                     "tabelas": [], "rotas": []},
     # ── DOMÍNIOS ───────────────────────────────────────────────────────────
+    "captacao":    {"camada": "dominio", "depende_de": [], "rotulo": "Captação", "faixa": "vendas",
+                    "arquivos": [], "tabelas": [], "rotas": []},
     "cadastro":    {"camada": "dominio", "depende_de": [], "rotulo": "Cadastro", "faixa": "vendas",
                     "arquivos": ["validacao_doc.py"],
                     "tabelas": ["clientes", "parceiros"],
@@ -38,7 +40,7 @@ MODULOS = {
                     "tabelas": ["projetos_meta", "briefings", "pool_ambientes", "orcamentos",
                                 "orcamento_ambientes", "contratos", "contratos_assinaturas"],
                     "rotas": ["/api/orcamentos", "/api/contratos"]},
-    "producao":    {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Produção / Projetos", "faixa": "execucao_projeto",
+    "producao":    {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Projetos", "faixa": "execucao_projeto",
                     "arquivos": ["mod_medicao.py", "mod_qualidade_xml.py"],
                     "tabelas": ["medicoes"],
                     "rotas": ["/api/medicoes"]},
@@ -55,13 +57,16 @@ MODULOS = {
                               "/api/financeiro/reconciliar", "/api/financeiro/periodos", "/api/financeiro/balanco",
                               "/api/financeiro/repasse-fabrica", "/api/financeiro/sugerir-conta",
                               "/api/financeiro/provisoes-venda", "/api/financeiro/dashboard"]},
-    # domínios NOVOS — fronteira só (stub, sem código/tabela hoje)
+    # domínios NOVOS — fronteira só (stub, sem código/tabela hoje). Montagem e Assistências substituem
+    # o antigo "posvenda" (que virou FAIXA, não módulo — Modulos_Orizon_v4).
     "estoque":     {"camada": "dominio", "depende_de": ["cadastro", "producao"], "rotulo": "Estoque", "faixa": "expedicao",
                     "arquivos": [], "tabelas": [], "rotas": []},
-    "posvenda":    {"camada": "dominio", "depende_de": ["cadastro", "fiscal", "estoque"], "rotulo": "Pós-venda", "faixa": "montagem",
-                    "arquivos": [], "tabelas": [], "rotas": []},
-    "expedicao":   {"camada": "dominio", "depende_de": ["producao", "estoque", "fiscal"], "rotulo": "Expedição / Logística", "faixa": "expedicao",
+    "expedicao":   {"camada": "dominio", "depende_de": ["producao", "estoque", "fiscal"], "rotulo": "Expedição", "faixa": "expedicao",
                     "arquivos": [], "tabelas": [], "rotas": ["/api/expedicao/kanban"]},
+    "montagem":    {"camada": "dominio", "depende_de": ["comercial"], "rotulo": "Montagem", "faixa": "montagem",
+                    "arquivos": [], "tabelas": [], "rotas": []},
+    "assistencias":{"camada": "dominio", "depende_de": ["comercial", "montagem"], "rotulo": "Assistências", "faixa": "montagem",
+                    "arquivos": [], "tabelas": [], "rotas": []},
 }
 
 # Arquivos que NÃO são módulo (shell/compositor e utilitários). O teste de cobertura os ignora.
@@ -113,9 +118,10 @@ def modulo_do_path(path):
     return candidatos[0][1]
 
 
-# Ordem estável dos domínios para a UI (DOMINIOS é frozenset, sem ordem).
-DOMINIOS_ORDEM = ["cadastro", "comercial", "producao", "fiscal", "financeiro",
-                  "estoque", "posvenda", "expedicao"]
+# Ordem estável dos domínios para a UI (DOMINIOS é frozenset, sem ordem). Sidebar plana usa esta ordem
+# (achatada por faixa no hub_layout). Captação primeiro (entrada do funil); Montagem/Assistências ao fim.
+DOMINIOS_ORDEM = ["captacao", "cadastro", "comercial", "producao", "fiscal",
+                  "estoque", "expedicao", "montagem", "assistencias", "financeiro"]
 
 
 def dominios_com_rotulo():

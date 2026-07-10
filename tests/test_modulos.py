@@ -45,7 +45,9 @@ def test_rotulo_e_ordem_dos_dominios():
     ids = [d["id"] for d in ordem]
     assert set(ids) == set(m.DOMINIOS)
     assert all(d["rotulo"] for d in ordem)
-    assert ids[0] == "cadastro"
+    assert ids[0] == "captacao"
+    assert "posvenda" not in ids                       # virou FAIXA, não módulo (Modulos_Orizon_v4)
+    assert {"montagem", "assistencias"} <= set(ids)    # substituem o antigo Pós-venda
 
 
 def test_faixa_por_dominio():
@@ -62,7 +64,7 @@ def test_hub_layout_agrupa_por_faixa():
     assert faixas == ["vendas", "execucao_projeto", "expedicao", "montagem", "financeiro"]
     vendas = next(x for x in g if x["faixa"] == "vendas")
     ids = [mm["id"] for mm in vendas["modulos"]]
-    assert ids == ["cadastro", "comercial"] and vendas["rotulo"] == "Vendas"
+    assert ids == ["captacao", "cadastro", "comercial"] and vendas["rotulo"] == "Vendas"
 
 
 def test_hub_layout_so_ativos_e_sem_faixa_vazia():
