@@ -16,8 +16,9 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
                        CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente,
-                       PerfilEmissao, CicloLogistico, CicloLogisticoTransicao)
+                       PerfilEmissao, CicloLogistico, CicloLogisticoTransicao, AssistenciaCaso)
 import mod_expedicao
+import mod_assistencias
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -583,6 +584,26 @@ class Handler(BaseHTTPRequestHandler):
                 p = db.query(Projeto).filter_by(nome_safe=card.projeto_nome).first()
                 cli = db.get(Cliente, p.cliente_id) if p and p.cliente_id else None
                 self.send_json({"ok": True, "card": mod_expedicao.card_detalhe(db, card, cli.nome if cli else "")})
+            finally:
+                db.close()
+            return
+
+        if path == "/api/assistencias/casos":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return
+            db = get_session()
+            try:
+                lid = usuario.get("loja_id")
+                loja = db.get(Loja, lid) if lid else None
+                if loja is not None and not mod_tenancy.modulo_ativo(loja, "assistencias"):
+                    self.send_json({"ok": False, "erro": "Módulo Assistências inativo."}, code=403); return
+                from urllib.parse import parse_qs
+                tipo = (parse_qs(urlparse(self.path).query).get("tipo") or [""])[0].strip()
+                self.send_json({"ok": True,
+                                "casos": mod_assistencias.listar(db, lid, tipo or None),
+                                "a_cobrar_fabrica": mod_assistencias.a_cobrar_fabrica(db, lid),
+                                "meta": mod_assistencias.meta()})
             finally:
                 db.close()
             return
@@ -2026,6 +2047,57 @@ class Handler(BaseHTTPRequestHandler):
                 if card is None or (lid and card.loja_id != lid):
                     self.send_json({"ok": False, "erro": "Não encontrado."}, code=404); return
                 mod_expedicao.atualizar_detalhe(db, card, json.loads(body or b'{}'))
+                db.commit()
+                self.send_json({"ok": True})
+            except Exception as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        # ── Assistências (Modulos_Orizon_v5 módulo 10 / Financeiro v7 §6) ─────────────────
+        if path == "/api/assistencias/casos":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return
+            db = get_session()
+            try:
+                lid = usuario.get("loja_id")
+                loja = db.get(Loja, lid) if lid else None
+                if loja is not None and not mod_tenancy.modulo_ativo(loja, "assistencias"):
+                    self.send_json({"ok": False, "erro": "Módulo Assistências inativo."}, code=403); return
+                req = json.loads(body or b'{}')
+                projeto = (req.get("projeto_nome") or "").strip() or None
+                if projeto and db.query(Projeto).filter_by(nome_safe=projeto, loja_id=lid).first() is None:
+                    self.send_json({"ok": False, "erro": "Projeto não encontrado nesta loja."}, code=404); return
+                caso = mod_assistencias.criar_caso(db, lid, projeto, req.get("sub_tipo"), req.get("motivo"),
+                                                   req.get("descricao"), req.get("valor"), usuario.get("id"))
+                db.commit()
+                self.send_json({"ok": True, "id": caso.id, "tipo_custo": caso.tipo_custo}, code=201)
+            except ValueError as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=400)
+            except Exception as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        m = re.match(r'^/api/assistencias/casos/(\d+)/realizar$', path)
+        if m:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return
+            import mod_contabil
+            db = get_session()
+            try:
+                lid = usuario.get("loja_id")
+                caso = db.get(AssistenciaCaso, int(m.group(1)))
+                if caso is None or (lid and caso.loja_id != lid):
+                    self.send_json({"ok": False, "erro": "Não encontrado."}, code=404); return
+                ot, oid = mod_contabil.resolver_owner(db, usuario)
+                ok, err = mod_assistencias.realizar_caso(db, ot, oid, caso, (json.loads(body or b'{}')).get("valor"))
+                if not ok:
+                    self.send_json({"ok": False, "erro": err}, code=400); return
                 db.commit()
                 self.send_json({"ok": True})
             except Exception as e:

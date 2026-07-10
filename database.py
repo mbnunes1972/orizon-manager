@@ -454,6 +454,28 @@ class CicloLogisticoTransicao(Base):
     quando             = Column(DateTime, nullable=True)
 
 
+class AssistenciaCaso(Base):
+    """Módulo Assistências (Modulos_Orizon_v5, módulo 10 / Financeiro v7 §6): atendimento pós-execução.
+    Duas dimensões independentes: sub_tipo (montagem × pós-conclusão) e tipo_custo (paga/loja/fabrica),
+    este DERIVADO do motivo. Realizar o caso dispara o lançamento contábil conforme o tipo de custo."""
+    __tablename__ = "assistencia_caso"
+
+    id             = Column(Integer,  primary_key=True, autoincrement=True)
+    loja_id        = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
+    projeto_nome   = Column(Text,     nullable=True)                 # ref: nome_safe (opcional)
+    sub_tipo       = Column(Text,     nullable=False)                # "montagem" | "pos_conclusao"
+    motivo         = Column(Text,     nullable=False)                # chave de mod_assistencias.MOTIVOS
+    tipo_custo     = Column(Text,     nullable=False)                # "paga" | "loja" | "fabrica" (derivado)
+    descricao      = Column(Text,     nullable=True)
+    valor          = Column(Float,    nullable=True)                 # custo do reparo / valor da venda
+    status         = Column(Text,     nullable=False, default="aberto")   # aberto | realizado
+    reembolsado_fabrica = Column(Integer, nullable=True)             # fase 2: fábrica reembolsou de fato
+    ref_lancamento = Column(Text,     nullable=True)                 # ref idempotente do lançamento
+    criado_em      = Column(DateTime, nullable=True)
+    realizado_em   = Column(DateTime, nullable=True)
+    criado_por_id  = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+
+
 class ProvisaoRegistro(Base):
     """Provisões registradas por versão (venda/rev1/rev2) de um orçamento.
     venda = snapshot na geração do contrato; rev1/rev2 = aprovação financeira I/II."""

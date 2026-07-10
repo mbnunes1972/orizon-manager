@@ -1327,6 +1327,50 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     </div>
   </div>
 
+  <!-- PAGE 14: Assistências (Modulos_Orizon_v5 módulo 10 / Financeiro v7 §6) -->
+  <div class="page" id="page-14">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div class="page-title" style="margin:0">Assistências</div>
+        <div class="page-sub">Atendimento pós-execução. O motivo define o tipo de custo (Paga · Loja · Fábrica).</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="assistNovoAbrir()">+ Novo caso</button>
+    </div>
+    <div style="height:12px"></div>
+    <div id="assist-resumo"></div>
+    <div id="assist-filtros" style="display:flex;gap:6px;margin:12px 0 14px;flex-wrap:wrap"></div>
+    <div id="assist-lista"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+  </div>
+
+  <!-- Modal: Novo caso de assistência -->
+  <div id="modal-assist-novo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:min(480px,92vw);max-height:90vh;overflow:auto;box-shadow:var(--shadow);animation:mIn .18s ease">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-family:var(--font-sans);font-weight:900;font-size:16px">Novo caso de assistência</div>
+        <span onclick="assistNovoFechar()" style="cursor:pointer;color:var(--muted);font-size:18px">&#x2715;</span>
+      </div>
+      <label style="font-size:11px;color:var(--muted)">PROJETO (opcional)</label>
+      <select id="assist-novo-projeto" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px"></select>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+        <div><label style="font-size:11px;color:var(--muted)">SUB-TIPO</label>
+          <select id="assist-novo-subtipo" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px"></select></div>
+        <div><label style="font-size:11px;color:var(--muted)">MOTIVO</label>
+          <select id="assist-novo-motivo" onchange="assistNovoMotivoChange()" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px"></select></div>
+      </div>
+      <div id="assist-novo-tc" style="font-size:12px;color:var(--accent);font-weight:600;margin-bottom:12px"></div>
+      <label style="font-size:11px;color:var(--muted)">DESCRIÇÃO</label>
+      <input type="text" id="assist-novo-desc" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px">
+      <label style="font-size:11px;color:var(--muted)">VALOR (R$) — custo do reparo / valor da venda</label>
+      <input type="number" step="0.01" min="0" id="assist-novo-valor" placeholder="pode informar depois, ao realizar"
+             style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 4px">
+      <div id="assist-novo-status" style="font-size:11px;color:var(--muted);min-height:14px;margin:6px 0 8px"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="assistNovoFechar()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="assistCriar()">Criar caso</button>
+      </div>
+    </div>
+  </div>
+
   <!-- PAGE 07: Admin -->
   <div class="page" id="page-07">
     <div class="page-title">&#x2699;&#xFE0F; Administra&ccedil;&atilde;o</div>
@@ -2548,12 +2592,13 @@ function goPage(n){
   if(n===11){ if(_adminNav) _adminNav.loja = null; adminFiscalCarregar(); }
   if(n===12){ if(_adminNav) _adminNav.loja = null; finTab('prov'); }   // seções no submenu da sidebar
   if(n===13) expedicaoKanbanCarregar();
+  if(n===14) assistenciasCarregar();
   sbSyncActive(n);   // realça/expande o módulo correspondente no acordeão da sidebar
 }
 
 // Página -> módulo de domínio que ela representa (para realçar/expandir na sidebar).
 // page-00 (Projetos) fica com o Atalho, não realça o módulo Comercial (evita realce duplicado).
-const _PAGE_MODULO = {10:'cadastro', 11:'fiscal', 12:'financeiro', 13:'expedicao'};
+const _PAGE_MODULO = {10:'cadastro', 11:'fiscal', 12:'financeiro', 13:'expedicao', 14:'assistencias'};
 function sbSyncActive(n){
   if(n===8) { sbNavRender(); return; }   // EM CONSTRUÇÃO: mantém o módulo clicado realçado (sbModuloClick já setou)
   const mod = _PAGE_MODULO[n] || null;
@@ -2742,6 +2787,94 @@ async function expMover(){
     expedicaoKanbanCarregar();
     expDetAbrir(_expDetId);   // recarrega o detalhe c/ o histórico atualizado
   }catch(e){ st.textContent='Erro: '+e; st.style.color='var(--err)'; }
+}
+
+// ── Assistências (Modulos_Orizon_v5 módulo 10 / Financeiro v7 §6) ────────────────────────────
+let _assistMeta = null, _assistFiltro = '';
+async function assistenciasCarregar(){
+  const box = document.getElementById('assist-lista');
+  if(!box) return;
+  const r = await fetch('/api/assistencias/casos'+(_assistFiltro?('?tipo='+_assistFiltro):''), {credentials:'same-origin'});
+  if(r.status===403){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Módulo Assistências inativo ou sem acesso.</em>'; return; }
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Falha ao carregar.</em>'; return; }
+  _assistMeta = d.meta;
+  const ac = d.a_cobrar_fabrica || {total:0, qtd:0};
+  document.getElementById('assist-resumo').innerHTML =
+     '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 18px;display:inline-flex;gap:22px;align-items:center;flex-wrap:wrap">'
+    +'<div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">A cobrar da fábrica</div>'
+    +'<div style="font-family:var(--font-mono);font-weight:700;font-size:16px;color:var(--text)">'+_fBRL(ac.total)+'</div></div>'
+    +'<div style="font-size:11px;color:var(--muted);max-width:280px">'+ac.qtd+' caso(s) de garantia · custo documentado p/ negociação com a fábrica (não é Contas a Receber formal)</div></div>';
+  document.getElementById('assist-filtros').innerHTML = [['','Todos'],['loja','Loja'],['fabrica','Fábrica'],['paga','Paga']]
+    .map(f => '<button class="btn '+(_assistFiltro===f[0]?'btn-primary':'btn-ghost')+' btn-sm" onclick="assistFiltrar(\''+f[0]+'\')">'+f[1]+'</button>').join('');
+  if(!d.casos.length){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Nenhum caso.</em>'; return; }
+  box.innerHTML = '<table class="proj-table"><thead><tr>'
+    +'<th>Projeto</th><th>Sub-tipo</th><th>Motivo</th><th style="width:110px">Custo</th>'
+    +'<th style="width:120px;text-align:right">Valor</th><th style="width:100px">Status</th><th style="width:90px"></th></tr></thead><tbody>'
+    + d.casos.map(c => {
+        const acao = c.status==='aberto'
+          ? '<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="assistRealizar('+c.id+','+(c.valor||0)+')">Realizar</button>'
+          : '<span style="font-size:11px;color:var(--ok)">✓ realizado</span>';
+        return '<tr><td>'+esc(c.projeto_nome||'—')+'</td><td style="color:var(--muted)">'+esc(c.sub_tipo_label)+'</td>'
+          +'<td style="color:var(--muted)">'+esc(c.motivo_label)+'</td><td>'+_assistBadge(c.tipo_custo, c.tipo_custo_label)+'</td>'
+          +'<td style="text-align:right;font-family:var(--font-mono);font-size:12px">'+(c.valor!=null?_fBRL(c.valor):'—')+'</td>'
+          +'<td style="color:var(--muted)">'+esc(c.status)+'</td><td style="text-align:right">'+acao+'</td></tr>';
+      }).join('')
+    + '</tbody></table>';
+}
+function assistFiltrar(v){ _assistFiltro = v; assistenciasCarregar(); }
+function _assistBadge(tc, label){
+  const col = tc==='fabrica' ? 'var(--st-frio)' : tc==='loja' ? 'var(--st-morno)' : 'var(--st-convertido)';
+  return '<span class="proj-status-badge" style="background:rgba(120,120,120,.12);color:'+col+'">'+esc(label)+'</span>';
+}
+async function assistRealizar(id, valor){
+  let v = valor;
+  if(!v || v<=0){
+    const inp = prompt('Valor do caso (R$):'); if(inp===null) return;
+    v = parseFloat(String(inp).replace(',','.')); if(!v || v<=0){ showToast('Valor inválido.', true); return; }
+  }
+  const d = await (await fetch('/api/assistencias/casos/'+id+'/realizar', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({valor:v})})).json();
+  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+  showToast('Caso realizado — lançamento contábil gerado.', false); assistenciasCarregar();
+}
+async function assistNovoAbrir(){
+  const st = document.getElementById('assist-novo-status'); if(st) st.textContent='';
+  document.getElementById('assist-novo-desc').value=''; document.getElementById('assist-novo-valor').value='';
+  if(!_assistMeta) await assistenciasCarregar();
+  const meta = _assistMeta || {sub_tipos:[], motivos:[]};
+  document.getElementById('assist-novo-subtipo').innerHTML = meta.sub_tipos.map(s=>'<option value="'+esc(s.id)+'">'+esc(s.label)+'</option>').join('');
+  document.getElementById('assist-novo-motivo').innerHTML = meta.motivos.map(m=>'<option value="'+esc(m.id)+'" data-tc="'+esc(m.tipo_custo)+'">'+esc(m.label)+'</option>').join('');
+  assistNovoMotivoChange();
+  const sel = document.getElementById('assist-novo-projeto'); sel.innerHTML='<option value="">— sem projeto —</option>';
+  try{
+    const dj = await (await fetch('/projetos', {credentials:'same-origin'})).json();
+    sel.innerHTML = '<option value="">— sem projeto —</option>' + (dj.projetos||[]).filter(p=>p.nome_safe).map(p=>
+      '<option value="'+esc(p.nome_safe)+'">'+esc(p.nome_projeto||p.nome_safe)+(p.cliente_nome?' · '+esc(p.cliente_nome):'')+'</option>').join('');
+  }catch(e){}
+  document.getElementById('modal-assist-novo').style.display='flex';
+}
+function assistNovoFechar(){ document.getElementById('modal-assist-novo').style.display='none'; }
+function assistNovoMotivoChange(){
+  const sel = document.getElementById('assist-novo-motivo');
+  const tc = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].getAttribute('data-tc') : '';
+  const lbl = (_assistMeta && _assistMeta.tipo_custo_label && _assistMeta.tipo_custo_label[tc]) || tc;
+  const el = document.getElementById('assist-novo-tc'); if(el) el.textContent = lbl ? ('→ Tipo de custo: '+lbl) : '';
+}
+async function assistCriar(){
+  const st = document.getElementById('assist-novo-status');
+  const payload = {
+    projeto_nome: document.getElementById('assist-novo-projeto').value,
+    sub_tipo: document.getElementById('assist-novo-subtipo').value,
+    motivo: document.getElementById('assist-novo-motivo').value,
+    descricao: document.getElementById('assist-novo-desc').value.trim(),
+    valor: document.getElementById('assist-novo-valor').value.trim(),
+  };
+  st.textContent='Criando...'; st.style.color='var(--muted)';
+  const d = await (await fetch('/api/assistencias/casos', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})).json();
+  if(!d.ok){ st.textContent='Erro: '+(d.erro||'falha'); st.style.color='var(--err)'; return; }
+  assistNovoFechar(); showToast('Caso criado.', false); assistenciasCarregar();
 }
 
 // Módulo Cadastro: troca de aba + lazy-load do painel ativo
@@ -7752,7 +7885,7 @@ const _SB_MODULOS = {
   estoque:    {ic:'packages'},                            // em construção
   expedicao:  {ic:'truck',         go:()=>goPage(13)},    // folha: Kanban de expedição
   montagem:   {ic:'hammer'},                              // NOVO — em construção
-  assistencias:{ic:'lifebuoy'},                           // NOVO — em construção (casos + repasse fábrica)
+  assistencias:{ic:'lifebuoy', go:()=>goPage(14)},        // casos + a-cobrar-da-fábrica (v7 §6)
   financeiro: {ic:'cash', secoes: _FIN_SECOES.map(s => ({id:s.id, lbl:s.lbl, ic:s.ic, go:()=>finIrSecao(s.id)}))},
 };
 

@@ -67,8 +67,10 @@ MODULOS = {
                     "rotas": ["/api/expedicao"]},
     "montagem":    {"camada": "dominio", "depende_de": ["comercial"], "rotulo": "Montagem", "faixa": "montagem",
                     "arquivos": [], "tabelas": [], "rotas": []},
-    "assistencias":{"camada": "dominio", "depende_de": ["comercial", "montagem"], "rotulo": "Assistências", "faixa": "montagem",
-                    "arquivos": [], "tabelas": [], "rotas": []},
+    "assistencias":{"camada": "dominio", "depende_de": ["comercial", "montagem", "financeiro"], "rotulo": "Assistências", "faixa": "montagem",
+                    "arquivos": ["mod_assistencias.py"],
+                    "tabelas": ["assistencia_caso"],
+                    "rotas": ["/api/assistencias"]},
 }
 
 # Arquivos que NÃO são módulo (shell/compositor e utilitários). O teste de cobertura os ignora.
