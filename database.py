@@ -3,7 +3,7 @@ database.py — Conexão SQLAlchemy + modelos de dados
 Orizon Manager | Dalmóbile
 """
 
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Date, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship
 from datetime import datetime
 import hashlib
@@ -409,6 +409,49 @@ class CicloEtapa(Base):
     __table_args__ = (UniqueConstraint("projeto_nome", "etapa_codigo", name="uq_ciclo_etapa"),)
 
     responsavel = relationship("Usuario", foreign_keys=[responsavel_id])
+
+
+class CicloLogistico(Base):
+    """Expedição (Modulos_Orizon_v5, módulo 7): pedido produzido -> cliente com o produto.
+    Estado AGREGADO + referências por ID a Projetos/Estoque/Fiscal — NUNCA duplica dado.
+    Prazos (planejado) entram uma vez na criação; datas (realizado) são capturadas ao mover o card."""
+    __tablename__ = "ciclo_logistico"
+
+    id             = Column(Integer,  primary_key=True, autoincrement=True)
+    loja_id        = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
+    projeto_nome   = Column(Text,     nullable=False)                 # ref: nome_safe do projeto
+    numero_pedido  = Column(Text,     nullable=True)                  # nº do pedido na fábrica
+    status_atual   = Column(Text,     nullable=False, default="Pedido Enviado")
+    # Prazos (planejado — informados pela fábrica na criação)
+    prazo_producao    = Column(Date, nullable=True)
+    prazo_saida       = Column(Date, nullable=True)
+    prazo_recebimento = Column(Date, nullable=True)
+    prazo_entrega     = Column(Date, nullable=True)
+    # Realizado (capturado ao mover o card, editável)
+    data_producao     = Column(Date, nullable=True)
+    data_saida        = Column(Date, nullable=True)
+    data_recebimento  = Column(Date, nullable=True)
+    data_entrega      = Column(Date, nullable=True)
+    # Transporte
+    transportadora = Column(Text, nullable=True)
+    cte            = Column(Text, nullable=True)                      # conhecimento de transporte
+    rastreio       = Column(Text, nullable=True)
+    # Referências (nunca duplica): NF-e é dado do Fiscal
+    nfe_id         = Column(Integer, ForeignKey("documento_fiscal.id"), nullable=True)
+    criado_em      = Column(DateTime, nullable=True)
+    criado_por_id  = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+
+
+class CicloLogisticoTransicao(Base):
+    """Histórico auditável de mudanças de status_atual do CicloLogistico (quem/quando)."""
+    __tablename__ = "ciclo_logistico_transicao"
+
+    id                 = Column(Integer,  primary_key=True, autoincrement=True)
+    ciclo_logistico_id = Column(Integer,  ForeignKey("ciclo_logistico.id"), nullable=False)
+    de_status          = Column(Text,     nullable=True)
+    para_status        = Column(Text,     nullable=False)
+    usuario_id         = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    quando             = Column(DateTime, nullable=True)
 
 
 class ProvisaoRegistro(Base):

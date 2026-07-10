@@ -16,7 +16,8 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        LogAcaoGerencial, Medicao, Rede, Loja, ParceiroLoja,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
                        CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente,
-                       PerfilEmissao)
+                       PerfilEmissao, CicloLogistico, CicloLogisticoTransicao)
+import mod_expedicao
 from urllib.parse import urlparse, unquote
 
 from storage import (
@@ -550,28 +551,38 @@ class Handler(BaseHTTPRequestHandler):
                 loja = db.get(Loja, lid) if lid else None
                 if loja is not None and not mod_tenancy.modulo_ativo(loja, "expedicao"):
                     self.send_json({"ok": False, "erro": "Módulo Expedição inativo."}, code=403); return
-                _exp = [("12", "Implantação"), ("13", "Produção"), ("14", "Entrega no depósito"),
-                        ("15", "Emissão NF-e"), ("16", "Entrega no cliente")]
-                cods = [c for c, _ in _exp]
-                projs = {p.nome_safe: p for p in db.query(Projeto).filter_by(loja_id=lid).all()}
-                por_proj = {}   # nome_safe -> etapa em andamento mais avançada (12–16)
-                for e in (db.query(CicloEtapa)
-                          .filter(CicloEtapa.etapa_codigo.in_(cods), CicloEtapa.status == "em_andamento").all()):
-                    if e.projeto_nome not in projs:
+                proj_cli = {p.nome_safe: p.cliente_id for p in db.query(Projeto).filter_by(loja_id=lid).all()}
+                cli_nome = {c.id: c.nome for c in db.query(Cliente).filter_by(loja_id=lid).all()}
+                idx = {s: i for i, s in enumerate(mod_expedicao.STATUS)}
+                colunas = [{"status": s, "cards": []} for s in mod_expedicao.STATUS]
+                for card in db.query(CicloLogistico).filter_by(loja_id=lid).all():
+                    if card.status_atual not in idx:
                         continue
-                    cur = por_proj.get(e.projeto_nome)
-                    if cur is None or int(e.etapa_codigo) > int(cur):
-                        por_proj[e.projeto_nome] = e.etapa_codigo
-                clientes = {c.id: c.nome for c in db.query(Cliente).filter_by(loja_id=lid).all()}
-                idx = {c: i for i, (c, _) in enumerate(_exp)}
-                colunas = [{"codigo": c, "nome": n, "cards": []} for c, n in _exp]
-                for nome_safe, etp in por_proj.items():
-                    p = projs[nome_safe]
-                    colunas[idx[etp]]["cards"].append({
-                        "nome_safe": nome_safe,
-                        "cliente": clientes.get(getattr(p, "cliente_id", None), ""),
-                    })
-                self.send_json({"ok": True, "colunas": colunas})
+                    cnome = cli_nome.get(proj_cli.get(card.projeto_nome))
+                    colunas[idx[card.status_atual]]["cards"].append(mod_expedicao.card_kanban(card, cnome))
+                self.send_json({"ok": True, "colunas": colunas,
+                                "meta": {"status": mod_expedicao.STATUS,
+                                         "captura": mod_expedicao.REALIZADO_AO_ENTRAR,
+                                         "campos_prazo": mod_expedicao.CAMPOS_PRAZO,
+                                         "campos_realizado": mod_expedicao.CAMPOS_REALIZADO}})
+            finally:
+                db.close()
+            return
+
+        m = re.match(r'^/api/expedicao/cards/(\d+)$', path)
+        if m:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return
+            db = get_session()
+            try:
+                lid = usuario.get("loja_id")
+                card = db.get(CicloLogistico, int(m.group(1)))
+                if card is None or (lid and card.loja_id != lid):
+                    self.send_json({"ok": False, "erro": "Não encontrado."}, code=404); return
+                p = db.query(Projeto).filter_by(nome_safe=card.projeto_nome).first()
+                cli = db.get(Cliente, p.cliente_id) if p and p.cliente_id else None
+                self.send_json({"ok": True, "card": mod_expedicao.card_detalhe(db, card, cli.nome if cli else "")})
             finally:
                 db.close()
             return
@@ -1951,6 +1962,78 @@ class Handler(BaseHTTPRequestHandler):
         body   = self.rfile.read(length) if length else b'{}'
 
         if handle_auth_post(self, path, body): return
+
+        # ── Expedição (Modulos_Orizon_v5, módulo 7): CicloLogistico — criar/mover/editar ──
+        if path == "/api/expedicao/cards":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return
+            db = get_session()
+            try:
+                lid = usuario.get("loja_id")
+                loja = db.get(Loja, lid) if lid else None
+                if loja is not None and not mod_tenancy.modulo_ativo(loja, "expedicao"):
+                    self.send_json({"ok": False, "erro": "Módulo Expedição inativo."}, code=403); return
+                req = json.loads(body or b'{}')
+                projeto = (req.get("projeto_nome") or "").strip()
+                if not projeto:
+                    self.send_json({"ok": False, "erro": "Selecione o projeto."}, code=400); return
+                if db.query(Projeto).filter_by(nome_safe=projeto, loja_id=lid).first() is None:
+                    self.send_json({"ok": False, "erro": "Projeto não encontrado nesta loja."}, code=404); return
+                card = mod_expedicao.criar_ciclo(db, lid, projeto, req.get("numero_pedido"),
+                                                 req.get("prazos") or {}, usuario.get("id"))
+                db.commit()
+                self.send_json({"ok": True, "id": card.id}, code=201)
+            except Exception as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        m = re.match(r'^/api/expedicao/cards/(\d+)/mover$', path)
+        if m:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return
+            db = get_session()
+            try:
+                lid = usuario.get("loja_id")
+                card = db.get(CicloLogistico, int(m.group(1)))
+                if card is None or (lid and card.loja_id != lid):
+                    self.send_json({"ok": False, "erro": "Não encontrado."}, code=404); return
+                req = json.loads(body or b'{}')
+                ok, err = mod_expedicao.mover(db, card, req.get("novo_status"),
+                                              req.get("realizados") or {}, usuario.get("id"))
+                if not ok:
+                    self.send_json({"ok": False, "erro": err}, code=400); return
+                db.commit()
+                self.send_json({"ok": True})
+            except Exception as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        m = re.match(r'^/api/expedicao/cards/(\d+)$', path)
+        if m:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return
+            db = get_session()
+            try:
+                lid = usuario.get("loja_id")
+                card = db.get(CicloLogistico, int(m.group(1)))
+                if card is None or (lid and card.loja_id != lid):
+                    self.send_json({"ok": False, "erro": "Não encontrado."}, code=404); return
+                mod_expedicao.atualizar_detalhe(db, card, json.loads(body or b'{}'))
+                db.commit()
+                self.send_json({"ok": True})
+            except Exception as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
         if path == "/api/financeiro/contas":
             ctx = _contabil_ctx(self, exige_edicao=True)
             if ctx is None: return

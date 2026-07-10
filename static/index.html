@@ -1276,12 +1276,55 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="fin-panel-repasse" style="display:none"><div id="repasse-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
   </div>
 
-  <!-- PAGE 13: Expedição / Logística — Kanban (pedidos por etapa) -->
+  <!-- PAGE 13: Expedição — Kanban do CicloLogistico (Modulos_Orizon_v5, módulo 7) -->
   <div class="page" id="page-13">
-    <div class="page-title">Expedição / Logística</div>
-    <div class="page-sub">Pedidos por etapa do ciclo (produção · recebimento · entrega).</div>
-    <div style="height:8px"></div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <div>
+        <div class="page-title" style="margin:0">Expedição</div>
+        <div class="page-sub">Pedido produzido → cliente. Clique num card para abrir o detalhe.</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="expNovoAbrir()">+ Novo pedido</button>
+    </div>
+    <div style="height:12px"></div>
     <div id="exp-kanban-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+  </div>
+
+  <!-- Modal: Novo pedido à fábrica (cria CicloLogistico) -->
+  <div id="modal-exp-novo" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:min(460px,92vw);max-height:90vh;overflow:auto;box-shadow:var(--shadow);animation:mIn .18s ease">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="font-family:var(--font-sans);font-weight:900;font-size:16px">Novo pedido à fábrica</div>
+        <span onclick="expNovoFechar()" style="cursor:pointer;color:var(--muted);font-size:18px">&#x2715;</span>
+      </div>
+      <label style="font-size:11px;color:var(--muted)">PROJETO</label>
+      <select id="exp-novo-projeto" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px"></select>
+      <label style="font-size:11px;color:var(--muted)">NÚMERO DO PEDIDO</label>
+      <input type="text" id="exp-novo-pedido" placeholder="nº do pedido na fábrica"
+             style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px">
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Prazos planejados (informados pela fábrica)</div>
+      <div id="exp-novo-prazos" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-bottom:12px"></div>
+      <div id="exp-novo-status" style="font-size:11px;color:var(--muted);min-height:14px;margin-bottom:8px"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="expNovoFechar()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="expCriar()">Criar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Detalhe do pedido (Identificação · Prazos · Transporte · Histórico) -->
+  <div id="modal-exp-det" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:min(640px,94vw);max-height:92vh;overflow:auto;box-shadow:var(--shadow);animation:mIn .18s ease">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="font-family:var(--font-sans);font-weight:900;font-size:16px">Detalhe do pedido</div>
+        <span onclick="expDetFechar()" style="cursor:pointer;color:var(--muted);font-size:18px">&#x2715;</span>
+      </div>
+      <div id="exp-det-body"></div>
+      <div id="exp-det-status" style="font-size:11px;color:var(--muted);min-height:14px;margin:6px 0 8px"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="expDetFechar()">Fechar</button>
+        <button class="btn btn-primary btn-sm" onclick="expDetSalvar()">Salvar</button>
+      </div>
+    </div>
   </div>
 
   <!-- PAGE 07: Admin -->
@@ -2537,6 +2580,15 @@ function emConstrucao(rotulo){
 }
 
 // ── Expedição: Kanban de pedidos por etapa (Diagramacao_v2 §1.4) ─────────────
+// Etapas com par Planejado/Realizado (Diagramacao_v5 §1.4). Ordem = ordem das colunas de prazo.
+const _EXP_ETAPAS = [
+  {prazo:'prazo_producao',    real:'data_producao',    lbl:'Produção'},
+  {prazo:'prazo_saida',       real:'data_saida',       lbl:'Saída da Fábrica'},
+  {prazo:'prazo_recebimento', real:'data_recebimento', lbl:'Recebimento no Depósito'},
+  {prazo:'prazo_entrega',     real:'data_entrega',     lbl:'Entrega ao Cliente'},
+];
+let _expMeta = null;   // {status[], captura{status:[campos]}} vindo do backend
+
 async function expedicaoKanbanCarregar(){
   const box = document.getElementById('exp-kanban-box');
   if(!box) return;
@@ -2544,21 +2596,152 @@ async function expedicaoKanbanCarregar(){
   if(r.status===403){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Módulo Expedição inativo ou sem acesso.</em>'; return; }
   const d = await r.json().catch(()=>({}));
   if(!d.ok){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Falha ao carregar.</em>'; return; }
-  const total = d.colunas.reduce((a,c)=>a+c.cards.length,0);
-  if(!total){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Nenhum pedido em etapa de expedição no momento.</em>'; return; }
+  _expMeta = d.meta || null;
   const cols = d.colunas.map(c=>{
-    const cards = c.cards.map(p=>
-       '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer" onclick="abrirProjeto(\''+esc(p.nome_safe)+'\')">'
-      +'<div style="font-weight:500;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.nome_safe)+'</div>'
-      +(p.cliente?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(p.cliente)+'</div>':'')+'</div>'
-      ).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 4px">—</div>';
-    return '<div style="flex:1;min-width:190px">'
+    const cards = c.cards.map(p=>{
+      const badge = p.atrasado ? '<span class="proj-status-badge" style="background:rgba(240,90,80,.14);color:var(--err)">Atrasado</span>' : '';
+      return '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer" onclick="expDetAbrir('+p.id+')">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">'
+        +'<div style="font-weight:500;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.projeto_nome)+'</div>'+badge+'</div>'
+        +(p.cliente?'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(p.cliente)+'</div>':'')
+        +(p.numero_pedido?'<div style="font-size:10.5px;color:var(--muted);margin-top:2px;font-family:var(--font-mono)">#'+esc(p.numero_pedido)+'</div>':'')
+        +'</div>';
+    }).join('') || '<div style="font-size:11px;color:var(--muted);padding:8px 4px">—</div>';
+    return '<div style="flex:0 0 200px;min-width:200px">'
       +'<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;margin-bottom:10px;border-bottom:2px solid var(--accent)">'
-      +'<span style="font-size:12px;font-weight:600;color:var(--text)">'+esc(c.nome)+'</span>'
+      +'<span style="font-size:12px;font-weight:600;color:var(--text)">'+esc(c.status)+'</span>'
       +'<span style="font-size:11px;color:var(--muted)">('+c.cards.length+')</span></div>'+cards+'</div>';
   }).join('');
-  box.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Pedido aparece na etapa em andamento; clique num card para abrir o projeto e avançar a etapa no ciclo.</div>'
-    + '<div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">'+cols+'</div>';
+  box.innerHTML = '<div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px">'+cols+'</div>';
+}
+
+function _expDateInput(id, val){
+  return '<input type="date" id="'+id+'" value="'+(val||'')+'" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font-size:12px">';
+}
+
+// ── Novo pedido (cria CicloLogistico no status "Pedido Enviado") ──────────────
+async function expNovoAbrir(){
+  const st = document.getElementById('exp-novo-status'); if(st) st.textContent='';
+  document.getElementById('exp-novo-pedido').value='';
+  document.getElementById('exp-novo-prazos').innerHTML = _EXP_ETAPAS.map(e =>
+    '<div><label style="font-size:10px;color:var(--muted)">'+esc(e.lbl)+'</label>'+_expDateInput('exp-novo-'+e.prazo,'')+'</div>').join('');
+  const sel = document.getElementById('exp-novo-projeto');
+  sel.innerHTML = '<option value="">Carregando…</option>';
+  try{
+    const d = await (await fetch('/projetos', {credentials:'same-origin'})).json();
+    const lista = (d.projetos||[]).filter(p=>p.nome_safe);
+    sel.innerHTML = '<option value="">— selecione —</option>' + lista.map(p =>
+      '<option value="'+esc(p.nome_safe)+'">'+esc(p.nome_projeto||p.nome_safe)+(p.cliente_nome?' · '+esc(p.cliente_nome):'')+'</option>').join('');
+  }catch(e){ sel.innerHTML='<option value="">Falha ao carregar</option>'; }
+  document.getElementById('modal-exp-novo').style.display='flex';
+}
+function expNovoFechar(){ document.getElementById('modal-exp-novo').style.display='none'; }
+async function expCriar(){
+  const st = document.getElementById('exp-novo-status');
+  const projeto = document.getElementById('exp-novo-projeto').value;
+  if(!projeto){ st.textContent='Selecione o projeto.'; st.style.color='var(--err)'; return; }
+  const prazos = {};
+  _EXP_ETAPAS.forEach(e => { const v=document.getElementById('exp-novo-'+e.prazo).value; if(v) prazos[e.prazo]=v; });
+  st.textContent='Criando...'; st.style.color='var(--muted)';
+  try{
+    const r = await fetch('/api/expedicao/cards', {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({projeto_nome:projeto, numero_pedido:document.getElementById('exp-novo-pedido').value.trim(), prazos})});
+    const d = await r.json();
+    if(!d.ok){ st.textContent='Erro: '+(d.erro||'falha'); st.style.color='var(--err)'; return; }
+    expNovoFechar(); showToast('Pedido criado.', false); expedicaoKanbanCarregar();
+  }catch(e){ st.textContent='Erro: '+e; st.style.color='var(--err)'; }
+}
+
+// ── Painel de Detalhe (reaproveita o template Detalhe/Formulário) ─────────────
+let _expDetId = null;
+function _expSecTitle(t){ return '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:14px 0 8px;border-top:1px solid var(--border);padding-top:12px">'+t+'</div>'; }
+async function expDetAbrir(id){
+  const d = await (await fetch('/api/expedicao/cards/'+id, {credentials:'same-origin'})).json().catch(()=>({}));
+  if(!d.ok){ showToast('Falha ao abrir o pedido.', true); return; }
+  _expDetId = id;
+  document.getElementById('exp-det-status').textContent='';
+  document.getElementById('exp-det-body').innerHTML = _expDetHtml(d.card);
+  document.getElementById('modal-exp-det').style.display='flex';
+}
+function expDetFechar(){ document.getElementById('modal-exp-det').style.display='none'; }
+function _expDetHtml(card){
+  const status = (_expMeta && _expMeta.status) || [card.status_atual];
+  const opts = status.map(s=>'<option value="'+esc(s)+'"'+(s===card.status_atual?' selected':'')+'>'+esc(s)+'</option>').join('');
+  const ti = (id,val)=>'<input type="text" id="'+id+'" value="'+esc(val||'')+'" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font-size:12px">';
+  let h = '<div style="font-size:13px;color:var(--muted);margin-top:6px">'+esc(card.projeto_nome)+(card.cliente?' · '+esc(card.cliente):'')+'</div>';
+  h += _expSecTitle('Identificação');
+  h += '<div style="display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center">'
+    +'<label style="font-size:11px;color:var(--muted)">Nº do pedido</label>'+ti('exp-det-pedido', card.numero_pedido)+'</div>';
+  h += _expSecTitle('Status');
+  h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+    +'<select id="exp-det-status-sel" onchange="expDetStatusChange()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font-size:12px">'+opts+'</select>'
+    +'<button class="btn btn-ghost btn-sm" onclick="expMover()">Mover</button>'
+    +'<span style="font-size:11px;color:var(--muted)">a data realizada é pré-preenchida com hoje ao trocar o status</span></div>';
+  h += _expSecTitle('Prazos (planejado / realizado)');
+  h += '<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="color:var(--muted);text-align:left">'
+    +'<th style="padding:4px 6px;font-weight:500">Etapa</th><th style="padding:4px 6px;font-weight:500">Planejado</th><th style="padding:4px 6px;font-weight:500">Realizado</th></tr></thead><tbody>'
+    + _EXP_ETAPAS.map(e =>
+      '<tr><td style="padding:4px 6px;color:var(--text)">'+esc(e.lbl)+'</td>'
+      +'<td style="padding:4px 6px">'+_expDateInput('exp-det-'+e.prazo, card.prazos[e.prazo]||'')+'</td>'
+      +'<td style="padding:4px 6px">'+_expDateInput('exp-det-'+e.real, card.realizados[e.real]||'')+'</td></tr>').join('')
+    + '</tbody></table>';
+  h += _expSecTitle('Transporte');
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
+    +'<div><label style="font-size:10px;color:var(--muted)">Transportadora</label>'+ti('exp-det-transportadora',card.transporte.transportadora)+'</div>'
+    +'<div><label style="font-size:10px;color:var(--muted)">CT-e</label>'+ti('exp-det-cte',card.transporte.cte)+'</div>'
+    +'<div><label style="font-size:10px;color:var(--muted)">Rastreio</label>'+ti('exp-det-rastreio',card.transporte.rastreio)+'</div></div>';
+  h += _expSecTitle('Histórico de transições');
+  h += (card.historico&&card.historico.length) ? card.historico.map(t=>
+    '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);font-size:12px"><span>'+(t.de?esc(t.de)+' → ':'')+'<strong>'+esc(t.para)+'</strong></span>'
+    +'<span style="color:var(--muted);font-family:var(--font-mono);font-size:11px">'+(t.quando?esc(t.quando.substring(0,16).replace('T',' ')):'')+'</span></div>').join('')
+    : '<div style="font-size:11px;color:var(--muted)">Sem transições.</div>';
+  return h;
+}
+function expDetStatusChange(){
+  const sel = document.getElementById('exp-det-status-sel'); if(!sel) return;
+  const campos = (_expMeta && _expMeta.captura && _expMeta.captura[sel.value]) || [];
+  const hoje = new Date().toISOString().substring(0,10);
+  campos.forEach(campo => { const el=document.getElementById('exp-det-'+campo); if(el && !el.value) el.value = hoje; });
+}
+function _expColetaDatas(){
+  const prazos={}, realizados={};
+  _EXP_ETAPAS.forEach(e => {
+    prazos[e.prazo] = document.getElementById('exp-det-'+e.prazo).value || null;
+    realizados[e.real] = document.getElementById('exp-det-'+e.real).value || null;
+  });
+  return {prazos, realizados};
+}
+async function expDetSalvar(){
+  const st = document.getElementById('exp-det-status');
+  const {prazos, realizados} = _expColetaDatas();
+  const payload = Object.assign({
+    numero_pedido: document.getElementById('exp-det-pedido').value.trim(),
+    transportadora: document.getElementById('exp-det-transportadora').value.trim(),
+    cte: document.getElementById('exp-det-cte').value.trim(),
+    rastreio: document.getElementById('exp-det-rastreio').value.trim(),
+  }, prazos, realizados);
+  st.textContent='Salvando...'; st.style.color='var(--muted)';
+  try{
+    const d = await (await fetch('/api/expedicao/cards/'+_expDetId, {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)})).json();
+    if(!d.ok){ st.textContent='Erro: '+(d.erro||'falha'); st.style.color='var(--err)'; return; }
+    expDetFechar(); showToast('Pedido atualizado.', false); expedicaoKanbanCarregar();
+  }catch(e){ st.textContent='Erro: '+e; st.style.color='var(--err)'; }
+}
+async function expMover(){
+  const st = document.getElementById('exp-det-status');
+  const novo = document.getElementById('exp-det-status-sel').value;
+  const {realizados} = _expColetaDatas();
+  st.textContent='Movendo...'; st.style.color='var(--muted)';
+  try{
+    const d = await (await fetch('/api/expedicao/cards/'+_expDetId+'/mover', {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({novo_status:novo, realizados})})).json();
+    if(!d.ok){ st.textContent='Erro: '+(d.erro||'falha'); st.style.color='var(--err)'; return; }
+    showToast('Status atualizado.', false);
+    expedicaoKanbanCarregar();
+    expDetAbrir(_expDetId);   // recarrega o detalhe c/ o histórico atualizado
+  }catch(e){ st.textContent='Erro: '+e; st.style.color='var(--err)'; }
 }
 
 // Módulo Cadastro: troca de aba + lazy-load do painel ativo
