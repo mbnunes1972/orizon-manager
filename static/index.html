@@ -16,6 +16,7 @@
   --border:#2A3234; --border-strong:#3A4548;
   --text:#E8EAE9; --muted:#8C979A;
   --shadow:0 2px 6px rgba(0,0,0,.35);   /* elevação — substitui borda como fonte de profundidade */
+  --r-sm:6px; --r-md:8px; --r-lg:12px;  /* raios da escala (Padrao_Design_v7 §4) */
   /* accent (petróleo) e marca (dourado) — escuro */
   --accent:#5BB8AC; --accent-tint:rgba(91,184,172,.14);
   --gold:#D4B348; --gold-tint:rgba(212,179,72,.16); --warn-tint:rgba(239,159,39,.14);
@@ -110,7 +111,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
 .hub-card:not(.soon) .hub-card-tag{color:var(--accent)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 label.field-label{font-size:10px;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:5px}
-input[type=text],input[type=password],input[type=number]{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none;transition:.15s}
+/* Campo de Entrada (Padrao_Design_v7 §4): MESMA regra p/ texto/número/moeda/data — nunca branco fixo
+   nem estilo nativo do navegador. Fundo --surface-2, borda --border (foco --accent), 36px, radius --r-sm. */
+input[type=text],input[type=password],input[type=number],input[type=email],input[type=tel],input[type=search],input[type=date]{
+  width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);
+  height:36px;padding:0 12px;color:var(--text);font-family:var(--font-sans);font-size:13px;outline:none;transition:.15s}
+input[type=number],input[type=date]{font-family:var(--font-mono)}   /* dígitos alinhados (Mono) */
+input::placeholder{color:var(--muted)}
 input:focus{border-color:var(--accent)}
 /* Botões — Padrao_Design_Orizon_v4 §4: profundidade por --shadow, não por borda (corrige "terminal") */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 18px;height:36px;border-radius:8px;font-family:var(--font-sans);font-weight:500;font-size:13px;cursor:pointer;border:none;transition:all .15s;letter-spacing:.2px;white-space:nowrap}
@@ -289,9 +296,10 @@ body{overflow:hidden}
 .sb-params{padding:12px 0;border-top:1px solid var(--border);margin-top:8px}
 .sb-param-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-family:var(--font-sans)}
 .sb-label{display:block;font-size:9px;letter-spacing:.5px;color:var(--muted);margin-bottom:3px}
-.sb-select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:var(--font-mono);font-size:11px;outline:none;cursor:pointer;margin-bottom:8px}
-.sb-input-sm{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none;margin-bottom:8px}
-.sb-input-sm:focus{border-color:var(--accent)}
+/* Variantes pequenas da sidebar — especificidade elevada p/ vencer a regra de tipo (input[type=…]) */
+.sidebar .sb-select{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);height:auto;padding:6px 8px;color:var(--text);font-family:var(--font-mono);font-size:11px;outline:none;cursor:pointer;margin-bottom:8px}
+.sidebar .sb-input-sm{width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);height:auto;padding:6px 8px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none;margin-bottom:8px}
+.sidebar .sb-input-sm:focus{border-color:var(--accent)}
 /* Cards teal/amber para contrato */
 .contrato-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:14px 0}
 .card-teal{background:var(--teal-bg);border:1px solid var(--teal-brd);border-radius:10px;padding:16px}
@@ -8860,7 +8868,7 @@ async function adminRenderProjeto(box){
   const es = d.etapas || [];
   box.innerHTML = `
     <div class="card" style="padding:14px 16px">
-      <strong style="color:var(--dalm-gold,#c8a84b)">&#x1F4CB; Etapas do projeto ${esc(nome)}</strong>
+      <strong style="color:var(--text)">Etapas do projeto ${esc(nome)}</strong>
       <table class="cli-table" style="margin-top:10px"><thead><tr>
         <th>#</th><th>Etapa</th><th>Status</th><th>Concluída em</th>
       </tr></thead><tbody>
@@ -9553,10 +9561,8 @@ function renderCiclo() {
   if (!panel) return;
   panel.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-      <button onclick="fecharCiclo()" style="background:none;border:1px solid var(--dalm-gold);
-        border-radius:6px;color:var(--dalm-gold);cursor:pointer;font-size:.9rem;padding:6px 14px;
-        display:flex;align-items:center;gap:6px;">&#x2190; Voltar</button>
-      <h3 style="margin:0;color:var(--dalm-gold)">Etapas do Projeto</h3>
+      <button class="btn btn-ghost btn-sm" onclick="fecharCiclo()"><i class="ti ti-arrow-left"></i>Voltar</button>
+      <h3 style="margin:0;color:var(--text);font-weight:800">Etapas do Projeto</h3>
     </div>
   `;
   for (const etapa of ETAPAS_CICLO) {
@@ -9612,9 +9618,7 @@ function renderCiclo() {
   const rodape = document.createElement('div');
   rodape.style.cssText = 'margin-top:14px;display:flex';
   rodape.innerHTML = `
-    <button onclick="fecharCiclo()" style="background:none;border:1px solid var(--dalm-gold);
-      border-radius:6px;color:var(--dalm-gold);cursor:pointer;font-size:.9rem;padding:6px 14px;
-      display:flex;align-items:center;gap:6px;">&#x2190; Voltar</button>`;
+    <button class="btn btn-ghost btn-sm" onclick="fecharCiclo()"><i class="ti ti-arrow-left"></i>Voltar</button>`;
   panel.appendChild(rodape);
 }
 
@@ -9646,10 +9650,7 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
         ${cliEmail? `<div style="color:var(--muted)">E-mail: <span style="color:var(--text)">${cliEmail}</span></div>` : ''}
         ${cliTel  ? `<div style="color:var(--muted)">Tel: <span style="color:var(--text)">${cliTel}</span></div>`   : ''}
       </div>
-      ${cliId ? `<button onclick="cliAbrirModal(${cliId})"
-        style="background:none;border:1px solid var(--dalm-gold);color:var(--dalm-gold);
-        border-radius:5px;padding:5px 14px;font-size:.82rem;cursor:pointer">
-        ✎ Editar Cadastro</button>` : ''}
+      ${cliId ? `<button class="btn btn-ghost btn-sm" onclick="cliAbrirModal(${cliId})">✎ Editar Cadastro</button>` : ''}
       ${concluido ? `<span style="margin-left:8px;font-size:.8rem;color:var(--ok)">✓ Concluído${dt?' em '+dt:''}</span>` : ''}`;
   }
 
@@ -9669,7 +9670,7 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
       : `<div style="font-size:.85rem;color:var(--muted);margin-bottom:10px">Nenhum parceiro (arquiteto) associado.</div>`;
     const botao = assinado
       ? (temPar ? '' : '<span style="font-size:.78rem;color:var(--muted)">🔒 contrato assinado — não editável</span>')
-      : `<button onclick="abrirAssociarParceiro()" class="btn-ciclo" style="font-size:.82rem">
+      : `<button class="btn btn-ghost btn-sm" onclick="abrirAssociarParceiro()">
            ${temPar ? '✎ Alterar / remover parceiro' : '+ Inserir parceiro'}</button>`;
     return info + botao +
       (concluido ? `<span style="margin-left:8px;font-size:.8rem;color:var(--ok)">✓ Concluído${dt?' em '+dt:''}</span>` : '');
@@ -9689,9 +9690,7 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
         ${briefLocked ? `<span style="margin-left:10px;font-size:.75rem;color:var(--muted);
           border:1px solid var(--muted);border-radius:3px;padding:1px 6px">🔒 bloqueado após 1º orçamento</span>` : ''}
       </div>
-      ${cliId ? `<button onclick="cliAbrirBriefing(${cliId}, '${(cliNome).replace(/'/g,"\\'")}')"
-        style="background:none;border:1px solid var(--dalm-gold);color:var(--dalm-gold);
-        border-radius:5px;padding:5px 14px;font-size:.82rem;cursor:pointer">
+      ${cliId ? `<button class="btn btn-ghost btn-sm" onclick="cliAbrirBriefing(${cliId}, '${(cliNome).replace(/'/g,"\\'")}')">
         ${briefLocked ? '👁 Ver Briefing' : '✎ ' + (concluido ? 'Editar' : 'Preencher') + ' Briefing'}
       </button>` : ''}`;
   }
@@ -9704,8 +9703,8 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
     const linhas = _orcamentos.map(o => `
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
         <span style="flex:1">${esc(o.nome || ('Orçamento ' + o.id))}</span>
-        <button class="btn-ciclo" style="font-size:.8rem" onclick="fecharCiclo();ativarOrcamento(${o.id})">Abrir</button>
-        <a class="btn-ciclo" style="font-size:.8rem;text-decoration:none" target="_blank" rel="noopener"
+        <button class="btn btn-ghost btn-sm" onclick="fecharCiclo();ativarOrcamento(${o.id})">Abrir</button>
+        <a class="btn btn-ghost btn-sm" style="text-decoration:none" target="_blank" rel="noopener"
            href="/api/orcamentos/${o.id}/proposta/pdf">&#x1F5A8; Imprimir</a>
       </div>`).join('');
     return `<div>${linhas}</div>`;
