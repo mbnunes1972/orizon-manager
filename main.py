@@ -657,8 +657,17 @@ class Handler(BaseHTTPRequestHandler):
                 qs = parse_qs(urlparse(self.path).query)
                 q = (qs.get("q") or [""])[0].strip()
                 status = (qs.get("status") or [""])[0].strip()
-                self.send_json({"ok": True, "meta": mod_cadastro.META,
-                                "itens": mod_cadastro.listar(db, Model, ser, loja_id, q or None, status or None)})
+                itens = mod_cadastro.listar(db, Model, ser, loja_id, q or None, status or None)
+                # Filtro por função (Modulos_Orizon_v12): dropdown de responsável do Cronograma lista
+                # só funcionários da função exigida pela fase.
+                funcao_id = (qs.get("funcao_id") or [""])[0].strip()
+                if funcao_id:
+                    try:
+                        fid = int(funcao_id)
+                        itens = [x for x in itens if x.get("funcao_id") == fid]
+                    except ValueError:
+                        pass
+                self.send_json({"ok": True, "meta": mod_cadastro.META, "itens": itens})
             finally:
                 db.close()
             return
@@ -985,12 +994,24 @@ class Handler(BaseHTTPRequestHandler):
                     for uid, lid in db.query(UsuarioLoja.usuario_id, UsuarioLoja.loja_id).filter(
                             UsuarioLoja.usuario_id.in_(vis_ids)).all():
                         memb.setdefault(uid, []).append(lid)
+                # Função (Modulos_Orizon_v12): herdada do Funcionário vinculado (funcionario_id →
+                # Funcionario.funcao_id → Funcao.nome), NÃO duplicada no Usuário. Perfil = nivel (acesso).
+                func_ids = {u.funcionario_id for u in visiveis if u.funcionario_id}
+                funcs = {f.id: f for f in db.query(Funcionario).filter(Funcionario.id.in_(func_ids)).all()} \
+                    if func_ids else {}
+                funcao_ids = {f.funcao_id for f in funcs.values() if f.funcao_id}
+                funcoes_map = {fn.id: fn.nome for fn in db.query(Funcao).filter(Funcao.id.in_(funcao_ids)).all()} \
+                    if funcao_ids else {}
+                def _funcao_nome(u):
+                    f = funcs.get(u.funcionario_id) if u.funcionario_id else None
+                    return funcoes_map.get(f.funcao_id, "") if (f and f.funcao_id) else ""
                 self.send_json({"ok": True, "usuarios": [
                     {"id": u.id, "nome": u.nome, "login": u.login, "nivel": u.nivel,
                      "rotulo": perfis.rotulo(u.nivel), "telefone": u.telefone or "",
                      "whatsapp": u.whatsapp or "", "email": u.email or "", "cpf": u.cpf or "",
                      "loja_id": u.loja_id, "rede_id": u.rede_id,
                      "loja_ids": memb.get(u.id, []),
+                     "funcao_nome": _funcao_nome(u),
                      "ativo": bool(u.ativo)} for u in visiveis]})
             finally:
                 db.close()
@@ -1582,6 +1603,13 @@ class Handler(BaseHTTPRequestHandler):
                                 etapas.append(nova)
                             db.commit()
                     etapas_sorted = sorted(etapas, key=lambda e: mod_ciclo.chave_ordenacao(e.etapa_codigo))
+                    # Responsável por função (v12): resolve nomes de função e do funcionário escolhido (batch).
+                    _fnc_ids = {e.funcao_responsavel_id for e in etapas_sorted if e.funcao_responsavel_id}
+                    _fnc_map = {f.id: f.nome for f in db.query(Funcao).filter(Funcao.id.in_(_fnc_ids)).all()} \
+                        if _fnc_ids else {}
+                    _fio_ids = {e.responsavel_funcionario_id for e in etapas_sorted if e.responsavel_funcionario_id}
+                    _fio_map = {f.id: f.nome for f in db.query(Funcionario).filter(Funcionario.id.in_(_fio_ids)).all()} \
+                        if _fio_ids else {}
                     resultado = [{
                         "etapa_codigo":  e.etapa_codigo,
                         "status":        e.status,
@@ -1592,6 +1620,11 @@ class Handler(BaseHTTPRequestHandler):
                         # (= concluido_em, exposta com o nome do spec).
                         "data_prevista_conclusao": e.data_prevista_conclusao.isoformat() if e.data_prevista_conclusao else None,
                         "data_conclusao": e.concluido_em.isoformat() if e.concluido_em else None,
+                        # Responsável por função (v12): função exigida (herdada) + funcionário escolhido.
+                        "funcao_responsavel_id":   e.funcao_responsavel_id,
+                        "funcao_responsavel_nome": _fnc_map.get(e.funcao_responsavel_id, ""),
+                        "responsavel_funcionario_id":   e.responsavel_funcionario_id,
+                        "responsavel_funcionario_nome": _fio_map.get(e.responsavel_funcionario_id, ""),
                         "observacoes":   e.observacoes or "",
                     } for e in etapas_sorted]
                     assinado = _contrato_assinado(nome_safe, db)
@@ -4427,6 +4460,52 @@ class Handler(BaseHTTPRequestHandler):
                     ))
                     db.commit()
                     self.send_json({"ok": True, "data_prevista_conclusao": nova_dt.isoformat()})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            # POST /api/projetos/<nome>/ciclo/<codigo>/responsavel — escolhe o FUNCIONÁRIO responsável
+            # pela etapa (Cronograma do Projeto, Modulos_Orizon_v12). O funcionário precisa ter a FUNÇÃO
+            # exigida pela fase (funcao_responsavel_id, herdada do padrão no D0). funcionario_id vazio limpa.
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/([^/]+)/responsavel$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                etapa_cod = unquote(m.group(2))
+                usuario   = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    req = json.loads(body or b'{}')
+                    fio_id = req.get("funcionario_id")
+                    etapa = db.query(CicloEtapa).filter_by(
+                        projeto_nome=nome_safe, etapa_codigo=etapa_cod).first()
+                    if etapa is None:
+                        etapa = CicloEtapa(projeto_nome=nome_safe, etapa_codigo=etapa_cod)
+                        db.add(etapa)
+                    if fio_id in (None, "", 0, "0"):
+                        etapa.responsavel_funcionario_id = None
+                    else:
+                        func = db.get(Funcionario, int(fio_id))
+                        if func is None or func.loja_id != loja_id:
+                            self.send_json({"ok": False, "erro": "Funcionário não encontrado"}, code=404); return
+                        # Restrição por função: se a fase exige uma função, o funcionário tem de tê-la.
+                        if etapa.funcao_responsavel_id and func.funcao_id != etapa.funcao_responsavel_id:
+                            self.send_json({"ok": False,
+                                            "erro": "Funcionário não tem a função exigida por esta fase"}, code=400)
+                            return
+                        etapa.responsavel_funcionario_id = func.id
+                    db.commit()
+                    self.send_json({"ok": True, "responsavel_funcionario_id": etapa.responsavel_funcionario_id})
                 except Exception as e:
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)

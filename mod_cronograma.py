@@ -13,7 +13,9 @@ from database import CicloEtapa
 
 
 def cronograma_padrao(cfg):
-    """Normaliza a lista de fases do Cronograma Padrão da config: [{codigo, prazo_dias}]."""
+    """Normaliza a lista de fases do Cronograma Padrão da config: [{codigo, prazo_dias, funcao_id}].
+    funcao_id (→ Tabela de Funções, Modulos_Orizon_v12) é a FUNÇÃO responsável pela fase; None se não
+    definida."""
     itens = (cfg or {}).get("cronograma_padrao") or []
     out = []
     for it in itens:
@@ -24,7 +26,11 @@ def cronograma_padrao(cfg):
             prazo = int((it or {}).get("prazo_dias") or 0)
         except (TypeError, ValueError):
             prazo = 0
-        out.append({"codigo": cod, "prazo_dias": max(0, prazo)})
+        try:
+            fid = int((it or {}).get("funcao_id")) if (it or {}).get("funcao_id") else None
+        except (TypeError, ValueError):
+            fid = None
+        out.append({"codigo": cod, "prazo_dias": max(0, prazo), "funcao_id": fid})
     return out
 
 
@@ -41,6 +47,8 @@ def gerar_cronograma_projeto(db, projeto_nome, cfg, d0):
             reg = CicloEtapa(projeto_nome=projeto_nome, etapa_codigo=fase["codigo"])
             db.add(reg)
         reg.data_prevista_conclusao = prevista
+        # Herda a FUNÇÃO responsável do padrão (v12); não sobrescreve o funcionário já escolhido.
+        reg.funcao_responsavel_id = fase.get("funcao_id")
         afetadas.append(reg)
     db.flush()
     return afetadas

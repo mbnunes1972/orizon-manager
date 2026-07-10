@@ -539,6 +539,11 @@ class CicloEtapa(Base):
     # Cronograma do Ciclo (Modulos_Orizon_v11): data prevista de conclusão (D0 + prazo padrão),
     # constituída na assinatura do contrato; editável só por reautenticação Gerente+ (auditada).
     data_prevista_conclusao = Column(DateTime, nullable=True)
+    # Responsável por função (Modulos_Orizon_v12): funcao_responsavel_id é herdada do Cronograma de
+    # Projeto Padrão no D0 (a FUNÇÃO que executa a fase); responsavel_funcionario_id nasce vazio e é
+    # escolhido depois, restrito aos funcionários que têm essa função.
+    funcao_responsavel_id       = Column(Integer, ForeignKey("funcoes.id"), nullable=True)
+    responsavel_funcionario_id  = Column(Integer, ForeignKey("funcionarios.id"), nullable=True)
     observacoes    = Column(Text,     nullable=True)
 
     __table_args__ = (UniqueConstraint("projeto_nome", "etapa_codigo", name="uq_ciclo_etapa"),)
@@ -1074,7 +1079,10 @@ def _migrar_colunas():
         _add_cols("terceiros",    [("funcao_id","INTEGER")] + _ENDERECO + _BANCO)
         _add_cols("parceiros",    [("pix","VARCHAR(140)")])
         # Cronograma do Ciclo (Modulos_Orizon_v11): data prevista de conclusão por etapa
-        _add_cols("ciclo_etapas", [("data_prevista_conclusao","DATETIME")])
+        # + Responsável por função (Modulos_Orizon_v12): função exigida + funcionário escolhido
+        _add_cols("ciclo_etapas", [("data_prevista_conclusao","DATETIME"),
+                                   ("funcao_responsavel_id","INTEGER"),
+                                   ("responsavel_funcionario_id","INTEGER")])
 
         conn.commit()
     except Exception:
