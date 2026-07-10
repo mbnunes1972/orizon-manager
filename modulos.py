@@ -17,7 +17,7 @@ MODULOS = {
                     "arquivos": [],
                     "tabelas": ["log_autorizacoes", "log_acoes_gerenciais"], "rotas": []},
     "ciclo":       {"camada": "nucleo", "depende_de": [],
-                    "arquivos": ["mod_ciclo.py"],
+                    "arquivos": ["mod_ciclo.py", "mod_cronograma.py"],
                     "tabelas": ["ciclo_etapas", "ciclo_documentos", "ciclo_revisoes"], "rotas": []},
     "integracoes": {"camada": "nucleo", "depende_de": [],
                     "arquivos": ["emissor_fiscal.py", "focus_client.py", "focus_config.py",

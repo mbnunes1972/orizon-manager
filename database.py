@@ -535,7 +535,10 @@ class CicloEtapa(Base):
     status         = Column(Text,     nullable=False, default="pendente")
     responsavel_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     iniciado_em    = Column(DateTime, nullable=True)
-    concluido_em   = Column(DateTime, nullable=True)
+    concluido_em   = Column(DateTime, nullable=True)   # = data_conclusao (Modulos_Orizon_v11)
+    # Cronograma do Ciclo (Modulos_Orizon_v11): data prevista de conclusão (D0 + prazo padrão),
+    # constituída na assinatura do contrato; editável só por reautenticação Gerente+ (auditada).
+    data_prevista_conclusao = Column(DateTime, nullable=True)
     observacoes    = Column(Text,     nullable=True)
 
     __table_args__ = (UniqueConstraint("projeto_nome", "etapa_codigo", name="uq_ciclo_etapa"),)
@@ -1070,6 +1073,8 @@ def _migrar_colunas():
         _add_cols("fornecedores", _ENDERECO + _BANCO)
         _add_cols("terceiros",    [("funcao_id","INTEGER")] + _ENDERECO + _BANCO)
         _add_cols("parceiros",    [("pix","VARCHAR(140)")])
+        # Cronograma do Ciclo (Modulos_Orizon_v11): data prevista de conclusão por etapa
+        _add_cols("ciclo_etapas", [("data_prevista_conclusao","DATETIME")])
 
         conn.commit()
     except Exception:

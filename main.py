@@ -1586,6 +1586,10 @@ class Handler(BaseHTTPRequestHandler):
                         "responsavel_id": e.responsavel_id,
                         "iniciado_em":   e.iniciado_em.isoformat() if e.iniciado_em else None,
                         "concluido_em":  e.concluido_em.isoformat() if e.concluido_em else None,
+                        # Cronograma do Ciclo (v11): data prevista (D0+prazo) e data de conclusão
+                        # (= concluido_em, exposta com o nome do spec).
+                        "data_prevista_conclusao": e.data_prevista_conclusao.isoformat() if e.data_prevista_conclusao else None,
+                        "data_conclusao": e.concluido_em.isoformat() if e.concluido_em else None,
                         "observacoes":   e.observacoes or "",
                     } for e in etapas_sorted]
                     assinado = _contrato_assinado(nome_safe, db)
@@ -4360,6 +4364,74 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # POST /api/projetos/<nome>/ciclo/<codigo>/data-prevista — edita a data prevista de
+            # conclusão de uma etapa (Cronograma do Ciclo, Modulos_Orizon_v11). Protegida por
+            # reautenticação Gerente+ (mesmo princípio dos gates financeiros) e auditada (quem/quando/
+            # valor antigo → novo) em LogAcaoGerencial.
+            m = _re.match(r'^/api/projetos/([^/]+)/ciclo/([^/]+)/data-prevista$', path)
+            if m:
+                nome_safe   = unquote(m.group(1))
+                etapa_cod   = unquote(m.group(2))
+                solicitante = get_usuario_sessao(self)
+                if not solicitante:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                    return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, solicitante)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403)
+                        return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                        return
+                    req   = json.loads(body or b'{}')
+                    login = (req.get("login") or "").strip()
+                    senha = (req.get("senha") or "").strip()
+                    nova_str = (req.get("data_prevista") or "").strip()   # "AAAA-MM-DD"
+                    autorizador = db.query(Usuario).filter_by(login=login, ativo=1).first()
+                    if not autorizador or not autorizador.check_senha(senha):
+                        self.send_json({"ok": False, "erro": "Credenciais inválidas"}, code=403)
+                        return
+                    if not perfis.pode(autorizador.nivel, "autorizar"):
+                        self.send_json({"ok": False, "erro": "Necessário nível Gerente ou Diretor"}, code=403)
+                        return
+                    try:
+                        nova_dt = datetime.strptime(nova_str, "%Y-%m-%d") if nova_str else None
+                    except ValueError:
+                        self.send_json({"ok": False, "erro": "Data inválida (use AAAA-MM-DD)"}, code=400)
+                        return
+                    if nova_dt is None:
+                        self.send_json({"ok": False, "erro": "Informe a nova data prevista"}, code=400)
+                        return
+                    etapa = db.query(CicloEtapa).filter_by(
+                        projeto_nome=nome_safe, etapa_codigo=etapa_cod).first()
+                    if etapa is None:
+                        etapa = CicloEtapa(projeto_nome=nome_safe, etapa_codigo=etapa_cod)
+                        db.add(etapa)
+                    antigo = etapa.data_prevista_conclusao
+                    etapa.data_prevista_conclusao = nova_dt
+                    db.add(LogAcaoGerencial(
+                        solicitante_id=solicitante["id"],
+                        autorizador_id=autorizador.id,
+                        acao="editar_data_prevista",
+                        projeto_nome=nome_safe,
+                        etapa_alvo=etapa_cod,
+                        contexto=json.dumps({
+                            "valor_antigo": antigo.isoformat() if antigo else None,
+                            "valor_novo":   nova_dt.isoformat(),
+                        }),
+                    ))
+                    db.commit()
+                    self.send_json({"ok": True, "data_prevista_conclusao": nova_dt.isoformat()})
+                except Exception as e:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
             # POST /api/projetos/<nome>/parceiro — associa/remove o parceiro (arquiteto) do
             # projeto (etapa "Criação do Projeto"). Editável só ATÉ a assinatura do contrato.
             m = _re.match(r'^/api/projetos/([^/]+)/parceiro$', path)
@@ -4572,6 +4644,19 @@ class Handler(BaseHTTPRequestHandler):
                         etapa7.concluido_em  = datetime.utcnow()
                         etapa7.responsavel_id = usuario["id"]
                         db.commit()
+                        # Cronograma do Ciclo (Modulos_Orizon_v11): D0 = assinatura total do contrato
+                        # (mesmo gatilho das Provisões). Constitui data_prevista_conclusao por etapa a
+                        # partir do Cronograma de Projeto Padrão (Config). Fail-soft: não bloqueia a
+                        # assinatura se algo falhar.
+                        try:
+                            import mod_cronograma
+                            _cfg_crono = _cfg_financeira_loja(db, loja_id)
+                            mod_cronograma.gerar_cronograma_projeto(
+                                db, nome_safe, _cfg_crono, datetime.utcnow())
+                            db.commit()
+                        except Exception as _ec:
+                            db.rollback()
+                            print("[CRONOGRAMA] gerar_cronograma_projeto falhou:", _ec)
                         try:
                             upsert_projeto_status(nome_safe, "fechado")
                         except Exception as _e:
