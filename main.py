@@ -1612,6 +1612,19 @@ class Handler(BaseHTTPRequestHandler):
                     _fio_ids = {e.responsavel_funcionario_id for e in etapas_sorted if e.responsavel_funcionario_id}
                     _fio_map = {f.id: f.nome for f in db.query(Funcionario).filter(Funcionario.id.in_(_fio_ids)).all()} \
                         if _fio_ids else {}
+                    # Mapa de Atribuições (Fase 1) é o DEFAULT do responsável da fase; o
+                    # responsavel_funcionario_id (v12) é o override pontual. Efetivo = override OU Mapa.
+                    _atrib = _atribuicoes_dicts(db, nome_safe)
+                    def _resp_efetivo(e):
+                        if e.responsavel_funcionario_id:
+                            return e.responsavel_funcionario_id
+                        papel = _ETAPA_PAPEL.get(e.etapa_codigo)
+                        a = mod_escopo.resolver_responsavel(_atrib, None, papel) if papel else None
+                        return a.get("funcionario_id") if a else None
+                    _efet_by_cod = {e.etapa_codigo: _resp_efetivo(e) for e in etapas_sorted}
+                    _efet_ids = {i for i in _efet_by_cod.values() if i}
+                    _efet_map = {f.id: f.nome for f in db.query(Funcionario).filter(Funcionario.id.in_(_efet_ids)).all()} \
+                        if _efet_ids else {}
                     resultado = [{
                         "etapa_codigo":  e.etapa_codigo,
                         "status":        e.status,
@@ -1627,6 +1640,9 @@ class Handler(BaseHTTPRequestHandler):
                         "funcao_responsavel_nome": _fnc_map.get(e.funcao_responsavel_id, ""),
                         "responsavel_funcionario_id":   e.responsavel_funcionario_id,
                         "responsavel_funcionario_nome": _fio_map.get(e.responsavel_funcionario_id, ""),
+                        # Responsável EFETIVO (Fase 1): override da etapa OU default do Mapa de Atribuições.
+                        "responsavel_efetivo_id":   _efet_by_cod.get(e.etapa_codigo),
+                        "responsavel_efetivo_nome": _efet_map.get(_efet_by_cod.get(e.etapa_codigo), ""),
                         "observacoes":   e.observacoes or "",
                     } for e in etapas_sorted]
                     assinado = _contrato_assinado(nome_safe, db)
@@ -3303,6 +3319,9 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
+                _bc = _bloqueio_comercial(ator)      # visão do papel (§3): operacional não vê comercial
+                if _bc:
+                    self.send_json({"ok": False, "erro": _bc}, code=403); return
                 req = json.loads(body.decode("utf-8", "replace")) if body else {}
                 orc = _obj_da_loja(db, Orcamento, oid, loja_id)
                 if orc is None:
@@ -3352,6 +3371,9 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
+                _bc = _bloqueio_comercial(ator)      # visão do papel (§3): operacional não vê comercial
+                if _bc:
+                    self.send_json({"ok": False, "erro": _bc}, code=403); return
                 orc = _obj_da_loja(db, Orcamento, int(m_prev.group(1)), loja_id)
                 if orc is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
@@ -7250,6 +7272,23 @@ def _pode_editar_mapa(nivel):
     """Abrir/editar o Mapa: Gerência+ (autorizar/aprovar_financeiro) ou Supervisor de Montagem."""
     return bool(nivel) and (perfis.pode(nivel, "autorizar") or perfis.pode(nivel, "aprovar_financeiro")
                             or nivel == "supervisor_montagem")
+
+
+def _bloqueio_comercial(ator):
+    """Visão do papel (Regras §3): operacional (PE/Medidor/Montagem) NUNCA vê o comercial
+    (negociação, valores, margem, comissão). Retorna a msg de erro (403) ou None."""
+    if mod_escopo.visao_do_papel(ator) == "operacional":
+        return "Sem acesso ao comercial (visão operacional)."
+    return None
+
+
+# Etapa do ciclo → papel operacional do Mapa (Regras §7). O Mapa é o default do responsável da fase.
+_ETAPA_PAPEL = {
+    "9": "medicao", "10": "medicao",
+    "11": "projeto_executivo", "11a": "projeto_executivo", "11b": "projeto_executivo",
+    "11c": "projeto_executivo", "11e": "projeto_executivo",
+    "17": "montagem", "18": "assistencia",
+}
 
 
 def _ambientes_do_projeto(db, nome_safe):

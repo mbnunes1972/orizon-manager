@@ -175,3 +175,34 @@ def test_escopo_operacional_so_o_atribuido(http_client_factory, seed, projetos_d
 def test_escopo_isolamento_loja_intacto(http_client_factory, seed, projetos_dir, app_db):
     c = http_client_factory(); c.login("cons_l1", "senha123")
     assert c.get("/projetos/Proj_L2")[0] == 404   # F4: outra loja
+
+
+# ── F1.5: visão do papel (comercial bloqueado ao operacional) + Mapa = responsável default ──
+def test_operacional_bloqueado_no_comercial(http_client_factory, seed, projetos_dir, app_db):
+    db = app_db.get_session()
+    l1 = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    u = app_db.Usuario(nome="Med", login="med@loja.com", nivel="medidor", loja_id=l1, ativo=1)
+    u.set_senha("x"); db.add(u); db.commit(); db.close()
+    med = http_client_factory(); med.login("med@loja.com", "x")
+    st, d = med.post("/api/orcamentos/1/negociacao-preview", {})
+    assert st == 403 and "operacional" in (d.get("erro", "").lower())   # §9: Medidor não vê valores
+    # consultor NÃO é barrado pelo gate comercial (passa; 404 pois o orçamento não existe)
+    c = http_client_factory(); c.login("cons_l1", "senha123")
+    assert c.post("/api/orcamentos/1/negociacao-preview", {})[0] != 403
+
+
+def test_ciclo_responsavel_efetivo_vem_do_mapa(http_client_factory, seed, projetos_dir, app_db):
+    db = app_db.get_session()
+    l1 = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    fpe = app_db.Funcao(loja_id=l1, nome="Projetista Executivo"); db.add(fpe); db.flush()
+    func = app_db.Funcionario(loja_id=l1, nome="Paulo PE", funcao_id=fpe.id, status="ativo")
+    db.add(func); db.flush()
+    db.add(app_db.CicloEtapa(projeto_nome="Proj_L1", etapa_codigo="11", status="pendente"))
+    db.add(app_db.AtribuicaoAmbiente(loja_id=l1, projeto_nome="Proj_L1", pool_ambiente_id=None,
+                                     papel="projeto_executivo", funcionario_id=func.id))
+    db.commit(); db.close()
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.get("/api/projetos/Proj_L1/ciclo")
+    assert st == 200
+    e11 = next(x for x in d["ciclo"] if x["etapa_codigo"] == "11")
+    assert e11["responsavel_efetivo_nome"] == "Paulo PE"   # Mapa é o default da fase
