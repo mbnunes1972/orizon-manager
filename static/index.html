@@ -119,6 +119,13 @@ input[type=text],input[type=password],input[type=number],input[type=email],input
 input[type=number],input[type=date]{font-family:var(--font-mono)}   /* dígitos alinhados (Mono) */
 input::placeholder{color:var(--muted)}
 input:focus{border-color:var(--accent)}
+/* Autofill do navegador (Padrao_Design_v8 §4): a camada de autofill do Chrome pinta o fundo (branco/
+   amarelo) por cima do token — o `background` sozinho não vence. Achado real: "R$ máx" branco enquanto
+   "R$ mín" (não preenchido) fica --surface-2. O box-shadow inset força --surface-2 em qualquer campo. */
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,input:-webkit-autofill:active{
+  -webkit-box-shadow:0 0 0 1000px var(--surface-2) inset;box-shadow:0 0 0 1000px var(--surface-2) inset;
+  -webkit-text-fill-color:var(--text);caret-color:var(--text);
+  transition:background-color 9999s ease-out 0s}   /* mata o flash de fundo do autofill */
 /* Botões — Padrao_Design_Orizon_v4 §4: profundidade por --shadow, não por borda (corrige "terminal") */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 18px;height:36px;border-radius:8px;font-family:var(--font-sans);font-weight:500;font-size:13px;cursor:pointer;border:none;transition:all .15s;letter-spacing:.2px;white-space:nowrap}
 .btn-primary{background:var(--accent);color:#fff;box-shadow:var(--shadow)}
@@ -759,15 +766,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <label class="proj-status-filter-item"><input type="checkbox" value="sem"        checked onchange="projAplicarFiltros()"> — Sem status</label>
         </div>
       </div>
-      <!-- Filtros: Faixa de valor · Data (Diagramacao_v6) -->
+      <!-- Filtros: Faixa de valor · Data (Diagramacao_v6). Largura compacta por tipo (Padrao_Design_v8 §4):
+           moeda ~130px · data ~160px — lado a lado com o Status, NUNCA full-width empilhado (o padrão
+           input width:100% empilharia os campos de data, que não tinham largura própria). -->
       <input type="number" id="proj-val-min" placeholder="R$ mín" oninput="projAplicarFiltros()"
-             class="inp" style="width:92px;box-sizing:border-box" title="Valor mínimo (último orçamento)">
+             class="inp" style="width:130px;box-sizing:border-box" title="Valor mínimo (último orçamento)">
       <input type="number" id="proj-val-max" placeholder="R$ máx" oninput="projAplicarFiltros()"
-             class="inp" style="width:92px;box-sizing:border-box" title="Valor máximo (último orçamento)">
+             class="inp" style="width:130px;box-sizing:border-box" title="Valor máximo (último orçamento)">
       <input type="date" id="proj-data-ini" onchange="projAplicarFiltros()"
-             class="inp" style="box-sizing:border-box" title="Data inicial (atualização)">
+             class="inp" style="width:160px;box-sizing:border-box" title="Data inicial (atualização)">
       <input type="date" id="proj-data-fim" onchange="projAplicarFiltros()"
-             class="inp" style="box-sizing:border-box" title="Data final (atualização)">
+             class="inp" style="width:160px;box-sizing:border-box" title="Data final (atualização)">
       <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:8px;padding:3px;box-shadow:var(--shadow)">
         <button id="projview-lista" onclick="projSetView('lista')" style="border:none;background:var(--surface);color:var(--accent);box-shadow:var(--shadow);font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s">Lista</button>
         <button id="projview-funil" onclick="projSetView('funil')" style="border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s">Funil</button>
