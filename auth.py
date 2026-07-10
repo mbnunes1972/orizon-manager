@@ -18,12 +18,19 @@ COOKIE_NAME            = "omie_session"
 # ── Login ─────────────────────────────────────────────────────────────────────
 def fazer_login(login: str, senha: str) -> dict:
     """
-    Autentica um usuário e retorna token de sessão.
+    Autentica um usuário e retorna token de sessão. O identificador aceita **login OU e-mail**
+    (a tela de entrada usa e-mail; contas antigas seguem entrando pelo login).
     Retorna: {"ok": True, "token": "...", "usuario": {...}} ou {"ok": False, "erro": "..."}
     """
+    from sqlalchemy import or_, func
     db = get_session()
     try:
-        usuario = db.query(Usuario).filter_by(login=login, ativo=1).first()
+        ident = (login or "").strip()
+        usuario = (db.query(Usuario)
+                   .filter(Usuario.ativo == 1,
+                           or_(Usuario.login == ident,
+                               func.lower(Usuario.email) == ident.lower()))
+                   .first())
         if not usuario or not usuario.check_senha(senha):
             return {"ok": False, "erro": "Usuário ou senha inválidos."}
 

@@ -1,223 +1,487 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Orizon Manager — Login</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orizon Manager — Gestão para redes de móveis planejados</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FFFFFF;
+    --surface: #F7F7F5;
+    --surface-2: #FFFFFF;
+    --border: #DDDAD2;
+    --border-strong: #C9C6BC;
+    --text: #2A2A28;
+    --muted: #6B6860;
+    --accent: #1F4B4B;
+    --accent-tint: rgba(31,75,75,.08);
+    --accent-text: #FFFFFF;
+    --gold: #9C7A0C;
+    --gold-tint: rgba(156,122,12,.10);
+    --shadow-sm: 0 1px 2px rgba(20,20,15,.05);
+    --shadow-md: 0 6px 24px rgba(20,20,15,.08);
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --font-display: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+  [data-theme="dark"] {
+    --bg: #181C1E;
+    --surface: #1D2224;
+    --surface-2: #232A2C;
+    --border: #2A3234;
+    --border-strong: #3A4548;
+    --text: #E8EAE9;
+    --muted: #8C979A;
+    --accent: #5BB8AC;
+    --accent-tint: rgba(91,184,172,.12);
+    --accent-text: #12191A;
+    --gold: #D4B348;
+    --gold-tint: rgba(212,179,72,.14);
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
+    --shadow-md: 0 10px 32px rgba(0,0,0,.4);
+  }
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font-display);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    transition: background .2s ease, color .2s ease;
+  }
+  img, svg { display: block; max-width: 100%; }
+  a { color: inherit; text-decoration: none; }
+  section { padding: 88px 24px; }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .eyebrow::before {
+    content: "";
+    width: 14px;
+    height: 1px;
+    background: var(--gold);
+    display: inline-block;
+  }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+  h1 { font-size: 52px; line-height: 1.08; }
+  h2 { font-size: 32px; line-height: 1.2; }
+  h3 { font-size: 17px; font-weight: 700; }
+  p { color: var(--muted); }
+  .lede { font-size: 18px; line-height: 1.6; max-width: 560px; }
 
-    :root {
-      /* Tokens alinhados ao :root do app (Padrao_Design_Orizon_v2 — tema escuro; fonte de verdade = .docx).
-         login.html é página standalone (servida antes do app) → replica os tokens, não pode herdar o <style>. */
-      --bg:      #171B1C;
-      --card:    #20262A;
-      --border:  #2C3335;
-      --accent:  #4FA89E;
-      --text:    #EDEFEE;
-      --muted:   #8C979A;
-      --err:     #E2876C;
-      --input-bg:#1D2224;
-    }
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 44px; padding: 0 22px; border-radius: var(--radius-md);
+    font-weight: 600; font-size: 14px; border: none; cursor: pointer;
+    transition: all .15s ease; white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: var(--accent-text); box-shadow: var(--shadow-sm); }
+  .btn-primary:hover { opacity: .92; box-shadow: var(--shadow-md); }
+  .btn-ghost { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--border-strong); }
+  .btn-sm { height: 36px; padding: 0 16px; font-size: 13px; }
 
-    body {
-      background: var(--bg);
-      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+  /* Nav */
+  header {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  nav {
+    max-width: 1120px; margin: 0 auto; padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; letter-spacing: -0.01em; }
+  .logo-mark { width: 26px; height: 26px; flex-shrink: 0; }
+  .nav-links { display: flex; align-items: center; gap: 32px; font-size: 14px; font-weight: 500; color: var(--muted); }
+  .nav-links a:hover { color: var(--text); }
+  .nav-right { display: flex; align-items: center; gap: 14px; }
+  .theme-toggle {
+    width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--surface-2); display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--muted); transition: border-color .15s;
+  }
+  .theme-toggle:hover { border-color: var(--border-strong); }
+  .theme-toggle svg { width: 17px; height: 17px; }
+  .icon-moon { display: none; }
+  [data-theme="dark"] .icon-sun { display: none; }
+  [data-theme="dark"] .icon-moon { display: block; }
 
-    .card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 40px 36px 36px;
-      width: 100%;
-      max-width: 380px;
-    }
+  @media (max-width: 760px) {
+    .nav-links { display: none; }
+  }
 
-    .logo {
-      text-align: center;
-      margin-bottom: 32px;
-    }
+  /* Hero */
+  .hero { padding: 96px 24px 40px; }
+  .hero-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 64px; align-items: center; }
+  .hero-ctas { display: flex; gap: 12px; margin-top: 32px; flex-wrap: wrap; }
+  .hero-note { margin-top: 22px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .hero-note svg { width: 14px; height: 14px; color: var(--gold); flex-shrink: 0; }
+  @media (max-width: 860px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+    h1 { font-size: 38px; }
+  }
 
-    .logo-title {
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--accent);
-      letter-spacing: .5px;
-    }
+  /* Signature illustration */
+  .signature { width: 100%; height: auto; }
 
-    .logo-sub {
-      font-size: 12px;
-      color: var(--muted);
-      margin-top: 4px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
+  /* Process strip */
+  .process { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .process-head { max-width: 640px; margin-bottom: 56px; }
+  .process-track { position: relative; }
+  .process-line {
+    position: absolute; top: 19px; left: 0; right: 0; height: 1px;
+    background: var(--border-strong);
+  }
+  .process-steps { display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; position: relative; }
+  .process-step { display: flex; flex-direction: column; align-items: flex-start; }
+  .process-num {
+    width: 38px; height: 38px; border-radius: 50%; background: var(--bg); border: 1.5px solid var(--accent);
+    color: var(--accent); font-family: var(--font-mono); font-size: 13px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center; margin-bottom: 14px; position: relative; z-index: 1;
+  }
+  .process-step:last-child .process-num { background: var(--accent); color: var(--accent-text); }
+  .process-label { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .process-sub { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  @media (max-width: 900px) {
+    .process-steps { grid-template-columns: repeat(2, 1fr); row-gap: 36px; }
+    .process-line { display: none; }
+  }
 
-    .field {
-      margin-bottom: 18px;
-    }
+  /* Diferenciais */
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 56px; }
+  .card {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 36px; box-shadow: var(--shadow-sm);
+  }
+  .card-process { border-top: 3px solid var(--accent); }
+  .card-fin { border-top: 3px solid var(--gold); }
+  .card-icon {
+    width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;
+    margin-bottom: 20px;
+  }
+  .card-process .card-icon { background: var(--accent-tint); color: var(--accent); }
+  .card-fin .card-icon { background: var(--gold-tint); color: var(--gold); }
+  .card-icon svg { width: 22px; height: 22px; }
+  .card h3 { font-size: 20px; margin-bottom: 6px; }
+  .card > p.tag { font-size: 13px; color: var(--muted); margin-bottom: 22px; }
+  .feature-list { list-style: none; display: flex; flex-direction: column; gap: 16px; }
+  .feature-list li { display: flex; gap: 12px; font-size: 14.5px; color: var(--text); line-height: 1.5; }
+  .feature-list svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px; }
+  .card-process .feature-list svg { color: var(--accent); }
+  .card-fin .feature-list svg { color: var(--gold); }
+  @media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
 
-    label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--muted);
-      letter-spacing: .8px;
-      text-transform: uppercase;
-      margin-bottom: 7px;
-    }
+  /* Mobile app teaser */
+  .app-teaser {
+    display: flex; align-items: center; justify-content: space-between; gap: 32px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 40px 44px; margin-top: 64px; flex-wrap: wrap;
+  }
+  .app-teaser-text h3 { margin-bottom: 8px; }
+  .app-teaser-text p { max-width: 420px; font-size: 14.5px; }
+  .app-badge {
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--muted);
+    border: 1px dashed var(--border-strong); border-radius: var(--radius-sm);
+    padding: 9px 14px; white-space: nowrap;
+  }
 
-    input {
-      width: 100%;
-      background: var(--input-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 11px 14px;
-      color: var(--text);
-      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      font-size: 14px;
-      outline: none;
-      transition: border-color .2s;
-    }
+  /* Login */
+  .login-section { background: var(--surface); border-top: 1px solid var(--border); }
+  .login-grid { display: grid; grid-template-columns: 1fr 420px; gap: 64px; align-items: center; }
+  .login-card {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-lg);
+    padding: 40px; box-shadow: var(--shadow-md);
+  }
+  .login-card h3 { font-size: 20px; margin-bottom: 6px; }
+  .login-card > p { font-size: 13.5px; margin-bottom: 28px; }
+  .field { margin-bottom: 18px; }
+  .field label { display: block; font-size: 12.5px; font-weight: 500; color: var(--muted); margin-bottom: 7px; }
+  .field input {
+    width: 100%; height: 42px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); padding: 0 13px; font-size: 14px; font-family: var(--font-display);
+    outline: none; transition: border-color .15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .login-card .btn { width: 100%; margin-top: 6px; }
+  .login-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; font-size: 12.5px; }
+  .login-foot a { color: var(--accent); font-weight: 500; }
+  .login-foot a:hover { text-decoration: underline; }
+  @media (max-width: 860px) { .login-grid { grid-template-columns: 1fr; } }
 
-    input:focus {
-      border-color: var(--accent);
-    }
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border); padding: 32px 24px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+  }
+  footer, footer * { font-size: 12.5px; color: var(--muted); }
+  .footer-links { display: flex; gap: 22px; }
 
-    .btn {
-      width: 100%;
-      padding: 13px;
-      background: var(--accent);
-      color: var(--bg);
-      border: none;
-      border-radius: 9px;
-      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      font-weight: 700;
-      font-size: 14px;
-      letter-spacing: .3px;
-      cursor: pointer;
-      transition: opacity .15s;
-      margin-top: 8px;
-    }
+  /* Reveal animation */
+  .reveal { opacity: 0; transform: translateY(14px); animation: reveal .6s ease forwards; }
+  .reveal:nth-child(2) { animation-delay: .08s; }
+  .reveal:nth-child(3) { animation-delay: .16s; }
+  @keyframes reveal { to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal { animation: none; opacity: 1; transform: none; }
+  }
 
-    .btn:hover   { opacity: .88; }
-    .btn:active  { opacity: .75; }
-    .btn:disabled { opacity: .45; cursor: not-allowed; }
-
-    .erro {
-      background: rgba(226,135,108,.14);
-      border: 1px solid rgba(226,135,108,.32);
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 13px;
-      color: var(--err);
-      margin-top: 16px;
-      display: none;
-    }
-
-    .spinner {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(0,0,0,.25);
-      border-top-color: var(--bg);
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
 </head>
-<body>
+<body data-theme="light">
 
-<div class="card">
-  <div class="logo">
-    <div class="logo-title">Promob → Omie</div>
-    <div class="logo-sub">Dalmóbile · Sistema de Gestão</div>
+<header>
+  <nav>
+    <div class="logo">
+      <svg class="logo-mark" viewBox="0 0 32 32" fill="none">
+        <path d="M4 22 C4 22 9 10 16 10 C23 10 28 22 28 22" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="28" cy="22" r="2.6" fill="var(--gold)"/>
+      </svg>
+      Orizon Manager
+    </div>
+    <div class="nav-links">
+      <a href="#processo">Processo</a>
+      <a href="#financeiro">Financeiro</a>
+      <a href="#app">App</a>
+    </div>
+    <div class="nav-right">
+      <button class="theme-toggle" id="themeToggle" aria-label="Alternar tema claro/escuro">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
+      </button>
+      <a href="#entrar" class="btn btn-primary btn-sm">Entrar</a>
+    </div>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div class="reveal">
+      <div class="eyebrow">Gestão para redes de móveis planejados</div>
+      <h1>Da venda ao balanço,<br>um só sistema.</h1>
+      <p class="lede" style="margin-top:20px;">
+        Orizon Manager conecta captação, projeto, produção e entrega às suas provisões, DRE e margem por projeto —
+        sem planilha paralela e sem depender de dois sistemas que nunca batem.
+      </p>
+      <div class="hero-ctas">
+        <a href="#entrar" class="btn btn-primary">Acessar minha conta</a>
+        <a href="#processo" class="btn btn-ghost">Ver como funciona</a>
+      </div>
+      <div class="hero-note">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+        Feito para redes multi-loja — cada loja com seu escopo, a rede com visão consolidada
+      </div>
+    </div>
+    <div class="reveal" aria-hidden="true">
+      <svg class="signature" viewBox="0 0 480 380" fill="none">
+        <line x1="20" y1="40" x2="460" y2="40" stroke="var(--border)" stroke-width="1"/>
+        <line x1="20" y1="130" x2="460" y2="130" stroke="var(--border)" stroke-width="1"/>
+        <line x1="20" y1="220" x2="460" y2="220" stroke="var(--border)" stroke-width="1"/>
+        <line x1="20" y1="310" x2="460" y2="310" stroke="var(--border)" stroke-width="1"/>
+        <path d="M20 300 C 90 300, 90 210, 160 210 C 220 210, 220 120, 290 120 C 350 120, 350 60, 420 60"
+              stroke="var(--accent)" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+        <circle cx="20" cy="300" r="5" fill="var(--accent)"/>
+        <circle cx="160" cy="210" r="5" fill="var(--accent)"/>
+        <circle cx="290" cy="120" r="5" fill="var(--accent)"/>
+        <g transform="translate(400,38)">
+          <line x1="0" y1="0" x2="40" y2="0" stroke="var(--gold)" stroke-width="2.4" stroke-linecap="round"/>
+          <line x1="20" y1="-14" x2="20" y2="14" stroke="var(--gold)" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M4 0 L0 8 L8 8 Z" fill="none" stroke="var(--gold)" stroke-width="1.6"/>
+          <path d="M36 0 L32 8 L40 8 Z" fill="none" stroke="var(--gold)" stroke-width="1.6"/>
+        </g>
+        <text x="20" y="330" font-family="'IBM Plex Mono', monospace" font-size="11" fill="var(--muted)">venda</text>
+        <text x="255" y="145" font-family="'IBM Plex Mono', monospace" font-size="11" fill="var(--muted)">produção</text>
+        <text x="378" y="20" font-family="'IBM Plex Mono', monospace" font-size="11" fill="var(--muted)">balanço</text>
+      </svg>
+    </div>
   </div>
+</section>
 
-  <div class="field">
-    <label for="login">Usuário</label>
-    <input type="text" id="login" placeholder="seu.login" autocomplete="username">
+<section class="process" id="processo">
+  <div class="wrap">
+    <div class="process-head">
+      <div class="eyebrow">Uma jornada, ponta a ponta</div>
+      <h2>Do primeiro contato à assistência pós-venda</h2>
+    </div>
+    <div class="process-track">
+      <div class="process-line"></div>
+      <div class="process-steps">
+        <div class="process-step">
+          <div class="process-num">01</div>
+          <div class="process-label">Captação</div>
+          <div class="process-sub">Origem e qualificação do lead</div>
+        </div>
+        <div class="process-step">
+          <div class="process-num">02</div>
+          <div class="process-label">Vendas</div>
+          <div class="process-sub">Orçamento, negociação, contrato</div>
+        </div>
+        <div class="process-step">
+          <div class="process-num">03</div>
+          <div class="process-label">Projetos</div>
+          <div class="process-sub">Medição, projeto executivo, corte</div>
+        </div>
+        <div class="process-step">
+          <div class="process-num">04</div>
+          <div class="process-label">Produção &amp; Expedição</div>
+          <div class="process-sub">Fábrica, recebimento, entrega</div>
+        </div>
+        <div class="process-step">
+          <div class="process-num">05</div>
+          <div class="process-label">Montagem</div>
+          <div class="process-sub">Execução do serviço no cliente</div>
+        </div>
+        <div class="process-step">
+          <div class="process-num">06</div>
+          <div class="process-label">Assistências</div>
+          <div class="process-sub">Loja, fábrica ou cliente — cada custo no seu lugar</div>
+        </div>
+      </div>
+    </div>
   </div>
+</section>
 
-  <div class="field">
-    <label for="senha">Senha</label>
-    <input type="password" id="senha" placeholder="••••••••" autocomplete="current-password">
+<section id="financeiro">
+  <div class="wrap">
+    <div class="eyebrow">Dois sistemas em um</div>
+    <h2 style="max-width:600px;">Processo e financeiro, alimentados pelos mesmos dados</h2>
+    <p class="lede" style="margin-top:14px;">Nenhum outro número para conferir depois. O que a operação registra é exatamente o que vira DRE, Balanço e margem por projeto.</p>
+
+    <div class="split">
+      <div class="card card-process reveal">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+        </div>
+        <h3>Gestão de Processo</h3>
+        <p class="tag">Cada venda, do jeito certo, sempre</p>
+        <ul class="feature-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Ciclo com etapas e aprovações claras — nunca perde o fio de uma venda</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Captação, projeto, produção e expedição em um só lugar, não em três sistemas</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Times sabem onde cada pedido está, sem perguntar no grupo</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Rede com várias lojas, cada uma com seu escopo — visão consolidada para quem administra</li>
+        </ul>
+      </div>
+
+      <div class="card card-fin reveal">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+        </div>
+        <h3>Gestão Financeira</h3>
+        <p class="tag">Margem real, por projeto, desde o primeiro dia</p>
+        <ul class="feature-list">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Provisões constituídas automaticamente no fechamento da venda</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>DRE e Balanço nascem dos mesmos lançamentos que a operação já gera</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Assistências classificadas por quem paga — cliente, loja ou fábrica</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>Reconciliação periódica entre resultado por projeto e resultado da empresa</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="app-teaser" id="app">
+      <div class="app-teaser-text">
+        <h3>Em breve, no seu bolso</h3>
+        <p>Um app para consultores e supervisores acompanharem vendas, entregas e aprovações de qualquer lugar. Em desenvolvimento.</p>
+      </div>
+      <div class="app-badge">iOS &amp; Android — em breve</div>
+    </div>
   </div>
+</section>
 
-  <button class="btn" id="btnLogin" onclick="entrar()">Entrar</button>
+<section class="login-section" id="entrar">
+  <div class="wrap login-grid">
+    <div class="reveal">
+      <div class="eyebrow">Acesso</div>
+      <h2>Sua operação, sua<br>conta, seu painel.</h2>
+      <p class="lede" style="margin-top:16px;">
+        Entre com as credenciais da sua loja ou rede. Se você administra mais de uma loja,
+        escolha qual está acessando logo depois de entrar.
+      </p>
+    </div>
+    <div class="login-card reveal">
+      <h3>Entrar</h3>
+      <p>Acesse o painel da sua loja ou rede</p>
+      <form id="loginForm" novalidate>
+        <div class="field">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" placeholder="voce@sualoja.com.br" autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <div id="loginErro" style="display:none;color:#e5484d;font-size:12.5px;margin-bottom:10px"></div>
+        <button type="submit" class="btn btn-primary" id="loginBtn">Entrar</button>
+      </form>
+      <div class="login-foot">
+        <a href="#">Esqueci minha senha</a>
+        <span style="color:var(--muted);">Precisa de ajuda? <a href="#">Fale com o suporte</a></span>
+      </div>
+    </div>
+  </div>
+</section>
 
-  <div class="erro" id="erro"></div>
-</div>
+<footer>
+  <span>© 2026 Orizon Manager. Todos os direitos reservados.</span>
+  <div class="footer-links">
+    <a href="#processo">Processo</a>
+    <a href="#financeiro">Financeiro</a>
+    <a href="#entrar">Entrar</a>
+  </div>
+</footer>
 
 <script>
-  // Foca no campo login ao carregar
-  document.getElementById('login').focus();
-
-  // Enter no campo senha dispara o login
-  document.getElementById('senha').addEventListener('keydown', e => {
-    if (e.key === 'Enter') entrar();
-  });
-  document.getElementById('login').addEventListener('keydown', e => {
-    if (e.key === 'Enter') document.getElementById('senha').focus();
+  const toggle = document.getElementById('themeToggle');
+  const body = document.body;
+  toggle.addEventListener('click', () => {
+    const next = body.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    body.setAttribute('data-theme', next);
   });
 
-  async function entrar() {
-    const login = document.getElementById('login').value.trim();
-    const senha = document.getElementById('senha').value;
-    const btn   = document.getElementById('btnLogin');
-    const erro  = document.getElementById('erro');
-
-    if (!login || !senha) {
-      mostrarErro('Preencha usuário e senha.');
-      return;
+  // ── Login: POST /api/auth/login e entra no painel ────────────────────────────
+  (function(){
+    const form  = document.getElementById('loginForm');
+    const erro  = document.getElementById('loginErro');
+    const btn   = document.getElementById('loginBtn');
+    if(!form) return;
+    function mostrarErro(msg){ erro.textContent = msg; erro.style.display = msg ? 'block' : 'none'; }
+    async function entrar(){
+      const login = (document.getElementById('email').value || '').trim();
+      const senha = document.getElementById('senha').value || '';
+      if(!login || !senha){ mostrarErro('Informe e-mail e senha.'); return; }
+      mostrarErro(''); btn.disabled = true; const txt = btn.textContent; btn.textContent = 'Entrando…';
+      try{
+        const r = await fetch('/api/auth/login', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          credentials: 'same-origin', body: JSON.stringify({login, senha})
+        });
+        const d = await r.json().catch(() => ({}));
+        if(d.ok){ window.location.href = '/'; return; }
+        mostrarErro(d.erro || 'Usuário ou senha inválidos.');
+      }catch(e){ mostrarErro('Falha de conexão. Tente novamente.'); }
+      btn.disabled = false; btn.textContent = txt;
     }
-
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>Entrando...';
-    erro.style.display = 'none';
-
-    try {
-      const resp = await fetch('/api/auth/login', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ login, senha })
-      });
-
-      const data = await resp.json();
-
-      if (data.ok) {
-        // Salva dados do usuário na sessão do browser
-        sessionStorage.setItem('usuario', JSON.stringify(data.usuario));
-        window.location.href = '/';
-      } else {
-        mostrarErro(data.erro || 'Erro ao fazer login.');
-        btn.disabled = false;
-        btn.innerHTML = 'Entrar';
-      }
-    } catch (e) {
-      mostrarErro('Erro de conexão. Tente novamente.');
-      btn.disabled = false;
-      btn.innerHTML = 'Entrar';
-    }
-  }
-
-  function mostrarErro(msg) {
-    const el = document.getElementById('erro');
-    el.textContent = msg;
-    el.style.display = 'block';
-  }
+    form.addEventListener('submit', (e) => { e.preventDefault(); entrar(); });
+  })();
 </script>
 
 </body>
