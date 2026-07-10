@@ -435,7 +435,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <nav class="sb-nav">
     <div class="sb-secao">
       <div class="sb-nav-title">Atalhos</div>
-      <div class="nav-item" id="nav-00" onclick="goPage(0)"><i class="ti ti-diamond"></i>Projetos</div>
+      <div class="nav-item" id="nav-00" onclick="goPage(0)"><i class="ti ti-diamond"></i>Orçamentos</div>
     </div>
 
     <!-- Lista PLANA dos módulos de domínio (Modulos_Orizon_v4): sem cabeçalho de faixa, todo módulo
@@ -641,7 +641,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <!-- PAGE 00: Projetos -->
   <div class="page active" id="page-00">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-      <div class="page-title" style="margin:0">Projetos</div>
+      <div class="page-title" style="margin:0">Orçamentos</div>
       <button class="btn btn-primary btn-sm" onclick="mostrarFormNovoProjeto()">+ Novo Projeto</button>
     </div>
     <div id="form-novo-projeto" class="p00-form" style="display:none">
@@ -707,55 +707,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <span id="novo-proj-status" style="font-size:11px;color:var(--muted)"></span>
       </div>
     </div>
-    <!-- ── Home tabs: Projetos | Clientes ─────────────────────── -->
-    <div id="home-tabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:12px;">
-      <button id="tab-btn-projetos" class="home-tab ativo" onclick="homeMostrarTab('projetos')">Projetos</button>
-      <button id="tab-btn-clientes" class="home-tab" onclick="homeMostrarTab('clientes')">Clientes</button>
-      <button id="tab-btn-parceiros" class="home-tab" onclick="homeMostrarTab('parceiros')">Parceiros</button>
-    </div>
-    <div id="home-clientes-panel" style="display:none;">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-        <input id="cli-busca-home" type="text" placeholder="Buscar cliente por nome ou CPF..."
-               style="flex:1;padding:8px 12px;border:1px solid var(--dalm-gold);border-radius:6px;background:var(--card);color:var(--text);"
-               oninput="cliHomeCarregar()">
-        <button class="btn btn-primary" onclick="cliAbrirModalNovo()">+ Novo Cliente</button>
-      </div>
-      <table style="width:100%;border-collapse:collapse;">
-        <thead>
-          <tr style="border-bottom:2px solid var(--dalm-gold);">
-            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">Nome</th>
-            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">CPF/CNPJ</th>
-            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">Telefone</th>
-            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">Cadastro</th>
-            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">Briefing</th>
-            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">Ações</th>
-          </tr>
-        </thead>
-        <tbody id="cli-home-tbody"></tbody>
-      </table>
-    </div>
-    <div id="home-parceiros-panel" style="display:none;">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
-        <input id="par-busca-home" type="text" placeholder="Buscar parceiro por nome ou CPF/CNPJ..."
-               style="flex:1;padding:8px 12px;border:1px solid var(--dalm-gold);border-radius:6px;background:var(--card);color:var(--text);"
-               oninput="parHomeCarregar()">
-      </div>
-      <table style="width:100%;border-collapse:collapse;">
-        <thead>
-          <tr style="border-bottom:2px solid var(--dalm-gold);">
-            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">Parceiro</th>
-            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">CPF/CNPJ</th>
-            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">Tipo</th>
-            <th style="text-align:left;padding:8px;color:var(--dalm-gold-light);">Projetos relacionados</th>
-          </tr>
-        </thead>
-        <tbody id="par-home-tbody"></tbody>
-      </table>
-    </div>
+    <!-- Clientes e Parceiros saíram desta tela (Diagramacao_v6): vivem só no submenu de Cadastro.
+         Sobra apenas a lista de orçamentos/negociações, sem seletor de abas. -->
     <div id="home-projetos-panel">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
       <div style="flex:1;position:relative;min-width:200px">
-        <input type="text" id="proj-search" placeholder="Filtrar por nome, cliente ou CPF..."
+        <input type="text" id="proj-search" placeholder="Buscar por projeto, cliente, CPF ou parceiro..."
                oninput="projAplicarFiltros()" class="inp" style="width:100%;box-sizing:border-box;padding-right:32px">
         <div class="search-spinner" id="proj-spinner" style="position:absolute;right:8px;top:50%;transform:translateY(-50%)"><div class="spinner"></div></div>
       </div>
@@ -774,6 +731,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <label class="proj-status-filter-item"><input type="checkbox" value="sem"        checked onchange="projAplicarFiltros()"> — Sem status</label>
         </div>
       </div>
+      <!-- Filtros: Faixa de valor · Data (Diagramacao_v6) -->
+      <input type="number" id="proj-val-min" placeholder="R$ mín" oninput="projAplicarFiltros()"
+             class="inp" style="width:92px;box-sizing:border-box" title="Valor mínimo (último orçamento)">
+      <input type="number" id="proj-val-max" placeholder="R$ máx" oninput="projAplicarFiltros()"
+             class="inp" style="width:92px;box-sizing:border-box" title="Valor máximo (último orçamento)">
+      <input type="date" id="proj-data-ini" onchange="projAplicarFiltros()"
+             class="inp" style="box-sizing:border-box" title="Data inicial (atualização)">
+      <input type="date" id="proj-data-fim" onchange="projAplicarFiltros()"
+             class="inp" style="box-sizing:border-box" title="Data final (atualização)">
       <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:8px;padding:3px;box-shadow:var(--shadow)">
         <button id="projview-lista" onclick="projSetView('lista')" style="border:none;background:var(--surface);color:var(--accent);box-shadow:var(--shadow);font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s">Lista</button>
         <button id="projview-funil" onclick="projSetView('funil')" style="border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:500;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all .15s">Funil</button>
@@ -3162,10 +3128,12 @@ function projAplicarFiltros(){
   let lista = [..._projListaBase];
 
   if(txt.length >= 2){
+    const txtDig = txt.replace(/\D/g,'');
     lista = lista.filter(p=>
       (p.nome_projeto||'').toLowerCase().includes(txt) ||
       (p.cliente_nome||'').toLowerCase().includes(txt) ||
-      (p.cliente_cpf||'').replace(/\D/g,'').includes(txt.replace(/\D/g,''))
+      (p.parceiro_nome||'').toLowerCase().includes(txt) ||
+      (!!txtDig && (p.cliente_cpf||'').replace(/\D/g,'').includes(txtDig))
     );
   }
 
@@ -3175,6 +3143,16 @@ function projAplicarFiltros(){
       return ativos.has(s);
     });
   }
+
+  // Faixa de valor (último orçamento) e Data (última atualização) — Diagramacao_v6
+  const vmin = parseFloat(document.getElementById('proj-val-min')?.value);
+  const vmax = parseFloat(document.getElementById('proj-val-max')?.value);
+  if(!isNaN(vmin)) lista = lista.filter(p => (p.ultimo_orcamento_valor||0) >= vmin);
+  if(!isNaN(vmax)) lista = lista.filter(p => (p.ultimo_orcamento_valor||0) <= vmax);
+  const dIni = document.getElementById('proj-data-ini')?.value;
+  const dFim = document.getElementById('proj-data-fim')?.value;
+  if(dIni) lista = lista.filter(p => ((p.atualizado_em||p.criado_em||'').substring(0,10)) >= dIni);
+  if(dFim) lista = lista.filter(p => ((p.atualizado_em||p.criado_em||'').substring(0,10)) <= dFim);
 
   lista.sort((a,b)=>{
     const da = a.atualizado_em||a.criado_em||'';
