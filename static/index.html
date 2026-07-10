@@ -2576,31 +2576,36 @@ function cfgTab(qual){
   if(qual==='funcoes')    cfgFuncoesRender();
   if(qual==='documentos') cfgDocumentosRender();
 }
-// ── Config → Cronograma de Projeto Padrão (Modulos_Orizon_v11): prazo em dias/etapa a partir de D0 ──
+// ── Config → Cronograma de Projeto Padrão (v11 prazo + v12 função responsável por fase) ──
 async function cfgCronogramaRender(){
   const box = document.getElementById('cfg-panel-cronograma'); if(!box) return;
   const lid = (_adminNav && _adminNav.loja && _adminNav.loja.id) || (_usuarioAtual && _usuarioAtual.loja_id);
   if(!lid){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Loja não identificada.</em>'; return; }
   box.innerHTML='<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  await cadFuncoesGarantir();   // catálogo de funções (Tabela de Funções) p/ o dropdown
   const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {credentials:'same-origin'});
   if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Sem acesso.</em>'; return; }
   _cfgFin = (await r.json().catch(()=>({}))).config || {};
   const fases = _cfgFin.cronograma_padrao || [];
   const nome = c => { const e = ETAPAS_CICLO.find(x=>x.codigo===c); return e ? e.nome : ('Etapa '+c); };
+  const funcOps = sel => '<option value="">— sem função —</option>' + (_funcoesCache||[]).map(fn =>
+      '<option value="'+fn.id+'"'+(String(sel)===String(fn.id)?' selected':'')+'>'+esc(fn.nome)+'</option>').join('');
   const linhas = fases.map(f =>
      '<tr class="proj-row"><td style="padding:8px 12px;color:var(--muted);width:56px">'+esc(f.codigo)+'</td>'
     +'<td style="padding:8px 12px;color:var(--text)">'+esc(nome(f.codigo))+'</td>'
-    +'<td style="padding:8px 12px;text-align:right"><input type="number" min="0" step="1" id="crono-prazo-'+esc(f.codigo)+'" value="'+(parseInt(f.prazo_dias,10)||0)+'" style="width:90px;box-sizing:border-box;text-align:right"> <span style="font-size:11px;color:var(--muted)">dias</span></td></tr>'
-  ).join('') || '<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma fase configurada.</td></tr>';
+    +'<td style="padding:8px 12px;text-align:right"><input type="number" min="0" step="1" id="crono-prazo-'+esc(f.codigo)+'" value="'+(parseInt(f.prazo_dias,10)||0)+'" style="width:80px;box-sizing:border-box;text-align:right"> <span style="font-size:11px;color:var(--muted)">dias</span></td>'
+    +'<td style="padding:8px 12px"><select id="crono-funcao-'+esc(f.codigo)+'" style="width:180px;box-sizing:border-box">'+funcOps(f.funcao_id)+'</select></td></tr>'
+  ).join('') || '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma fase configurada.</td></tr>';
   box.innerHTML =
-     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:680px">Prazo (dias) de cada etapa a partir de <strong style="color:var(--text)">D0 = assinatura do contrato</strong>. Na assinatura, cada etapa do projeto recebe <strong style="color:var(--text)">data prevista = D0 + prazo</strong>.</div>'
-    +'<table class="proj-table" style="max-width:680px"><thead><tr><th>Etapa</th><th>Fase</th><th style="text-align:right;width:150px">Prazo (D0 + dias)</th></tr></thead><tbody>'+linhas+'</tbody></table>'
+     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:720px">Por fase: o <strong style="color:var(--text)">prazo</strong> (dias a partir de <strong style="color:var(--text)">D0 = assinatura</strong>) e a <strong style="color:var(--text)">função responsável</strong> (referencia a Tabela de Funções — é o cargo que executa a fase, não uma pessoa). Na assinatura, cada etapa recebe a data prevista e herda a função; o funcionário específico é escolhido depois, no cronograma do projeto.</div>'
+    +'<table class="proj-table" style="max-width:720px"><thead><tr><th>Etapa</th><th>Fase</th><th style="text-align:right;width:130px">Prazo</th><th style="width:190px">Função responsável</th></tr></thead><tbody>'+linhas+'</tbody></table>'
     +'<div style="margin-top:14px"><button class="btn btn-primary btn-sm" onclick="cfgCronogramaSalvar('+lid+')">Salvar cronograma padrão</button></div>';
 }
 async function cfgCronogramaSalvar(lid){
   const fases = (_cfgFin.cronograma_padrao || []).map(f => ({
     codigo: f.codigo,
     prazo_dias: parseInt((document.getElementById('crono-prazo-'+f.codigo)||{}).value, 10) || 0,
+    funcao_id: parseInt((document.getElementById('crono-funcao-'+f.codigo)||{}).value, 10) || null,
   }));
   _cfgFin.cronograma_padrao = fases;
   const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {method:'PUT', credentials:'same-origin',
@@ -9178,11 +9183,12 @@ async function adminUsuariosCarregar() {
     box.innerHTML = `
       <table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="text-align:left;color:var(--muted)">
-          <th style="padding:4px 6px">Nome</th><th>Login</th><th>Perfil</th><th>Ativo</th><th></th></tr></thead>
+          <th style="padding:4px 6px">Nome</th><th>Login</th><th>Função</th><th>Perfil</th><th>Ativo</th><th></th></tr></thead>
         <tbody>${d.usuarios.map(u => `
           <tr style="border-top:1px solid var(--border)">
             <td style="padding:4px 6px">${esc(u.nome)}</td>
             <td>${esc(u.login)}</td>
+            <td style="color:${u.funcao_nome ? 'var(--text)' : 'var(--muted)'}">${esc(u.funcao_nome || '—')}</td>
             <td>${esc(u.rotulo)}</td>
             <td>${u.ativo ? '✓' : '—'}</td>
             <td style="text-align:right">
@@ -9678,6 +9684,7 @@ async function carregarCiclo() {
     if (projetoAtivo) await peCarregar(projetoAtivo.nome_safe);
     if (projetoAtivo) await pedidosXmlCarregar(projetoAtivo.nome_safe);
     if (projetoAtivo) await nfe15Carregar(projetoAtivo.nome_safe);
+    await cronoFuncionariosGarantir();   // funcionários p/ o dropdown de responsável (v12)
     renderCiclo();
     atualizarBotoesAprovacao();
   } catch(e) { console.error('Erro ao carregar ciclo:', e); }
@@ -9844,6 +9851,7 @@ function renderCiclo() {
         ${cronoLabel}
       </div>
       <div class="ciclo-card-body" id="ciclo-body-${etapa.codigo}">
+        ${_cronoRespBlock(etapa.codigo, dados)}
         ${etapa.acao === 'contrato'
           ? _renderCardContrato()
           : (etapa.codigo === '8' || etapa.codigo === '11d')
@@ -9935,6 +9943,37 @@ async function cronoSalvar() {
     body: JSON.stringify({ login, senha, data_prevista }) })).json().catch(() => ({}));
   if (!d.ok) { st.textContent = 'Erro: ' + (d.erro || 'falha'); st.style.color = 'var(--err)'; return; }
   cronoFechar(); showToast('Data prevista atualizada.', false); carregarCiclo();
+}
+
+// ── Responsável por função (Modulos_Orizon_v12): funcionário escolhido, filtrado pela função da fase ──
+let _funcionariosCache = null;
+async function cronoFuncionariosGarantir(force){
+  if(_funcionariosCache && !force) return _funcionariosCache;
+  const d = await (await fetch('/api/funcionarios?status=ativo',{credentials:'same-origin'})).json().catch(()=>({}));
+  _funcionariosCache = (d && d.ok && d.itens) ? d.itens : [];
+  return _funcionariosCache;
+}
+function _cronoRespBlock(codigo, dados){
+  const fid = dados.funcao_responsavel_id;
+  if(!fid) return '';                    // fase sem função responsável definida no padrão
+  const funcName = dados.funcao_responsavel_nome || 'função';
+  const elegiveis = (_funcionariosCache||[]).filter(f => f.funcao_id === fid);
+  const cur = dados.responsavel_funcionario_id || '';
+  const ops = '<option value="">— selecionar —</option>' + elegiveis.map(f =>
+     '<option value="'+f.id+'"'+(String(cur)===String(f.id)?' selected':'')+'>'+esc(f.nome)+'</option>').join('');
+  const aviso = elegiveis.length ? '' : ' <span style="color:var(--warn);font-size:11px">nenhum funcionário com esta função</span>';
+  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:8px 10px;background:var(--surface);border-radius:6px;font-size:12px">'
+    +'<i class="ti ti-user-check" style="font-size:14px;color:var(--muted)"></i>'
+    +'<span style="color:var(--muted)">Responsável — função <strong style="color:var(--text)">'+esc(funcName)+'</strong>:</span>'
+    +'<select onchange="cronoResponsavelSalvar(\''+codigo+'\',this.value)" style="width:200px;box-sizing:border-box">'+ops+'</select>'+aviso+'</div>';
+}
+async function cronoResponsavelSalvar(codigo, funcionario_id){
+  const url = `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${codigo}/responsavel`;
+  const d = await (await fetch(url,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({funcionario_id: funcionario_id||null})})).json().catch(()=>({}));
+  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+  if(_cicloData[codigo]) _cicloData[codigo].responsavel_funcionario_id = d.responsavel_funcionario_id;
+  showToast('Responsável atualizado.', false);
 }
 
 function _renderCardGenerico(etapa, dados, bloqueada) {
