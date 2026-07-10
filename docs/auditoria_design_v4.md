@@ -10,7 +10,7 @@ Legenda: ✅ Migrada · 🟡 Parcial · 🔴 Não migrada · ⚪ Stub/N-A
 |---|---|---|---|
 | **Login** (entrada) | `static/login.html` | ✅ | Página nova do usuário (v4). O card de login é token-based; a seção "marketing" tem cores próprias por design. |
 | **Orçamentos** (atalho) | page-00 | ✅ | Migrada na frente v6 (tokens, filtros, sem abas duplicadas). |
-| **Negociação/Orçamento** | page-02 | 🟡 | **Corrigida agora**: cards de resumo, Seletor de Status (Fechado), botão "Etapas do Projeto" e linhas do plano de pagamento passaram a tokens. Painéis das modalidades (Aymoré/Cartão/VP/Total Flex) já eram token-based. **Resta**: painel **Etapas do Projeto (Ciclo)** — badges `.badge-pendente/.badge-em_andamento/...` com cores escuras fixas (§CSS 384–397). |
+| **Negociação/Orçamento** | page-02 | 🟡 | **Corrigida**: cards de resumo, Seletor de Status (Fechado **e** "Orçamento N"), plano de pagamento em tokens; rodapé com hierarquia certa (Aprovar=primário único, Salvar/Imprimir=secundários, rótulos sem "Orçamento"); botão secundário com borda no tema claro (§4 v5). Painéis das modalidades já eram token-based. **Resta**: painel **Etapas do Projeto (Ciclo)** — badges `.badge-*` com cores escuras fixas. |
 | **Em Construção** (genérica) | page-08 | ✅ | Construída com tokens. |
 | **Config** (Provisões/Comissão/Documentos) | page-09 | ✅ | Construída com tokens (frente v8). |
 | **Cadastro** (Clientes/Parceiros/…) | page-10 | 🟡 | Token-based, mas estética **dourada antiga** (tabelas com `--dalm-gold-light`, sublinhado de aba `--dalm-gold`) em vez do accent teal v4. |

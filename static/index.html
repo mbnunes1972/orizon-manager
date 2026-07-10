@@ -117,8 +117,12 @@ input:focus{border-color:var(--accent)}
 .btn-primary{background:var(--accent);color:#fff;box-shadow:var(--shadow)}
 .btn-primary:hover{opacity:.90;box-shadow:0 3px 10px rgba(0,0,0,.18)}
 .btn-primary:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
-.btn-ghost{background:var(--surface-2);color:var(--muted);box-shadow:var(--shadow)}   /* secundário: SEM borda + sombra */
+.btn-ghost{background:var(--surface-2);color:var(--muted);box-shadow:var(--shadow)}   /* secundário */
+/* §4 (Padrao_Design_v5): borda condicional por tema — no claro --bg≈--surface-2, sombra sozinha
+   não separa (botão some); no escuro a superfície já se distingue, só sombra basta. */
+:root[data-theme="light"] .btn-ghost{border:1px solid var(--border)}
 .btn-ghost:hover{color:var(--accent);box-shadow:0 3px 10px rgba(0,0,0,.16)}
+:root[data-theme="light"] .btn-ghost:hover{border-color:var(--accent)}
 .btn-sm{height:28px;padding:0 12px;font-size:11px;border-radius:6px}
 .btn-lg{height:44px;padding:0 22px;font-size:14px}
 .btn-danger{background:transparent;border:1px solid var(--err);color:var(--err);box-shadow:none}   /* perigo mantém borda (§4) */
@@ -1128,13 +1132,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <div id="neg-resumo-parcelas" style="display:none;text-align:right;font-family:var(--font-sans);font-weight:700;font-size:15px;color:var(--muted);margin-top:8px;padding-right:2px"></div>
     </div>
 
-    <!-- Acoes -->
+    <!-- Ações — Aprovar é a de maior peso (fecha o negócio): primário único. Salvar/Imprimir: secundários. -->
     <div class="action-row">
-      <button class="btn btn-ok" onclick="salvarOrcamento()">&#x1F4BE; Salvar Orcamento</button>
-      <button class="btn btn-amber" onclick="abrirAprovacaoComDados()" title="Aprovar orçamento e iniciar contrato">&#x2713; Aprovar Orcamento</button>
+      <button class="btn btn-ghost" onclick="salvarOrcamento()">&#x1F4BE; Salvar</button>
+      <button class="btn btn-primary" onclick="abrirAprovacaoComDados()" title="Aprovar orçamento e iniciar contrato">&#x2713; Aprovar</button>
       <a id="btn-imprimir-orcamento" class="btn btn-ghost" target="_blank" rel="noopener"
          style="text-decoration:none" href="#"
-         onclick="this.href='/api/orcamentos/'+_orcamentoAtivoId+'/proposta/pdf'">&#x1F5A8; Imprimir Or&ccedil;amento</a>
+         onclick="this.href='/api/orcamentos/'+_orcamentoAtivoId+'/proposta/pdf'">&#x1F5A8; Imprimir</a>
     </div>
 
     <!-- Ciclo do Projeto (EP-08) -->
@@ -3298,27 +3302,38 @@ function renderOrcamentosBar(){
   // Detecta nomes duplicados para exibir id como disambiguação
   const nCount = {};
   _orcamentos.forEach(o => { nCount[o.nome] = (nCount[o.nome]||0)+1; });
-  tabs.innerHTML = _orcamentos.map(o => {
-    const lbl = nCount[o.nome] > 1 ? `${esc(o.nome)} (${o.id})` : esc(o.nome);
-    const ativo = o.id===_orcamentoAtivoId;
-    const inner = ativo
-      ? `<span onclick="iniciarRenomearOrc(event,${o.id})" title="Clique para renomear">${lbl}</span>`
-      : lbl;
-    return `<button class="btn btn-sm ${ativo?'btn-primary':'btn-ghost'}"
-              onclick="ativarOrcamento(${o.id})"
-              style="font-size:11px;padding:4px 10px;${ativo?'font-weight:700;color:#0a1a0a;box-shadow:0 2px 0 var(--accent);':''}"
-              title="R$ ${fmt(o.valor_total||0)} — ordem ${o.ordem}">${inner}</button>`;
-  }).join('');
-  const orc = _orcamentos.find(o => o.id === _orcamentoAtivoId);
+  const rot = o => nCount[o.nome] > 1 ? `${esc(o.nome)} (${o.id})` : esc(o.nome);
+  const ativo = _orcamentos.find(o => o.id === _orcamentoAtivoId) || _orcamentos[0];
+  // "Orçamento ativo" = Seletor de Status (Diagramacao_v7 §1.5): badge + chevron que abre o menu
+  // para trocar qual orçamento está ativo — mesmo componente do badge "Fechado", não é botão de ação.
+  const itens = _orcamentos.map(o =>
+    `<div class="proj-status-dd-item" onclick="ativarOrcamento(${o.id})">`
+    + (o.id===ativo.id ? '<span style="color:var(--accent)">●</span>' : '<span style="width:9px;display:inline-block"></span>')
+    + ` ${rot(o)}<span style="color:var(--muted);font-size:10px;margin-left:8px">R$ ${fmt(o.valor_total||0)}</span></div>`
+  ).join('')
+  + `<div class="proj-status-dd-item" style="border-top:1px solid var(--border);color:var(--muted)" onclick="iniciarRenomearOrc(${ativo.id})">&#x270E; Renomear ativo</div>`;
+  tabs.innerHTML =
+    `<div style="position:relative;display:inline-block">`
+    + `<button class="status-selector" onclick="orcSelectorToggle(event)"`
+    + ` style="color:var(--accent);background:color-mix(in srgb, var(--accent) 14%, transparent)" title="Trocar orçamento ativo">`
+    + `<span id="neg-orc-ativo-lbl">${rot(ativo)}</span> &#9662;</button>`
+    + `<div class="proj-status-dd" id="neg-orc-dd" style="left:0;right:auto;min-width:190px">${itens}</div>`
+    + `</div>`;
   const hdr = document.getElementById('neg-orc-nome-hdr');
-  if(hdr) hdr.textContent = orc ? orc.nome : 'Valores finais apresentados ao cliente';
+  if(hdr) hdr.textContent = ativo ? ativo.nome : 'Valores finais apresentados ao cliente';
 }
 
-function iniciarRenomearOrc(evt, id){
-  evt.stopPropagation();
+function orcSelectorToggle(e){
+  e.stopPropagation();
+  document.querySelectorAll('.proj-status-dd.open').forEach(d => { if(d.id !== 'neg-orc-dd') d.classList.remove('open'); });
+  document.getElementById('neg-orc-dd')?.classList.toggle('open');
+}
+
+function iniciarRenomearOrc(id){
   const orc = _orcamentos.find(o => o.id === id);
-  if(!orc) return;
-  const span = evt.currentTarget;
+  const span = document.getElementById('neg-orc-ativo-lbl');
+  if(!orc || !span) return;
+  document.getElementById('neg-orc-dd')?.classList.remove('open');
   const input = document.createElement('input');
   input.value = orc.nome;
   input.style.cssText = 'background:transparent;border:none;border-bottom:1px solid var(--accent);outline:none;color:inherit;font:inherit;min-width:60px;max-width:160px;padding:0';
