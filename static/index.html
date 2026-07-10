@@ -1800,6 +1800,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     </div>
   </div>
 
+  <!-- Modal: Mapa de Atribuições (Regras_Funcoes_Perfis_Atribuicoes §4) — só Gerência+/Supervisor -->
+  <div id="modal-mapa" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:24px;max-width:820px;width:94%;max-height:90vh;overflow:auto;animation:mIn .18s ease">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-family:var(--font-sans);font-weight:900;font-size:16px">Mapa de Atribuições</div>
+        <span onclick="mapaFechar()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;max-width:720px">Quem executa cada papel operacional (PE / Medição / Montagem / Assistência), por ambiente. Só aparecem profissionais com a <strong style="color:var(--text)">função compatível</strong>. Uma pessoa por papel/ambiente. A atribuição concede visibilidade escopada ao profissional.</div>
+      <div id="mapa-body"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+    </div>
+  </div>
+
 </main>
 
 <!-- Modal: Novo Orçamento (EP-07) -->
@@ -9821,6 +9833,7 @@ function renderCiclo() {
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
       <button class="btn btn-ghost btn-sm" onclick="fecharCiclo()"><i class="ti ti-arrow-left"></i>Voltar</button>
       <h3 style="margin:0;color:var(--text);font-weight:800">Etapas do Projeto</h3>
+      ${_podeEditarMapaFront() && projetoAtivo ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="mapaAbrir('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-users-group"></i>Mapa de Atribuições</button>` : ''}
     </div>
   `;
   for (const etapa of ETAPAS_CICLO) {
@@ -9976,6 +9989,75 @@ async function cronoResponsavelSalvar(codigo, funcionario_id){
   if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
   if(_cicloData[codigo]) _cicloData[codigo].responsavel_funcionario_id = d.responsavel_funcionario_id;
   showToast('Responsável atualizado.', false);
+}
+
+// ── Mapa de Atribuições (Regras_Funcoes_Perfis_Atribuicoes §4) — só Gerência+/Supervisor ──
+const _PAPEL_LABEL = {projeto_executivo:"Projeto Executivo", medicao:"Medição",
+                      montagem:"Montagem", assistencia:"Assistência"};
+const _PAPEL_FUNCOES = {   // espelha mod_escopo.PAPEL_FUNCOES (§7)
+  projeto_executivo:["Projetista Executivo"], medicao:["Medidor"],
+  montagem:["Montador","Supervisor de Montagem"], assistencia:["Montador","Supervisor de Montagem"],
+};
+function _podeEditarMapaFront(){
+  return ["diretor","gerente_vendas","gerente_adm_fin","supervisor_montagem"]
+    .includes((_usuarioAtual && _usuarioAtual.nivel) || "");
+}
+let _mapaProfs = null, _mapaNome = null;
+async function mapaProfissionaisGarantir(force){
+  if(_mapaProfs && !force) return _mapaProfs;
+  const f = await (await fetch('/api/funcionarios?status=ativo',{credentials:'same-origin'})).json().catch(()=>({}));
+  const t = await (await fetch('/api/terceiros?status=ativo',{credentials:'same-origin'})).json().catch(()=>({}));
+  const prof = [];
+  ((f && f.itens) || []).forEach(x => prof.push({tipo:'f', id:x.id, nome:x.nome, funcao_nome:x.funcao_nome||''}));
+  ((t && t.itens) || []).forEach(x => prof.push({tipo:'t', id:x.id, nome:x.nome, funcao_nome:x.funcao_nome||''}));
+  _mapaProfs = prof; return prof;
+}
+async function mapaAbrir(nomeSafe){
+  _mapaNome = nomeSafe;
+  document.getElementById('mapa-body').innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  document.getElementById('modal-mapa').style.display = 'flex';
+  await mapaProfissionaisGarantir();
+  const d = await (await fetch('/api/projetos/'+encodeURIComponent(nomeSafe)+'/atribuicoes',{credentials:'same-origin'})).json().catch(()=>({}));
+  if(!d.ok){ document.getElementById('mapa-body').innerHTML='<em style="color:var(--err);font-size:12px">'+esc(d.erro||'Sem acesso.')+'</em>'; return; }
+  mapaRender(d);
+}
+function mapaFechar(){ document.getElementById('modal-mapa').style.display = 'none'; }
+function mapaRender(d){
+  const papeis = d.papeis || Object.keys(_PAPEL_LABEL);
+  const cols = [{id:null, nome:'Projeto inteiro'}].concat(d.ambientes || []);
+  const atrib = {};
+  (d.atribuicoes || []).forEach(a => { atrib[a.papel+'|'+(a.pool_ambiente_id||'')] = a; });
+  const opts = (papel, cur) => {
+    const aceitas = _PAPEL_FUNCOES[papel] || [];
+    const elig = (_mapaProfs||[]).filter(p => aceitas.includes(p.funcao_nome));
+    let h = '<option value="">— ninguém —</option>';
+    elig.forEach(p => { const v = p.tipo+':'+p.id;
+      h += '<option value="'+v+'"'+(cur===v?' selected':'')+'>'+esc(p.nome)+' ('+esc(p.funcao_nome)+')</option>'; });
+    return h;
+  };
+  let html = '<table class="proj-table" style="width:100%"><thead><tr><th>Papel</th>'
+    + cols.map(c => '<th>'+esc(c.nome)+'</th>').join('') + '</tr></thead><tbody>';
+  papeis.forEach(papel => {
+    html += '<tr><td style="font-weight:600;color:var(--text)">'+esc(_PAPEL_LABEL[papel]||papel)+'</td>';
+    cols.forEach(c => {
+      const a = atrib[papel+'|'+(c.id||'')];
+      const cur = a ? (a.funcionario_id?('f:'+a.funcionario_id):(a.terceiro_id?('t:'+a.terceiro_id):'')) : '';
+      html += '<td><select onchange="mapaSetAtribuicao(\''+papel+'\','+(c.id||'null')+',this.value)" style="width:160px;box-sizing:border-box">'+opts(papel, cur)+'</select></td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  const aviso = (_mapaProfs||[]).length ? '' :
+    '<div style="font-size:11px;color:var(--warn);margin-top:8px">Nenhum funcionário/terceiro com função cadastrada — cadastre em Cadastro e defina a Função.</div>';
+  document.getElementById('mapa-body').innerHTML = html + aviso;
+}
+async function mapaSetAtribuicao(papel, ambId, sel){
+  const body = {papel: papel, pool_ambiente_id: (ambId===null||ambId==='null') ? null : ambId};
+  if(sel){ const p = sel.split(':'); if(p[0]==='f') body.funcionario_id = parseInt(p[1],10); else body.terceiro_id = parseInt(p[1],10); }
+  const d = await (await fetch('/api/projetos/'+encodeURIComponent(_mapaNome)+'/atribuicoes',{method:'POST',credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)})).json().catch(()=>({}));
+  if(!d.ok) showToast('Erro: '+(d.erro||'falha'), true); else showToast('Atribuição salva.', false);
+  mapaAbrir(_mapaNome);   // recarrega o grid (reflete substituições/limpezas)
 }
 
 function _renderCardGenerico(etapa, dados, bloqueada) {
