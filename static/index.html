@@ -2328,10 +2328,12 @@ async function carregarUsuarioAutenticado(){
     _lojaAtiva = (_salva && _idsValidos.indexOf(_salva) !== -1)
       ? _salva : (_usuarioAtual.loja_ativa_id || null);
     // Perfil-4 (rev2 §2): navegação Admin/Config pela matriz de acesso do perfil (acessa_admin/config).
+    // Esconde só quando o backend diz explicitamente NÃO (=== false); flag ausente (backend antigo/
+    // pré-restart) NÃO esconde — evita "sumir os painéis" numa janela de deploy.
     const _navAdmin = document.getElementById('nav-07');
-    if (_navAdmin) _navAdmin.style.display = (_usuarioAtual && _usuarioAtual.acessa_admin) ? '' : 'none';
+    if (_navAdmin) _navAdmin.style.display = (_usuarioAtual && _usuarioAtual.acessa_admin === false) ? 'none' : '';
     const _navCfg = document.getElementById('nav-cfg');
-    if (_navCfg) _navCfg.style.display = (_usuarioAtual && _usuarioAtual.acessa_config) ? '' : 'none';
+    if (_navCfg) _navCfg.style.display = (_usuarioAtual && _usuarioAtual.acessa_config === false) ? 'none' : '';
     _aplicarModulosNoMenu();
     sbNavRender();               // monta o acordeão dos módulos (usa _usuarioAtual.hub)
     carregarConsultores();       // seletor de consultor (criação/edição); só gerente+ atribui
