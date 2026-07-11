@@ -58,7 +58,7 @@ def func_serialize(f, db=None):
          "remuneracao_tipo": f.remuneracao_tipo or "fixa",
          "remuneracao_fixa": f.remuneracao_fixa, "remuneracao_var": f.remuneracao_var,
          "status": f.status or "ativo", "usuario_id": f.usuario_id,
-         "acesso": {"tem_acesso": False, "email": f.email or "", "perfil": "consultor"}}
+         "acesso": {"tem_acesso": False, "email": f.email or "", "perfil": "operador"}}
     d.update(_serial_campos(f, ENDERECO_CAMPOS + BANCO_CAMPOS))
     if db is not None and f.funcao_id:
         fn = db.get(Funcao, f.funcao_id); d["funcao_nome"] = fn.nome if fn else ""
@@ -102,7 +102,7 @@ def func_sync_acesso(db, f, req):
                 u.ativo = 0                      # desativa (nunca apaga — preserva histórico/sessões)
         return True, None
     email = _s(ac.get("email")) or _s(f.email)
-    perfil = _s(ac.get("perfil")) or "consultor"
+    perfil = _s(ac.get("perfil")) or "operador"
     if not email:
         return False, "Informe o e-mail de acesso do funcionário."
     if perfil not in perfis.slugs_loja():

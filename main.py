@@ -7543,14 +7543,11 @@ def _parceiro_visivel_loja(db, parceiro, loja_id):
     return False
 
 
-# Perfis que veem apenas os projetos que criaram (os demais veem todos da loja).
-_PERFIS_ESCOPO_PROPRIO = {"consultor"}
-
-
 def _ve_apenas_proprios_projetos(nivel):
-    """True se o perfil vê só os projetos que criou (Consultor/projetista). Gerente de
-    vendas e níveis acima — e os operacionais de pós-venda — veem todos da loja."""
-    return nivel in _PERFIS_ESCOPO_PROPRIO
+    """True se o perfil vê só os projetos que criou (base operador). Gerência+ — e os
+    operacionais de pós-venda — veem todos da loja. Dirigido pela BASE (perfis.py) para
+    sobreviver à migração de nivel e escopar corretamente perfis customizados."""
+    return perfis.base(nivel) == "operador"
 
 
 def _usuario_ids_atribuidos_projeto(db, nome_safe):

@@ -105,6 +105,11 @@ def _base(slug):
     return _ALIAS_BASE.get(slug, slug)   # Task 5 sobrescreve p/ consultar o registro DB
 
 
+def base(slug):
+    """Base (master/gerencial/operador/plataforma) de um slug de perfil — pública."""
+    return _base(slug)
+
+
 def pode(slug, capacidade):
     return bool(PERFIS.get(_base(slug), _DEFAULT).get(capacidade, False))
 

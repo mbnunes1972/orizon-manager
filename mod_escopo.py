@@ -27,8 +27,8 @@ def funcao_compativel(papel, funcao_nome):
     aceitas = PAPEL_FUNCOES.get(papel)
     return True if not aceitas else (funcao_nome in aceitas)
 
-# Perfis que veem só o que criaram (posse do projeto). Regras §3.
-_ESCOPO_POSSE = frozenset({"consultor"})
+# Perfis que veem só o que criaram (posse do projeto). Regras §3. Dirigido pela BASE (perfis.py) para
+# sobreviver à migração de nivel e escopar corretamente perfis customizados derivados de "operador".
 
 # Perfis operacionais escopados pelo Mapa (só o atribuído). Decisão da Fase 1: apenas estes; os demais
 # perfis de loja (conferente/assistente_logistico/assistente_administrativo) seguem vendo tudo na loja.
@@ -47,7 +47,7 @@ def eh_gerencia(ator):
 
 
 def escopo_por_posse(ator):
-    return (ator or {}).get("nivel") in _ESCOPO_POSSE
+    return perfis.base((ator or {}).get("nivel")) == "operador"
 
 
 def escopo_por_atribuicao(ator):

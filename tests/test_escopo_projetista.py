@@ -8,10 +8,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 def test_ve_apenas_proprios_projetos():
     from main import _ve_apenas_proprios_projetos
-    assert _ve_apenas_proprios_projetos("consultor") is True
-    assert _ve_apenas_proprios_projetos("gerente_vendas") is False
-    assert _ve_apenas_proprios_projetos("diretor") is False
-    assert _ve_apenas_proprios_projetos("gerente_adm_fin") is False
+    assert _ve_apenas_proprios_projetos("operador") is True
+    assert _ve_apenas_proprios_projetos("gerencial") is False
+    assert _ve_apenas_proprios_projetos("master") is False
+    assert _ve_apenas_proprios_projetos("master") is False
     assert _ve_apenas_proprios_projetos("projetista_executivo") is False
 
 
@@ -23,9 +23,9 @@ def test_projeto_visivel_ao_ator():
 
     do_cons10 = _Meta(10)
     legado    = _Meta(None)
-    cons10      = {"nivel": "consultor", "id": 10}
-    outro_cons  = {"nivel": "consultor", "id": 20}
-    gerente     = {"nivel": "gerente_vendas", "id": 30}
+    cons10      = {"nivel": "operador", "id": 10}
+    outro_cons  = {"nivel": "operador", "id": 20}
+    gerente     = {"nivel": "gerencial", "id": 30}
 
     assert _projeto_visivel_ao_ator(do_cons10, cons10) is True       # o próprio
     assert _projeto_visivel_ao_ator(do_cons10, outro_cons) is False  # de outro consultor
@@ -47,8 +47,8 @@ def test_filtrar_projetos_por_loja_escopo_projetista(app_db):
         ])
         db.commit()
         projetos = [{"nome_safe": n} for n in ("P_own", "P_other", "P_legacy")]
-        cons10 = {"nivel": "consultor", "id": 10}
-        gerente = {"nivel": "gerente_vendas", "id": 30}
+        cons10 = {"nivel": "operador", "id": 10}
+        gerente = {"nivel": "gerencial", "id": 30}
         vis_cons = {p["nome_safe"] for p in
                     main._filtrar_projetos_por_loja(projetos, db, l.id, ator=cons10)}
         vis_ger = {p["nome_safe"] for p in

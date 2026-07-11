@@ -1263,6 +1263,13 @@ def _run_migracoes(conn):
                 cur.execute("UPDATE usuarios SET nivel=? WHERE nivel=?", (novo, antigo))
         cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v3_2026')")
 
+    # 2026-07-10: RESET rev3 — perfis viram configuráveis por loja; nivel passa a referenciar a BASE.
+    if "perfis_v4_2026" not in aplicadas and _tabela_existe(cur, "usuarios"):
+        _MAP = {"diretoria": "master", "consultor": "operador", "suporte": "operador"}
+        for antigo, novo in _MAP.items():
+            cur.execute("UPDATE usuarios SET nivel=? WHERE nivel=?", (novo, antigo))
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v4_2026')")
+
     # 2026-06-20: F1 multi-tenant — loja seed (das constantes do contrato) + backfill.
     if "tenancy_v1_2026" not in aplicadas and _tabela_existe(cur, "lojas"):
         cur.execute("SELECT id FROM lojas ORDER BY id LIMIT 1")

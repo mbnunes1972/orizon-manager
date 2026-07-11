@@ -36,7 +36,7 @@ class _Meta:
 
 def test_gerencia_ve_tudo_admin_nada():
     m = _Meta("P", criado_por_id=999)
-    for g in ("diretor", "gerente_vendas", "gerente_adm_fin"):
+    for g in ("master", "gerencial", "master"):
         assert mod_escopo.pode_ver_projeto(_ator(g), m, set()) is True
     for a in ("super_admin", "admin_rede"):
         assert mod_escopo.pode_ver_projeto(_ator(a), m, set()) is False
@@ -45,10 +45,10 @@ def test_gerencia_ve_tudo_admin_nada():
 def test_consultor_por_posse():
     meu = _Meta("P1", criado_por_id=7)
     outro = _Meta("P2", criado_por_id=8)
-    assert mod_escopo.pode_ver_projeto(_ator("consultor", 7), meu, set()) is True
-    assert mod_escopo.pode_ver_projeto(_ator("consultor", 7), outro, set()) is False
+    assert mod_escopo.pode_ver_projeto(_ator("operador", 7), meu, set()) is True
+    assert mod_escopo.pode_ver_projeto(_ator("operador", 7), outro, set()) is False
     # legado sem criador é visível
-    assert mod_escopo.pode_ver_projeto(_ator("consultor", 7), _Meta("P3", None), set()) is True
+    assert mod_escopo.pode_ver_projeto(_ator("operador", 7), _Meta("P3", None), set()) is True
 
 
 def test_operacional_so_atribuido():
@@ -72,8 +72,8 @@ def test_resolver_responsavel_ambiente_prevalece():
 
 def test_visao_do_papel():
     assert mod_escopo.visao_do_papel(_ator("medidor")) == "operacional"
-    assert mod_escopo.visao_do_papel(_ator("consultor")) == "comercial"
-    assert mod_escopo.visao_do_papel(_ator("diretor")) == "comercial"
+    assert mod_escopo.visao_do_papel(_ator("operador")) == "comercial"
+    assert mod_escopo.visao_do_papel(_ator("master")) == "comercial"
     assert mod_escopo.visao_do_papel(_ator("super_admin")) == "nenhuma"
 
 
@@ -138,7 +138,7 @@ def test_mapa_so_gerencia_edita(http_client_factory, seed, projetos_dir, app_db)
 def test_escopo_consultor_nao_ve_projeto_de_outro(http_client_factory, seed, projetos_dir, app_db):
     db = app_db.get_session()
     l1 = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
-    b = app_db.Usuario(nome="ConsB", login="consb@loja.com", nivel="consultor", loja_id=l1, ativo=1)
+    b = app_db.Usuario(nome="ConsB", login="consb@loja.com", nivel="operador", loja_id=l1, ativo=1)
     b.set_senha("x"); db.add(b); db.flush()
     db.query(app_db.Projeto).filter_by(nome_safe="Proj_L1").first().criado_por_id = b.id
     db.commit(); db.close()

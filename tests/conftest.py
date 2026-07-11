@@ -64,14 +64,10 @@ def seed(app_db):
 
     mkuser("Diretor L1", "dir_l1", "master", loja_id=l1.id)   # Perfil-4: master (era 'diretoria')
     mkuser("Diretor L2", "dir_l2", "master", loja_id=l2.id)
-    # NOTA: mantido como 'consultor' (não 'operador') deliberadamente — perfis.py resolve
-    # 'consultor' -> base 'operador' via _ALIAS_BASE para toda checagem de capacidade
-    # (pode()/desconto_max()/acessa_*), então o comportamento de novo modelo é idêntico.
-    # main.py:7547 (_PERFIS_ESCOPO_PROPRIO) ainda faz match LITERAL de string 'consultor'
-    # (fora do alias de perfis.py) para a regra "consultor só vê os projetos que criou";
-    # trocar para 'operador' aqui quebraria essa regra sem tocar em main.py (fora do
-    # escopo desta migração de testes/seed). Ver relatório da Task 1b.
-    mkuser("Consultor L1", "cons_l1", "consultor", loja_id=l1.id)
+    # Perfil-4/Task 3: 'operador' (era 'consultor') — agora que a regra "só vê os próprios
+    # projetos" (main._ve_apenas_proprios_projetos / mod_escopo.escopo_por_posse) é dirigida
+    # pela BASE (perfis.base(nivel) == 'operador'), o seed pode usar a base diretamente.
+    mkuser("Consultor L1", "cons_l1", "operador", loja_id=l1.id)
     mkuser("Super",      "super",  "super_admin")
     mkuser("Adm Rede",   "adm_rede", "admin_rede", rede_id=rede.id)
 
