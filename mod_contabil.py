@@ -344,6 +344,20 @@ EVENTOS = {
     "execucao_reparo_garantia":     ("2.1.04.03", "1.1.01",  "Execução de reparo em garantia (baixa da provisão)"),
     # Caso de Assistência — tipo de custo Paga: nova venda ao cliente, sem tocar provisão (v7 §6)
     "venda_assistencia":            ("1.1.02", "4.1.02",    "Venda de assistência (caso Paga — cobrança do cliente)"),
+    # ── FASE B2: Adiantamento de Clientes + receita segmentada (Mercadoria/Serviço) + CMV=CFO ──
+    # Recebimento ANTES do documento fiscal: dinheiro entra como PASSIVO (obrigação de entregar).
+    "recebimento_venda":            ("1.1.01", "2.1.06",    "Recebimento do cliente (adiantamento — antes do faturamento)"),
+    # Faturamento SEGMENTADO (B1): Mercadoria → 4.1.01 (NF-e) · Serviço → 4.2.01 (NFS-e). NUNCA lançar
+    # estes 4 direto no wiring — sempre via faturar_segmento() (split adiantado/a-receber + idempotência).
+    "faturamento_mercadoria_adiantado": ("2.1.06", "4.1.01", "Faturamento mercadoria (NF-e) — baixa de adiantamento"),
+    "faturamento_mercadoria_a_receber": ("1.1.02", "4.1.01", "Faturamento mercadoria (NF-e) — a receber"),
+    "faturamento_servico_adiantado":    ("2.1.06", "4.2.01", "Faturamento serviço (NFS-e) — baixa de adiantamento"),
+    "faturamento_servico_a_receber":    ("1.1.02", "4.2.01", "Faturamento serviço (NFS-e) — a receber"),
+    # CMV = CFO congelado do orçamento do contrato, UMA vez por projeto (ref "cmv:<projeto>"). O crédito
+    # em 2.1.04.06 constitui o passivo com a fábrica NO MESMO lançamento (sem transitar por 5.6).
+    "faturamento_cmv":              ("5.1.01", "2.1.04.06", "CMV Fábrica — reconhecimento no faturamento (CFO congelado)"),
+    # Baixa do passivo com a fábrica ao pagar: passivo × ativo, não toca o resultado.
+    "pagamento_fabrica":            ("2.1.04.06", "1.1.01", "Pagamento à fábrica (baixa da Provisão de Custo de Fábrica)"),
     # Folha de Pagamento (v10 §2.1): despesa nas contas 5.3 existentes × Caixa (sem conta nova)
     "folha_fixa":                   ("5.3.06", "1.1.01",    "Folha — parte fixa (Salários de Vendas)"),
     "folha_variavel":               ("5.3.01", "1.1.01",    "Folha — parte variável (Comissão de Vendedor)"),
@@ -374,6 +388,46 @@ def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=No
     return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor,
                   data=data, projeto_id=projeto_id, origem=tipo_evento,
                   historico=historico or hist_pad, ref=ref, motivo=motivo)
+
+
+# ── FASE B2: faturamento segmentado com split contra o Adiantamento de Clientes ──────────────
+def saldo_adiantamento_projeto(db, owner_tipo, owner_id, projeto_id):
+    """Pool de Adiantamento de Clientes (2.1.06) EM ABERTO do projeto: crédito − débito dos
+    lançamentos tagueados ao projeto. Nunca considerado abaixo de 0."""
+    return max(_mov(db, owner_tipo, owner_id, "2.1.06", "credor", None, None, projeto_id=projeto_id), 0.0)
+
+
+def faturar_segmento(db, owner_tipo, owner_id, projeto_id, segmento, valor, ref_base, data=None):
+    """Fatura um segmento da receita (B1): 'mercadoria' → 4.1.01 (NF-e) | 'servico' → 4.2.01 (NFS-e).
+    Faz o SPLIT do valor entre baixar o Adiantamento do projeto (2.1.06, até o saldo em aberto) e
+    constituir Contas a Receber (1.1.02) pelo resto. Idempotente por documento (refs `ref_base:adiantado`
+    e `ref_base:areceber`) e crash-safe: se a 1ª perna já existe, o split é RECUPERADO dela (não
+    recalculado do pool, que já mudou). Invariantes: soma das pernas == valor; 2.1.06 do projeto ≥ 0."""
+    if segmento not in ("mercadoria", "servico"):
+        raise ValueError("segmento inválido: %s" % segmento)
+    valor = round(float(valor or 0), 2)
+    if valor <= 0:
+        return []
+    ev_adiantado = "faturamento_%s_adiantado" % segmento
+    ev_areceber  = "faturamento_%s_a_receber" % segmento
+    ref_a, ref_r = ref_base + ":adiantado", ref_base + ":areceber"
+    ja_a = lancamento_por_ref(db, owner_tipo, owner_id, ref_a)
+    ja_r = lancamento_por_ref(db, owner_tipo, owner_id, ref_r)
+    if ja_r is not None:                       # a perna final já existe → tudo lançado
+        return [l for l in (ja_a, ja_r) if l is not None]
+    if ja_a is not None:
+        usa = ja_a["valor"]                    # crash-recovery: split congelado na 1ª perna
+    else:
+        usa = round(min(saldo_adiantamento_projeto(db, owner_tipo, owner_id, projeto_id), valor), 2)
+    resto = round(valor - usa, 2)
+    out = []
+    if usa > 0:                                # perna 1: saca do pool (registrar_evento re-checa o ref)
+        out.append(registrar_evento(db, owner_tipo, owner_id, ev_adiantado, usa,
+                                    projeto_id=projeto_id, data=data, ref=ref_a))
+    if resto > 0:                              # perna 2: resto a receber
+        out.append(registrar_evento(db, owner_tipo, owner_id, ev_areceber, resto,
+                                    projeto_id=projeto_id, data=data, ref=ref_r))
+    return out
 
 
 # ── Provisões da venda: % configurável + auto-constituição no fechamento (v6 §6.4) ──
