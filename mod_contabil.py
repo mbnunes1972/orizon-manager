@@ -722,7 +722,14 @@ def margem_projeto(db, owner_tipo, owner_id, projeto_id, ini=None, fim=None):
     prov_garantia = m("5.6.01", "devedor")
     comissao = m("5.3", "devedor")           # comissão do consultor + demais comerciais tagueados ao projeto
     margem = round(receita - custo_produto - prov_montagem - prov_assistencia - prov_garantia - comissao, 2)
+    # Custo de SERVIÇO do projeto (lastro contábil real): Custo de Serviço direto (5.2) + as constituições
+    # 5.6.x (montagem/assistência/garantia), que são o custo estimado dos serviços da venda. Campo
+    # INFORMATIVO / peso de rateio (reconciliar proporcional_custo_direto) — NÃO entra de novo na margem
+    # (as provisões já foram subtraídas acima). Se um dia a execução passar a debitar 5.2 por projeto,
+    # trocar a constituição pela execução aqui (nunca somar as duas, senão duplica o custo).
+    custo_servico = round(m("5.2", "devedor") + prov_montagem + prov_assistencia + prov_garantia, 2)
     return {"projeto_id": projeto_id, "receita": receita, "custo_produto": custo_produto,
+            "custo_servico": custo_servico,
             "prov_montagem": prov_montagem, "prov_assistencia": prov_assistencia,
             "prov_garantia": prov_garantia, "comissao": comissao, "margem_contribuicao": margem}
 

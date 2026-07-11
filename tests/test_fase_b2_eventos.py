@@ -145,3 +145,29 @@ def test_congelar_segmentacao_override_vence_e_preserva_params(app_db):
     par = _j.loads(db.query(Projeto).filter_by(nome_safe="Proj_Cong_2").first().parametros_json)
     assert par["carga_trib"] == 9.0                               # não apaga os demais parâmetros
     db.close()
+
+
+# ── B2.2: margem_projeto expõe custo_servico → destrava reconciliar(proporcional_custo_direto) ──
+def test_margem_projeto_expoe_custo_servico(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 322; mc.seed_plano(db, ot, oid)
+    cfg = {"provisoes": {"assist_pct": 3.0}, "provisoes_contabeis": {"montagem_pct": 5.0, "garantia_pct": 2.0}}
+    mc.constituir_provisoes_venda(db, ot, oid, "P", 10000.0, cfg, ref_base="prov:P")   # 500/300/200
+    m = mc.margem_projeto(db, ot, oid, "P")
+    assert m["custo_servico"] == 1000.0     # 500 montagem + 300 assistência + 200 garantia (5.6.x do projeto)
+    # expor custo_servico NÃO altera a margem (as provisões já são subtraídas individualmente)
+    assert m["margem_contribuicao"] == -1000.0
+    db.close()
+
+
+def test_reconciliar_proporcional_custo_direto_nao_quebra(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 323; mc.seed_plano(db, ot, oid)
+    c = lambda cod: db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first().id
+    # custo direto (CMV 5.1): A=900, B=300 → 75%/25%
+    mc.registrar_evento(db, ot, oid, "faturamento_cmv", 900.0, projeto_id="A", ref="cmv:A")
+    mc.registrar_evento(db, ot, oid, "faturamento_cmv", 300.0, projeto_id="B", ref="cmv:B")
+    mc.lancar(db, ot, oid, conta_debito_id=c("5.4.01"), conta_credito_id=c("1.1.01"), valor=400.0)
+    rec = mc.reconciliar(db, ot, oid, metodologia="proporcional_custo_direto")   # antes: KeyError
+    aloc = {a["projeto_id"]: a for a in rec["alocacao_por_projeto"]}
+    assert aloc["A"]["valor_rateado"] == 300.0    # 75% de 400
+    assert aloc["B"]["valor_rateado"] == 100.0    # 25% de 400
+    db.close()
