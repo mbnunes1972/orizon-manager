@@ -48,6 +48,7 @@ PLANO_PADRAO = [
     ("4.3.01", "Simples Nacional s/ Vendas"), ("4.3.02", "Devolução de Vendas"),
     ("4.4", "Outras Receitas Não Operacionais"),
     ("4.4.01", "Receita de Aluguéis"),
+    ("4.4.02", "Reversão de Provisões"),   # FASE D: destino da SOBRA (provisionado > efetivado)
     ("5", "DESPESAS / CUSTOS"),
     ("5.1", "CMV"),
     ("5.1.01", "CMV Fábrica (Dal Mobile)"), ("5.1.02", "Frete Fábrica"),
@@ -88,6 +89,7 @@ PLANO_PADRAO = [
     ("5.6.07", "Constituição — Provisão de Comissão de Medidor"),
     ("5.6.08", "Constituição — Provisão de Comissão de Projeto/Executivo"),
     ("5.6.09", "Constituição — Provisão de Retenção de Comissão de Vendas"),
+    ("5.6.10", "Ajuste de Provisões"),   # FASE D: destino da FALTA (efetivado > provisionado)
 ]
 
 
@@ -383,6 +385,8 @@ EVENTOS = {
     "faturamento_cmv":              ("5.1.01", "2.1.04.06", "CMV Fábrica — reconhecimento no faturamento (CFO congelado)"),
     # Baixa do passivo com a fábrica ao pagar: passivo × ativo, não toca o resultado.
     "pagamento_fabrica":            ("2.1.04.06", "1.1.01", "Pagamento à fábrica (baixa da Provisão de Custo de Fábrica)"),
+    # FASE D: pagamento da obrigação com fornecedor (baixa de Fornecedores a Pagar) — passivo × ativo
+    "pagamento_fornecedor":         ("2.1.01", "1.1.01",   "Pagamento a fornecedor (baixa de Fornecedores a Pagar)"),
     # Folha de Pagamento (v10 §2.1): despesa nas contas 5.3 existentes × Caixa (sem conta nova)
     "folha_fixa":                   ("5.3.06", "1.1.01",    "Folha — parte fixa (Salários de Vendas)"),
     "folha_variavel":               ("5.3.01", "1.1.01",    "Folha — parte variável (Comissão de Vendedor)"),
@@ -491,15 +495,21 @@ def constituir_provisoes_fechamento(db, owner_tipo, owner_id, projeto_id, valore
     return out
 
 
-def total_lancado(db, owner_tipo, owner_id, codigo, lado, projeto_id=None):
+def total_lancado(db, owner_tipo, owner_id, codigo, lado, projeto_id=None,
+                  origens=None, excluir_origens=None):
     """Soma BRUTA dos lançamentos de um lado ('debito'|'credito') de uma conta (opcionalmente por
-    projeto). Ex.: total constituído da Provisão de Impostos = total_lancado(..., '2.1.04.13', 'credito',
-    projeto) — diferente do saldo, que já desconta as baixas."""
+    projeto). `origens` = só estas origens; `excluir_origens` = todas menos estas. Ex.: total constituído
+    da Provisão de Impostos = total_lancado(..., '2.1.04.13', 'credito', projeto) — diferente do saldo,
+    que já desconta as baixas."""
     conta = _conta_por_codigo(db, owner_tipo, owner_id, codigo)
     col = Lancamento.conta_debito_id if lado == "debito" else Lancamento.conta_credito_id
     q = db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id).filter(col == conta.id)
     if projeto_id:
         q = q.filter(Lancamento.projeto_id == projeto_id)
+    if origens is not None:
+        q = q.filter(Lancamento.origem.in_(list(origens)))
+    if excluir_origens is not None:
+        q = q.filter(~Lancamento.origem.in_(list(excluir_origens)))
     return round(sum(l.valor for l in q.all()), 2)
 
 
@@ -523,6 +533,85 @@ def efetivar_impostos_segmento(db, owner_tipo, owner_id, projeto_id, valor, ref_
     registrar_evento(db, owner_tipo, owner_id, "faturamento_impostos_obrigacao", v,
                      projeto_id=projeto_id, data=data, ref=ref_base + ":obr")
     return v
+
+
+# ── FASE D: reconciliação (Provisionado × Efetivado × Saldo × Destino) + Contas a Pagar ───────
+_ORIGEM_RESOL_SOBRA = "resolucao_provisao_sobra"
+_ORIGEM_RESOL_FALTA = "resolucao_provisao_falta"
+
+
+def efetivar_provisao(db, owner_tipo, owner_id, projeto_id, codigo_provisao, valor, ref, data=None):
+    """Efetiva (reconhece) o custo REAL de uma provisão como obrigação com fornecedor: Provisão
+    (2.1.04.x) × Fornecedores a Pagar (2.1.01), por COMPETÊNCIA (não baixa em caixa — o pagamento é o
+    evento `pagamento_fornecedor`). Cobre QUALQUER provisão do grupo. Idempotente por ref."""
+    if not (codigo_provisao or "").startswith(GRUPO_PROVISOES + "."):
+        raise ValueError("efetivar_provisao: %s não é conta de provisão (%s.x)" % (codigo_provisao, GRUPO_PROVISOES))
+    ja = lancamento_por_ref(db, owner_tipo, owner_id, ref)
+    if ja is not None:
+        return ja
+    valor = round(float(valor or 0), 2)
+    if valor <= 0:
+        return None
+    cd = _conta_por_codigo(db, owner_tipo, owner_id, codigo_provisao)
+    cc = _conta_por_codigo(db, owner_tipo, owner_id, "2.1.01")
+    return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor, data=data, projeto_id=projeto_id,
+                  origem="efetivacao_provisao",
+                  historico="Efetivação de provisão (custo real → Fornecedores a Pagar)", ref=ref)
+
+
+def resolver_saldo_provisao(db, owner_tipo, owner_id, projeto_id, codigo_provisao, ref, data=None):
+    """Fecha o saldo em aberto da provisão (de um projeto) ao resultado. SOBRA (provisionado > efetivado)
+    → Provisão × Reversão de Provisões (4.4.02, receita). FALTA (efetivado > provisionado) → Ajuste de
+    Provisões (5.6.10, despesa) × Provisão. Zera a provisão do projeto. Idempotente por ref."""
+    ja = lancamento_por_ref(db, owner_tipo, owner_id, ref)
+    if ja is not None:
+        return ja
+    saldo = round(_mov(db, owner_tipo, owner_id, codigo_provisao, "credor", None, None, projeto_id=projeto_id), 2)
+    if abs(saldo) < 0.005:
+        return None
+    prov = _conta_por_codigo(db, owner_tipo, owner_id, codigo_provisao)
+    if saldo > 0:   # sobra → receita (débito Provisão × crédito 4.4.02)
+        cc = _conta_por_codigo(db, owner_tipo, owner_id, "4.4.02")
+        return lancar(db, owner_tipo, owner_id, prov.id, cc.id, saldo, data=data, projeto_id=projeto_id,
+                      origem=_ORIGEM_RESOL_SOBRA, historico="Reversão de provisão (sobra → receita)", ref=ref)
+    cd = _conta_por_codigo(db, owner_tipo, owner_id, "5.6.10")   # falta → despesa (débito 5.6.10 × crédito Provisão)
+    return lancar(db, owner_tipo, owner_id, cd.id, prov.id, -saldo, data=data, projeto_id=projeto_id,
+                  origem=_ORIGEM_RESOL_FALTA, historico="Ajuste de provisão (falta → despesa)", ref=ref)
+
+
+def reconciliacao(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None):
+    """Reconciliação de provisões (Provisionado × Efetivado × Saldo × Destino), data-driven sobre o grupo
+    de provisões (exclui as de tratamento próprio). `projeto_id=None` → consolidado (todos os projetos);
+    `projeto_id=X` → granular. Fonte única = razão: provisionado = créditos (constituição), efetivado =
+    débitos (efetivação real), saldo = prov − efet; `resolvido` = o que já foi mandado ao resultado (as
+    resoluções são excluídas de provisionado/efetivado p/ não contaminar)."""
+    seed_plano(db, owner_tipo, owner_id)
+    contas = (db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, tipo="analitica")
+              .filter(Conta.codigo.like(GRUPO_PROVISOES + ".%")).order_by(Conta.codigo).all())
+    tl = lambda cod, lado, **kw: total_lancado(db, owner_tipo, owner_id, cod, lado, projeto_id, **kw)
+    provs = []
+    for c in contas:
+        if c.codigo in _PROV_PAINEL_EXCLUI:
+            continue
+        provisionado = tl(c.codigo, "credito", excluir_origens={_ORIGEM_RESOL_FALTA})
+        efetivado = tl(c.codigo, "debito", excluir_origens={_ORIGEM_RESOL_SOBRA})
+        resolvido = round(tl(c.codigo, "debito", origens={_ORIGEM_RESOL_SOBRA})
+                          + tl(c.codigo, "credito", origens={_ORIGEM_RESOL_FALTA}), 2)
+        provs.append({"codigo": c.codigo, "nome": c.nome, "tipo": _PROV_PAINEL_TIPO.get(c.codigo, "O"),
+                      "provisionado": provisionado, "efetivado": efetivado,
+                      "saldo": round(provisionado - efetivado, 2), "resolvido": resolvido})
+    t = lambda k: round(sum(p[k] for p in provs), 2)
+    return {"projeto_id": projeto_id, "provisoes": provs,
+            "totais": {"provisionado": t("provisionado"), "efetivado": t("efetivado"),
+                       "saldo": t("saldo"), "resolvido": t("resolvido")}}
+
+
+def contas_a_pagar(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None):
+    """Contas a Pagar (MVP, FASE D): obrigações com fornecedores em aberto = saldo de Fornecedores a
+    Pagar (2.1.01), escopado por projeto (None = consolidado). Derivado do razão — o sub-razão de títulos
+    (fornecedor/vencimento) é fase futura."""
+    total = _mov(db, owner_tipo, owner_id, "2.1.01", "credor", ini, fim, projeto_id=projeto_id)
+    return {"projeto_id": projeto_id, "total_em_aberto": round(total, 2)}
 
 
 # ── Provisões da venda: % configurável + auto-constituição no fechamento (v6 §6.4) ──

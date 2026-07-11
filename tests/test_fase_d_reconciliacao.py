@@ -1,0 +1,101 @@
+"""FASE D1 — reconciliação de provisões (Provisionado × Efetivado × Saldo × Destino) + Contas a Pagar.
+Efetivado = competência (2.1.04.x × 2.1.01 Fornecedores a Pagar). Destino: sobra→4.4.02 (receita),
+falta→5.6.10 (despesa). Fonte única = razão; reconciliacao(projeto_id) serve granular e consolidado."""
+import mod_contabil as mc
+
+
+def _s(db, ot, oid, cod):
+    c = db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first()
+    return mc.saldo_conta(db, ot, oid, c.id)
+
+
+def test_contas_e_evento_d1_existem(app_db):
+    db = app_db.get_session(); mc.seed_plano(db, "loja", 600)
+    cods = {c.codigo for c in db.query(mc.Conta).filter_by(owner_tipo="loja", owner_id=600).all()}
+    assert "4.4.02" in cods and "5.6.10" in cods
+    assert mc.EVENTOS["pagamento_fornecedor"][:2] == ("2.1.01", "1.1.01")
+    db.close()
+
+
+def test_efetivar_provisao_reconhece_obrigacao(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 601; mc.seed_plano(db, ot, oid)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"frete_fabrica": 1000.0}, ref_base="pf:P")
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.07", 900.0, ref="ef:P:07")
+    assert _s(db, ot, oid, "2.1.04.07") == 100.0    # provisão em aberto (1000 − 900)
+    assert _s(db, ot, oid, "2.1.01") == 900.0        # Fornecedores a Pagar (competência)
+    assert _s(db, ot, oid, "1.1.01") == 0.0          # caixa intocado (ainda não pagou)
+    db.close()
+
+
+def test_efetivar_idempotente(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 6011; mc.seed_plano(db, ot, oid)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"frete_fabrica": 1000.0}, ref_base="pf:P")
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.07", 900.0, ref="ef:P:07")
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.07", 900.0, ref="ef:P:07")   # 2ª vez
+    assert _s(db, ot, oid, "2.1.01") == 900.0        # não duplica
+    db.close()
+
+
+def test_reconciliacao_projeto(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 602; mc.seed_plano(db, ot, oid)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"frete_fabrica": 1000.0, "montagem": 500.0}, ref_base="pf:P")
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.07", 900.0, ref="ef:P:07")
+    linhas = {l["codigo"]: l for l in mc.reconciliacao(db, ot, oid, projeto_id="P")["provisoes"]}
+    assert linhas["2.1.04.07"]["provisionado"] == 1000.0 and linhas["2.1.04.07"]["efetivado"] == 900.0
+    assert linhas["2.1.04.07"]["saldo"] == 100.0 and linhas["2.1.04.07"]["tipo"] == "C"
+    assert linhas["2.1.04.02"]["provisionado"] == 500.0 and linhas["2.1.04.02"]["efetivado"] == 0.0
+    assert linhas["2.1.04.02"]["saldo"] == 500.0
+    db.close()
+
+
+def test_resolver_saldo_sobra_vira_receita(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 603; mc.seed_plano(db, ot, oid)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"frete_fabrica": 1000.0}, ref_base="pf:P")
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.07", 900.0, ref="ef:P:07")
+    mc.resolver_saldo_provisao(db, ot, oid, "P", "2.1.04.07", ref="rs:P:07")
+    assert _s(db, ot, oid, "2.1.04.07") == 0.0       # provisão zerada
+    assert _s(db, ot, oid, "4.4.02") == 100.0        # sobra → receita reversão
+    # reconciliação: efetivado NÃO conta a resolução; expõe resolvido à parte
+    rec = {l["codigo"]: l for l in mc.reconciliacao(db, ot, oid, projeto_id="P")["provisoes"]}
+    assert rec["2.1.04.07"]["provisionado"] == 1000.0 and rec["2.1.04.07"]["efetivado"] == 900.0
+    assert rec["2.1.04.07"]["saldo"] == 100.0 and rec["2.1.04.07"]["resolvido"] == 100.0
+    db.close()
+
+
+def test_resolver_saldo_falta_vira_despesa(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 604; mc.seed_plano(db, ot, oid)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"frete_fabrica": 1000.0}, ref_base="pf:P")
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.07", 1200.0, ref="ef:P:07")   # custo real > provisão
+    assert _s(db, ot, oid, "2.1.04.07") == -200.0    # falta (saldo negativo)
+    mc.resolver_saldo_provisao(db, ot, oid, "P", "2.1.04.07", ref="rs:P:07")
+    assert _s(db, ot, oid, "2.1.04.07") == 0.0       # zerada
+    assert _s(db, ot, oid, "5.6.10") == 200.0        # falta → despesa ajuste
+    db.close()
+
+
+def test_pagamento_fornecedor_baixa_2101(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 605; mc.seed_plano(db, ot, oid)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"frete_fabrica": 1000.0}, ref_base="pf:P")
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.07", 900.0, ref="ef:P:07")
+    mc.registrar_evento(db, ot, oid, "pagamento_fornecedor", 900.0, projeto_id="P", ref="pg:P:07")
+    assert _s(db, ot, oid, "2.1.01") == 0.0          # obrigação quitada
+    assert mc.contas_a_pagar(db, ot, oid, projeto_id="P")["total_em_aberto"] == 0.0
+    db.close()
+
+
+def test_reconciliacao_consolidada_soma_projetos(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 606; mc.seed_plano(db, ot, oid)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "A", {"frete_fabrica": 1000.0}, ref_base="pf:A")
+    mc.constituir_provisoes_fechamento(db, ot, oid, "B", {"frete_fabrica": 500.0}, ref_base="pf:B")
+    linhas = {l["codigo"]: l for l in mc.reconciliacao(db, ot, oid, projeto_id=None)["provisoes"]}
+    assert linhas["2.1.04.07"]["provisionado"] == 1500.0   # consolidado A+B
+    db.close()
+
+
+def test_contas_a_pagar_em_aberto(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 607; mc.seed_plano(db, ot, oid)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"frete_fabrica": 1000.0, "insumos": 300.0}, ref_base="pf:P")
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.07", 900.0, ref="ef:P:07")
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.09", 250.0, ref="ef:P:09")
+    assert mc.contas_a_pagar(db, ot, oid, projeto_id="P")["total_em_aberto"] == 1150.0   # 900 + 250
+    db.close()
