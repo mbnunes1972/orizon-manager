@@ -394,6 +394,10 @@ class Loja(Base):
     criado_em   = Column(DateTime, default=datetime.utcnow)
     config_financeira_json = Column(Text, nullable=True)   # config financeira da loja (JSON)
     modulos_ativos = Column(Text, nullable=True)   # JSON: domínios ativos; NULL/"" = todos ligados (topologia)
+    # Segmentação de receita Mercadoria × Serviço (default da loja; seed 65/35). Val_Cont divide-se
+    # em Mercadoria (NF-e produto) + Serviço (NFS-e); override por projeto vive em parametros_json.
+    pct_mercadoria = Column(Float, nullable=True, default=65.0)
+    pct_servico    = Column(Float, nullable=True, default=35.0)
 
 
 class ParceiroLoja(Base):
@@ -1107,6 +1111,13 @@ def _migrar_colunas():
                 cur.execute("ALTER TABLE lojas ADD COLUMN emitente_id INTEGER")
             if "modulos_ativos" not in loja_cols:
                 cur.execute("ALTER TABLE lojas ADD COLUMN modulos_ativos TEXT")
+            # Segmentação Mercadoria × Serviço: colunas + seed 65/35 nas lojas existentes (backfill).
+            if "pct_mercadoria" not in loja_cols:
+                cur.execute("ALTER TABLE lojas ADD COLUMN pct_mercadoria REAL")
+                cur.execute("UPDATE lojas SET pct_mercadoria = 65.0 WHERE pct_mercadoria IS NULL")
+            if "pct_servico" not in loja_cols:
+                cur.execute("ALTER TABLE lojas ADD COLUMN pct_servico REAL")
+                cur.execute("UPDATE lojas SET pct_servico = 35.0 WHERE pct_servico IS NULL")
         if _tabela_existe(cur, "redes"):
             rede_cols = {c[1] for c in cur.execute("PRAGMA table_info(redes)").fetchall()}
             if "emitente_central_id" not in rede_cols:

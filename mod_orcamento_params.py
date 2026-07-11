@@ -88,6 +88,48 @@ def parametros_default_loja(cfg):
     return base
 
 
+# ── Segmentação de receita Mercadoria × Serviço ──────────────────────────────────────────────
+# Val_Cont = Mercadoria + Serviço, por um percentual configurável. Default da loja (Dados da Loja,
+# seed 65/35) com override por projeto (parametros_json, editável só pelo Diretor). Base da receita
+# segmentada (NF-e produto 4.1.01 × NFS-e 4.2.01, sem duplicar) e da futura distribuidora.
+SEGMENTACAO_DEFAULT = {"pct_mercadoria": 65.0, "pct_servico": 35.0}
+
+
+def validar_segmentacao(pct_mercadoria, pct_servico, tol=0.01) -> None:
+    """Valida o par de percentuais. Levanta ValueError se fora de 0..100 ou se a soma != 100."""
+    m = float(pct_mercadoria); s = float(pct_servico)
+    if not (0.0 <= m <= 100.0) or not (0.0 <= s <= 100.0):
+        raise ValueError("Percentuais de segmentação devem estar entre 0 e 100.")
+    if abs((m + s) - 100.0) > tol:
+        raise ValueError(f"Mercadoria + Serviço deve somar 100 (recebido {m}+{s}={round(m + s, 2)}).")
+
+
+def resolver_segmentacao(pct_mercadoria, pct_servico) -> dict:
+    """Resolve o par de percentuais de uma loja; NULL/ausente → default 65/35."""
+    if pct_mercadoria is None or pct_servico is None:
+        return dict(SEGMENTACAO_DEFAULT)
+    return {"pct_mercadoria": float(pct_mercadoria), "pct_servico": float(pct_servico)}
+
+
+def segmentacao_efetiva(loja_seg, projeto_params) -> dict:
+    """Segmentação efetiva do projeto: override em parametros_json (Diretor) vence o default da loja;
+    sem override, herda a loja."""
+    p = projeto_params or {}
+    pm = p.get("pct_mercadoria"); ps = p.get("pct_servico")
+    if pm is not None and ps is not None:
+        return {"pct_mercadoria": float(pm), "pct_servico": float(ps)}
+    return dict(loja_seg or SEGMENTACAO_DEFAULT)
+
+
+def segmentar(val_cont, pct_mercadoria):
+    """Divide Val_Cont em (mercadoria, serviço). Serviço = resto (Val_Cont − Mercadoria) para a soma
+    fechar EXATAMENTE no Val_Cont, sem centavo perdido no arredondamento."""
+    v = round(float(val_cont or 0), 2)
+    merc = round(v * float(pct_mercadoria) / 100.0, 2)
+    serv = round(v - merc, 2)
+    return merc, serv
+
+
 def sanear_descontos(pares, ids_validos) -> dict:
     ids_validos = set(ids_validos)
     out = {}
