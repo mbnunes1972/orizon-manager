@@ -78,6 +78,13 @@ PLANO_PADRAO = [
     ("5.6.01", "Constituição — Provisão de Garantia"),
     ("5.6.02", "Constituição — Provisão de Montagem"),
     ("5.6.03", "Constituição — Provisão de Assistência Técnica"),
+    # FASE B2.4: constituição das demais rubricas rastreadas no fechamento (Tipos C e A)
+    ("5.6.04", "Constituição — Provisão de Frete de Fábrica"),
+    ("5.6.05", "Constituição — Provisão de Frete Local"),
+    ("5.6.06", "Constituição — Provisão de Insumos Locais"),
+    ("5.6.07", "Constituição — Provisão de Comissão de Medidor"),
+    ("5.6.08", "Constituição — Provisão de Comissão de Projeto/Executivo"),
+    ("5.6.09", "Constituição — Provisão de Retenção de Comissão de Vendas"),
 ]
 
 
@@ -334,6 +341,17 @@ EVENTOS = {
     "fechamento_venda_montagem":    ("5.6.02", "2.1.04.02", "Constituição — Provisão de Montagem (fechamento de venda)"),
     "fechamento_venda_assistencia": ("5.6.03", "2.1.04.05", "Constituição — Provisão de Assistência Técnica (fechamento de venda)"),
     "fechamento_venda_garantia":    ("5.6.01", "2.1.04.03", "Constituição — Provisão de Garantia (fechamento de venda)"),
+    # FASE B2.4: constituição das demais provisões rastreadas — Despesa (5.6.x) × Provisão (2.1.04.x)
+    "fechamento_venda_frete_fabrica":       ("5.6.04", "2.1.04.07", "Constituição — Provisão de Frete de Fábrica"),
+    "fechamento_venda_frete_local":         ("5.6.05", "2.1.04.08", "Constituição — Provisão de Frete Local"),
+    "fechamento_venda_insumos":             ("5.6.06", "2.1.04.09", "Constituição — Provisão de Insumos Locais"),
+    "fechamento_venda_com_medidor":         ("5.6.07", "2.1.04.10", "Constituição — Provisão de Comissão de Medidor"),
+    "fechamento_venda_com_proj_exec":       ("5.6.08", "2.1.04.11", "Constituição — Provisão de Comissão de Projeto/Executivo"),
+    "fechamento_venda_retencao_com_vendas": ("5.6.09", "2.1.04.12", "Constituição — Provisão de Retenção de Comissão de Vendas"),
+    # Impostos (Simples): dedução da receita (4.3.01) × Obrigações Tributárias (2.1.03), não é provisão de custo
+    "fechamento_venda_impostos":            ("4.3.01", "2.1.03",    "Provisão de Impostos (Simples Nacional s/ Vendas)"),
+    # Custo financeiro (Total Flex): despesa financeira × Financiamento a Pagar  [CONFIRMAR CONTADOR]
+    "custo_financeiro":                     ("5.5.03", "2.1.05",    "Custo Financeiro (antecipação de recebíveis — Total Flex)"),
     # Ciclo de caixa
     "faturamento":                  ("1.1.02", "4.1.01",    "Faturamento (NF-e emitida)"),
     "recebimento":                  ("1.1.01", "1.1.02",    "Recebimento do cliente"),
@@ -427,6 +445,42 @@ def faturar_segmento(db, owner_tipo, owner_id, projeto_id, segmento, valor, ref_
     if resto > 0:                              # perna 2: resto a receber
         out.append(registrar_evento(db, owner_tipo, owner_id, ev_areceber, resto,
                                     projeto_id=projeto_id, data=data, ref=ref_r))
+    return out
+
+
+# ── FASE B2.4: constituição de TODAS as provisões rastreadas no fechamento ────────────────────
+# chave da rubrica -> evento de constituição. O VALOR de cada uma vem do motor (mod_provisoes), computado
+# pelo composition root (main.py) — o razão só BOOKA, sem calcular (mantém o layering ledger×cálculo).
+_PROV_FECHAMENTO = {
+    "montagem":            "fechamento_venda_montagem",
+    "garantia":            "fechamento_venda_garantia",
+    "assistencia":         "fechamento_venda_assistencia",
+    "frete_fabrica":       "fechamento_venda_frete_fabrica",
+    "frete_local":         "fechamento_venda_frete_local",
+    "insumos":             "fechamento_venda_insumos",
+    "com_medidor":         "fechamento_venda_com_medidor",
+    "com_proj_exec":       "fechamento_venda_com_proj_exec",
+    "retencao_com_vendas": "fechamento_venda_retencao_com_vendas",
+    "impostos":            "fechamento_venda_impostos",
+}
+
+
+def constituir_provisoes_fechamento(db, owner_tipo, owner_id, projeto_id, valores, ref_base):
+    """Constitui TODAS as provisões rastreadas no fechamento da venda. `valores` = {chave_rubrica: R$}
+    (do motor, computado pelo chamador). Cada uma: Despesa × Provisão (do mapa EVENTOS), idempotente por
+    ref (`ref_base:<chave>`). Valor <= 0 não lança. Custo de Fábrica NÃO entra aqui (vira CMV=CFO no
+    faturamento). Retorna {chave: valor_lançado}."""
+    out = {}
+    for chave, valor in (valores or {}).items():
+        evento = _PROV_FECHAMENTO.get(chave)
+        if evento is None:
+            continue
+        v = round(float(valor or 0), 2)
+        if v <= 0:
+            continue
+        registrar_evento(db, owner_tipo, owner_id, evento, v, projeto_id=projeto_id,
+                         ref=ref_base + ":" + chave)
+        out[chave] = v
     return out
 
 

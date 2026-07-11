@@ -171,3 +171,62 @@ def test_reconciliar_proporcional_custo_direto_nao_quebra(app_db):
     assert aloc["A"]["valor_rateado"] == 300.0    # 75% de 400
     assert aloc["B"]["valor_rateado"] == 100.0    # 25% de 400
     db.close()
+
+
+# ── B2.4/B2.5: constituição de TODAS as provisões rastreadas + custo financeiro ────────────────
+_EVENTOS_FECH = {
+    "fechamento_venda_frete_fabrica":       ("5.6.04", "2.1.04.07"),
+    "fechamento_venda_frete_local":         ("5.6.05", "2.1.04.08"),
+    "fechamento_venda_insumos":             ("5.6.06", "2.1.04.09"),
+    "fechamento_venda_com_medidor":         ("5.6.07", "2.1.04.10"),
+    "fechamento_venda_com_proj_exec":       ("5.6.08", "2.1.04.11"),
+    "fechamento_venda_retencao_com_vendas": ("5.6.09", "2.1.04.12"),
+    "fechamento_venda_impostos":            ("4.3.01", "2.1.03"),
+    "custo_financeiro":                     ("5.5.03", "2.1.05"),
+}
+
+
+def test_eventos_e_contas_b24_existem(app_db):
+    for ev, (d, c) in _EVENTOS_FECH.items():
+        assert ev in mc.EVENTOS and mc.EVENTOS[ev][0] == d and mc.EVENTOS[ev][1] == c, ev
+    db = app_db.get_session(); mc.seed_plano(db, "loja", 400)
+    cods = {x.codigo for x in db.query(mc.Conta).filter_by(owner_tipo="loja", owner_id=400).all()}
+    for cod in ("5.6.04", "5.6.05", "5.6.06", "5.6.07", "5.6.08", "5.6.09"):
+        assert cod in cods, cod
+    db.close()
+
+
+def test_constituir_todas_provisoes_fechamento(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 401; mc.seed_plano(db, ot, oid)
+    s = lambda cod: mc.saldo_conta(db, ot, oid, db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first().id)
+    valores = {"montagem": 100.0, "garantia": 50.0, "assistencia": 0.0, "frete_fabrica": 30.0,
+               "frete_local": 20.0, "insumos": 10.0, "com_medidor": 15.0, "com_proj_exec": 25.0,
+               "retencao_com_vendas": 40.0, "impostos": 80.0}
+    out = mc.constituir_provisoes_fechamento(db, ot, oid, "P", valores, ref_base="provf:P")
+    assert "assistencia" not in out                 # valor 0 não lança
+    assert s("2.1.04.02") == 100.0 and s("2.1.04.03") == 50.0
+    assert s("2.1.04.07") == 30.0 and s("2.1.04.08") == 20.0 and s("2.1.04.09") == 10.0
+    assert s("2.1.04.10") == 15.0 and s("2.1.04.11") == 25.0 and s("2.1.04.12") == 40.0
+    # impostos: crédito em Obrigações Tributárias (passivo) + débito em 4.3.01 (dedução, lida como
+    # devedor na DRE → reduz a receita líquida). saldo_conta(4.3.01) vem na natureza credora (= −80).
+    assert s("2.1.03") == 80.0
+    assert mc._mov(db, ot, oid, "4.3", "devedor", None, None) == 80.0
+    db.close()
+
+
+def test_constituir_fechamento_idempotente(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 402; mc.seed_plano(db, ot, oid)
+    s = lambda cod: mc.saldo_conta(db, ot, oid, db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first().id)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"frete_fabrica": 30.0}, ref_base="provf:P")
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"frete_fabrica": 30.0}, ref_base="provf:P")
+    assert s("2.1.04.07") == 30.0                   # não duplica
+    db.close()
+
+
+def test_custo_financeiro(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 403; mc.seed_plano(db, ot, oid)
+    s = lambda cod: mc.saldo_conta(db, ot, oid, db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first().id)
+    mc.registrar_evento(db, ot, oid, "custo_financeiro", 14880.15, projeto_id="P", ref="cfin:P")
+    assert s("5.5.03") == 14880.15                  # despesa financeira
+    assert s("2.1.05") == 14880.15                  # financiamento total flex a pagar
+    db.close()
