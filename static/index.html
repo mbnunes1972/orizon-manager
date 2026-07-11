@@ -471,8 +471,8 @@ body{overflow:hidden}
   border-top: 1px solid var(--border, #2a3a2a);
 }
 .ciclo-card-body.aberto { display: block; }
-.home-tab { padding:8px 20px;background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;color:var(--muted);font-size:14px;transition:color .15s; }
-.home-tab.ativo, .home-tab.active { color:var(--text);border-bottom-color:var(--accent);font-weight:600; }
+.home-tab { padding:7px 16px;background:transparent;border:none;border-radius:8px;cursor:pointer;color:var(--muted);font-size:14px;font-weight:500;transition:all .15s; }
+.home-tab.ativo, .home-tab.active { color:var(--text);background:var(--surface-2);box-shadow:var(--shadow);font-weight:600; }
 .home-tab:hover { color:var(--text); }
 
 /* Calendário: ícone visível e campo inteiro clicável */
@@ -501,6 +501,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div class="sb-secao">
       <div class="sb-nav-title">Admin</div>
       <div class="nav-item" id="nav-07" onclick="goPage(7)" style="display:none"><i class="ti ti-settings"></i>Admin</div>
+      <div class="nav-item" id="nav-cfg" onclick="goPage(9)" style="display:none"><i class="ti ti-adjustments"></i>Config</div>
     </div>
   </nav>
 
@@ -567,7 +568,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <!-- Espaçador + Config -->
   <div style="flex:1"></div>
   <div style="padding:12px 14px;border-top:1px solid var(--border)">
-    <div class="nav-item" id="nav-cfg" onclick="goPage(9)" style="opacity:.6;padding:6px 8px"><i class="ti ti-adjustments"></i>Config</div>
     <!-- Botão de perfil do usuário -->
     <div id="sb-user-btn" onclick="abrirModalPerfil()"
          style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;
@@ -588,6 +588,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div id="sb-user-nivel" style="font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase">—</div>
       </div>
     </div>
+    <button onclick="mpLogout()" title="Sair do sistema"
+            style="width:100%;margin-top:8px;padding:8px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:var(--font-sans);font-size:11px;font-weight:700;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:6px"
+            onmouseover="this.style.borderColor='var(--err)';this.style.color='var(--err)'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'"><i class="ti ti-logout"></i> Sair</button>
     <div style="display:flex;gap:4px;margin-top:8px;background:var(--surface-2);border-radius:8px;padding:3px;box-shadow:var(--shadow)">
       <button id="tema-claro"  onclick="setTema('claro')"  title="Tema claro"  style="flex:1;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s">&#x2600; Claro</button>
       <button id="tema-escuro" onclick="setTema('escuro')" title="Tema escuro" style="flex:1;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s">&#x1F319; Escuro</button>
@@ -599,7 +603,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <!-- MODAL PERFIL ─────────────────────────────────────────────── -->
 <div id="modal-perfil" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);
      z-index:9000;display:none;align-items:center;justify-content:center">
-  <div style="background:#111d11;border:1px solid #1e2e1e;border-radius:16px;
+  <div style="background:var(--card);border:1px solid var(--border2);border-radius:16px;
               padding:32px;width:100%;max-width:420px;position:relative">
     <!-- Fechar -->
     <button onclick="fecharModalPerfil()"
@@ -624,7 +628,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                style="position:absolute;bottom:0;right:0;width:22px;height:22px;
                       background:var(--border2);border-radius:50%;display:flex;
                       align-items:center;justify-content:center;cursor:pointer;
-                      font-size:11px;border:2px solid #111d11" title="Trocar foto">📷</label>
+                      font-size:11px;border:2px solid var(--card)" title="Trocar foto">📷</label>
         <input type="file" id="mp-foto-input" accept="image/*" style="display:none"
                onchange="mpTrocarFoto(event)">
       </div>
@@ -642,7 +646,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
                        display:block;margin-bottom:5px">Telefone</label>
         <input type="tel" id="mp-telefone" placeholder="(11) 99999-9999"
-               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;
+               style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
                       padding:10px 12px;color:var(--text);font-family:var(--font-mono);
                       font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'"
@@ -652,7 +656,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
                        display:block;margin-bottom:5px">WhatsApp</label>
         <input type="tel" id="mp-whatsapp" placeholder="(11) 99999-9999"
-               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;
+               style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
                       padding:10px 12px;color:var(--text);font-family:var(--font-mono);
                       font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'"
@@ -662,7 +666,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
                        display:block;margin-bottom:5px">E-mail</label>
         <input type="email" id="mp-email" placeholder="seu@email.com"
-               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;
+               style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
                       padding:10px 12px;color:var(--text);font-family:var(--font-mono);
                       font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'"
@@ -1764,7 +1768,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div class="page" id="page-09">
     <div class="page-title" style="margin:0">Config</div>
     <div class="page-sub">Parâmetros de regra de negócio da loja.</div>
-    <div style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin:12px 0 16px;flex-wrap:wrap">
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin:12px 0 16px;flex-wrap:wrap">
       <button class="home-tab ativo" id="cfg-tab-provisoes"  onclick="cfgTab('provisoes')">Provisões</button>
       <button class="home-tab"       id="cfg-tab-comissao"   onclick="cfgTab('comissao')">Comissão de Vendas</button>
       <button class="home-tab"       id="cfg-tab-cronograma" onclick="cfgTab('cronograma')">Cronograma</button>
@@ -2088,7 +2092,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 </div>
 
 <div id="modal-liberar-impostos" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9600;align-items:center;justify-content:center">
-  <div style="background:#111d11;border:1px solid #1e2e1e;border-radius:14px;padding:28px;width:100%;max-width:380px">
+  <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;width:100%;max-width:380px">
     <div style="font-family:var(--font-sans);font-weight:700;font-size:15px;margin-bottom:8px">Liberar impostos</div>
     <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">Senha de Diretor ou Gerente Administrativo-Financeiro.</div>
     <input id="li-login" placeholder="Usuário" autocomplete="off" style="width:100%;margin-bottom:8px;padding:9px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);box-sizing:border-box">
@@ -2101,7 +2105,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 <div id="modal-autorizacao" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9500;align-items:center;justify-content:center">
-  <div style="background:#111d11;border:1px solid #1e2e1e;border-radius:14px;padding:28px;width:100%;max-width:380px">
+  <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;width:100%;max-width:380px">
     <div style="font-family:var(--font-sans);font-weight:700;font-size:15px;margin-bottom:8px">Autorização Necessária</div>
     <div id="auth-modal-msg" style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6"></div>
     <div style="font-size:11px;color:var(--text);margin-bottom:14px">Informe as credenciais de um Gerente ou Diretor:</div>
@@ -2109,14 +2113,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <div>
         <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Usuário autorizador</label>
         <input type="text" id="auth-modal-login" placeholder="login.autorizador"
-               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none"
+               style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
                onkeydown="if(event.key==='Enter') document.getElementById('auth-modal-senha').focus()">
       </div>
       <div>
         <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Senha</label>
         <input type="password" id="auth-modal-senha" placeholder="••••••••"
-               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none"
+               style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
                onkeydown="if(event.key==='Enter') confirmarAutorizacao()">
       </div>
@@ -2370,7 +2374,7 @@ function aplicarTema(tema){
   else                  root.removeAttribute('data-theme');
   // controle segmentado no rodapé da sidebar (v4 §4)
   const bc = document.getElementById('tema-claro'), be = document.getElementById('tema-escuro');
-  const on = 'background:var(--surface);color:var(--accent);box-shadow:var(--shadow)';
+  const on = 'background:var(--surface);color:var(--text);box-shadow:var(--shadow)';
   const off = 'background:transparent;color:var(--muted);box-shadow:none';
   if(bc) bc.style.cssText = 'flex:1;border:none;font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s;'+(tema==='claro'?on:off);
   if(be) be.style.cssText = 'flex:1;border:none;font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s;'+(tema==='escuro'?on:off);
@@ -8492,7 +8496,7 @@ async function adminLojaNova(redeId){
 async function adminRenderLoja(box){
   const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
   box.innerHTML = `
-    <div style="display:flex;gap:0;border-bottom:2px solid var(--dalm-gold);margin-bottom:12px">
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:12px">
       <button class="home-tab ativo" id="loja-tab-dados" onclick="adminLojaTab('dados')">Dados da loja</button>
       <button class="home-tab" id="loja-tab-usuarios" onclick="adminLojaTab('usuarios')">Usuários da loja</button>
       <button class="home-tab" id="loja-tab-perfis" onclick="adminLojaTab('perfis')">Perfis de Usuário</button>
