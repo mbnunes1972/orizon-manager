@@ -1339,7 +1339,26 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
-## ⏸️ ESTADO ATUAL (2026-07-10) — retomar aqui
+## ⏸️ ESTADO ATUAL (2026-07-11) — retomar aqui
+
+> **🏗️ Frente ATIVA — infraestrutura contábil ponta a ponta (p/ o Projeto Simulação popular DRE/Balanço/
+> Provisões/Reconciliação pelo fluxo REAL de fechamento).** Fases: **A** (caixinhas: Adiantamento 2.1.06 +
+> Provisão Custo Fábrica 2.1.04.06 + demais provisões) ✅ **mergeada + no VPS**. **B1** (segmentação de receita
+> Mercadoria × Serviço — default 65/35 na Loja + override do Diretor no projeto + funções puras `segmentar`/
+> `segmentacao_efetiva`) ✅ **mergeada** (Sessão 64). **Próxima: B2 — eventos de dupla-partida (design com
+> Fable 5):** recebimento_venda (1.1.01×2.1.06) · faturamento com **receita SEGMENTADA** (Mercadoria 4.1.01 na
+> NF-e + Serviço 4.2.01 na NFS-e, baixando o Adiantamento; Σ=Val_Cont) · CMV 5.1.01×2.1.04.06 = **CFO congelado**
+> (uma vez só) · pagamento_fabrica 2.1.04.06×1.1.01. Prova de não-duplicação (CFO 1×) + timing `[CONFIRMAR COM
+> CONTADOR]`. Bug a corrigir junto: `reconciliar(proporcional_custo_direto)` → KeyError `custo_servico` (alinhar
+> à segmentação). Depois: **C** (painel de Provisões por tipo A/B/C/D) e **D** (reconciliação: Provisionado ×
+> **Efetivado** × Saldo × Destino — o custo real da fábrica entra como Efetivado; CFO−real vai ao resultado).
+> Processo da frente: auditoria + plano por fases → OK do usuário → implementa 1 fase de cada vez, TDD, **para
+> antes de mergear** p/ conferência dos números. Dinheiro = seguir NOMENCLATURA.md + prova de não-duplicação.
+>
+> _(Frente anterior — Perfil-4/perfis por loja — abaixo. Follow-up ainda válido: re-chave do escopo operacional
+> para Função, dormente desde o Perfil-4.)_
+
+## ⏸️ ESTADO ATUAL (2026-07-10)
 
 > **🚀 Deploy no VPS mais recente (2026-07-10, `4fe9955`):** `http://167.88.33.121:8765` no ar (HTTP 302),
 > **banco preservado**, migrações idempotentes rodaram no start (`funcoes_seed_v1`, `perfis_v3_2026`,
@@ -1984,6 +2003,16 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 64 — Infra contábil FASE B1: segmentação de receita Mercadoria × Serviço
+Branch `feat/financeiro-fase-b1-segmentacao` (mergeada na `main`). Área sensível (dinheiro); TDD; plano aprovado antes de codar; parou antes de mergear p/ conferência. Suíte 879→**880**.
+**Contexto:** parte da frente "infraestrutura contábil ponta a ponta" (contas + eventos + painéis p/ o Projeto Simulação popular tudo). FASE A (caixinhas: Adiantamento de Clientes 2.1.06 + Provisão Custo Fábrica 2.1.04.06 + demais provisões) já fechada e no VPS. **B1** monta a base da **receita segmentada** (decisão do usuário: NÃO desligar a NFS-e; o Val_Cont divide-se em Mercadoria + Serviço, cada parte no seu documento, sem duplicar — e já prepara a futura **distribuidora**: parcela Mercadoria = receita da distribuidora, Serviço = receita da loja).
+**Regra de segmentação (estabelecida agora):** `Val_Cont = pct_mercadoria%·Mercadoria + pct_servico%·Serviço` (soma obrigatória 100). **Default por loja** em Admin › Dados da Loja (`Loja.pct_mercadoria`/`pct_servico`, **seed 65/35**, migração idempotente com backfill). **Override por projeto** em `parametros_json`, editável **só pelo Diretor** (gate `aprovar_financeiro`, mecanismo atual do `perfis.py` — NÃO amarrado à refatoração Master/Gerencial/Operador). Sem override, herda a loja.
+**Funções puras** (`mod_orcamento_params.py`): `SEGMENTACAO_DEFAULT`, `segmentar(Val_Cont, pct_merc)` (serviço = **resto**, soma fecha exato no Val_Cont), `validar_segmentacao` (soma=100 + faixa), `resolver_segmentacao` (NULL→65/35), `segmentacao_efetiva` (override vence loja).
+**Endpoints:** `PATCH /api/admin/lojas/<id>` aceita `pct_*` (gate `editar_dados_loja`, valida soma=100); `POST /api/projetos/<nome>/parametros` aceita `pct_*` override (gate `aprovar_financeiro`, valida, persiste preservando override anterior — `merge_parametros` ignora chaves fora do `PARAMETROS_DEFAULT`, então `pct_*` é tratado à parte). `_loja_dict` expõe `pct_*`.
+**Frontend:** Admin › Dados da Loja ganha os 2 campos % (checa soma=100). No **modal de Parâmetros**, a segmentação fica **sob o MESMO cadeado 🔒 da margem real** (`_impostosLiberados`, liberação por senha de diretor/gerente adm-fin) — sempre visível, campos revelados só após a senha; **auto-salva ao alterar** (debounce, chamada isolada — um 403 não quebra o save dos outros parâmetros); os 2 campos espelham-se p/ somar 100. _(Iteração de UX: primeiro bloco dependia de flag de perfil `pode_aprovar_financeiro` no payload — exigia restart e "não aparecia"; trocado pelo cadeado, flag revertida.)_
+**Testes:** `test_segmentacao.py` (8, puras), `test_loja_segmentacao.py` (2, ORM 65/35), `test_endpoints_segmentacao.py` (7, incl. gates + "override sobrevive a salvamento de outros parâmetros"). `node --check` OK.
+**Próximo — FASE B2 (design com Fable 5):** eventos de dupla-partida (recebimento_venda 1.1.01×2.1.06; faturamento com **receita segmentada** — Mercadoria 4.1.01 na NF-e + Serviço 4.2.01 na NFS-e — baixando o Adiantamento; CMV 5.1.01×2.1.04.06 = **CFO** congelado; pagamento_fabrica 2.1.04.06×1.1.01), com prova de não-duplicação (CFO 1×) e o timing marcado `[CONFIRMAR COM CONTADOR]`. **CMV = `orc.cfo`** (custo real da fábrica + outros forn. + insumos entram como **Efetivado** na reconciliação/FASE D; diferença CFO−real vai ao resultado). Bug latente a corrigir junto: `reconciliar(proporcional_custo_direto)` → KeyError `custo_servico` (alinhar `custo_servico` à segmentação). Depois: FASE C (painel de Provisões por tipo A/B/C/D) e FASE D (reconciliação com Efetivado).
 
 ## Sessão 63 — Frente Financeira: painel de provisões consolidado + fold Montagem/Garantia na aprovação (FASE 1–2)
 Branch `financeiro-provisoes` (NÃO mergeada — aguardando conferência). Área sensível (dinheiro); TDD; design intrincado via **Fable 5** (subagente). Suíte 850→**857**.

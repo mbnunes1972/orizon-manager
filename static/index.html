@@ -2071,6 +2071,31 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <span class="toggle-unit">%</span>
     </div>
 
+    <!-- Segmentação Mercadoria × Serviço — override do projeto, sob o MESMO cadeado da margem real
+         (liberação por senha de diretor/gerente adm-fin). Escrita gated por aprovar_financeiro. -->
+    <div id="mp-seg-box" style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase">Segmentação Mercadoria × Serviço</span>
+        <span id="mp-seg-lock"></span>
+      </div>
+      <div id="mp-seg-fields" style="display:none">
+        <div class="toggle-row">
+          <span class="toggle-label" style="flex:1">Mercadoria (NF-e)</span>
+          <input type="number" class="toggle-input" id="mp-pct-merc" min="0" max="100" step="0.5" value="65" oninput="mpSegSync('merc'); mpSegAgendar()">
+          <span class="toggle-unit">%</span>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label" style="flex:1">Serviço (NFS-e)</span>
+          <input type="number" class="toggle-input" id="mp-pct-serv" min="0" max="100" step="0.5" value="35" oninput="mpSegSync('serv'); mpSegAgendar()">
+          <span class="toggle-unit">%</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button class="btn btn-primary btn-sm" id="mp-seg-btn" onclick="mpSegAplicar()">Salvar segmentação</button>
+          <span id="mp-seg-hint" style="font-size:10px;color:var(--muted)"></span>
+        </div>
+      </div>
+    </div>
+
 
     <!-- Painel de apoio à negociação -->
     <div id="mp-apoio" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;display:none">
@@ -5843,6 +5868,18 @@ function _renderImpostosLock() {
       if (elMargCont) elMargCont.innerHTML = lock;
     }
   }
+  // ── segmentação Mercadoria × Serviço: sob o MESMO cadeado (liberação por senha) ──
+  const segFields = document.getElementById('mp-seg-fields');
+  const segLock   = document.getElementById('mp-seg-lock');
+  if (segFields) {
+    if (_impostosLiberados) {
+      segFields.style.display = '';
+      if (segLock) segLock.innerHTML = '<span style="cursor:pointer" title="Ocultar (🔓)" onclick="_reBloquearImpostos()">🔓</span>';
+    } else {
+      segFields.style.display = 'none';
+      if (segLock) segLock.innerHTML = '<span style="cursor:pointer" title="Liberar com senha de diretor/gerente adm-fin" onclick="abrirModalLiberarImpostos()">🔒</span>';
+    }
+  }
 }
 function _reBloquearImpostos() { _impostosLiberados = false; _renderImpostosLock(); }
 
@@ -7381,6 +7418,7 @@ function abrirModalParams(){
   // preenche out_forn com o valor vindo do preview do motor (Out_Forn)
   const outFornEl = id('mp-out-forn');
   if (outFornEl) outFornEl.value = (_previewNeg && _previewNeg.Out_Forn != null) ? _previewNeg.Out_Forn : 0;
+  mpSegPopular(m);   // segmentação Mercadoria × Serviço (override do projeto) — só ao Diretor
   mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
   // Carrega toggle incluir_custos — sincroniza _incluirCustos com o valor salvo
   _incluirCustos = !!m.incluir_custos;
@@ -7430,6 +7468,64 @@ function _aplicarModoLeituraParams(ro){
   if (badge) badge.style.display = ro ? '' : 'none';
 }
 let _mpSnapshot = null;
+
+// ── Segmentação Mercadoria × Serviço (override do projeto — só o Diretor) ─────────────────────
+// Bloco fora do auto-save dos parâmetros: escrito por botão próprio (gate aprovar_financeiro no
+// backend), para um não-Diretor editando desconto nunca disparar o gate. Val_Cont = Mercadoria
+// (NF-e produto) + Serviço (NFS-e); os dois campos espelham-se para somar sempre 100%.
+function mpSegPopular(m){
+  const em = document.getElementById('mp-pct-merc');
+  const es = document.getElementById('mp-pct-serv');
+  if(!em || !es) return;
+  const temOverride = !!(m && m.pct_mercadoria != null && m.pct_servico != null);
+  em.value = temOverride ? m.pct_mercadoria : 65;
+  es.value = temOverride ? m.pct_servico   : 35;
+  const hint = document.getElementById('mp-seg-hint');
+  if(hint){ hint.style.color = 'var(--muted)';
+    hint.textContent = temOverride ? 'Override deste projeto' : 'Sem override: herda o padrão da loja'; }
+  _renderImpostosLock();   // aplica o cadeado (mostra 🔒 ou libera os campos)
+}
+function mpSegSync(which){
+  const em = document.getElementById('mp-pct-merc');
+  const es = document.getElementById('mp-pct-serv');
+  if(!em || !es) return;
+  if(which === 'merc'){
+    const v = Math.max(0, Math.min(100, parseFloat(em.value)||0));
+    es.value = +(100 - v).toFixed(2);
+  } else {
+    const v = Math.max(0, Math.min(100, parseFloat(es.value)||0));
+    em.value = +(100 - v).toFixed(2);
+  }
+}
+// Auto-save da segmentação (debounced) — igual aos demais campos do modal, mas em chamada isolada:
+// um 403 (perfil sem aprovar_financeiro) afeta só a segmentação, nunca os outros parâmetros.
+let _mpSegTimer = null;
+function mpSegAgendar(){ clearTimeout(_mpSegTimer); _mpSegTimer = setTimeout(mpSegAplicar, 600); }
+async function mpSegAplicar(){
+  if(!projetoAtivo) return;
+  const merc = parseFloat(document.getElementById('mp-pct-merc').value)||0;
+  const serv = parseFloat(document.getElementById('mp-pct-serv').value)||0;
+  const hint = document.getElementById('mp-seg-hint');
+  if(Math.abs((merc+serv)-100) > 0.01){
+    if(hint){ hint.textContent = 'Mercadoria + Serviço deve somar 100%'; hint.style.color = 'var(--err)'; }
+    return;
+  }
+  if(hint){ hint.textContent = 'Salvando…'; hint.style.color = 'var(--muted)'; }
+  try{
+    const r = await fetch('/api/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/parametros',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({pct_mercadoria: merc, pct_servico: serv})
+    });
+    const d = await r.json();
+    if(d.ok){
+      projetoAtivo.margens = Object.assign({}, projetoAtivo.margens||{}, {pct_mercadoria: merc, pct_servico: serv});
+      if(hint){ hint.textContent = 'Salvo ✓'; hint.style.color = 'var(--ok)'; }
+      if(typeof negPreview === 'function') await negPreview();
+    } else if(hint){ hint.textContent = d.erro || 'Erro ao salvar'; hint.style.color = 'var(--err)'; }
+  }catch(e){
+    if(hint){ hint.textContent = 'Erro de rede'; hint.style.color = 'var(--err)'; }
+  }
+}
 
 async function fecharModalParams(salvar){
   document.getElementById('modal-params').style.display = 'none';
@@ -9546,16 +9642,27 @@ async function adminLojaCarregarDados(lid){
       ${f('loja-t2n','Testemunha 2 — nome',loja.testemunha2_nome)}
       ${f('loja-t2c','Testemunha 2 — CPF',loja.testemunha2_cpf)}
     </div>
+    <div style="font-size:12px;color:var(--muted);margin:2px 0 8px">Segmentação de receita — Mercadoria + Serviço deve somar 100%</div>
+    <div class="grid2" style="gap:14px;margin-bottom:14px">
+      ${f('loja-pct-merc','% Mercadoria (NF-e produto)',loja.pct_mercadoria!=null?loja.pct_mercadoria:65)}
+      ${f('loja-pct-serv','% Serviço (NFS-e)',loja.pct_servico!=null?loja.pct_servico:35)}
+    </div>
     <button class="btn btn-primary btn-sm" onclick="adminLojaSalvar(${lid})">Salvar dados da loja</button>`;
 }
 
 async function adminLojaSalvar(lid){
   const v = id => document.getElementById(id).value.trim();
+  const nMerc = parseFloat(v('loja-pct-merc'));
+  const nServ = parseFloat(v('loja-pct-serv'));
+  if(!isNaN(nMerc) && !isNaN(nServ) && Math.abs((nMerc+nServ)-100) > 0.01){
+    await avisoPopup('Segmentação: Mercadoria + Serviço deve somar 100%.', {titulo:'Dados da loja'}); return;
+  }
   const payload = {
     nome: v('loja-nome'), codigo: v('loja-codigo'), cnpj: v('loja-cnpj'),
     telefone: v('loja-tel'), email: v('loja-email'),
     testemunha1_nome: v('loja-t1n'), testemunha1_cpf: v('loja-t1c'),
     testemunha2_nome: v('loja-t2n'), testemunha2_cpf: v('loja-t2c'),
+    pct_mercadoria: nMerc, pct_servico: nServ,
   };
   const r = await fetch('/api/admin/lojas/'+lid, {method:'PATCH', credentials:'same-origin',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
