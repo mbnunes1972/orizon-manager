@@ -2699,15 +2699,48 @@ async function cfgCronogramaRender(){
   const funcOps = sel => '<option value="">— sem função —</option>' + (_funcoesCache||[]).map(fn =>
       '<option value="'+fn.id+'"'+(String(sel)===String(fn.id)?' selected':'')+'>'+esc(fn.nome)+'</option>').join('');
   const linhas = fases.map(f =>
-     '<tr class="proj-row"><td style="padding:8px 12px;color:var(--muted);width:56px">'+esc(f.codigo)+'</td>'
+     '<tr class="proj-row"><td style="padding:8px 12px;color:var(--muted);width:52px">'+esc(f.codigo)+'</td>'
     +'<td style="padding:8px 12px;color:var(--text)">'+esc(nome(f.codigo))+'</td>'
-    +'<td style="padding:8px 12px;text-align:right"><input type="number" min="0" step="1" id="crono-prazo-'+esc(f.codigo)+'" value="'+(parseInt(f.prazo_dias,10)||0)+'" style="width:80px;box-sizing:border-box;text-align:right"> <span style="font-size:11px;color:var(--muted)">dias</span></td>'
+    +'<td id="crono-d-'+esc(f.codigo)+'" style="padding:8px 12px;color:var(--muted);font-family:var(--font-mono);width:52px">D0</td>'
+    +'<td style="padding:8px 12px;text-align:right"><input type="number" min="0" step="1" id="crono-prazo-'+esc(f.codigo)+'" value="'+(parseInt(f.prazo_dias,10)||0)+'" oninput="cronoTplRecalc()" style="width:78px;box-sizing:border-box;text-align:right"> <span style="font-size:11px;color:var(--muted)">dias</span></td>'
+    +'<td id="crono-data-'+esc(f.codigo)+'" style="padding:8px 12px;color:var(--text);font-family:var(--font-mono);white-space:nowrap">—</td>'
     +'<td style="padding:8px 12px"><select id="crono-funcao-'+esc(f.codigo)+'" style="width:180px;box-sizing:border-box">'+funcOps(f.funcao_id)+'</select></td></tr>'
-  ).join('') || '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma fase configurada.</td></tr>';
+  ).join('') || '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma fase configurada.</td></tr>';
   box.innerHTML =
-     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:720px">Por fase: o <strong style="color:var(--text)">prazo</strong> (dias a partir de <strong style="color:var(--text)">D0 = assinatura</strong>) e a <strong style="color:var(--text)">função responsável</strong> (referencia a Tabela de Funções — é o cargo que executa a fase, não uma pessoa). Na assinatura, cada etapa recebe a data prevista e herda a função; o funcionário específico é escolhido depois, no cronograma do projeto.</div>'
-    +'<table class="proj-table" style="max-width:720px"><thead><tr><th>Etapa</th><th>Fase</th><th style="text-align:right;width:130px">Prazo</th><th style="width:190px">Função responsável</th></tr></thead><tbody>'+linhas+'</tbody></table>'
+     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:780px">Por fase: o <strong style="color:var(--text)">prazo</strong> (dias a partir de <strong style="color:var(--text)">D0</strong>) e a <strong style="color:var(--text)">função responsável</strong> (Tabela de Funções — o cargo que executa a fase). A coluna <strong style="color:var(--text)">Início</strong> mostra o dia acumulado (D0, D+prazo…); a <strong style="color:var(--text)">Data prevista</strong> é calculada a partir da data de referência abaixo (simulação — não é salva; só o prazo e a função são).</div>'
+    +'<div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:14px;flex-wrap:wrap">'
+    +'<div><label class="field-label" id="crono-d0-lbl">Data de assinatura (D0)</label>'
+    +'<input type="date" id="crono-d0" value="'+_hojeISO()+'" onchange="cronoTplRecalc()" style="width:170px"></div>'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding-bottom:8px;cursor:pointer"><input type="checkbox" id="crono-compra" onchange="cronoTplCompraLabel();cronoTplRecalc()"> compra programada (D0 = solicitação do cliente)</label>'
+    +'</div>'
+    +'<table class="proj-table" style="max-width:840px"><thead><tr><th>Etapa</th><th>Fase</th><th style="width:52px">Início</th><th style="text-align:right;width:120px">Prazo</th><th style="width:120px">Data prevista</th><th style="width:190px">Função responsável</th></tr></thead><tbody>'+linhas+'</tbody></table>'
     +'<div style="margin-top:14px"><button class="btn btn-primary btn-sm" onclick="cfgCronogramaSalvar('+lid+')">Salvar cronograma padrão</button></div>';
+  cronoTplRecalc();
+}
+function _hojeISO(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+function cronoTplCompraLabel(){
+  const compra = document.getElementById('crono-compra'), lbl = document.getElementById('crono-d0-lbl');
+  if(lbl) lbl.textContent = (compra && compra.checked) ? 'Data da solicitação (D0)' : 'Data de assinatura (D0)';
+}
+// Recalcula, ao vivo, a coluna Início (dia acumulado Dn) e a Data prevista (D0 + acumulado + prazo) por fase.
+function cronoTplRecalc(){
+  const fases = (_cfgFin && _cfgFin.cronograma_padrao) || [];
+  const d0el = document.getElementById('crono-d0');
+  const d0 = (d0el && d0el.value) ? new Date(d0el.value+'T00:00:00') : null;
+  let acc = 0;
+  fases.forEach(f => {
+    const cod = f.codigo;
+    const prazoEl = document.getElementById('crono-prazo-'+cod);
+    const prazo = prazoEl ? (parseInt(prazoEl.value,10)||0) : 0;
+    const dCell = document.getElementById('crono-d-'+cod);
+    const dataCell = document.getElementById('crono-data-'+cod);
+    if(dCell) dCell.textContent = 'D'+acc;
+    if(dataCell){
+      if(d0){ const dt=new Date(d0.getTime()); dt.setDate(dt.getDate()+acc+prazo); dataCell.textContent = dt.toLocaleDateString('pt-BR'); }
+      else dataCell.textContent = '—';
+    }
+    acc += prazo;
+  });
 }
 async function cfgCronogramaSalvar(lid){
   const fases = (_cfgFin.cronograma_padrao || []).map(f => ({
@@ -10246,8 +10279,8 @@ function toggleCicloCard(codigo) {
 }
 
 // ── Cronograma do Ciclo (Modulos_Orizon_v11): datas prevista/conclusão + edição reautenticada ──
-// Níveis que podem autorizar (= perfis.pode(nivel,"autorizar") no backend). Gerente+.
-const _NIVEIS_AUTORIZAR = new Set(["diretor", "gerente_vendas"]);
+// Níveis que podem autorizar (= perfis.pode(nivel,"autorizar") no backend). Master/Gerencial (rev3).
+const _NIVEIS_AUTORIZAR = new Set(["master", "gerencial"]);
 function _podeAutorizarFront() {
   return _NIVEIS_AUTORIZAR.has((_usuarioAtual && _usuarioAtual.nivel) || '');
 }
