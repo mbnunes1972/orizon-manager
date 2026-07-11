@@ -1342,18 +1342,20 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 ## ⏸️ ESTADO ATUAL (2026-07-11) — retomar aqui
 
 > **🏗️ Frente ATIVA — infraestrutura contábil ponta a ponta (p/ o Projeto Simulação popular DRE/Balanço/
-> Provisões/Reconciliação pelo fluxo REAL de fechamento).** Fases: **A** (caixinhas: Adiantamento 2.1.06 +
-> Provisão Custo Fábrica 2.1.04.06 + demais provisões) ✅ **mergeada + no VPS**. **B1** (segmentação de receita
-> Mercadoria × Serviço — default 65/35 na Loja + override do Diretor no projeto + funções puras `segmentar`/
-> `segmentacao_efetiva`) ✅ **mergeada** (Sessão 64). **Próxima: B2 — eventos de dupla-partida (design com
-> Fable 5):** recebimento_venda (1.1.01×2.1.06) · faturamento com **receita SEGMENTADA** (Mercadoria 4.1.01 na
-> NF-e + Serviço 4.2.01 na NFS-e, baixando o Adiantamento; Σ=Val_Cont) · CMV 5.1.01×2.1.04.06 = **CFO congelado**
-> (uma vez só) · pagamento_fabrica 2.1.04.06×1.1.01. Prova de não-duplicação (CFO 1×) + timing `[CONFIRMAR COM
-> CONTADOR]`. Bug a corrigir junto: `reconciliar(proporcional_custo_direto)` → KeyError `custo_servico` (alinhar
-> à segmentação). Depois: **C** (painel de Provisões por tipo A/B/C/D) e **D** (reconciliação: Provisionado ×
-> **Efetivado** × Saldo × Destino — o custo real da fábrica entra como Efetivado; CFO−real vai ao resultado).
+> Provisões/Reconciliação pelo fluxo REAL de fechamento).** Fases: **A** (caixinhas) ✅ **no VPS**. **B1**
+> (segmentação de receita Mercadoria × Serviço — default 65/35 na Loja + override do Diretor) ✅ **mergeada**
+> (Sessão 64). **B2** (eventos: Adiantamento → receita segmentada → CMV=CFO → constituição COMPLETA das
+> provisões + impostos-provisão diferida + custo financeiro direto; face fiscal reescalada; bug reconciliar)
+> ✅ **mergeada** (Sessão 65). A DRE agora representa o projeto e reconcilia com o motor centavo a centavo.
+> **Próxima: FASE C — painel de Provisões por tipo A/B/C/D** (data-driven sobre 2.1.04 + 5.6.x, agora que
+> todas as provisões são constituídas no fechamento; A comissões/pessoas, B custos futuros, C aquisição/
+> fábrica, D fiscal). Depois **FASE D — reconciliação** (Provisionado × **Efetivado** × Saldo × Destino: o
+> custo real da fábrica/insumos entra como Efetivado, CFO−real vai ao resultado; + eventos de estorno de
+> cancelamento fiscal, backlog anotado na B2). UI: `.modal-box` + tokens, conferir nos 2 temas.
 > Processo da frente: auditoria + plano por fases → OK do usuário → implementa 1 fase de cada vez, TDD, **para
 > antes de mergear** p/ conferência dos números. Dinheiro = seguir NOMENCLATURA.md + prova de não-duplicação.
+> `[CONFIRMAR CONTADOR]` pendentes (documentados no razão): receita no doc fiscal · adiantamento passivo no
+> Simples · timing dos impostos-provisão · custo financeiro direto · estorno de cancelamento fiscal.
 >
 > _(Frente anterior — Perfil-4/perfis por loja — abaixo. Follow-up ainda válido: re-chave do escopo operacional
 > para Função, dormente desde o Perfil-4.)_
@@ -2003,6 +2005,18 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 65 — Infra contábil FASE B2: eventos (Adiantamento → receita segmentada → CMV=CFO → provisões completas)
+Branch `feat/financeiro-fase-b2-eventos` (mergeada na `main`). Área sensível; TDD; design intrincado via **Fable 5**; plano por sub-fase, parou antes de mergear p/ conferência dos números. Suíte 891→**906**.
+**Contexto:** fecha a infra contábil p/ o Projeto Simulação popular DRE/Balanço/Provisões pelo fluxo REAL de fechamento. Decisões do usuário validadas número a número (o razão reconcilia com o motor **centavo a centavo**: lucro líquido = Val_Liq − Cust_Var do motor; margens diferem só pela base Val_Cont × Val_Liq = Cust_Fin).
+**B2.1 — eventos + Adiantamento + CMV:** 7 eventos novos (`recebimento_venda` 1.1.01×2.1.06; faturamento **segmentado** Mercadoria 4.1.01 / Serviço 4.2.01 com split adiantado/a-receber; `faturamento_cmv` 5.1.01×2.1.04.06 = **CFO** congelado, 1×/projeto; `pagamento_fabrica` 2.1.04.06×1.1.01). Orquestrador `faturar_segmento()` saca `min(pool, segmento)` do Adiantamento → 2.1.06 **nunca negativo** (prova por indução + crash-safe) e **Σ receitas = Val_Cont**. Congela a segmentação na assinatura (`_congelar_segmentacao_no_projeto`, A6). O evento `faturamento` legado sai do wiring. Fail-soft.
+**B2.2 — bug `reconciliar`:** `margem_projeto` expõe `custo_servico` (5.2 + provisões 5.6.x) → destrava `reconciliar(proporcional_custo_direto)` (KeyError). Margem inalterada.
+**B2.3 — face fiscal (decisão do usuário: reescalar):** `mod_nfe.rescalar_itens_para_total` reescala os itens da NF-e p/ Σ = parcela Mercadoria (fecha ao centavo, resíduo no último item); NFS-e = parcela Serviço. Markup vira output/fallback. ICMS/alíquotas ficam p/ a frente Fiscal (contador). `_valores_segmentados_do_projeto` = fonte única (face fiscal + wiring contábil).
+**B2.4/B2.5 — constituição COMPLETA + custo financeiro:** contas `5.6.04-09` + `constituir_provisoes_fechamento(valores do motor)` constitui TODAS as rubricas rastreadas (montagem/garantia/assist + frete fáb/local/insumos/com med/proj/retenção), cada Despesa 5.6.x × Provisão 2.1.04.x. Custo Fábrica NÃO entra aqui (é CMV=CFO). **Custo financeiro** (Cust_Fin = Val_Cont − VAVO) = despesa DIRETA no contrato (5.5.03×2.1.05) — decisão do usuário (o fechamento É a antecipação).
+**B2.6 — impostos = PROVISÃO diferida (decisão do usuário):** contas `1.1.05 Impostos a Apropriar` (ativo diferido) + `2.1.04.13 Provisão de Impostos`. CONTRATO: `1.1.05 × 2.1.04.13` (passivo nasce, **DRE intocada**). EMISSÃO (proporcional Merc/Serv, emissões separadas mesma data): `4.3.01 × 1.1.05` (dedução entra na DRE, baixa o ativo) + `2.1.04.13 × 2.1.03` (obrigação fiscal real). Helpers `total_lancado`/`efetivar_impostos_segmento`. Chave: imposto **é** provisão (Balanço); "dedução" é só a linha da DRE onde imposto sobre venda se apresenta — e só surge na emissão.
+**B2.7 — wire do fechamento completo:** o composition root lê `_negociacao_breakdown` (motor) → `constituir_provisoes_fechamento` (todas + impostos-provisão) + custo financeiro; no faturamento efetiva a parcela de impostos do segmento junto com a receita. `_fin_provisoes_venda_seguro` reescrito (motor, não mais só 3 provisões).
+**Simulação ponta a ponta (Projeto 21):** Val_Cont 194.257,89 · CFO 64.523,73 · Σ provisões 47.970,57 + custo fin 14.880,15. DRE: receita 194.257,89 − deduções(impostos) 15.540,63 − CMV 64.523,73 − constituição 32.429,94 − res. financeiro 14.880,15 = **lucro líquido 66.883,44** = Val_Liq − Cust_Var (motor). Balanço fecha em cada passo; CFO 1×; Σ receitas = Val_Cont. Margem contábil 34,43% (Val_Cont) × negociação 37,29% (Val_Liq).
+**Testes:** `test_fase_b2_eventos.py` (21), `test_nfe_rescalar.py` (6), e2e do wiring/face fiscal reescritos, `test_fold_nao_duplica` adaptado ao novo wire. `[CONFIRMAR CONTADOR]`: T1 receita no doc · T2 adiantamento passivo (Simples) · impostos-provisão diferida · custo financeiro direto · cancelamento fiscal sem estorno (backlog FASE D). **Próximo: FASE C** (painel de Provisões por tipo A/B/C/D) e **FASE D** (reconciliação: Provisionado × Efetivado × Saldo × Destino).
 
 ## Sessão 64 — Infra contábil FASE B1: segmentação de receita Mercadoria × Serviço
 Branch `feat/financeiro-fase-b1-segmentacao` (mergeada na `main`). Área sensível (dinheiro); TDD; plano aprovado antes de codar; parou antes de mergear p/ conferência. Suíte 879→**880**.
