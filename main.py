@@ -3356,7 +3356,29 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Contrato assinado — alterações não permitidas."}, code=403)
                     return
                 atual = json.loads(p.parametros_json) if p.parametros_json else {}
+                # Override de segmentação Mercadoria × Serviço: só o Diretor (aprovar_financeiro),
+                # valida soma=100. merge_parametros ignora chaves fora do PARAMETROS_DEFAULT, então a
+                # segmentação é tratada e persistida à parte (preservando override anterior).
+                if "pct_mercadoria" in req or "pct_servico" in req:
+                    if not perfis.pode(ator.get("nivel"), "aprovar_financeiro"):
+                        self.send_json({"ok": False,
+                                        "erro": "Apenas o Diretor pode alterar a segmentação Mercadoria × Serviço."},
+                                       code=403)
+                        return
+                    from mod_orcamento_params import validar_segmentacao
+                    pm = req.get("pct_mercadoria", atual.get("pct_mercadoria"))
+                    ps = req.get("pct_servico", atual.get("pct_servico"))
+                    try:
+                        if pm is None or ps is None:
+                            raise ValueError("Informe Mercadoria e Serviço juntos.")
+                        validar_segmentacao(pm, ps)
+                    except ValueError as _ve:
+                        self.send_json({"ok": False, "erro": str(_ve)}, code=400)
+                        return
                 novos = merge_parametros(atual, req)
+                for _k in ("pct_mercadoria", "pct_servico"):
+                    if _k in req:      novos[_k] = float(req[_k])
+                    elif _k in atual:  novos[_k] = atual[_k]
                 p.parametros_json = json.dumps(novos, ensure_ascii=False)
                 db.commit()
                 proj_orcs = db.query(Orcamento).filter_by(projeto_id=nome_safe).all()
@@ -6728,6 +6750,17 @@ class Handler(BaseHTTPRequestHandler):
                                 self.send_json({"ok": False, "erro": "Nome da loja é obrigatório."})
                                 return
                             setattr(l, campo, val)
+                    # Segmentação de receita Mercadoria × Serviço (default da loja; valida soma=100).
+                    if "pct_mercadoria" in req or "pct_servico" in req:
+                        from mod_orcamento_params import validar_segmentacao
+                        pm = req.get("pct_mercadoria", l.pct_mercadoria)
+                        ps = req.get("pct_servico", l.pct_servico)
+                        try:
+                            validar_segmentacao(pm, ps)
+                        except ValueError as _ve:
+                            self.send_json({"ok": False, "erro": str(_ve)}, code=400)
+                            return
+                        l.pct_mercadoria = float(pm); l.pct_servico = float(ps)
                     if perfis.pode(ator.get("nivel"), "gerir_lojas"):
                         if "ativo" in req:   l.ativo = 1 if req["ativo"] else 0
                         if "rede_id" in req and mod_tenancy._eh_super_admin(ator):
@@ -7320,6 +7353,8 @@ def _loja_dict(l) -> dict:
         "testemunha1_cpf":  l.testemunha1_cpf  or "",
         "testemunha2_nome": l.testemunha2_nome or "",
         "testemunha2_cpf":  l.testemunha2_cpf  or "",
+        "pct_mercadoria":   l.pct_mercadoria if l.pct_mercadoria is not None else 65.0,
+        "pct_servico":      l.pct_servico    if l.pct_servico    is not None else 35.0,
         "ativo":       bool(l.ativo),
         "criado_em":   l.criado_em.strftime("%Y-%m-%d") if l.criado_em else "",
     }
