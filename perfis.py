@@ -60,7 +60,17 @@ _MODULO_ACESSO = {"financeiro": "acesso_financeiro", "folha": "acesso_financeiro
 
 
 def acessa_modulo(slug, modulo_id):
-    """True se o perfil `slug` pode abrir o módulo de domínio `modulo_id` (matriz §2)."""
+    """True se o perfil `slug` pode abrir o módulo de domínio `modulo_id` (matriz §2).
+    Registro DB (perfil_acesso) manda quando existir; núcleo/desconhecido nunca é bloqueado."""
+    info = _reg().get(slug)
+    if info is not None:
+        try:
+            import modulos as _mod
+            if modulo_id not in _mod.DOMINIOS:   # núcleo/desconhecido
+                return True
+        except Exception:
+            pass
+        return modulo_id in info["modulos"]
     if modulo_id in _MODULO_ACESSO:
         return pode(slug, _MODULO_ACESSO[modulo_id])
     if modulo_id in _MODULOS_OPERACIONAIS:
@@ -70,6 +80,9 @@ def acessa_modulo(slug, modulo_id):
 
 def acessa_painel(slug, painel):
     """True se o perfil abre o painel 'admin' (page-07) ou 'config' (page-09)."""
+    info = _reg().get(slug)
+    if info is not None:
+        return painel in info["modulos"]
     return pode(slug, "acesso_admin" if painel == "admin" else "acesso_config")
 
 
@@ -95,14 +108,21 @@ def opcoes_loja():
 
 
 def rotulo(slug):
-    return PERFIS.get(slug, _DEFAULT)["rotulo"]
+    info = _reg().get(slug)
+    if info:
+        return info["nome"]
+    return PERFIS.get(_base(slug), _DEFAULT)["rotulo"]
 
 
 def _base(slug):
-    """Resolve o slug para a BASE de capacidades finas (master/gerencial/operador/plataforma)."""
+    """Resolve o slug para a BASE de capacidades finas (master/gerencial/operador/plataforma).
+    Consulta primeiro o registro DB (perfil_acesso); sem registro, cai no PERFIS hardcoded."""
+    info = _reg().get(slug)
+    if info:
+        return info["base"]
     if slug in PERFIS:
         return slug
-    return _ALIAS_BASE.get(slug, slug)   # Task 5 sobrescreve p/ consultar o registro DB
+    return _ALIAS_BASE.get(slug, slug)
 
 
 def base(slug):
@@ -111,6 +131,10 @@ def base(slug):
 
 
 def pode(slug, capacidade):
+    """Override do perfil (capacidades_json) manda; senão cai na base PERFIS[base]."""
+    info = _reg().get(slug)
+    if info and capacidade in info["caps"]:
+        return bool(info["caps"][capacidade])
     return bool(PERFIS.get(_base(slug), _DEFAULT).get(capacidade, False))
 
 
@@ -169,3 +193,78 @@ def matriz():
         "loja": s in loja, "capacidades": [c for c in caps if PERFIS[s].get(c)],
     } for s in slugs()]
     return {"perfis": perfis_out, "capacidades": CAPACIDADES}
+
+
+# ── Registro DB-backed (Task 5): perfil_acesso governa módulo/painel + overrides de capacidade fina
+# por LOJA. Cache em memória (_REG_BY_SLUG/_REG_BY_LOJA), invalidado por recarregar(). Plataforma
+# (super_admin/admin_rede) e lojas sem registro caem no PERFIS hardcoded acima.
+import json as _json
+
+_REG_BY_SLUG = None   # {slug: {"base","nome","modulos":set,"caps":dict,"loja_id","sistema"}}
+_REG_BY_LOJA = None   # {loja_id: {slug: <mesma info>}}
+
+
+def _carregar_registro():
+    """Carrega perfil_acesso do banco para os caches. Silencioso se a tabela ainda não existe."""
+    global _REG_BY_SLUG, _REG_BY_LOJA
+    _REG_BY_SLUG, _REG_BY_LOJA = {}, {}
+    try:
+        from database import Session, PerfilAcesso
+        db = Session()
+        try:
+            for p in db.query(PerfilAcesso).all():
+                info = {"base": p.base, "nome": p.nome, "sistema": bool(p.sistema),
+                        "loja_id": p.loja_id, "modulos": set(_json.loads(p.modulos_json or "[]")),
+                        "caps": _json.loads(p.capacidades_json or "{}")}
+                _REG_BY_SLUG[p.slug] = info
+                _REG_BY_LOJA.setdefault(p.loja_id, {})[p.slug] = info
+        finally:
+            db.close()
+    except Exception:
+        pass   # DB indisponível/tabela ausente → registro vazio, cai no fallback PERFIS
+
+
+def recarregar():
+    global _REG_BY_SLUG, _REG_BY_LOJA
+    _REG_BY_SLUG, _REG_BY_LOJA = None, None
+
+
+def _reg():
+    if _REG_BY_SLUG is None:
+        _carregar_registro()
+    return _REG_BY_SLUG
+
+
+def slugs_da_loja(loja_id):
+    if _REG_BY_LOJA is None:
+        _carregar_registro()
+    return list((_REG_BY_LOJA or {}).get(loja_id, {}).keys())
+
+
+def opcoes_da_loja(loja_id):
+    if _REG_BY_LOJA is None:
+        _carregar_registro()
+    reg = (_REG_BY_LOJA or {}).get(loja_id, {})
+    return [{"slug": s, "rotulo": reg[s]["nome"]} for s in reg]
+
+
+# Capacidades finas booleanas SELECIONÁVEIS no modal (exclui os acesso_* de módulo/painel e as de plataforma).
+CAPS_SELECIONAVEIS = ["ver_parametros", "autorizar", "aprovar_financeiro", "gerir_usuarios",
+                      "gerir_perfis", "editar_dados_loja", "registrar_medicao",
+                      "aprovar_medicao_reprovada", "executar_pe", "revisar_pe"]
+
+
+def capacidades_efetivas(slug):
+    """Mapa {cap: bool} das caps selecionáveis, resolvido (override sobre a base)."""
+    return {c: pode(slug, c) for c in CAPS_SELECIONAVEIS}
+
+
+def matriz_loja(loja_id):
+    """Perfis da loja com módulos + capacidades resolvidos — alimenta Admin › Perfis de Usuário (editável)."""
+    if _REG_BY_LOJA is None:
+        _carregar_registro()
+    reg = (_REG_BY_LOJA or {}).get(loja_id, {})
+    perfis_out = [{"slug": s, "nome": reg[s]["nome"], "base": reg[s]["base"],
+                   "sistema": reg[s]["sistema"], "modulos": sorted(reg[s]["modulos"]),
+                   "capacidades": capacidades_efetivas(s), "desconto_max": desconto_max(s)} for s in reg]
+    return {"perfis": perfis_out, "capacidades": CAPACIDADES, "caps_selecionaveis": CAPS_SELECIONAVEIS}

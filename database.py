@@ -914,6 +914,11 @@ def init_db():
     Base.metadata.create_all(ENGINE)
     _migrar_colunas()
     _migrar_dados()
+    try:
+        import perfis
+        perfis.recarregar()   # invalida o cache do registro de perfis (perfil_acesso pode ter mudado)
+    except Exception:
+        pass
 
 
 def _migrar_pre_schema():
