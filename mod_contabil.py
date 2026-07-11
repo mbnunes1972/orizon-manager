@@ -549,6 +549,17 @@ _PROV_PAINEL_SUB = {
     "2.1.04.05": "Custo da loja · reverte no atendimento",
     "2.1.04.03": "Repasse à fábrica · controle de cobrança",
 }
+# FASE C: TIPO A/B/C/D de cada provisão (painel agrupado). Data-driven: conta nova no grupo sem tipo
+# mapeado cai em "O" (Outros), aparecendo mesmo assim — sem tocar no painel.
+_PROV_PAINEL_TIPO = {
+    "2.1.04.10": "A", "2.1.04.11": "A", "2.1.04.12": "A",             # Comissões / Pessoas
+    "2.1.04.02": "B", "2.1.04.03": "B", "2.1.04.05": "B",             # Custos futuros (serviços da venda)
+    "2.1.04.06": "C", "2.1.04.07": "C", "2.1.04.08": "C", "2.1.04.09": "C",   # Aquisição / Fábrica
+    "2.1.04.13": "D",                                                 # Fiscal
+}
+_PROV_TIPO_ROTULO = {"A": "Comissões / Pessoas", "B": "Custos futuros",
+                     "C": "Aquisição / Fábrica", "D": "Fiscal", "O": "Outros"}
+_PROV_TIPO_ORDEM = ("A", "B", "C", "D", "O")
 
 
 def _cfg_f(v):
@@ -597,8 +608,20 @@ def contas_provisao_do_plano(db, owner_tipo, owner_id, ini=None, fim=None):
             continue
         out.append({"codigo": c.codigo, "nome": c.nome,
                     "sub": _PROV_PAINEL_SUB.get(c.codigo, "Saldo provisionado em aberto"),
+                    "tipo": _PROV_PAINEL_TIPO.get(c.codigo, "O"),
                     "saldo_em_aberto": saldo_conta(db, owner_tipo, owner_id, c.id, ini, fim)})
     return out
+
+
+def _agrupar_provisoes_por_tipo(provs):
+    """Agrupa a lista de provisões por TIPO (A/B/C/D/O), na ordem canônica, com subtotal por tipo.
+    Data-driven: só cria os grupos que têm ao menos uma conta."""
+    grupos = {}
+    for p in provs:
+        grupos.setdefault(p.get("tipo", "O"), []).append(p)
+    return [{"tipo": t, "rotulo": _PROV_TIPO_ROTULO.get(t, "Outros"), "itens": grupos[t],
+             "subtotal": round(sum(i["saldo_em_aberto"] for i in grupos[t]), 2)}
+            for t in _PROV_TIPO_ORDEM if t in grupos]
 
 
 def dashboard_financeiro(db, owner_tipo, owner_id, ini=None, fim=None):
@@ -615,6 +638,7 @@ def dashboard_financeiro(db, owner_tipo, owner_id, ini=None, fim=None):
     indice = round(caixa / total_prov, 2) if total_prov > 0 else None
     return {
         "provisoes": provs,
+        "provisoes_por_tipo": _agrupar_provisoes_por_tipo(provs),   # FASE C: agrupado A/B/C/D + subtotal
         "total_provisoes_abertas": total_prov,
         "dre_resumo": {"receita_liquida": d["receita_liquida"], "ebitda": d["ebitda"],
                        "lucro_liquido": d["lucro_liquido"]},
