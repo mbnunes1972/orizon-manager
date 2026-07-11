@@ -696,6 +696,31 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/financeiro/reconciliacao-provisoes":
+            # FASE D: Provisionado × Efetivado × Saldo × Destino. ?projeto=<nome> → granular; sem → consolidado.
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            from urllib.parse import parse_qs
+            usuario, db, ot, oid = ctx
+            try:
+                proj = (parse_qs(urlparse(self.path).query).get("projeto") or [None])[0]
+                self.send_json({"ok": True, "reconciliacao": mod_contabil.reconciliacao(db, ot, oid, projeto_id=proj)})
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/contas-a-pagar":
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            from urllib.parse import parse_qs
+            usuario, db, ot, oid = ctx
+            try:
+                proj = (parse_qs(urlparse(self.path).query).get("projeto") or [None])[0]
+                self.send_json({"ok": True, "contas_a_pagar": mod_contabil.contas_a_pagar(db, ot, oid, projeto_id=proj)})
+            finally:
+                db.close()
+            return
         if path == "/api/expedicao/kanban":
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -2578,6 +2603,65 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, "reconciliacao": rec})
             except ValueError as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/efetivar-provisao":
+            # FASE D: registra o custo REAL de uma provisão (2.1.04.x × 2.1.01, competência).
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                conta = (dd.get("conta") or "").strip()
+                proj = (dd.get("projeto") or "").strip() or None
+                ref = (dd.get("ref") or "").strip() or ("ef:%s:%s:%s" % (proj or "-", conta, uuid.uuid4().hex[:8]))
+                lan = mod_contabil.efetivar_provisao(db, ot, oid, proj, conta, dd.get("valor"), ref=ref)
+                db.commit()
+                self.send_json({"ok": True, "lancamento": lan})
+            except ValueError as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/resolver-saldo-provisao":
+            # FASE D: fecha o saldo da provisão ao resultado (sobra→4.4.02 / falta→5.6.10). Idempotente.
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                conta = (dd.get("conta") or "").strip()
+                proj = (dd.get("projeto") or "").strip() or None
+                ref = "resolve:%s:%s" % (proj or "-", conta)
+                lan = mod_contabil.resolver_saldo_provisao(db, ot, oid, proj, conta, ref=ref)
+                db.commit()
+                self.send_json({"ok": True, "lancamento": lan})
+            except ValueError as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/pagar-fornecedor":
+            # FASE D: paga a obrigação com fornecedor (2.1.01 × 1.1.01).
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                proj = (dd.get("projeto") or "").strip() or None
+                valor = round(float(dd.get("valor") or 0), 2)
+                if valor <= 0:
+                    self.send_json({"ok": False, "erro": "Valor inválido."}, code=400); return
+                ref = (dd.get("ref") or "").strip() or ("pgf:%s:%s" % (proj or "-", uuid.uuid4().hex[:8]))
+                lan = mod_contabil.registrar_evento(db, ot, oid, "pagamento_fornecedor", valor, projeto_id=proj, ref=ref)
+                db.commit()
+                self.send_json({"ok": True, "lancamento": lan})
+            except (ValueError, TypeError) as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=400)
             finally:
                 db.close()
             return

@@ -552,6 +552,7 @@ def efetivar_provisao(db, owner_tipo, owner_id, projeto_id, codigo_provisao, val
     valor = round(float(valor or 0), 2)
     if valor <= 0:
         return None
+    seed_plano(db, owner_tipo, owner_id)
     cd = _conta_por_codigo(db, owner_tipo, owner_id, codigo_provisao)
     cc = _conta_por_codigo(db, owner_tipo, owner_id, "2.1.01")
     return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor, data=data, projeto_id=projeto_id,
@@ -566,6 +567,7 @@ def resolver_saldo_provisao(db, owner_tipo, owner_id, projeto_id, codigo_provisa
     ja = lancamento_por_ref(db, owner_tipo, owner_id, ref)
     if ja is not None:
         return ja
+    seed_plano(db, owner_tipo, owner_id)
     saldo = round(_mov(db, owner_tipo, owner_id, codigo_provisao, "credor", None, None, projeto_id=projeto_id), 2)
     if abs(saldo) < 0.005:
         return None
