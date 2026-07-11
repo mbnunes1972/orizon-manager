@@ -28,7 +28,9 @@ def test_dashboard_endpoint(http_client_factory, seed, app_db):
     c = http_client_factory(); c.login("dir_l1", "senha123")
     st, d = c.get("/api/financeiro/dashboard")
     assert st == 200 and d["ok"] is True
-    assert len(d["dashboard"]["provisoes"]) == 3
+    cods = {p["codigo"] for p in d["dashboard"]["provisoes"]}
+    assert {"2.1.04.02", "2.1.04.03", "2.1.04.05", "2.1.04.06"} <= cods   # 3 antigas + Custo Fábrica (FASE A)
+    assert "2.1.04.01" not in cods and "2.1.04.04" not in cods            # comissão/devolução excluídas
 
 
 def test_dashboard_provisoes_data_driven(app_db):
@@ -39,16 +41,17 @@ def test_dashboard_provisoes_data_driven(app_db):
     mc.seed_plano(db, "loja", 61)
     dash = mc.dashboard_financeiro(db, "loja", 61)
     cods = {p["codigo"] for p in dash["provisoes"]}
-    assert cods == {"2.1.04.02", "2.1.04.03", "2.1.04.05"}       # as 3 da venda
+    assert {"2.1.04.02", "2.1.04.03", "2.1.04.05"} <= cods       # provisões da venda (B)
+    assert {"2.1.04.06", "2.1.04.12"} <= cods                    # provisões novas (FASE A) aparecem sozinhas
     assert "2.1.04.01" not in cods and "2.1.04.04" not in cods   # comissão/devolução: tratamento próprio
-    # nova provisão CRIADA no Plano de Contas -> novo card, sem alterar a tela
-    db.add(mc.Conta(owner_tipo="loja", owner_id=61, codigo="2.1.04.06", nome="Provisão de Frete",
+    # nova provisão CRIADA no Plano de Contas (código fora do PLANO_PADRAO) -> novo card, sem tocar a tela
+    db.add(mc.Conta(owner_tipo="loja", owner_id=61, codigo="2.1.04.99", nome="Provisão Ad Hoc",
                     grupo=2, tipo="analitica", natureza=mc._natureza(2), ativa=1, ordem=999))
     db.commit()
     dash2 = mc.dashboard_financeiro(db, "loja", 61)
     db.close()
-    novo = {p["codigo"]: p for p in dash2["provisoes"]}.get("2.1.04.06")
+    novo = {p["codigo"]: p for p in dash2["provisoes"]}.get("2.1.04.99")
     assert novo is not None
-    assert novo["nome"] == "Provisão de Frete"        # nome vem do plano, não hardcoded
+    assert novo["nome"] == "Provisão Ad Hoc"          # nome vem do plano, não hardcoded
     assert novo["saldo_em_aberto"] == 0.0
     assert novo["sub"] == "Saldo provisionado em aberto"   # descrição genérica (não estava no mapa)

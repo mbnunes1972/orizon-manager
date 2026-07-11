@@ -7742,6 +7742,18 @@ def main():
         print("  Aviso: omie_config.json sem credenciais. Configure na sidebar.")
 
     init_db()
+    # FASE A (infra contábil): backfill do plano de contas nos owners existentes — planos antigos
+    # ganham as contas novas de PLANO_PADRAO (Adiantamento de Clientes, Provisão Custo Fábrica etc.).
+    # Idempotente + fail-soft (não aborta o start). main.py é o composition root: pode importar domínio.
+    try:
+        import mod_contabil as _mc
+        _dbp = get_session()
+        try:
+            _mc.backfill_plano_todos_owners(_dbp)
+        finally:
+            _dbp.close()
+    except Exception as _e:
+        logging.getLogger(__name__).warning("backfill plano de contas falhou: %s", _e)
     # (migrações margens->orcamento e margens->parametros removidas na faxina: a coluna
     #  Orcamento.margens foi removida; parâmetros vêm de Projeto.parametros_json e o desconto
     #  de Orcamento.desconto_pct.)

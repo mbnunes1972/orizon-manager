@@ -8,7 +8,8 @@ def test_contas_provisao_do_plano_data_driven(app_db):
     mc.seed_plano(db, "loja", 62)
     contas = mc.contas_provisao_do_plano(db, "loja", 62)
     cods = {c["codigo"] for c in contas}
-    assert cods == {"2.1.04.02", "2.1.04.03", "2.1.04.05"}   # as 3 da venda
+    assert {"2.1.04.02", "2.1.04.03", "2.1.04.05"} <= cods      # provisões da venda (B)
+    assert {"2.1.04.06", "2.1.04.12"} <= cods                   # provisões novas (FASE A)
     assert "2.1.04.01" not in cods and "2.1.04.04" not in cods
     assert all({"codigo", "nome", "sub", "saldo_em_aberto"} <= set(c) for c in contas)
     db.close()
@@ -28,11 +29,11 @@ def test_conta_nova_no_grupo_aparece(app_db):
     """Provar o data-driven: uma conta nova em 2.1.04 aparece sem tocar no painel."""
     db = app_db.get_session()
     mc.seed_plano(db, "loja", 64)
-    db.add(mc.Conta(owner_tipo="loja", owner_id=64, codigo="2.1.04.06", nome="Provisão de Frete",
+    db.add(mc.Conta(owner_tipo="loja", owner_id=64, codigo="2.1.04.99", nome="Provisão Ad Hoc",
                     grupo=2, tipo="analitica", natureza=mc._natureza(2), ativa=1, ordem=999))
     db.commit()
     cods = {c["codigo"] for c in mc.contas_provisao_do_plano(db, "loja", 64)}
-    assert "2.1.04.06" in cods
+    assert "2.1.04.99" in cods
     db.close()
 
 
