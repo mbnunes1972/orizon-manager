@@ -121,10 +121,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
 label.field-label{font-size:10px;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:5px}
 /* Campo de Entrada (Padrao_Design_v7 §4): MESMA regra p/ texto/número/moeda/data — nunca branco fixo
    nem estilo nativo do navegador. Fundo --surface-2, borda --border (foco --accent), 36px, radius --r-sm. */
-input[type=text],input[type=password],input[type=number],input[type=email],input[type=tel],input[type=search],input[type=date]{
+input[type=text],input[type=password],input[type=number],input[type=email],input[type=tel],input[type=search],input[type=date],input[type=month],input[type=time],input[type=week]{
   width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);
   height:36px;padding:0 12px;color:var(--text);font-family:var(--font-sans);font-size:13px;outline:none;transition:.15s}
-input[type=number],input[type=date]{font-family:var(--font-mono)}   /* dígitos alinhados (Mono) */
+input[type=number],input[type=date],input[type=month],input[type=time],input[type=week]{font-family:var(--font-mono)}   /* dígitos alinhados (Mono) */
 input::placeholder{color:var(--muted)}
 input:focus{border-color:var(--accent)}
 /* Select (Padrao_Design §4): MESMO padrão dos campos de entrada — nunca branco fixo nem estilo nativo do
