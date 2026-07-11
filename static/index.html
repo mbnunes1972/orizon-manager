@@ -2128,6 +2128,43 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     </div>
   </div>
 </div>
+
+<!-- Modal: Perfil de acesso (Admin › Perfis de Usuário) — criar/editar perfil configurável -->
+<div id="modal-perfil-acesso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9500;align-items:center;justify-content:center">
+  <div style="background:#111d11;border:1px solid #1e2e1e;border-radius:14px;padding:28px;width:100%;max-width:640px;max-height:88vh;overflow-y:auto">
+    <div style="font-family:var(--font-sans);font-weight:700;font-size:15px;margin-bottom:16px" id="pfa-titulo">Novo perfil</div>
+    <div style="display:grid;grid-template-columns:1fr 200px;gap:12px;margin-bottom:18px">
+      <div>
+        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Nome</label>
+        <input type="text" id="pfa-nome" placeholder="Ex.: Vendedor Sênior"
+               style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box"
+               onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Base</label>
+        <select id="pfa-base" onchange="_pfaBaseMudou()"
+                style="width:100%;background:#0a120a;border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none;box-sizing:border-box">
+          <option value="master">Master</option>
+          <option value="gerencial">Gerencial</option>
+          <option value="operador">Operador</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">Módulos e painéis acessíveis</div>
+    <div id="pfa-modulos" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:18px"></div>
+
+    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">Capacidades (liberar / bloquear)</div>
+    <div id="pfa-capacidades" style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px"></div>
+
+    <div id="pfa-erro" style="font-size:12px;color:var(--err);min-height:18px;margin:8px 0 6px"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="fecharModalPerfilAcesso()" style="padding:10px 18px;background:transparent;border:1px solid var(--border);border-radius:9px;color:var(--muted);font-family:var(--font-sans);font-weight:700;font-size:13px;cursor:pointer">Cancelar</button>
+      <button onclick="salvarPerfilAcesso()" style="padding:10px 18px;background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:9px;font-family:var(--font-sans);font-weight:700;font-size:13px;cursor:pointer">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2277,6 +2314,10 @@ let _perfilAtivo = {
             pode_editar_total:true, pode_ver_margens:false }
 };
 let _perfisConfig = null;
+let _perfisAdmin  = null;   // último payload de GET /api/admin/perfis (Admin › Perfis de Usuário)
+// NOTE: prefixo "pfa" (Perfil de Acesso) evita colisão com o já existente #modal-perfil /
+// abrirModalPerfil() / fecharModalPerfil() — modal "Meu Perfil" (conta do usuário logado).
+let _pfaCtx = null; // { modo:'novo'|'editar', slug } do modal #modal-perfil-acesso aberto
 
 // ── Usuário autenticado ───────────────────────────────────────
 let _usuarioAtual = null;
@@ -2694,35 +2735,158 @@ function cfgDocumentosRender(){
     +'</div>';
 }
 
-// Admin › Perfis de Usuário — matriz perfil × capacidades, DERIVADA de perfis.py (read-only).
-// Formaliza o que o sistema já aplica; distinto de "Usuários da loja" (atribui QUEM tem qual perfil).
+// Admin › Perfis de Usuário — CRUD de perfis de acesso configuráveis por loja (Task 10).
+// Master (gerir_perfis) cria/edita perfis personalizados (base master/gerencial/operador +
+// módulos/painéis + capacidades finas). Perfis "sistema" (os 3 padrão) são fixos, só leitura.
+// Distinto de "Usuários da loja" (atribui QUEM tem qual perfil).
 async function adminPerfisCarregar(){
   const box = document.getElementById('loja-panel-perfis'); if(!box) return;
   box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
-  const d = await (await fetch('/api/admin/perfis-matriz',{credentials:'same-origin'})).json().catch(()=>({}));
+  const d = await (await fetch('/api/admin/perfis',{credentials:'same-origin'})).json().catch(()=>({}));
   if(!d.ok){ box.innerHTML = '<em style="color:var(--err);font-size:12px">'+esc(d.erro||'Sem acesso.')+'</em>'; return; }
+  _perfisAdmin = d;
   const caps = d.capacidades || {};
   const rotuloCap = s => (caps[s] && caps[s].rotulo) || s;
-  const grupos = {};
-  Object.keys(caps).forEach(s => { const g = caps[s].grupo || 'Outros'; (grupos[g] = grupos[g] || []).push(s); });
-  const legenda = Object.keys(grupos).map(g =>
-    '<div style="margin-bottom:10px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:4px">'+esc(g)+'</div>'
-    + grupos[g].map(s => '<div style="font-size:12px;color:var(--text);margin-bottom:2px"><strong>'+esc(caps[s].rotulo)+'</strong> <span style="color:var(--muted)">— '+esc(caps[s].descricao)+'</span></div>').join('')
-    + '</div>').join('');
+  const opc = d.modulos_opcoes || { dominios: [], paineis: [] };
+  const rotuloMod = {};
+  (opc.dominios || []).forEach(m => rotuloMod[m.id] = m.rotulo);
+  (opc.paineis  || []).forEach(m => rotuloMod[m.id] = m.rotulo);
+  const chip = txt => '<span style="display:inline-block;background:var(--accent-tint);color:var(--accent);border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 3px 0 0">'+esc(txt)+'</span>';
   const linhas = (d.perfis || []).map(p => {
-    const chips = (p.capacidades || []).map(s =>
-      '<span style="display:inline-block;background:var(--accent-tint);color:var(--accent);border-radius:10px;padding:2px 8px;font-size:11px;margin:2px 3px 0 0">'+esc(rotuloCap(s))+'</span>').join('')
+    const chipsMod = (p.modulos || []).map(m => chip(rotuloMod[m] || m)).join('')
+      || '<span style="color:var(--muted);font-size:11px">— nenhum —</span>';
+    const chipsCap = Object.keys(p.capacidades || {}).filter(c => p.capacidades[c]).map(c => chip(rotuloCap(c))).join('')
       || '<span style="color:var(--muted);font-size:11px">— nenhuma —</span>';
-    return '<tr class="proj-row"><td style="padding:8px 12px;color:var(--text);font-weight:600">'+esc(p.rotulo)
+    const btnEditar = (d.pode_editar && !p.sistema)
+      ? '<button class="btn btn-ghost btn-sm" onclick="abrirModalPerfilAcesso(_perfisAdmin.perfis.find(x=>x.slug===\''+p.slug+'\'))">Editar</button>'
+      : '';
+    return '<tr class="proj-row"><td style="padding:8px 12px;color:var(--text);font-weight:600">'+esc(p.nome)
       + '<div style="font-size:10px;color:var(--muted);font-weight:400">'+esc(p.slug)+'</div></td>'
-      + '<td style="padding:8px 12px;color:var(--muted);font-size:11px">'+(p.loja?'Loja':'Plataforma/Rede')+'</td>'
-      + '<td style="padding:8px 12px;text-align:right;font-family:var(--font-mono)">'+(p.desconto_max||0)+'%</td>'
-      + '<td style="padding:8px 12px">'+chips+'</td></tr>';
+      + '<td style="padding:8px 12px;color:var(--muted);font-size:11px">'+esc(p.base)+'</td>'
+      + '<td style="padding:8px 12px;color:var(--muted);font-size:11px">'+(p.sistema?'Sistema':'Personalizado')+'</td>'
+      + '<td style="padding:8px 12px">'+chipsMod+'</td>'
+      + '<td style="padding:8px 12px">'+chipsCap+'</td>'
+      + '<td style="padding:8px 12px;text-align:right">'+btnEditar+'</td></tr>';
   }).join('');
+  const btnNovo = d.pode_editar
+    ? '<button class="btn btn-ghost btn-sm" onclick="abrirModalPerfilAcesso(null)" style="font-size:11px;margin-bottom:10px">+ Novo perfil</button>'
+    : '';
+  const nota = d.pode_editar
+    ? ' Perfis <strong style="color:var(--text)">Sistema</strong> são fixos; crie um perfil personalizado para ajustar módulos e capacidades.'
+    : ' Somente leitura — só o Master pode criar/editar perfis.';
   box.innerHTML =
-     '<div style="font-size:12px;color:var(--muted);margin-bottom:14px;max-width:720px">Define <strong style="color:var(--text)">o que cada perfil pode fazer</strong> (capacidades e limite de desconto), refletindo o que o sistema já aplica. Distinto de <strong style="color:var(--text)">Usuários da loja</strong>, onde se atribui <strong style="color:var(--text)">quem</strong> tem qual perfil. Somente leitura (fonte: perfis.py).</div>'
-    +'<table class="proj-table" style="width:100%;margin-bottom:18px"><thead><tr><th>Perfil</th><th>Escopo</th><th style="text-align:right">Desc. máx</th><th>Capacidades</th></tr></thead><tbody>'+linhas+'</tbody></table>'
-    +'<div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:8px">O que cada capacidade significa</div>'+legenda;
+     '<div style="font-size:12px;color:var(--muted);margin-bottom:14px;max-width:760px">Configura <strong style="color:var(--text)">o que cada perfil pode fazer</strong> (módulos/painéis acessíveis e capacidades finas). Distinto de <strong style="color:var(--text)">Usuários da loja</strong>, onde se atribui <strong style="color:var(--text)">quem</strong> tem qual perfil.'+nota+'</div>'
+    + btnNovo
+    +'<table class="proj-table" style="width:100%"><thead><tr><th>Perfil</th><th>Base</th><th>Tipo</th><th>Módulos/Painéis</th><th>Capacidades liberadas</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table>';
+}
+
+// ── Modal Perfil de acesso (criar/editar) — prefixo "pfa" evita colisão com o modal
+// "Meu Perfil" (#modal-perfil / abrirModalPerfil / fecharModalPerfil, conta do usuário logado).
+const _PFA_GRUPO_OPERACIONAIS = ['captacao','cadastro','comercial','producao','estoque','expedicao','montagem','assistencias'];
+const _PFA_GRUPO_FISCAL_FIN   = ['fiscal','financeiro','folha'];
+
+// Perfil de SISTEMA (base===slug) cujas capacidades/módulos servem de preset ao criar/trocar a base.
+function _pfaPresetDaBase(baseSlug){
+  if(!_perfisAdmin) return null;
+  return (_perfisAdmin.perfis || []).find(p => p.sistema && p.slug === baseSlug) || null;
+}
+
+function _pfaRenderModulos(modulosMarcados){
+  const box = document.getElementById('pfa-modulos'); if(!box) return;
+  const opc = (_perfisAdmin && _perfisAdmin.modulos_opcoes) || { dominios: [], paineis: [] };
+  const rotuloDe = {};
+  (opc.dominios || []).forEach(m => rotuloDe[m.id] = m.rotulo);
+  (opc.paineis  || []).forEach(m => rotuloDe[m.id] = m.rotulo);
+  const marcados = new Set(modulosMarcados || []);
+  const linha = id => '<label style="display:block;font-size:12px;color:var(--text);margin-bottom:5px">'
+    + '<input type="checkbox" class="pfa-mod-cb" id="pfa-mod-'+id+'" value="'+id+'" '+(marcados.has(id)?'checked':'')+'> '+esc(rotuloDe[id]||id)+'</label>';
+  const domIds    = (opc.dominios || []).map(m => m.id);
+  const operIds   = domIds.filter(id => _PFA_GRUPO_OPERACIONAIS.includes(id));
+  const fiscFinIds= domIds.filter(id => _PFA_GRUPO_FISCAL_FIN.includes(id));
+  const painelIds = (opc.paineis || []).map(m => m.id);
+  const secao = (rotulo, ids) => !ids.length ? '' :
+    '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:8px 0 5px">'+esc(rotulo)+'</div>' + ids.map(linha).join('');
+  box.innerHTML = secao('Operacionais', operIds) + secao('Fiscal / Financeiro', fiscFinIds) + secao('Painéis', painelIds);
+}
+
+function _pfaRenderCapacidades(capacidadesMarcadas){
+  const box = document.getElementById('pfa-capacidades'); if(!box) return;
+  const caps  = (_perfisAdmin && _perfisAdmin.capacidades) || {};
+  const lista = (_perfisAdmin && _perfisAdmin.caps_selecionaveis) || [];
+  const marcadas = capacidadesMarcadas || {};
+  box.innerHTML = lista.map(c => {
+    const info = caps[c] || { rotulo: c, descricao: '' };
+    return '<label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:9px;font-size:12px;cursor:pointer">'
+      + '<input type="checkbox" class="pfa-cap-cb" id="pfa-cap-'+c+'" value="'+c+'" style="margin-top:2px" '+(marcadas[c]?'checked':'')+'>'
+      + '<span><strong style="color:var(--text)">'+esc(info.rotulo)+'</strong><br><span style="color:var(--muted)">'+esc(info.descricao)+'</span></span></label>';
+  }).join('');
+}
+
+// Troca de base no CREATE: reposiciona os presets (módulos + capacidades) do perfil de sistema.
+function _pfaBaseMudou(){
+  if(_pfaCtx && _pfaCtx.modo === 'editar') return;   // base não muda em edição
+  const baseSel = document.getElementById('pfa-base');
+  const preset = _pfaPresetDaBase(baseSel.value);
+  _pfaRenderModulos(preset ? preset.modulos : []);
+  _pfaRenderCapacidades(preset ? preset.capacidades : {});
+}
+
+function abrirModalPerfilAcesso(perfil){
+  if(!_perfisAdmin) return;
+  if(perfil && perfil.sistema) return;   // perfis de sistema não são editáveis
+  _pfaCtx = perfil ? { modo: 'editar', slug: perfil.slug } : { modo: 'novo' };
+  document.getElementById('pfa-titulo').textContent = perfil ? 'Editar perfil' : 'Novo perfil';
+  document.getElementById('pfa-nome').value = perfil ? perfil.nome : '';
+  document.getElementById('pfa-erro').textContent = '';
+  const baseSel = document.getElementById('pfa-base');
+  if(perfil){
+    baseSel.value = perfil.base;
+    baseSel.disabled = true;
+    _pfaRenderModulos(perfil.modulos);
+    _pfaRenderCapacidades(perfil.capacidades);
+  } else {
+    baseSel.disabled = false;
+    baseSel.value = 'operador';
+    _pfaBaseMudou();
+  }
+  document.getElementById('modal-perfil-acesso').style.display = 'flex';
+}
+
+function fecharModalPerfilAcesso(){
+  const m = document.getElementById('modal-perfil-acesso');
+  if(m) m.style.display = 'none';
+  _pfaCtx = null;
+}
+
+async function salvarPerfilAcesso(){
+  const ctx = _pfaCtx; if(!ctx || !_perfisAdmin) return;
+  const erroEl = document.getElementById('pfa-erro');
+  const nome = (document.getElementById('pfa-nome').value || '').trim();
+  if(!nome){ erroEl.textContent = 'Informe o nome do perfil.'; return; }
+  const modulos = Array.from(document.querySelectorAll('#pfa-modulos .pfa-mod-cb:checked')).map(cb => cb.value);
+  const capacidades = {};
+  (_perfisAdmin.caps_selecionaveis || []).forEach(c => {
+    const cb = document.getElementById('pfa-cap-'+c);
+    capacidades[c] = !!(cb && cb.checked);
+  });
+  const payload = { nome, modulos, capacidades };
+  let url, method;
+  if(ctx.modo === 'editar'){
+    url = '/api/admin/perfis/' + ctx.slug; method = 'PATCH';
+  } else {
+    payload.base = document.getElementById('pfa-base').value;
+    url = '/api/admin/perfis'; method = 'POST';
+  }
+  let d;
+  try {
+    const r = await fetch(url, { method, credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    d = await r.json();
+  } catch(e){ erroEl.textContent = 'Erro de rede.'; return; }
+  if(!d.ok){ erroEl.textContent = d.erro || 'Erro ao salvar.'; return; }
+  showToast(ctx.modo === 'editar' ? 'Perfil atualizado.' : 'Perfil criado.', false);
+  fecharModalPerfilAcesso();
+  adminPerfisCarregar();
 }
 
 function cfgRenderizarPerfis(){
@@ -9536,6 +9700,7 @@ document.addEventListener('keydown', function(e){
   // Cada entrada: [id, fn_cancelar]
   const ESC_MAP = [
     ['modal-autorizacao',      () => fecharModalAutorizacao(false)],
+    ['modal-perfil-acesso',    fecharModalPerfilAcesso],
     ['modal-perfil',           fecharModalPerfil],
     ['modal-exportar',         fecharModalExportar],
     ['modal-gerente-senha',    tfFecharModalSenha],
