@@ -184,6 +184,7 @@ def _usuario_dict(u: Usuario) -> dict:
         "pode_ver_parametros": u.pode_ver_parametros,
         "rotulo":              perfis.rotulo(u.nivel),
         "pode_gerir_usuarios": perfis.pode(u.nivel, "gerir_usuarios"),
+        "pode_gerir_perfis":  perfis.pode(u.nivel, "gerir_perfis"),
         "pode_gerir_redes":    perfis.pode(u.nivel, "gerir_redes"),
         "pode_gerir_lojas":    perfis.pode(u.nivel, "gerir_lojas"),
         "pode_editar_dados_loja": perfis.pode(u.nivel, "editar_dados_loja"),

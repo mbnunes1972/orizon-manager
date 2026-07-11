@@ -164,7 +164,9 @@ def perfis_atribuiveis(ator, escopo):
             return ["admin_rede"]
         return []
     if escopo == "loja":
-        return [s for s in perfis.slugs() if s not in ("super_admin", "admin_rede")]
+        _lid = ator.get("active_loja_id") or ator.get("loja_id")
+        do_banco = perfis.slugs_da_loja(_lid) if _lid else []
+        return do_banco or [s for s in perfis.slugs() if s not in ("super_admin", "admin_rede")]
     return []
 
 

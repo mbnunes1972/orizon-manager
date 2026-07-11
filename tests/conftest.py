@@ -41,6 +41,15 @@ def seed(app_db):
     l2 = app_db.Loja(nome="Loja 2", rede_id=rede.id, codigo="LJ2")
     db.add_all([l1, l2]); db.flush()
 
+    # Semeia os perfis padrão (master/gerencial/operador) por loja — fiel à produção, onde a
+    # migração já semeia as lojas reais. Sem isto o registro DB fica vazio e perfis.py cai
+    # inteiro no fallback hardcoded, mascarando bugs de wiring por-loja (Task 7).
+    import perfil_store
+    import perfis as _perfis
+    for _lid in (l1.id, l2.id):
+        perfil_store.seed_perfis_loja(db, _lid)
+    _perfis.recarregar()
+
     # Emitente próprio de cada loja (identidade fiscal — Task 1/2/4). loja.emitente_id = self.
     def mk_emitente(cnpj, razao, uf="SP"):
         em = app_db.Emitente(cnpj=cnpj, razao_social=razao, regime_tributario="simples",

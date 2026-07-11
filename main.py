@@ -408,6 +408,13 @@ def _ler_loja_ativa_header(handler):
     return int(raw) if raw.isdigit() else None
 
 
+def mod_perfis_opcoes():
+    import modulos, mod_perfis
+    doms = [{"id": d["id"], "rotulo": d["rotulo"]} for d in modulos.dominios_com_rotulo()]
+    return {"dominios": doms, "paineis": [{"id": "admin", "rotulo": "Painel Administração"},
+                                          {"id": "config", "rotulo": "Painel Config"}]}
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -1029,14 +1036,28 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
 
         elif path == "/api/admin/perfis-matriz":
-            # Admin › Perfis de Usuário: matriz perfil × capacidades, DERIVADA de perfis.py (read-only).
-            # Formaliza o que já roda; não configura nada. Gate: gerir_usuarios (mesma audiência de Usuários).
+            # Admin › Perfis de Usuário: matriz perfil × capacidades da LOJA do ator (Task 7),
+            # DB-backed via perfis.matriz_loja. Gate: gerir_usuarios (mesma audiência de Usuários).
             usuario = get_usuario_sessao(self)
             if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
-                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
-                return
-            _m = perfis.matriz()
-            self.send_json({"ok": True, "perfis": _m["perfis"], "capacidades": _m["capacidades"]})
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+            lid = usuario.get("loja_id")
+            _m = perfis.matriz_loja(lid)
+            self.send_json({"ok": True, "perfis": _m["perfis"], "capacidades": _m["capacidades"],
+                            "caps_selecionaveis": _m["caps_selecionaveis"],
+                            "pode_editar": perfis.pode(usuario.get("nivel"), "gerir_perfis")})
+
+        elif path == "/api/admin/perfis":
+            # CRUD de perfis de acesso configuráveis por loja (Task 7). Leitura: gerir_usuarios;
+            # criação/edição (POST/PATCH abaixo): gerir_perfis (só Master).
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+            _m = perfis.matriz_loja(usuario.get("loja_id"))
+            self.send_json({"ok": True, "perfis": _m["perfis"], "capacidades": _m["capacidades"],
+                            "caps_selecionaveis": _m["caps_selecionaveis"],
+                            "modulos_opcoes": mod_perfis_opcoes(),
+                            "pode_editar": perfis.pode(usuario.get("nivel"), "gerir_perfis")})
 
         elif path == "/api/admin/usuarios/perfis-permitidos":
             usuario = get_usuario_sessao(self)
@@ -4173,6 +4194,25 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            if path == "/api/admin/perfis":
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_perfis"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                req = json.loads(body) if body else {}
+                db = get_session()
+                try:
+                    import perfil_store
+                    p, err = perfil_store.criar_perfil(db, usuario.get("loja_id"),
+                                req.get("nome", ""), req.get("base", ""), req.get("modulos", []),
+                                capacidades=req.get("capacidades"))
+                    if not p:
+                        self.send_json({"ok": False, "erro": err}); return
+                    perfis.recarregar()
+                    self.send_json({"ok": True, "perfil": {"slug": p.slug, "nome": p.nome}}, code=201)
+                finally:
+                    db.close()
+                return
+
             if path == "/api/admin/redes":
                 usuario = get_usuario_sessao(self)
                 if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_redes"):
@@ -6470,6 +6510,26 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception as e:
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
+
+            m_perfil = re.match(r"^/api/admin/perfis/([a-z0-9_]+)$", path)
+            if m_perfil:
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_perfis"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                req = json.loads(body) if body else {}
+                db = get_session()
+                try:
+                    import perfil_store
+                    p, err = perfil_store.editar_perfil(db, usuario.get("loja_id"), m_perfil.group(1),
+                                nome=req.get("nome"), modulos=req.get("modulos"),
+                                capacidades=req.get("capacidades"))
+                    if not p:
+                        self.send_json({"ok": False, "erro": err}, code=403); return
+                    perfis.recarregar()
+                    self.send_json({"ok": True, "perfil": {"slug": p.slug, "nome": p.nome}})
                 finally:
                     db.close()
                 return

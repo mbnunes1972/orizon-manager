@@ -87,7 +87,7 @@ def acessa_painel(slug, painel):
 
 
 def existe(slug):
-    return slug in PERFIS
+    return slug in PERFIS or slug in _reg()
 
 
 def slugs():
