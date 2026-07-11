@@ -46,3 +46,16 @@ def test_override_rejeita_soma_diferente(http_client_factory, seed):
     proj = seed["projeto_l1"]
     st, d = c.post(f"/api/projetos/{proj}/parametros", {"pct_mercadoria": 80.0, "pct_servico": 30.0})
     assert st == 400 and d["ok"] is False
+
+
+def test_override_sobrevive_a_salvamento_de_outros_parametros(http_client_factory, seed):
+    """Salvar parâmetros normais (sem pct_*) NÃO pode apagar o override de segmentação já gravado."""
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    proj = seed["projeto_l1"]
+    st, d = c.post(f"/api/projetos/{proj}/parametros", {"pct_mercadoria": 80.0, "pct_servico": 20.0})
+    assert st == 200 and d["ok"] is True
+    # salvamento normal de OUTRO parâmetro, sem enviar pct_* (fluxo do auto-save geral)
+    st, d = c.post(f"/api/projetos/{proj}/parametros", {"carga_trib": 9.0})
+    assert st == 200 and d["ok"] is True
+    assert d["parametros"]["pct_mercadoria"] == 80.0 and d["parametros"]["pct_servico"] == 20.0
+    assert d["parametros"]["carga_trib"] == 9.0

@@ -2081,16 +2081,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <div id="mp-seg-fields" style="display:none">
         <div class="toggle-row">
           <span class="toggle-label" style="flex:1">Mercadoria (NF-e)</span>
-          <input type="number" class="toggle-input" id="mp-pct-merc" min="0" max="100" step="0.5" value="65" oninput="mpSegSync('merc')">
+          <input type="number" class="toggle-input" id="mp-pct-merc" min="0" max="100" step="0.5" value="65" oninput="mpSegSync('merc'); mpSegAgendar()">
           <span class="toggle-unit">%</span>
         </div>
         <div class="toggle-row">
           <span class="toggle-label" style="flex:1">Serviço (NFS-e)</span>
-          <input type="number" class="toggle-input" id="mp-pct-serv" min="0" max="100" step="0.5" value="35" oninput="mpSegSync('serv')">
+          <input type="number" class="toggle-input" id="mp-pct-serv" min="0" max="100" step="0.5" value="35" oninput="mpSegSync('serv'); mpSegAgendar()">
           <span class="toggle-unit">%</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-          <button class="btn btn-primary btn-sm" id="mp-seg-btn" onclick="mpSegAplicar()">Aplicar a este projeto</button>
+          <button class="btn btn-primary btn-sm" id="mp-seg-btn" onclick="mpSegAplicar()">Salvar segmentação</button>
           <span id="mp-seg-hint" style="font-size:10px;color:var(--muted)"></span>
         </div>
       </div>
@@ -7497,6 +7497,10 @@ function mpSegSync(which){
     em.value = +(100 - v).toFixed(2);
   }
 }
+// Auto-save da segmentação (debounced) — igual aos demais campos do modal, mas em chamada isolada:
+// um 403 (perfil sem aprovar_financeiro) afeta só a segmentação, nunca os outros parâmetros.
+let _mpSegTimer = null;
+function mpSegAgendar(){ clearTimeout(_mpSegTimer); _mpSegTimer = setTimeout(mpSegAplicar, 600); }
 async function mpSegAplicar(){
   if(!projetoAtivo) return;
   const merc = parseFloat(document.getElementById('mp-pct-merc').value)||0;
@@ -7506,6 +7510,7 @@ async function mpSegAplicar(){
     if(hint){ hint.textContent = 'Mercadoria + Serviço deve somar 100%'; hint.style.color = 'var(--err)'; }
     return;
   }
+  if(hint){ hint.textContent = 'Salvando…'; hint.style.color = 'var(--muted)'; }
   try{
     const r = await fetch('/api/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/parametros',{
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -7514,9 +7519,9 @@ async function mpSegAplicar(){
     const d = await r.json();
     if(d.ok){
       projetoAtivo.margens = Object.assign({}, projetoAtivo.margens||{}, {pct_mercadoria: merc, pct_servico: serv});
-      if(hint){ hint.textContent = 'Aplicado ✓'; hint.style.color = 'var(--ok)'; }
+      if(hint){ hint.textContent = 'Salvo ✓'; hint.style.color = 'var(--ok)'; }
       if(typeof negPreview === 'function') await negPreview();
-    } else if(hint){ hint.textContent = d.erro || 'Erro'; hint.style.color = 'var(--err)'; }
+    } else if(hint){ hint.textContent = d.erro || 'Erro ao salvar'; hint.style.color = 'var(--err)'; }
   }catch(e){
     if(hint){ hint.textContent = 'Erro de rede'; hint.style.color = 'var(--err)'; }
   }
