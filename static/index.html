@@ -1330,6 +1330,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="fin-panel-bal" style="display:none"><div id="bal-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-proj" style="display:none"><div id="proj-dre-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-recon" style="display:none"><div id="recon-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
+    <div id="fin-panel-reconprov" style="display:none"><div id="reconprov-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
+    <div id="fin-panel-contaspagar" style="display:none"><div id="contaspagar-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-repasse" style="display:none"><div id="repasse-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-folha" style="display:none"><div id="folha-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
   </div>
@@ -8704,6 +8706,8 @@ const _FIN_SECOES = [
   {id:'bal',     lbl:'Balanço',         ic:'scale',           load:()=>balancoCarregar()},
   {id:'proj',    lbl:'Margem/Projeto',  ic:'chart-dots',      load:()=>projDreCarregar()},
   {id:'recon',   lbl:'Reconciliação',   ic:'refresh',         load:()=>reconInit()},
+  {id:'reconprov', lbl:'Reconc. Provisões', ic:'checklist',   load:()=>finReconProvCarregar()},   // FASE D
+  {id:'contaspagar', lbl:'Contas a Pagar', ic:'file-invoice', load:()=>finContasPagarCarregar()}, // FASE D
   {id:'folha',   lbl:'Folha de Pagamento', ic:'wallet',       load:()=>folhaCarregar()},   // Modulos_Orizon_v10 §2.1
   // "Repasse Fábrica" saiu do Financeiro (Modulos_Orizon_v4/§6.2): migra p/ o módulo Assistências
   // (filtro Loja/Fábrica/Paga nativo). O painel/endpoint segue existindo, só não é mais aba do submenu.
@@ -8852,6 +8856,104 @@ async function finDashboardCarregar(){
      '<div style="margin-bottom:14px">'
     +'<span style="font-size:13px;color:var(--muted)">'+d.provisoes.length+' provisões monitoradas · total em aberto <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(d.total_provisoes_abertas)+'</strong></span></div>'
     + grupos + apoio;
+}
+
+// ── FASE D: Reconciliação de Provisões (Provisionado × Efetivado × Saldo × Destino) ───────────
+// Fonte única = razão: mesmo endpoint com ?projeto=X (granular) ou sem (consolidado). Efetivado
+// manual + resolver saldo só quando um projeto está selecionado.
+let _reconProvProj = null;   // null = consolidado
+async function finReconProvCarregar(){
+  const box = document.getElementById('reconprov-box');
+  if(!box) return;
+  let projetos = [];
+  try{
+    const rp = await fetch('/api/financeiro/projetos-dre', {credentials:'same-origin'});
+    if(rp.status===403){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Módulo financeiro inativo ou sem acesso.</em>'; return; }
+    projetos = ((await rp.json().catch(()=>({}))).projetos||[]).map(p=>p.projeto_id);
+  }catch(e){}
+  const qs = _reconProvProj ? ('?projeto='+encodeURIComponent(_reconProvProj)) : '';
+  const rec = (await fetch('/api/financeiro/reconciliacao-provisoes'+qs, {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({}))).reconciliacao;
+  if(!rec){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Falha ao carregar.</em>'; return; }
+  const granular = !!_reconProvProj;
+  const TIPOS={A:'Comissões / Pessoas',B:'Custos futuros',C:'Aquisição / Fábrica',D:'Fiscal',O:'Outros'};
+  const opts = ['<option value="">Consolidado (todos os projetos)</option>']
+    .concat(projetos.map(p=>'<option value="'+esc(p)+'"'+(p===_reconProvProj?' selected':'')+'>'+esc(p)+'</option>')).join('');
+  const seletor = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">'
+    +'<span style="font-size:12px;color:var(--muted)">Projeto:</span>'
+    +'<select id="reconprov-sel" onchange="_reconProvProj=this.value||null;finReconProvCarregar()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 11px;color:var(--text);font-size:12px">'+opts+'</select>'
+    +'<span style="font-size:11px;color:var(--muted)">'+(granular?'edite o Efetivado (custo real) e resolva o saldo por provisão':'visão consolidada — selecione um projeto para efetivar/resolver')+'</span></div>';
+  const grupos={}; rec.provisoes.forEach(p=>{(grupos[p.tipo]=grupos[p.tipo]||[]).push(p);});
+  const saldoCor = v => Math.abs(v)<0.005?'var(--muted)':(v>0?'var(--accent)':'var(--st-quente)');
+  const cel=(v,cor)=>'<td style="text-align:right;padding:6px 8px;font-family:var(--font-mono);color:'+(cor||'var(--text)')+'">'+_fBRL(v)+'</td>';
+  const linha=p=>{
+    let acao='';
+    if(granular){
+      acao='<td style="text-align:right;padding:6px 8px;white-space:nowrap">'
+        +'<input type="number" step="0.01" id="ef-'+p.codigo+'" placeholder="R$ real" style="width:90px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 7px;color:var(--text);font-size:11px">'
+        +' <button class="btn btn-sm" onclick="reconProvEfetivar(\''+p.codigo+'\')" style="font-size:11px">Efetivar</button>'
+        +(Math.abs(p.saldo)>=0.005?' <button class="btn btn-sm" onclick="reconProvResolver(\''+p.codigo+'\')" style="font-size:11px">Resolver</button>':'')
+        +'</td>';
+    }
+    return '<tr style="border-top:1px solid var(--border);font-size:12px">'
+      +'<td style="padding:6px 8px">'+esc(p.nome)+'</td>'
+      +cel(p.provisionado)+cel(p.efetivado)+cel(p.saldo,saldoCor(p.saldo))+cel(p.resolvido,'var(--muted)')+acao+'</tr>';
+  };
+  const head='<tr style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">'
+    +'<th style="text-align:left;padding:6px 8px">Provisão</th>'
+    +'<th style="text-align:right;padding:6px 8px">Provisionado</th><th style="text-align:right;padding:6px 8px">Efetivado</th>'
+    +'<th style="text-align:right;padding:6px 8px">Saldo</th><th style="text-align:right;padding:6px 8px">Resolvido</th>'
+    +(granular?'<th style="text-align:right;padding:6px 8px">Ação</th>':'')+'</tr>';
+  const secoes=['A','B','C','D','O'].filter(t=>grupos[t]).map(t=>
+    '<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);font-weight:700;margin:16px 0 4px">'+t+' · '+TIPOS[t]+'</div>'
+    +'<table style="width:100%;border-collapse:collapse">'+head+grupos[t].map(linha).join('')+'</table>').join('');
+  const tot=rec.totais;
+  box.innerHTML=seletor
+    +'<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 18px;display:flex;gap:24px;flex-wrap:wrap;font-size:12px">'
+    +'<span style="color:var(--muted)">Provisionado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(tot.provisionado)+'</strong></span>'
+    +'<span style="color:var(--muted)">Efetivado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(tot.efetivado)+'</strong></span>'
+    +'<span style="color:var(--muted)">Saldo <strong style="font-family:var(--font-mono);color:'+saldoCor(tot.saldo)+'">'+_fBRL(tot.saldo)+'</strong></span></div>'
+    +secoes;
+}
+async function reconProvEfetivar(conta){
+  if(!_reconProvProj) return;
+  const el=document.getElementById('ef-'+conta);
+  const valor=parseFloat(el&&el.value);
+  if(!valor||valor<=0){ showToast('Informe o valor real efetivado.', true); return; }
+  const d=await fetch('/api/financeiro/efetivar-provisao',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({projeto:_reconProvProj,conta:conta,valor:valor})}).then(r=>r.json());
+  if(d.ok){ showToast('Efetivado.'); finReconProvCarregar(); } else { await avisoPopup(d.erro||'Erro',{titulo:'Efetivar'}); }
+}
+async function reconProvResolver(conta){
+  if(!_reconProvProj) return;
+  if(!await confirmarPopup('Resolver o saldo desta provisão? A sobra vira receita e a falta vira despesa, zerando a provisão.',{titulo:'Resolver saldo'})) return;
+  const d=await fetch('/api/financeiro/resolver-saldo-provisao',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({projeto:_reconProvProj,conta:conta})}).then(r=>r.json());
+  if(d.ok){ showToast('Saldo resolvido.'); finReconProvCarregar(); } else { await avisoPopup(d.erro||'Erro',{titulo:'Resolver saldo'}); }
+}
+
+// ── FASE D: Contas a Pagar (Fornecedores a Pagar em aberto) ───────────────────────────────────
+async function finContasPagarCarregar(){
+  const box=document.getElementById('contaspagar-box');
+  if(!box) return;
+  const r=await fetch('/api/financeiro/contas-a-pagar', {credentials:'same-origin'});
+  if(r.status===403){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Módulo financeiro inativo ou sem acesso.</em>'; return; }
+  const cap=(await r.json().catch(()=>({}))).contas_a_pagar;
+  if(!cap){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Falha ao carregar.</em>'; return; }
+  box.innerHTML=
+    '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:18px 22px;margin-bottom:14px">'
+    +'<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:6px">Fornecedores a Pagar — total em aberto</div>'
+    +'<div style="font-family:var(--font-mono);font-weight:700;font-size:22px;color:var(--text)">'+_fBRL(cap.total_em_aberto)+'</div></div>'
+    +'<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:16px 20px">'
+    +'<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px">Registrar pagamento a fornecedor</div>'
+    +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    +'<input type="number" step="0.01" id="cap-valor" placeholder="Valor R$" style="width:120px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:12px">'
+    +'<input type="text" id="cap-proj" placeholder="Projeto (opcional)" style="width:170px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 11px;color:var(--text);font-size:12px">'
+    +'<button class="btn btn-primary btn-sm" onclick="contasPagarPagar()">Pagar</button></div></div>';
+}
+async function contasPagarPagar(){
+  const valor=parseFloat(document.getElementById('cap-valor').value);
+  const proj=document.getElementById('cap-proj').value.trim()||null;
+  if(!valor||valor<=0){ showToast('Informe o valor.', true); return; }
+  const d=await fetch('/api/financeiro/pagar-fornecedor',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({valor:valor,projeto:proj})}).then(r=>r.json());
+  if(d.ok){ showToast('Pagamento registrado.'); finContasPagarCarregar(); } else { await avisoPopup(d.erro||'Erro',{titulo:'Pagar fornecedor'}); }
 }
 function finTab(t){
   _finSecaoAtual = t;
