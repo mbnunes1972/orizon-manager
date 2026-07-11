@@ -1374,7 +1374,11 @@ class Handler(BaseHTTPRequestHandler):
                              "val_liq": float(d.get("Val_Liq") or 0),
                              "cust_var": float(d.get("Cust_Var") or 0),
                              "marg_cont": float(d.get("Marg_Cont") or 0)}
-                    desatualizado = bool(venda and venda["itens"] != atual["itens"])
+                    # Compara só as rubricas que o snapshot conhece: um snapshot pré-fold (10 chaves)
+                    # não deve acusar "desatualizado" apenas porque 'atual' ganhou prov_mont/prov_gar
+                    # (FASE 2). Snapshot novo (12 chaves) → comparação íntegra, inclui o drift das 2.
+                    desatualizado = bool(venda and any(
+                        venda["itens"].get(k) != atual["itens"].get(k) for k in venda["itens"]))
                     # custos adicionais (arq/fidelidade/viagem/brinde): já descontados do
                     # Val. Líquido pelo motor — exibidos à parte, não somam no Cust_Var.
                     custos_adicionais = {
