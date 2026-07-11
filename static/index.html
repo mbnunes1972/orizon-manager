@@ -11,6 +11,7 @@
    §2: contraste corrigido, escuro menos "terminal", --shadow novo (profundidade por sombra, não borda).
    Os "aliases dos tokens antigos" mantêm as ~250 referências var(--…) existentes funcionando. */
 :root{
+  color-scheme:dark;   /* controles nativos (ícone do date/month, popup do calendário, scrollbars) em modo escuro */
   /* superfícies e texto (escuro) — Padrao_Design_Orizon_v4 §2 (recalibrado, menos "terminal") */
   --bg:#181C1E; --surface:#1D2224; --surface-2:#232A2C;
   --border:#2A3234; --border-strong:#3A4548;
@@ -44,6 +45,7 @@
   --coral-bg:#4A1B0C; --coral-brd:#993C1D; --coral-text:#F5C4B3; --coral-lbl:#F0997B;
 }
 :root[data-theme="light"]{
+  color-scheme:light;   /* controles nativos em modo claro */
   --bg:#FFFFFF; --surface:#F7F7F5; --surface-2:#FFFFFF;
   --border:#DDDAD2; --border-strong:#C9C6BC;
   --text:#2A2A28; --muted:#6B6860;
