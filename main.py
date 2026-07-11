@@ -397,11 +397,15 @@ def _fin_evento_seguro(loja_id, tipo_evento, valor, projeto_id, ref):
         logging.getLogger(__name__).warning("wiring financeiro (%s, ref=%s) falhou: %s", tipo_evento, ref, e)
 
 
-def _fin_provisoes_venda_seguro(loja_id, projeto_id, valor_venda, ref_base):
-    """Auto-constitui as 3 provisões contábeis no fechamento da venda (v6 §6.4), a partir do %
-    configurado no Financeiro da loja. **Fail-soft/isolado/idempotente** — não aborta o contrato."""
+def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
+    """Auto-constitui as 3 provisões contábeis no fechamento da venda (v6 §6.4), base = **VAVO** do
+    orçamento (`orc.vavo` — valor à vista, convenção canônica das provisões % sobre a venda; NÃO
+    `valor_total`/Val_Cont, senão diverge da linha da modal/motor quando Cust_Fin>0), a partir do %
+    do Financeiro da loja. **Fail-soft/isolado/idempotente** — não aborta o contrato."""
     try:
-        if not loja_id or not valor_venda or float(valor_venda) <= 0:
+        loja_id = getattr(orc, "loja_id", None)
+        vavo = float(getattr(orc, "vavo", 0) or 0)
+        if not loja_id or vavo <= 0:
             return
         import mod_contabil, mod_tenancy
         db = get_session()
@@ -411,7 +415,7 @@ def _fin_provisoes_venda_seguro(loja_id, projeto_id, valor_venda, ref_base):
                 return
             cfg = json.loads(loja.config_financeira_json) if loja.config_financeira_json else {}
             ot, oid = mod_contabil.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
-            mod_contabil.constituir_provisoes_venda(db, ot, oid, projeto_id, float(valor_venda), cfg, ref_base)
+            mod_contabil.constituir_provisoes_venda(db, ot, oid, projeto_id, vavo, cfg, ref_base)
         finally:
             db.close()
     except Exception as e:
@@ -1374,7 +1378,11 @@ class Handler(BaseHTTPRequestHandler):
                              "val_liq": float(d.get("Val_Liq") or 0),
                              "cust_var": float(d.get("Cust_Var") or 0),
                              "marg_cont": float(d.get("Marg_Cont") or 0)}
-                    desatualizado = bool(venda and venda["itens"] != atual["itens"])
+                    # Compara só as rubricas que o snapshot conhece: um snapshot pré-fold (10 chaves)
+                    # não deve acusar "desatualizado" apenas porque 'atual' ganhou prov_mont/prov_gar
+                    # (FASE 2). Snapshot novo (12 chaves) → comparação íntegra, inclui o drift das 2.
+                    desatualizado = bool(venda and any(
+                        venda["itens"].get(k) != atual["itens"].get(k) for k in venda["itens"]))
                     # custos adicionais (arq/fidelidade/viagem/brinde): já descontados do
                     # Val. Líquido pelo motor — exibidos à parte, não somam no Cust_Var.
                     custos_adicionais = {
@@ -5103,8 +5111,7 @@ class Handler(BaseHTTPRequestHandler):
                                               por_id=(usuario.get("id") if usuario else None))
                     db.commit()
                     # v6 §6.4: auto-constitui as 3 provisões contábeis (% × valor da venda), fail-soft
-                    _fin_provisoes_venda_seguro(getattr(_orc_venda, "loja_id", None), nome_safe,
-                                                getattr(_orc_venda, "valor_total", 0), "prov:" + str(contrato.id))
+                    _fin_provisoes_venda_seguro(_orc_venda, nome_safe, "prov:" + str(contrato.id))
                     resp = {"ok": True, "contrato_id": contrato.id, "status": "para_assinatura"}
                     self.send_json(resp)
                 except Exception as e:

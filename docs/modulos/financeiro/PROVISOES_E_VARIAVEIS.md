@@ -70,8 +70,16 @@
 | Frete Local Orçamento | `Frete_Loc_Orc` | `%Frete_Loc × VAVO` |
 | Assistências Orçamento | `Assist_Orc` | `%Assist × VAVO` |
 | Insumos Locais Orçamento | `Ins_Loc_Orc` | `%Ins_Loc × VAVO` |
-| Custo Variável | `Cust_Var` | `CFO + Out_Forn + Frete_Fab_Orc + Com_Adm_Orc + Com_Venda_Orc + Com_Med_Orc + Com_Proj_Exec_Orc + Frete_Loc_Orc + Assist_Orc + Ins_Loc_Orc + Prov_Imp` |
-| Margem de Contribuição Orçamento | `Marg_Cont` | `(Val_Liq − Cust_Var) / Val_Liq` — margem **sobre o valor líquido** (pode ser negativa) |
+| Provisão de Montagem (visão) | `Prov_Mont` | `%montagem_pct × VAVO` — fold FASE 2 (base VAVO, convenção canônica) |
+| Provisão de Garantia (visão) | `Prov_Gar` | `%garantia_pct × VAVO` — fold FASE 2 (base VAVO, convenção canônica) |
+| Custo Variável | `Cust_Var` | `CFO + Out_Forn + Frete_Fab_Orc + Com_Adm_Orc + Com_Venda_Orc + Com_Med_Orc + Com_Proj_Exec_Orc + Frete_Loc_Orc + Assist_Orc + Ins_Loc_Orc + Prov_Imp + Prov_Mont + Prov_Gar` |
+| Margem de Contribuição Orçamento | `Marg_Cont` | `(Val_Liq − Cust_Var) / Val_Liq` — margem **sobre o valor líquido**, já **após** os custos comprometidos de montagem/garantia (fold FASE 2); pode ser negativa |
+
+> **Fold FASE 2 (Montagem/Garantia na aprovação):** `Prov_Mont`/`Prov_Gar` = `% × VAVO` (base canônica das
+> provisões % sobre a venda), MESMA base e arredondamento da constituição contábil no fechamento
+> (`5.6.x × 2.1.04.x`, também VAVO). É só **VISÃO** — a
+> constituição no razão segue sendo a única escrita contábil; o fold não lança nada e **não altera
+> DRE/Balanço** (prova mecânica: `tests/test_fold_nao_duplica.py`).
 
 > **Exceção de nomenclatura:** `Prov_Imp` é o único valor de provisão sem sufixo `_Orc`. Mantido
 > assim de propósito — é sigla já consagrada/implementada no motor (NOMENCLATURA §3 + coluna-sombra

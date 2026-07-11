@@ -118,13 +118,86 @@ def test_validar_rejeita_redutor_acima_de_100():
 
 
 def test_itens_provisao_mapeia_rubricas():
+    # 12 rubricas após o fold (Prov_Mont/Prov_Gar). Breakdown ANTIGO (sem as 2 novas) → 0.0 (retro-compat).
     d = {"Frete_Fab_Orc": 100.0, "Com_Adm_Orc": 200.0, "Com_Venda_Orc": 0.0,
          "Com_Med_Orc": 0.0, "Com_Proj_Exec_Orc": 0.0, "Frete_Loc_Orc": 50.0,
          "Assist_Orc": 0.0, "Ins_Loc_Orc": 0.0, "Prov_Imp": 0.0, "Out_Forn": 300.0}
     itens = mod_provisoes.itens_provisao(d)
     assert set(itens.keys()) == {"frete_fab","com_adm","com_venda","com_med",
-        "com_proj_exec","frete_loc","assist","ins_loc","prov_imp","out_forn"}
+        "com_proj_exec","frete_loc","assist","ins_loc","prov_imp","out_forn","prov_mont","prov_gar"}
     assert itens["frete_fab"] == 100.0 and itens["out_forn"] == 300.0 and itens["frete_loc"] == 50.0
+    assert itens["prov_mont"] == 0.0 and itens["prov_gar"] == 0.0   # chave ausente no d antigo → 0
+
+
+# ── FASE 2: fold de Montagem/Garantia no Cust_Var/Marg_Cont (base = VAVO, convenção canônica) ──
+def _cfg_fold():
+    c = mod_provisoes.config_financeira_default()
+    c["provisoes"].update({"frete_fab_pct": 10.0, "com_adm_pct": 5.0, "frete_loc_pct": 2.0})
+    c["provisoes_contabeis"].update({"montagem_pct": 8.0, "garantia_pct": 0.5})
+    return c
+
+
+def test_fold_montagem_garantia_no_cust_var():
+    # base = VAVO (2500), NÃO Val_Cont — mesmo com Cust_Fin>0 (Val_Cont=2600), o fold usa VAVO.
+    siglas = {"CFO": 1000.0, "Val_Liq": 2000.0, "VAVO": 2500.0, "Prov_Imp": 0.0, "Val_Cont": 2600.0}
+    r = mod_provisoes.provisoes_orcamento(siglas, _cfg_fold(), out_forn=300.0, com_venda_pct=1.0)
+    assert r["Prov_Mont"] == 200.0          # 8%   × 2500 VAVO
+    assert r["Prov_Gar"] == 12.5            # 0,5% × 2500 VAVO
+    assert r["Cust_Var"] == 1782.5          # 1570 (pré-fold) + 200 + 12,5
+    assert r["Marg_Cont"] == round((2000.0 - r["Cust_Var"]) / 2000.0, 4)
+
+
+def test_fold_decomposicao_aditiva():
+    siglas = {"CFO": 1000.0, "Val_Liq": 2000.0, "VAVO": 2500.0, "Prov_Imp": 0.0, "Val_Cont": 2600.0}
+    com = mod_provisoes.provisoes_orcamento(siglas, _cfg_fold(), out_forn=300.0, com_venda_pct=1.0)
+    c_sem = _cfg_fold(); c_sem["provisoes_contabeis"].update({"montagem_pct": 0.0, "garantia_pct": 0.0})
+    sem = mod_provisoes.provisoes_orcamento(siglas, c_sem, out_forn=300.0, com_venda_pct=1.0)
+    assert com["Cust_Var"] == round(sem["Cust_Var"] + com["Prov_Mont"] + com["Prov_Gar"], 2)
+    assert sem["Prov_Mont"] == 0.0 and sem["Prov_Gar"] == 0.0
+    assert sem["Cust_Var"] == 1570.0 and sem["Marg_Cont"] == 0.215   # idêntico ao mundo pré-fold
+
+
+def test_fold_vavo_zero_e_pct_zero():
+    base = {"CFO": 1000.0, "Val_Liq": 2000.0, "VAVO": 2500.0, "Prov_Imp": 0.0, "Val_Cont": 2600.0}
+    r_zero_vavo = mod_provisoes.provisoes_orcamento(dict(base, VAVO=0.0), _cfg_fold())
+    c0 = _cfg_fold(); c0["provisoes_contabeis"].update({"montagem_pct": 0.0, "garantia_pct": 0.0})
+    r_zero_pct = mod_provisoes.provisoes_orcamento(base, c0, out_forn=300.0, com_venda_pct=1.0)
+    assert r_zero_vavo["Prov_Mont"] == 0.0 and r_zero_vavo["Prov_Gar"] == 0.0   # VAVO 0 → fold 0
+    assert r_zero_pct["Prov_Mont"] == 0.0 and r_zero_pct["Prov_Gar"] == 0.0     # pct 0 → fold 0
+    assert r_zero_pct["Cust_Var"] == 1570.0
+
+
+def test_fold_bate_com_constituicao_contabil():
+    import mod_contabil
+    V = 12345.67   # VAVO "feio"
+    r = mod_provisoes.provisoes_orcamento({"CFO": 0.0, "Val_Liq": 1.0, "VAVO": V, "Prov_Imp": 0.0,
+                                           "Val_Cont": 99999.0}, _cfg_fold())
+    # base VAVO e MESMO arredondamento da constituição no razão (round(VAVO*pct/100, 2))
+    pcts = mod_contabil.pcts_provisao_venda(_cfg_fold())
+    assert r["Prov_Mont"] == round(V * pcts["montagem"] / 100.0, 2)
+    assert r["Prov_Gar"] == round(V * pcts["garantia"] / 100.0, 2)
+
+
+def test_provisoes_base_vavo_todas():
+    # convenção canônica: Montagem/Garantia/Assistência/Frete Local/Insumos Locais → base VAVO
+    siglas = {"CFO": 1000.0, "Val_Liq": 2000.0, "VAVO": 2000.0, "Prov_Imp": 0.0, "Val_Cont": 3000.0}
+    c = mod_provisoes.config_financeira_default()
+    c["provisoes"].update({"assist_pct": 3.0, "frete_loc_pct": 2.0, "ins_loc_pct": 1.0})
+    c["provisoes_contabeis"].update({"montagem_pct": 8.0, "garantia_pct": 0.5})
+    r = mod_provisoes.provisoes_orcamento(siglas, c)
+    assert r["Assist_Orc"] == 60.0      # 3%   × 2000 VAVO
+    assert r["Frete_Loc_Orc"] == 40.0   # 2%   × 2000 VAVO
+    assert r["Ins_Loc_Orc"] == 20.0     # 1%   × 2000 VAVO
+    assert r["Prov_Mont"] == 160.0      # 8%   × 2000 VAVO
+    assert r["Prov_Gar"] == 10.0        # 0,5% × 2000 VAVO
+
+
+def test_cust_var_marg_cont_soma_prov_mont_gar():
+    # o recálculo do Revisa (aprovador editou rubricas) inclui montagem/garantia
+    itens = {"frete_fab": 100.0, "prov_mont": 208.0, "prov_gar": 13.0}   # Σ = 321
+    cv, mc = mod_provisoes.cust_var_marg_cont(cfo=1000.0, val_liq=2000.0, itens=itens)
+    assert cv == 1321.0
+    assert mc == round((2000.0 - 1321.0) / 2000.0, 4)
 
 
 def test_cust_var_marg_cont_recalcula():
