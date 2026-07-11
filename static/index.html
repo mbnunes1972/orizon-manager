@@ -2743,18 +2743,28 @@ function cfgDocumentosRender(){
 // Master (gerir_perfis) cria/edita perfis personalizados (base master/gerencial/operador +
 // módulos/painéis + capacidades finas). Perfis "sistema" (os 3 padrão) são fixos, só leitura.
 // Distinto de "Usuários da loja" (atribui QUEM tem qual perfil).
+let _perfisSubAtivo = 'perfis';   // seletor Perfis | Funções dentro da aba "Perfis de Usuário"
+
 async function adminPerfisCarregar(){
   const box = document.getElementById('loja-panel-perfis'); if(!box) return;
   box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
   const d = await (await fetch('/api/admin/perfis',{credentials:'same-origin'})).json().catch(()=>({}));
   if(!d.ok){ box.innerHTML = '<em style="color:var(--err);font-size:12px">'+esc(d.erro||'Sem acesso.')+'</em>'; return; }
   _perfisAdmin = d;
-  const caps = d.capacidades || {};
-  const rotuloCap = s => (caps[s] && caps[s].rotulo) || s;
-  const opc = d.modulos_opcoes || { dominios: [], paineis: [] };
-  const rotuloMod = {};
-  (opc.dominios || []).forEach(m => rotuloMod[m.id] = m.rotulo);
-  (opc.paineis  || []).forEach(m => rotuloMod[m.id] = m.rotulo);
+  const pill = (id,txt) => '<button onclick="perfisSubTab(\''+id+'\')" style="padding:6px 15px;border-radius:8px;border:1px solid '
+    +(_perfisSubAtivo===id?'var(--accent)':'var(--border)')+';background:'+(_perfisSubAtivo===id?'var(--accent-tint)':'transparent')
+    +';color:'+(_perfisSubAtivo===id?'var(--accent)':'var(--muted)')+';font-family:var(--font-sans);font-weight:700;font-size:12px;cursor:pointer">'+txt+'</button>';
+  box.innerHTML =
+     '<div style="display:flex;gap:8px;margin-bottom:16px">'+pill('perfis','Perfis')+pill('funcoes','Funções')+'</div>'
+    +'<div id="perfis-subcontent"></div>';
+  if(_perfisSubAtivo==='funcoes') _perfisRenderFuncoes(); else _perfisRenderPerfis();
+}
+
+function perfisSubTab(qual){ _perfisSubAtivo = qual; adminPerfisCarregar(); }
+
+function _perfisRenderPerfis(){
+  const box = document.getElementById('perfis-subcontent'); if(!box) return;
+  const d = _perfisAdmin || {};
   const linhas = (d.perfis || []).map(p => {
     const btnEditar = (d.pode_editar && !p.sistema)
       ? '<button class="btn btn-ghost btn-sm" onclick="abrirModalPerfilAcesso(_perfisAdmin.perfis.find(x=>x.slug===\''+p.slug+'\'))">Editar</button>'
@@ -2772,9 +2782,43 @@ async function adminPerfisCarregar(){
     ? ' Perfis <strong style="color:var(--text)">Sistema</strong> são fixos; crie um perfil personalizado para ajustar módulos e capacidades.'
     : ' Somente leitura — só o Master pode criar/editar perfis.';
   box.innerHTML =
-     '<div style="font-size:12px;color:var(--muted);margin-bottom:14px;max-width:760px">Configura <strong style="color:var(--text)">o que cada perfil pode fazer</strong> (módulos/painéis acessíveis e capacidades finas). Distinto de <strong style="color:var(--text)">Usuários da loja</strong>, onde se atribui <strong style="color:var(--text)">quem</strong> tem qual perfil.'+nota+'</div>'
+     '<div style="font-size:12px;color:var(--muted);margin-bottom:14px;max-width:760px">Configura <strong style="color:var(--text)">o que cada perfil pode fazer</strong> (módulos/painéis acessíveis e capacidades finas).'+nota+'</div>'
     + btnNovo
     +'<table class="proj-table" style="width:100%"><thead><tr><th>Perfil</th><th>Tipo</th><th></th></tr></thead><tbody>'+linhas+'</tbody></table>';
+}
+
+// Sub-tela Funções: para cada função (catálogo /api/funcoes) define o perfil de acesso padrão (Mapa de Funções).
+async function _perfisRenderFuncoes(){
+  const box = document.getElementById('perfis-subcontent'); if(!box) return;
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const d = await (await fetch('/api/funcoes',{credentials:'same-origin'})).json().catch(()=>({}));
+  const itens = (d && d.ok && d.itens) ? d.itens : [];
+  const podeEditar = !!(_perfisAdmin && _perfisAdmin.pode_editar);
+  const perfisOpts = (_perfisAdmin && _perfisAdmin.perfis) || [];
+  const nomeDoSlug = {}; perfisOpts.forEach(p => nomeDoSlug[p.slug] = p.nome);
+  const cel = f => {
+    if(!podeEditar){
+      return '<span style="color:'+(f.perfil_padrao?'var(--text)':'var(--muted)')+';font-size:12px">'
+        +esc(f.perfil_padrao ? (nomeDoSlug[f.perfil_padrao]||f.perfil_padrao) : '— nenhum —')+'</span>';
+    }
+    const opts = '<option value="">— nenhum —</option>' + perfisOpts.map(p =>
+      '<option value="'+p.slug+'"'+((f.perfil_padrao||'')===p.slug?' selected':'')+'>'+esc(p.nome)+'</option>').join('');
+    return '<select onchange="salvarFuncaoPerfil('+f.id+',this.value)" style="width:100%;max-width:230px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 11px;color:var(--text);font-size:12px">'+opts+'</select>';
+  };
+  const linhas = itens.filter(f => f.status !== 'inativo').map(f =>
+     '<tr class="proj-row"><td style="padding:9px 12px;color:var(--text);font-weight:500">'+esc(f.nome)+'</td>'
+    +'<td style="padding:9px 12px">'+cel(f)+'</td></tr>').join('')
+    || '<tr><td colspan="2" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma função ativa. Cadastre em Config › Tabela de Funções.</td></tr>';
+  box.innerHTML =
+     '<div style="font-size:12px;color:var(--muted);margin-bottom:14px;max-width:760px">Para cada <strong style="color:var(--text)">função</strong> (cargo), defina o <strong style="color:var(--text)">perfil de acesso padrão</strong> — o papel sugerido ao criar um usuário com essa função. O catálogo vem da Tabela de Funções (Config).</div>'
+    +'<table class="proj-table" style="max-width:640px"><thead><tr><th>Função</th><th style="width:250px">Perfil de acesso padrão</th></tr></thead><tbody>'+linhas+'</tbody></table>';
+}
+
+async function salvarFuncaoPerfil(id, slug){
+  const d = await (await fetch('/api/funcoes/'+id,{method:'POST',credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({perfil_padrao:slug})})).json().catch(()=>({}));
+  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+  showToast('Perfil padrão da função atualizado.', false);
 }
 
 // ── Modal Perfil de acesso (criar/editar) — prefixo "pfa" evita colisão com o modal
