@@ -440,6 +440,30 @@ def _congelar_segmentacao_no_projeto(db, loja_id, projeto_nome):
     return seg
 
 
+def _valores_segmentados_do_projeto(db, loja_id, projeto_nome):
+    """Fonte ÚNICA da segmentação de um projeto p/ a face fiscal (NF-e/NFS-e) e o wiring contábil:
+    Val_Cont do orçamento do contrato + parcelas Mercadoria/Serviço pela segmentação efetiva (congelada
+    na assinatura; override do projeto vence o default da loja). Retorna
+    {val_cont, mercadoria, servico, cfo, orc} ou None se não houver contrato/Val_Cont > 0."""
+    from mod_orcamento_params import resolver_segmentacao, segmentacao_efetiva, segmentar
+    if not loja_id:
+        return None
+    loja = db.get(Loja, loja_id)
+    if loja is None:
+        return None
+    contrato = (db.query(Contrato).filter_by(projeto_nome=projeto_nome).order_by(Contrato.id.desc()).first())
+    orc = db.get(Orcamento, contrato.orcamento_id) if contrato else None
+    val_cont = round(float(getattr(orc, "valor_total", 0) or 0), 2)
+    if val_cont <= 0:
+        return None
+    pj = _projeto_da_loja(db, projeto_nome, loja_id)
+    params = json.loads(pj.parametros_json) if (pj and pj.parametros_json) else {}
+    seg = segmentacao_efetiva(resolver_segmentacao(loja.pct_mercadoria, loja.pct_servico), params)
+    merc, serv = segmentar(val_cont, seg["pct_mercadoria"])
+    return {"val_cont": val_cont, "mercadoria": merc, "servico": serv,
+            "cfo": round(float(getattr(orc, "cfo", 0) or 0), 2), "orc": orc}
+
+
 def _fin_faturamento_segmentado_seguro(loja_id, projeto_nome, segmento, ref_doc):
     """Wiring do faturamento SEGMENTADO (FASE B2). O valor do segmento vem do ORÇAMENTO DO CONTRATO
     (`Val_Cont × segmentação efetiva`, congelada na assinatura), NÃO do valor de face do documento
@@ -449,29 +473,21 @@ def _fin_faturamento_segmentado_seguro(loja_id, projeto_nome, segmento, ref_doc)
         if not loja_id or segmento not in ("mercadoria", "servico"):
             return
         import mod_contabil, mod_tenancy
-        from mod_orcamento_params import resolver_segmentacao, segmentacao_efetiva, segmentar
         db = get_session()
         try:
             loja = db.get(Loja, loja_id)
             if loja is None or not mod_tenancy.modulo_ativo(loja, "financeiro"):
                 return
-            contrato = (db.query(Contrato).filter_by(projeto_nome=projeto_nome)
-                        .order_by(Contrato.id.desc()).first())
-            orc = db.get(Orcamento, contrato.orcamento_id) if contrato else None
-            val_cont = round(float(getattr(orc, "valor_total", 0) or 0), 2)
-            if val_cont <= 0:
+            vals = _valores_segmentados_do_projeto(db, loja_id, projeto_nome)
+            if vals is None:
                 logging.getLogger(__name__).warning(
                     "faturamento segmentado (%s, %s): sem contrato/Val_Cont — nada lançado", projeto_nome, ref_doc)
                 return
-            pj = _projeto_da_loja(db, projeto_nome, loja_id)
-            params = json.loads(pj.parametros_json) if (pj and pj.parametros_json) else {}
-            seg = segmentacao_efetiva(resolver_segmentacao(loja.pct_mercadoria, loja.pct_servico), params)
-            merc, serv = segmentar(val_cont, seg["pct_mercadoria"])
-            valor_seg = merc if segmento == "mercadoria" else serv
+            valor_seg = vals["mercadoria"] if segmento == "mercadoria" else vals["servico"]
             ot, oid = mod_contabil.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
             mod_contabil.faturar_segmento(db, ot, oid, projeto_nome, segmento, valor_seg, ref_base="fat:" + ref_doc)
             if segmento == "mercadoria":
-                cfo = round(float(getattr(orc, "cfo", 0) or 0), 2)
+                cfo = vals["cfo"]
                 if cfo > 0:
                     mod_contabil.registrar_evento(db, ot, oid, "faturamento_cmv", cfo,
                                                   projeto_id=projeto_nome, ref="cmv:" + projeto_nome)
@@ -5731,6 +5747,14 @@ class Handler(BaseHTTPRequestHandler):
                         markup = 0.0   # markup inválido → custo (aceitável: emissão só em homologação por padrão)
                     xml_bytes = storage_ler_binario(os.path.join(_projeto_path(nome_safe), doc.arquivo_path))
                     preview = mod_nfe.preview(xml_bytes, markup)
+                    # FASE B2.3 (T4): alinhar a FACE da NF-e à parcela Mercadoria (pct_merc × Val_Cont) —
+                    # reescala os itens reais da fábrica p/ Σ = parcela Mercadoria (o total é governado pelo
+                    # Val_Cont, já líquido do desconto; markup vira output do rateio). Sem contrato/Val_Cont
+                    # (venda avulsa/teste) → mantém o markup (fallback). ICMS/alíquotas definitivos ficam p/
+                    # a frente Fiscal (contador) — o reescalonamento muda a base por item, é consequência.
+                    _vseg = _valores_segmentados_do_projeto(db, loja_id, nome_safe)
+                    if _vseg is not None:
+                        preview["itens"] = mod_nfe.rescalar_itens_para_total(preview["itens"], _vseg["mercadoria"])
                     ref = "NFE-" + nome_safe + "-" + str(doc.id)
                     data_emissao = datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00")
                     nota = mapa_fiscal.montar_nota(emitente, cliente, preview["itens"], ref, data_emissao)
@@ -5826,7 +5850,11 @@ class Handler(BaseHTTPRequestHandler):
                     ref = "NFSE-%s-%d" % (nome_safe, len(nfse_regs) + 1)
                     data_emissao = datetime.now().strftime("%Y-%m-%dT%H:%M:%S-03:00")
                     discriminacao = req.get("discriminacao") or "Serviço de montagem/instalação de móveis planejados"
-                    nota = mapa_fiscal.montar_nota_nfse(emitente, cliente, round(valor, 2), ref, data_emissao, discriminacao)
+                    # FASE B2.3 (T4): valor da NFS-e = parcela Serviço (pct_serv × Val_Cont), complemento da
+                    # NF-e produto (juntos fecham o Val_Cont). Sem contrato/Val_Cont → mantém o valor informado.
+                    _vseg = _valores_segmentados_do_projeto(db, loja_id, nome_safe)
+                    _valor_nfse = _vseg["servico"] if _vseg is not None else round(valor, 2)
+                    nota = mapa_fiscal.montar_nota_nfse(emitente, cliente, _valor_nfse, ref, data_emissao, discriminacao)
                     res = nfe_emissao.emitir(db, loja_id, nome_safe, nota, tipo_documento="servico",
                                              emitente_id=emitente.id)
                     # NFS-e autorizada conclui a etapa 15, como a NF-e de produto (auditoria A14).

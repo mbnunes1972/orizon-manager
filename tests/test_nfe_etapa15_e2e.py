@@ -618,3 +618,30 @@ def test_wiring_faturamento_lancado_apos_nfe_produto(http_client_factory, seed, 
     assert len(cmv) == 1 and cmv[0]["origem"] == "faturamento_cmv" and cmv[0]["valor"] == 40000.0
     # o evento legado 'faturamento' foi aposentado do wiring (não há lançamento com o ref antigo)
     assert not [l for l in lans if l["ref"] == f"fat:NFE-{proj}-{up['documento_id']}"]
+
+
+def test_face_fiscal_alinhada_a_segmentacao(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
+    """FASE B2.3: a NF-e de produto sai com Σ itens = parcela Mercadoria (pct_merc × Val_Cont) e a
+    NFS-e com valor = parcela Serviço — juntas fecham o Val_Cont, sem duplicar. O markup deixa de
+    governar o total (é output do rateio); o valor informado na NFS-e é ignorado quando há contrato."""
+    emissor = FakeEmissor()   # instância compartilhada p/ capturar as notas emitidas
+    monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: emissor)
+    proj = seed["projeto_l2"]
+    _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    dbx = app_db.get_session()
+    orc = dbx.get(app_db.Orcamento, seed["orcamento_l2_id"])
+    orc.valor_total = 100000.0; orc.cfo = 40000.0
+    dbx.commit(); dbx.close()
+    c = _login(http_client_factory, "dir_l2")
+    _, up = _upload_xml(c, proj, _fixture_xml())
+    st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe",
+                  {"fabrica_doc_id": up["documento_id"], "markup_pct": 30})
+    assert st == 200 and b["status"] == "autorizado", b
+    itens = emissor.nota_recebida["itens"]
+    total_nfe = round(sum(round((it["qCom"] or 0) * (it["preco_venda_unit"] or 0), 2) for it in itens), 2)
+    assert total_nfe == 65000.0     # parcela Mercadoria (65% × Val_Cont, loja default) — não custo×markup
+    # NFS-e: valor = parcela Serviço, ignora o valor informado (35% × Val_Cont)
+    st2, b2 = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfse", {"valor_servico": 999.0})
+    assert st2 == 200 and b2["status"] == "autorizado", b2
+    assert emissor.nota_nfse["servico"]["valor_servicos"] == 35000.0
+    assert round(total_nfe + emissor.nota_nfse["servico"]["valor_servicos"], 2) == 100000.0   # = Val_Cont
