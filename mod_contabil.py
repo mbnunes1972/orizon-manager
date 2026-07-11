@@ -415,23 +415,32 @@ def constituir_provisoes_venda(db, owner_tipo, owner_id, projeto_id, valor_venda
     return out
 
 
-def dashboard_financeiro(db, owner_tipo, owner_id, ini=None, fim=None):
-    """Dashboard do Financeiro (Padrao_Design_Orizon_v4 §5 / Diagramacao_v4 §1.3): um card por
-    provisão que EXISTIR no Plano de Contas (grupo GRUPO_PROVISOES), data-driven — nunca lista fixa
-    de 3. Mais o resumo do DRE e o indicador de cobertura de caixa (v6 §6.1: caixa vs provisões)."""
-    seed_plano(db, owner_tipo, owner_id)
-    contas_prov = (db.query(Conta)
-                   .filter_by(owner_tipo=owner_tipo, owner_id=owner_id, tipo="analitica")
-                   .filter(Conta.codigo.like(GRUPO_PROVISOES + ".%"))
-                   .order_by(Conta.codigo).all())
-    provs = []
-    for c in contas_prov:
+def contas_provisao_do_plano(db, owner_tipo, owner_id, ini=None, fim=None):
+    """Contas ANALÍTICAS do grupo de Provisões (GRUPO_PROVISOES) presentes no plano, data-driven,
+    cada uma com o saldo EM ABERTO. Exclui as de tratamento próprio (_PROV_PAINEL_EXCLUI). Fonte
+    única do painel de Provisões (dashboard) e reusável (individualização por projeto, etc.).
+    Assume o plano já semeado (o dashboard chama seed_plano antes)."""
+    contas = (db.query(Conta)
+              .filter_by(owner_tipo=owner_tipo, owner_id=owner_id, tipo="analitica")
+              .filter(Conta.codigo.like(GRUPO_PROVISOES + ".%"))
+              .order_by(Conta.codigo).all())
+    out = []
+    for c in contas:
         if c.codigo in _PROV_PAINEL_EXCLUI:
             continue
-        saldo = saldo_conta(db, owner_tipo, owner_id, c.id, ini, fim)
-        provs.append({"codigo": c.codigo, "nome": c.nome,
-                      "sub": _PROV_PAINEL_SUB.get(c.codigo, "Saldo provisionado em aberto"),
-                      "saldo_em_aberto": saldo})
+        out.append({"codigo": c.codigo, "nome": c.nome,
+                    "sub": _PROV_PAINEL_SUB.get(c.codigo, "Saldo provisionado em aberto"),
+                    "saldo_em_aberto": saldo_conta(db, owner_tipo, owner_id, c.id, ini, fim)})
+    return out
+
+
+def dashboard_financeiro(db, owner_tipo, owner_id, ini=None, fim=None):
+    """Dashboard do Financeiro (Padrao_Design_Orizon_v4 §5 / Diagramacao_v4 §1.3): um card por
+    provisão que EXISTIR no Plano de Contas (grupo GRUPO_PROVISOES), data-driven (via
+    contas_provisao_do_plano) — nunca lista fixa de 3. Mais o resumo do DRE e o indicador de
+    cobertura de caixa (v6 §6.1: caixa vs provisões)."""
+    seed_plano(db, owner_tipo, owner_id)
+    provs = contas_provisao_do_plano(db, owner_tipo, owner_id, ini, fim)
     total_prov = round(sum(p["saldo_em_aberto"] for p in provs), 2)
     d = dre(db, owner_tipo, owner_id, ini, fim)
     caixa_c = db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, codigo="1.1.01").first()
