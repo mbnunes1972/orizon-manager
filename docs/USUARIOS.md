@@ -12,24 +12,24 @@
 > (cargo, tabela `Funcao`, herdada do Funcionário) × **Escopo de visibilidade** (posse do projeto +
 > Mapa de Atribuições). Ver `docs/superpowers/specs/2026-07-10-fase1-mapa-atribuicoes-escopo.md`.
 
-## Perfis e permissões
+> **Perfil-4 (rev2 §2):** Perfil = **nível de ACESSO** (não é cargo). São **4 perfis de loja**
+> definidos por acesso a módulo/painel; os cargos antigos (Diretor, Medidor, …) viraram **Função**
+> (tabela `Funcao`, em Config › Funções). Ver a matriz viva em **Admin › Perfis de Usuário**.
 
-| Perfil | Desc. máx | Ver parâmetros | Autorizar desconto | Gerir usuários |
-|---|---|---|---|---|
-| Diretor | 50% | sim | sim | sim |
-| Gerente de Vendas | 20% | sim | sim | não |
-| Consultor | 10% | não | não | não |
-| Gerente Administrativo/Financeiro | 0% | sim | não | sim |
-| Assistente Logístico | 0% | não | não | não |
-| Conferente | 0% | não | não | não |
-| Supervisor de Montagem | 0% | não | não | não |
-| Assistente Administrativo | 0% | não | não | não |
-| Projetista Executivo | 0% | não | não | não |
-| Medidor | 0% | não | não | não |
+## Perfis de acesso (4 níveis) — matriz por módulo/painel
 
-(Slugs internos: `diretor`, `gerente_vendas`, `consultor`, `gerente_adm_fin`,
-`assistente_logistico`, `conferente`, `supervisor_montagem`,
-`assistente_administrativo`, `projetista_executivo`, `medidor`.)
+| Perfil (slug) | Desc. máx | Operacional | Financeiro/Folha | Fiscal | Painel Admin | Painel Config |
+|---|---|---|---|---|---|---|
+| Diretoria (`diretoria`) | 50% | sim | sim | sim | sim | sim |
+| Gerencial (`gerencial`) | 20% | sim | não | não | sim | sim |
+| Consultor (`consultor`) | 10% | sim | não | não | não | não |
+| Suporte (`suporte`) | 0% | não | não | não | sim | sim |
+
+*Operacionais = captacao, cadastro, comercial, producao, estoque, expedicao, montagem, assistencias.*
+Capacidades operacionais (autorizar, aprovar_financeiro, executar_pe, registrar_medicao, …) mapeadas
+de forma grosseira aos 4 perfis para não quebrar os gates — a precisão fina por **Função** é frente
+posterior. Migração `perfis_v3_2026`: diretor→Diretoria, gerente_vendas→Gerencial, gerente_adm_fin→
+Diretoria, consultor→Consultor, demais cargos→Consultor (o cargo antigo vira a Função da conta).
 
 ## Perfis administrativos de tenancy (F2 multi-tenant)
 

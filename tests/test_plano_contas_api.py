@@ -35,8 +35,7 @@ def test_remover_folha(http_client_factory, seed, app_db):
 
 
 def test_sem_capability_barra_mutacao(http_client_factory, seed, app_db):
-    c = http_client_factory(); c.login("cons_l1", "senha123")   # consultor: sem aprovar_financeiro/editar_dados_loja
-    _, d = c.get("/api/financeiro/contas")                        # GET ok (autenticado)
-    g = d["contas"][0]
-    st, _ = c.post("/api/financeiro/contas", {"pai_id": g["id"], "nome": "X"})
-    assert st == 403
+    # Perfil-4 (rev2 §2): Consultor NÃO acessa o módulo Financeiro (nem leitura nem escrita) → 403.
+    c = http_client_factory(); c.login("cons_l1", "senha123")
+    assert c.get("/api/financeiro/contas")[0] == 403
+    assert c.post("/api/financeiro/contas", {"pai_id": 1, "nome": "X"})[0] == 403

@@ -83,12 +83,17 @@ def handle_auth_get(handler, path: str) -> bool:
                 usuario["lojas"] = lojas
                 usuario["loja_ativa_id"] = usuario.get("loja_id")
                 # módulos ativos da loja ativa (topologia) — default tudo-ligado se sem loja/config
-                import mod_tenancy, modulos as _mod
+                import mod_tenancy, modulos as _mod, perfis as _perfis
                 _lid = usuario.get("loja_ativa_id") or usuario.get("loja_id")
                 _loja_ativa = db.get(Loja, _lid) if _lid else None
-                usuario["modulos_ativos"] = sorted(
-                    mod_tenancy.modulos_ativos_da_loja(_loja_ativa)
-                    if _loja_ativa else _mod.DOMINIOS)
+                _ativos = (mod_tenancy.modulos_ativos_da_loja(_loja_ativa)
+                           if _loja_ativa else set(_mod.DOMINIOS))
+                # Perfil-4 (rev2 §2): o hub reflete os módulos que o PERFIL acessa (matriz), além dos
+                # ativos na loja. Painéis Admin/Config idem (flags p/ o front esconder a navegação).
+                _niv = usuario.get("nivel")
+                usuario["modulos_ativos"] = sorted(m for m in _ativos if _perfis.acessa_modulo(_niv, m))
+                usuario["acessa_admin"] = _perfis.acessa_painel(_niv, "admin")
+                usuario["acessa_config"] = _perfis.acessa_painel(_niv, "config")
                 usuario["hub"] = _mod.hub_layout(usuario["modulos_ativos"])
             finally:
                 db.close()

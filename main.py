@@ -327,6 +327,9 @@ def _contabil_ctx(handler, exige_edicao):
     if not usuario:
         handler.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return None
     db = get_session()
+    # Perfil-4 (rev2 §2): só perfis com acesso ao Financeiro abrem o módulo (Diretoria).
+    if not perfis.acessa_modulo(usuario.get("nivel"), "financeiro"):
+        db.close(); handler.send_json({"ok": False, "erro": "Sem acesso ao módulo Financeiro."}, code=403); return None
     loja = db.get(Loja, usuario.get("loja_id")) if usuario.get("loja_id") else None
     if loja is not None and not mod_tenancy.modulo_ativo(loja, "financeiro"):
         db.close(); handler.send_json({"ok": False, "erro": "Módulo financeiro inativo."}, code=403); return None
@@ -628,6 +631,8 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            if _sem_acesso_modulo(usuario, "folha"):
+                self.send_json({"ok": False, "erro": "Sem acesso ao módulo Folha."}, code=403); return
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -997,17 +1002,21 @@ class Handler(BaseHTTPRequestHandler):
                     for uid, lid in db.query(UsuarioLoja.usuario_id, UsuarioLoja.loja_id).filter(
                             UsuarioLoja.usuario_id.in_(vis_ids)).all():
                         memb.setdefault(uid, []).append(lid)
-                # Função (Modulos_Orizon_v12): herdada do Funcionário vinculado (funcionario_id →
-                # Funcionario.funcao_id → Funcao.nome), NÃO duplicada no Usuário. Perfil = nivel (acesso).
+                # Função (cargo) = do Funcionário vinculado (funcionario_id → Funcao); para contas SEM
+                # Funcionário, cai em Usuario.funcao_id (Perfil-4: cargo migrado do nível antigo).
+                # Perfil = nivel (acesso). Os dois eixos separados.
                 func_ids = {u.funcionario_id for u in visiveis if u.funcionario_id}
                 funcs = {f.id: f for f in db.query(Funcionario).filter(Funcionario.id.in_(func_ids)).all()} \
                     if func_ids else {}
-                funcao_ids = {f.funcao_id for f in funcs.values() if f.funcao_id}
+                funcao_ids = {f.funcao_id for f in funcs.values() if f.funcao_id} \
+                    | {u.funcao_id for u in visiveis if u.funcao_id}
                 funcoes_map = {fn.id: fn.nome for fn in db.query(Funcao).filter(Funcao.id.in_(funcao_ids)).all()} \
                     if funcao_ids else {}
                 def _funcao_nome(u):
                     f = funcs.get(u.funcionario_id) if u.funcionario_id else None
-                    return funcoes_map.get(f.funcao_id, "") if (f and f.funcao_id) else ""
+                    if f and f.funcao_id:
+                        return funcoes_map.get(f.funcao_id, "")
+                    return funcoes_map.get(u.funcao_id, "") if u.funcao_id else ""
                 self.send_json({"ok": True, "usuarios": [
                     {"id": u.id, "nome": u.nome, "login": u.login, "nivel": u.nivel,
                      "rotulo": perfis.rotulo(u.nivel), "telefone": u.telefone or "",
@@ -2030,6 +2039,8 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                if _sem_acesso_modulo(usuario, "fiscal"):   # Perfil-4: só Diretoria abre Fiscal
+                    self.send_json({"ok": False, "erro": "Sem acesso ao módulo Fiscal."}, code=403); return
                 db = get_session()
                 try:
                     ator = _ator_dict(db, usuario)
@@ -7291,6 +7302,11 @@ def _bloqueio_comercial(ator):
     if mod_escopo.visao_do_papel(ator) == "operacional":
         return "Sem acesso ao comercial (visão operacional)."
     return None
+
+
+def _sem_acesso_modulo(usuario, modulo_id):
+    """True se o PERFIL do usuário não acessa o módulo (Perfil-4 rev2 §2, matriz de acesso)."""
+    return not perfis.acessa_modulo((usuario or {}).get("nivel"), modulo_id)
 
 
 # Etapa do ciclo → papel operacional do Mapa (Regras §7). O Mapa é o default do responsável da fase.

@@ -2327,10 +2327,11 @@ async function carregarUsuarioAutenticado(){
     const _idsValidos = _lojas.map(l => l.id);
     _lojaAtiva = (_salva && _idsValidos.indexOf(_salva) !== -1)
       ? _salva : (_usuarioAtual.loja_ativa_id || null);
+    // Perfil-4 (rev2 §2): navegação Admin/Config pela matriz de acesso do perfil (acessa_admin/config).
     const _navAdmin = document.getElementById('nav-07');
-    if (_navAdmin) _navAdmin.style.display =
-      (_usuarioAtual && (_usuarioAtual.pode_gerir_usuarios
-        || _usuarioAtual.pode_gerir_redes || _usuarioAtual.pode_gerir_lojas)) ? '' : 'none';
+    if (_navAdmin) _navAdmin.style.display = (_usuarioAtual && _usuarioAtual.acessa_admin) ? '' : 'none';
+    const _navCfg = document.getElementById('nav-cfg');
+    if (_navCfg) _navCfg.style.display = (_usuarioAtual && _usuarioAtual.acessa_config) ? '' : 'none';
     _aplicarModulosNoMenu();
     sbNavRender();               // monta o acordeão dos módulos (usa _usuarioAtual.hub)
     carregarConsultores();       // seletor de consultor (criação/edição); só gerente+ atribui
