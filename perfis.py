@@ -9,43 +9,43 @@ Ao adicionar/alterar um perfil, atualize TAMBÉM docs/USUARIOS.md.
 # daqui e viraram Função (tabela Funcao). Capacidades operacionais mapeadas de forma grosseira p/ não
 # quebrar os gates vigentes; a precisão fina por Função é frente posterior.
 PERFIS = {
-    "diretoria": {"rotulo": "Diretoria", "desconto_max": 50.0,
+    "master": {"rotulo": "Master", "desconto_max": 50.0,
         "acesso_operacional": True, "acesso_financeiro": True, "acesso_fiscal": True,
         "acesso_admin": True, "acesso_config": True,
         "ver_parametros": True, "autorizar": True, "aprovar_financeiro": True,
-        "aprovar_medicao_reprovada": True, "gerir_usuarios": True, "editar_dados_loja": True,
-        "executar_pe": True, "revisar_pe": True, "registrar_medicao": True},
+        "aprovar_medicao_reprovada": True, "gerir_usuarios": True, "gerir_perfis": True,
+        "editar_dados_loja": True, "executar_pe": True, "revisar_pe": True, "registrar_medicao": True},
     "gerencial": {"rotulo": "Gerencial", "desconto_max": 20.0,
-        "acesso_operacional": True, "acesso_financeiro": False, "acesso_fiscal": False,
-        "acesso_admin": True, "acesso_config": True,
-        "ver_parametros": True, "autorizar": True, "aprovar_financeiro": False,
-        "aprovar_medicao_reprovada": True, "gerir_usuarios": True, "editar_dados_loja": True,
-        "executar_pe": True, "revisar_pe": True, "registrar_medicao": True},
-    "consultor": {"rotulo": "Consultor", "desconto_max": 10.0,
-        "acesso_operacional": True, "acesso_financeiro": False, "acesso_fiscal": False,
+        "acesso_operacional": True, "acesso_financeiro": True, "acesso_fiscal": True,
+        "acesso_admin": False, "acesso_config": False,
+        "ver_parametros": True, "autorizar": True, "aprovar_financeiro": True,
+        "aprovar_medicao_reprovada": True, "gerir_usuarios": False, "gerir_perfis": False,
+        "editar_dados_loja": False, "executar_pe": True, "revisar_pe": True, "registrar_medicao": True},
+    "operador": {"rotulo": "Operador", "desconto_max": 10.0,
+        "acesso_operacional": True, "acesso_financeiro": False, "acesso_fiscal": True,
         "acesso_admin": False, "acesso_config": False,
         "ver_parametros": False, "autorizar": False, "aprovar_financeiro": False,
-        "aprovar_medicao_reprovada": False, "gerir_usuarios": False, "editar_dados_loja": False,
-        "executar_pe": True, "revisar_pe": False, "registrar_medicao": True},
-    "suporte": {"rotulo": "Suporte", "desconto_max": 0.0,
-        "acesso_operacional": False, "acesso_financeiro": False, "acesso_fiscal": False,
-        "acesso_admin": True, "acesso_config": True,
-        "ver_parametros": False, "autorizar": False, "aprovar_financeiro": False,
-        "aprovar_medicao_reprovada": False, "gerir_usuarios": True, "editar_dados_loja": True,
-        "executar_pe": False, "revisar_pe": False, "registrar_medicao": False},
-    # ── Plataforma/Rede (fora dos 4 de loja) — inalterados no papel; ganham só os acesso_* de painel ──
+        "aprovar_medicao_reprovada": False, "gerir_usuarios": False, "gerir_perfis": False,
+        "editar_dados_loja": False, "executar_pe": True, "revisar_pe": False, "registrar_medicao": True},
+    # ── Plataforma/Rede (fora dos perfis de loja; NÃO entram na tabela perfil_acesso) ──
     "super_admin": {"rotulo": "Administrador da Plataforma", "desconto_max": 0.0,
         "acesso_operacional": False, "acesso_financeiro": False, "acesso_fiscal": False,
         "acesso_admin": True, "acesso_config": True,
-        "gerir_usuarios": True, "editar_dados_loja": True, "gerir_redes": True, "gerir_lojas": True},
+        "gerir_usuarios": True, "gerir_perfis": True, "editar_dados_loja": True,
+        "gerir_redes": True, "gerir_lojas": True},
     "admin_rede": {"rotulo": "Administrador de Rede", "desconto_max": 0.0,
         "acesso_operacional": False, "acesso_financeiro": False, "acesso_fiscal": False,
         "acesso_admin": True, "acesso_config": True,
-        "gerir_usuarios": True, "editar_dados_loja": True, "gerir_redes": False, "gerir_lojas": True},
+        "gerir_usuarios": True, "gerir_perfis": False, "editar_dados_loja": True,
+        "gerir_redes": False, "gerir_lojas": True},
 }
 
+# Compat: slugs antigos ainda referenciados por dados residuais resolvem para a base equivalente.
+_ALIAS_BASE = {"diretoria": "master", "consultor": "operador", "suporte": "operador"}
+
 _DEFAULT = {"rotulo": "—", "desconto_max": 0.0, "ver_parametros": False,
-            "autorizar": False, "gerir_usuarios": False, "aprovar_financeiro": False,
+            "autorizar": False, "gerir_usuarios": False, "gerir_perfis": False,
+            "aprovar_financeiro": False,
             "registrar_medicao": False, "aprovar_medicao_reprovada": False,
             "gerir_redes": False, "gerir_lojas": False, "editar_dados_loja": False,
             "executar_pe": False, "revisar_pe": False,
@@ -98,12 +98,19 @@ def rotulo(slug):
     return PERFIS.get(slug, _DEFAULT)["rotulo"]
 
 
-def desconto_max(slug):
-    return PERFIS.get(slug, _DEFAULT)["desconto_max"]
+def _base(slug):
+    """Resolve o slug para a BASE de capacidades finas (master/gerencial/operador/plataforma)."""
+    if slug in PERFIS:
+        return slug
+    return _ALIAS_BASE.get(slug, slug)   # Task 5 sobrescreve p/ consultar o registro DB
 
 
 def pode(slug, capacidade):
-    return bool(PERFIS.get(slug, _DEFAULT).get(capacidade, False))
+    return bool(PERFIS.get(_base(slug), _DEFAULT).get(capacidade, False))
+
+
+def desconto_max(slug):
+    return PERFIS.get(_base(slug), _DEFAULT)["desconto_max"]
 
 
 # Metadados legíveis das capacidades — dão nome/descrição aos slugs para a tela Admin › Perfis de
@@ -128,6 +135,8 @@ CAPACIDADES = {
         "descricao": "Aprovar os gates financeiros e liberar impostos."},
     "gerir_usuarios":            {"rotulo": "Gerir usuários",             "grupo": "Administração",
         "descricao": "Criar/editar contas de usuário da loja."},
+    "gerir_perfis":              {"rotulo": "Gerir perfis de acesso", "grupo": "Administração",
+        "descricao": "Criar/editar perfis de acesso da loja (só Master)."},
     "registrar_medicao":         {"rotulo": "Registrar medição",          "grupo": "Execução",
         "descricao": "Lançar a medição in loco (Medidor)."},
     "aprovar_medicao_reprovada": {"rotulo": "Aprovar medição reprovada",  "grupo": "Execução",
