@@ -112,3 +112,36 @@ def test_soma_receitas_igual_val_cont_via_orquestrador(app_db):
     mc.faturar_segmento(db, ot, oid, "P", "servico", serv, ref_base="fat:NFSE-P-1")
     assert round(_saldo(db, ot, oid, "4.1.01") + _saldo(db, ot, oid, "4.2.01"), 2) == round(val_cont, 2)
     db.close()
+
+
+# ── Congelamento da segmentação na assinatura (A6) ────────────────────────────────────────────
+def test_congelar_segmentacao_grava_default_da_loja(app_db):
+    import json as _j, main
+    from database import Loja, Projeto
+    db = app_db.get_session()
+    lj = Loja(nome="Loja Cong 1", pct_mercadoria=65.0, pct_servico=35.0)
+    db.add(lj); db.flush()
+    db.add(Projeto(nome_safe="Proj_Cong_1", loja_id=lj.id, status="quente")); db.commit()
+    seg = main._congelar_segmentacao_no_projeto(db, lj.id, "Proj_Cong_1")
+    db.commit()
+    assert seg == {"pct_mercadoria": 65.0, "pct_servico": 35.0}
+    par = _j.loads(db.query(Projeto).filter_by(nome_safe="Proj_Cong_1").first().parametros_json)
+    assert par["pct_mercadoria"] == 65.0 and par["pct_servico"] == 35.0
+    db.close()
+
+
+def test_congelar_segmentacao_override_vence_e_preserva_params(app_db):
+    import json as _j, main
+    from database import Loja, Projeto
+    db = app_db.get_session()
+    lj = Loja(nome="Loja Cong 2", pct_mercadoria=65.0, pct_servico=35.0)
+    db.add(lj); db.flush()
+    db.add(Projeto(nome_safe="Proj_Cong_2", loja_id=lj.id, status="quente",
+                   parametros_json=_j.dumps({"pct_mercadoria": 80.0, "pct_servico": 20.0, "carga_trib": 9.0})))
+    db.commit()
+    seg = main._congelar_segmentacao_no_projeto(db, lj.id, "Proj_Cong_2")
+    db.commit()
+    assert seg == {"pct_mercadoria": 80.0, "pct_servico": 20.0}   # override do projeto vence a loja
+    par = _j.loads(db.query(Projeto).filter_by(nome_safe="Proj_Cong_2").first().parametros_json)
+    assert par["carga_trib"] == 9.0                               # não apaga os demais parâmetros
+    db.close()

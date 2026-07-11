@@ -422,6 +422,69 @@ def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
         logging.getLogger(__name__).warning("wiring provisões da venda (ref=%s) falhou: %s", ref_base, e)
 
 
+def _congelar_segmentacao_no_projeto(db, loja_id, projeto_nome):
+    """FASE B2 (A6): congela a segmentação Mercadoria × Serviço EFETIVA (override do projeto vence o
+    default da loja) no `parametros_json` do projeto — chamado na assinatura. Depois disso NF-e e NFS-e
+    leem os MESMOS percentuais, imunes a mudança do default da loja. Retorna o par congelado ou None
+    (loja/projeto ausente). NÃO commita (o chamador decide) e preserva os demais parâmetros."""
+    from mod_orcamento_params import resolver_segmentacao, segmentacao_efetiva
+    lj = db.get(Loja, loja_id) if loja_id else None
+    pj = _projeto_da_loja(db, projeto_nome, loja_id)
+    if lj is None or pj is None:
+        return None
+    par = json.loads(pj.parametros_json) if pj.parametros_json else {}
+    seg = segmentacao_efetiva(resolver_segmentacao(lj.pct_mercadoria, lj.pct_servico), par)
+    par["pct_mercadoria"] = seg["pct_mercadoria"]
+    par["pct_servico"]    = seg["pct_servico"]
+    pj.parametros_json = json.dumps(par, ensure_ascii=False)
+    return seg
+
+
+def _fin_faturamento_segmentado_seguro(loja_id, projeto_nome, segmento, ref_doc):
+    """Wiring do faturamento SEGMENTADO (FASE B2). O valor do segmento vem do ORÇAMENTO DO CONTRATO
+    (`Val_Cont × segmentação efetiva`, congelada na assinatura), NÃO do valor de face do documento
+    fiscal. No segmento 'mercadoria' também reconhece o CMV = **CFO** congelado (1× por projeto, ref
+    `cmv:<projeto>`). **Fail-soft/isolado/idempotente**, como `_fin_evento_seguro`."""
+    try:
+        if not loja_id or segmento not in ("mercadoria", "servico"):
+            return
+        import mod_contabil, mod_tenancy
+        from mod_orcamento_params import resolver_segmentacao, segmentacao_efetiva, segmentar
+        db = get_session()
+        try:
+            loja = db.get(Loja, loja_id)
+            if loja is None or not mod_tenancy.modulo_ativo(loja, "financeiro"):
+                return
+            contrato = (db.query(Contrato).filter_by(projeto_nome=projeto_nome)
+                        .order_by(Contrato.id.desc()).first())
+            orc = db.get(Orcamento, contrato.orcamento_id) if contrato else None
+            val_cont = round(float(getattr(orc, "valor_total", 0) or 0), 2)
+            if val_cont <= 0:
+                logging.getLogger(__name__).warning(
+                    "faturamento segmentado (%s, %s): sem contrato/Val_Cont — nada lançado", projeto_nome, ref_doc)
+                return
+            pj = _projeto_da_loja(db, projeto_nome, loja_id)
+            params = json.loads(pj.parametros_json) if (pj and pj.parametros_json) else {}
+            seg = segmentacao_efetiva(resolver_segmentacao(loja.pct_mercadoria, loja.pct_servico), params)
+            merc, serv = segmentar(val_cont, seg["pct_mercadoria"])
+            valor_seg = merc if segmento == "mercadoria" else serv
+            ot, oid = mod_contabil.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+            mod_contabil.faturar_segmento(db, ot, oid, projeto_nome, segmento, valor_seg, ref_base="fat:" + ref_doc)
+            if segmento == "mercadoria":
+                cfo = round(float(getattr(orc, "cfo", 0) or 0), 2)
+                if cfo > 0:
+                    mod_contabil.registrar_evento(db, ot, oid, "faturamento_cmv", cfo,
+                                                  projeto_id=projeto_nome, ref="cmv:" + projeto_nome)
+                else:
+                    logging.getLogger(__name__).warning(
+                        "faturamento_cmv (%s): CFO ausente/zero — CMV não lançado", projeto_nome)
+        finally:
+            db.close()
+    except Exception as e:
+        logging.getLogger(__name__).warning(
+            "wiring faturamento segmentado (%s, %s, ref=%s) falhou: %s", segmento, projeto_nome, ref_doc, e)
+
+
 _REQ_LOJA_ATIVA = None   # header X-Loja-Ativa da requisição atual (HTTPServer single-thread)
 
 def _ler_loja_ativa_header(handler):
@@ -4979,6 +5042,15 @@ class Handler(BaseHTTPRequestHandler):
                         except Exception as _ec:
                             db.rollback()
                             print("[CRONOGRAMA] gerar_cronograma_projeto falhou:", _ec)
+                        # FASE B2 (A6): congela a segmentação Mercadoria × Serviço efetiva no projeto.
+                        # A partir da assinatura, NF-e e NFS-e leem os MESMOS percentuais (imune a mudança
+                        # do default da loja entre os dois documentos). Sem migração; grava no JSON existente.
+                        try:
+                            if _congelar_segmentacao_no_projeto(db, loja_id, nome_safe) is not None:
+                                db.commit()
+                        except Exception as _eseg:
+                            db.rollback()
+                            print("[SEGMENTACAO] congelar na assinatura falhou:", _eseg)
                         try:
                             upsert_projeto_status(nome_safe, "fechado")
                         except Exception as _e:
@@ -5666,9 +5738,9 @@ class Handler(BaseHTTPRequestHandler):
                                              emitente_id=emitente.id, fabrica_doc_id=doc.id)
                     if res.status.value == "autorizado":
                         _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
-                        # wiring: NF-e produto autorizada = faturamento (D Contas a Receber / C Receita)
-                        _fin_evento_seguro(loja_id, "faturamento", preview.get("totais", {}).get("venda_total"),
-                                           nome_safe, "fat:" + ref)
+                        # wiring: NF-e produto autorizada = faturamento da MERCADORIA (4.1.01) + CMV=CFO
+                        # (FASE B2, receita segmentada — valor contábil = parcela Mercadoria do Val_Cont).
+                        _fin_faturamento_segmentado_seguro(loja_id, nome_safe, "mercadoria", ref)
                     reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
                     self.send_json({"ok": True, "ref": ref,
                                     "status": res.status.value, "chave": res.chave, "numero": res.numero,
@@ -5760,8 +5832,9 @@ class Handler(BaseHTTPRequestHandler):
                     # NFS-e autorizada conclui a etapa 15, como a NF-e de produto (auditoria A14).
                     if res.status.value == "autorizado":
                         _set_etapa_status(db, nome_safe, "15", "emitida", usuario["id"]); db.commit()
-                        # wiring: NFS-e (serviço) autorizada = faturamento de serviço
-                        _fin_evento_seguro(loja_id, "faturamento", round(valor, 2), nome_safe, "fat:" + ref)
+                        # wiring: NFS-e (serviço) autorizada = faturamento do SERVIÇO (4.2.01)
+                        # (FASE B2 — valor contábil = parcela Serviço do Val_Cont, não o valor de face).
+                        _fin_faturamento_segmentado_seguro(loja_id, nome_safe, "servico", ref)
                     reg = db.query(DocumentoFiscal).filter_by(ref=ref).first()
                     self.send_json({"ok": True, "ref": ref,
                                     "status": res.status.value, "chave": res.chave, "numero": res.numero,

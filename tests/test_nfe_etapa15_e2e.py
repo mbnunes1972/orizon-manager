@@ -589,19 +589,32 @@ def test_emitir_nfse_processando_idempotente(http_client_factory, seed, app_db, 
 
 
 def test_wiring_faturamento_lancado_apos_nfe_produto(http_client_factory, seed, app_db, projetos_dir, monkeypatch):
-    """Wiring #3: NF-e de produto autorizada gera um lançamento de `faturamento` no livro (idempotente por ref)."""
+    """Wiring FASE B2: NF-e de produto autorizada lança a receita da MERCADORIA (4.1.01, segmentada do
+    Val_Cont) + o CMV = CFO (5.1.01×2.1.04.06), idempotentes por ref. Sem adiantamento prévio → a
+    parcela Mercadoria vai como 'a receber'. O evento legado `faturamento` NÃO é mais emitido no wiring."""
     monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissor())
     proj = seed["projeto_l2"]
     _reset15(app_db, proj); _perfil(app_db, seed["loja2_id"])
+    # O wiring segmentado lê Val_Cont/CFO do orçamento do contrato (loja default 65/35 sem override).
+    dbx = app_db.get_session()
+    orc = dbx.get(app_db.Orcamento, seed["orcamento_l2_id"])
+    orc.valor_total = 100000.0; orc.cfo = 40000.0
+    dbx.commit(); dbx.close()
     c = _login(http_client_factory, "dir_l2")
     _, up = _upload_xml(c, proj, _fixture_xml())
     st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe",
                   {"fabrica_doc_id": up["documento_id"], "markup_pct": 30})
     assert st == 200 and b["status"] == "autorizado", b
-    # o wiring (fail-soft, idempotente por ref) lança o faturamento DESTA emissão.
-    # app_db é module-scoped (outras emissões do módulo também lançam) -> checar o ref específico.
-    esperado_ref = f"fat:NFE-{proj}-{up['documento_id']}"
     st2, d = c.get(f"/api/financeiro/lancamentos?projeto={proj}")
     assert st2 == 200, d
-    fats = [l for l in d["lancamentos"] if l["ref"] == esperado_ref]
-    assert len(fats) == 1 and fats[0]["origem"] == "faturamento" and fats[0]["valor"] > 0
+    lans = d["lancamentos"]
+    # receita da mercadoria = 65% × Val_Cont (loja default), como 'a receber' (sem adiantamento)
+    ref_merc = f"fat:NFE-{proj}-{up['documento_id']}:areceber"
+    merc = [l for l in lans if l["ref"] == ref_merc]
+    assert len(merc) == 1 and merc[0]["origem"] == "faturamento_mercadoria_a_receber"
+    assert merc[0]["valor"] == 65000.0
+    # CMV = CFO congelado, 1× por projeto
+    cmv = [l for l in lans if l["ref"] == f"cmv:{proj}"]
+    assert len(cmv) == 1 and cmv[0]["origem"] == "faturamento_cmv" and cmv[0]["valor"] == 40000.0
+    # o evento legado 'faturamento' foi aposentado do wiring (não há lançamento com o ref antigo)
+    assert not [l for l in lans if l["ref"] == f"fat:NFE-{proj}-{up['documento_id']}"]
