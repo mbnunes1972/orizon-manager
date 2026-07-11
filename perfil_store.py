@@ -41,6 +41,7 @@ def perfis_da_loja(db, loja_id):
 
 
 def criar_perfil(db, loja_id, nome, base, modulos, capacidades=None):
+    base = base or "operador"   # 'base' é detalhe interno (fonte do desconto_max, diferido); não aparece na UI
     ok, err = mod_perfis.validar_nome(nome)
     if not ok: return None, err
     ok, err = mod_perfis.validar_base(base)
