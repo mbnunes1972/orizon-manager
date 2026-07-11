@@ -275,6 +275,23 @@ def _parse_multipart_arquivos(body, ct):
     return arquivos, campos
 
 
+_STEPUP_GRANTS = {}   # {(token, recurso): expira_em_epoch}
+_STEPUP_TTL = 30 * 60
+
+
+def _stepup_conceder(token, recurso):
+    _STEPUP_GRANTS[(token, recurso)] = time.time() + _STEPUP_TTL
+
+
+def _stepup_valido(token, recurso):
+    exp = _STEPUP_GRANTS.get((token, recurso))
+    if exp and exp > time.time():
+        return True
+    if exp:
+        _STEPUP_GRANTS.pop((token, recurso), None)
+    return False
+
+
 def _usuario_com_capacidade(db, login, senha, capacidade):
     """Usuario ativo com senha correta e a capacidade dada (perfis), ou None."""
     u = db.query(Usuario).filter_by(login=(login or "").strip()).first()
@@ -328,8 +345,8 @@ def _contabil_ctx(handler, exige_edicao):
         handler.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return None
     db = get_session()
     # Perfil-4 (rev2 §2): só perfis com acesso ao Financeiro abrem o módulo (Diretoria).
-    if not perfis.acessa_modulo(usuario.get("nivel"), "financeiro"):
-        db.close(); handler.send_json({"ok": False, "erro": "Sem acesso ao módulo Financeiro."}, code=403); return None
+    if _sem_acesso_modulo(usuario, "financeiro", handler=handler):
+        db.close(); handler.send_json({"ok": False, "erro": "Sem acesso ao módulo Financeiro.", "precisa_stepup": "financeiro"}, code=403); return None
     loja = db.get(Loja, usuario.get("loja_id")) if usuario.get("loja_id") else None
     if loja is not None and not mod_tenancy.modulo_ativo(loja, "financeiro"):
         db.close(); handler.send_json({"ok": False, "erro": "Módulo financeiro inativo."}, code=403); return None
@@ -638,8 +655,8 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-            if _sem_acesso_modulo(usuario, "folha"):
-                self.send_json({"ok": False, "erro": "Sem acesso ao módulo Folha."}, code=403); return
+            if _sem_acesso_modulo(usuario, "folha", handler=self):
+                self.send_json({"ok": False, "erro": "Sem acesso ao módulo Folha.", "precisa_stepup": "folha"}, code=403); return
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -2060,8 +2077,8 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                if _sem_acesso_modulo(usuario, "fiscal"):   # Perfil-4: só Diretoria abre Fiscal
-                    self.send_json({"ok": False, "erro": "Sem acesso ao módulo Fiscal."}, code=403); return
+                if _sem_acesso_modulo(usuario, "fiscal", handler=self):   # Perfil-4: só Diretoria abre Fiscal
+                    self.send_json({"ok": False, "erro": "Sem acesso ao módulo Fiscal.", "precisa_stepup": "fiscal"}, code=403); return
                 db = get_session()
                 try:
                     ator = _ator_dict(db, usuario)
@@ -7364,9 +7381,17 @@ def _bloqueio_comercial(ator):
     return None
 
 
-def _sem_acesso_modulo(usuario, modulo_id):
-    """True se o PERFIL do usuário não acessa o módulo (Perfil-4 rev2 §2, matriz de acesso)."""
-    return not perfis.acessa_modulo((usuario or {}).get("nivel"), modulo_id)
+def _sem_acesso_modulo(usuario, modulo_id, handler=None):
+    """True se o PERFIL do usuário não acessa o módulo (Perfil-4 rev2 §2, matriz de acesso).
+    Se `handler` for dado, honra um grant de step-up (senha de quem tem o perfil) na sessão."""
+    if perfis.acessa_modulo((usuario or {}).get("nivel"), modulo_id):
+        return False
+    if handler is not None:
+        from auth_routes import get_token_from_cookie
+        token = get_token_from_cookie(handler.headers.get("Cookie", ""))
+        if _stepup_valido(token, modulo_id):
+            return False
+    return True
 
 
 # Etapa do ciclo → papel operacional do Mapa (Regras §7). O Mapa é o default do responsável da fase.
