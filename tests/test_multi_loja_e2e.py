@@ -129,7 +129,7 @@ def test_admin_rede_cria_usuario_multiloja_na_propria_rede(http_client_factory, 
     c = http_client_factory(); c.login("adm_rede", "senha123")
     st, body = c.post("/api/admin/usuarios", {
         "nome": "Novo Diretor", "login": "novodir", "senha": "senha123",
-        "nivel": "diretoria", "loja_ids": [seed["loja1_id"], seed["loja2_id"]],
+        "nivel": "master", "loja_ids": [seed["loja1_id"], seed["loja2_id"]],
     })
     assert st == 200 and body["ok"] is True
     # confere que as memberships foram gravadas via /api/auth/me do novo usuário
@@ -163,7 +163,7 @@ def test_diretor_edit_nao_revoga_memberships_fora_do_escopo(http_client_factory,
     cadm = http_client_factory(); cadm.login("adm_rede", "senha123")
     st, body = cadm.post("/api/admin/usuarios", {
         "nome": "Multi Diretor 2", "login": "multidir2", "senha": "senha123",
-        "nivel": "diretoria",
+        "nivel": "master",
         "loja_ids": [seed["loja1_id"], seed["loja2_id"]],
     })
     assert st == 200 and body["ok"] is True, f"Criação falhou: {body}"

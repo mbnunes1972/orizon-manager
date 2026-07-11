@@ -112,6 +112,19 @@ class LogAcaoGerencial(Base):
     autorizador = relationship("Usuario", foreign_keys=[autorizador_id])
 
 
+class LogAcessoDelegado(Base):
+    """Auditoria do step-up por senha: fulano acessou um módulo/painel fora do perfil com a
+    autorização (senha) de alguém que tinha o perfil. Molde do LogAcaoGerencial."""
+    __tablename__ = "log_acesso_delegado"
+
+    id             = Column(Integer,  primary_key=True, autoincrement=True)
+    solicitante_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=False)
+    autorizador_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    recurso        = Column(String(40), nullable=False)   # id do módulo ou 'admin'/'config'
+    contexto       = Column(Text,     nullable=True)      # JSON opcional
+    criado_em      = Column(DateTime, default=datetime.utcnow)
+
+
 class Medicao(Base):
     """Dados de medição por projeto (etapas 9 e 10 do ciclo)."""
     __tablename__ = "medicoes"
@@ -199,7 +212,27 @@ class Funcao(Base):
     loja_id   = Column(Integer,     ForeignKey("lojas.id"), nullable=True)
     nome      = Column(String(80),  nullable=False)
     status    = Column(String(10),  nullable=False, default="ativo")   # ativo | inativo
+    perfil_padrao = Column(String(40), nullable=True)   # slug do perfil_acesso default da função
     criado_em = Column(DateTime,    default=datetime.utcnow)
+
+
+class PerfilAcesso(Base):
+    """Perfil de acesso configurável POR LOJA (Regras_Funcoes_Perfis_Atribuicoes rev3 §2).
+    Acesso a módulo/painel vem de `modulos_json`; capacidades finas = base perfis.PERFIS[`base`]
+    com overrides opcionais em `capacidades_json`."""
+    __tablename__ = "perfil_acesso"
+
+    id           = Column(Integer,     primary_key=True, autoincrement=True)
+    loja_id      = Column(Integer,     ForeignKey("lojas.id"), nullable=False)  # perfis são por loja
+    slug         = Column(String(40),  nullable=False)   # único globalmente (system: master/gerencial/operador)
+    nome         = Column(String(80),  nullable=False)
+    base         = Column(String(20),  nullable=False)   # master | gerencial | operador (preset das caps finas)
+    modulos_json = Column(Text,        nullable=False, default="[]")  # JSON: ids de módulo/painel acessíveis
+    capacidades_json = Column(Text,    nullable=False, default="{}")  # JSON {cap: bool} — overrides sobre a base
+    sistema      = Column(Integer,     nullable=False, default=0)     # 1 = padrão, não apagável
+    criado_em    = Column(DateTime,    default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("loja_id", "slug", name="uq_perfil_loja_slug"),)
 
 
 class FolhaPagamento(Base):
@@ -881,6 +914,11 @@ def init_db():
     Base.metadata.create_all(ENGINE)
     _migrar_colunas()
     _migrar_dados()
+    try:
+        import perfis
+        perfis.recarregar()   # invalida o cache do registro de perfis (perfil_acesso pode ter mudado)
+    except Exception:
+        pass
 
 
 def _migrar_pre_schema():
@@ -1111,6 +1149,8 @@ def _migrar_colunas():
         _add_cols("terceiros",    [("usuario_id","INTEGER")])
         # Perfil-4 (rev2 §2): Função (cargo) da conta quando não há Funcionário vinculado
         _add_cols("usuarios",     [("funcao_id","INTEGER")])
+        # Perfis configuráveis por loja (rev3 §2): slug do perfil_acesso default da função
+        _add_cols("funcoes",      [("perfil_padrao", "VARCHAR(40)")])
         # Cronograma do Ciclo (Modulos_Orizon_v11): data prevista de conclusão por etapa
         # + Responsável por função (Modulos_Orizon_v12): função exigida + funcionário escolhido
         _add_cols("ciclo_etapas", [("data_prevista_conclusao","DATETIME"),
@@ -1227,6 +1267,28 @@ def _run_migracoes(conn):
             if antigo != novo:
                 cur.execute("UPDATE usuarios SET nivel=? WHERE nivel=?", (novo, antigo))
         cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v3_2026')")
+
+    # 2026-07-10: RESET rev3 — perfis viram configuráveis por loja; nivel passa a referenciar a BASE.
+    if "perfis_v4_2026" not in aplicadas and _tabela_existe(cur, "usuarios"):
+        _MAP = {"diretoria": "master", "consultor": "operador", "suporte": "operador"}
+        for antigo, novo in _MAP.items():
+            cur.execute("UPDATE usuarios SET nivel=? WHERE nivel=?", (novo, antigo))
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v4_2026')")
+
+    # 2026-07-10: semeia os 3 perfis padrão nas lojas existentes (rev3 §2). Idempotente por (loja_id, slug).
+    if "perfil_acesso_seed_v1" not in aplicadas and _tabela_existe(cur, "perfil_acesso") and _tabela_existe(cur, "lojas"):
+        import json as _json
+        _OP = ["captacao", "cadastro", "comercial", "producao", "estoque", "expedicao", "montagem", "assistencias"]
+        _SPEC = [("master", "Master", "master", _OP + ["fiscal", "financeiro", "folha", "admin", "config"]),
+                 ("gerencial", "Gerencial", "gerencial", _OP + ["fiscal", "financeiro", "folha"]),
+                 ("operador", "Operador", "operador", _OP + ["fiscal"])]
+        for (lid,) in cur.execute("SELECT id FROM lojas").fetchall():
+            tem = {r[0] for r in cur.execute("SELECT slug FROM perfil_acesso WHERE loja_id=?", (lid,)).fetchall()}
+            for slug, nome, base, mods in _SPEC:
+                if slug not in tem:
+                    cur.execute("INSERT INTO perfil_acesso(loja_id, slug, nome, base, modulos_json, capacidades_json, sistema) "
+                                "VALUES(?,?,?,?,?,'{}',1)", (lid, slug, nome, base, _json.dumps(mods)))
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('perfil_acesso_seed_v1')")
 
     # 2026-06-20: F1 multi-tenant — loja seed (das constantes do contrato) + backfill.
     if "tenancy_v1_2026" not in aplicadas and _tabela_existe(cur, "lojas"):

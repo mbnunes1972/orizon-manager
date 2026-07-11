@@ -15,7 +15,7 @@ def test_perfis_permitidos_loja_para_diretor(http_client_factory, seed):
     st, body = c.get(f"/api/admin/usuarios/perfis-permitidos?escopo=loja&loja_id={seed['loja1_id']}")
     assert st == 200 and body["ok"]
     slugs = {p["slug"] for p in body["perfis"]}
-    assert "consultor" in slugs and "super_admin" not in slugs and "admin_rede" not in slugs
+    assert "operador" in slugs and "super_admin" not in slugs and "admin_rede" not in slugs
 
 
 def test_perfis_permitidos_plataforma_so_super(http_client_factory, seed):
@@ -57,7 +57,7 @@ def test_lista_inclui_campos_contato(http_client_factory, seed):
 def test_diretor_cria_usuario_loja_com_contato(http_client_factory, seed):
     c = _login(http_client_factory, "dir_l1")
     st, body = c.post("/api/admin/usuarios", {
-        "nome": "Nova Pessoa", "login": "nova1", "senha": "s1", "nivel": "consultor",
+        "nome": "Nova Pessoa", "login": "nova1", "senha": "s1", "nivel": "operador",
         "telefone": "1", "whatsapp": "2", "email": "n@p.com", "cpf": "390.533.447-05",
         "loja_id": seed["loja1_id"]})
     assert st == 200 and body["ok"]

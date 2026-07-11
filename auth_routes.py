@@ -28,7 +28,7 @@ from auth import (
     verificar_desconto, autorizar_desconto,
     get_token_from_cookie, COOKIE_NAME
 )
-from database import get_session, Usuario, Loja, Rede, membership_loja_ids
+from database import get_session, Usuario, Loja, Rede, membership_loja_ids, LogAcessoDelegado
 import perfis
 
 # ── Caminho do login.html ─────────────────────────────────────────────────────
@@ -91,10 +91,19 @@ def handle_auth_get(handler, path: str) -> bool:
                 # Perfil-4 (rev2 §2): o hub reflete os módulos que o PERFIL acessa (matriz), além dos
                 # ativos na loja. Painéis Admin/Config idem (flags p/ o front esconder a navegação).
                 _niv = usuario.get("nivel")
-                usuario["modulos_ativos"] = sorted(m for m in _ativos if _perfis.acessa_modulo(_niv, m))
+                _acessiveis = set(m for m in _ativos if _perfis.acessa_modulo(_niv, m))
+                usuario["modulos_ativos"] = sorted(_acessiveis)
+                usuario["modulos_bloqueados"] = sorted(_ativos - _acessiveis)
                 usuario["acessa_admin"] = _perfis.acessa_painel(_niv, "admin")
                 usuario["acessa_config"] = _perfis.acessa_painel(_niv, "config")
-                usuario["hub"] = _mod.hub_layout(usuario["modulos_ativos"])
+                # Hub sobre TODOS os módulos ativos da loja, marcando os que o perfil não acessa
+                # (front mostra bloqueado com cadeado → step-up por senha). rev3 §2.
+                usuario["hub"] = [
+                    {"faixa": g["faixa"], "rotulo": g["rotulo"],
+                     "modulos": [{"id": m["id"], "rotulo": m["rotulo"],
+                                  "bloqueado": m["id"] not in _acessiveis} for m in g["modulos"]]}
+                    for g in _mod.hub_layout(sorted(_ativos))
+                ]
             finally:
                 db.close()
             _send_json(handler, {"ok": True, "usuario": usuario})
@@ -208,6 +217,37 @@ def handle_auth_post(handler, path: str, body: bytes) -> bool:
             if not perfis.pode(u.nivel, "aprovar_financeiro"):
                 _send_json(handler, {"ok": False, "erro": "Perfil sem permissão para liberar impostos."}, 403)
                 return True
+            _send_json(handler, {"ok": True, "autorizador": {"nome": u.nome}})
+        finally:
+            db.close()
+        return True
+
+    if path == "/api/auth/step-up":
+        try:
+            req = json.loads(body) if body else {}
+        except Exception:
+            _send_json(handler, {"ok": False, "erro": "JSON inválido."}, 400); return True
+        cookie = handler.headers.get("Cookie", "")
+        token  = get_token_from_cookie(cookie)
+        solicitante = validar_sessao(token)
+        if not solicitante:
+            _send_json(handler, {"ok": False, "erro": "Sessão inválida."}, 401); return True
+        recurso = (req.get("recurso") or "").strip()
+        login   = (req.get("login_autorizador") or "").strip()
+        senha   = req.get("senha_autorizador") or ""
+        db = get_session()
+        try:
+            u = db.query(Usuario).filter_by(login=login).first()
+            if not u or not u.ativo or not u.check_senha(senha):
+                _send_json(handler, {"ok": False, "erro": "Usuário ou senha inválidos."}, 401); return True
+            tem = (perfis.acessa_painel(u.nivel, recurso) if recurso in ("admin", "config")
+                   else perfis.acessa_modulo(u.nivel, recurso))
+            if not tem:
+                _send_json(handler, {"ok": False, "erro": f"{u.nome} não tem acesso a este recurso."}, 403); return True
+            db.add(LogAcessoDelegado(solicitante_id=solicitante["id"], autorizador_id=u.id, recurso=recurso))
+            db.commit()
+            import main as _main
+            _main._stepup_conceder(token, recurso)
             _send_json(handler, {"ok": True, "autorizador": {"nome": u.nome}})
         finally:
             db.close()

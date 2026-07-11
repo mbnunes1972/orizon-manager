@@ -73,14 +73,14 @@ def test_parceiro_editar_cpf_cnpj_invalido_400(http_client_factory, seed):
 def test_usuario_cpf_invalido_400(http_client_factory, seed):
     c = http_client_factory(); c.login("dir_l1", "senha123")
     st, d = c.post("/api/admin/usuarios", {
-        "nome": "U", "login": "u_cpf_bad", "senha": "s1", "nivel": "consultor",
+        "nome": "U", "login": "u_cpf_bad", "senha": "s1", "nivel": "operador",
         "cpf": "111.111.111-11", "loja_id": seed["loja1_id"]})
     assert st == 400, d
 
 def test_usuario_cpf_valido_200(http_client_factory, seed):
     c = http_client_factory(); c.login("dir_l1", "senha123")
     st, d = c.post("/api/admin/usuarios", {
-        "nome": "U", "login": "u_cpf_ok", "senha": "s1", "nivel": "consultor",
+        "nome": "U", "login": "u_cpf_ok", "senha": "s1", "nivel": "operador",
         "cpf": "390.533.447-05", "loja_id": seed["loja1_id"]})
     assert st == 200 and d.get("ok"), d
 

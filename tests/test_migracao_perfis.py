@@ -16,10 +16,11 @@ def _conn_com_usuarios(niveis):
 
 def test_migracao_renomeia_niveis_antigos():
     # cadeia completa: perfis_v2 (gerente→gerente_vendas, admin→diretor) + perfis_v3 (colapso em 4)
+    # + perfis_v4 (diretoria→master, consultor/suporte→operador — nivel passa a referenciar a BASE)
     conn = _conn_com_usuarios(["gerente", "admin", "diretor", "consultor"])
     database._run_migracoes(conn)
     niveis = [r[0] for r in conn.execute("SELECT nivel FROM usuarios ORDER BY id")]
-    assert niveis == ["gerencial", "diretoria", "diretoria", "consultor"]
+    assert niveis == ["gerencial", "master", "master", "operador"]
 
 
 def test_migracao_perfis_idempotente():

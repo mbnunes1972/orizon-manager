@@ -8,8 +8,8 @@ a camada (nucleo|dominio), as dependências permitidas e se o módulo é deslig�
 MODULOS = {
     # ── NÚCLEO / PLATAFORMA ────────────────────────────────────────────────
     "auth":        {"camada": "nucleo", "depende_de": [],
-                    "arquivos": ["auth.py", "auth_routes.py", "perfis.py", "mod_usuarios.py"],
-                    "tabelas": ["usuarios", "sessoes"], "rotas": []},
+                    "arquivos": ["auth.py", "auth_routes.py", "perfis.py", "perfil_store.py", "mod_perfis.py", "mod_usuarios.py"],
+                    "tabelas": ["usuarios", "sessoes", "perfil_acesso"], "rotas": []},
     "tenancy":     {"camada": "nucleo", "depende_de": ["auth"],
                     "arquivos": ["mod_tenancy.py"],
                     "tabelas": ["redes", "lojas", "usuario_lojas", "parceiro_lojas"], "rotas": []},
@@ -18,7 +18,7 @@ MODULOS = {
                     "tabelas": ["atribuicoes_ambiente"], "rotas": []},
     "auditoria":   {"camada": "nucleo", "depende_de": [],
                     "arquivos": [],
-                    "tabelas": ["log_autorizacoes", "log_acoes_gerenciais"], "rotas": []},
+                    "tabelas": ["log_autorizacoes", "log_acoes_gerenciais", "log_acesso_delegado"], "rotas": []},
     "ciclo":       {"camada": "nucleo", "depende_de": [],
                     "arquivos": ["mod_ciclo.py", "mod_cronograma.py"],
                     "tabelas": ["ciclo_etapas", "ciclo_documentos", "ciclo_revisoes"], "rotas": []},

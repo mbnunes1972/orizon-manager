@@ -275,6 +275,23 @@ def _parse_multipart_arquivos(body, ct):
     return arquivos, campos
 
 
+_STEPUP_GRANTS = {}   # {(token, recurso): expira_em_epoch}
+_STEPUP_TTL = 30 * 60
+
+
+def _stepup_conceder(token, recurso):
+    _STEPUP_GRANTS[(token, recurso)] = time.time() + _STEPUP_TTL
+
+
+def _stepup_valido(token, recurso):
+    exp = _STEPUP_GRANTS.get((token, recurso))
+    if exp and exp > time.time():
+        return True
+    if exp:
+        _STEPUP_GRANTS.pop((token, recurso), None)
+    return False
+
+
 def _usuario_com_capacidade(db, login, senha, capacidade):
     """Usuario ativo com senha correta e a capacidade dada (perfis), ou None."""
     u = db.query(Usuario).filter_by(login=(login or "").strip()).first()
@@ -328,8 +345,8 @@ def _contabil_ctx(handler, exige_edicao):
         handler.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return None
     db = get_session()
     # Perfil-4 (rev2 §2): só perfis com acesso ao Financeiro abrem o módulo (Diretoria).
-    if not perfis.acessa_modulo(usuario.get("nivel"), "financeiro"):
-        db.close(); handler.send_json({"ok": False, "erro": "Sem acesso ao módulo Financeiro."}, code=403); return None
+    if _sem_acesso_modulo(usuario, "financeiro", handler=handler):
+        db.close(); handler.send_json({"ok": False, "erro": "Sem acesso ao módulo Financeiro.", "precisa_stepup": "financeiro"}, code=403); return None
     loja = db.get(Loja, usuario.get("loja_id")) if usuario.get("loja_id") else None
     if loja is not None and not mod_tenancy.modulo_ativo(loja, "financeiro"):
         db.close(); handler.send_json({"ok": False, "erro": "Módulo financeiro inativo."}, code=403); return None
@@ -406,6 +423,13 @@ _REQ_LOJA_ATIVA = None   # header X-Loja-Ativa da requisição atual (HTTPServer
 def _ler_loja_ativa_header(handler):
     raw = (handler.headers.get("X-Loja-Ativa") or "").strip()
     return int(raw) if raw.isdigit() else None
+
+
+def mod_perfis_opcoes():
+    import modulos, mod_perfis
+    doms = [{"id": d["id"], "rotulo": d["rotulo"]} for d in modulos.dominios_com_rotulo()]
+    return {"dominios": doms, "paineis": [{"id": "admin", "rotulo": "Painel Administração"},
+                                          {"id": "config", "rotulo": "Painel Config"}]}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -631,8 +655,8 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-            if _sem_acesso_modulo(usuario, "folha"):
-                self.send_json({"ok": False, "erro": "Sem acesso ao módulo Folha."}, code=403); return
+            if _sem_acesso_modulo(usuario, "folha", handler=self):
+                self.send_json({"ok": False, "erro": "Sem acesso ao módulo Folha.", "precisa_stepup": "folha"}, code=403); return
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -1029,14 +1053,28 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
 
         elif path == "/api/admin/perfis-matriz":
-            # Admin › Perfis de Usuário: matriz perfil × capacidades, DERIVADA de perfis.py (read-only).
-            # Formaliza o que já roda; não configura nada. Gate: gerir_usuarios (mesma audiência de Usuários).
+            # Admin › Perfis de Usuário: matriz perfil × capacidades da LOJA do ator (Task 7),
+            # DB-backed via perfis.matriz_loja. Gate: gerir_usuarios (mesma audiência de Usuários).
             usuario = get_usuario_sessao(self)
             if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
-                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
-                return
-            _m = perfis.matriz()
-            self.send_json({"ok": True, "perfis": _m["perfis"], "capacidades": _m["capacidades"]})
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+            lid = usuario.get("loja_id")
+            _m = perfis.matriz_loja(lid)
+            self.send_json({"ok": True, "perfis": _m["perfis"], "capacidades": _m["capacidades"],
+                            "caps_selecionaveis": _m["caps_selecionaveis"],
+                            "pode_editar": perfis.pode(usuario.get("nivel"), "gerir_perfis")})
+
+        elif path == "/api/admin/perfis":
+            # CRUD de perfis de acesso configuráveis por loja (Task 7). Leitura: gerir_usuarios;
+            # criação/edição (POST/PATCH abaixo): gerir_perfis (só Master).
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+            _m = perfis.matriz_loja(usuario.get("loja_id"))
+            self.send_json({"ok": True, "perfis": _m["perfis"], "capacidades": _m["capacidades"],
+                            "caps_selecionaveis": _m["caps_selecionaveis"],
+                            "modulos_opcoes": mod_perfis_opcoes(),
+                            "pode_editar": perfis.pode(usuario.get("nivel"), "gerir_perfis")})
 
         elif path == "/api/admin/usuarios/perfis-permitidos":
             usuario = get_usuario_sessao(self)
@@ -2039,8 +2077,8 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                if _sem_acesso_modulo(usuario, "fiscal"):   # Perfil-4: só Diretoria abre Fiscal
-                    self.send_json({"ok": False, "erro": "Sem acesso ao módulo Fiscal."}, code=403); return
+                if _sem_acesso_modulo(usuario, "fiscal", handler=self):   # Perfil-4: só Diretoria abre Fiscal
+                    self.send_json({"ok": False, "erro": "Sem acesso ao módulo Fiscal.", "precisa_stepup": "fiscal"}, code=403); return
                 db = get_session()
                 try:
                     ator = _ator_dict(db, usuario)
@@ -4169,6 +4207,25 @@ class Handler(BaseHTTPRequestHandler):
                         db.add(UsuarioLoja(usuario_id=u.id, loja_id=lid))
                     db.commit()
                     self.send_json({"ok": True, "id": u.id})
+                finally:
+                    db.close()
+                return
+
+            if path == "/api/admin/perfis":
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_perfis"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                req = json.loads(body) if body else {}
+                db = get_session()
+                try:
+                    import perfil_store
+                    p, err = perfil_store.criar_perfil(db, usuario.get("loja_id"),
+                                req.get("nome", ""), req.get("base", ""), req.get("modulos", []),
+                                capacidades=req.get("capacidades"))
+                    if not p:
+                        self.send_json({"ok": False, "erro": err}); return
+                    perfis.recarregar()
+                    self.send_json({"ok": True, "perfil": {"slug": p.slug, "nome": p.nome}}, code=201)
                 finally:
                     db.close()
                 return
@@ -6474,6 +6531,26 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            m_perfil = re.match(r"^/api/admin/perfis/([a-z0-9_]+)$", path)
+            if m_perfil:
+                usuario = get_usuario_sessao(self)
+                if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_perfis"):
+                    self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+                req = json.loads(body) if body else {}
+                db = get_session()
+                try:
+                    import perfil_store
+                    p, err = perfil_store.editar_perfil(db, usuario.get("loja_id"), m_perfil.group(1),
+                                nome=req.get("nome"), modulos=req.get("modulos"),
+                                capacidades=req.get("capacidades"))
+                    if not p:
+                        self.send_json({"ok": False, "erro": err}, code=403); return
+                    perfis.recarregar()
+                    self.send_json({"ok": True, "perfil": {"slug": p.slug, "nome": p.nome}})
+                finally:
+                    db.close()
+                return
+
             m_user = re.match(r"^/api/admin/usuarios/(\d+)$", path)
             if m_user:
                 usuario = get_usuario_sessao(self)
@@ -7304,9 +7381,17 @@ def _bloqueio_comercial(ator):
     return None
 
 
-def _sem_acesso_modulo(usuario, modulo_id):
-    """True se o PERFIL do usuário não acessa o módulo (Perfil-4 rev2 §2, matriz de acesso)."""
-    return not perfis.acessa_modulo((usuario or {}).get("nivel"), modulo_id)
+def _sem_acesso_modulo(usuario, modulo_id, handler=None):
+    """True se o PERFIL do usuário não acessa o módulo (Perfil-4 rev2 §2, matriz de acesso).
+    Se `handler` for dado, honra um grant de step-up (senha de quem tem o perfil) na sessão."""
+    if perfis.acessa_modulo((usuario or {}).get("nivel"), modulo_id):
+        return False
+    if handler is not None:
+        from auth_routes import get_token_from_cookie
+        token = get_token_from_cookie(handler.headers.get("Cookie", ""))
+        if _stepup_valido(token, modulo_id):
+            return False
+    return True
 
 
 # Etapa do ciclo → papel operacional do Mapa (Regras §7). O Mapa é o default do responsável da fase.
@@ -7543,14 +7628,11 @@ def _parceiro_visivel_loja(db, parceiro, loja_id):
     return False
 
 
-# Perfis que veem apenas os projetos que criaram (os demais veem todos da loja).
-_PERFIS_ESCOPO_PROPRIO = {"consultor"}
-
-
 def _ve_apenas_proprios_projetos(nivel):
-    """True se o perfil vê só os projetos que criou (Consultor/projetista). Gerente de
-    vendas e níveis acima — e os operacionais de pós-venda — veem todos da loja."""
-    return nivel in _PERFIS_ESCOPO_PROPRIO
+    """True se o perfil vê só os projetos que criou (base operador). Gerência+ — e os
+    operacionais de pós-venda — veem todos da loja. Dirigido pela BASE (perfis.py) para
+    sobreviver à migração de nivel e escopar corretamente perfis customizados."""
+    return perfis.base(nivel) == "operador"
 
 
 def _usuario_ids_atribuidos_projeto(db, nome_safe):

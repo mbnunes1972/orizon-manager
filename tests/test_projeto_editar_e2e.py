@@ -19,6 +19,10 @@ def _cliente_id(app_db, nome):
 
 
 def test_consultores_endpoint_gerente_vs_consultor(http_client_factory, seed, app_db, projetos_dir):
+    # `_usuarios_atribuiveis_da_loja` (main.py) filtra por igualdade literal de slug em
+    # perfis.slugs_loja() (master/gerencial/operador). O fixture `cons_l1` (conftest) já usa
+    # o slug de BASE 'operador' (Task 3: nivel volta a ser a base, já que a regra de escopo
+    # próprio é dirigida por perfis.base()), então basta usá-lo direto.
     c = http_client_factory(); c.login("dir_l1", "senha123")
     st, d = c.get("/api/projetos/consultores")
     assert st == 200 and d["ok"] is True

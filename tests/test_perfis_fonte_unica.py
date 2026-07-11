@@ -8,7 +8,7 @@ import storage
 def test_slugs_loja_exclui_plataforma_e_rede():
     slugs = set(perfis.slugs_loja())
     assert "super_admin" not in slugs and "admin_rede" not in slugs
-    assert {"consultor", "gerencial", "diretoria", "suporte"} <= slugs
+    assert {"operador", "gerencial", "master"} <= slugs
 
 
 def test_opcoes_acesso_derivadas_sem_orfao_gerente():

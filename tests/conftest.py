@@ -41,6 +41,15 @@ def seed(app_db):
     l2 = app_db.Loja(nome="Loja 2", rede_id=rede.id, codigo="LJ2")
     db.add_all([l1, l2]); db.flush()
 
+    # Semeia os perfis padrão (master/gerencial/operador) por loja — fiel à produção, onde a
+    # migração já semeia as lojas reais. Sem isto o registro DB fica vazio e perfis.py cai
+    # inteiro no fallback hardcoded, mascarando bugs de wiring por-loja (Task 7).
+    import perfil_store
+    import perfis as _perfis
+    for _lid in (l1.id, l2.id):
+        perfil_store.seed_perfis_loja(db, _lid)
+    _perfis.recarregar()
+
     # Emitente próprio de cada loja (identidade fiscal — Task 1/2/4). loja.emitente_id = self.
     def mk_emitente(cnpj, razao, uf="SP"):
         em = app_db.Emitente(cnpj=cnpj, razao_social=razao, regime_tributario="simples",
@@ -62,9 +71,12 @@ def seed(app_db):
         u.set_senha("senha123")
         db.add(u)
 
-    mkuser("Diretor L1", "dir_l1", "diretoria", loja_id=l1.id)   # Perfil-4: Diretoria (era 'diretor')
-    mkuser("Diretor L2", "dir_l2", "diretoria", loja_id=l2.id)
-    mkuser("Consultor L1", "cons_l1", "consultor", loja_id=l1.id)
+    mkuser("Diretor L1", "dir_l1", "master", loja_id=l1.id)   # Perfil-4: master (era 'diretoria')
+    mkuser("Diretor L2", "dir_l2", "master", loja_id=l2.id)
+    # Perfil-4/Task 3: 'operador' (era 'consultor') — agora que a regra "só vê os próprios
+    # projetos" (main._ve_apenas_proprios_projetos / mod_escopo.escopo_por_posse) é dirigida
+    # pela BASE (perfis.base(nivel) == 'operador'), o seed pode usar a base diretamente.
+    mkuser("Consultor L1", "cons_l1", "operador", loja_id=l1.id)
     mkuser("Super",      "super",  "super_admin")
     mkuser("Adm Rede",   "adm_rede", "admin_rede", rede_id=rede.id)
 
