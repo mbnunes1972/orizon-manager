@@ -2792,9 +2792,11 @@ async function adminPerfisCarregar(){
   const d = await (await fetch('/api/admin/perfis',{credentials:'same-origin'})).json().catch(()=>({}));
   if(!d.ok){ box.innerHTML = '<em style="color:var(--err);font-size:12px">'+esc(d.erro||'Sem acesso.')+'</em>'; return; }
   _perfisAdmin = d;
-  const pill = (id,txt) => '<button onclick="perfisSubTab(\''+id+'\')" style="padding:6px 15px;border-radius:8px;border:1px solid '
-    +(_perfisSubAtivo===id?'var(--accent)':'var(--border)')+';background:'+(_perfisSubAtivo===id?'var(--accent-tint)':'transparent')
-    +';color:'+(_perfisSubAtivo===id?'var(--accent)':'var(--muted)')+';font-family:var(--font-sans);font-weight:700;font-size:12px;cursor:pointer">'+txt+'</button>';
+  const pill = (id,txt) => { const on = _perfisSubAtivo===id;
+    return '<button onclick="perfisSubTab(\''+id+'\')" style="padding:6px 15px;border-radius:8px;border:1px solid '
+      +(on?'var(--border)':'transparent')+';background:'+(on?'var(--surface-2)':'transparent')
+      +';box-shadow:'+(on?'var(--shadow)':'none')+';color:'+(on?'var(--text)':'var(--muted)')
+      +';font-family:var(--font-sans);font-weight:700;font-size:12px;cursor:pointer">'+txt+'</button>'; };
   box.innerHTML =
      '<div style="display:flex;gap:8px;margin-bottom:16px">'+pill('perfis','Perfis')+pill('funcoes','Funções')+'</div>'
     +'<div id="perfis-subcontent"></div>';
