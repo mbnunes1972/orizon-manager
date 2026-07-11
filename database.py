@@ -1270,6 +1270,21 @@ def _run_migracoes(conn):
             cur.execute("UPDATE usuarios SET nivel=? WHERE nivel=?", (novo, antigo))
         cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v4_2026')")
 
+    # 2026-07-10: semeia os 3 perfis padrão nas lojas existentes (rev3 §2). Idempotente por (loja_id, slug).
+    if "perfil_acesso_seed_v1" not in aplicadas and _tabela_existe(cur, "perfil_acesso") and _tabela_existe(cur, "lojas"):
+        import json as _json
+        _OP = ["captacao", "cadastro", "comercial", "producao", "estoque", "expedicao", "montagem", "assistencias"]
+        _SPEC = [("master", "Master", "master", _OP + ["fiscal", "financeiro", "folha", "admin", "config"]),
+                 ("gerencial", "Gerencial", "gerencial", _OP + ["fiscal", "financeiro", "folha"]),
+                 ("operador", "Operador", "operador", _OP + ["fiscal"])]
+        for (lid,) in cur.execute("SELECT id FROM lojas").fetchall():
+            tem = {r[0] for r in cur.execute("SELECT slug FROM perfil_acesso WHERE loja_id=?", (lid,)).fetchall()}
+            for slug, nome, base, mods in _SPEC:
+                if slug not in tem:
+                    cur.execute("INSERT INTO perfil_acesso(loja_id, slug, nome, base, modulos_json, capacidades_json, sistema) "
+                                "VALUES(?,?,?,?,?,'{}',1)", (lid, slug, nome, base, _json.dumps(mods)))
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('perfil_acesso_seed_v1')")
+
     # 2026-06-20: F1 multi-tenant — loja seed (das constantes do contrato) + backfill.
     if "tenancy_v1_2026" not in aplicadas and _tabela_existe(cur, "lojas"):
         cur.execute("SELECT id FROM lojas ORDER BY id LIMIT 1")
