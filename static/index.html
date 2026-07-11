@@ -2071,23 +2071,28 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <span class="toggle-unit">%</span>
     </div>
 
-    <!-- Segmentação Mercadoria × Serviço — override do projeto (só o Diretor). Fora do auto-save:
-         escrito por botão próprio, gate aprovar_financeiro no backend. -->
-    <div id="mp-seg-box" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Segmentação Mercadoria × Serviço</div>
-      <div class="toggle-row">
-        <span class="toggle-label" style="flex:1">Mercadoria (NF-e)</span>
-        <input type="number" class="toggle-input" id="mp-pct-merc" min="0" max="100" step="0.5" value="65" oninput="mpSegSync('merc')">
-        <span class="toggle-unit">%</span>
+    <!-- Segmentação Mercadoria × Serviço — override do projeto, sob o MESMO cadeado da margem real
+         (liberação por senha de diretor/gerente adm-fin). Escrita gated por aprovar_financeiro. -->
+    <div id="mp-seg-box" style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase">Segmentação Mercadoria × Serviço</span>
+        <span id="mp-seg-lock"></span>
       </div>
-      <div class="toggle-row">
-        <span class="toggle-label" style="flex:1">Serviço (NFS-e)</span>
-        <input type="number" class="toggle-input" id="mp-pct-serv" min="0" max="100" step="0.5" value="35" oninput="mpSegSync('serv')">
-        <span class="toggle-unit">%</span>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-        <button class="btn btn-primary btn-sm" id="mp-seg-btn" onclick="mpSegAplicar()">Aplicar a este projeto</button>
-        <span id="mp-seg-hint" style="font-size:10px;color:var(--muted)"></span>
+      <div id="mp-seg-fields" style="display:none">
+        <div class="toggle-row">
+          <span class="toggle-label" style="flex:1">Mercadoria (NF-e)</span>
+          <input type="number" class="toggle-input" id="mp-pct-merc" min="0" max="100" step="0.5" value="65" oninput="mpSegSync('merc')">
+          <span class="toggle-unit">%</span>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label" style="flex:1">Serviço (NFS-e)</span>
+          <input type="number" class="toggle-input" id="mp-pct-serv" min="0" max="100" step="0.5" value="35" oninput="mpSegSync('serv')">
+          <span class="toggle-unit">%</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+          <button class="btn btn-primary btn-sm" id="mp-seg-btn" onclick="mpSegAplicar()">Aplicar a este projeto</button>
+          <span id="mp-seg-hint" style="font-size:10px;color:var(--muted)"></span>
+        </div>
       </div>
     </div>
 
@@ -5863,6 +5868,18 @@ function _renderImpostosLock() {
       if (elMargCont) elMargCont.innerHTML = lock;
     }
   }
+  // ── segmentação Mercadoria × Serviço: sob o MESMO cadeado (liberação por senha) ──
+  const segFields = document.getElementById('mp-seg-fields');
+  const segLock   = document.getElementById('mp-seg-lock');
+  if (segFields) {
+    if (_impostosLiberados) {
+      segFields.style.display = '';
+      if (segLock) segLock.innerHTML = '<span style="cursor:pointer" title="Ocultar (🔓)" onclick="_reBloquearImpostos()">🔓</span>';
+    } else {
+      segFields.style.display = 'none';
+      if (segLock) segLock.innerHTML = '<span style="cursor:pointer" title="Liberar com senha de diretor/gerente adm-fin" onclick="abrirModalLiberarImpostos()">🔒</span>';
+    }
+  }
 }
 function _reBloquearImpostos() { _impostosLiberados = false; _renderImpostosLock(); }
 
@@ -7457,17 +7474,16 @@ let _mpSnapshot = null;
 // backend), para um não-Diretor editando desconto nunca disparar o gate. Val_Cont = Mercadoria
 // (NF-e produto) + Serviço (NFS-e); os dois campos espelham-se para somar sempre 100%.
 function mpSegPopular(m){
-  const box = document.getElementById('mp-seg-box');
-  if(!box) return;
-  const podeDir = !!(_usuarioAtual && _usuarioAtual.pode_aprovar_financeiro);
-  box.style.display = podeDir ? '' : 'none';
-  if(!podeDir) return;
+  const em = document.getElementById('mp-pct-merc');
+  const es = document.getElementById('mp-pct-serv');
+  if(!em || !es) return;
   const temOverride = !!(m && m.pct_mercadoria != null && m.pct_servico != null);
-  document.getElementById('mp-pct-merc').value = temOverride ? m.pct_mercadoria : 65;
-  document.getElementById('mp-pct-serv').value = temOverride ? m.pct_servico   : 35;
+  em.value = temOverride ? m.pct_mercadoria : 65;
+  es.value = temOverride ? m.pct_servico   : 35;
   const hint = document.getElementById('mp-seg-hint');
   if(hint){ hint.style.color = 'var(--muted)';
     hint.textContent = temOverride ? 'Override deste projeto' : 'Sem override: herda o padrão da loja'; }
+  _renderImpostosLock();   // aplica o cadeado (mostra 🔒 ou libera os campos)
 }
 function mpSegSync(which){
   const em = document.getElementById('mp-pct-merc');
