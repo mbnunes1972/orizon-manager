@@ -8,6 +8,8 @@ PLANO_PADRAO = [
     ("1.1", "Circulante"),
     ("1.1.01", "Caixa/Bancos"), ("1.1.02", "Contas a Receber (Clientes)"),
     ("1.1.03", "Estoques"), ("1.1.04", "Adiantamentos a Fornecedores"),
+    ("1.1.05", "Impostos a Apropriar"),   # FASE B2.6: ativo diferido — imposto reservado no contrato,
+                                          # baixado na emissão (dedução só ocorre no faturamento)
     ("1.2", "Não Circulante"),
     ("1.2.1", "Imobilizado"),
     ("1.2.1.01", "Itens de Informática"), ("1.2.1.02", "Veículos"),
@@ -29,6 +31,7 @@ PLANO_PADRAO = [
     ("2.1.04.10", "Provisão de Comissão de Medidor"),
     ("2.1.04.11", "Provisão de Comissão de Projeto/Executivo"),
     ("2.1.04.12", "Provisão de Retenção de Comissão de Vendas"),
+    ("2.1.04.13", "Provisão de Impostos"),   # FASE B2.6: passivo reservado no contrato; efetivado (→ 2.1.03) na emissão
     ("2.1.05", "Financiamento Total Flex a Pagar"),
     ("2.1.06", "Adiantamento de Clientes"),
     ("2.2", "Não Circulante"),
@@ -78,6 +81,13 @@ PLANO_PADRAO = [
     ("5.6.01", "Constituição — Provisão de Garantia"),
     ("5.6.02", "Constituição — Provisão de Montagem"),
     ("5.6.03", "Constituição — Provisão de Assistência Técnica"),
+    # FASE B2.4: constituição das demais rubricas rastreadas no fechamento (Tipos C e A)
+    ("5.6.04", "Constituição — Provisão de Frete de Fábrica"),
+    ("5.6.05", "Constituição — Provisão de Frete Local"),
+    ("5.6.06", "Constituição — Provisão de Insumos Locais"),
+    ("5.6.07", "Constituição — Provisão de Comissão de Medidor"),
+    ("5.6.08", "Constituição — Provisão de Comissão de Projeto/Executivo"),
+    ("5.6.09", "Constituição — Provisão de Retenção de Comissão de Vendas"),
 ]
 
 
@@ -334,6 +344,21 @@ EVENTOS = {
     "fechamento_venda_montagem":    ("5.6.02", "2.1.04.02", "Constituição — Provisão de Montagem (fechamento de venda)"),
     "fechamento_venda_assistencia": ("5.6.03", "2.1.04.05", "Constituição — Provisão de Assistência Técnica (fechamento de venda)"),
     "fechamento_venda_garantia":    ("5.6.01", "2.1.04.03", "Constituição — Provisão de Garantia (fechamento de venda)"),
+    # FASE B2.4: constituição das demais provisões rastreadas — Despesa (5.6.x) × Provisão (2.1.04.x)
+    "fechamento_venda_frete_fabrica":       ("5.6.04", "2.1.04.07", "Constituição — Provisão de Frete de Fábrica"),
+    "fechamento_venda_frete_local":         ("5.6.05", "2.1.04.08", "Constituição — Provisão de Frete Local"),
+    "fechamento_venda_insumos":             ("5.6.06", "2.1.04.09", "Constituição — Provisão de Insumos Locais"),
+    "fechamento_venda_com_medidor":         ("5.6.07", "2.1.04.10", "Constituição — Provisão de Comissão de Medidor"),
+    "fechamento_venda_com_proj_exec":       ("5.6.08", "2.1.04.11", "Constituição — Provisão de Comissão de Projeto/Executivo"),
+    "fechamento_venda_retencao_com_vendas": ("5.6.09", "2.1.04.12", "Constituição — Provisão de Retenção de Comissão de Vendas"),
+    # Impostos = PROVISÃO (Tipo D). CONTRATO: passivo nasce SEM tocar a DRE — ativo diferido (1.1.05) ×
+    # Provisão de Impostos (2.1.04.13). EMISSÃO (proporcional Merc/Serv): a dedução entra na DRE
+    # (4.3.01 × baixa do ativo 1.1.05) e a obrigação fiscal real crystalliza (2.1.04.13 × 2.1.03).
+    "fechamento_venda_impostos":            ("1.1.05", "2.1.04.13", "Provisão de Impostos — reserva no contrato (ativo diferido)"),
+    "faturamento_impostos_deducao":         ("4.3.01", "1.1.05",    "Impostos — dedução da receita na emissão (baixa do ativo diferido)"),
+    "faturamento_impostos_obrigacao":       ("2.1.04.13", "2.1.03", "Impostos — efetivação da obrigação fiscal na emissão"),
+    # Custo financeiro (Total Flex): despesa financeira × Financiamento a Pagar  [CONFIRMAR CONTADOR]
+    "custo_financeiro":                     ("5.5.03", "2.1.05",    "Custo Financeiro (antecipação de recebíveis — Total Flex)"),
     # Ciclo de caixa
     "faturamento":                  ("1.1.02", "4.1.01",    "Faturamento (NF-e emitida)"),
     "recebimento":                  ("1.1.01", "1.1.02",    "Recebimento do cliente"),
@@ -344,6 +369,20 @@ EVENTOS = {
     "execucao_reparo_garantia":     ("2.1.04.03", "1.1.01",  "Execução de reparo em garantia (baixa da provisão)"),
     # Caso de Assistência — tipo de custo Paga: nova venda ao cliente, sem tocar provisão (v7 §6)
     "venda_assistencia":            ("1.1.02", "4.1.02",    "Venda de assistência (caso Paga — cobrança do cliente)"),
+    # ── FASE B2: Adiantamento de Clientes + receita segmentada (Mercadoria/Serviço) + CMV=CFO ──
+    # Recebimento ANTES do documento fiscal: dinheiro entra como PASSIVO (obrigação de entregar).
+    "recebimento_venda":            ("1.1.01", "2.1.06",    "Recebimento do cliente (adiantamento — antes do faturamento)"),
+    # Faturamento SEGMENTADO (B1): Mercadoria → 4.1.01 (NF-e) · Serviço → 4.2.01 (NFS-e). NUNCA lançar
+    # estes 4 direto no wiring — sempre via faturar_segmento() (split adiantado/a-receber + idempotência).
+    "faturamento_mercadoria_adiantado": ("2.1.06", "4.1.01", "Faturamento mercadoria (NF-e) — baixa de adiantamento"),
+    "faturamento_mercadoria_a_receber": ("1.1.02", "4.1.01", "Faturamento mercadoria (NF-e) — a receber"),
+    "faturamento_servico_adiantado":    ("2.1.06", "4.2.01", "Faturamento serviço (NFS-e) — baixa de adiantamento"),
+    "faturamento_servico_a_receber":    ("1.1.02", "4.2.01", "Faturamento serviço (NFS-e) — a receber"),
+    # CMV = CFO congelado do orçamento do contrato, UMA vez por projeto (ref "cmv:<projeto>"). O crédito
+    # em 2.1.04.06 constitui o passivo com a fábrica NO MESMO lançamento (sem transitar por 5.6).
+    "faturamento_cmv":              ("5.1.01", "2.1.04.06", "CMV Fábrica — reconhecimento no faturamento (CFO congelado)"),
+    # Baixa do passivo com a fábrica ao pagar: passivo × ativo, não toca o resultado.
+    "pagamento_fabrica":            ("2.1.04.06", "1.1.01", "Pagamento à fábrica (baixa da Provisão de Custo de Fábrica)"),
     # Folha de Pagamento (v10 §2.1): despesa nas contas 5.3 existentes × Caixa (sem conta nova)
     "folha_fixa":                   ("5.3.06", "1.1.01",    "Folha — parte fixa (Salários de Vendas)"),
     "folha_variavel":               ("5.3.01", "1.1.01",    "Folha — parte variável (Comissão de Vendedor)"),
@@ -374,6 +413,116 @@ def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=No
     return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor,
                   data=data, projeto_id=projeto_id, origem=tipo_evento,
                   historico=historico or hist_pad, ref=ref, motivo=motivo)
+
+
+# ── FASE B2: faturamento segmentado com split contra o Adiantamento de Clientes ──────────────
+def saldo_adiantamento_projeto(db, owner_tipo, owner_id, projeto_id):
+    """Pool de Adiantamento de Clientes (2.1.06) EM ABERTO do projeto: crédito − débito dos
+    lançamentos tagueados ao projeto. Nunca considerado abaixo de 0."""
+    return max(_mov(db, owner_tipo, owner_id, "2.1.06", "credor", None, None, projeto_id=projeto_id), 0.0)
+
+
+def faturar_segmento(db, owner_tipo, owner_id, projeto_id, segmento, valor, ref_base, data=None):
+    """Fatura um segmento da receita (B1): 'mercadoria' → 4.1.01 (NF-e) | 'servico' → 4.2.01 (NFS-e).
+    Faz o SPLIT do valor entre baixar o Adiantamento do projeto (2.1.06, até o saldo em aberto) e
+    constituir Contas a Receber (1.1.02) pelo resto. Idempotente por documento (refs `ref_base:adiantado`
+    e `ref_base:areceber`) e crash-safe: se a 1ª perna já existe, o split é RECUPERADO dela (não
+    recalculado do pool, que já mudou). Invariantes: soma das pernas == valor; 2.1.06 do projeto ≥ 0."""
+    if segmento not in ("mercadoria", "servico"):
+        raise ValueError("segmento inválido: %s" % segmento)
+    valor = round(float(valor or 0), 2)
+    if valor <= 0:
+        return []
+    ev_adiantado = "faturamento_%s_adiantado" % segmento
+    ev_areceber  = "faturamento_%s_a_receber" % segmento
+    ref_a, ref_r = ref_base + ":adiantado", ref_base + ":areceber"
+    ja_a = lancamento_por_ref(db, owner_tipo, owner_id, ref_a)
+    ja_r = lancamento_por_ref(db, owner_tipo, owner_id, ref_r)
+    if ja_r is not None:                       # a perna final já existe → tudo lançado
+        return [l for l in (ja_a, ja_r) if l is not None]
+    if ja_a is not None:
+        usa = ja_a["valor"]                    # crash-recovery: split congelado na 1ª perna
+    else:
+        usa = round(min(saldo_adiantamento_projeto(db, owner_tipo, owner_id, projeto_id), valor), 2)
+    resto = round(valor - usa, 2)
+    out = []
+    if usa > 0:                                # perna 1: saca do pool (registrar_evento re-checa o ref)
+        out.append(registrar_evento(db, owner_tipo, owner_id, ev_adiantado, usa,
+                                    projeto_id=projeto_id, data=data, ref=ref_a))
+    if resto > 0:                              # perna 2: resto a receber
+        out.append(registrar_evento(db, owner_tipo, owner_id, ev_areceber, resto,
+                                    projeto_id=projeto_id, data=data, ref=ref_r))
+    return out
+
+
+# ── FASE B2.4: constituição de TODAS as provisões rastreadas no fechamento ────────────────────
+# chave da rubrica -> evento de constituição. O VALOR de cada uma vem do motor (mod_provisoes), computado
+# pelo composition root (main.py) — o razão só BOOKA, sem calcular (mantém o layering ledger×cálculo).
+_PROV_FECHAMENTO = {
+    "montagem":            "fechamento_venda_montagem",
+    "garantia":            "fechamento_venda_garantia",
+    "assistencia":         "fechamento_venda_assistencia",
+    "frete_fabrica":       "fechamento_venda_frete_fabrica",
+    "frete_local":         "fechamento_venda_frete_local",
+    "insumos":             "fechamento_venda_insumos",
+    "com_medidor":         "fechamento_venda_com_medidor",
+    "com_proj_exec":       "fechamento_venda_com_proj_exec",
+    "retencao_com_vendas": "fechamento_venda_retencao_com_vendas",
+    "impostos":            "fechamento_venda_impostos",
+}
+
+
+def constituir_provisoes_fechamento(db, owner_tipo, owner_id, projeto_id, valores, ref_base):
+    """Constitui TODAS as provisões rastreadas no fechamento da venda. `valores` = {chave_rubrica: R$}
+    (do motor, computado pelo chamador). Cada uma: Despesa × Provisão (do mapa EVENTOS), idempotente por
+    ref (`ref_base:<chave>`). Valor <= 0 não lança. Custo de Fábrica NÃO entra aqui (vira CMV=CFO no
+    faturamento). Retorna {chave: valor_lançado}."""
+    out = {}
+    for chave, valor in (valores or {}).items():
+        evento = _PROV_FECHAMENTO.get(chave)
+        if evento is None:
+            continue
+        v = round(float(valor or 0), 2)
+        if v <= 0:
+            continue
+        registrar_evento(db, owner_tipo, owner_id, evento, v, projeto_id=projeto_id,
+                         ref=ref_base + ":" + chave)
+        out[chave] = v
+    return out
+
+
+def total_lancado(db, owner_tipo, owner_id, codigo, lado, projeto_id=None):
+    """Soma BRUTA dos lançamentos de um lado ('debito'|'credito') de uma conta (opcionalmente por
+    projeto). Ex.: total constituído da Provisão de Impostos = total_lancado(..., '2.1.04.13', 'credito',
+    projeto) — diferente do saldo, que já desconta as baixas."""
+    conta = _conta_por_codigo(db, owner_tipo, owner_id, codigo)
+    col = Lancamento.conta_debito_id if lado == "debito" else Lancamento.conta_credito_id
+    q = db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id).filter(col == conta.id)
+    if projeto_id:
+        q = q.filter(Lancamento.projeto_id == projeto_id)
+    return round(sum(l.valor for l in q.all()), 2)
+
+
+def efetivar_impostos_segmento(db, owner_tipo, owner_id, projeto_id, valor, ref_base, data=None):
+    """Efetiva (baixa) a Provisão de Impostos no faturamento, para a parcela `valor` (proporcional ao
+    segmento Mercadoria/Serviço). Dois lançamentos idempotentes por ref: dedução na DRE
+    (4.3.01 × baixa do ativo diferido 1.1.05) e obrigação fiscal real (2.1.04.13 × 2.1.03). O valor é
+    limitado ao saldo em aberto da provisão (nunca negativa). Retorna o valor efetivado."""
+    valor = round(float(valor or 0), 2)
+    if valor <= 0:
+        return 0.0
+    ja = lancamento_por_ref(db, owner_tipo, owner_id, ref_base + ":ded")
+    if ja is not None:
+        return ja["valor"]                         # idempotente: já efetivado com este ref
+    saldo = max(_mov(db, owner_tipo, owner_id, "2.1.04.13", "credor", None, None, projeto_id=projeto_id), 0.0)
+    v = round(min(valor, saldo), 2)
+    if v <= 0:
+        return 0.0
+    registrar_evento(db, owner_tipo, owner_id, "faturamento_impostos_deducao", v,
+                     projeto_id=projeto_id, data=data, ref=ref_base + ":ded")
+    registrar_evento(db, owner_tipo, owner_id, "faturamento_impostos_obrigacao", v,
+                     projeto_id=projeto_id, data=data, ref=ref_base + ":obr")
+    return v
 
 
 # ── Provisões da venda: % configurável + auto-constituição no fechamento (v6 §6.4) ──
@@ -668,7 +817,14 @@ def margem_projeto(db, owner_tipo, owner_id, projeto_id, ini=None, fim=None):
     prov_garantia = m("5.6.01", "devedor")
     comissao = m("5.3", "devedor")           # comissão do consultor + demais comerciais tagueados ao projeto
     margem = round(receita - custo_produto - prov_montagem - prov_assistencia - prov_garantia - comissao, 2)
+    # Custo de SERVIÇO do projeto (lastro contábil real): Custo de Serviço direto (5.2) + as constituições
+    # 5.6.x (montagem/assistência/garantia), que são o custo estimado dos serviços da venda. Campo
+    # INFORMATIVO / peso de rateio (reconciliar proporcional_custo_direto) — NÃO entra de novo na margem
+    # (as provisões já foram subtraídas acima). Se um dia a execução passar a debitar 5.2 por projeto,
+    # trocar a constituição pela execução aqui (nunca somar as duas, senão duplica o custo).
+    custo_servico = round(m("5.2", "devedor") + prov_montagem + prov_assistencia + prov_garantia, 2)
     return {"projeto_id": projeto_id, "receita": receita, "custo_produto": custo_produto,
+            "custo_servico": custo_servico,
             "prov_montagem": prov_montagem, "prov_assistencia": prov_assistencia,
             "prov_garantia": prov_garantia, "comissao": comissao, "margem_contribuicao": margem}
 

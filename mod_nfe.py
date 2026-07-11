@@ -136,6 +136,43 @@ def preview(xml, markup_pct):
     }
 
 
+def _valor_bruto_item(it, vun=None):
+    """Valor bruto do item como a nota fiscal calcula (mapa_fiscal.montar_payload):
+    round(qCom · preco_venda_unit, 2)."""
+    if vun is None:
+        vun = it.get("preco_venda_unit") or 0
+    return round((it.get("qCom") or 0) * vun, 2)
+
+
+def rescalar_itens_para_total(itens, total_alvo):
+    """FASE B2.3: reescala o preço unitário dos itens da NF-e para que Σ round(qCom·preco_venda_unit, 2)
+    == `total_alvo` EXATO (a mesma soma que a nota usa). Aplica o fator = total_alvo / total_atual a
+    cada item e faz o ÚLTIMO item com quantidade > 0 absorver o resíduo de arredondamento (fecha ao
+    centavo). Se o total atual ou o alvo forem <= 0, devolve os itens inalterados. NÃO muta a lista
+    original. Usado para alinhar a face da NF-e à parcela Mercadoria (pct_merc × Val_Cont)."""
+    total_alvo = round(float(total_alvo or 0), 2)
+    atual = round(sum(_valor_bruto_item(it) for it in itens), 2)
+    if atual <= 0 or total_alvo <= 0:
+        return [dict(it) for it in itens]
+    fator = total_alvo / atual
+    idx_ultimo = None
+    for i, it in enumerate(itens):
+        if (it.get("qCom") or 0) > 0:
+            idx_ultimo = i
+    out = [dict(it) for it in itens]
+    acum = 0.0
+    for i, it in enumerate(out):
+        q = it.get("qCom") or 0
+        if q > 0 and i != idx_ultimo:
+            it["preco_venda_unit"] = round((it.get("preco_venda_unit") or 0) * fator, 6)
+            acum = round(acum + _valor_bruto_item(it), 2)
+    if idx_ultimo is not None:
+        q = out[idx_ultimo].get("qCom") or 0
+        resto = round(total_alvo - acum, 2)                     # o que falta p/ fechar no alvo
+        out[idx_ultimo]["preco_venda_unit"] = round(resto / q, 6) if q else 0.0
+    return out
+
+
 if __name__ == "__main__":
     import sys
     if len(sys.argv) < 2:

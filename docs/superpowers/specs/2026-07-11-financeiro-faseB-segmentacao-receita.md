@@ -68,12 +68,35 @@ idempotente: `ALTER TABLE lojas ADD COLUMN ...` + `UPDATE ... WHERE ... IS NULL`
 **Testes:** `test_segmentacao.py`, `test_loja_segmentacao.py`, `test_endpoints_segmentacao.py` (17 no total),
 incl. "override sobrevive a salvamento de outros parâmetros".
 
-## B2 — eventos (a implementar; design com Fable 5)
+## B2 — eventos (IMPLEMENTADO, Sessão 65; design com Fable 5)
 
-Eventos NOVOS (nenhum alterado): `recebimento_venda` (1.1.01×2.1.06); no faturamento, **receita segmentada**
-→ Mercadoria (4.1.01, NF-e) e Serviço (4.2.01, NFS-e), cada uma com split adiantado/a-receber contra o
-Adiantamento; `faturamento_cmv` (5.1.01×2.1.04.06 = CFO); `pagamento_fabrica` (2.1.04.06×1.1.01).
-Prova de não-duplicação (5.1.01 = único débito em 5.1 → CFO 1× no resultado; provisão é passivo fora do DRE;
-baixa passivo×ativo não toca resultado). Timing marcado `[CONFIRMAR COM CONTADOR]`.
-Corrigir junto: `reconciliar(metodologia="proporcional_custo_direto")` → KeyError `custo_servico`
-(`mod_contabil.py`) — alinhar `custo_servico` à proporção da segmentação, não a `_peso` avulso.
+**Eventos (mod_contabil.py):** `recebimento_venda` (1.1.01×2.1.06); faturamento **segmentado** →
+Mercadoria (4.1.01, NF-e) e Serviço (4.2.01, NFS-e), cada uma com split adiantado/a-receber via
+`faturar_segmento()` (saca `min(pool, segmento)` do Adiantamento → 2.1.06 ≥ 0, Σ receitas = Val_Cont);
+`faturamento_cmv` (5.1.01×2.1.04.06 = **CFO**, 1×/projeto, ref `cmv:<proj>`); `pagamento_fabrica`
+(2.1.04.06×1.1.01). Congelamento da segmentação na assinatura (`_congelar_segmentacao_no_projeto`, A6).
+
+**Constituição COMPLETA no fechamento** (`constituir_provisoes_fechamento`, valores do motor
+`_negociacao_breakdown`): montagem/garantia/assist + frete fáb/local/insumos/com med/proj/retenção →
+Despesa `5.6.01-09` × Provisão `2.1.04.02-12`. Custo Fábrica NÃO entra aqui (é CMV=CFO). **Custo
+financeiro** (Cust_Fin = Val_Cont − VAVO) = despesa DIRETA no contrato (`5.5.03 × 2.1.05`).
+
+**Impostos = PROVISÃO diferida** (Tipo D): contas novas `1.1.05 Impostos a Apropriar` (ativo diferido) +
+`2.1.04.13 Provisão de Impostos`. CONTRATO: `1.1.05 × 2.1.04.13` (passivo nasce, DRE intocada). EMISSÃO
+(proporcional Merc/Serv — NF-e e NFS-e são emissões separadas, mesma data): `4.3.01 × 1.1.05` (dedução
+entra na DRE, baixa o ativo) + `2.1.04.13 × 2.1.03` (obrigação fiscal real). `efetivar_impostos_segmento`.
+
+**Face fiscal (B2.3):** `mod_nfe.rescalar_itens_para_total` reescala os itens da NF-e p/ Σ = parcela
+Mercadoria (fecha ao centavo); NFS-e = parcela Serviço. Markup vira output/fallback. ICMS/alíquotas → frente
+Fiscal (contador). `_valores_segmentados_do_projeto` = fonte única (face fiscal + wiring contábil).
+
+**Prova de não-duplicação (validada na simulação):** 5.1.01 = único débito em 5.1 → CFO 1× no resultado;
+provisões são passivo fora do DRE; baixas passivo×ativo não tocam resultado; Σ receitas = Val_Cont. O razão
+reconcilia com o motor: **lucro líquido = Val_Liq − Cust_Var** (margens diferem só pela base Val_Cont ×
+Val_Liq = Cust_Fin).
+
+**Bug corrigido (B2.2):** `margem_projeto` expõe `custo_servico` (5.2 + provisões 5.6.x) → destrava
+`reconciliar(proporcional_custo_direto)` (era KeyError).
+
+`[CONFIRMAR CONTADOR]`: receita no doc fiscal · adiantamento passivo (Simples) · timing dos impostos-provisão
+· custo financeiro direto · estorno de cancelamento fiscal (backlog FASE D).
