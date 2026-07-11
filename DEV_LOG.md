@@ -1339,9 +1339,34 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
-## ⏸️ ESTADO ATUAL (2026-07-07) — retomar aqui
+## ⏸️ ESTADO ATUAL (2026-07-10) — retomar aqui
 
-> **🚀 Deploy no VPS (2026-07-09, mais recente = `3d60a43`):** servidor online `http://167.88.33.121:8765` — **Módulo
+> **🚀 Deploy no VPS mais recente (2026-07-10, `4fe9955`):** `http://167.88.33.121:8765` no ar (HTTP 302),
+> **banco preservado**, migrações idempotentes rodaram no start (`funcoes_seed_v1`, `perfis_v3_2026`,
+> colunas `usuarios.funcao_id`/`Terceiro.usuario_id`/cronograma, tabela `atribuicoes_ambiente`). Usuários
+> migrados aos 4 perfis (nenhum cargo-nível antigo). MCP re-ingerido (código 1813 nós). **Suíte 816 verde.**
+>
+> **Frentes fechadas (jul/2026, sessões 52–61):** Modulos_Orizon **v10** (sub-entidades Endereço/Bancário/
+> PIX + Tabela de Funções + Folha de Pagamento) · **v11** (Cronograma do Ciclo: acesso corrigido + datas +
+> reauth) · **v12** (responsável por função + Função×Perfil) · design **v8/v9/v10** (inputs, botão primário,
+> token próprio) · **Fase 0** (perfis.py fonte única + seed de Funções) · **Fase 1** (Mapa de Atribuições +
+> `mod_escopo` + 404 fora de escopo) · **Perfis de Usuário** (tela Admin, matriz) · **Perfil-4** (Perfil =
+> 4 níveis de ACESSO por módulo/painel; cargos viram Função; enforcement da matriz).
+>
+> **Os três eixos (modelo vigente):** **Perfil** (acesso, `perfis.py`/`Usuario.nivel` — diretoria/gerencial/
+> consultor/suporte) × **Função** (cargo, tabela `Funcao`) × **Escopo de visibilidade** (posse +
+> `atribuicoes_ambiente`/`mod_escopo`). Specs em `docs/superpowers/specs/2026-07-10-*`.
+>
+> **⚠️ Próxima frente pendente (retomar aqui):** **re-chave do escopo operacional para Função.** No Perfil-4
+> os operacionais (Medidor/Projetista/Supervisor) viraram **Consultor=posse**, então a visibilidade-por-Mapa
+> deles ficou **dormente** (`mod_escopo._ESCOPO_ATRIBUICAO` ainda chaveia nos slugs-cargo antigos, que não
+> existem mais como perfil). Re-chavear para `Funcao` reativa a Fase 1. Não vaza dados — só relaxa a
+> restrição fina. Outros follow-ups: precisão de capacidades por Função; gate backend dos módulos
+> operacionais p/ Suporte (hoje só escondido na UI); semear Funções ao criar loja nova.
+>
+> _(Histórico do deploy anterior, fiscal/Financeiro, abaixo.)_
+
+> **🚀 Deploy no VPS (2026-07-09, `3d60a43`):** servidor online `http://167.88.33.121:8765` — **Módulo
 > Financeiro completo (#1–#6) + wiring do faturamento + atualização v2→v5 (5 fronts)**. Migrações idempotentes rodaram
 > no start (colunas `lancamento.ref/motivo/ia_sugestao`; backfill das 3 provisões no 1º acesso ao Plano de Contas por
 > owner). **Banco preservado**, HTTP 302 local / **200 externo**, sem erros. _(Antes → `7ff3cf0`: Financeiro #1–#6 +

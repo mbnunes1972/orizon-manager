@@ -58,24 +58,38 @@
 
 ## 3. PERFIS DE ACESSO
 
-### 3.1 Perfis atuais
+> **Modelo vigente (Perfil-4, rev2 §2 — jul/2026).** Três eixos independentes, não confundir:
+> **Perfil** (nível de ACESSO — `perfis.py`/`Usuario.nivel`) × **Função** (cargo — tabela `Funcao`,
+> Config › Funções) × **Escopo de visibilidade** (posse `criado_por_id` + Mapa de Atribuições
+> `atribuicoes_ambiente`/`mod_escopo`). Fonte única dos perfis: `perfis.py`. Detalhes em `docs/USUARIOS.md`
+> e `docs/superpowers/specs/2026-07-10-perfil-4-niveis-acesso.md`.
 
-| Perfil | Limite desconto | Pode ver parâmetros | Observação |
-|---|---|---|---|
-| Consultor | 10% | Não | Acesso à negociação |
-| Gerente | 20% | Sim | Pode autorizar até 20% |
-| Diretor | 50% | Sim | Pode autorizar até 50% |
+### 3.1 Perfis de acesso — 4 níveis por módulo/painel
 
-### 3.2 Perfis futuros (a definir)
-- **Projetista** — permissões similares ao Consultor, poderá carregar Promob
-- **Financeiro de Rede** — acesso amplo a todas as lojas, emissão de relatórios
-- **Administrador de Rede (CEO)** — acesso total, criação de perfis administrativos
-- **Cliente** — módulo de acompanhamento de projeto (fase futura)
+| Perfil (slug) | Desc. máx | Operacional* | Financeiro/Folha | Fiscal | Painel Admin | Painel Config |
+|---|---|---|---|---|---|---|
+| Diretoria (`diretoria`) | 50% | sim | sim | sim | sim | sim |
+| Gerencial (`gerencial`) | 20% | sim | não | não | sim | sim |
+| Consultor (`consultor`) | 10% | sim | não | não | não | não |
+| Suporte (`suporte`) | 0% | não | não | não | sim | sim |
 
-### 3.3 Regras de acesso
-- Desconto acima do limite exige autorização delegada (credenciais de Gerente ou Diretor)
-- Autorização delegada é registrada em log com autorizador, solicitante, desconto e contexto
-- Futuro: módulo de configuração de perfis permitirá definir acessos por módulo
+*Operacionais = captacao, cadastro, comercial, producao, estoque, expedicao, montagem, assistencias.*
+Perfis de plataforma/rede (fora dos 4 de loja): `super_admin`, `admin_rede` (administram a estrutura,
+sem acesso operacional). Cargos (Diretor, Medidor, Consultor de Vendas, Montador…) agora são **Função**.
+
+### 3.2 Regras de acesso
+- Acesso a módulo/painel respeita a matriz acima (enforcement no backend + hub filtrado por perfil).
+- Desconto acima do limite exige autorização delegada (capacidade `autorizar` → Diretoria/Gerencial),
+  registrada em `log_autorizacoes` (autorizador, solicitante, desconto, contexto).
+- Visibilidade dentro da loja: Consultor vê só o que criou; operacionais (via Função) só o atribuído no
+  Mapa; Diretoria/Gerencial veem tudo na loja; isolamento por loja (F4) → 404 fora de escopo.
+- Capacidades de fluxo (autorizar, aprovar_financeiro, executar_pe, registrar_medicao…) mapeadas aos 4
+  perfis; a precisão fina por **Função** é frente posterior (ver DEV_LOG › ESTADO ATUAL).
+
+### 3.3 Futuro (a definir)
+- Editor de perfis por loja (definir acessos por módulo na UI) — hoje a matriz vive em `perfis.py`.
+- Re-chave do escopo operacional para **Função** (reativa a visibilidade-por-Mapa dos operacionais).
+- **Cliente** — módulo de acompanhamento de projeto (fase futura).
 
 ---
 
