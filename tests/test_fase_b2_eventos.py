@@ -181,7 +181,9 @@ _EVENTOS_FECH = {
     "fechamento_venda_com_medidor":         ("5.6.07", "2.1.04.10"),
     "fechamento_venda_com_proj_exec":       ("5.6.08", "2.1.04.11"),
     "fechamento_venda_retencao_com_vendas": ("5.6.09", "2.1.04.12"),
-    "fechamento_venda_impostos":            ("4.3.01", "2.1.03"),
+    "fechamento_venda_impostos":            ("1.1.05", "2.1.04.13"),   # B2.6: ativo diferido × provisão
+    "faturamento_impostos_deducao":         ("4.3.01", "1.1.05"),
+    "faturamento_impostos_obrigacao":       ("2.1.04.13", "2.1.03"),
     "custo_financeiro":                     ("5.5.03", "2.1.05"),
 }
 
@@ -207,10 +209,42 @@ def test_constituir_todas_provisoes_fechamento(app_db):
     assert s("2.1.04.02") == 100.0 and s("2.1.04.03") == 50.0
     assert s("2.1.04.07") == 30.0 and s("2.1.04.08") == 20.0 and s("2.1.04.09") == 10.0
     assert s("2.1.04.10") == 15.0 and s("2.1.04.11") == 25.0 and s("2.1.04.12") == 40.0
-    # impostos: crédito em Obrigações Tributárias (passivo) + débito em 4.3.01 (dedução, lida como
-    # devedor na DRE → reduz a receita líquida). saldo_conta(4.3.01) vem na natureza credora (= −80).
-    assert s("2.1.03") == 80.0
-    assert mc._mov(db, ot, oid, "4.3", "devedor", None, None) == 80.0
+    # impostos (B2.6): PROVISÃO no contrato — ativo diferido (1.1.05) × provisão (2.1.04.13), SEM tocar
+    # a DRE. A dedução/obrigação só ocorrem na emissão (efetivar_impostos_segmento).
+    assert s("1.1.05") == 80.0 and s("2.1.04.13") == 80.0
+    assert mc.dre(db, ot, oid)["deducoes"] == 0.0
+    db.close()
+
+
+def test_impostos_efetivacao_segmentada(app_db):
+    """B2.6: provisão de impostos reservada no contrato; efetivada proporcional Merc/Serv na emissão."""
+    from mod_orcamento_params import segmentar
+    db = app_db.get_session(); ot, oid = "loja", 404; mc.seed_plano(db, ot, oid)
+    s = lambda cod: mc.saldo_conta(db, ot, oid, db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first().id)
+    imp_total = 15540.63
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"impostos": imp_total}, ref_base="provf:P")
+    im_merc, im_serv = segmentar(imp_total, 65.0)
+    # NF-e: efetiva a parcela mercadoria
+    mc.efetivar_impostos_segmento(db, ot, oid, "P", im_merc, ref_base="imp:NFE-P-1")
+    assert abs(mc._mov(db, ot, oid, "4.3", "devedor", None, None) - im_merc) < 0.01   # dedução na DRE
+    assert abs(s("2.1.03") - im_merc) < 0.01                                          # obrigação real
+    assert abs(s("2.1.04.13") - (imp_total - im_merc)) < 0.01                         # provisão parcial
+    assert abs(s("1.1.05") - (imp_total - im_merc)) < 0.01                            # ativo diferido parcial
+    # NFS-e: efetiva o resto → zera provisão e ativo, obrigação total
+    mc.efetivar_impostos_segmento(db, ot, oid, "P", im_serv, ref_base="imp:NFSE-P-1")
+    assert abs(s("2.1.04.13")) < 0.01 and abs(s("1.1.05")) < 0.01
+    assert abs(s("2.1.03") - imp_total) < 0.01
+    assert abs(mc.dre(db, ot, oid)["deducoes"] - imp_total) < 0.01
+    db.close()
+
+
+def test_efetivar_impostos_idempotente(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 405; mc.seed_plano(db, ot, oid)
+    s = lambda cod: mc.saldo_conta(db, ot, oid, db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first().id)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"impostos": 1000.0}, ref_base="provf:P")
+    mc.efetivar_impostos_segmento(db, ot, oid, "P", 650.0, ref_base="imp:NFE-P-1")
+    mc.efetivar_impostos_segmento(db, ot, oid, "P", 650.0, ref_base="imp:NFE-P-1")   # 2ª vez
+    assert abs(s("2.1.03") - 650.0) < 0.01                                            # não duplica
     db.close()
 
 

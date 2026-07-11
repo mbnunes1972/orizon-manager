@@ -398,14 +398,15 @@ def _fin_evento_seguro(loja_id, tipo_evento, valor, projeto_id, ref):
 
 
 def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
-    """Auto-constitui as 3 provisões contábeis no fechamento da venda (v6 §6.4), base = **VAVO** do
-    orçamento (`orc.vavo` — valor à vista, convenção canônica das provisões % sobre a venda; NÃO
-    `valor_total`/Val_Cont, senão diverge da linha da modal/motor quando Cust_Fin>0), a partir do %
-    do Financeiro da loja. **Fail-soft/isolado/idempotente** — não aborta o contrato."""
+    """Auto-constitui TODAS as provisões rastreadas no fechamento da venda (v6 §6.4 + FASE B2.4/B2.5), a
+    partir do breakdown do motor (`_negociacao_breakdown` → `mod_provisoes`): montagem/garantia/assist +
+    fretes/insumos/comissões (5.6.x × 2.1.04.x), impostos como provisão diferida (1.1.05 × 2.1.04.13) e
+    o custo financeiro (Cust_Fin) como despesa DIRETA no contrato (5.5.03 × 2.1.05). Cada base é a do
+    motor. **Fail-soft/isolado/idempotente** — não aborta o contrato."""
     try:
         loja_id = getattr(orc, "loja_id", None)
-        vavo = float(getattr(orc, "vavo", 0) or 0)
-        if not loja_id or vavo <= 0:
+        orc_id = getattr(orc, "id", None)
+        if not loja_id or not orc_id:
             return
         import mod_contabil, mod_tenancy
         db = get_session()
@@ -413,13 +414,33 @@ def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
             loja = db.get(Loja, loja_id)
             if loja is None or not mod_tenancy.modulo_ativo(loja, "financeiro"):
                 return
-            cfg = json.loads(loja.config_financeira_json) if loja.config_financeira_json else {}
+            orc2 = db.get(Orcamento, orc_id)
+            if orc2 is None:
+                return
+            d = _negociacao_breakdown(orc2, db)
+            valores = {
+                "montagem":            d.get("Prov_Mont"),
+                "garantia":            d.get("Prov_Gar"),
+                "assistencia":         d.get("Assist_Orc"),
+                "frete_fabrica":       d.get("Frete_Fab_Orc"),
+                "frete_local":         d.get("Frete_Loc_Orc"),
+                "insumos":             d.get("Ins_Loc_Orc"),
+                "com_medidor":         d.get("Com_Med_Orc"),
+                "com_proj_exec":       d.get("Com_Proj_Exec_Orc"),
+                "retencao_com_vendas": d.get("Com_Venda_Orc"),
+                "impostos":            d.get("Prov_Imp"),
+            }
             ot, oid = mod_contabil.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
-            mod_contabil.constituir_provisoes_venda(db, ot, oid, projeto_id, vavo, cfg, ref_base)
+            mod_contabil.constituir_provisoes_fechamento(db, ot, oid, projeto_id, valores, ref_base)
+            # Custo financeiro = Val_Cont − VAVO (despesa direta no contrato — o fechamento É a antecipação)
+            cust_fin = round(float(getattr(orc2, "valor_total", 0) or 0) - float(d.get("VAVO") or 0), 2)
+            if cust_fin > 0:
+                mod_contabil.registrar_evento(db, ot, oid, "custo_financeiro", cust_fin,
+                                              projeto_id=projeto_id, ref=ref_base + ":cfin")
         finally:
             db.close()
     except Exception as e:
-        logging.getLogger(__name__).warning("wiring provisões da venda (ref=%s) falhou: %s", ref_base, e)
+        logging.getLogger(__name__).warning("wiring fechamento (provisões+custo fin, ref=%s) falhou: %s", ref_base, e)
 
 
 def _congelar_segmentacao_no_projeto(db, loja_id, projeto_nome):
@@ -460,7 +481,7 @@ def _valores_segmentados_do_projeto(db, loja_id, projeto_nome):
     params = json.loads(pj.parametros_json) if (pj and pj.parametros_json) else {}
     seg = segmentacao_efetiva(resolver_segmentacao(loja.pct_mercadoria, loja.pct_servico), params)
     merc, serv = segmentar(val_cont, seg["pct_mercadoria"])
-    return {"val_cont": val_cont, "mercadoria": merc, "servico": serv,
+    return {"val_cont": val_cont, "mercadoria": merc, "servico": serv, "seg": seg,
             "cfo": round(float(getattr(orc, "cfo", 0) or 0), 2), "orc": orc}
 
 
@@ -486,6 +507,14 @@ def _fin_faturamento_segmentado_seguro(loja_id, projeto_nome, segmento, ref_doc)
             valor_seg = vals["mercadoria"] if segmento == "mercadoria" else vals["servico"]
             ot, oid = mod_contabil.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
             mod_contabil.faturar_segmento(db, ot, oid, projeto_nome, segmento, valor_seg, ref_base="fat:" + ref_doc)
+            # Impostos (B2.6): efetiva a parcela do segmento (proporcional Merc/Serv) — dedução na DRE +
+            # obrigação fiscal real, baixando a provisão diferida constituída no contrato.
+            from mod_orcamento_params import segmentar as _segmentar
+            imp_total = mod_contabil.total_lancado(db, ot, oid, "2.1.04.13", "credito", projeto_nome)
+            if imp_total > 0:
+                imp_merc, imp_serv = _segmentar(imp_total, vals["seg"]["pct_mercadoria"])
+                imp_seg = imp_merc if segmento == "mercadoria" else imp_serv
+                mod_contabil.efetivar_impostos_segmento(db, ot, oid, projeto_nome, imp_seg, ref_base="imp:" + ref_doc)
             if segmento == "mercadoria":
                 cfo = vals["cfo"]
                 if cfo > 0:

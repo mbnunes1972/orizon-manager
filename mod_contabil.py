@@ -8,6 +8,8 @@ PLANO_PADRAO = [
     ("1.1", "Circulante"),
     ("1.1.01", "Caixa/Bancos"), ("1.1.02", "Contas a Receber (Clientes)"),
     ("1.1.03", "Estoques"), ("1.1.04", "Adiantamentos a Fornecedores"),
+    ("1.1.05", "Impostos a Apropriar"),   # FASE B2.6: ativo diferido — imposto reservado no contrato,
+                                          # baixado na emissão (dedução só ocorre no faturamento)
     ("1.2", "Não Circulante"),
     ("1.2.1", "Imobilizado"),
     ("1.2.1.01", "Itens de Informática"), ("1.2.1.02", "Veículos"),
@@ -29,6 +31,7 @@ PLANO_PADRAO = [
     ("2.1.04.10", "Provisão de Comissão de Medidor"),
     ("2.1.04.11", "Provisão de Comissão de Projeto/Executivo"),
     ("2.1.04.12", "Provisão de Retenção de Comissão de Vendas"),
+    ("2.1.04.13", "Provisão de Impostos"),   # FASE B2.6: passivo reservado no contrato; efetivado (→ 2.1.03) na emissão
     ("2.1.05", "Financiamento Total Flex a Pagar"),
     ("2.1.06", "Adiantamento de Clientes"),
     ("2.2", "Não Circulante"),
@@ -348,8 +351,12 @@ EVENTOS = {
     "fechamento_venda_com_medidor":         ("5.6.07", "2.1.04.10", "Constituição — Provisão de Comissão de Medidor"),
     "fechamento_venda_com_proj_exec":       ("5.6.08", "2.1.04.11", "Constituição — Provisão de Comissão de Projeto/Executivo"),
     "fechamento_venda_retencao_com_vendas": ("5.6.09", "2.1.04.12", "Constituição — Provisão de Retenção de Comissão de Vendas"),
-    # Impostos (Simples): dedução da receita (4.3.01) × Obrigações Tributárias (2.1.03), não é provisão de custo
-    "fechamento_venda_impostos":            ("4.3.01", "2.1.03",    "Provisão de Impostos (Simples Nacional s/ Vendas)"),
+    # Impostos = PROVISÃO (Tipo D). CONTRATO: passivo nasce SEM tocar a DRE — ativo diferido (1.1.05) ×
+    # Provisão de Impostos (2.1.04.13). EMISSÃO (proporcional Merc/Serv): a dedução entra na DRE
+    # (4.3.01 × baixa do ativo 1.1.05) e a obrigação fiscal real crystalliza (2.1.04.13 × 2.1.03).
+    "fechamento_venda_impostos":            ("1.1.05", "2.1.04.13", "Provisão de Impostos — reserva no contrato (ativo diferido)"),
+    "faturamento_impostos_deducao":         ("4.3.01", "1.1.05",    "Impostos — dedução da receita na emissão (baixa do ativo diferido)"),
+    "faturamento_impostos_obrigacao":       ("2.1.04.13", "2.1.03", "Impostos — efetivação da obrigação fiscal na emissão"),
     # Custo financeiro (Total Flex): despesa financeira × Financiamento a Pagar  [CONFIRMAR CONTADOR]
     "custo_financeiro":                     ("5.5.03", "2.1.05",    "Custo Financeiro (antecipação de recebíveis — Total Flex)"),
     # Ciclo de caixa
@@ -482,6 +489,40 @@ def constituir_provisoes_fechamento(db, owner_tipo, owner_id, projeto_id, valore
                          ref=ref_base + ":" + chave)
         out[chave] = v
     return out
+
+
+def total_lancado(db, owner_tipo, owner_id, codigo, lado, projeto_id=None):
+    """Soma BRUTA dos lançamentos de um lado ('debito'|'credito') de uma conta (opcionalmente por
+    projeto). Ex.: total constituído da Provisão de Impostos = total_lancado(..., '2.1.04.13', 'credito',
+    projeto) — diferente do saldo, que já desconta as baixas."""
+    conta = _conta_por_codigo(db, owner_tipo, owner_id, codigo)
+    col = Lancamento.conta_debito_id if lado == "debito" else Lancamento.conta_credito_id
+    q = db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id).filter(col == conta.id)
+    if projeto_id:
+        q = q.filter(Lancamento.projeto_id == projeto_id)
+    return round(sum(l.valor for l in q.all()), 2)
+
+
+def efetivar_impostos_segmento(db, owner_tipo, owner_id, projeto_id, valor, ref_base, data=None):
+    """Efetiva (baixa) a Provisão de Impostos no faturamento, para a parcela `valor` (proporcional ao
+    segmento Mercadoria/Serviço). Dois lançamentos idempotentes por ref: dedução na DRE
+    (4.3.01 × baixa do ativo diferido 1.1.05) e obrigação fiscal real (2.1.04.13 × 2.1.03). O valor é
+    limitado ao saldo em aberto da provisão (nunca negativa). Retorna o valor efetivado."""
+    valor = round(float(valor or 0), 2)
+    if valor <= 0:
+        return 0.0
+    ja = lancamento_por_ref(db, owner_tipo, owner_id, ref_base + ":ded")
+    if ja is not None:
+        return ja["valor"]                         # idempotente: já efetivado com este ref
+    saldo = max(_mov(db, owner_tipo, owner_id, "2.1.04.13", "credor", None, None, projeto_id=projeto_id), 0.0)
+    v = round(min(valor, saldo), 2)
+    if v <= 0:
+        return 0.0
+    registrar_evento(db, owner_tipo, owner_id, "faturamento_impostos_deducao", v,
+                     projeto_id=projeto_id, data=data, ref=ref_base + ":ded")
+    registrar_evento(db, owner_tipo, owner_id, "faturamento_impostos_obrigacao", v,
+                     projeto_id=projeto_id, data=data, ref=ref_base + ":obr")
+    return v
 
 
 # ── Provisões da venda: % configurável + auto-constituição no fechamento (v6 §6.4) ──
