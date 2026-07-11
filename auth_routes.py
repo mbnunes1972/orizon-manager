@@ -91,10 +91,19 @@ def handle_auth_get(handler, path: str) -> bool:
                 # Perfil-4 (rev2 §2): o hub reflete os módulos que o PERFIL acessa (matriz), além dos
                 # ativos na loja. Painéis Admin/Config idem (flags p/ o front esconder a navegação).
                 _niv = usuario.get("nivel")
-                usuario["modulos_ativos"] = sorted(m for m in _ativos if _perfis.acessa_modulo(_niv, m))
+                _acessiveis = set(m for m in _ativos if _perfis.acessa_modulo(_niv, m))
+                usuario["modulos_ativos"] = sorted(_acessiveis)
+                usuario["modulos_bloqueados"] = sorted(_ativos - _acessiveis)
                 usuario["acessa_admin"] = _perfis.acessa_painel(_niv, "admin")
                 usuario["acessa_config"] = _perfis.acessa_painel(_niv, "config")
-                usuario["hub"] = _mod.hub_layout(usuario["modulos_ativos"])
+                # Hub sobre TODOS os módulos ativos da loja, marcando os que o perfil não acessa
+                # (front mostra bloqueado com cadeado → step-up por senha). rev3 §2.
+                usuario["hub"] = [
+                    {"faixa": g["faixa"], "rotulo": g["rotulo"],
+                     "modulos": [{"id": m["id"], "rotulo": m["rotulo"],
+                                  "bloqueado": m["id"] not in _acessiveis} for m in g["modulos"]]}
+                    for g in _mod.hub_layout(sorted(_ativos))
+                ]
             finally:
                 db.close()
             _send_json(handler, {"ok": True, "usuario": usuario})

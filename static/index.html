@@ -3565,6 +3565,12 @@ function hubRender(){
       <div class="hub-faixa-title">${esc(g.rotulo)}</div>
       <div class="hub-cards">
         ${g.modulos.map(m => {
+          if(m.bloqueado){
+            return `<div class="hub-card" style="opacity:.55;cursor:pointer" title="Sem acesso — clique para liberar com a senha de quem tem o perfil" onclick="solicitarAcessoModulo('${esc(m.id)}')">
+              <span class="hub-card-nome">${esc(m.rotulo)}</span>
+              <span class="hub-card-tag"><i class="ti ti-lock"></i> Bloqueado</span>
+            </div>`;
+          }
           const tem = !!_HUB_DESTINO[m.id];
           return `<div class="hub-card${tem?'':' soon'}" ${tem?`onclick="_hubIr('${esc(m.id)}')"`:''}>
             <span class="hub-card-nome">${esc(m.rotulo)}</span>
@@ -3576,6 +3582,17 @@ function hubRender(){
 }
 
 function _hubIr(id){ const f = _HUB_DESTINO[id]; if(f) f(); }
+
+// Módulo bloqueado clicado (hub/sidebar): pede step-up por senha; se liberado, o grant no
+// servidor passa a valer, então marcamos localmente como acessível e navegamos.
+async function solicitarAcessoModulo(id){
+  const ok = await abrirModalStepUp(id);
+  if(!ok) return;
+  (_usuarioAtual && _usuarioAtual.hub || []).forEach(g =>
+    (g.modulos || []).forEach(m => { if(m.id === id) m.bloqueado = false; }));
+  hubRender(); sbNavRender();
+  const f = _HUB_DESTINO[id]; if(f) f();
+}
 
 function unlockNav(n){
   const el = document.getElementById('nav-0'+n);
@@ -8577,6 +8594,11 @@ function sbNavRender(){
   if(!grupos){ box.innerHTML = ''; return; }      // sem info do hub -> nada (compat)
   const mods = grupos.flatMap(g => g.modulos || []);   // lista PLANA, sem cabeçalho de faixa
   box.innerHTML = mods.map(m => {
+    if(m.bloqueado){
+      return '<div class="nav-item sb-mod" style="opacity:.55" title="Sem acesso — clique para liberar com senha"'
+        + ' onclick="solicitarAcessoModulo(\'' + m.id + '\')">'
+        + '<i class="ti ti-lock"></i><span class="sb-mod-lbl">' + esc(m.rotulo) + '</span></div>';
+    }
     const cfg = _SB_MODULOS[m.id] || {};
     const ic  = cfg.ic || 'point';
     const temSec = !!(cfg.secoes && cfg.secoes.length);
