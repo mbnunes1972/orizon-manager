@@ -8,7 +8,7 @@ a camada (nucleo|dominio), as dependências permitidas e se o módulo é deslig�
 MODULOS = {
     # ── NÚCLEO / PLATAFORMA ────────────────────────────────────────────────
     "auth":        {"camada": "nucleo", "depende_de": [],
-                    "arquivos": ["auth.py", "auth_routes.py", "perfis.py", "perfil_store.py", "mod_usuarios.py"],
+                    "arquivos": ["auth.py", "auth_routes.py", "perfis.py", "perfil_store.py", "mod_perfis.py", "mod_usuarios.py"],
                     "tabelas": ["usuarios", "sessoes", "perfil_acesso"], "rotas": []},
     "tenancy":     {"camada": "nucleo", "depende_de": ["auth"],
                     "arquivos": ["mod_tenancy.py"],
