@@ -40,6 +40,9 @@ class Usuario(Base):
     whatsapp      = Column(String(20),  nullable=True)
     ativo         = Column(Integer,     default=1)
     funcionario_id = Column(Integer,    ForeignKey("funcionarios.id"), nullable=True)  # RH (Cadastro) que esta conta representa
+    # Função (cargo) da CONTA quando não há Funcionário vinculado (Perfil-4 rev2 §2): a coluna Função
+    # de Usuários da Loja usa Funcionario.funcao_id se houver vínculo, senão este funcao_id.
+    funcao_id     = Column(Integer,     ForeignKey("funcoes.id"), nullable=True)
     tema          = Column(String(10),  default="escuro")   # 'claro' | 'escuro'
     criado_em     = Column(DateTime,    default=datetime.utcnow)
     loja_id       = Column(Integer,     ForeignKey("lojas.id"), nullable=True)  # usuário de loja
@@ -1106,6 +1109,8 @@ def _migrar_colunas():
         _add_cols("parceiros",    [("pix","VARCHAR(140)")])
         # Mapa de Atribuições (Regras_Funcoes_Perfis §5): conta opcional do Terceiro
         _add_cols("terceiros",    [("usuario_id","INTEGER")])
+        # Perfil-4 (rev2 §2): Função (cargo) da conta quando não há Funcionário vinculado
+        _add_cols("usuarios",     [("funcao_id","INTEGER")])
         # Cronograma do Ciclo (Modulos_Orizon_v11): data prevista de conclusão por etapa
         # + Responsável por função (Modulos_Orizon_v12): função exigida + funcionário escolhido
         _add_cols("ciclo_etapas", [("data_prevista_conclusao","DATETIME"),
@@ -1191,6 +1196,37 @@ def _run_migracoes(conn):
                 if nome not in existentes:
                     cur.execute("INSERT INTO funcoes(loja_id, nome, status) VALUES(?,?,'ativo')", (lid, nome))
         cur.execute("INSERT INTO schema_migrations(id) VALUES('funcoes_seed_v1')")
+
+    # 2026-07-10: Perfil-4 (rev2 §2) — colapsa os ~13 níveis-cargo em 4 perfis de acesso; o cargo
+    # antigo vira Função (usuarios.funcao_id, só p/ contas sem Funcionário vinculado). Idempotente.
+    if "perfis_v3_2026" not in aplicadas and _tabela_existe(cur, "usuarios"):
+        _CARGO = {"diretor": "Diretor", "gerente_vendas": "Gerente de Vendas",
+                  "gerente_adm_fin": "Gerente Administrativo/Financeiro", "consultor": "Consultor",
+                  "medidor": "Medidor", "projetista_executivo": "Projetista Executivo",
+                  "conferente": "Conferente", "supervisor_montagem": "Supervisor de Montagem",
+                  "assistente_logistico": "Assistente Logístico",
+                  "assistente_administrativo": "Assistente Administrativo"}
+        _PERFIL = {"diretor": "diretoria", "gerente_vendas": "gerencial",
+                   "gerente_adm_fin": "diretoria", "consultor": "consultor", "medidor": "consultor",
+                   "projetista_executivo": "consultor", "conferente": "consultor",
+                   "supervisor_montagem": "consultor", "assistente_logistico": "consultor",
+                   "assistente_administrativo": "consultor"}
+        if {"funcao_id", "loja_id", "funcionario_id"} <= _cols_de(cur, "usuarios") \
+                and _tabela_existe(cur, "funcoes"):
+            for uid, niv, loja_id, fnid in cur.execute(
+                    "SELECT id, nivel, loja_id, funcionario_id FROM usuarios").fetchall():
+                if fnid:                       # tem Funcionário → função vem de lá
+                    continue
+                nome = _CARGO.get(niv)
+                if nome and loja_id:
+                    row = cur.execute("SELECT id FROM funcoes WHERE loja_id=? AND nome=?",
+                                      (loja_id, nome)).fetchone()
+                    if row:
+                        cur.execute("UPDATE usuarios SET funcao_id=? WHERE id=?", (row[0], uid))
+        for antigo, novo in _PERFIL.items():
+            if antigo != novo:
+                cur.execute("UPDATE usuarios SET nivel=? WHERE nivel=?", (novo, antigo))
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('perfis_v3_2026')")
 
     # 2026-06-20: F1 multi-tenant — loja seed (das constantes do contrato) + backfill.
     if "tenancy_v1_2026" not in aplicadas and _tabela_existe(cur, "lojas"):

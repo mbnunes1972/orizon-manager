@@ -3,13 +3,13 @@ import mod_tenancy as mt
 
 SUPER = {"nivel": "super_admin", "loja_id": None, "rede_id": None}
 ADMR  = {"nivel": "admin_rede",  "loja_id": None, "rede_id": 1}
-DIR   = {"nivel": "diretor",     "loja_id": 10,   "rede_id": None}
+DIR   = {"nivel": "diretoria",     "loja_id": 10,   "rede_id": None}
 CONS  = {"nivel": "consultor",   "loja_id": 10,   "rede_id": None}
 
 def test_loja_lista_operacionais_sem_admins():
     for ator in (DIR, ADMR, SUPER):
         lst = mt.perfis_atribuiveis(ator, "loja")
-        assert "consultor" in lst and "diretor" in lst
+        assert "consultor" in lst and "diretoria" in lst
         assert "super_admin" not in lst and "admin_rede" not in lst
 
 def test_rede_so_admin_rede_e_so_para_super_e_admrede():

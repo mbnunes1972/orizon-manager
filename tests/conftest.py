@@ -62,8 +62,8 @@ def seed(app_db):
         u.set_senha("senha123")
         db.add(u)
 
-    mkuser("Diretor L1", "dir_l1", "diretor", loja_id=l1.id)
-    mkuser("Diretor L2", "dir_l2", "diretor", loja_id=l2.id)
+    mkuser("Diretor L1", "dir_l1", "diretoria", loja_id=l1.id)   # Perfil-4: Diretoria (era 'diretor')
+    mkuser("Diretor L2", "dir_l2", "diretoria", loja_id=l2.id)
     mkuser("Consultor L1", "cons_l1", "consultor", loja_id=l1.id)
     mkuser("Super",      "super",  "super_admin")
     mkuser("Adm Rede",   "adm_rede", "admin_rede", rede_id=rede.id)

@@ -20,9 +20,9 @@ def test_capacidades_administrativas():
     assert perfis.pode("admin_rede", "editar_dados_loja")   is True
     assert perfis.pode("admin_rede", "gerir_usuarios")      is True
 
-    assert perfis.pode("diretor", "editar_dados_loja")      is True
-    assert perfis.pode("diretor", "gerir_lojas")            is False
-    assert perfis.pode("diretor", "gerir_redes")            is False
+    assert perfis.pode("diretoria", "editar_dados_loja")      is True
+    assert perfis.pode("diretoria", "gerir_lojas")            is False
+    assert perfis.pode("diretoria", "gerir_redes")            is False
 
     assert perfis.pode("consultor", "gerir_redes")          is False
     assert perfis.pode("consultor", "gerir_lojas")          is False

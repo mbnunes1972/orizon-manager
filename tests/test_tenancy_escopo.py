@@ -3,7 +3,7 @@ import mod_tenancy as mt
 
 SUPER = {"nivel": "super_admin", "loja_id": None, "rede_id": None}
 ADMR  = {"nivel": "admin_rede",  "loja_id": None, "rede_id": 1}
-DIR   = {"nivel": "diretor",     "loja_id": 10,   "rede_id": None}
+DIR   = {"nivel": "diretoria",     "loja_id": 10,   "rede_id": None}
 
 LOJA_R1 = {"id": 10, "rede_id": 1}
 LOJA_R2 = {"id": 20, "rede_id": 2}
@@ -26,7 +26,7 @@ def test_pode_editar_dados_rede():
     assert mt.pode_editar_dados_rede(ADMR, 2) is False     # outra rede
     assert mt.pode_editar_dados_rede(DIR, 1) is False      # diretor não enxerga a rede
     # gerente adm/fin não tem editar_dados_loja → nunca edita config de rede
-    assert mt.pode_editar_dados_rede({"nivel": "gerente_adm_fin", "rede_id": 1}, 1) is False
+    assert mt.pode_editar_dados_rede({"nivel": "consultor", "rede_id": 1}, 1) is False
 
 
 def test_pode_ver_loja():
@@ -54,11 +54,11 @@ def test_atribuir_tenant_super_admin():
     assert mt.atribuir_tenant_usuario(SUPER, {"nivel": "admin_rede", "rede_id": 5}) == (None, 5, [])
     loja_id, rede_id, erros = mt.atribuir_tenant_usuario(SUPER, {"nivel": "admin_rede"})
     assert erros and rede_id is None
-    assert mt.atribuir_tenant_usuario(SUPER, {"nivel": "diretor", "loja_id": 30}) == (30, None, [])
+    assert mt.atribuir_tenant_usuario(SUPER, {"nivel": "diretoria", "loja_id": 30}) == (30, None, [])
 
 
 def test_atribuir_tenant_admin_rede():
-    assert mt.atribuir_tenant_usuario(ADMR, {"nivel": "diretor", "loja_id": 10}) == (10, None, [])
+    assert mt.atribuir_tenant_usuario(ADMR, {"nivel": "diretoria", "loja_id": 10}) == (10, None, [])
     # admin_rede agora cria PAR admin_rede (herda a própria rede); super_admin segue bloqueado
     assert mt.atribuir_tenant_usuario(ADMR, {"nivel": "admin_rede"}) == (None, 1, [])
     _, _, e_super = mt.atribuir_tenant_usuario(ADMR, {"nivel": "super_admin"})

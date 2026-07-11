@@ -20,13 +20,13 @@ def test_diretor_libera(http_client_factory, seed):
 
 
 def test_gerente_adm_fin_libera(http_client_factory, seed, app_db):
-    _mk(app_db, "gaf", "gerente_adm_fin")
+    _mk(app_db, "gaf", "diretoria")
     st, body = _post(http_client_factory, "gaf", "senha123")
     assert st == 200 and body["ok"]
 
 
 def test_gerente_vendas_403(http_client_factory, seed, app_db):
-    _mk(app_db, "gv", "gerente_vendas")
+    _mk(app_db, "gv", "gerencial")
     st, body = _post(http_client_factory, "gv", "senha123")
     assert st == 403 and body["ok"] is False
 

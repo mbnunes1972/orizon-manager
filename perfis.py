@@ -4,26 +4,73 @@
 Ao adicionar/alterar um perfil, atualize TAMBÉM docs/USUARIOS.md.
 """
 
+# Perfil = NÍVEL DE ACESSO (Regras_Funcoes_Perfis_Atribuicoes rev2 §2): 4 perfis de LOJA definidos por
+# acesso a módulo/painel (acesso_*), + os 2 de plataforma/rede. Os CARGOS (Diretor, Medidor, …) saíram
+# daqui e viraram Função (tabela Funcao). Capacidades operacionais mapeadas de forma grosseira p/ não
+# quebrar os gates vigentes; a precisão fina por Função é frente posterior.
 PERFIS = {
-    "diretor":                   {"rotulo": "Diretor",                           "desconto_max": 50.0, "ver_parametros": True,  "autorizar": True,  "gerir_usuarios": True,  "aprovar_financeiro": True,  "registrar_medicao": True,  "aprovar_medicao_reprovada": True, "editar_dados_loja": True, "executar_pe": True, "revisar_pe": True},
-    "gerente_vendas":            {"rotulo": "Gerente de Vendas",                 "desconto_max": 20.0, "ver_parametros": True,  "autorizar": True,  "gerir_usuarios": False, "aprovar_medicao_reprovada": True, "executar_pe": True, "revisar_pe": True},
-    "consultor":                 {"rotulo": "Consultor",                         "desconto_max": 10.0, "ver_parametros": False, "autorizar": False, "gerir_usuarios": False},
-    "gerente_adm_fin":           {"rotulo": "Gerente Administrativo/Financeiro", "desconto_max": 0.0,  "ver_parametros": True,  "autorizar": False, "gerir_usuarios": True,  "aprovar_financeiro": True,  "aprovar_medicao_reprovada": True, "executar_pe": True, "revisar_pe": True},
-    "assistente_logistico":      {"rotulo": "Assistente Logístico",              "desconto_max": 0.0,  "ver_parametros": False, "autorizar": False, "gerir_usuarios": False},
-    "conferente":                {"rotulo": "Conferente",                        "desconto_max": 0.0,  "ver_parametros": False, "autorizar": False, "gerir_usuarios": False, "executar_pe": True},
-    "supervisor_montagem":       {"rotulo": "Supervisor de Montagem",            "desconto_max": 0.0,  "ver_parametros": False, "autorizar": False, "gerir_usuarios": False},
-    "assistente_administrativo": {"rotulo": "Assistente Administrativo",         "desconto_max": 0.0,  "ver_parametros": False, "autorizar": False, "gerir_usuarios": False},
-    "projetista_executivo":      {"rotulo": "Projetista Executivo",             "desconto_max": 0.0,  "ver_parametros": False, "autorizar": False, "gerir_usuarios": False, "executar_pe": True},
-    "medidor":                   {"rotulo": "Medidor",                           "desconto_max": 0.0,  "ver_parametros": False, "autorizar": False, "gerir_usuarios": False, "registrar_medicao": True},
-    "super_admin":               {"rotulo": "Administrador da Plataforma",       "desconto_max": 0.0,  "ver_parametros": False, "autorizar": False, "gerir_usuarios": True,  "aprovar_financeiro": False, "registrar_medicao": False, "aprovar_medicao_reprovada": False, "gerir_redes": True,  "gerir_lojas": True,  "editar_dados_loja": True},
-    "admin_rede":                {"rotulo": "Administrador de Rede",             "desconto_max": 0.0,  "ver_parametros": False, "autorizar": False, "gerir_usuarios": True,  "aprovar_financeiro": False, "registrar_medicao": False, "aprovar_medicao_reprovada": False, "gerir_redes": False, "gerir_lojas": True,  "editar_dados_loja": True},
+    "diretoria": {"rotulo": "Diretoria", "desconto_max": 50.0,
+        "acesso_operacional": True, "acesso_financeiro": True, "acesso_fiscal": True,
+        "acesso_admin": True, "acesso_config": True,
+        "ver_parametros": True, "autorizar": True, "aprovar_financeiro": True,
+        "aprovar_medicao_reprovada": True, "gerir_usuarios": True, "editar_dados_loja": True,
+        "executar_pe": True, "revisar_pe": True, "registrar_medicao": True},
+    "gerencial": {"rotulo": "Gerencial", "desconto_max": 20.0,
+        "acesso_operacional": True, "acesso_financeiro": False, "acesso_fiscal": False,
+        "acesso_admin": True, "acesso_config": True,
+        "ver_parametros": True, "autorizar": True, "aprovar_financeiro": False,
+        "aprovar_medicao_reprovada": True, "gerir_usuarios": True, "editar_dados_loja": True,
+        "executar_pe": True, "revisar_pe": True, "registrar_medicao": True},
+    "consultor": {"rotulo": "Consultor", "desconto_max": 10.0,
+        "acesso_operacional": True, "acesso_financeiro": False, "acesso_fiscal": False,
+        "acesso_admin": False, "acesso_config": False,
+        "ver_parametros": False, "autorizar": False, "aprovar_financeiro": False,
+        "aprovar_medicao_reprovada": False, "gerir_usuarios": False, "editar_dados_loja": False,
+        "executar_pe": True, "revisar_pe": False, "registrar_medicao": True},
+    "suporte": {"rotulo": "Suporte", "desconto_max": 0.0,
+        "acesso_operacional": False, "acesso_financeiro": False, "acesso_fiscal": False,
+        "acesso_admin": True, "acesso_config": True,
+        "ver_parametros": False, "autorizar": False, "aprovar_financeiro": False,
+        "aprovar_medicao_reprovada": False, "gerir_usuarios": True, "editar_dados_loja": True,
+        "executar_pe": False, "revisar_pe": False, "registrar_medicao": False},
+    # ── Plataforma/Rede (fora dos 4 de loja) — inalterados no papel; ganham só os acesso_* de painel ──
+    "super_admin": {"rotulo": "Administrador da Plataforma", "desconto_max": 0.0,
+        "acesso_operacional": False, "acesso_financeiro": False, "acesso_fiscal": False,
+        "acesso_admin": True, "acesso_config": True,
+        "gerir_usuarios": True, "editar_dados_loja": True, "gerir_redes": True, "gerir_lojas": True},
+    "admin_rede": {"rotulo": "Administrador de Rede", "desconto_max": 0.0,
+        "acesso_operacional": False, "acesso_financeiro": False, "acesso_fiscal": False,
+        "acesso_admin": True, "acesso_config": True,
+        "gerir_usuarios": True, "editar_dados_loja": True, "gerir_redes": False, "gerir_lojas": True},
 }
 
 _DEFAULT = {"rotulo": "—", "desconto_max": 0.0, "ver_parametros": False,
             "autorizar": False, "gerir_usuarios": False, "aprovar_financeiro": False,
             "registrar_medicao": False, "aprovar_medicao_reprovada": False,
             "gerir_redes": False, "gerir_lojas": False, "editar_dados_loja": False,
-            "executar_pe": False, "revisar_pe": False}
+            "executar_pe": False, "revisar_pe": False,
+            "acesso_operacional": False, "acesso_financeiro": False, "acesso_fiscal": False,
+            "acesso_admin": False, "acesso_config": False}
+
+# Acesso a MÓDULO/PAINEL (matriz rev2 §2) — mapeia id de módulo → capacidade acesso_* do perfil.
+_MODULOS_OPERACIONAIS = frozenset({"captacao", "cadastro", "comercial", "producao",
+                                   "estoque", "expedicao", "montagem", "assistencias"})
+_MODULO_ACESSO = {"financeiro": "acesso_financeiro", "folha": "acesso_financeiro",
+                  "fiscal": "acesso_fiscal"}
+
+
+def acessa_modulo(slug, modulo_id):
+    """True se o perfil `slug` pode abrir o módulo de domínio `modulo_id` (matriz §2)."""
+    if modulo_id in _MODULO_ACESSO:
+        return pode(slug, _MODULO_ACESSO[modulo_id])
+    if modulo_id in _MODULOS_OPERACIONAIS:
+        return pode(slug, "acesso_operacional")
+    return True   # módulos de núcleo / desconhecidos não são bloqueados por esta matriz
+
+
+def acessa_painel(slug, painel):
+    """True se o perfil abre o painel 'admin' (page-07) ou 'config' (page-09)."""
+    return pode(slug, "acesso_admin" if painel == "admin" else "acesso_config")
 
 
 def existe(slug):
@@ -63,6 +110,16 @@ def pode(slug, capacidade):
 # Usuário FORMALIZAR o que perfis.py já governa. A fonte única de VERDADE continua sendo PERFIS; isto
 # é só a camada de apresentação. Toda capacidade booleana usada em PERFIS deve ter entrada aqui.
 CAPACIDADES = {
+    "acesso_operacional":        {"rotulo": "Módulos operacionais",       "grupo": "Acesso",
+        "descricao": "Abrir os módulos operacionais (Cadastro, Comercial, Projetos, Expedição…)."},
+    "acesso_financeiro":         {"rotulo": "Financeiro / Folha",         "grupo": "Acesso",
+        "descricao": "Abrir os módulos Financeiro e Folha de Pagamento."},
+    "acesso_fiscal":             {"rotulo": "Fiscal",                     "grupo": "Acesso",
+        "descricao": "Abrir o módulo Fiscal (NF-e/NFS-e)."},
+    "acesso_admin":              {"rotulo": "Painel Admin",               "grupo": "Acesso",
+        "descricao": "Abrir o painel de Administração (identidade e acesso)."},
+    "acesso_config":             {"rotulo": "Painel Config",              "grupo": "Acesso",
+        "descricao": "Abrir o painel de Config (parâmetros de negócio)."},
     "ver_parametros":            {"rotulo": "Ver parâmetros",             "grupo": "Comercial",
         "descricao": "Ver o painel de apoio da negociação (margens/custos internos)."},
     "autorizar":                 {"rotulo": "Autorizar desconto",         "grupo": "Comercial",

@@ -31,7 +31,7 @@ def test_validar_novo_usuario_perfil_invalido():
 
 
 def test_validar_edicao_usuario():
-    assert mu.validar_edicao_usuario({"nivel": "medidor"}) == []
+    assert mu.validar_edicao_usuario({"nivel": "gerencial"}) == []
     assert mu.validar_edicao_usuario({}) == []                 # nada a validar
     erros = mu.validar_edicao_usuario({"nivel": "rei"})
     assert any("perfil" in e.lower() for e in erros)

@@ -8,17 +8,15 @@ Uso: python3 seed.py
 import database
 from database import init_db, get_session, Usuario, Funcao, loja_seed_id, FUNCOES_PADRAO
 
+# Perfil-4 (rev2 §2): Perfil = nível de ACESSO (diretoria/gerencial/consultor/suporte). O cargo é a
+# FUNÇÃO (semeada em Config › Funções); é atribuído pelo cadastro de Funcionário, não pelo login.
 USUARIOS = [
-    {"nome": "Pedro da Mota",        "login": "pdm2026", "senha": "teste123", "nivel": "diretor"},
-    {"nome": "Luiz da Silva",        "login": "lds2026", "senha": "teste234", "nivel": "gerente_vendas"},
+    {"nome": "Pedro da Mota",        "login": "pdm2026", "senha": "teste123", "nivel": "diretoria"},
+    {"nome": "Luiz da Silva",        "login": "lds2026", "senha": "teste234", "nivel": "gerencial"},
     {"nome": "Marcia dos Santos",    "login": "mds2026", "senha": "teste345", "nivel": "consultor"},
-    {"nome": "Gabriela Adm/Fin",     "login": "gaf2026", "senha": "teste456", "nivel": "gerente_adm_fin"},
-    {"nome": "Alex Logistica",       "login": "alg2026", "senha": "teste567", "nivel": "assistente_logistico"},
-    {"nome": "Carla Conferente",     "login": "ccf2026", "senha": "teste678", "nivel": "conferente"},
-    {"nome": "Sergio Montagem",      "login": "smt2026", "senha": "teste789", "nivel": "supervisor_montagem"},
-    {"nome": "Aline Administrativo", "login": "aad2026", "senha": "teste890", "nivel": "assistente_administrativo"},
-    {"nome": "Paulo Projetista",     "login": "ppe2026", "senha": "teste901", "nivel": "projetista_executivo"},
-    {"nome": "Marcos Medidor",       "login": "med2026", "senha": "teste012", "nivel": "medidor"},
+    {"nome": "Gabriela Adm/Fin",     "login": "gaf2026", "senha": "teste456", "nivel": "diretoria"},
+    {"nome": "Sonia Suporte",        "login": "sup2026", "senha": "teste567", "nivel": "suporte"},
+    {"nome": "Marcos Medidor",       "login": "med2026", "senha": "teste012", "nivel": "consultor"},
 ]
 
 

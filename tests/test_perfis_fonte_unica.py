@@ -8,7 +8,7 @@ import storage
 def test_slugs_loja_exclui_plataforma_e_rede():
     slugs = set(perfis.slugs_loja())
     assert "super_admin" not in slugs and "admin_rede" not in slugs
-    assert {"consultor", "gerente_vendas", "diretor"} <= slugs
+    assert {"consultor", "gerencial", "diretoria", "suporte"} <= slugs
 
 
 def test_opcoes_acesso_derivadas_sem_orfao_gerente():
@@ -16,8 +16,8 @@ def test_opcoes_acesso_derivadas_sem_orfao_gerente():
     assert all("slug" in o and "rotulo" in o for o in ops)
     slugs = {o["slug"] for o in ops}
     assert slugs <= set(perfis.slugs())      # nada fora de perfis.py
-    assert "gerente" not in slugs            # o órfão antigo (não é slug de perfis.py)
-    assert "gerente_vendas" in slugs         # o slug real
+    assert "gerente" not in slugs            # órfão antigo — nunca foi slug de perfis.py
+    assert "gerencial" in slugs              # perfil real (Perfil-4)
     assert "super_admin" not in slugs
 
 
@@ -31,10 +31,10 @@ def test_func_sync_acesso_valida_contra_perfis_py(app_db):
     assert ok is False and "inválido" in (err or "").lower()
     # slug real de perfis.py → aceito (cria a conta com nivel válido)
     ok2, err2 = mod_cadastro.func_sync_acesso(
-        db, f, {"acesso": {"tem_acesso": True, "email": "b@loja.com", "perfil": "gerente_vendas"}})
+        db, f, {"acesso": {"tem_acesso": True, "email": "b@loja.com", "perfil": "gerencial"}})
     assert ok2 is True, err2
     u = db.get(app_db.Usuario, f.usuario_id)
-    assert u.nivel == "gerente_vendas" and perfis.existe(u.nivel)
+    assert u.nivel == "gerencial" and perfis.existe(u.nivel)
     db.close()
 
 

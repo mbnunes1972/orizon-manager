@@ -140,7 +140,8 @@ def _enriquecer_projetos_com_pool(projetos):
         db.close()
 
 # Consultor responsável do projeto (criado_por_id) — atribuição por gerente+ ------------------
-_NIVEIS_ATRIBUIVEIS = ("consultor", "gerente", "diretor")   # quem pode ser "consultor responsável"
+# Quem pode ser "consultor responsável" (Perfil-4): perfis de loja com acesso operacional.
+_NIVEIS_ATRIBUIVEIS = tuple(s for s in perfis.slugs_loja() if perfis.pode(s, "acesso_operacional"))
 
 def _usuario_pertence_a_loja(db, u, loja_id):
     """True se o usuário `u` está ligado à loja (loja_id direto ou vínculo UsuarioLoja)."""

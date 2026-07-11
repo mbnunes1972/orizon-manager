@@ -115,13 +115,17 @@ def test_upload_sem_arquivo_400(http_client_factory, seed, projetos_dir):
     assert st == 400
 
 
-def test_upload_sem_capability_403(http_client_factory, seed, projetos_dir):
-    # consultor (cons_l1) NÃO tem executar_pe; projeto da loja 1
-    c = _login(http_client_factory, "cons_l1")
+def test_upload_sem_capability_403(http_client_factory, seed, projetos_dir, app_db):
+    # Perfil-4: consultor GANHOU executar_pe (mapeamento grosseiro); só o perfil Suporte NÃO tem.
+    db = app_db.get_session()
+    l1 = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    u = app_db.Usuario(nome="Sup", login="sup@loja.com", nivel="suporte", loja_id=l1, ativo=1)
+    u.set_senha("senha123"); db.add(u); db.commit(); db.close()
+    c = _login(http_client_factory, "sup@loja.com")
     proj = seed["projeto_l1"]
     st, body = _post_multipart(
         c.base, c.cookie, f"/api/projetos/{proj}/ciclo/11a/documento",
-        {"login": "cons_l1", "senha": "senha123"},
+        {"login": "sup@loja.com", "senha": "senha123"},
         file_field="arquivo", filename="x.pdf", filedata=b"x")
     assert st == 403
 
