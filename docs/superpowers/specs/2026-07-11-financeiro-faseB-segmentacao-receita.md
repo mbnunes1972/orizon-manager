@@ -100,3 +100,23 @@ Val_Liq = Cust_Fin).
 
 `[CONFIRMAR CONTADOR]`: receita no doc fiscal · adiantamento passivo (Simples) · timing dos impostos-provisão
 · custo financeiro direto · estorno de cancelamento fiscal (backlog FASE D).
+
+## C — painel de Provisões por tipo A/B/C/D (IMPLEMENTADO, Sessão 66)
+
+**Backend** (`mod_contabil.py`): `_PROV_PAINEL_TIPO` (`2.1.04.x → A/B/C/D`, data-driven; conta nova sem tipo
+→ "O" Outros). `contas_provisao_do_plano` devolve `tipo`; `dashboard_financeiro` ganha
+`provisoes_por_tipo` (grupos A→B→C→D→O com `rotulo`/`itens`/`subtotal`; mantém `provisoes` + total p/
+compat). Σ subtotais = `total_provisoes_abertas`.
+Mapeamento: **A** comissões/pessoas (.10/.11/.12) · **B** custos futuros (.02/.03/.05) · **C** aquisição/
+fábrica (.06/.07/.08/.09) · **D** fiscal (.13).
+
+**Frontend** (`static/index.html`, `finDashboardCarregar`): um card por grupo (cabeçalho `tipo · rótulo` +
+subtotal; linhas por dentro), tokens/`.surface-2`, 2 temas. Fallback à lista plana se o backend não
+devolve `provisoes_por_tipo` (evita painel vazio antes do restart — C1 é Python).
+
+## D — reconciliação (PENDENTE)
+
+Por provisão/projeto: **Provisionado × Efetivado × Saldo × Destino**. O custo real (NF fábrica + outros
+fornecedores + insumos) entra como **Efetivado** (manual); a diferença provisionado−real (ex.: CFO−real)
+vai ao resultado (sobra→receita / falta→despesa). + eventos de **estorno** de cancelamento fiscal (backlog
+da B2).
