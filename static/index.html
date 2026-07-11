@@ -2169,6 +2169,33 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 
+<div id="modal-stepup" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:400px">
+    <div class="modal-hdr">
+      <div class="modal-title">Autorização necessária</div>
+      <span class="modal-close" onclick="fecharModalStepUp(false)">&#x2715;</span>
+    </div>
+    <div id="stepup-msg" style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5"></div>
+    <div style="margin-bottom:12px">
+      <label class="field-label">Login do autorizador</label>
+      <input type="text" id="stepup-login" autocomplete="off"
+             style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"
+             onkeydown="if(event.key==='Enter')document.getElementById('stepup-senha').focus()">
+    </div>
+    <div style="margin-bottom:6px">
+      <label class="field-label">Senha</label>
+      <input type="password" id="stepup-senha"
+             style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"
+             onkeydown="if(event.key==='Enter')confirmarStepUp()">
+    </div>
+    <div id="stepup-erro" style="font-size:12px;color:var(--err);min-height:18px;margin:6px 0"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost btn-sm" onclick="fecharModalStepUp(false)">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="confirmarStepUp()">Liberar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2179,7 +2206,7 @@ const fmt = n => Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maxim
 let _lojaAtiva = null;   // loja ativa atual (multi-loja); null = usa default do backend
 (function _instalarFetchLojaAtiva(){
   const _origFetch = window.fetch.bind(window);
-  window.fetch = function(input, init){
+  window.fetch = async function(input, init){
     init = init || {};
     try {
       const url = (typeof input === 'string') ? input : (input && input.url) || '';
@@ -2189,7 +2216,17 @@ let _lojaAtiva = null;   // loja ativa atual (multi-loja); null = usa default do
         init.headers = h;
       }
     } catch(e){ /* não bloquear a requisição por erro do interceptor */ }
-    return _origFetch(input, init);
+    let resp = await _origFetch(input, init);
+    // Step-up: 403 com precisa_stepup → pede senha de quem tem o recurso e refaz a requisição.
+    if (resp && resp.status === 403 && typeof abrirModalStepUp === 'function') {
+      let data = null;
+      try { data = await resp.clone().json(); } catch(e){}
+      if (data && data.precisa_stepup) {
+        const ok = await abrirModalStepUp(data.precisa_stepup);
+        if (ok) { resp = await _origFetch(input, init); }
+      }
+    }
+    return resp;
   };
 })();
 
@@ -2934,6 +2971,46 @@ function abrirModalPerfilDetalhe(slug){
 }
 function fecharModalPerfilDetalhe(){
   const m = document.getElementById('modal-perfil-detalhe'); if(m) m.style.display = 'none';
+}
+
+// Step-up por senha: quando um módulo/painel fora do perfil retorna 403 precisa_stepup,
+// pede a senha de alguém que tenha o recurso; se autorizado, o interceptor refaz a requisição.
+const _RECURSO_ROTULO = { folha:'Folha de Pagamento', financeiro:'Financeiro', fiscal:'Fiscal',
+                          admin:'Administração', config:'Configurações' };
+let _stepupResolve = null, _stepupRecurso = null;
+function abrirModalStepUp(recurso){
+  if(_stepupResolve) return Promise.resolve(false);   // já há um step-up em andamento
+  _stepupRecurso = recurso;
+  const nome = _RECURSO_ROTULO[recurso] || recurso;
+  document.getElementById('stepup-msg').innerHTML =
+    'Seu perfil não inclui <strong style="color:var(--text)">'+esc(nome)+'</strong>. Informe o login e a senha de um usuário que tenha esse acesso para liberar.';
+  document.getElementById('stepup-login').value = '';
+  document.getElementById('stepup-senha').value = '';
+  document.getElementById('stepup-erro').textContent = '';
+  document.getElementById('modal-stepup').style.display = 'flex';
+  setTimeout(() => { const el = document.getElementById('stepup-login'); if(el) el.focus(); }, 60);
+  return new Promise(res => { _stepupResolve = res; });
+}
+function fecharModalStepUp(resultado){
+  const m = document.getElementById('modal-stepup'); if(m) m.style.display = 'none';
+  const r = _stepupResolve; _stepupResolve = null; _stepupRecurso = null;
+  if(r) r(!!resultado);
+}
+async function confirmarStepUp(){
+  const login = (document.getElementById('stepup-login').value || '').trim();
+  const senha = document.getElementById('stepup-senha').value || '';
+  const erroEl = document.getElementById('stepup-erro');
+  if(!login || !senha){ erroEl.textContent = 'Informe login e senha.'; return; }
+  let d;
+  try {
+    const r = await fetch('/api/auth/step-up', { method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ recurso:_stepupRecurso, login_autorizador:login, senha_autorizador:senha }) });
+    d = await r.json();
+  } catch(e){ erroEl.textContent = 'Erro de rede.'; return; }
+  if(!d.ok){ erroEl.textContent = d.erro || 'Não autorizado.'; return; }
+  showToast('Acesso liberado por ' + ((d.autorizador && d.autorizador.nome) || 'autorizador') + '.', false);
+  fecharModalStepUp(true);
 }
 
 function cfgRenderizarPerfis(){
@@ -9749,6 +9826,7 @@ document.addEventListener('keydown', function(e){
     ['modal-autorizacao',      () => fecharModalAutorizacao(false)],
     ['modal-perfil-acesso',    fecharModalPerfilAcesso],
     ['modal-perfil-detalhe',   fecharModalPerfilDetalhe],
+    ['modal-stepup',           () => fecharModalStepUp(false)],
     ['modal-perfil',           fecharModalPerfil],
     ['modal-exportar',         fecharModalExportar],
     ['modal-gerente-senha',    tfFecharModalSenha],
