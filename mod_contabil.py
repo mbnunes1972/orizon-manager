@@ -21,7 +21,16 @@ PLANO_PADRAO = [
     ("2.1.04.01", "Provisão de Comissão"), ("2.1.04.02", "Provisão de Montagem"),
     ("2.1.04.03", "Provisão de Garantia"), ("2.1.04.04", "Provisão de Devolução"),
     ("2.1.04.05", "Provisão de Assistência Técnica"),
+    # FASE A (infra contábil): Custo Fábrica + provisões das demais rubricas monitoradas
+    ("2.1.04.06", "Provisão de Custo de Fábrica"),
+    ("2.1.04.07", "Provisão de Frete de Fábrica"),
+    ("2.1.04.08", "Provisão de Frete Local"),
+    ("2.1.04.09", "Provisão de Insumos Locais"),
+    ("2.1.04.10", "Provisão de Comissão de Medidor"),
+    ("2.1.04.11", "Provisão de Comissão de Projeto/Executivo"),
+    ("2.1.04.12", "Provisão de Retenção de Comissão de Vendas"),
     ("2.1.05", "Financiamento Total Flex a Pagar"),
+    ("2.1.06", "Adiantamento de Clientes"),
     ("2.2", "Não Circulante"),
     ("2.2.01", "Financiamentos de Longo Prazo (principal)"),
     ("3", "PATRIMÔNIO LÍQUIDO"),
@@ -123,6 +132,14 @@ def seed_plano(db, owner_tipo, owner_id):
     if criadas:
         db.commit()
     return criadas
+
+
+def backfill_plano_todos_owners(db):
+    """Backfill idempotente do plano de contas em TODOS os owners que já têm plano — garante que
+    planos antigos ganhem as contas novas de PLANO_PADRAO (Adiantamento de Clientes, Provisão Custo
+    Fábrica e demais provisões monitoradas — FASE A). Reusa seed_plano. Retorna nº total de contas criadas."""
+    owners = db.query(Conta.owner_tipo, Conta.owner_id).distinct().all()
+    return sum(seed_plano(db, ot, oid) for ot, oid in owners)
 
 
 def _serial(c):
