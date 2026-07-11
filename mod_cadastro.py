@@ -183,7 +183,8 @@ def terc_aplicar(db, t, req, loja_id):
 
 # ── Tabela de Funções (Config) ───────────────────────────────────────────────
 def funcao_serialize(f, db=None):
-    return {"id": f.id, "nome": f.nome, "status": f.status or "ativo"}
+    return {"id": f.id, "nome": f.nome, "status": f.status or "ativo",
+            "perfil_padrao": getattr(f, "perfil_padrao", None)}
 
 
 def funcao_aplicar(db, f, req, loja_id):
@@ -193,6 +194,8 @@ def funcao_aplicar(db, f, req, loja_id):
         f.nome = _s(req.get("nome"))
     if "status" in req:
         f.status = (_s(req.get("status")) or "ativo")
+    if "perfil_padrao" in req:
+        f.perfil_padrao = _s(req.get("perfil_padrao")) or None
 
 
 def listar_funcoes(db, loja_id, ativos_only=False):
