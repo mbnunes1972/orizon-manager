@@ -8814,12 +8814,30 @@ async function finDashboardCarregar(){
   const d = (await r.json().catch(()=>({}))).dashboard;
   if(!d){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Falha ao carregar o dashboard.</em>'; return; }
   const card = inner => '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:16px 20px;margin-bottom:12px">'+inner+'</div>';
-  const provs = d.provisoes.map(p => card(
-     '<div style="display:flex;justify-content:space-between;align-items:flex-start">'
-    +'<div><div style="font-weight:700;color:var(--text);font-size:14px">'+esc(p.nome)+'</div>'
-    +'<div style="font-size:12px;color:var(--muted);margin-top:2px">'+esc(p.sub)+'</div></div>'
-    +'<div style="text-align:right"><div style="font-family:var(--font-mono);font-weight:700;font-size:15px;color:var(--text)">'+_fBRL(p.saldo_em_aberto)+'</div>'
-    +'<div style="font-size:11px;color:var(--muted)">saldo em aberto</div></div></div>')).join('');
+  // FASE C: provisões agrupadas por TIPO (A/B/C/D/O), cada grupo com subtotal; um card por grupo.
+  const linhaProv = p =>
+     '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-top:1px solid var(--border)">'
+    +'<div><div style="font-weight:600;color:var(--text);font-size:13px">'+esc(p.nome)+'</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(p.sub)+'</div></div>'
+    +'<div style="font-family:var(--font-mono);font-weight:700;font-size:14px;color:var(--text);white-space:nowrap">'+_fBRL(p.saldo_em_aberto)+'</div></div>';
+  const grupoCard = g => card(
+     '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px">'
+    +'<div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);font-weight:700">'+esc(g.tipo)+' · '+esc(g.rotulo)+'</div>'
+    +'<div style="text-align:right;white-space:nowrap"><span style="font-family:var(--font-mono);font-weight:700;font-size:15px;color:var(--text)">'+_fBRL(g.subtotal)+'</span>'
+    +'<span style="font-size:10px;color:var(--muted);margin-left:6px">subtotal</span></div></div>'
+    + (g.itens||[]).map(linhaProv).join(''));
+  // Robusto: agrupado por tipo (C1) OU, se o backend ainda não devolve provisoes_por_tipo (servidor
+  // não reiniciado / versão antiga), agrupa no cliente por p.tipo; sem tipo algum, cai numa lista plana.
+  let grupos;
+  if(d.provisoes_por_tipo && d.provisoes_por_tipo.length){
+    grupos = d.provisoes_por_tipo.map(grupoCard).join('');
+  } else {
+    grupos = (d.provisoes||[]).map(p => card(
+       '<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+      +'<div><div style="font-weight:600;color:var(--text);font-size:13px">'+esc(p.nome)+'</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(p.sub)+'</div></div>'
+      +'<div style="font-family:var(--font-mono);font-weight:700;font-size:14px;color:var(--text);white-space:nowrap">'+_fBRL(p.saldo_em_aberto)+'</div></div>')).join('');
+  }
   const dre=d.dre_resumo, cob=d.cobertura_caixa;
   const mini=(lbl,val,cor)=>'<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0"><span style="color:var(--muted)">'+lbl+'</span><span style="font-family:var(--font-mono);color:'+(cor||'var(--text)')+'">'+val+'</span></div>';
   const apoio='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
@@ -8833,7 +8851,7 @@ async function finDashboardCarregar(){
   box.innerHTML =
      '<div style="margin-bottom:14px">'
     +'<span style="font-size:13px;color:var(--muted)">'+d.provisoes.length+' provisões monitoradas · total em aberto <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(d.total_provisoes_abertas)+'</strong></span></div>'
-    + provs + apoio;
+    + grupos + apoio;
 }
 function finTab(t){
   _finSecaoAtual = t;
