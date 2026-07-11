@@ -2694,8 +2694,8 @@ async function cfgCronogramaRender(){
   const linhas = fases.map(f =>
      '<tr class="proj-row"><td style="padding:8px 12px;color:var(--muted);width:56px">'+esc(f.codigo)+'</td>'
     +'<td style="padding:8px 12px;color:var(--text)">'+esc(nome(f.codigo))+'</td>'
-    +'<td style="padding:8px 12px;text-align:right"><input type="number" min="0" step="1" id="crono-prazo-'+esc(f.codigo)+'" value="'+(parseInt(f.prazo_dias,10)||0)+'" style="width:80px;box-sizing:border-box;text-align:right"> <span style="font-size:11px;color:var(--muted)">dias</span></td>'
-    +'<td style="padding:8px 12px"><select id="crono-funcao-'+esc(f.codigo)+'" style="width:180px;box-sizing:border-box">'+funcOps(f.funcao_id)+'</select></td></tr>'
+    +'<td style="padding:8px 12px;text-align:right"><input type="number" min="0" step="1" id="crono-prazo-'+esc(f.codigo)+'" value="'+(parseInt(f.prazo_dias,10)||0)+'" style="width:80px;box-sizing:border-box;text-align:right;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font-size:12px;outline:none"> <span style="font-size:11px;color:var(--muted)">dias</span></td>'
+    +'<td style="padding:8px 12px"><select id="crono-funcao-'+esc(f.codigo)+'" style="width:180px;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 11px;color:var(--text);font-size:12px;outline:none;cursor:pointer">'+funcOps(f.funcao_id)+'</select></td></tr>'
   ).join('') || '<tr><td colspan="4" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma fase configurada.</td></tr>';
   box.innerHTML =
      '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:720px">Por fase: o <strong style="color:var(--text)">prazo</strong> (dias a partir de <strong style="color:var(--text)">D0 = assinatura</strong>) e a <strong style="color:var(--text)">função responsável</strong> (referencia a Tabela de Funções — é o cargo que executa a fase, não uma pessoa). Na assinatura, cada etapa recebe a data prevista e herda a função; o funcionário específico é escolhido depois, no cronograma do projeto.</div>'
