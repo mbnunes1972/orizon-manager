@@ -22,9 +22,9 @@ def test_fold_nao_altera_dre_nem_balanco(app_db):
     bal_antes = mc.balanco(db, "loja", 80)
     n_antes = db.query(mc.Lancamento).filter_by(owner_tipo="loja", owner_id=80).count()
 
-    # roda TODO o caminho de visão do fold
-    r = mp.provisoes_orcamento({"CFO": 3000.0, "Val_Liq": 6000.0, "VAVO": 7000.0,
-                                "Prov_Imp": 0.0, "Val_Cont": V}, _cfg())
+    # roda TODO o caminho de visão do fold (base VAVO = V, como a constituição)
+    r = mp.provisoes_orcamento({"CFO": 3000.0, "Val_Liq": 6000.0, "VAVO": V,
+                                "Prov_Imp": 0.0, "Val_Cont": 12000.0}, _cfg())
     mp.cust_var_marg_cont(3000.0, 6000.0, mp.itens_provisao(r))
 
     dre_depois = mc.dre(db, "loja", 80)
@@ -45,8 +45,42 @@ def test_dre_ja_continha_montagem_garantia_e_fold_bate(app_db):
     mc.constituir_provisoes_venda(db, "loja", 81, "PY", V, _cfg(), ref_base="p:1")    # 800/50, assist 0
     db.commit()
     dre = mc.dre(db, "loja", 81)
-    r = mp.provisoes_orcamento({"CFO": 0.0, "Val_Liq": 1.0, "VAVO": 0.0, "Prov_Imp": 0.0,
-                                "Val_Cont": V}, _cfg())
+    r = mp.provisoes_orcamento({"CFO": 0.0, "Val_Liq": 1.0, "VAVO": V, "Prov_Imp": 0.0,
+                                "Val_Cont": 12000.0}, _cfg())   # base VAVO = V; Val_Cont diferente (Cust_Fin>0)
     db.close()
-    assert r["Prov_Mont"] == 800.0 and r["Prov_Gar"] == 50.0
+    assert r["Prov_Mont"] == 800.0 and r["Prov_Gar"] == 50.0    # 8% / 0,5% × 10000 VAVO
     assert dre["constituicao_provisoes"] == r["Prov_Mont"] + r["Prov_Gar"]            # 850, assist 0
+
+
+def test_constituicao_usa_vavo_nao_val_cont(app_db, seed):
+    """Fix Fable 5: a constituição de Montagem/Assist/Garantia usa VAVO, não Val_Cont. Com Cust_Fin>0
+    (vavo != valor_total) o razão reflete VAVO e bate com a linha da modal (motor, também VAVO)."""
+    import main, types, json as _json
+    db = app_db.get_session()
+    ot, oid = mc.resolver_owner(db, {"loja_id": seed["loja1_id"], "rede_id": None})
+    mc.seed_plano(db, ot, oid)
+    loja = db.get(app_db.Loja, seed["loja1_id"])
+    loja.modulos_ativos = None   # financeiro ativo
+    loja.config_financeira_json = _json.dumps({
+        "provisoes": {"assist_pct": 3.0},
+        "provisoes_contabeis": {"montagem_pct": 8.0, "garantia_pct": 0.5}})
+    db.commit(); db.close()
+
+    orc = types.SimpleNamespace(loja_id=seed["loja1_id"], vavo=90000.0, valor_total=99000.0)  # Cust_Fin=9000
+    main._fin_provisoes_venda_seguro(orc, "PZproj", "prov:testvavo")
+
+    db = app_db.get_session()
+    def saldo(cod):
+        c = db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first()
+        return round(abs(mc.saldo_conta(db, ot, oid, c.id, None, None)), 2)
+    # base VAVO (90000): assist 3%→2700, montagem 8%→7200, garantia 0,5%→450 (NÃO × 99000 Val_Cont)
+    assert saldo("2.1.04.05") == 2700.0
+    assert saldo("2.1.04.02") == 7200.0
+    assert saldo("2.1.04.03") == 450.0
+    # a linha da modal (motor) usa a MESMA base VAVO → bate com a constituição
+    r = mp.provisoes_orcamento({"CFO": 0.0, "Val_Liq": 1.0, "VAVO": 90000.0, "Prov_Imp": 0.0,
+                                "Val_Cont": 99000.0},
+                               {"provisoes": {"assist_pct": 3.0},
+                                "provisoes_contabeis": {"montagem_pct": 8.0, "garantia_pct": 0.5}})
+    db.close()
+    assert r["Assist_Orc"] == 2700.0 and r["Prov_Mont"] == 7200.0 and r["Prov_Gar"] == 450.0

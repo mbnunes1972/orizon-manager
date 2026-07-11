@@ -135,7 +135,6 @@ def provisoes_orcamento(siglas, cfg, out_forn=0.0, com_venda_pct=0.0):
     s = siglas or {}
     CFO = _f(s.get("CFO")); Val_Liq = _f(s.get("Val_Liq"))
     VAVO = _f(s.get("VAVO")); Prov_Imp = _f(s.get("Prov_Imp"))
-    Val_Cont = _f(s.get("Val_Cont"))
     prov = (cfg or {}).get("provisoes", {}) or {}
     pc = (cfg or {}).get("provisoes_contabeis", {}) or {}
     out_forn = _f(out_forn)
@@ -148,12 +147,12 @@ def provisoes_orcamento(siglas, cfg, out_forn=0.0, com_venda_pct=0.0):
     frete_loc = _f(prov.get("frete_loc_pct")) / 100.0 * VAVO
     assist    = _f(prov.get("assist_pct"))    / 100.0 * VAVO
     ins_loc   = _f(prov.get("ins_loc_pct"))   / 100.0 * VAVO
-    # Fold (FASE 2): provisões contábeis de Montagem/Garantia entram no Cust_Var — MESMA base
-    # (Val_Cont) e MESMO arredondamento da constituição no fechamento (mod_contabil.
-    # constituir_provisoes_venda: round(valor_venda × pct/100, 2), com valor_venda = orc.valor_total =
-    # Val_Cont). É VISÃO: não lança nada no razão — mod_contabil segue a única escrita contábil.
-    prov_mont = round(_f(pc.get("montagem_pct")) / 100.0 * Val_Cont, 2)
-    prov_gar  = round(_f(pc.get("garantia_pct")) / 100.0 * Val_Cont, 2)
+    # Fold (FASE 2): provisões contábeis de Montagem/Garantia entram no Cust_Var — base = VAVO
+    # (convenção canônica de bases, NOMENCLATURA §"Bases": provisões % sobre a VENDA usam VAVO, valor à
+    # vista, DEPOIS de extrair o Cust_Fin) e MESMO arredondamento da constituição no fechamento
+    # (mod_contabil.constituir_provisoes_venda, também base VAVO). É VISÃO: não lança nada no razão.
+    prov_mont = round(_f(pc.get("montagem_pct")) / 100.0 * VAVO, 2)
+    prov_gar  = round(_f(pc.get("garantia_pct")) / 100.0 * VAVO, 2)
 
     cust_var = (CFO + out_forn + frete_fab + com_adm + com_venda + com_med
                 + com_proj + frete_loc + assist + ins_loc + Prov_Imp + prov_mont + prov_gar)

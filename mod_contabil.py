@@ -402,13 +402,14 @@ def pcts_provisao_venda(cfg):
             "garantia": _cfg_f(pc.get("garantia_pct"))}
 
 
-def constituir_provisoes_venda(db, owner_tipo, owner_id, projeto_id, valor_venda, cfg, ref_base):
-    """Auto-constitui as 3 provisões no fechamento da venda (v6 §6.4): valor = % × valor_venda.
-    Idempotente por `ref` (ref_base:<chave>). Só constitui as com % > 0. Retorna os lançamentos."""
+def constituir_provisoes_venda(db, owner_tipo, owner_id, projeto_id, vavo, cfg, ref_base):
+    """Auto-constitui as 3 provisões no fechamento da venda (v6 §6.4): valor = % × VAVO (valor à vista —
+    convenção canônica de base das provisões % sobre a venda, DEPOIS de extrair o Cust_Fin; NÃO Val_Cont,
+    senão diverge da linha da modal/motor). Idempotente por `ref` (ref_base:<chave>). Só constitui % > 0."""
     pcts = pcts_provisao_venda(cfg)
     out = []
     for chave, (evento, _cod) in _PROV_VENDA.items():
-        val = round(_cfg_f(valor_venda) * pcts[chave] / 100.0, 2)
+        val = round(_cfg_f(vavo) * pcts[chave] / 100.0, 2)
         if val > 0:
             out.append(registrar_evento(db, owner_tipo, owner_id, evento, val,
                                         projeto_id=projeto_id, ref=ref_base + ":" + chave))
