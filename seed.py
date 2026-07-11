@@ -8,15 +8,15 @@ Uso: python3 seed.py
 import database
 from database import init_db, get_session, Usuario, Funcao, loja_seed_id, FUNCOES_PADRAO
 
-# Perfil-4 (rev2 §2): Perfil = nível de ACESSO (diretoria/gerencial/consultor/suporte). O cargo é a
+# Perfil-4 (rev2 §2): Perfil = nível de ACESSO (master/gerencial/operador). O cargo é a
 # FUNÇÃO (semeada em Config › Funções); é atribuído pelo cadastro de Funcionário, não pelo login.
 USUARIOS = [
-    {"nome": "Pedro da Mota",        "login": "pdm2026", "senha": "teste123", "nivel": "diretoria"},
+    {"nome": "Pedro da Mota",        "login": "pdm2026", "senha": "teste123", "nivel": "master"},
     {"nome": "Luiz da Silva",        "login": "lds2026", "senha": "teste234", "nivel": "gerencial"},
-    {"nome": "Marcia dos Santos",    "login": "mds2026", "senha": "teste345", "nivel": "consultor"},
-    {"nome": "Gabriela Adm/Fin",     "login": "gaf2026", "senha": "teste456", "nivel": "diretoria"},
-    {"nome": "Sonia Suporte",        "login": "sup2026", "senha": "teste567", "nivel": "suporte"},
-    {"nome": "Marcos Medidor",       "login": "med2026", "senha": "teste012", "nivel": "consultor"},
+    {"nome": "Marcia dos Santos",    "login": "mds2026", "senha": "teste345", "nivel": "operador"},
+    {"nome": "Gabriela Adm/Fin",     "login": "gaf2026", "senha": "teste456", "nivel": "master"},
+    {"nome": "Sonia Suporte",        "login": "sup2026", "senha": "teste567", "nivel": "operador"},
+    {"nome": "Marcos Medidor",       "login": "med2026", "senha": "teste012", "nivel": "operador"},
 ]
 
 

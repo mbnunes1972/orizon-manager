@@ -21,14 +21,14 @@ def test_funcionario_crud_e_isolamento(http_client_factory, seed, app_db):
 def test_funcionario_acesso_cria_usuario_vinculado_sem_duplicar(http_client_factory, seed, app_db):
     c = http_client_factory(); c.login("dir_l1", "senha123")
     st, d = c.post("/api/funcionarios", {"nome": "Maria Acesso", "cpf": "111.444.777-35",
-        "acesso": {"tem_acesso": True, "email": "maria@loja.com", "perfil": "consultor"}})
+        "acesso": {"tem_acesso": True, "email": "maria@loja.com", "perfil": "operador"}})
     assert st == 201, d
     fid = d["id"]
     # fronteira: existe UM Usuário ligado por funcionario_id; o Funcionário aponta de volta
     db = app_db.get_session()
     try:
         u = db.query(app_db.Usuario).filter_by(funcionario_id=fid).first()
-        assert u is not None and u.login == "maria@loja.com" and u.nivel == "consultor" and u.ativo == 1
+        assert u is not None and u.login == "maria@loja.com" and u.nivel == "operador" and u.ativo == 1
         assert db.get(app_db.Funcionario, fid).usuario_id == u.id
     finally:
         db.close()
@@ -49,9 +49,9 @@ def test_funcionario_acesso_cria_usuario_vinculado_sem_duplicar(http_client_fact
 def test_acesso_email_duplicado_barrado(http_client_factory, seed, app_db):
     c = http_client_factory(); c.login("dir_l1", "senha123")
     c.post("/api/funcionarios", {"nome": "A", "cpf": "111.444.777-35",
-        "acesso": {"tem_acesso": True, "email": "dup@loja.com", "perfil": "consultor"}})
+        "acesso": {"tem_acesso": True, "email": "dup@loja.com", "perfil": "operador"}})
     st, d = c.post("/api/funcionarios", {"nome": "B", "cpf": "222.222.222-22",
-        "acesso": {"tem_acesso": True, "email": "dup@loja.com", "perfil": "consultor"}})
+        "acesso": {"tem_acesso": True, "email": "dup@loja.com", "perfil": "operador"}})
     assert st == 400 and "conta" in d["erro"].lower()
 
 

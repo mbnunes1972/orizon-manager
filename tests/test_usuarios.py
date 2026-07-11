@@ -4,7 +4,7 @@ import mod_usuarios as mu
 
 def test_validar_novo_usuario_ok():
     erros = mu.validar_novo_usuario(
-        {"nome": "Ana", "login": "ana", "senha": "12345", "nivel": "consultor"},
+        {"nome": "Ana", "login": "ana", "senha": "12345", "nivel": "operador"},
         logins_existentes=["pedro"])
     assert erros == []
 
@@ -44,7 +44,7 @@ def test_email_invalido_acusa():
     assert any("mail" in e.lower() for e in erros)
 
 def test_email_valido_ou_vazio_passa():
-    base = {"nome": "Ana", "login": "ana", "senha": "1", "nivel": "consultor"}
+    base = {"nome": "Ana", "login": "ana", "senha": "1", "nivel": "operador"}
     assert mu.validar_novo_usuario({**base, "email": "a@b.com"}, []) == []
     assert mu.validar_novo_usuario({**base, "email": ""}, []) == []
 

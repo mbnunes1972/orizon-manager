@@ -19,12 +19,25 @@ def _cliente_id(app_db, nome):
 
 
 def test_consultores_endpoint_gerente_vs_consultor(http_client_factory, seed, app_db, projetos_dir):
+    # `_usuarios_atribuiveis_da_loja` (main.py) já foi migrada e filtra por
+    # perfis.slugs_loja() (slugs NOVOS: master/gerencial/operador). O fixture `cons_l1`
+    # (conftest) é mantido de propósito com o slug LEGADO 'consultor' — resolvido via
+    # perfis._ALIAS_BASE só para checagens de capacidade (pode()/desconto_max()); ele não
+    # aparece nesta listagem porque o filtro aqui é por igualdade literal de slug, não pelo
+    # alias. Criamos um usuário 'operador' (slug novo) ad hoc para exercitar esse caminho
+    # sem acoplar o teste ao slug legado do fixture compartilhado.
+    db = app_db.get_session()
+    l1 = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    op = app_db.Usuario(nome="Operador L1", login="op_l1@loja.com", nivel="operador",
+                         loja_id=l1, ativo=1)
+    op.set_senha("senha123"); db.add(op); db.commit(); db.close()
+
     c = http_client_factory(); c.login("dir_l1", "senha123")
     st, d = c.get("/api/projetos/consultores")
     assert st == 200 and d["ok"] is True
     assert d["pode_atribuir"] is True
     nomes = {x["nome"] for x in d["consultores"]}
-    assert "Consultor L1" in nomes and "Diretor L1" in nomes
+    assert "Operador L1" in nomes and "Diretor L1" in nomes
     # consultor (escopo próprio) não pode atribuir
     c2 = http_client_factory(); c2.login("cons_l1", "senha123")
     _, d2 = c2.get("/api/projetos/consultores")

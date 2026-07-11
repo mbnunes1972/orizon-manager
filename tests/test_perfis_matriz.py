@@ -26,11 +26,11 @@ def test_cada_capacidade_tem_rotulo_e_descricao():
 def test_matriz_deriva_de_perfis():
     m = perfis.matriz()
     assert len(m["perfis"]) == len(perfis.slugs())
-    d = next(x for x in m["perfis"] if x["slug"] == "diretoria")
+    d = next(x for x in m["perfis"] if x["slug"] == "master")
     assert "autorizar" in d["capacidades"] and d["desconto_max"] == 50.0 and d["loja"] is True
-    cons = next(x for x in m["perfis"] if x["slug"] == "consultor")
-    assert "acesso_operacional" in cons["capacidades"] and "autorizar" not in cons["capacidades"]
-    assert cons["desconto_max"] == 10.0
+    op = next(x for x in m["perfis"] if x["slug"] == "operador")
+    assert "acesso_operacional" in op["capacidades"] and "autorizar" not in op["capacidades"]
+    assert op["desconto_max"] == 10.0
     sa = next(x for x in m["perfis"] if x["slug"] == "super_admin")
     assert sa["loja"] is False
     assert set(m["capacidades"]) == set(perfis.CAPACIDADES)
@@ -38,10 +38,10 @@ def test_matriz_deriva_de_perfis():
 
 # ── endpoint: gate gerir_usuarios ────────────────────────────────────────────────
 def test_perfis_matriz_endpoint_gate(http_client_factory, seed):
-    g = http_client_factory(); g.login("dir_l1", "senha123")     # diretor: gerir_usuarios
+    g = http_client_factory(); g.login("dir_l1", "senha123")     # master: gerir_usuarios
     st, d = g.get("/api/admin/perfis-matriz")
     assert st == 200 and d.get("ok") is True
-    assert {"diretoria", "gerencial", "consultor", "suporte"} <= {p["slug"] for p in d["perfis"]}
+    assert {"master", "gerencial", "operador"} <= {p["slug"] for p in d["perfis"]}
     assert "autorizar" in d["capacidades"] and "acesso_financeiro" in d["capacidades"]
-    c = http_client_factory(); c.login("cons_l1", "senha123")    # consultor: sem gerir_usuarios
+    c = http_client_factory(); c.login("cons_l1", "senha123")    # operador: sem gerir_usuarios
     assert c.get("/api/admin/perfis-matriz")[0] == 403

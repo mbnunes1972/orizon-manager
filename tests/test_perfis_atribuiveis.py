@@ -9,7 +9,7 @@ CONS  = {"nivel": "consultor",   "loja_id": 10,   "rede_id": None}
 def test_loja_lista_operacionais_sem_admins():
     for ator in (DIR, ADMR, SUPER):
         lst = mt.perfis_atribuiveis(ator, "loja")
-        assert "consultor" in lst and "diretoria" in lst
+        assert "operador" in lst and "master" in lst
         assert "super_admin" not in lst and "admin_rede" not in lst
 
 def test_rede_so_admin_rede_e_so_para_super_e_admrede():
