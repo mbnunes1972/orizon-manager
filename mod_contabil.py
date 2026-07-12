@@ -379,6 +379,7 @@ EVENTOS = {
     "reconhecimento_despesa_com_proj_exec":       ("5.6.08", "1.1.06.11", "Reconhecimento de despesa na NF-e — Comissão de Projeto/Executivo"),
     "reconhecimento_despesa_retencao_com_vendas": ("5.6.09", "1.1.06.12", "Reconhecimento de despesa na NF-e — Retenção de Comissão de Vendas"),
     "reconhecimento_despesa_custo_fabrica":       ("5.1.01", "1.1.06.06", "CMV Fábrica — reconhecimento na NF-e (baixa do ativo diferido)"),
+    "reconhecimento_despesa_outros_fornecedores": ("5.1.01", "1.1.06.14", "CMV Outros Fornecedores — reconhecimento na NF-e (baixa do ativo diferido)"),
     # Impostos = PROVISÃO (Tipo D). CONTRATO: passivo nasce SEM tocar a DRE — ativo diferido (1.1.05) ×
     # Provisão de Impostos (2.1.04.13). EMISSÃO (proporcional Merc/Serv): a dedução entra na DRE
     # (4.3.01 × baixa do ativo 1.1.05) e a obrigação fiscal real crystalliza (2.1.04.13 × 2.1.03).
@@ -428,6 +429,10 @@ def _conta_por_codigo(db, owner_tipo, owner_id, codigo):
     if c is None:
         raise ValueError("conta %s ausente no plano de contas do owner" % codigo)
     return c
+
+
+def _conta_existe(db, owner_tipo, owner_id, codigo):
+    return db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, codigo=codigo).first() is not None
 
 
 def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=None, data=None,
@@ -540,6 +545,9 @@ _MATCHING_NFE = {
     "com_proj_exec":       "reconhecimento_despesa_com_proj_exec",
     "retencao_com_vendas": "reconhecimento_despesa_retencao_com_vendas",
     "custo_fabrica":       "reconhecimento_despesa_custo_fabrica",
+    # Outros Fornecedores só tem saldo em 1.1.06.14 se houve reclassificação ANTES da NF-e (substituição
+    # de parte do pedido de fábrica) — nesse caso o matching o reconhece; senão o saldo é 0 e é pulado.
+    "outros_fornecedores": "reconhecimento_despesa_outros_fornecedores",
 }
 
 
@@ -626,8 +634,24 @@ def reclassificar_provisao(db, owner_tipo, owner_id, projeto_id, cod_de, cod_par
     seed_plano(db, owner_tipo, owner_id)
     cd = _conta_por_codigo(db, owner_tipo, owner_id, cod_de)
     cc = _conta_por_codigo(db, owner_tipo, owner_id, cod_para)
-    return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor, data=data, projeto_id=projeto_id,
-                  origem=_ORIGEM_RECLASS, historico="Reclassificação de provisão", ref=ref)
+    lan = lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor, data=data, projeto_id=projeto_id,
+                 origem=_ORIGEM_RECLASS, historico="Reclassificação de provisão", ref=ref)
+    # FASE D2: espelha o ativo diferido (1.1.06.XX → 1.1.06.YY) NA PROPORÇÃO ainda não baixada na NF-e —
+    # senão a rubrica de destino não é reconhecida no matching. Move só até o saldo em aberto do ativo de
+    # origem: reclass ANTES da NF-e (ativo cheio) espelha tudo; DEPOIS da NF-e (ativo já baixado) não move.
+    ativo_de = "1.1.06." + cod_de.rsplit(".", 1)[-1]
+    ativo_para = "1.1.06." + cod_para.rsplit(".", 1)[-1]
+    if _conta_existe(db, owner_tipo, owner_id, ativo_de) and _conta_existe(db, owner_tipo, owner_id, ativo_para):
+        saldo_ativo = round(total_lancado(db, owner_tipo, owner_id, ativo_de, "debito", projeto_id)
+                            - total_lancado(db, owner_tipo, owner_id, ativo_de, "credito", projeto_id), 2)
+        mv = round(min(valor, max(saldo_ativo, 0.0)), 2)
+        if mv > 0:
+            ad = _conta_por_codigo(db, owner_tipo, owner_id, ativo_para)
+            ac = _conta_por_codigo(db, owner_tipo, owner_id, ativo_de)
+            lancar(db, owner_tipo, owner_id, ad.id, ac.id, mv, data=data, projeto_id=projeto_id,
+                   origem=_ORIGEM_RECLASS, historico="Reclassificação de custo a apropriar (espelho do ativo)",
+                   ref=ref + ":ativo")
+    return lan
 
 
 def efetivar_provisao(db, owner_tipo, owner_id, projeto_id, codigo_provisao, valor, ref, data=None):
