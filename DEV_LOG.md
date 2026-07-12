@@ -1339,7 +1339,7 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
-## ⏸️ ESTADO ATUAL (2026-07-11) — retomar aqui
+## ⏸️ ESTADO ATUAL (2026-07-12) — retomar aqui
 
 > **🏗️ Frente ATIVA — infraestrutura contábil ponta a ponta (p/ o Projeto Simulação popular DRE/Balanço/
 > Provisões/Reconciliação pelo fluxo REAL de fechamento).** Fases: **A** (caixinhas) ✅ **no VPS**. **B1**
@@ -1347,12 +1347,15 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > (Sessão 64). **B2** (eventos: Adiantamento → receita segmentada → CMV=CFO → constituição COMPLETA das
 > provisões + impostos-provisão diferida + custo financeiro direto; face fiscal reescalada; bug reconciliar)
 > ✅ **mergeada** (Sessão 65). A DRE representa o projeto e reconcilia com o motor centavo a centavo.
-> **C** (painel de Provisões por tipo A/B/C/D — `dashboard_financeiro.provisoes_por_tipo`, data-driven; front
-> agrupado com subtotais + fallback plano) ✅ **mergeada** (Sessão 66).
-> **Próxima: FASE D — reconciliação** (por provisão/projeto: Provisionado × **Efetivado** × Saldo × Destino).
-> O custo real (NF fábrica + outros forn. + insumos) entra como **Efetivado**; a diferença provisionado−real
-> (ex.: CFO−real) vai ao resultado (sobra→receita / falta→despesa); "Efetivado" manual + destino. + eventos de
-> **estorno** de cancelamento fiscal (backlog anotado na B2). UI: `.modal-box` + tokens, conferir nos 2 temas.
+> **C** (painel de Provisões por tipo A/B/C/D) ✅ **mergeada** (Sessão 66).
+> **D** (reconciliação Provisionado × **Efetivado** × Saldo × Destino: efetivar_provisao 2.1.04.x×2.1.01
+> competência; sobra→4.4.02 receita / falta→5.6.10 despesa; Contas a Pagar MVP; painéis Financeiro + aba no
+> Projeto; DRE passa a incluir 4.4) ✅ **mergeada** (Sessão 67). **Validado ponta a ponta pela Simulação
+> Claude** (3 XMLs Promob reais + Aymoré 10x): Val_Cont 278.769, ganho da 2ª aprovação vira sobra reconciliada,
+> lucro líquido 93.598, Balanço fecha.
+> **A infra contábil (A→D) está COMPLETA.** Backlog contábil: **estorno de cancelamento fiscal** (B2) e
+> **sub-razão de Contas a Pagar** por fornecedor/vencimento (aging). `[CONFIRMAR CONTADOR]` pendentes seguem
+> documentados no razão. Próxima frente: a definir com o usuário.
 > Processo da frente: auditoria + plano por fases → OK do usuário → implementa 1 fase de cada vez, TDD, **para
 > antes de mergear** p/ conferência dos números. Dinheiro = seguir NOMENCLATURA.md + prova de não-duplicação.
 > `[CONFIRMAR CONTADOR]` pendentes (documentados no razão): receita no doc fiscal · adiantamento passivo no
@@ -2006,6 +2009,16 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 67 — Infra contábil FASE D: reconciliação (Provisionado × Efetivado × Saldo × Destino) + Contas a Pagar + Simulação Claude
+Branch `feat/financeiro-fase-d-reconciliacao` (mergeada). Área sensível; TDD; decisões contábeis com o usuário. Suíte 909→**923**.
+**Princípios que o usuário fixou (memória):** (1) **fonte única = razão** — lançamentos por conta+`projeto_id` são a verdade; painéis são views (`reconciliacao(projeto_id)` serve consolidado=None e granular=X). (2) **rigor contábil > escopo** — no efetivado, escolheu **competência** (Fornecedores a Pagar) em vez de caixa direto, mesmo abrindo o MVP de Contas a Pagar.
+**D1 (backend):** contas `4.4.02 Reversão de Provisões` (sobra→receita) / `5.6.10 Ajuste de Provisões` (falta→despesa) + evento `pagamento_fornecedor` (2.1.01×1.1.01). Funções: `efetivar_provisao` (2.1.04.x × **2.1.01**, competência — reconhece o custo real como obrigação, não baixa em caixa) · `resolver_saldo_provisao` (sobra→4.4.02, falta→5.6.10, zera a provisão) · `reconciliacao(projeto_id)` (provisionado=créditos, efetivado=débitos, saldo, resolvido; resoluções excluídas p/ não contaminar) · `contas_a_pagar` (saldo 2.1.01 em aberto, MVP conta/projeto). `total_lancado` ganhou filtro por origem.
+**D2 (endpoints+front):** GET `reconciliacao-provisoes`/`contas-a-pagar`, POST `efetivar-provisao`/`resolver-saldo-provisao`/`pagar-fornecedor` (gate `aprovar_financeiro`). Painéis Financeiro: **Reconc. Provisões** (seletor consolidado/projeto; efetivar manual + resolver) e **Contas a Pagar**. **Aba Reconciliação no Projeto** (modal, granular — mesma fonte). Sub-razão de títulos por fornecedor/vencimento = fase futura.
+**Bug crítico resolvido:** "contas a pagar falha ao carregar" + "Projetos vazio" — causa: **4 processos `main.py` fantasmas**, um servia a 8765 sem a D2 (front novo × backend velho). Diagnóstico: endpoint dava 404 cru; matou todos, subiu **um** limpo. (Mudança de Python exige restart; múltiplos servidores mascaram.)
+**Simulação Claude (dados REAIS dos 3 XMLs Promob):** parser `promob_grupos` (venda+custo por ambiente) → motor real (Aymoré 10x/entrada 20k via `mod_fin.aymore`, arq 6%, fid 2%, viagem 5k) → orçamento (VBVO 223.530 · CFO 80.406 · **Val_Cont 278.769** = VAVO 247.651 + Cust_Fin 31.118 · impostos 12%) → fechamento → faturamento segmentado 65/35 + CMV=CFO congelado + impostos → **2ª aprovação** (PE −5%, pedido fábrica 20% menor + outros forn. 10% ⇒ real 90% do CFO_PE; montagem insumos 1,5%/assist 3%/gar 1%) → efetivação pelas NFs reais → reconciliação. **CMV congelado; ganho vira SOBRA** (Custo Fábrica 80.406 vs efetivado 68.747 = **sobra 11.659→receita**). Regra: só resolve provisão **efetivada**; as demais ficam abertas (custo futuro). Balanço fecha; Σ receitas=Val_Cont; Contas a Pagar 82.368.
+**Furo que a simulação revelou + corrigiu:** a `dre()` montava `receita_bruta=4.1+4.2` e **ignorava o grupo 4.4** → a **falta** (5.6.10) entrava na DRE mas a **sobra** (4.4.02) ficava órfã. Corrigido: DRE inclui **Outras Receitas (4.4)** no resultado → lucro líquido da simulação **81.939 → 93.598** (a reversão de 11.659 agora aparece), simétrico com a falta.
+**Backlog (anotado):** eventos de **estorno de cancelamento fiscal** (B2); sub-razão de Contas a Pagar por fornecedor/vencimento (aging).
 
 ## Sessão 66 — Infra contábil FASE C: painel de Provisões por tipo A/B/C/D
 Branch `feat/financeiro-fase-c-provisoes-tipos` (mergeada na `main`). TDD (backend) + verificação manual (frontend). Suíte 906→**909**.

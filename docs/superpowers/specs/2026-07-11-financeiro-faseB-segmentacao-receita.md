@@ -120,3 +120,17 @@ Por provisão/projeto: **Provisionado × Efetivado × Saldo × Destino**. O cust
 fornecedores + insumos) entra como **Efetivado** (manual); a diferença provisionado−real (ex.: CFO−real)
 vai ao resultado (sobra→receita / falta→despesa). + eventos de **estorno** de cancelamento fiscal (backlog
 da B2).
+
+## D — reconciliação + Contas a Pagar (IMPLEMENTADO, Sessão 67)
+
+**Fonte única = razão** (memória `fonte-unica-razao-contabil`): `reconciliacao(projeto_id)` serve consolidado
+(None) e granular (X). **Efetivado = competência** (memória `rigor-contabil-sobre-escopo`): `efetivar_provisao`
+→ `2.1.04.x × 2.1.01` (Fornecedores a Pagar), NÃO caixa. Pagamento: `pagamento_fornecedor` (2.1.01×1.1.01).
+**Destino do saldo:** `resolver_saldo_provisao` — sobra→`4.4.02` (receita), falta→`5.6.10` (despesa); zera a
+provisão. Só resolve provisão EFETIVADA; não-efetivadas ficam abertas (custo futuro).
+**Contas a Pagar (MVP):** saldo de `2.1.01` em aberto (conta/projeto); sub-razão por fornecedor/vencimento é
+fase futura. **DRE:** passou a incluir **Outras Receitas (4.4)** — sem isso a reversão (sobra) ficava órfã.
+Endpoints: GET reconciliacao-provisoes/contas-a-pagar; POST efetivar-provisao/resolver-saldo-provisao/
+pagar-fornecedor (gate aprovar_financeiro). Front: painéis Financeiro + aba Reconciliação no Projeto.
+Validado pela **Simulação Claude** (3 XMLs Promob reais + Aymoré 10x): Val_Cont 278.769, ganho da 2ª
+aprovação = sobra reconciliada, lucro líquido 93.598, Balanço fecha.
