@@ -716,13 +716,18 @@ def reconciliacao(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None)
         efetivado = tl(c.codigo, "debito", excluir_origens={_ORIGEM_RESOL_SOBRA, _ORIGEM_RECLASS})
         resolvido = round(tl(c.codigo, "debito", origens={_ORIGEM_RESOL_SOBRA})
                           + tl(c.codigo, "credito", origens={_ORIGEM_RESOL_FALTA}), 2)
+        saldo = round(provisionado - efetivado, 2)
+        # saldo_aberto (líquido) = o que ainda falta resolver. `resolvido` é magnitude positiva nos dois
+        # casos; sobra (saldo>0) e falta (saldo<0) reduzem o bruto em direções opostas → desconta na direção
+        # do sinal do saldo. (Painel exibe este como "Saldo"; saldo/resolvido ficam p/ auditoria.)
+        saldo_aberto = round(saldo - resolvido if saldo > 0 else (saldo + resolvido if saldo < 0 else 0.0), 2)
         provs.append({"codigo": c.codigo, "nome": c.nome, "tipo": _PROV_PAINEL_TIPO.get(c.codigo, "O"),
                       "provisionado": provisionado, "efetivado": efetivado,
-                      "saldo": round(provisionado - efetivado, 2), "resolvido": resolvido})
+                      "saldo": saldo, "resolvido": resolvido, "saldo_aberto": saldo_aberto})
     t = lambda k: round(sum(p[k] for p in provs), 2)
     return {"projeto_id": projeto_id, "provisoes": provs,
             "totais": {"provisionado": t("provisionado"), "efetivado": t("efetivado"),
-                       "saldo": t("saldo"), "resolvido": t("resolvido")}}
+                       "saldo": t("saldo"), "resolvido": t("resolvido"), "saldo_aberto": t("saldo_aberto")}}
 
 
 def conciliar_final(db, owner_tipo, owner_id, projeto_id, ref_base):
