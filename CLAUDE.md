@@ -60,7 +60,28 @@ implementação.
   (ambas).
 - **Escopo por projetista:** Consultor vê só os projetos que criou (`projetos_meta.criado_por_id`);
   gerente+ veem todos.
+- **Fechamento contábil = provisão diferida no contrato + matching pleno na NF-e (FASE D2, implementada
+  2026-07-12, Sessão 70 — supera a decisão da Sessão 65):** no **contrato**, `registro_venda_contrato`
+  lança a venda cheia (`1.1.02 × 2.1.06` "Receita a Realizar", Val_Cont) e **as 10 rubricas** (as 9 + Custo
+  de Fábrica `2.1.04.06`) são constituídas como **ativo diferido** `1.1.06.0X × 2.1.04.0X` — **sem tocar a
+  DRE** (impostos no `1.1.05 × 2.1.04.13`). Na **NF-e**, `reconhecer_despesas_nfe` faz o **matching pleno**:
+  reconhece TODA despesa de uma vez (`5.6.0X`, ou `5.1.01` p/ a fábrica) × baixa do ativo `1.1.06.0X`; a
+  Provisão `2.1.04.0X` **sobrevive** (paga/reconciliada depois). O evento `faturamento_cmv` foi **retirado**.
+  `recebimento_venda` abate `1.1.02` (era `2.1.06`). Divergência real×planejado → sobra `4.4.02`/falta
+  `5.6.10` (`resolver_saldo_provisao`, pras 10). `reclassificar_provisao` (`2.1.04.06→2.1.04.14` Outros
+  Fornecedores) espelha o ativo `1.1.06.06→1.1.06.14` só na proporção não baixada. **Etapa 21 "Conciliação
+  Final"** (`mod_contabil.conciliar_final`, endpoint `.../ciclo/21/conciliar`) resolve à força o saldo
+  remanescente das 10 e encerra o projeto com status **`concluido`** (distinto de `fechado`). Projetos
+  legados (fluxo antigo) **não migram**. Detalhes: spec `docs/superpowers/specs/2026-07-12-fase-d2-*.md`.
 
 ## Dicas de modelo
 Para **lógica financeira intrincada** (ex.: cálculo reverso da negociação), o **Fable 5** rende — pode
 ser chamado pontualmente via subagente sem trocar o modelo da sessão. Opus/Sonnet dão conta do resto.
+
+## Agente de QA (Vera)
+Subagente de teste em `.claude/agents/vera.md` (**local, não versionado** — `.claude/…` é ignorado pelo
+git, então cada máquina precisa do arquivo próprio). Cobre backend (pytest/TDD + `test_arquitetura_modulos`),
+fluxo de telas do frontend (navegação, escopo/tenancy, tema claro/escuro), consistência de design
+(`docs/design/`) e simulação financeira ponta a ponta (fluxo real, não script sintético). Chamar
+proativamente antes de fechar frente/mergear área sensível, ou sob demanda ("chama a Vera"). Só reporta —
+não commita/mergeia/corrige sozinha.
