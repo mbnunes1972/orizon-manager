@@ -34,13 +34,13 @@
   --card:var(--surface-2); --border2:var(--border-strong); --ok:var(--accent);
   --section:var(--info);
   --sb-bg:var(--surface);
-  /* usados por inputs de modais (antes indefinidos: --fg herdava, --input caía em #0d1a0d verde) */
+  /* usados por inputs de modais (antes indefinidos: --fg herdava, --input caía em #0B1D3A verde) */
   --fg:var(--text); --input:var(--surface);
   /* Tipografia — família sans única (Inter) + mono reservado a números (Padrao_Design_Orizon_v2 §3) */
   --font-sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --font-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
   /* Cartões teal/amber/coral — NÃO cobertos pela paleta v2; mantidos p/ frente futura */
-  --teal-bg:#04342C; --teal-brd:#0F6E56; --teal-text:#9FE1CB; --teal-lbl:#5DCAA5;
+  --teal-bg:#062A31; --teal-brd:#0F6E7A; --teal-text:#A6E2EA; --teal-lbl:#4FD0DD;   /* de-green: família ciano (era verde-menta) */
   --amber-bg:#412402; --amber-brd:#854F0B; --amber-text:#FAC775; --amber-lbl:#EF9F27;
   --coral-bg:#4A1B0C; --coral-brd:#993C1D; --coral-text:#F5C4B3; --coral-lbl:#F0997B;
 }
@@ -204,7 +204,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .proj-status-badge.quente{background:rgba(240,90,80,.12);color:var(--st-quente)}
 .proj-status-badge.morno{background:rgba(251,191,36,.12);color:var(--st-morno)}
 .proj-status-badge.frio{background:rgba(96,165,250,.12);color:var(--st-frio)}
-.proj-status-badge.convertido{background:rgba(25,201,160,.12);color:var(--st-convertido)}
+.proj-status-badge.convertido{background:rgba(0,184,201,.12);color:var(--st-convertido)}
 .proj-status-badge.fechado{background:rgba(91,155,255,.16);color:var(--st-fechado)}
 .proj-status-badge.perdido{background:rgba(120,120,120,.12);color:var(--st-perdido)}
 .proj-status-badge.sem{background:transparent;color:var(--muted)}
@@ -226,7 +226,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .form-field{margin-bottom:14px}
 /* Badge de origem */
 .badge-origem { font-size:9px; padding:2px 7px; border-radius:10px; font-weight:700; letter-spacing:.5px; }
-.badge-origem.local { background:rgba(25,201,160,.15); color:var(--ok); }
+.badge-origem.local { background:rgba(0,184,201,.15); color:var(--ok); }
 .badge-origem.omie  { background:rgba(96,165,250,.15); color:var(--section); }
 /* Ambientes page */
 .proj-header{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
@@ -245,7 +245,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .drop-sub{font-size:11px;color:var(--muted)}
 /* Ambiente cards */
 .amb-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;transition:.15s}
-.amb-card.selected{border-color:rgba(25,201,160,.35)}
+.amb-card.selected{border-color:rgba(0,184,201,.35)}
 .amb-card-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer}
 .amb-check{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
 .amb-info{flex:1;min-width:0}
@@ -400,7 +400,7 @@ body{overflow:hidden}
 .modal-close:hover{color:var(--text)}
 @keyframes mIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 /* Banner de projeto bloqueado */
-.bloqueio-banner{display:none;background:rgba(93,202,165,.07);border:1px solid rgba(93,202,165,.3);border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.bloqueio-banner{display:none;background:rgba(0,184,201,.07);border:1px solid rgba(0,184,201,.3);border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px}
 .bloqueio-banner.ativo{display:flex}
 .bloqueio-icon{font-size:18px;flex-shrink:0}
 .bloqueio-txt{font-size:11px;color:var(--ok);line-height:1.5}
@@ -460,7 +460,7 @@ body{overflow:hidden}
 }
 .ciclo-card-header .etapa-num {
   font-size: .75rem;
-  color: var(--muted, #6a7a6a);
+  color: var(--muted, #8A96A3);
   min-width: 28px;
 }
 .ciclo-card-header .etapa-nome { flex: 1; font-weight: 500; }
@@ -471,13 +471,13 @@ body{overflow:hidden}
 }
 .badge-pendente        { background: #2a2a1a; color: var(--warn, #c8a84b); }
 .badge-em_andamento    { background: #1a2a2a; color: var(--section, #4b8bc8); }
-.badge-para_assinatura { background: #1a2010; color: #80e090; }
+.badge-para_assinatura { background: #10272e; color: var(--ok, #00B8C9); }
 .badge-assinado,
 .badge-vigente,
 .badge-concluido,
-.badge-aprovado        { background: #1a2a1a; color: var(--ok, #4caf82); }
+.badge-aprovado        { background: #10272e; color: var(--ok, #00B8C9); }
 .badge-rascunho        { background: #2a1a1a; color: #c08080; }
-.badge-bloqueado       { background: #1a1a1a; color: var(--muted, #6a7a6a); }
+.badge-bloqueado       { background: #1a1a1a; color: var(--muted, #8A96A3); }
 
 .ciclo-card-body {
   display: none;
@@ -590,10 +590,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
          onmouseover="this.style.borderColor='var(--accent)'"
          onmouseout="this.style.borderColor='var(--border)'">
       <div id="sb-user-avatar"
-           style="width:30px;height:30px;border-radius:50%;background:var(--accent);
+           style="width:30px;height:30px;border-radius:50%;background:var(--primary);
                   display:flex;align-items:center;justify-content:center;
                   font-family:var(--font-sans);font-weight:700;font-size:12px;
-                  color:#0d160d;flex-shrink:0;overflow:hidden">
+                  color:#fff;flex-shrink:0;overflow:hidden">
         <span id="sb-user-inicial">?</span>
         <img id="sb-user-foto" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%">
       </div>
@@ -631,10 +631,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
       <div style="position:relative;width:64px;height:64px;flex-shrink:0">
         <div id="mp-avatar-circle"
-             style="width:64px;height:64px;border-radius:50%;background:var(--accent);
+             style="width:64px;height:64px;border-radius:50%;background:var(--primary);
                     display:flex;align-items:center;justify-content:center;
                     font-family:var(--font-sans);font-weight:700;font-size:22px;
-                    color:#0d160d;overflow:hidden">
+                    color:#fff;overflow:hidden">
           <span id="mp-avatar-inicial">?</span>
           <img id="mp-avatar-foto" src="" alt=""
                style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%">
@@ -729,7 +729,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <input type="hidden" id="novo-proj-cliente-id">
       <label>CLIENTE *</label>
       <!-- Chip: cliente selecionado -->
-      <div id="np-cli-chip" style="display:none;align-items:center;justify-content:space-between;background:rgba(93,202,165,.08);border:1px solid rgba(93,202,165,.25);border-radius:8px;padding:9px 13px;margin-bottom:6px">
+      <div id="np-cli-chip" style="display:none;align-items:center;justify-content:space-between;background:rgba(0,184,201,.08);border:1px solid rgba(0,184,201,.25);border-radius:8px;padding:9px 13px;margin-bottom:6px">
         <div>
           <div style="font-size:12px;font-weight:600;color:var(--text)" id="np-cli-chip-nome"></div>
           <div style="font-size:10px;color:var(--muted);margin-top:2px" id="np-cli-chip-cpf"></div>
@@ -1766,7 +1766,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <span onclick="mceFechar()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
       </div>
       <!-- Info do cliente -->
-      <div style="background:rgba(93,202,165,.07);border:1px solid rgba(93,202,165,.2);border-radius:8px;padding:12px 14px;margin-bottom:18px">
+      <div style="background:rgba(0,184,201,.07);border:1px solid rgba(0,184,201,.2);border-radius:8px;padding:12px 14px;margin-bottom:18px">
         <div style="font-weight:700;font-size:14px;margin-bottom:3px" id="mce-nome"></div>
         <div style="font-size:11px;color:var(--muted)" id="mce-detalhe"></div>
       </div>
@@ -2032,7 +2032,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:598px;width:92%;max-height:90vh;overflow-y:auto;animation:mIn .18s ease">
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;gap:12px">
       <div style="font-family:var(--font-sans);font-weight:900;font-size:16px">Parametros da negociacao <span id="mp-ro-badge" style="display:none;font-size:11px;font-weight:600;color:var(--muted)">🔒 somente leitura</span></div>
-      <div id="mp-total-ambientes" style="font-family:var(--font-mono);font-size:11px;color:var(--ok);background:rgba(25,201,160,.08);border:1px solid rgba(25,201,160,.2);border-radius:6px;padding:3px 10px;white-space:nowrap">—</div>
+      <div id="mp-total-ambientes" style="font-family:var(--font-mono);font-size:11px;color:var(--ok);background:rgba(0,184,201,.08);border:1px solid rgba(0,184,201,.2);border-radius:6px;padding:3px 10px;white-space:nowrap">—</div>
     </div>
 
     <!-- Toggle: Incluir custos adicionais ao valor bruto -->
@@ -4353,7 +4353,7 @@ async function npBuscarCliente(q){
       dd.innerHTML = lista.map(c =>
         `<div onclick="npSelecionarCliente(${c.id},'${esc(c.nome)}','${esc(c.cpf||'')}','${esc(c.email||'')}','${esc(c.telefone||c.whatsapp||'')}')"
               style="padding:10px 14px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
-              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+              onmouseover="this.style.background='rgba(0,184,201,.08)'" onmouseout="this.style.background=''">
           <span style="font-weight:600">${esc(c.nome)}</span>
           ${c.cpf?`<span style="color:var(--muted);margin-left:8px">${esc(c.cpf)}</span>`:''}
           ${c.cidade?`<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(c.cidade)}</span>`:''}
@@ -4509,7 +4509,7 @@ function peBuscarCliente(q){
       dd.innerHTML = lista.length ? lista.map(c =>
         `<div onclick="peSelCliente(${c.id},'${esc(c.nome)}')"
               style="padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
-              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+              onmouseover="this.style.background='rgba(0,184,201,.08)'" onmouseout="this.style.background=''">
           <span style="font-weight:600">${esc(c.nome)}</span>${c.cpf?`<span style="color:var(--muted);margin-left:8px">${esc(c.cpf)}</span>`:''}
         </div>`).join('') : '<div style="padding:9px 12px;font-size:11px;color:var(--muted)">Nenhum cliente.</div>';
       dd.style.display = 'block';
@@ -4533,7 +4533,7 @@ function peBuscarParceiro(q){
       dd.innerHTML = lista.length ? lista.map(p =>
         `<div onclick="peSelParceiro(${p.id},'${esc(p.nome)}')"
               style="padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
-              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+              onmouseover="this.style.background='rgba(0,184,201,.08)'" onmouseout="this.style.background=''">
           <span style="font-weight:600">${esc(p.nome)}</span>${p.tipo?`<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(p.tipo)}</span>`:''}
         </div>`).join('') : '<div style="padding:9px 12px;font-size:11px;color:var(--muted)">Nenhum parceiro.</div>';
       dd.style.display = 'block';
@@ -6339,8 +6339,8 @@ function tfRenderTabela(d, valorAvista, entrada) {
       ? '<span class="badge-plano" style="background:var(--accent-tint);color:var(--accent)">&#9664; Última</span>'
       : '<span class="badge-plano" style="background:var(--accent-tint);color:var(--accent)">&#x2713; Ativa</span>';
 
-    const dataBg  = isUltima ? 'rgba(93,202,165,.06)' : 'transparent';
-    const rowBg   = isUltima ? 'rgba(93,202,165,.06)' : 'transparent';
+    const dataBg  = isUltima ? 'rgba(0,184,201,.06)' : 'transparent';
+    const rowBg   = isUltima ? 'rgba(0,184,201,.06)' : 'transparent';
 
     const dataCell = `<td style="padding:4px 8px;background:${dataBg}">
       <input type="date" value="${esc(p.data_iso)}" min="${esc(minIso)}" max="${esc(limIso)}"
@@ -6350,7 +6350,7 @@ function tfRenderTabela(d, valorAvista, entrada) {
 
     let valorDigCell;
     if (isUltima) {
-      valorDigCell = `<td style="padding:4px 8px;background:rgba(93,202,165,.06)">
+      valorDigCell = `<td style="padding:4px 8px;background:rgba(0,184,201,.06)">
         <input type="text" value="${fmt(p.valor_digitado)}" disabled
                title="Valor calculado automaticamente para fechar o saldo."
                style="${inputStyle(false, true)}">
@@ -8142,7 +8142,7 @@ async function npBuscarParceiro(q){
       dd.innerHTML = lista.map(p =>
         `<div onclick="npSelecionarParceiro(${p.id},'${esc(p.nome)}','${esc(p.tipo||'')}',${p.comissao_padrao_pct||0})"
               style="padding:10px 14px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
-              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+              onmouseover="this.style.background='rgba(0,184,201,.08)'" onmouseout="this.style.background=''">
           <span style="font-weight:600">${esc(p.nome)}</span>
           ${p.tipo?`<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(p.tipo)}</span>`:''}
           ${p.comissao_padrao_pct?`<span style="color:var(--ok);margin-left:8px;font-size:10px">${p.comissao_padrao_pct}%</span>`:''}
@@ -10119,8 +10119,8 @@ async function aprovarOrcamento() {
 
   logBox.innerHTML    = '<div style="color:var(--muted)">Iniciando exportacao...</div>';
   banner.textContent  = 'Enviando para o Omie...';
-  banner.style.background = 'rgba(93,202,165,.08)';
-  banner.style.borderColor = 'rgba(93,202,165,.2)';
+  banner.style.background = 'rgba(0,184,201,.08)';
+  banner.style.borderColor = 'rgba(0,184,201,.2)';
   banner.style.color  = 'var(--ok)';
   confirmBox.style.display = 'none';
   btnFechar.style.display  = 'none';
@@ -10178,8 +10178,8 @@ async function _expPoll() {
       _expPollTimer = null;
       const banner = document.getElementById('exp-status-banner');
       banner.textContent  = 'Exportacao concluida — projeto bloqueado e XMLs travados.';
-      banner.style.background  = 'rgba(93,202,165,.12)';
-      banner.style.borderColor = 'rgba(93,202,165,.35)';
+      banner.style.background  = 'rgba(0,184,201,.12)';
+      banner.style.borderColor = 'rgba(0,184,201,.35)';
       banner.style.color  = 'var(--ok)';
       document.getElementById('exp-btn-fechar').style.display  = 'inline-flex';
       document.getElementById('exp-btn-fechar-top').style.display = 'block';
@@ -10894,7 +10894,7 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
 function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
   const concluido = dados.status === 'concluido';
   const _btnProvisoes = `<button onclick="abrirProvisoes(_orcamentoAtivoId)"
-    style="background:none;border:1px solid var(--border2,#2a4a3a);color:var(--ok,#5DCAA5);
+    style="background:none;border:1px solid var(--border2,#2A4A73);color:var(--ok,#00B8C9);
     border-radius:6px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
     &#x1F4CA; Provisões
   </button>`;
@@ -11051,7 +11051,7 @@ async function abrirProvisoes(oid) {
       return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <label style="font-size:.8rem;color:var(--muted);flex:1">${esc(rb.label)}</label>
         <input type="number" step="0.01" id="_prov-inp-${rb.key}" value="${esc(prev)}"
-          style="width:120px;background:var(--input,#0d1a0d);border:1px solid var(--border);
+          style="width:120px;background:var(--input,#0B1D3A);border:1px solid var(--border);
           color:var(--fg);padding:4px 7px;border-radius:4px;font-size:.82rem;text-align:right">
       </div>`;
     }).join('');
@@ -11067,7 +11067,7 @@ async function abrirProvisoes(oid) {
     actionBtns = `<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <span style="font-size:.8rem;color:var(--muted)">Próxima revisão: <strong style="color:var(--ok)">${esc(revLabel)}</strong></span>
       <button onclick="_provAcao('${oid}','${pendingRev}','concorda')"
-        style="background:rgba(93,202,165,.08);color:var(--ok,#5DCAA5);border:1px solid var(--ok,#5DCAA5);
+        style="background:rgba(0,184,201,.08);color:var(--ok,#00B8C9);border:1px solid var(--ok,#00B8C9);
         border-radius:5px;padding:6px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
         &#x2713; Concorda
       </button>
@@ -11944,7 +11944,7 @@ function abrirAssociarParceiro(){
       : '<span style="color:var(--muted)">Nenhum parceiro associado.</span>'}</div>
     <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Buscar parceiro</label>
     <input id="_ap-busca" type="text" autocomplete="off" oninput="_apBuscar(this.value)" placeholder="Nome ou CPF/CNPJ…"
-      style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">
+      style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">
     <div id="_ap-result" style="max-height:190px;overflow-y:auto"></div>
     <div id="_ap-erro" style="color:var(--err);font-size:.78rem;min-height:14px;margin-top:6px"></div>
     <div style="display:flex;justify-content:flex-end;margin-top:10px">
@@ -11966,7 +11966,7 @@ function _apBuscar(q){
       const lista = d.parceiros || [];
       box.innerHTML = lista.length ? lista.map(p =>
         `<div onclick="_associarParceiro(${p.id})" style="padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
-              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+              onmouseover="this.style.background='rgba(0,184,201,.08)'" onmouseout="this.style.background=''">
            <span style="font-weight:600">${esc(p.nome)}</span>
            ${p.tipo ? `<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(p.tipo)}</span>` : ''}
            ${p.comissao_padrao_pct ? `<span style="color:var(--ok);margin-left:8px;font-size:10px">${p.comissao_padrao_pct}%</span>` : ''}
@@ -12053,10 +12053,10 @@ function pedirCredenciaisGerente(opts) {
       '<p style="margin:0 0 12px;color:var(--muted);font-size:.82rem;white-space:pre-line">' + esc(mensagem) + '</p>' +
       '<label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Login</label>' +
       '<input id="_cred-login" type="text" autocomplete="off" style="width:100%;box-sizing:border-box;' +
-      'background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:10px">' +
+      'background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:10px">' +
       '<label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Senha</label>' +
       '<input id="_cred-senha" type="password" style="width:100%;box-sizing:border-box;' +
-      'background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">' +
+      'background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">' +
       '<div id="_cred-erro" style="color:var(--err);font-size:.78rem;min-height:14px;margin-bottom:8px"></div>' +
       '<div style="display:flex;gap:8px;justify-content:flex-end">' +
       '<button data-act="cancel" style="background:none;border:1px solid var(--muted);color:var(--muted);' +
@@ -12180,7 +12180,7 @@ function _formGerarContrato() {
       <label style="font-size:.85rem">Endereço de instalação</label>
       <div style="display:flex;gap:6px;align-items:center">
         <input id="ctrt-end-instalacao" type="text" placeholder="Rua, nº - Bairro - Cidade/UF"
-          style="flex:1;background:var(--input,#0d1a0d);border:1px solid var(--border);
+          style="flex:1;background:var(--input,#0B1D3A);border:1px solid var(--border);
           color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
         <button onclick="copiarEnderecoCliente()" title="Copiar endereço do cliente"
           style="background:none;border:1px solid var(--border);color:var(--muted);
@@ -12188,15 +12188,15 @@ function _formGerarContrato() {
       </div>
       <label style="font-size:.85rem">Entrada (R$)</label>
       <input id="ctrt-entrada" type="number" value="0" min="0" step="100"
-        style="background:var(--input,#0d1a0d);border:1px solid var(--border);
+        style="background:var(--input,#0B1D3A);border:1px solid var(--border);
         color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
       <label style="font-size:.85rem">Descrição das parcelas</label>
       <input id="ctrt-parcelas" type="text" placeholder="ex: 10x de R$ 4.820,00"
-        style="background:var(--input,#0d1a0d);border:1px solid var(--border);
+        style="background:var(--input,#0B1D3A);border:1px solid var(--border);
         color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
       <label style="font-size:.85rem">Adendo (opcional)</label>
       <textarea id="ctrt-adendo" rows="3"
-        style="background:var(--input,#0d1a0d);border:1px solid var(--border);
+        style="background:var(--input,#0B1D3A);border:1px solid var(--border);
         color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem;resize:vertical"></textarea>
       <button onclick="gerarContrato()" class="btn-ciclo" style="align-self:flex-start">
         Gerar Contrato
@@ -12243,11 +12243,11 @@ function abrirModalReverOrcamento() {
       </p>
       <label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:3px">Login do Gerente/Diretor</label>
       <input id="vt-login" type="text" autocomplete="off"
-        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+        style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
         color:var(--fg);padding:7px;border-radius:4px;font-size:.9rem;margin-bottom:10px">
       <label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:3px">Senha</label>
       <input id="vt-senha" type="password"
-        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+        style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
         color:var(--fg);padding:7px;border-radius:4px;font-size:.9rem;margin-bottom:6px">
       <p id="vt-erro" style="color:#f08080;font-size:.82rem;min-height:1.2em;margin:0 0 14px"></p>
       <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -12426,7 +12426,7 @@ function _campo(id, label, valor, tipo, placeholder, obrigatorio) {
       </label>
       <input id="${id}" type="${tipo||'text'}" value="${(valor||'').replace(/"/g,'&quot;')}"
         placeholder="${placeholder||''}"
-        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);
+        style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);
         border:1px solid ${obrigatorio && vazio ? '#c84b4b' : 'var(--border)'};
         color:var(--fg);padding:8px;border-radius:4px;font-size:.9rem">
     </div>`;
@@ -12489,13 +12489,13 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
           <input id="apr-entrada" type="text" readonly
             value="${pagAtual.entrada > 0 ? 'R$ ' + pagAtual.entrada.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}"
             placeholder="R$ 0,00"
-            style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+            style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
         </div>
         <div style="margin-bottom:8px">
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Forma de Pagamento da Entrada</label>
           <select id="apr-forma-entrada" disabled
-            style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+            style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
             <option value="pix">Pix</option>
             <option value="transferencia">Transfer&ecirc;ncia Banc&aacute;ria</option>
@@ -12509,7 +12509,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
         <div style="margin-bottom:8px">
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Forma das Parcelas</label>
           <select id="apr-forma-parcelas" disabled
-            style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+            style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
             <option value="boleto">Boleto Banc&aacute;rio</option>
             <option value="debito_automatico">D&eacute;bito Autom&aacute;tico</option>
@@ -12522,7 +12522,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Descri&ccedil;&atilde;o das parcelas</label>
           <input id="apr-parcelas" type="text" readonly value="${pagAtual.descricao.replace(/"/g,'&quot;')}"
             placeholder="ex: 10x de R$ 4.820,00"
-            style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+            style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
         </div>
       </div>
@@ -12530,7 +12530,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
       <div style="margin-bottom:16px">
         <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Adendo (opcional)</label>
         <textarea id="apr-adendo" rows="2"
-          style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+          style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
           color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;resize:vertical"></textarea>
       </div>
 
@@ -12699,7 +12699,7 @@ async function coletarSignatarioOverride() {
         ${campos.map(([k,lbl]) => `
           <label style="display:block;font-size:.75rem;color:var(--muted);margin:6px 0 2px">${lbl}</label>
           <input id="sigov-${k}" value="${(base[k]||'').toString().replace(/"/g,'&quot;')}"
-            style="width:100%;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
+            style="width:100%;background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
         `).join('')}
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
           <button id="sig-cancel" style="background:none;border:1px solid var(--border);color:var(--muted);padding:7px 16px;border-radius:5px;cursor:pointer">Cancelar</button>
@@ -12725,10 +12725,10 @@ function abrirModalAssinatura(parte) {
       <h4 style="margin:0 0 16px">Assinar como: <strong>${parte}</strong></h4>
       <label style="font-size:.85rem">Nome completo</label>
       <input id="sig-nome" type="text" placeholder="Nome completo"
-        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
+        style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
       <label style="font-size:.85rem">CPF</label>
       <input id="sig-cpf" type="text" placeholder="000.000.000-00"
-        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
+        style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
       <label style="display:flex;gap:8px;align-items:center;margin-bottom:16px;font-size:.85rem">
         <input type="checkbox" id="sig-aceite">
         Li e aceito os termos do contrato
@@ -12780,7 +12780,7 @@ function abrirModalAdendo() {
       overlay.innerHTML = `
         <div style="background:var(--card,#132013);border:1px solid var(--border);border-radius:8px;padding:24px;min-width:400px;max-width:560px">
           <h4 style="margin:0 0 12px">Editar Adendo</h4>
-          <textarea id="adendo-texto" rows="6" style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;font-size:.85rem;resize:vertical">${adendo}</textarea>
+          <textarea id="adendo-texto" rows="6" style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;font-size:.85rem;resize:vertical">${adendo}</textarea>
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
             <button onclick="document.getElementById('modal-adendo-overlay').remove()"
               class="btn-ciclo" style="border-color:var(--muted);color:var(--muted)">Cancelar</button>
@@ -13092,7 +13092,7 @@ function bfFechar() {
     <!-- Banner de status -->
     <div id="exp-status-banner"
          style="font-size:12px;padding:9px 14px;border-radius:8px;
-                background:rgba(93,202,165,.08);border:1px solid rgba(93,202,165,.2);color:var(--ok)">
+                background:rgba(0,184,201,.08);border:1px solid rgba(0,184,201,.2);color:var(--ok)">
       Iniciando...
     </div>
 
@@ -13132,12 +13132,12 @@ function bfFechar() {
      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:700;
             align-items:center;justify-content:center;backdrop-filter:blur(4px)"
      onclick="if(event.target===this)tfFecharModalSenha()">
-  <div style="background:var(--card);border:1px solid rgba(93,202,165,.25);border-radius:16px;
+  <div style="background:var(--card);border:1px solid rgba(0,184,201,.25);border-radius:16px;
               padding:28px 24px;max-width:320px;width:92%;animation:mIn .18s ease;
               box-shadow:0 24px 60px rgba(0,0,0,.5)">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
       <div style="width:38px;height:38px;flex-shrink:0;border-radius:9px;
-                  background:rgba(93,202,165,.12);border:1px solid rgba(93,202,165,.25);
+                  background:rgba(0,184,201,.12);border:1px solid rgba(0,184,201,.25);
                   display:flex;align-items:center;justify-content:center;font-size:18px">&#x1F511;</div>
       <div>
         <div style="font-family:var(--font-sans);font-weight:900;font-size:14px;color:var(--text)">Liberacao Gerencial</div>
