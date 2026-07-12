@@ -32,6 +32,7 @@ PLANO_PADRAO = [
     ("2.1.04.11", "Provisão de Comissão de Projeto/Executivo"),
     ("2.1.04.12", "Provisão de Retenção de Comissão de Vendas"),
     ("2.1.04.13", "Provisão de Impostos"),   # FASE B2.6: passivo reservado no contrato; efetivado (→ 2.1.03) na emissão
+    ("2.1.04.14", "Provisão de Outros Fornecedores"),   # FASE D: recebe a reclassificação do Custo de Fábrica (substituição)
     ("2.1.05", "Financiamento Total Flex a Pagar"),
     ("2.1.06", "Adiantamento de Clientes"),
     ("2.2", "Não Circulante"),
@@ -538,6 +539,28 @@ def efetivar_impostos_segmento(db, owner_tipo, owner_id, projeto_id, valor, ref_
 # ── FASE D: reconciliação (Provisionado × Efetivado × Saldo × Destino) + Contas a Pagar ───────
 _ORIGEM_RESOL_SOBRA = "resolucao_provisao_sobra"
 _ORIGEM_RESOL_FALTA = "resolucao_provisao_falta"
+_ORIGEM_RECLASS     = "reclassificacao_provisao"
+
+
+def reclassificar_provisao(db, owner_tipo, owner_id, projeto_id, cod_de, cod_para, valor, ref, data=None):
+    """Reclassifica parte de uma provisão para OUTRA (passivo × passivo — NÃO toca o resultado). Ex.:
+    substituição de custo — parte da Provisão de Custo de Fábrica (2.1.04.06) passa para a Provisão de
+    Outros Fornecedores (2.1.04.14). Débito `cod_de` (reduz a provisionado de origem), crédito `cod_para`
+    (aumenta a provisionado de destino). Idempotente por ref. Assim cada provisão reconcilia com o seu
+    efetivado, e a soma dos saldos = a economia total."""
+    if not (cod_de or "").startswith(GRUPO_PROVISOES + ".") or not (cod_para or "").startswith(GRUPO_PROVISOES + "."):
+        raise ValueError("reclassificar_provisao: contas devem ser provisões (%s.x)" % GRUPO_PROVISOES)
+    ja = lancamento_por_ref(db, owner_tipo, owner_id, ref)
+    if ja is not None:
+        return ja
+    valor = round(float(valor or 0), 2)
+    if valor <= 0:
+        return None
+    seed_plano(db, owner_tipo, owner_id)
+    cd = _conta_por_codigo(db, owner_tipo, owner_id, cod_de)
+    cc = _conta_por_codigo(db, owner_tipo, owner_id, cod_para)
+    return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor, data=data, projeto_id=projeto_id,
+                  origem=_ORIGEM_RECLASS, historico="Reclassificação de provisão", ref=ref)
 
 
 def efetivar_provisao(db, owner_tipo, owner_id, projeto_id, codigo_provisao, valor, ref, data=None):
@@ -595,8 +618,11 @@ def reconciliacao(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None)
     for c in contas:
         if c.codigo in _PROV_PAINEL_EXCLUI:
             continue
-        provisionado = tl(c.codigo, "credito", excluir_origens={_ORIGEM_RESOL_FALTA})
-        efetivado = tl(c.codigo, "debito", excluir_origens={_ORIGEM_RESOL_SOBRA})
+        # provisionado = créditos (constituição + reclass-IN) − reclass-OUT; efetivado = débitos de custo
+        # real (exclui resolução e reclassificação, que são passivo×passivo, não efetivação).
+        provisionado = round(tl(c.codigo, "credito", excluir_origens={_ORIGEM_RESOL_FALTA})
+                             - tl(c.codigo, "debito", origens={_ORIGEM_RECLASS}), 2)
+        efetivado = tl(c.codigo, "debito", excluir_origens={_ORIGEM_RESOL_SOBRA, _ORIGEM_RECLASS})
         resolvido = round(tl(c.codigo, "debito", origens={_ORIGEM_RESOL_SOBRA})
                           + tl(c.codigo, "credito", origens={_ORIGEM_RESOL_FALTA}), 2)
         provs.append({"codigo": c.codigo, "nome": c.nome, "tipo": _PROV_PAINEL_TIPO.get(c.codigo, "O"),
@@ -614,6 +640,41 @@ def contas_a_pagar(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None
     (fornecedor/vencimento) é fase futura."""
     total = _mov(db, owner_tipo, owner_id, "2.1.01", "credor", ini, fim, projeto_id=projeto_id)
     return {"projeto_id": projeto_id, "total_em_aberto": round(total, 2)}
+
+
+def provisao_projetos(db, owner_tipo, owner_id, codigo, ini=None, fim=None):
+    """Discrimina UMA conta de provisão por PROJETO: provisionado/efetivado/saldo + detalhe por ORIGEM
+    (cada evento que tocou a conta, com débito/crédito e histórico). Alimenta o modal 'clicar na
+    provisão' do painel de Provisões."""
+    from sqlalchemy import or_
+    conta = _conta_por_codigo(db, owner_tipo, owner_id, codigo)
+    q = db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id).filter(
+        or_(Lancamento.conta_debito_id == conta.id, Lancamento.conta_credito_id == conta.id))
+    projs = {}
+    for l in _filtra_periodo(q, ini, fim).all():
+        pid = l.projeto_id or "(sem projeto)"
+        p = projs.setdefault(pid, {"projeto_id": pid, "por_origem": {}})
+        o = p["por_origem"].setdefault(l.origem or "(manual)", {"debito": 0.0, "credito": 0.0, "historico": l.historico})
+        if l.conta_debito_id == conta.id:
+            o["debito"] = round(o["debito"] + l.valor, 2)
+        else:
+            o["credito"] = round(o["credito"] + l.valor, 2)
+    out = []
+    for pid, p in projs.items():
+        # mesma regra da reconciliacao: provisionado = créditos (excl. resol_falta) − reclass-out;
+        # efetivado = débitos de custo real (excl. resol_sobra e reclass).
+        prov = round(sum(o["credito"] for org, o in p["por_origem"].items() if org != _ORIGEM_RESOL_FALTA)
+                     - sum(o["debito"] for org, o in p["por_origem"].items() if org == _ORIGEM_RECLASS), 2)
+        efet = round(sum(o["debito"] for org, o in p["por_origem"].items()
+                         if org not in (_ORIGEM_RESOL_SOBRA, _ORIGEM_RECLASS)), 2)
+        out.append({"projeto_id": pid, "provisionado": prov, "efetivado": efet,
+                    "saldo": round(prov - efet, 2), "por_origem": p["por_origem"]})
+    out.sort(key=lambda x: x["projeto_id"])
+    return {"codigo": codigo, "nome": conta.nome,
+            "totais": {"provisionado": round(sum(p["provisionado"] for p in out), 2),
+                       "efetivado": round(sum(p["efetivado"] for p in out), 2),
+                       "saldo": round(sum(p["saldo"] for p in out), 2)},
+            "projetos": out}
 
 
 # ── Provisões da venda: % configurável + auto-constituição no fechamento (v6 §6.4) ──
@@ -645,7 +706,7 @@ _PROV_PAINEL_SUB = {
 _PROV_PAINEL_TIPO = {
     "2.1.04.10": "A", "2.1.04.11": "A", "2.1.04.12": "A",             # Comissões / Pessoas
     "2.1.04.02": "B", "2.1.04.03": "B", "2.1.04.05": "B",             # Custos futuros (serviços da venda)
-    "2.1.04.06": "C", "2.1.04.07": "C", "2.1.04.08": "C", "2.1.04.09": "C",   # Aquisição / Fábrica
+    "2.1.04.06": "C", "2.1.04.07": "C", "2.1.04.08": "C", "2.1.04.09": "C", "2.1.04.14": "C",   # Aquisição / Fábrica
     "2.1.04.13": "D",                                                 # Fiscal
 }
 _PROV_TIPO_ROTULO = {"A": "Comissões / Pessoas", "B": "Custos futuros",
@@ -903,6 +964,7 @@ def balanco(db, owner_tipo, owner_id, data_corte=None):
     1/2/3. O resultado do exercício (Receitas − Despesas acumuladas) entra no PL → fecha por
     partida dobrada (Ativo = Passivo + PL). `data_corte` = fim; ini=None (desde o começo)."""
     s = lambda pref, sen: _mov(db, owner_tipo, owner_id, pref, sen, None, data_corte)
+    det = lambda pref, sen: _detalhe_grupo(db, owner_tipo, owner_id, pref, sen, None, data_corte)
     ativo_circ = s("1.1", "devedor")
     ativo_ncirc = s("1.2", "devedor")
     total_ativo = round(ativo_circ + ativo_ncirc, 2)
@@ -920,6 +982,13 @@ def balanco(db, owner_tipo, owner_id, data_corte=None):
         "patrimonio_liquido": {"contas": pl_contas, "resultado_exercicio": resultado, "total": total_pl},
         "total_passivo_mais_pl": total_passivo_pl,
         "confere": abs(total_ativo - total_passivo_pl) < 0.01,
+        "detalhe": {   # composição nível 3 por grupo (modo Analítico)
+            "ativo_circulante": det("1.1", "devedor"),
+            "ativo_nao_circulante": det("1.2", "devedor"),
+            "passivo_circulante": det("2.1", "credor"),
+            "passivo_nao_circulante": det("2.2", "credor"),
+            "patrimonio_liquido": det("3", "credor"),
+        },
     }
 
 

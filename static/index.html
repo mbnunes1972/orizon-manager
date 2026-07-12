@@ -12,53 +12,53 @@
    Os "aliases dos tokens antigos" mantêm as ~250 referências var(--…) existentes funcionando. */
 :root{
   color-scheme:dark;   /* controles nativos (ícone do date/month, popup do calendário, scrollbars) em modo escuro */
-  /* superfícies e texto (escuro) — Padrao_Design_Orizon_v4 §2 (recalibrado, menos "terminal") */
-  --bg:#181C1E; --surface:#1D2224; --surface-2:#232A2C;
-  --border:#2A3234; --border-strong:#3A4548;
-  --text:#E8EAE9; --muted:#8C979A;
-  --shadow:0 2px 6px rgba(0,0,0,.35);   /* elevação — substitui borda como fonte de profundidade */
+  /* NOVA PALETA — identidade Orizon Manager (logo). design-tokens.md §2.0 CANÔNICA (rebrand: navy + azul
+     elétrico + ciano; dourado e laranja legados REMOVIDOS). Substitui o verde-menta + dourado do v4/v10. */
+  --bg:#081120; --surface:#0B1D3A; --surface-2:#12294A;   /* navy da logo */
+  --border:#1C3459; --border-strong:#2A4A73;
+  --text:#E6EBF1; --muted:#8A96A3;
+  --shadow:0 2px 6px rgba(0,0,0,.35);   /* elevação — profundidade por sombra */
   --r-sm:6px; --r-md:8px; --r-lg:12px;  /* raios da escala (Padrao_Design_v7 §4) */
-  /* accent (petróleo) e marca (dourado) — escuro */
-  --accent:#5BB8AC; --accent-tint:rgba(91,184,172,.14);
-  /* Botão primário — paleta PRÓPRIA, deliberadamente fora do --accent (Padrao_Design_v10). Escuro:
-     fill perto do fundo, borda teal SUAVE (baixo contraste) + sombra fazem o destaque. */
-  --btn-primary-bg:#193430; --btn-primary-text:#EAF5F2;
-  --btn-primary-border:1px solid rgba(89,192,178,.32); --btn-primary-shadow:0 6px 20px rgba(0,0,0,.55);
-  --gold:#D4B348; --gold-tint:rgba(212,179,72,.16); --warn-tint:rgba(239,159,39,.14);
-  /* semânticas de sistema — escuro */
-  --warn:#EF9F27; --err:#E2876C; --info:#7DB3E8;
-  /* status de negócio — escuro (aplicados aos badges no item 4; definidos aqui já como parte da paleta) */
+  --accent:#00B8C9; --accent-tint:rgba(0,184,201,.16);   /* ciano de ação — menu ativo, logo, foco, valores */
+  --primary:#0066FF;                                     /* azul elétrico — botão primário, links */
+  /* Botão primário — azul elétrico da marca (§2.0). */
+  --btn-primary-bg:#0066FF; --btn-primary-text:#FFFFFF;
+  --btn-primary-border:none; --btn-primary-shadow:0 6px 20px rgba(0,0,0,.45);
+  --warn-tint:rgba(239,159,39,.14);
+  /* semânticas de sistema — escuro (âmbar aviso, coral erro; info azul substitui o dourado no "fechado") */
+  --warn:#EF9F27; --err:#E2876C; --info:#5B9BFF;
+  /* status de negócio — escuro */
   --st-quente:#E2876C; --st-morno:#E8B458; --st-frio:var(--info);
-  --st-convertido:var(--accent); --st-fechado:var(--gold); --st-perdido:var(--muted);
-  /* ── ALIASES dos tokens antigos (NÃO remover — o CSS existente depende deles) ── */
+  --st-convertido:var(--accent); --st-fechado:var(--info); --st-perdido:var(--muted);   /* fechado AZUL (§2.0) */
+  /* ── ALIASES dos tokens antigos (NÃO remover — o CSS existente depende deles). SEM gold. ── */
   --card:var(--surface-2); --border2:var(--border-strong); --ok:var(--accent);
-  --section:var(--info); --dalm-gold:var(--gold); --dalm-gold-light:var(--gold);
+  --section:var(--info);
   --sb-bg:var(--surface);
-  /* usados por inputs de modais (antes indefinidos: --fg herdava, --input caía em #0d1a0d verde) */
+  /* usados por inputs de modais (antes indefinidos: --fg herdava, --input caía em #0B1D3A verde) */
   --fg:var(--text); --input:var(--surface);
   /* Tipografia — família sans única (Inter) + mono reservado a números (Padrao_Design_Orizon_v2 §3) */
   --font-sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
   --font-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace;
   /* Cartões teal/amber/coral — NÃO cobertos pela paleta v2; mantidos p/ frente futura */
-  --teal-bg:#04342C; --teal-brd:#0F6E56; --teal-text:#9FE1CB; --teal-lbl:#5DCAA5;
+  --teal-bg:#062A31; --teal-brd:#0F6E7A; --teal-text:#A6E2EA; --teal-lbl:#4FD0DD;   /* de-green: família ciano (era verde-menta) */
   --amber-bg:#412402; --amber-brd:#854F0B; --amber-text:#FAC775; --amber-lbl:#EF9F27;
   --coral-bg:#4A1B0C; --coral-brd:#993C1D; --coral-text:#F5C4B3; --coral-lbl:#F0997B;
 }
 :root[data-theme="light"]{
   color-scheme:light;   /* controles nativos em modo claro */
-  --bg:#FFFFFF; --surface:#F7F7F5; --surface-2:#FFFFFF;
-  --border:#DDDAD2; --border-strong:#C9C6BC;
-  --text:#2A2A28; --muted:#6B6860;
+  --bg:#FFFFFF; --surface:#F4F7FB; --surface-2:#FFFFFF;
+  --border:#DCE3EC; --border-strong:#C6CFDB;
+  --text:#0B1D3A; --muted:#5A6572;
   --shadow:0 1px 2px rgba(0,0,0,.06);
-  --accent:#1F4B4B; --accent-tint:rgba(31,75,75,.10);
-  /* Botão primário — paleta própria (Padrao_Design_v10). Claro: cinza neutro (sem matiz de marca),
-     contraste só pelo valor tonal; sem borda. */
-  --btn-primary-bg:#666666; --btn-primary-text:#FFFFFF;
+  --accent:#0E7C8C; --accent-tint:rgba(14,124,140,.10);   /* ciano escuro (contraste no claro) */
+  --primary:#0066FF;
+  /* Botão primário — azul elétrico da marca (§2.0). */
+  --btn-primary-bg:#0066FF; --btn-primary-text:#FFFFFF;
   --btn-primary-border:none; --btn-primary-shadow:0 2px 8px rgba(0,0,0,.12);
-  --gold:#9C7A0C; --gold-tint:rgba(184,150,12,.14); --warn-tint:rgba(239,159,39,.16);
-  --warn:#EF9F27; --err:#D64A3C; --info:#2266A8;
+  --warn-tint:rgba(239,159,39,.16);
+  --warn:#EF9F27; --err:#D64A3C; --info:#0066FF;
   --st-quente:#B1452A; --st-morno:#B87A1E; --st-frio:var(--info);
-  --st-convertido:var(--accent); --st-fechado:var(--gold); --st-perdido:var(--muted);
+  --st-convertido:var(--accent); --st-fechado:var(--info); --st-perdido:var(--muted);   /* fechado AZUL (§2.0) */
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:100vh;display:flex;overflow:hidden}
@@ -204,8 +204,8 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .proj-status-badge.quente{background:rgba(240,90,80,.12);color:var(--st-quente)}
 .proj-status-badge.morno{background:rgba(251,191,36,.12);color:var(--st-morno)}
 .proj-status-badge.frio{background:rgba(96,165,250,.12);color:var(--st-frio)}
-.proj-status-badge.convertido{background:rgba(25,201,160,.12);color:var(--st-convertido)}
-.proj-status-badge.fechado{background:rgba(180,140,40,.16);color:var(--st-fechado)}
+.proj-status-badge.convertido{background:rgba(0,184,201,.12);color:var(--st-convertido)}
+.proj-status-badge.fechado{background:rgba(91,155,255,.16);color:var(--st-fechado)}
 .proj-status-badge.perdido{background:rgba(120,120,120,.12);color:var(--st-perdido)}
 .proj-status-badge.sem{background:transparent;color:var(--muted)}
 .proj-status-dd{position:absolute;top:100%;left:0;z-index:300;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);min-width:140px;overflow:hidden;display:none}
@@ -226,7 +226,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .form-field{margin-bottom:14px}
 /* Badge de origem */
 .badge-origem { font-size:9px; padding:2px 7px; border-radius:10px; font-weight:700; letter-spacing:.5px; }
-.badge-origem.local { background:rgba(25,201,160,.15); color:var(--ok); }
+.badge-origem.local { background:rgba(0,184,201,.15); color:var(--ok); }
 .badge-origem.omie  { background:rgba(96,165,250,.15); color:var(--section); }
 /* Ambientes page */
 .proj-header{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
@@ -245,7 +245,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .drop-sub{font-size:11px;color:var(--muted)}
 /* Ambiente cards */
 .amb-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;transition:.15s}
-.amb-card.selected{border-color:rgba(25,201,160,.35)}
+.amb-card.selected{border-color:rgba(0,184,201,.35)}
 .amb-card-header{display:flex;align-items:center;gap:12px;padding:14px 18px;cursor:pointer}
 .amb-check{width:18px;height:18px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
 .amb-info{flex:1;min-width:0}
@@ -400,7 +400,7 @@ body{overflow:hidden}
 .modal-close:hover{color:var(--text)}
 @keyframes mIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 /* Banner de projeto bloqueado */
-.bloqueio-banner{display:none;background:rgba(93,202,165,.07);border:1px solid rgba(93,202,165,.3);border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.bloqueio-banner{display:none;background:rgba(0,184,201,.07);border:1px solid rgba(0,184,201,.3);border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px}
 .bloqueio-banner.ativo{display:flex}
 .bloqueio-icon{font-size:18px;flex-shrink:0}
 .bloqueio-txt{font-size:11px;color:var(--ok);line-height:1.5}
@@ -460,7 +460,7 @@ body{overflow:hidden}
 }
 .ciclo-card-header .etapa-num {
   font-size: .75rem;
-  color: var(--muted, #6a7a6a);
+  color: var(--muted, #8A96A3);
   min-width: 28px;
 }
 .ciclo-card-header .etapa-nome { flex: 1; font-weight: 500; }
@@ -471,13 +471,13 @@ body{overflow:hidden}
 }
 .badge-pendente        { background: #2a2a1a; color: var(--warn, #c8a84b); }
 .badge-em_andamento    { background: #1a2a2a; color: var(--section, #4b8bc8); }
-.badge-para_assinatura { background: #1a2010; color: #80e090; }
+.badge-para_assinatura { background: #10272e; color: var(--ok, #00B8C9); }
 .badge-assinado,
 .badge-vigente,
 .badge-concluido,
-.badge-aprovado        { background: #1a2a1a; color: var(--ok, #4caf82); }
+.badge-aprovado        { background: #10272e; color: var(--ok, #00B8C9); }
 .badge-rascunho        { background: #2a1a1a; color: #c08080; }
-.badge-bloqueado       { background: #1a1a1a; color: var(--muted, #6a7a6a); }
+.badge-bloqueado       { background: #1a1a1a; color: var(--muted, #8A96A3); }
 
 .ciclo-card-body {
   display: none;
@@ -590,10 +590,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
          onmouseover="this.style.borderColor='var(--accent)'"
          onmouseout="this.style.borderColor='var(--border)'">
       <div id="sb-user-avatar"
-           style="width:30px;height:30px;border-radius:50%;background:var(--accent);
+           style="width:30px;height:30px;border-radius:50%;background:var(--primary);
                   display:flex;align-items:center;justify-content:center;
                   font-family:var(--font-sans);font-weight:700;font-size:12px;
-                  color:#0d160d;flex-shrink:0;overflow:hidden">
+                  color:#fff;flex-shrink:0;overflow:hidden">
         <span id="sb-user-inicial">?</span>
         <img id="sb-user-foto" src="" alt="" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%">
       </div>
@@ -631,10 +631,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px">
       <div style="position:relative;width:64px;height:64px;flex-shrink:0">
         <div id="mp-avatar-circle"
-             style="width:64px;height:64px;border-radius:50%;background:var(--accent);
+             style="width:64px;height:64px;border-radius:50%;background:var(--primary);
                     display:flex;align-items:center;justify-content:center;
                     font-family:var(--font-sans);font-weight:700;font-size:22px;
-                    color:#0d160d;overflow:hidden">
+                    color:#fff;overflow:hidden">
           <span id="mp-avatar-inicial">?</span>
           <img id="mp-avatar-foto" src="" alt=""
                style="display:none;width:100%;height:100%;object-fit:cover;border-radius:50%">
@@ -729,7 +729,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <input type="hidden" id="novo-proj-cliente-id">
       <label>CLIENTE *</label>
       <!-- Chip: cliente selecionado -->
-      <div id="np-cli-chip" style="display:none;align-items:center;justify-content:space-between;background:rgba(93,202,165,.08);border:1px solid rgba(93,202,165,.25);border-radius:8px;padding:9px 13px;margin-bottom:6px">
+      <div id="np-cli-chip" style="display:none;align-items:center;justify-content:space-between;background:rgba(0,184,201,.08);border:1px solid rgba(0,184,201,.25);border-radius:8px;padding:9px 13px;margin-bottom:6px">
         <div>
           <div style="font-size:12px;font-weight:600;color:var(--text)" id="np-cli-chip-nome"></div>
           <div style="font-size:10px;color:var(--muted);margin-top:2px" id="np-cli-chip-cpf"></div>
@@ -1697,7 +1697,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         </div>
         <!-- Endereço de instalação -->
         <div style="grid-column:1/-1;margin-top:16px;padding-top:12px;border-top:1px solid rgba(156,122,60,.2);">
-          <div style="font-weight:600;color:var(--dalm-gold);margin-bottom:8px;">Endereço de Instalação</div>
+          <div style="font-weight:600;color:var(--accent);margin-bottom:8px;">Endereço de Instalação</div>
           <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer;">
             <input type="checkbox" id="cli-inst-mesmo" onchange="cliToggleInstEnd(this.checked)">
             <span style="color:var(--text)">Mesmo endereço residencial</span>
@@ -1766,7 +1766,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <span onclick="mceFechar()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
       </div>
       <!-- Info do cliente -->
-      <div style="background:rgba(93,202,165,.07);border:1px solid rgba(93,202,165,.2);border-radius:8px;padding:12px 14px;margin-bottom:18px">
+      <div style="background:rgba(0,184,201,.07);border:1px solid rgba(0,184,201,.2);border-radius:8px;padding:12px 14px;margin-bottom:18px">
         <div style="font-weight:700;font-size:14px;margin-bottom:3px" id="mce-nome"></div>
         <div style="font-size:11px;color:var(--muted)" id="mce-detalhe"></div>
       </div>
@@ -2032,7 +2032,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:598px;width:92%;max-height:90vh;overflow-y:auto;animation:mIn .18s ease">
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;gap:12px">
       <div style="font-family:var(--font-sans);font-weight:900;font-size:16px">Parametros da negociacao <span id="mp-ro-badge" style="display:none;font-size:11px;font-weight:600;color:var(--muted)">🔒 somente leitura</span></div>
-      <div id="mp-total-ambientes" style="font-family:var(--font-mono);font-size:11px;color:var(--ok);background:rgba(25,201,160,.08);border:1px solid rgba(25,201,160,.2);border-radius:6px;padding:3px 10px;white-space:nowrap">—</div>
+      <div id="mp-total-ambientes" style="font-family:var(--font-mono);font-size:11px;color:var(--ok);background:rgba(0,184,201,.08);border:1px solid rgba(0,184,201,.2);border-radius:6px;padding:3px 10px;white-space:nowrap">—</div>
     </div>
 
     <!-- Toggle: Incluir custos adicionais ao valor bruto -->
@@ -2156,6 +2156,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <button onclick="fecharModalLiberarImpostos()" style="padding:8px 14px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer">Cancelar</button>
       <button onclick="confirmarLiberarImpostos()" style="padding:8px 14px;background:var(--btn-primary-bg);border:var(--btn-primary-border);border-radius:6px;color:var(--btn-primary-text);font-weight:700;cursor:pointer">Confirmar</button>
     </div>
+  </div>
+</div>
+<!-- FASE D: modal ao clicar numa provisão do painel — discrimina por projeto + origem -->
+<div id="modal-provisao-proj" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9550;align-items:center;justify-content:center;backdrop-filter:blur(3px)" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);max-width:820px;width:94%;max-height:88vh;overflow:auto;padding:20px 24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-family:var(--font-sans);font-weight:900;font-size:16px" id="provproj-titulo">Provisão</div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-provisao-proj').style.display='none'">Fechar</button>
+    </div>
+    <div id="provproj-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
   </div>
 </div>
 <div id="modal-autorizacao" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9500;align-items:center;justify-content:center">
@@ -4343,7 +4353,7 @@ async function npBuscarCliente(q){
       dd.innerHTML = lista.map(c =>
         `<div onclick="npSelecionarCliente(${c.id},'${esc(c.nome)}','${esc(c.cpf||'')}','${esc(c.email||'')}','${esc(c.telefone||c.whatsapp||'')}')"
               style="padding:10px 14px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
-              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+              onmouseover="this.style.background='rgba(0,184,201,.08)'" onmouseout="this.style.background=''">
           <span style="font-weight:600">${esc(c.nome)}</span>
           ${c.cpf?`<span style="color:var(--muted);margin-left:8px">${esc(c.cpf)}</span>`:''}
           ${c.cidade?`<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(c.cidade)}</span>`:''}
@@ -4499,7 +4509,7 @@ function peBuscarCliente(q){
       dd.innerHTML = lista.length ? lista.map(c =>
         `<div onclick="peSelCliente(${c.id},'${esc(c.nome)}')"
               style="padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
-              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+              onmouseover="this.style.background='rgba(0,184,201,.08)'" onmouseout="this.style.background=''">
           <span style="font-weight:600">${esc(c.nome)}</span>${c.cpf?`<span style="color:var(--muted);margin-left:8px">${esc(c.cpf)}</span>`:''}
         </div>`).join('') : '<div style="padding:9px 12px;font-size:11px;color:var(--muted)">Nenhum cliente.</div>';
       dd.style.display = 'block';
@@ -4523,7 +4533,7 @@ function peBuscarParceiro(q){
       dd.innerHTML = lista.length ? lista.map(p =>
         `<div onclick="peSelParceiro(${p.id},'${esc(p.nome)}')"
               style="padding:9px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
-              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+              onmouseover="this.style.background='rgba(0,184,201,.08)'" onmouseout="this.style.background=''">
           <span style="font-weight:600">${esc(p.nome)}</span>${p.tipo?`<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(p.tipo)}</span>`:''}
         </div>`).join('') : '<div style="padding:9px 12px;font-size:11px;color:var(--muted)">Nenhum parceiro.</div>';
       dd.style.display = 'block';
@@ -6329,8 +6339,8 @@ function tfRenderTabela(d, valorAvista, entrada) {
       ? '<span class="badge-plano" style="background:var(--accent-tint);color:var(--accent)">&#9664; Última</span>'
       : '<span class="badge-plano" style="background:var(--accent-tint);color:var(--accent)">&#x2713; Ativa</span>';
 
-    const dataBg  = isUltima ? 'rgba(93,202,165,.06)' : 'transparent';
-    const rowBg   = isUltima ? 'rgba(93,202,165,.06)' : 'transparent';
+    const dataBg  = isUltima ? 'rgba(0,184,201,.06)' : 'transparent';
+    const rowBg   = isUltima ? 'rgba(0,184,201,.06)' : 'transparent';
 
     const dataCell = `<td style="padding:4px 8px;background:${dataBg}">
       <input type="date" value="${esc(p.data_iso)}" min="${esc(minIso)}" max="${esc(limIso)}"
@@ -6340,7 +6350,7 @@ function tfRenderTabela(d, valorAvista, entrada) {
 
     let valorDigCell;
     if (isUltima) {
-      valorDigCell = `<td style="padding:4px 8px;background:rgba(93,202,165,.06)">
+      valorDigCell = `<td style="padding:4px 8px;background:rgba(0,184,201,.06)">
         <input type="text" value="${fmt(p.valor_digitado)}" disabled
                title="Valor calculado automaticamente para fechar o saldo."
                style="${inputStyle(false, true)}">
@@ -7284,7 +7294,7 @@ function _mpRenderSombra(liquidoHoje, margemHoje) {
   const fmtR = v => (Number(v) || 0).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
   const fmtP = v => (Number(v) || 0).toLocaleString('pt-BR', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
   const txt  = id => { const el = document.getElementById(id); return el ? el.textContent.trim() : '—'; };
-  const gold = 'var(--dalm-gold,#f5c842)';
+  const gold = 'var(--accent)';
   const linha = (rot, hoje, novo) =>
     `<tr><td style="color:var(--muted)">${rot}</td>` +
     `<td style="text-align:right">${hoje}</td>` +
@@ -8132,7 +8142,7 @@ async function npBuscarParceiro(q){
       dd.innerHTML = lista.map(p =>
         `<div onclick="npSelecionarParceiro(${p.id},'${esc(p.nome)}','${esc(p.tipo||'')}',${p.comissao_padrao_pct||0})"
               style="padding:10px 14px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
-              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+              onmouseover="this.style.background='rgba(0,184,201,.08)'" onmouseout="this.style.background=''">
           <span style="font-weight:600">${esc(p.nome)}</span>
           ${p.tipo?`<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(p.tipo)}</span>`:''}
           ${p.comissao_padrao_pct?`<span style="color:var(--ok);margin-left:8px;font-size:10px">${p.comissao_padrao_pct}%</span>`:''}
@@ -8516,7 +8526,7 @@ async function adminRenderPlataforma(box){
   box.innerHTML = `
     <div class="card" style="padding:14px 16px">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-        <strong style="color:var(--dalm-gold,#c8a84b)">🏢 Redes</strong>
+        <strong style="color:var(--accent)">🏢 Redes</strong>
         <button class="btn btn-ghost btn-sm" onclick="adminRedeNova()" style="font-size:11px">+ Nova rede</button>
       </div>
       <table class="cli-table"><thead><tr><th>Nome</th><th>CNPJ</th><th></th></tr></thead><tbody>
@@ -8529,7 +8539,7 @@ async function adminRenderPlataforma(box){
     </div>
     <div class="card" style="padding:14px 16px">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-        <strong style="color:var(--dalm-gold,#c8a84b)">🏪 Lojas avulsas</strong>
+        <strong style="color:var(--accent)">🏪 Lojas avulsas</strong>
         <button class="btn btn-ghost btn-sm" onclick="adminLojaNova(null)" style="font-size:11px">+ Nova loja avulsa</button>
       </div>
       <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th></th></tr></thead><tbody>
@@ -8546,7 +8556,7 @@ async function adminRenderPlataforma(box){
     box.insertAdjacentHTML('beforeend', `
       <div class="card" style="padding:14px 16px">
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-          <strong style="color:var(--dalm-gold,#c8a84b)">👤 Gestores gerais</strong>
+          <strong style="color:var(--accent)">👤 Gestores gerais</strong>
           <button class="btn btn-ghost btn-sm" style="font-size:11px"
             onclick="abrirModalUsuario({modo:'novo', escopo:'plataforma', onSaved:adminRender})">+ Novo gestor</button>
         </div>
@@ -8595,7 +8605,7 @@ async function adminRenderRede(box){
   box.innerHTML = `
     <div class="card" style="padding:14px 16px">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-        <strong style="color:var(--dalm-gold,#c8a84b)">🏪 Lojas da rede</strong>
+        <strong style="color:var(--accent)">🏪 Lojas da rede</strong>
         <button class="btn btn-ghost btn-sm" onclick="adminLojaNova(${rid})" style="font-size:11px">+ Nova loja</button>
       </div>
       <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th></th></tr></thead><tbody>
@@ -8614,7 +8624,7 @@ async function adminRenderRede(box){
     box.insertAdjacentHTML('beforeend', `
       <div class="card" style="padding:14px 16px">
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-          <strong style="color:var(--dalm-gold,#c8a84b)">👤 Administradores da rede</strong>
+          <strong style="color:var(--accent)">👤 Administradores da rede</strong>
           <button class="btn btn-ghost btn-sm" style="font-size:11px"
             onclick="abrirModalUsuario({modo:'novo', escopo:'rede', rede_id:${rid}, onSaved:adminRender})">+ Novo administrador</button>
         </div>
@@ -8631,7 +8641,7 @@ async function adminRenderRede(box){
     box.insertAdjacentHTML('beforeend', `
       <div class="card" style="padding:14px 16px">
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px">
-          <strong style="color:var(--dalm-gold,#c8a84b)">🧾 Fiscal da rede — Emitente central</strong>
+          <strong style="color:var(--accent)">🧾 Fiscal da rede — Emitente central</strong>
           <button class="btn btn-ghost btn-sm" style="font-size:11px"
             onclick="adminFiscalCarregar('rede', ${rid})">Configurar</button>
         </div>
@@ -8832,8 +8842,8 @@ async function finDashboardCarregar(){
   const card = inner => '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:16px 20px;margin-bottom:12px">'+inner+'</div>';
   // FASE C: provisões agrupadas por TIPO (A/B/C/D/O), cada grupo com subtotal; um card por grupo.
   const linhaProv = p =>
-     '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-top:1px solid var(--border)">'
-    +'<div><div style="font-weight:600;color:var(--text);font-size:13px">'+esc(p.nome)+'</div>'
+     '<div onclick="abrirProvisaoModal(\''+p.codigo+'\')" title="Ver por projeto" style="cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-top:1px solid var(--border)">'
+    +'<div><div style="font-weight:600;color:var(--text);font-size:13px">'+esc(p.nome)+' <span style="font-size:10px;color:var(--muted)">›</span></div>'
     +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(p.sub)+'</div></div>'
     +'<div style="font-family:var(--font-mono);font-weight:700;font-size:14px;color:var(--text);white-space:nowrap">'+_fBRL(p.saldo_em_aberto)+'</div></div>';
   const grupoCard = g => card(
@@ -8868,6 +8878,46 @@ async function finDashboardCarregar(){
      '<div style="margin-bottom:14px">'
     +'<span style="font-size:13px;color:var(--muted)">'+d.provisoes.length+' provisões monitoradas · total em aberto <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(d.total_provisoes_abertas)+'</strong></span></div>'
     + grupos + apoio;
+}
+
+// ── FASE D: modal ao clicar numa provisão — discrimina por projeto + origem ───────────────────
+const _ORIG_LBL = {
+  faturamento_cmv:'CMV — custo de fábrica (CFO)', efetivacao_provisao:'Efetivação (custo real → Fornecedores)',
+  reclassificacao_provisao:'Reclassificação (substituição)', resolucao_provisao_sobra:'Resolução — sobra→receita',
+  resolucao_provisao_falta:'Resolução — falta→despesa',
+  fechamento_venda_montagem:'Constituição — Montagem', fechamento_venda_garantia:'Constituição — Garantia',
+  fechamento_venda_assistencia:'Constituição — Assistência', fechamento_venda_frete_fabrica:'Constituição — Frete Fábrica',
+  fechamento_venda_frete_local:'Constituição — Frete Local', fechamento_venda_insumos:'Constituição — Insumos',
+  fechamento_venda_com_medidor:'Constituição — Com. Medidor', fechamento_venda_com_proj_exec:'Constituição — Com. Proj/Exec',
+  fechamento_venda_retencao_com_vendas:'Constituição — Retenção Com. Vendas', fechamento_venda_impostos:'Constituição — Impostos',
+  faturamento_impostos_obrigacao:'Efetivação impostos (emissão)',
+};
+async function abrirProvisaoModal(codigo){
+  const modal=document.getElementById('modal-provisao-proj');
+  document.getElementById('provproj-box').innerHTML='<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  document.getElementById('provproj-titulo').textContent=codigo+' — por projeto';
+  modal.style.display='flex';
+  const pv=(await fetch('/api/financeiro/provisao-projetos?conta='+encodeURIComponent(codigo),{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({}))).provisao;
+  const box=document.getElementById('provproj-box');
+  if(!pv){ box.innerHTML='<em style="color:var(--err);font-size:12px">Falha ao carregar (reinicie o servidor se necessário).</em>'; return; }
+  document.getElementById('provproj-titulo').textContent=esc(pv.nome)+' — por projeto';
+  if(!pv.projetos.length){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Sem lançamentos nesta provisão.</em>'; return; }
+  const saldoCor=v=>Math.abs(v)<0.005?'var(--muted)':(v>0?'var(--accent)':'var(--st-quente)');
+  const projCard=p=>{
+    const origens=Object.keys(p.por_origem).map(org=>{
+      const o=p.por_origem[org];
+      return '<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:var(--muted)">'
+        +'<span>'+esc(_ORIG_LBL[org]||org)+'</span>'
+        +'<span style="font-family:var(--font-mono)">'+(o.credito?('provisiona '+_fBRL(o.credito)):'')+(o.debito?((o.credito?' · ':'')+'baixa '+_fBRL(o.debito)):'')+'</span></div>';
+    }).join('');
+    return '<div style="background:var(--surface-2);border-radius:10px;padding:12px 16px;margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px"><div style="font-weight:700;font-size:13px">'+esc(p.projeto_id)+'</div>'
+      +'<div style="font-size:12px;color:var(--muted)">Prov <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(p.provisionado)+'</strong> · Efet <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(p.efetivado)+'</strong> · Saldo <strong style="font-family:var(--font-mono);color:'+saldoCor(p.saldo)+'">'+_fBRL(p.saldo)+'</strong></div></div>'
+      +'<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">'+origens+'</div></div>';
+  };
+  const t=pv.totais;
+  box.innerHTML='<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Total — Provisionado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(t.provisionado)+'</strong> · Efetivado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(t.efetivado)+'</strong> · Saldo <strong style="font-family:var(--font-mono);color:'+saldoCor(t.saldo)+'">'+_fBRL(t.saldo)+'</strong></div>'
+    +pv.projetos.map(projCard).join('');
 }
 
 // ── FASE D: Reconciliação de Provisões (Provisionado × Efetivado × Saldo × Destino) ───────────
@@ -9106,6 +9156,8 @@ async function repasseRegistrar(){
   showToast('Reparo em garantia registrado'); repasseCarregar();
 }
 
+let _balModo = 'resumido';   // 'resumido' | 'analitico'
+function balSetModo(m){ _balModo = m; balancoCarregar(); }
 async function balancoCarregar(){
   const box = document.getElementById('bal-box');
   if(!box) return;
@@ -9113,25 +9165,37 @@ async function balancoCarregar(){
   if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Módulo financeiro inativo ou sem acesso.</em>'; return; }
   const b = (await r.json().catch(()=>({}))).balanco;
   if(!b){ box.innerHTML='<em style="color:var(--muted)">Falha ao carregar o balanço.</em>'; return; }
+  const det = b.detalhe || {};
   const ln=(lbl,val,opts)=>{ opts=opts||{};
     return '<div style="display:flex;justify-content:space-between;padding:5px 10px;'
       +(opts.total?'font-weight:700;border-top:1px solid var(--border-strong)':'border-bottom:1px solid var(--border)')
       +(opts.sub?';padding-left:24px;color:var(--muted)':'')+'">'
       +'<span>'+lbl+'</span><span style="font-family:var(--font-mono);color:'+(opts.total?'var(--accent)':'var(--text)')+'">'+_fBRL(val)+'</span></div>'; };
-  const ativo = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Ativo</div>'
-    + ln('Circulante', b.ativo.circulante, {sub:true}) + ln('Não Circulante', b.ativo.nao_circulante, {sub:true})
+  // no Analítico, expande a composição (nível 3) de cada grupo
+  const comp = chave => (_balModo==='analitico'
+    ? (det[chave]||[]).map(c=>ln('<span style="font-size:11px">'+esc(c.codigo)+' · '+esc(c.nome)+'</span>', c.valor, {sub:true})).join('')
+    : '');
+  const cab = t => '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">'+t+'</div>';
+  const ativoCol = cab('Ativo')
+    + ln('Circulante', b.ativo.circulante, {sub:true}) + comp('ativo_circulante')
+    + ln('Não Circulante', b.ativo.nao_circulante, {sub:true}) + comp('ativo_nao_circulante')
     + ln('Total do Ativo', b.ativo.total, {total:true});
-  const passivo = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:12px 0 4px">Passivo + Patrimônio Líquido</div>'
-    + ln('Passivo Circulante', b.passivo.circulante, {sub:true}) + ln('Passivo Não Circulante', b.passivo.nao_circulante, {sub:true})
-    + ln('Patrimônio Líquido', b.patrimonio_liquido.contas, {sub:true})
+  const passivoCol = cab('Passivo + Patrimônio Líquido')
+    + ln('Passivo Circulante', b.passivo.circulante, {sub:true}) + comp('passivo_circulante')
+    + ln('Passivo Não Circulante', b.passivo.nao_circulante, {sub:true}) + comp('passivo_nao_circulante')
+    + ln('Patrimônio Líquido', b.patrimonio_liquido.contas, {sub:true}) + comp('patrimonio_liquido')
     + ln('Resultado do Exercício', b.patrimonio_liquido.resultado_exercicio, {sub:true})
     + ln('Total Passivo + PL', b.total_passivo_mais_pl, {total:true});
+  const btn=(m,lbl)=>'<button class="btn '+(_balModo===m?'btn-primary':'btn-ghost')+' btn-sm" onclick="balSetModo(\''+m+'\')">'+lbl+'</button>';
   const confere = b.confere
-    ? '<div style="font-size:10px;color:var(--accent);margin-top:8px">✓ Ativo = Passivo + PL (fecha por partida dobrada)</div>'
-    : '<div style="font-size:10px;color:var(--warn);margin-top:8px">⚠ Ativo ≠ Passivo + PL — verificar lançamentos</div>';
-  box.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Posição patrimonial acumulada'
+    ? '<div style="font-size:10px;color:var(--accent);margin-top:10px">✓ Ativo = Passivo + PL (fecha por partida dobrada)</div>'
+    : '<div style="font-size:10px;color:var(--warn);margin-top:10px">⚠ Ativo ≠ Passivo + PL — verificar lançamentos</div>';
+  box.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:10px">'+btn('resumido','Resumido')+btn('analitico','Analítico')+'</div>'
+    + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Posição patrimonial acumulada'
     +(b.data_corte?(' até '+esc(b.data_corte.slice(0,10))):' (data atual)')+'.</div>'
-    + '<div style="max-width:520px">'+ativo+passivo+confere+'</div>';
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">'
+    + '<div>'+ativoCol+'</div><div>'+passivoCol+'</div></div>'
+    + confere;
 }
 
 function reconInit(){
@@ -9537,7 +9601,7 @@ async function adminFiscalCarregar(kind, id){
   _cfgFisc = d;
   const p = d.perfil || {};
   const ph = new Set(d.placeholders || []);
-  const sec = t => `<div style="font-weight:600;color:var(--dalm-gold);font-size:12px;margin:16px 0 8px">${t}</div>`;
+  const sec = t => `<div style="font-weight:600;color:var(--accent);font-size:12px;margin:16px 0 8px">${t}</div>`;
   const badge = k => ph.has(k)
     ? `<span class="badge-pendente" style="font-size:9px;padding:1px 5px;border-radius:4px;margin-left:6px">valor de teste — confirmar</span>`
       + `<label style="font-size:10px;color:var(--muted);margin-left:4px"><input type="checkbox" id="pf-conf-${k}" style="vertical-align:middle"> confirmado</label>`
@@ -10055,8 +10119,8 @@ async function aprovarOrcamento() {
 
   logBox.innerHTML    = '<div style="color:var(--muted)">Iniciando exportacao...</div>';
   banner.textContent  = 'Enviando para o Omie...';
-  banner.style.background = 'rgba(93,202,165,.08)';
-  banner.style.borderColor = 'rgba(93,202,165,.2)';
+  banner.style.background = 'rgba(0,184,201,.08)';
+  banner.style.borderColor = 'rgba(0,184,201,.2)';
   banner.style.color  = 'var(--ok)';
   confirmBox.style.display = 'none';
   btnFechar.style.display  = 'none';
@@ -10114,8 +10178,8 @@ async function _expPoll() {
       _expPollTimer = null;
       const banner = document.getElementById('exp-status-banner');
       banner.textContent  = 'Exportacao concluida — projeto bloqueado e XMLs travados.';
-      banner.style.background  = 'rgba(93,202,165,.12)';
-      banner.style.borderColor = 'rgba(93,202,165,.35)';
+      banner.style.background  = 'rgba(0,184,201,.12)';
+      banner.style.borderColor = 'rgba(0,184,201,.35)';
       banner.style.color  = 'var(--ok)';
       document.getElementById('exp-btn-fechar').style.display  = 'inline-flex';
       document.getElementById('exp-btn-fechar-top').style.display = 'block';
@@ -10830,7 +10894,7 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
 function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
   const concluido = dados.status === 'concluido';
   const _btnProvisoes = `<button onclick="abrirProvisoes(_orcamentoAtivoId)"
-    style="background:none;border:1px solid var(--border2,#2a4a3a);color:var(--ok,#5DCAA5);
+    style="background:none;border:1px solid var(--border2,#2A4A73);color:var(--ok,#00B8C9);
     border-radius:6px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
     &#x1F4CA; Provisões
   </button>`;
@@ -10987,7 +11051,7 @@ async function abrirProvisoes(oid) {
       return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <label style="font-size:.8rem;color:var(--muted);flex:1">${esc(rb.label)}</label>
         <input type="number" step="0.01" id="_prov-inp-${rb.key}" value="${esc(prev)}"
-          style="width:120px;background:var(--input,#0d1a0d);border:1px solid var(--border);
+          style="width:120px;background:var(--input,#0B1D3A);border:1px solid var(--border);
           color:var(--fg);padding:4px 7px;border-radius:4px;font-size:.82rem;text-align:right">
       </div>`;
     }).join('');
@@ -11003,7 +11067,7 @@ async function abrirProvisoes(oid) {
     actionBtns = `<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <span style="font-size:.8rem;color:var(--muted)">Próxima revisão: <strong style="color:var(--ok)">${esc(revLabel)}</strong></span>
       <button onclick="_provAcao('${oid}','${pendingRev}','concorda')"
-        style="background:rgba(93,202,165,.08);color:var(--ok,#5DCAA5);border:1px solid var(--ok,#5DCAA5);
+        style="background:rgba(0,184,201,.08);color:var(--ok,#00B8C9);border:1px solid var(--ok,#00B8C9);
         border-radius:5px;padding:6px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
         &#x2713; Concorda
       </button>
@@ -11022,7 +11086,7 @@ async function abrirProvisoes(oid) {
 
   // Build desatualizado banner
   const desatualizadoBanner = desatualizado ? `
-    <div style="background:rgba(239,159,39,.08);border:1px solid var(--warn,#b8960c);border-radius:6px;
+    <div style="background:rgba(239,159,39,.08);border:1px solid var(--warn);border-radius:6px;
       padding:10px 14px;margin-bottom:14px">
       <span style="color:var(--warn,#f0c84a);font-size:.85rem">
         &#x26A0;&#xFE0F; provisões desatualizadas — a negociação mudou após o último registro.
@@ -11288,7 +11352,7 @@ function _renderCardPE(codigo, dados, bloqueada) {
       return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:.8rem">
         <a href="/api/projetos/${encodeURIComponent(projetoAtivo ? projetoAtivo.nome_safe : '')}/ciclo/documento/${d.id}"
            target="_blank" rel="noopener"
-           style="color:var(--dalm-gold);text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+           style="color:var(--accent);text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
            title="${esc(d.nome_original)}">&#x1F4CE; ${esc(d.nome_original)}</a>
         <span style="color:var(--muted);white-space:nowrap">${dDt}</span>
       </div>`;
@@ -11307,7 +11371,7 @@ function _renderCardPE(codigo, dados, bloqueada) {
         const rDt = rv.aberta_em ? new Date(rv.aberta_em).toLocaleDateString('pt-BR') : '';
         const docLink = rv.relatorio_doc_id
           ? `<a href="/api/projetos/${encodeURIComponent(projetoAtivo ? projetoAtivo.nome_safe : '')}/ciclo/documento/${rv.relatorio_doc_id}"
-               target="_blank" rel="noopener" style="color:var(--dalm-gold);font-size:.78rem;margin-left:6px">&#x1F4CE; relatório</a>`
+               target="_blank" rel="noopener" style="color:var(--accent);font-size:.78rem;margin-left:6px">&#x1F4CE; relatório</a>`
           : '';
         return `<div style="font-size:.78rem;color:var(--warn,#c8a84b);margin-bottom:3px">
           &#x21BA; Revisão ${rDt}${rv.motivo ? ': ' + esc(rv.motivo) : ''}${docLink}
@@ -11537,7 +11601,7 @@ function _renderCardEmissaoNfe(dados, bloqueada) {
   const linhas = (_nfe15.fabrica_xmls || []).map(x => {
     const e = x.emissao;
     if (e) {
-      const cor = e.status === 'autorizado' ? 'var(--ok)' : e.status === 'erro' ? 'var(--warn)' : e.status === 'cancelado' ? 'var(--muted)' : 'var(--dalm-gold)';
+      const cor = e.status === 'autorizado' ? 'var(--ok)' : e.status === 'erro' ? 'var(--warn)' : e.status === 'cancelado' ? 'var(--muted)' : 'var(--info)';
       const dl = (id, rot) => id ? `<a class="btn-ciclo" style="font-size:.75rem;text-decoration:none" target="_blank" rel="noopener" href="/api/projetos/${encodeURIComponent(proj)}/ciclo/documento/${id}">${rot}</a>` : '';
       return `<div style="border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px;font-size:.82rem">
         <div>📄 ${esc(x.nome_original || '')} — <span style="color:${cor};font-weight:700">${esc(e.status || '')}</span>${e.chave ? ' · ' + esc(e.chave) : ''}</div>
@@ -11564,7 +11628,7 @@ function _renderCardEmissaoNfe(dados, bloqueada) {
     const travado = nfse && (nfse.status === 'autorizado' || nfse.status === 'processando');
     let corpoNfse;
     if (travado) {
-      const cor = nfse.status === 'autorizado' ? 'var(--ok)' : 'var(--dalm-gold)';
+      const cor = nfse.status === 'autorizado' ? 'var(--ok)' : 'var(--info)';
       corpoNfse = `<div style="border:1px solid var(--border);border-radius:6px;padding:8px;font-size:.82rem">
         <div>🧾 NFS-e — <span style="color:${cor};font-weight:700">${esc(nfse.status || '')}</span>${nfse.chave ? ' · ' + esc(nfse.chave) : ''}</div>
         ${nfse.emitente_cnpj ? `<div style="color:var(--muted);font-size:.72rem">Emitente: ${esc(nfse.emitente_razao || '')} · ${esc(nfse.emitente_cnpj)}</div>` : ''}
@@ -11873,14 +11937,14 @@ function abrirAssociarParceiro(){
   if(!projetoAtivo) return;
   const atual = _parceiroAtivoProjeto;
   _apOverlay = _popupOverlay(`
-    <h4 style="margin:0 0 12px;font-size:1rem;color:var(--dalm-gold,#c8a84b)">Parceiro (arquiteto) do projeto</h4>
+    <h4 style="margin:0 0 12px;font-size:1rem;color:var(--accent)">Parceiro (arquiteto) do projeto</h4>
     <div style="font-size:.85rem;margin-bottom:10px">${atual
       ? `Atual: <strong>${esc(atual.nome)}</strong>
          <button onclick="_associarParceiro(null)" style="margin-left:8px;background:none;border:1px solid var(--err);color:var(--err);border-radius:5px;padding:3px 10px;font-size:.78rem;cursor:pointer">Remover</button>`
       : '<span style="color:var(--muted)">Nenhum parceiro associado.</span>'}</div>
     <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Buscar parceiro</label>
     <input id="_ap-busca" type="text" autocomplete="off" oninput="_apBuscar(this.value)" placeholder="Nome ou CPF/CNPJ…"
-      style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">
+      style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">
     <div id="_ap-result" style="max-height:190px;overflow-y:auto"></div>
     <div id="_ap-erro" style="color:var(--err);font-size:.78rem;min-height:14px;margin-top:6px"></div>
     <div style="display:flex;justify-content:flex-end;margin-top:10px">
@@ -11902,7 +11966,7 @@ function _apBuscar(q){
       const lista = d.parceiros || [];
       box.innerHTML = lista.length ? lista.map(p =>
         `<div onclick="_associarParceiro(${p.id})" style="padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--border)"
-              onmouseover="this.style.background='rgba(93,202,165,.08)'" onmouseout="this.style.background=''">
+              onmouseover="this.style.background='rgba(0,184,201,.08)'" onmouseout="this.style.background=''">
            <span style="font-weight:600">${esc(p.nome)}</span>
            ${p.tipo ? `<span style="color:var(--muted);margin-left:8px;font-size:10px">${esc(p.tipo)}</span>` : ''}
            ${p.comissao_padrao_pct ? `<span style="color:var(--ok);margin-left:8px;font-size:10px">${p.comissao_padrao_pct}%</span>` : ''}
@@ -11938,7 +12002,7 @@ function confirmarPopup(mensagem, opts) {
   const perigo = !!opts.perigo;
   return new Promise((resolve) => {
     const ov = _popupOverlay(
-      '<h4 style="margin:0 0 10px;color:var(--dalm-gold,#c8a84b);font-size:1rem">' + esc(titulo) + '</h4>' +
+      '<h4 style="margin:0 0 10px;color:var(--accent);font-size:1rem">' + esc(titulo) + '</h4>' +
       '<p style="margin:0 0 16px;color:var(--fg,#e8efe9);font-size:.9rem;white-space:pre-line">' + esc(mensagem) + '</p>' +
       '<div style="display:flex;gap:8px;justify-content:flex-end">' +
       '<button data-act="cancel" style="background:none;border:1px solid var(--muted);color:var(--muted);' +
@@ -11963,7 +12027,7 @@ function avisoPopup(mensagem, opts) {
   const okLabel = opts.okLabel || 'OK';
   return new Promise((resolve) => {
     const ov = _popupOverlay(
-      '<h4 style="margin:0 0 10px;color:var(--dalm-gold,#c8a84b);font-size:1rem">' + esc(titulo) + '</h4>' +
+      '<h4 style="margin:0 0 10px;color:var(--accent);font-size:1rem">' + esc(titulo) + '</h4>' +
       '<p style="margin:0 0 16px;color:var(--fg,#e8efe9);font-size:.9rem;white-space:pre-line">' + esc(mensagem) + '</p>' +
       '<div style="display:flex;justify-content:flex-end">' +
       '<button data-act="ok" style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:5px;' +
@@ -11989,10 +12053,10 @@ function pedirCredenciaisGerente(opts) {
       '<p style="margin:0 0 12px;color:var(--muted);font-size:.82rem;white-space:pre-line">' + esc(mensagem) + '</p>' +
       '<label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Login</label>' +
       '<input id="_cred-login" type="text" autocomplete="off" style="width:100%;box-sizing:border-box;' +
-      'background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:10px">' +
+      'background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:10px">' +
       '<label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Senha</label>' +
       '<input id="_cred-senha" type="password" style="width:100%;box-sizing:border-box;' +
-      'background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">' +
+      'background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">' +
       '<div id="_cred-erro" style="color:var(--err);font-size:.78rem;min-height:14px;margin-bottom:8px"></div>' +
       '<div style="display:flex;gap:8px;justify-content:flex-end">' +
       '<button data-act="cancel" style="background:none;border:1px solid var(--muted);color:var(--muted);' +
@@ -12052,7 +12116,7 @@ function renderContratoUI(contrato) {
 
   ui.innerHTML = `
     ${contrato.desatualizado ? `
-    <div style="background:rgba(239,159,39,.08);border:1px solid var(--warn,#b8960c);border-radius:6px;padding:12px 14px;margin-bottom:14px">
+    <div style="background:rgba(239,159,39,.08);border:1px solid var(--warn);border-radius:6px;padding:12px 14px;margin-bottom:14px">
       <p style="color:var(--warn,#f0c84a);font-size:.85rem;margin:0">
         &#x26A0;&#xFE0F; Este contrato pode estar desatualizado &mdash; a negocia&ccedil;&atilde;o/pagamento mudou ap&oacute;s a gera&ccedil;&atilde;o. Gere o contrato novamente se necess&aacute;rio.
       </p>
@@ -12116,7 +12180,7 @@ function _formGerarContrato() {
       <label style="font-size:.85rem">Endereço de instalação</label>
       <div style="display:flex;gap:6px;align-items:center">
         <input id="ctrt-end-instalacao" type="text" placeholder="Rua, nº - Bairro - Cidade/UF"
-          style="flex:1;background:var(--input,#0d1a0d);border:1px solid var(--border);
+          style="flex:1;background:var(--input,#0B1D3A);border:1px solid var(--border);
           color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
         <button onclick="copiarEnderecoCliente()" title="Copiar endereço do cliente"
           style="background:none;border:1px solid var(--border);color:var(--muted);
@@ -12124,15 +12188,15 @@ function _formGerarContrato() {
       </div>
       <label style="font-size:.85rem">Entrada (R$)</label>
       <input id="ctrt-entrada" type="number" value="0" min="0" step="100"
-        style="background:var(--input,#0d1a0d);border:1px solid var(--border);
+        style="background:var(--input,#0B1D3A);border:1px solid var(--border);
         color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
       <label style="font-size:.85rem">Descrição das parcelas</label>
       <input id="ctrt-parcelas" type="text" placeholder="ex: 10x de R$ 4.820,00"
-        style="background:var(--input,#0d1a0d);border:1px solid var(--border);
+        style="background:var(--input,#0B1D3A);border:1px solid var(--border);
         color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
       <label style="font-size:.85rem">Adendo (opcional)</label>
       <textarea id="ctrt-adendo" rows="3"
-        style="background:var(--input,#0d1a0d);border:1px solid var(--border);
+        style="background:var(--input,#0B1D3A);border:1px solid var(--border);
         color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem;resize:vertical"></textarea>
       <button onclick="gerarContrato()" class="btn-ciclo" style="align-self:flex-start">
         Gerar Contrato
@@ -12179,11 +12243,11 @@ function abrirModalReverOrcamento() {
       </p>
       <label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:3px">Login do Gerente/Diretor</label>
       <input id="vt-login" type="text" autocomplete="off"
-        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+        style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
         color:var(--fg);padding:7px;border-radius:4px;font-size:.9rem;margin-bottom:10px">
       <label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:3px">Senha</label>
       <input id="vt-senha" type="password"
-        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+        style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
         color:var(--fg);padding:7px;border-radius:4px;font-size:.9rem;margin-bottom:6px">
       <p id="vt-erro" style="color:#f08080;font-size:.82rem;min-height:1.2em;margin:0 0 14px"></p>
       <div style="display:flex;gap:8px;justify-content:flex-end">
@@ -12362,7 +12426,7 @@ function _campo(id, label, valor, tipo, placeholder, obrigatorio) {
       </label>
       <input id="${id}" type="${tipo||'text'}" value="${(valor||'').replace(/"/g,'&quot;')}"
         placeholder="${placeholder||''}"
-        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);
+        style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);
         border:1px solid ${obrigatorio && vazio ? '#c84b4b' : 'var(--border)'};
         color:var(--fg);padding:8px;border-radius:4px;font-size:.9rem">
     </div>`;
@@ -12425,13 +12489,13 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
           <input id="apr-entrada" type="text" readonly
             value="${pagAtual.entrada > 0 ? 'R$ ' + pagAtual.entrada.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}"
             placeholder="R$ 0,00"
-            style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+            style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
         </div>
         <div style="margin-bottom:8px">
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Forma de Pagamento da Entrada</label>
           <select id="apr-forma-entrada" disabled
-            style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+            style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
             <option value="pix">Pix</option>
             <option value="transferencia">Transfer&ecirc;ncia Banc&aacute;ria</option>
@@ -12445,7 +12509,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
         <div style="margin-bottom:8px">
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Forma das Parcelas</label>
           <select id="apr-forma-parcelas" disabled
-            style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+            style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
             <option value="boleto">Boleto Banc&aacute;rio</option>
             <option value="debito_automatico">D&eacute;bito Autom&aacute;tico</option>
@@ -12458,7 +12522,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
           <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Descri&ccedil;&atilde;o das parcelas</label>
           <input id="apr-parcelas" type="text" readonly value="${pagAtual.descricao.replace(/"/g,'&quot;')}"
             placeholder="ex: 10x de R$ 4.820,00"
-            style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+            style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
         </div>
       </div>
@@ -12466,7 +12530,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
       <div style="margin-bottom:16px">
         <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Adendo (opcional)</label>
         <textarea id="apr-adendo" rows="2"
-          style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);
+          style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);
           color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;resize:vertical"></textarea>
       </div>
 
@@ -12635,7 +12699,7 @@ async function coletarSignatarioOverride() {
         ${campos.map(([k,lbl]) => `
           <label style="display:block;font-size:.75rem;color:var(--muted);margin:6px 0 2px">${lbl}</label>
           <input id="sigov-${k}" value="${(base[k]||'').toString().replace(/"/g,'&quot;')}"
-            style="width:100%;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
+            style="width:100%;background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
         `).join('')}
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
           <button id="sig-cancel" style="background:none;border:1px solid var(--border);color:var(--muted);padding:7px 16px;border-radius:5px;cursor:pointer">Cancelar</button>
@@ -12661,10 +12725,10 @@ function abrirModalAssinatura(parte) {
       <h4 style="margin:0 0 16px">Assinar como: <strong>${parte}</strong></h4>
       <label style="font-size:.85rem">Nome completo</label>
       <input id="sig-nome" type="text" placeholder="Nome completo"
-        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
+        style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
       <label style="font-size:.85rem">CPF</label>
       <input id="sig-cpf" type="text" placeholder="000.000.000-00"
-        style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
+        style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
       <label style="display:flex;gap:8px;align-items:center;margin-bottom:16px;font-size:.85rem">
         <input type="checkbox" id="sig-aceite">
         Li e aceito os termos do contrato
@@ -12716,7 +12780,7 @@ function abrirModalAdendo() {
       overlay.innerHTML = `
         <div style="background:var(--card,#132013);border:1px solid var(--border);border-radius:8px;padding:24px;min-width:400px;max-width:560px">
           <h4 style="margin:0 0 12px">Editar Adendo</h4>
-          <textarea id="adendo-texto" rows="6" style="width:100%;box-sizing:border-box;background:var(--input,#0d1a0d);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;font-size:.85rem;resize:vertical">${adendo}</textarea>
+          <textarea id="adendo-texto" rows="6" style="width:100%;box-sizing:border-box;background:var(--input,#0B1D3A);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;font-size:.85rem;resize:vertical">${adendo}</textarea>
           <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
             <button onclick="document.getElementById('modal-adendo-overlay').remove()"
               class="btn-ciclo" style="border-color:var(--muted);color:var(--muted)">Cancelar</button>
@@ -13028,7 +13092,7 @@ function bfFechar() {
     <!-- Banner de status -->
     <div id="exp-status-banner"
          style="font-size:12px;padding:9px 14px;border-radius:8px;
-                background:rgba(93,202,165,.08);border:1px solid rgba(93,202,165,.2);color:var(--ok)">
+                background:rgba(0,184,201,.08);border:1px solid rgba(0,184,201,.2);color:var(--ok)">
       Iniciando...
     </div>
 
@@ -13068,12 +13132,12 @@ function bfFechar() {
      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:700;
             align-items:center;justify-content:center;backdrop-filter:blur(4px)"
      onclick="if(event.target===this)tfFecharModalSenha()">
-  <div style="background:var(--card);border:1px solid rgba(93,202,165,.25);border-radius:16px;
+  <div style="background:var(--card);border:1px solid rgba(0,184,201,.25);border-radius:16px;
               padding:28px 24px;max-width:320px;width:92%;animation:mIn .18s ease;
               box-shadow:0 24px 60px rgba(0,0,0,.5)">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px">
       <div style="width:38px;height:38px;flex-shrink:0;border-radius:9px;
-                  background:rgba(93,202,165,.12);border:1px solid rgba(93,202,165,.25);
+                  background:rgba(0,184,201,.12);border:1px solid rgba(0,184,201,.25);
                   display:flex;align-items:center;justify-content:center;font-size:18px">&#x1F511;</div>
       <div>
         <div style="font-family:var(--font-sans);font-weight:900;font-size:14px;color:var(--text)">Liberacao Gerencial</div>
@@ -13136,12 +13200,12 @@ function bfFechar() {
 <div id="modal-briefing" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center;">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;width:min(720px,95vw);max-height:90vh;overflow-y:auto;position:relative;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-      <h3 style="color:var(--dalm-gold);margin:0;">Briefing — <span id="bf-cliente-nome"></span></h3>
+      <h3 style="color:var(--accent);margin:0;">Briefing — <span id="bf-cliente-nome"></span></h3>
       <button onclick="bfFechar()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">&#x2715;</button>
     </div>
 
     <!-- Seção 1: Identificação -->
-    <div style="color:var(--dalm-gold);font-weight:600;margin-bottom:8px;margin-top:4px;">1. Identificação</div>
+    <div style="color:var(--accent);font-weight:600;margin-bottom:8px;margin-top:4px;">1. Identificação</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
       <div><label style="font-size:12px;color:var(--muted)">Data do atendimento (auto)</label>
         <input id="bf-data" type="date" readonly style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);box-sizing:border-box;"></div>
@@ -13150,7 +13214,7 @@ function bfFechar() {
     </div>
 
     <!-- Seção 2: Empreendimento -->
-    <div style="color:var(--dalm-gold);font-weight:600;margin-bottom:8px;">2. Empreendimento</div>
+    <div style="color:var(--accent);font-weight:600;margin-bottom:8px;">2. Empreendimento</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
       <div><label style="font-size:12px;color:var(--muted)">Tipo de imóvel *</label>
         <select id="bf-tipo-imovel" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
@@ -13182,7 +13246,7 @@ function bfFechar() {
       <input id="bf-end-emp" type="text" placeholder="Rua, número, bairro, cidade, CEP" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);box-sizing:border-box;"></div>
 
     <!-- Seção 3: Perfil do Cliente -->
-    <div style="color:var(--dalm-gold);font-weight:600;margin-bottom:8px;">3. Perfil do Cliente</div>
+    <div style="color:var(--accent);font-weight:600;margin-bottom:8px;">3. Perfil do Cliente</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
       <div><label style="font-size:12px;color:var(--muted)">Decisor final</label>
         <select id="bf-decisor" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
@@ -13202,7 +13266,7 @@ function bfFechar() {
     </div>
 
     <!-- Seção 4: Proposta e Budget -->
-    <div style="color:var(--dalm-gold);font-weight:600;margin-bottom:8px;">4. Proposta e Budget</div>
+    <div style="color:var(--accent);font-weight:600;margin-bottom:8px;">4. Proposta e Budget</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
       <div><label style="font-size:12px;color:var(--muted)">Categoria de proposta *</label>
         <select id="bf-categoria" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
@@ -13217,7 +13281,7 @@ function bfFechar() {
     </div>
 
     <!-- Seção 5: Prazo -->
-    <div style="color:var(--dalm-gold);font-weight:600;margin-bottom:8px;">5. Prazo</div>
+    <div style="color:var(--accent);font-weight:600;margin-bottom:8px;">5. Prazo</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
       <div><label style="font-size:12px;color:var(--muted)">Data desejada para entrega *</label>
         <input id="bf-data-entrega" type="date" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);box-sizing:border-box;"></div>
@@ -13231,7 +13295,7 @@ function bfFechar() {
     </div>
 
     <!-- Seção 6: Observações -->
-    <div style="color:var(--dalm-gold);font-weight:600;margin-bottom:8px;">6. Observações Gerais</div>
+    <div style="color:var(--accent);font-weight:600;margin-bottom:8px;">6. Observações Gerais</div>
     <div style="margin-bottom:8px;"><label style="font-size:12px;color:var(--muted)">Itens que não abre mão</label>
       <textarea id="bf-nao-abre-mao" rows="2" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);resize:vertical;box-sizing:border-box;"></textarea></div>
     <div style="margin-bottom:8px;"><label style="font-size:12px;color:var(--muted)">Restrições ou pontos de atenção</label>

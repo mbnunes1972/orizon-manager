@@ -92,6 +92,46 @@ def test_reconciliacao_consolidada_soma_projetos(app_db):
     db.close()
 
 
+def test_reclassificacao_outros_fornecedores(app_db):
+    """FASE D: substituição — reclassifica parte do Custo Fábrica p/ Outros Fornecedores; cada linha
+    reconcilia com o seu efetivado (soma dos saldos = economia total). Passivo × passivo, não toca DRE."""
+    db = app_db.get_session(); ot, oid = "loja", 620; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "faturamento_cmv", 1000.0, projeto_id="P", ref="cmv:P")   # provisão fábrica 1000
+    mc.reclassificar_provisao(db, ot, oid, "P", "2.1.04.06", "2.1.04.14", 200.0, ref="rc:P")   # 20% → outros
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.06", 760.0, ref="ef:fab")                   # NF fábrica
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.14", 95.0, ref="ef:out")                    # NF outros
+    rec = {l["codigo"]: l for l in mc.reconciliacao(db, ot, oid, projeto_id="P")["provisoes"]}
+    assert rec["2.1.04.06"]["provisionado"] == 800.0 and rec["2.1.04.06"]["efetivado"] == 760.0 and rec["2.1.04.06"]["saldo"] == 40.0
+    assert rec["2.1.04.14"]["provisionado"] == 200.0 and rec["2.1.04.14"]["efetivado"] == 95.0 and rec["2.1.04.14"]["saldo"] == 105.0
+    assert rec["2.1.04.14"]["tipo"] == "C"
+    assert mc.dre(db, ot, oid)["deducoes"] == 0.0   # reclassificação não toca o resultado
+    db.close()
+
+
+def test_balanco_tem_detalhe_analitico(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 630; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "recebimento_venda", 1000.0, projeto_id="P", ref="rcb")
+    b = mc.balanco(db, ot, oid)
+    assert "detalhe" in b
+    assert "1.1.01" in [x["codigo"] for x in b["detalhe"]["ativo_circulante"]]      # Caixa
+    assert "2.1.06" in [x["codigo"] for x in b["detalhe"]["passivo_circulante"]]    # Adiantamento
+    db.close()
+
+
+def test_provisao_projetos(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 631; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "faturamento_cmv", 1000.0, projeto_id="A", ref="cmvA")
+    mc.registrar_evento(db, ot, oid, "faturamento_cmv", 500.0, projeto_id="B", ref="cmvB")
+    mc.efetivar_provisao(db, ot, oid, "A", "2.1.04.06", 800.0, ref="efA")
+    pp = mc.provisao_projetos(db, ot, oid, "2.1.04.06")
+    projs = {p["projeto_id"]: p for p in pp["projetos"]}
+    assert projs["A"]["provisionado"] == 1000.0 and projs["A"]["efetivado"] == 800.0 and projs["A"]["saldo"] == 200.0
+    assert projs["B"]["provisionado"] == 500.0 and projs["B"]["efetivado"] == 0.0
+    assert "faturamento_cmv" in projs["A"]["por_origem"] and "efetivacao_provisao" in projs["A"]["por_origem"]
+    assert pp["totais"]["provisionado"] == 1500.0
+    db.close()
+
+
 def test_dre_inclui_reversao_de_provisao(app_db):
     """FASE D: a SOBRA da reconciliação (4.4.02) entra na DRE via Outras Receitas (não fica órfã)."""
     db = app_db.get_session(); ot, oid = "loja", 610; mc.seed_plano(db, ot, oid)
