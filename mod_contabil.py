@@ -867,7 +867,10 @@ def dre(db, owner_tipo, owner_id, ini=None, fim=None):
     depreciacao = 0.0                                  # sem conta dedicada no seed
     ebit = round(ebitda - depreciacao, 2)
     resultado_financeiro = round(-m("5.5", "devedor"), 2)
-    resultado_antes_impostos = round(ebit + resultado_financeiro, 2)
+    # FASE D: Outras Receitas (4.4) — inclui a Reversão de Provisões (4.4.02, sobra da reconciliação).
+    # Sem isto a sobra ficava órfã da DRE (a falta, 5.6.10, já entra em constituicao_provisoes).
+    outras_receitas = round(m("4.4", "credor"), 2)
+    resultado_antes_impostos = round(ebit + resultado_financeiro + outras_receitas, 2)
     impostos = 0.0                                     # Simples/DAS já em Deduções (4.3)
     lucro_liquido = round(resultado_antes_impostos - impostos, 2)
     return {
@@ -877,7 +880,8 @@ def dre(db, owner_tipo, owner_id, ini=None, fim=None):
         "despesas_comerciais": desp_com, "despesas_administrativas": desp_adm,
         "constituicao_provisoes": const_prov, "ebitda": ebitda,
         "depreciacao": depreciacao, "ebit": ebit,
-        "resultado_financeiro": resultado_financeiro, "resultado_antes_impostos": resultado_antes_impostos,
+        "resultado_financeiro": resultado_financeiro, "outras_receitas": outras_receitas,
+        "resultado_antes_impostos": resultado_antes_impostos,
         "impostos": impostos, "lucro_liquido": lucro_liquido,
         "obs": "Depreciação e Impostos = 0 (sem conta dedicada no seed; Simples/DAS já em Deduções). Refinar com contador.",
         "detalhe": {   # composição nível 3 por linha (modo Analítico)
@@ -888,6 +892,7 @@ def dre(db, owner_tipo, owner_id, ini=None, fim=None):
             "despesas_administrativas": det("5.4", "devedor"),
             "constituicao_provisoes": det("5.6", "devedor"),
             "resultado_financeiro": det("5.5", "devedor"),
+            "outras_receitas": det("4.4", "credor"),
         },
     }
 

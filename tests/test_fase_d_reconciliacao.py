@@ -92,6 +92,18 @@ def test_reconciliacao_consolidada_soma_projetos(app_db):
     db.close()
 
 
+def test_dre_inclui_reversao_de_provisao(app_db):
+    """FASE D: a SOBRA da reconciliação (4.4.02) entra na DRE via Outras Receitas (não fica órfã)."""
+    db = app_db.get_session(); ot, oid = "loja", 610; mc.seed_plano(db, ot, oid)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"frete_fabrica": 1000.0}, ref_base="pf:P")
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.07", 600.0, ref="ef")   # sobra 400
+    mc.resolver_saldo_provisao(db, ot, oid, "P", "2.1.04.07", ref="rs")
+    d = mc.dre(db, ot, oid)
+    assert d["outras_receitas"] == 400.0
+    assert d["resultado_antes_impostos"] == round(d["ebit"] + d["resultado_financeiro"] + 400.0, 2)
+    db.close()
+
+
 def test_contas_a_pagar_em_aberto(app_db):
     db = app_db.get_session(); ot, oid = "loja", 607; mc.seed_plano(db, ot, oid)
     mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"frete_fabrica": 1000.0, "insumos": 300.0}, ref_base="pf:P")
