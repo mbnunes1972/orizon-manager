@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Orizon Manager</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B1D3A'/><path d='M6 22C6 22 10.5 11 16 11 21.5 11 26 22 26 22' stroke='%2300B8C9' stroke-width='2.6' fill='none' stroke-linecap='round'/><circle cx='26' cy='22' r='2.6' fill='%230066FF'/></svg>">
+<link rel="icon" type="image/png" href="favicon-orizon.png">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" rel="stylesheet">
 <style>
@@ -69,6 +69,11 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
 .sb-app-name{font-family:var(--font-sans);font-weight:900;font-size:15px;letter-spacing:-.3px}
 .sb-app-name span{color:var(--accent)}
 .sb-version{font-size:9px;color:var(--muted);letter-spacing:1px;margin-top:2px}
+/* Logomarca PNG com variante por tema (padrão = escuro → logo claro) */
+.sb-logo-img{display:block;width:150px;max-width:100%;height:auto}
+.logo-on-light{display:none}
+:root[data-theme="light"] .logo-on-dark{display:none}
+:root[data-theme="light"] .logo-on-light{display:block}
 .sb-creds{padding:16px 20px;border-bottom:1px solid var(--border)}
 .sb-creds-title{font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-family:var(--font-sans);margin-bottom:10px}
 .sb-creds label{font-size:9px;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:4px;margin-top:8px}
@@ -503,15 +508,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <body>
 
 <aside class="sidebar">
-  <!-- Logomarca Orizon Manager (mesma marca do login) -->
+  <!-- Logomarca Orizon Manager (PNG; variante clara p/ tema escuro, escura p/ tema claro) -->
   <div class="sb-logo">
-    <div style="display:flex;align-items:center;gap:9px">
-      <svg viewBox="0 0 32 32" fill="none" style="width:28px;height:28px;flex-shrink:0" aria-hidden="true">
-        <path d="M4 22 C4 22 9 10 16 10 C23 10 28 22 28 22" stroke="var(--accent)" stroke-width="2.4" fill="none" stroke-linecap="round"/>
-        <circle cx="28" cy="22" r="2.6" fill="var(--primary)"/>
-      </svg>
-      <div class="sb-app-name">Orizon Manager</div>
-    </div>
+    <img class="sb-logo-img logo-on-dark"  src="logo-orizon-light.png" alt="Orizon Manager">
+    <img class="sb-logo-img logo-on-light" src="logo-orizon-dark.png"  alt="Orizon Manager">
   </div>
   <!-- Navegação -->
   <nav class="sb-nav">

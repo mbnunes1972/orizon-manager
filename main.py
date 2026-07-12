@@ -1354,6 +1354,27 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif path.rsplit(".", 1)[-1].lower() in ("png", "svg", "ico", "jpg", "jpeg", "webp", "gif") and path != "/":
+            # Assets estáticos (logomarca, favicon, ícones) servidos de static/
+            ext     = path.rsplit(".", 1)[-1].lower()
+            nome    = os.path.basename(path.lstrip("/"))
+            caminho = os.path.join(_STATIC_DIR, nome)
+            _CT = {"png": "image/png", "svg": "image/svg+xml", "ico": "image/x-icon",
+                   "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}
+            if os.path.exists(caminho):
+                with open(caminho, "rb") as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", _CT.get(ext, "application/octet-stream"))
+                self.send_header("Content-Length", len(data))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                self.wfile.write(data)
+            else:
+                self.send_error(404)
+            return
+
         elif path.endswith(".html") and path != "/":
             nome    = path.lstrip("/")
             caminho = os.path.join(_BASE_DIR, nome)

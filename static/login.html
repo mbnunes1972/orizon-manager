@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Orizon Manager — Gestão para redes de móveis planejados</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230B1D3A'/><path d='M6 22C6 22 10.5 11 16 11 21.5 11 26 22 26 22' stroke='%2300B8C9' stroke-width='2.6' fill='none' stroke-linecap='round'/><circle cx='26' cy='22' r='2.6' fill='%230066FF'/></svg>">
+<link rel="icon" type="image/png" href="favicon-orizon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -113,6 +113,11 @@
   }
   .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; letter-spacing: -0.01em; }
   .logo-mark { width: 26px; height: 26px; flex-shrink: 0; }
+  /* Logomarca PNG com variante por tema (padrão = claro → logo escuro) */
+  .logo-img { height: 34px; width: auto; display: block; }
+  .logo-on-dark { display: none; }
+  [data-theme="dark"] .logo-on-light { display: none; }
+  [data-theme="dark"] .logo-on-dark { display: block; }
   .nav-links { display: flex; align-items: center; gap: 32px; font-size: 14px; font-weight: 500; color: var(--muted); }
   .nav-links a:hover { color: var(--text); }
   .nav-right { display: flex; align-items: center; gap: 14px; }
@@ -255,11 +260,8 @@
 <header>
   <nav>
     <div class="logo">
-      <svg class="logo-mark" viewBox="0 0 32 32" fill="none">
-        <path d="M4 22 C4 22 9 10 16 10 C23 10 28 22 28 22" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>
-        <circle cx="28" cy="22" r="2.6" fill="var(--primary)"/>
-      </svg>
-      Orizon Manager
+      <img class="logo-img logo-on-dark"  src="logo-orizon-light.png" alt="Orizon Manager">
+      <img class="logo-img logo-on-light" src="logo-orizon-dark.png"  alt="Orizon Manager">
     </div>
     <div class="nav-links">
       <a href="#processo">Processo</a>
