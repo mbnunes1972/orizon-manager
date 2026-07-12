@@ -110,11 +110,11 @@ def test_reclassificacao_outros_fornecedores(app_db):
 
 def test_balanco_tem_detalhe_analitico(app_db):
     db = app_db.get_session(); ot, oid = "loja", 630; mc.seed_plano(db, ot, oid)
-    mc.registrar_evento(db, ot, oid, "recebimento_venda", 1000.0, projeto_id="P", ref="rcb")
+    mc.registrar_evento(db, ot, oid, "registro_venda_contrato", 1000.0, projeto_id="P", ref="venda")
     b = mc.balanco(db, ot, oid)
     assert "detalhe" in b
-    assert "1.1.01" in [x["codigo"] for x in b["detalhe"]["ativo_circulante"]]      # Caixa
-    assert "2.1.06" in [x["codigo"] for x in b["detalhe"]["passivo_circulante"]]    # Adiantamento
+    assert "1.1.02" in [x["codigo"] for x in b["detalhe"]["ativo_circulante"]]      # Contas a Receber
+    assert "2.1.06" in [x["codigo"] for x in b["detalhe"]["passivo_circulante"]]    # Receita a Realizar
     db.close()
 
 

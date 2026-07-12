@@ -354,17 +354,19 @@ def listar_lancamentos(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=
 # As 5 regras do .docx §5. Contas resolvidas por CÓDIGO (estável: rename não muda o
 # código; reparent/recodificar foi adiado no #1). (codigo_debito, codigo_credito, historico)
 EVENTOS = {
-    # Fechamento de venda — 3 provisões INDEPENDENTES: abre Despesa (5.6.x) × Provisão (2.1.04.x)
-    "fechamento_venda_montagem":    ("5.6.02", "2.1.04.02", "Constituição — Provisão de Montagem (fechamento de venda)"),
-    "fechamento_venda_assistencia": ("5.6.03", "2.1.04.05", "Constituição — Provisão de Assistência Técnica (fechamento de venda)"),
-    "fechamento_venda_garantia":    ("5.6.01", "2.1.04.03", "Constituição — Provisão de Garantia (fechamento de venda)"),
-    # FASE B2.4: constituição das demais provisões rastreadas — Despesa (5.6.x) × Provisão (2.1.04.x)
-    "fechamento_venda_frete_fabrica":       ("5.6.04", "2.1.04.07", "Constituição — Provisão de Frete de Fábrica"),
-    "fechamento_venda_frete_local":         ("5.6.05", "2.1.04.08", "Constituição — Provisão de Frete Local"),
-    "fechamento_venda_insumos":             ("5.6.06", "2.1.04.09", "Constituição — Provisão de Insumos Locais"),
-    "fechamento_venda_com_medidor":         ("5.6.07", "2.1.04.10", "Constituição — Provisão de Comissão de Medidor"),
-    "fechamento_venda_com_proj_exec":       ("5.6.08", "2.1.04.11", "Constituição — Provisão de Comissão de Projeto/Executivo"),
-    "fechamento_venda_retencao_com_vendas": ("5.6.09", "2.1.04.12", "Constituição — Provisão de Retenção de Comissão de Vendas"),
+    # FASE D2: constituição das 10 provisões no CONTRATO como ATIVO DIFERIDO (1.1.06.0X) × Provisão
+    # (2.1.04.0X), SEM tocar a DRE. A despesa (5.6.0X, ou 5.1.01 p/ a fábrica) só é reconhecida na NF-e
+    # (matching pleno). Espelha o padrão dos impostos (1.1.05 × 2.1.04.13). [antes: débito direto em 5.6.0X]
+    "fechamento_venda_montagem":    ("1.1.06.02", "2.1.04.02", "Constituição — Provisão de Montagem (ativo diferido)"),
+    "fechamento_venda_assistencia": ("1.1.06.05", "2.1.04.05", "Constituição — Provisão de Assistência Técnica (ativo diferido)"),
+    "fechamento_venda_garantia":    ("1.1.06.03", "2.1.04.03", "Constituição — Provisão de Garantia (ativo diferido)"),
+    "fechamento_venda_frete_fabrica":       ("1.1.06.07", "2.1.04.07", "Constituição — Provisão de Frete de Fábrica (ativo diferido)"),
+    "fechamento_venda_frete_local":         ("1.1.06.08", "2.1.04.08", "Constituição — Provisão de Frete Local (ativo diferido)"),
+    "fechamento_venda_insumos":             ("1.1.06.09", "2.1.04.09", "Constituição — Provisão de Insumos Locais (ativo diferido)"),
+    "fechamento_venda_com_medidor":         ("1.1.06.10", "2.1.04.10", "Constituição — Provisão de Comissão de Medidor (ativo diferido)"),
+    "fechamento_venda_com_proj_exec":       ("1.1.06.11", "2.1.04.11", "Constituição — Provisão de Comissão de Projeto/Executivo (ativo diferido)"),
+    "fechamento_venda_retencao_com_vendas": ("1.1.06.12", "2.1.04.12", "Constituição — Provisão de Retenção de Comissão de Vendas (ativo diferido)"),
+    "fechamento_venda_custo_fabrica":       ("1.1.06.06", "2.1.04.06", "Constituição — Provisão de Custo de Fábrica (ativo diferido)"),
     # Impostos = PROVISÃO (Tipo D). CONTRATO: passivo nasce SEM tocar a DRE — ativo diferido (1.1.05) ×
     # Provisão de Impostos (2.1.04.13). EMISSÃO (proporcional Merc/Serv): a dedução entra na DRE
     # (4.3.01 × baixa do ativo 1.1.05) e a obrigação fiscal real crystalliza (2.1.04.13 × 2.1.03).
@@ -385,7 +387,11 @@ EVENTOS = {
     "venda_assistencia":            ("1.1.02", "4.1.02",    "Venda de assistência (caso Paga — cobrança do cliente)"),
     # ── FASE B2: Adiantamento de Clientes + receita segmentada (Mercadoria/Serviço) + CMV=CFO ──
     # Recebimento ANTES do documento fiscal: dinheiro entra como PASSIVO (obrigação de entregar).
-    "recebimento_venda":            ("1.1.01", "2.1.06",    "Recebimento do cliente (adiantamento — antes do faturamento)"),
+    # FASE D2: contrato registra a venda CHEIA (Val_Cont) em Receita a Realizar (passivo) contra Contas a
+    # Receber (ativo); a NF-e depois debita 2.1.06 × 4.1.01/4.2.01 (fato gerador). Não toca a DRE.
+    "registro_venda_contrato":      ("1.1.02", "2.1.06",    "Registro da venda no contrato — Receita a Realizar"),
+    # Recebimento (entrada + parcelas Total Flex/Aymoré) abate Contas a Receber, não a Receita a Realizar.
+    "recebimento_venda":            ("1.1.01", "1.1.02",    "Recebimento do cliente (abate Contas a Receber)"),
     # Faturamento SEGMENTADO (B1): Mercadoria → 4.1.01 (NF-e) · Serviço → 4.2.01 (NFS-e). NUNCA lançar
     # estes 4 direto no wiring — sempre via faturar_segmento() (split adiantado/a-receber + idempotência).
     "faturamento_mercadoria_adiantado": ("2.1.06", "4.1.01", "Faturamento mercadoria (NF-e) — baixa de adiantamento"),
@@ -484,15 +490,17 @@ _PROV_FECHAMENTO = {
     "com_medidor":         "fechamento_venda_com_medidor",
     "com_proj_exec":       "fechamento_venda_com_proj_exec",
     "retencao_com_vendas": "fechamento_venda_retencao_com_vendas",
+    "custo_fabrica":       "fechamento_venda_custo_fabrica",   # FASE D2: 10ª rubrica (era só no faturamento)
     "impostos":            "fechamento_venda_impostos",
 }
 
 
 def constituir_provisoes_fechamento(db, owner_tipo, owner_id, projeto_id, valores, ref_base):
-    """Constitui TODAS as provisões rastreadas no fechamento da venda. `valores` = {chave_rubrica: R$}
-    (do motor, computado pelo chamador). Cada uma: Despesa × Provisão (do mapa EVENTOS), idempotente por
-    ref (`ref_base:<chave>`). Valor <= 0 não lança. Custo de Fábrica NÃO entra aqui (vira CMV=CFO no
-    faturamento). Retorna {chave: valor_lançado}."""
+    """Constitui TODAS as 10 rubricas no fechamento da venda. `valores` = {chave_rubrica: R$} (do motor,
+    computado pelo chamador). Cada uma: Ativo diferido (1.1.06.0X, ou 1.1.05 p/ impostos) × Provisão
+    (2.1.04.0X) — **sem tocar a DRE** (FASE D2); a despesa vira resultado só na NF-e. Idempotente por ref
+    (`ref_base:<chave>`). Valor <= 0 não lança. Custo de Fábrica (`custo_fabrica`) É constituído aqui.
+    Retorna {chave: valor_lançado}."""
     out = {}
     for chave, valor in (valores or {}).items():
         evento = _PROV_FECHAMENTO.get(chave)

@@ -10,7 +10,8 @@ def _saldo(db, ot, oid, cod):
 
 
 _EVENTOS_B2 = {
-    "recebimento_venda":                ("1.1.01", "2.1.06"),
+    "registro_venda_contrato":          ("1.1.02", "2.1.06"),   # FASE D2: venda cheia → Receita a Realizar
+    "recebimento_venda":                ("1.1.01", "1.1.02"),   # FASE D2: recebimento abate Contas a Receber
     "faturamento_mercadoria_adiantado": ("2.1.06", "4.1.01"),
     "faturamento_mercadoria_a_receber": ("1.1.02", "4.1.01"),
     "faturamento_servico_adiantado":    ("2.1.06", "4.2.01"),
@@ -26,21 +27,26 @@ def test_eventos_b2_existem_com_par_correto():
         assert mc.EVENTOS[ev][0] == d and mc.EVENTOS[ev][1] == c, ev
 
 
-def test_recebimento_venda_credita_adiantamento(app_db):
+def test_registro_venda_e_recebimento_abate_receber(app_db):
+    """FASE D2: o contrato registra a venda cheia em Receita a Realizar (2.1.06); o recebimento abate
+    Contas a Receber (1.1.02), não a Receita a Realizar."""
     db = app_db.get_session(); ot, oid = "loja", 300; mc.seed_plano(db, ot, oid)
-    mc.registrar_evento(db, ot, oid, "recebimento_venda", 100000.0, projeto_id="P", ref="rcb:P:1")
-    assert _saldo(db, ot, oid, "2.1.06") == 100000.0   # passivo
-    assert _saldo(db, ot, oid, "1.1.01") == 100000.0   # caixa
+    mc.registrar_evento(db, ot, oid, "registro_venda_contrato", 100000.0, projeto_id="P", ref="venda:P")
+    mc.registrar_evento(db, ot, oid, "recebimento_venda", 30000.0, projeto_id="P", ref="rcb:P:1")
+    assert _saldo(db, ot, oid, "2.1.06") == 100000.0   # Receita a Realizar (passivo) intocada
+    assert _saldo(db, ot, oid, "1.1.01") == 30000.0    # caixa recebido
+    assert _saldo(db, ot, oid, "1.1.02") == 70000.0    # Contas a Receber abatido (100k − 30k)
     db.close()
 
 
 def test_faturar_segmento_pool_cheio_so_adiantado(app_db):
     db = app_db.get_session(); ot, oid = "loja", 301; mc.seed_plano(db, ot, oid)
-    mc.registrar_evento(db, ot, oid, "recebimento_venda", 100000.0, projeto_id="P", ref="rcb:P:1")
+    # FASE D2: a Receita a Realizar (2.1.06) é populada pelo registro da venda no contrato (Val_Cont cheio)
+    mc.registrar_evento(db, ot, oid, "registro_venda_contrato", 100000.0, projeto_id="P", ref="venda:P")
     mc.faturar_segmento(db, ot, oid, "P", "mercadoria", 65000.0, ref_base="fat:NFE-P-9")
-    assert _saldo(db, ot, oid, "4.1.01") == 65000.0
-    assert _saldo(db, ot, oid, "2.1.06") == 35000.0
-    assert _saldo(db, ot, oid, "1.1.02") == 0.0        # nada a receber (tudo adiantado)
+    assert _saldo(db, ot, oid, "4.1.01") == 65000.0    # receita reconhecida na NF-e
+    assert _saldo(db, ot, oid, "2.1.06") == 35000.0    # pool baixado pela parcela mercadoria
+    assert _saldo(db, ot, oid, "1.1.02") == 100000.0   # Contas a Receber = venda cheia (faturar_segmento não a altera)
     db.close()
 
 
@@ -150,8 +156,12 @@ def test_congelar_segmentacao_override_vence_e_preserva_params(app_db):
 # ── B2.2: margem_projeto expõe custo_servico → destrava reconciliar(proporcional_custo_direto) ──
 def test_margem_projeto_expoe_custo_servico(app_db):
     db = app_db.get_session(); ot, oid = "loja", 322; mc.seed_plano(db, ot, oid)
-    cfg = {"provisoes": {"assist_pct": 3.0}, "provisoes_contabeis": {"montagem_pct": 5.0, "garantia_pct": 2.0}}
-    mc.constituir_provisoes_venda(db, ot, oid, "P", 10000.0, cfg, ref_base="prov:P")   # 500/300/200
+    c = lambda cod: db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first().id
+    # FASE D2: os custos de serviço viram DESPESA (5.6.x) só na NF-e (matching, baixa do ativo 1.1.06);
+    # a margem lê o custo REALIZADO — simulando aqui 500/300/200 já reconhecidos na emissão.
+    mc.lancar(db, ot, oid, conta_debito_id=c("5.6.02"), conta_credito_id=c("1.1.06.02"), valor=500.0, projeto_id="P")  # montagem
+    mc.lancar(db, ot, oid, conta_debito_id=c("5.6.03"), conta_credito_id=c("1.1.06.05"), valor=300.0, projeto_id="P")  # assistência
+    mc.lancar(db, ot, oid, conta_debito_id=c("5.6.01"), conta_credito_id=c("1.1.06.03"), valor=200.0, projeto_id="P")  # garantia
     m = mc.margem_projeto(db, ot, oid, "P")
     assert m["custo_servico"] == 1000.0     # 500 montagem + 300 assistência + 200 garantia (5.6.x do projeto)
     # expor custo_servico NÃO altera a margem (as provisões já são subtraídas individualmente)
@@ -175,12 +185,13 @@ def test_reconciliar_proporcional_custo_direto_nao_quebra(app_db):
 
 # ── B2.4/B2.5: constituição de TODAS as provisões rastreadas + custo financeiro ────────────────
 _EVENTOS_FECH = {
-    "fechamento_venda_frete_fabrica":       ("5.6.04", "2.1.04.07"),
-    "fechamento_venda_frete_local":         ("5.6.05", "2.1.04.08"),
-    "fechamento_venda_insumos":             ("5.6.06", "2.1.04.09"),
-    "fechamento_venda_com_medidor":         ("5.6.07", "2.1.04.10"),
-    "fechamento_venda_com_proj_exec":       ("5.6.08", "2.1.04.11"),
-    "fechamento_venda_retencao_com_vendas": ("5.6.09", "2.1.04.12"),
+    # FASE D2: constituição debita o ATIVO DIFERIDO (1.1.06.0X), não mais 5.6.0X (despesa só na NF-e)
+    "fechamento_venda_frete_fabrica":       ("1.1.06.07", "2.1.04.07"),
+    "fechamento_venda_frete_local":         ("1.1.06.08", "2.1.04.08"),
+    "fechamento_venda_insumos":             ("1.1.06.09", "2.1.04.09"),
+    "fechamento_venda_com_medidor":         ("1.1.06.10", "2.1.04.10"),
+    "fechamento_venda_com_proj_exec":       ("1.1.06.11", "2.1.04.11"),
+    "fechamento_venda_retencao_com_vendas": ("1.1.06.12", "2.1.04.12"),
     "fechamento_venda_impostos":            ("1.1.05", "2.1.04.13"),   # B2.6: ativo diferido × provisão
     "faturamento_impostos_deducao":         ("4.3.01", "1.1.05"),
     "faturamento_impostos_obrigacao":       ("2.1.04.13", "2.1.03"),

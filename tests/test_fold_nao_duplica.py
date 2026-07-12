@@ -37,10 +37,11 @@ def test_fold_nao_altera_dre_nem_balanco(app_db):
 
 
 def test_dre_ja_continha_montagem_garantia_e_fold_bate(app_db):
-    """O fold não adiciona custo ao mundo: montagem+garantia já estão no DRE (const. de provisões),
-    e o valor exibido na visão (Prov_Mont+Prov_Gar) é exatamente o constituído no razão."""
+    """FASE D2: o fold não adiciona custo ao mundo. A constituição é DIFERIDA (não toca a DRE) — o valor
+    exibido na visão (Prov_Mont+Prov_Gar) é exatamente o constituído no razão (Provisões 2.1.04.x)."""
     db = app_db.get_session()
     mc.seed_plano(db, "loja", 81)
+    s = lambda cod: mc.saldo_conta(db, "loja", 81, db.query(mc.Conta).filter_by(owner_tipo="loja", owner_id=81, codigo=cod).first().id)
     V = 10000.0
     mc.constituir_provisoes_venda(db, "loja", 81, "PY", V, _cfg(), ref_base="p:1")    # 800/50, assist 0
     db.commit()
@@ -49,7 +50,9 @@ def test_dre_ja_continha_montagem_garantia_e_fold_bate(app_db):
                                 "Val_Cont": 12000.0}, _cfg())   # base VAVO = V; Val_Cont diferente (Cust_Fin>0)
     db.close()
     assert r["Prov_Mont"] == 800.0 and r["Prov_Gar"] == 50.0    # 8% / 0,5% × 10000 VAVO
-    assert dre["constituicao_provisoes"] == r["Prov_Mont"] + r["Prov_Gar"]            # 850, assist 0
+    assert dre["constituicao_provisoes"] == 0.0                 # FASE D2: constituição não toca a DRE (só a NF-e)
+    # a visão bate com o constituído no razão (montagem 2.1.04.02, garantia 2.1.04.03)
+    assert s("2.1.04.02") == r["Prov_Mont"] and s("2.1.04.03") == r["Prov_Gar"]
 
 
 def test_constituicao_usa_vavo_nao_val_cont(app_db, seed, monkeypatch):

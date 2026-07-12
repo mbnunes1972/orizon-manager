@@ -428,9 +428,16 @@ def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
                 "com_medidor":         d.get("Com_Med_Orc"),
                 "com_proj_exec":       d.get("Com_Proj_Exec_Orc"),
                 "retencao_com_vendas": d.get("Com_Venda_Orc"),
+                # FASE D2: Custo de Fábrica (= CFO congelado) passa a ser provisionado no contrato (era só na NF-e)
+                "custo_fabrica":       round(float(getattr(orc2, "cfo", 0) or 0), 2),
                 "impostos":            d.get("Prov_Imp"),
             }
             ot, oid = mod_contabil.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+            # FASE D2: registra a venda CHEIA (Val_Cont) em Receita a Realizar (1.1.02 × 2.1.06) — não toca a DRE
+            val_cont = round(float(getattr(orc2, "valor_total", 0) or 0), 2)
+            if val_cont > 0:
+                mod_contabil.registrar_evento(db, ot, oid, "registro_venda_contrato", val_cont,
+                                              projeto_id=projeto_id, ref=ref_base + ":venda")
             mod_contabil.constituir_provisoes_fechamento(db, ot, oid, projeto_id, valores, ref_base)
             # Custo financeiro = Val_Cont − VAVO (despesa direta no contrato — o fechamento É a antecipação)
             cust_fin = round(float(getattr(orc2, "valor_total", 0) or 0) - float(d.get("VAVO") or 0), 2)
