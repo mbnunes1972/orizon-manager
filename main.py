@@ -522,14 +522,10 @@ def _fin_faturamento_segmentado_seguro(loja_id, projeto_nome, segmento, ref_doc)
                 imp_merc, imp_serv = _segmentar(imp_total, vals["seg"]["pct_mercadoria"])
                 imp_seg = imp_merc if segmento == "mercadoria" else imp_serv
                 mod_contabil.efetivar_impostos_segmento(db, ot, oid, projeto_nome, imp_seg, ref_base="imp:" + ref_doc)
-            if segmento == "mercadoria":
-                cfo = vals["cfo"]
-                if cfo > 0:
-                    mod_contabil.registrar_evento(db, ot, oid, "faturamento_cmv", cfo,
-                                                  projeto_id=projeto_nome, ref="cmv:" + projeto_nome)
-                else:
-                    logging.getLogger(__name__).warning(
-                        "faturamento_cmv (%s): CFO ausente/zero — CMV não lançado", projeto_nome)
+            # FASE D2: matching pleno — reconhece TODAS as despesas planejadas (10 rubricas, incl. o CMV da
+            # fábrica) na NF-e, baixando os ativos diferidos 1.1.06.0X. Idempotente por projeto+rubrica e por
+            # saldo → seguro disparar em ambas as emissões (mercadoria/serviço). Substitui o faturamento_cmv.
+            mod_contabil.reconhecer_despesas_nfe(db, ot, oid, projeto_nome, ref_base="match:" + projeto_nome)
         finally:
             db.close()
     except Exception as e:

@@ -367,6 +367,18 @@ EVENTOS = {
     "fechamento_venda_com_proj_exec":       ("1.1.06.11", "2.1.04.11", "Constituição — Provisão de Comissão de Projeto/Executivo (ativo diferido)"),
     "fechamento_venda_retencao_com_vendas": ("1.1.06.12", "2.1.04.12", "Constituição — Provisão de Retenção de Comissão de Vendas (ativo diferido)"),
     "fechamento_venda_custo_fabrica":       ("1.1.06.06", "2.1.04.06", "Constituição — Provisão de Custo de Fábrica (ativo diferido)"),
+    # FASE D2: matching pleno na NF-e — reconhece a DESPESA de cada rubrica (5.6.0X, ou 5.1.01 p/ a fábrica)
+    # × baixa do ativo diferido (1.1.06.0X). A Provisão (2.1.04.0X) SOBREVIVE — é paga/reconciliada depois.
+    "reconhecimento_despesa_montagem":            ("5.6.02", "1.1.06.02", "Reconhecimento de despesa na NF-e — Montagem"),
+    "reconhecimento_despesa_garantia":            ("5.6.01", "1.1.06.03", "Reconhecimento de despesa na NF-e — Garantia"),
+    "reconhecimento_despesa_assistencia":         ("5.6.03", "1.1.06.05", "Reconhecimento de despesa na NF-e — Assistência Técnica"),
+    "reconhecimento_despesa_frete_fabrica":       ("5.6.04", "1.1.06.07", "Reconhecimento de despesa na NF-e — Frete de Fábrica"),
+    "reconhecimento_despesa_frete_local":         ("5.6.05", "1.1.06.08", "Reconhecimento de despesa na NF-e — Frete Local"),
+    "reconhecimento_despesa_insumos":             ("5.6.06", "1.1.06.09", "Reconhecimento de despesa na NF-e — Insumos Locais"),
+    "reconhecimento_despesa_com_medidor":         ("5.6.07", "1.1.06.10", "Reconhecimento de despesa na NF-e — Comissão de Medidor"),
+    "reconhecimento_despesa_com_proj_exec":       ("5.6.08", "1.1.06.11", "Reconhecimento de despesa na NF-e — Comissão de Projeto/Executivo"),
+    "reconhecimento_despesa_retencao_com_vendas": ("5.6.09", "1.1.06.12", "Reconhecimento de despesa na NF-e — Retenção de Comissão de Vendas"),
+    "reconhecimento_despesa_custo_fabrica":       ("5.1.01", "1.1.06.06", "CMV Fábrica — reconhecimento na NF-e (baixa do ativo diferido)"),
     # Impostos = PROVISÃO (Tipo D). CONTRATO: passivo nasce SEM tocar a DRE — ativo diferido (1.1.05) ×
     # Provisão de Impostos (2.1.04.13). EMISSÃO (proporcional Merc/Serv): a dedução entra na DRE
     # (4.3.01 × baixa do ativo 1.1.05) e a obrigação fiscal real crystalliza (2.1.04.13 × 2.1.03).
@@ -398,9 +410,9 @@ EVENTOS = {
     "faturamento_mercadoria_a_receber": ("1.1.02", "4.1.01", "Faturamento mercadoria (NF-e) — a receber"),
     "faturamento_servico_adiantado":    ("2.1.06", "4.2.01", "Faturamento serviço (NFS-e) — baixa de adiantamento"),
     "faturamento_servico_a_receber":    ("1.1.02", "4.2.01", "Faturamento serviço (NFS-e) — a receber"),
-    # CMV = CFO congelado do orçamento do contrato, UMA vez por projeto (ref "cmv:<projeto>"). O crédito
-    # em 2.1.04.06 constitui o passivo com a fábrica NO MESMO lançamento (sem transitar por 5.6).
-    "faturamento_cmv":              ("5.1.01", "2.1.04.06", "CMV Fábrica — reconhecimento no faturamento (CFO congelado)"),
+    # FASE D2: o CMV da fábrica deixou de ser um evento próprio no faturamento (faturamento_cmv, retirado).
+    # Agora o passivo 2.1.04.06 nasce no CONTRATO (fechamento_venda_custo_fabrica) e o CMV é reconhecido na
+    # NF-e via matching pleno (reconhecimento_despesa_custo_fabrica: 5.1.01 × baixa do ativo 1.1.06.06).
     # Baixa do passivo com a fábrica ao pagar: passivo × ativo, não toca o resultado.
     "pagamento_fabrica":            ("2.1.04.06", "1.1.01", "Pagamento à fábrica (baixa da Provisão de Custo de Fábrica)"),
     # FASE D: pagamento da obrigação com fornecedor (baixa de Fornecedores a Pagar) — passivo × ativo
@@ -512,6 +524,42 @@ def constituir_provisoes_fechamento(db, owner_tipo, owner_id, projeto_id, valore
         registrar_evento(db, owner_tipo, owner_id, evento, v, projeto_id=projeto_id,
                          ref=ref_base + ":" + chave)
         out[chave] = v
+    return out
+
+
+# FASE D2: matching pleno na NF-e — rubrica → evento de reconhecimento de despesa (baixa do ativo diferido).
+# Impostos NÃO entram (têm faturamento_impostos_deducao/obrigacao próprios).
+_MATCHING_NFE = {
+    "montagem":            "reconhecimento_despesa_montagem",
+    "garantia":            "reconhecimento_despesa_garantia",
+    "assistencia":         "reconhecimento_despesa_assistencia",
+    "frete_fabrica":       "reconhecimento_despesa_frete_fabrica",
+    "frete_local":         "reconhecimento_despesa_frete_local",
+    "insumos":             "reconhecimento_despesa_insumos",
+    "com_medidor":         "reconhecimento_despesa_com_medidor",
+    "com_proj_exec":       "reconhecimento_despesa_com_proj_exec",
+    "retencao_com_vendas": "reconhecimento_despesa_retencao_com_vendas",
+    "custo_fabrica":       "reconhecimento_despesa_custo_fabrica",
+}
+
+
+def reconhecer_despesas_nfe(db, owner_tipo, owner_id, projeto_id, ref_base):
+    """FASE D2 — matching pleno na NF-e: reconhece de UMA vez TODAS as despesas planejadas do projeto.
+    Para cada rubrica com saldo em aberto no ativo diferido 1.1.06.0X, debita a despesa (5.6.0X, ou
+    5.1.01 p/ Custo de Fábrica) × credita a baixa do ativo. A Provisão (2.1.04.0X) SOBREVIVE (paga/
+    reconciliada depois). Idempotente por ref (`ref_base:<rubrica>`) E por saldo (rubrica já baixada →
+    nada a reconhecer). Impostos NÃO entram aqui (faturamento_impostos_deducao/obrigacao). Retorna
+    {rubrica: valor_reconhecido}."""
+    out = {}
+    for chave, evento in _MATCHING_NFE.items():
+        ativo = EVENTOS[evento][1]   # crédito do evento = ativo diferido 1.1.06.0X
+        val = round(total_lancado(db, owner_tipo, owner_id, ativo, "debito", projeto_id)
+                    - total_lancado(db, owner_tipo, owner_id, ativo, "credito", projeto_id), 2)
+        if val <= 0:
+            continue
+        registrar_evento(db, owner_tipo, owner_id, evento, val, projeto_id=projeto_id,
+                         ref=ref_base + ":" + chave)
+        out[chave] = val
     return out
 
 

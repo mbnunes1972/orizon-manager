@@ -16,7 +16,6 @@ _EVENTOS_B2 = {
     "faturamento_mercadoria_a_receber": ("1.1.02", "4.1.01"),
     "faturamento_servico_adiantado":    ("2.1.06", "4.2.01"),
     "faturamento_servico_a_receber":    ("1.1.02", "4.2.01"),
-    "faturamento_cmv":                  ("5.1.01", "2.1.04.06"),
     "pagamento_fabrica":                ("2.1.04.06", "1.1.01"),
 }
 
@@ -79,30 +78,41 @@ def test_adiantamento_nunca_negativo_dois_segmentos(app_db):
     db.close()
 
 
-def test_faturamento_cmv_uma_vez_por_projeto(app_db):
+def test_cmv_fabrica_reconhecido_na_nfe(app_db):
+    """FASE D2: a provisão de fábrica nasce no CONTRATO (2.1.04.06); o CMV entra no resultado só na NF-e
+    (5.1.01 × baixa do ativo diferido 1.1.06.06). A provisão SOBREVIVE p/ ser paga depois."""
     db = app_db.get_session(); ot, oid = "loja", 305; mc.seed_plano(db, ot, oid)
-    mc.registrar_evento(db, ot, oid, "faturamento_cmv", 40000.0, projeto_id="P", ref="cmv:P")
-    mc.registrar_evento(db, ot, oid, "faturamento_cmv", 40000.0, projeto_id="P", ref="cmv:P")  # reproc.
-    assert _saldo(db, ot, oid, "5.1.01") == 40000.0       # 1× no resultado
-    assert _saldo(db, ot, oid, "2.1.04.06") == 40000.0    # passivo com a fábrica
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"custo_fabrica": 40000.0}, ref_base="pf:P")
+    assert _saldo(db, ot, oid, "5.1.01") == 0.0           # antes da NF-e: nada no resultado
+    mc.reconhecer_despesas_nfe(db, ot, oid, "P", ref_base="match:P")
+    mc.reconhecer_despesas_nfe(db, ot, oid, "P", ref_base="match:P")   # reproc. NF-e (idempotente)
+    assert _saldo(db, ot, oid, "5.1.01") == 40000.0       # CMV 1× no resultado
+    assert _saldo(db, ot, oid, "1.1.06.06") == 0.0        # ativo diferido baixado
+    assert _saldo(db, ot, oid, "2.1.04.06") == 40000.0    # provisão sobrevive
     db.close()
 
 
 def test_fluxo_completo_balanco_fecha_e_dre(app_db):
-    """Cenário A do design: Val_Cont 100k (65/35), CFO 40k, recebimento total."""
+    """FASE D2 — Cenário A: Val_Cont 100k (65/35), CFO 40k. Contrato: registra a venda cheia + constitui a
+    fábrica (ativo diferido). NF-e: reconhece receita + CMV (matching). Recebe e paga a fábrica. Balanço
+    fecha; DRE mostra receita 100k, CMV 40k, sem duplicar."""
     db = app_db.get_session(); ot, oid = "loja", 306; mc.seed_plano(db, ot, oid)
-    mc.registrar_evento(db, ot, oid, "recebimento_venda", 100000.0, projeto_id="P", ref="rcb:P:1")
+    mc.registrar_evento(db, ot, oid, "registro_venda_contrato", 100000.0, projeto_id="P", ref="venda:P")
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"custo_fabrica": 40000.0}, ref_base="pf:P")
     mc.faturar_segmento(db, ot, oid, "P", "mercadoria", 65000.0, ref_base="fat:NFE-P-9")
-    mc.registrar_evento(db, ot, oid, "faturamento_cmv", 40000.0, projeto_id="P", ref="cmv:P")
     mc.faturar_segmento(db, ot, oid, "P", "servico", 35000.0, ref_base="fat:NFSE-P-1")
+    mc.reconhecer_despesas_nfe(db, ot, oid, "P", ref_base="match:P")
+    mc.registrar_evento(db, ot, oid, "recebimento_venda", 100000.0, projeto_id="P", ref="rcb:P:1")
     mc.registrar_evento(db, ot, oid, "pagamento_fabrica", 40000.0, projeto_id="P", ref="pgf:P:1")
     assert mc.balanco(db, ot, oid)["confere"] is True
-    assert _saldo(db, ot, oid, "1.1.01") == 60000.0       # 100k − 40k fábrica
-    assert _saldo(db, ot, oid, "2.1.06") == 0.0           # adiantamento zerou ao faturar
-    assert _saldo(db, ot, oid, "2.1.04.06") == 0.0        # provisão fábrica baixada
+    assert _saldo(db, ot, oid, "1.1.01") == 60000.0       # 100k recebido − 40k fábrica
+    assert _saldo(db, ot, oid, "1.1.02") == 0.0           # Contas a Receber quitado
+    assert _saldo(db, ot, oid, "2.1.06") == 0.0           # Receita a Realizar baixada ao faturar
+    assert _saldo(db, ot, oid, "1.1.06.06") == 0.0        # ativo diferido baixado na NF-e
+    assert _saldo(db, ot, oid, "2.1.04.06") == 0.0        # provisão fábrica paga
     d = mc.dre(db, ot, oid)
     assert d["receita_bruta"] == 100000.0                 # 65k + 35k, sem duplicar
-    assert d["cmv_csp"] == 40000.0                        # CFO 1× (deixa de ser 0)
+    assert d["cmv_csp"] == 40000.0                        # CFO 1× (só na NF-e)
     assert d["lucro_bruto"] == 60000.0
     db.close()
 
@@ -172,9 +182,11 @@ def test_margem_projeto_expoe_custo_servico(app_db):
 def test_reconciliar_proporcional_custo_direto_nao_quebra(app_db):
     db = app_db.get_session(); ot, oid = "loja", 323; mc.seed_plano(db, ot, oid)
     c = lambda cod: db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first().id
-    # custo direto (CMV 5.1): A=900, B=300 → 75%/25%
-    mc.registrar_evento(db, ot, oid, "faturamento_cmv", 900.0, projeto_id="A", ref="cmv:A")
-    mc.registrar_evento(db, ot, oid, "faturamento_cmv", 300.0, projeto_id="B", ref="cmv:B")
+    # custo direto (CMV 5.1): A=900, B=300 → 75%/25% (FASE D2: constitui a fábrica e reconhece na NF-e)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "A", {"custo_fabrica": 900.0}, ref_base="pf:A")
+    mc.constituir_provisoes_fechamento(db, ot, oid, "B", {"custo_fabrica": 300.0}, ref_base="pf:B")
+    mc.reconhecer_despesas_nfe(db, ot, oid, "A", ref_base="match:A")
+    mc.reconhecer_despesas_nfe(db, ot, oid, "B", ref_base="match:B")
     mc.lancar(db, ot, oid, conta_debito_id=c("5.4.01"), conta_credito_id=c("1.1.01"), valor=400.0)
     rec = mc.reconciliar(db, ot, oid, metodologia="proporcional_custo_direto")   # antes: KeyError
     aloc = {a["projeto_id"]: a for a in rec["alocacao_por_projeto"]}
