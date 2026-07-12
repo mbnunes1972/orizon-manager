@@ -1415,6 +1415,14 @@ def _run_migracoes(conn):
                 "(SELECT emitente_id FROM lojas WHERE lojas.id=documento_fiscal.loja_id) "
                 "WHERE emitente_id IS NULL")
 
+    # 2026-07-12 (FASE D2): 2.1.06 "Adiantamento de Clientes" -> "Receita a Realizar" (passa a receber o
+    # Val_Cont cheio no contrato). Migração PONTUAL: só renomeia onde o nome ainda é o default antigo —
+    # preserva contas que o owner renomeou pelo painel (editar_conta permite renomear qualquer conta).
+    if "conta_2106_receita_a_realizar_2026" not in aplicadas and _tabela_existe(cur, "conta"):
+        cur.execute("UPDATE conta SET nome='Receita a Realizar' "
+                    "WHERE codigo='2.1.06' AND nome='Adiantamento de Clientes'")
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('conta_2106_receita_a_realizar_2026')")
+
     conn.commit()
 
 

@@ -10,6 +10,17 @@ PLANO_PADRAO = [
     ("1.1.03", "Estoques"), ("1.1.04", "Adiantamentos a Fornecedores"),
     ("1.1.05", "Impostos a Apropriar"),   # FASE B2.6: ativo diferido — imposto reservado no contrato,
                                           # baixado na emissão (dedução só ocorre no faturamento)
+    # FASE D2: "Custos a Apropriar" — ativo diferido espelho de 1.1.05, generalizado às 10 rubricas.
+    # No contrato: DR 1.1.06.0X × CR 2.1.04.0X (constitui a provisão sem tocar a DRE). Na NF-e: a despesa
+    # (5.6.0X ou 5.1.01 p/ fábrica) debita contra a baixa deste ativo (matching pleno). Sobrevive só até a NF-e.
+    ("1.1.06", "Custos a Apropriar"),
+    ("1.1.06.02", "Montagem a Apropriar"), ("1.1.06.03", "Garantia a Apropriar"),
+    ("1.1.06.05", "Assistência Técnica a Apropriar"), ("1.1.06.06", "Custo de Fábrica a Apropriar"),
+    ("1.1.06.07", "Frete de Fábrica a Apropriar"), ("1.1.06.08", "Frete Local a Apropriar"),
+    ("1.1.06.09", "Insumos Locais a Apropriar"), ("1.1.06.10", "Comissão de Medidor a Apropriar"),
+    ("1.1.06.11", "Comissão de Projeto/Executivo a Apropriar"),
+    ("1.1.06.12", "Retenção de Comissão de Vendas a Apropriar"),
+    ("1.1.06.14", "Outros Fornecedores a Apropriar"),
     ("1.2", "Não Circulante"),
     ("1.2.1", "Imobilizado"),
     ("1.2.1.01", "Itens de Informática"), ("1.2.1.02", "Veículos"),
@@ -34,7 +45,7 @@ PLANO_PADRAO = [
     ("2.1.04.13", "Provisão de Impostos"),   # FASE B2.6: passivo reservado no contrato; efetivado (→ 2.1.03) na emissão
     ("2.1.04.14", "Provisão de Outros Fornecedores"),   # FASE D: recebe a reclassificação do Custo de Fábrica (substituição)
     ("2.1.05", "Financiamento Total Flex a Pagar"),
-    ("2.1.06", "Adiantamento de Clientes"),
+    ("2.1.06", "Receita a Realizar"),   # FASE D2: recebe o Val_Cont cheio no contrato (era "Adiantamento de Clientes")
     ("2.2", "Não Circulante"),
     ("2.2.01", "Financiamentos de Longo Prazo (principal)"),
     ("3", "PATRIMÔNIO LÍQUIDO"),
