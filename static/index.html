@@ -8975,12 +8975,14 @@ async function finReconProvCarregar(){
       acao='<td style="text-align:right;padding:6px 8px;white-space:nowrap">'
         +'<input type="number" step="0.01" id="ef-'+p.codigo+'" placeholder="R$ real" style="width:90px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 7px;color:var(--text);font-size:11px">'
         +' <button class="btn btn-sm" onclick="reconProvEfetivar(\''+p.codigo+'\')" style="font-size:11px">Efetivar</button>'
-        +(Math.abs(p.saldo)>=0.005?' <button class="btn btn-sm" onclick="reconProvResolver(\''+p.codigo+'\')" style="font-size:11px">Resolver</button>':'')
+        +(Math.abs(p.saldo_aberto)>=0.005?' <button class="btn btn-sm" onclick="reconProvResolver(\''+p.codigo+'\')" style="font-size:11px">Resolver</button>':'')
         +'</td>';
     }
+    // "Saldo" exibido = saldo_aberto (líquido, o que falta resolver); bruto vai no tooltip p/ auditoria.
+    const celSaldo='<td title="Bruto '+_fBRL(p.saldo)+'" style="text-align:right;padding:6px 8px;font-family:var(--font-mono);color:'+saldoCor(p.saldo_aberto)+'">'+_fBRL(p.saldo_aberto)+'</td>';
     return '<tr style="border-top:1px solid var(--border);font-size:12px">'
       +'<td style="padding:6px 8px">'+esc(p.nome)+'</td>'
-      +cel(p.provisionado)+cel(p.efetivado)+cel(p.saldo,saldoCor(p.saldo))+cel(p.resolvido,'var(--muted)')+acao+'</tr>';
+      +cel(p.provisionado)+cel(p.efetivado)+celSaldo+cel(p.resolvido,'var(--muted)')+acao+'</tr>';
   };
   const head='<tr style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">'
     +'<th style="text-align:left;padding:6px 8px">Provisão</th>'
@@ -8995,7 +8997,7 @@ async function finReconProvCarregar(){
     +'<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 18px;display:flex;gap:24px;flex-wrap:wrap;font-size:12px">'
     +'<span style="color:var(--muted)">Provisionado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(tot.provisionado)+'</strong></span>'
     +'<span style="color:var(--muted)">Efetivado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(tot.efetivado)+'</strong></span>'
-    +'<span style="color:var(--muted)">Saldo <strong style="font-family:var(--font-mono);color:'+saldoCor(tot.saldo)+'">'+_fBRL(tot.saldo)+'</strong></span></div>'
+    +'<span style="color:var(--muted)" title="Bruto '+_fBRL(tot.saldo)+'">Saldo <strong style="font-family:var(--font-mono);color:'+saldoCor(tot.saldo_aberto)+'">'+_fBRL(tot.saldo_aberto)+'</strong></span></div>'
     +secoes;
 }
 function _reconReloadAtivo(){
@@ -9031,20 +9033,21 @@ async function reconProjRender(){
   if(!rec){ box.innerHTML='<em style="color:var(--err);font-size:12px">Falha ao carregar (módulo financeiro inativo/sem acesso ou servidor desatualizado).</em>'; return; }
   const saldoCor=v=>Math.abs(v)<0.005?'var(--muted)':(v>0?'var(--accent)':'var(--st-quente)');
   const cel=(v,cor)=>'<td style="text-align:right;padding:6px 8px;font-family:var(--font-mono);color:'+(cor||'var(--text)')+'">'+_fBRL(v)+'</td>';
+  const celSaldo=p=>'<td title="Bruto '+_fBRL(p.saldo)+'" style="text-align:right;padding:6px 8px;font-family:var(--font-mono);color:'+saldoCor(p.saldo_aberto)+'">'+_fBRL(p.saldo_aberto)+'</td>';
   const linha=p=>'<tr style="border-top:1px solid var(--border);font-size:12px">'
     +'<td style="padding:6px 8px">'+esc(p.nome)+'</td>'
-    +cel(p.provisionado)+cel(p.efetivado)+cel(p.saldo,saldoCor(p.saldo))
+    +cel(p.provisionado)+cel(p.efetivado)+celSaldo(p)
     +'<td style="text-align:right;padding:6px 8px;white-space:nowrap">'
     +'<input type="number" step="0.01" id="efp-'+p.codigo+'" placeholder="R$ real" style="width:86px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:4px 7px;color:var(--text);font-size:11px">'
     +' <button class="btn btn-sm" onclick="reconProvEfetivar(\''+p.codigo+'\',\'efp-\')" style="font-size:11px">Efetivar</button>'
-    +(Math.abs(p.saldo)>=0.005?' <button class="btn btn-sm" onclick="reconProvResolver(\''+p.codigo+'\')" style="font-size:11px">Resolver</button>':'')
+    +(Math.abs(p.saldo_aberto)>=0.005?' <button class="btn btn-sm" onclick="reconProvResolver(\''+p.codigo+'\')" style="font-size:11px">Resolver</button>':'')
     +'</td></tr>';
   const head='<tr style="font-size:10px;color:var(--muted);text-transform:uppercase"><th style="text-align:left;padding:6px 8px">Provisão</th><th style="text-align:right;padding:6px 8px">Provisionado</th><th style="text-align:right;padding:6px 8px">Efetivado</th><th style="text-align:right;padding:6px 8px">Saldo</th><th style="text-align:right;padding:6px 8px">Ação</th></tr>';
   const rows=rec.provisoes.filter(p=>p.provisionado||p.efetivado).map(linha).join('');
   const tot=rec.totais;
   box.innerHTML='<table style="width:100%;border-collapse:collapse">'+head
     +(rows||'<tr><td colspan="5" style="padding:8px;color:var(--muted);font-size:12px">Sem provisões constituídas neste projeto ainda.</td></tr>')
-    +'</table><div style="margin-top:10px;font-size:12px;color:var(--muted)">Saldo total a reconciliar: <strong style="font-family:var(--font-mono);color:'+saldoCor(tot.saldo)+'">'+_fBRL(tot.saldo)+'</strong></div>';
+    +'</table><div style="margin-top:10px;font-size:12px;color:var(--muted)" title="Bruto '+_fBRL(tot.saldo)+'">Saldo total a reconciliar: <strong style="font-family:var(--font-mono);color:'+saldoCor(tot.saldo_aberto)+'">'+_fBRL(tot.saldo_aberto)+'</strong></div>';
 }
 
 // ── FASE D: Contas a Pagar (Fornecedores a Pagar em aberto) ───────────────────────────────────
