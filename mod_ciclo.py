@@ -11,6 +11,7 @@ o ETAPAS_CICLO do frontend é alinhado a ela na tarefa de frontend.
 ETAPAS_PRINCIPAIS = [
     "1", "2", "3", "4", "7", "8", "9", "10",
     "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+    "21",   # FASE D2: Conciliação Final — fecha os números e encerra o projeto (status "Concluído")
 ]
 
 ETAPA_NOME = {
@@ -32,6 +33,7 @@ ETAPA_NOME = {
     "18": "Assistência pós Montagem",
     "19": "Vistoria final",
     "20": "Aprovação final",
+    "21": "Conciliação Final",
 }
 
 # Status que contam como "etapa concluída" para fins de gating (espelha o
@@ -159,6 +161,7 @@ FAIXA_POR_ETAPA = {
     "11d": "gate_financeiro_2",
     "12": "expedicao", "13": "expedicao", "14": "expedicao", "15": "expedicao", "16": "expedicao",
     "17": "montagem", "18": "montagem", "19": "montagem", "20": "montagem",
+    "21": "conciliacao_final",   # FASE D2: encerramento financeiro do projeto
 }
 
 

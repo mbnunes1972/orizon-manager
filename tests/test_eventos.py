@@ -24,12 +24,13 @@ def test_evento_recebimento(app_db):
 
 def test_fechamento_venda_3_provisoes_independentes(app_db):
     db = app_db.get_session(); c = _q(db)
+    # FASE D2: a constituição debita o ATIVO DIFERIDO (1.1.06.0X), não mais 5.6.0X (despesa só na NF-e)
     m = mc.registrar_evento(db, "loja", 1, "fechamento_venda_montagem", 90.0, projeto_id="Proj_C")
-    assert m["conta_debito_id"] == c("5.6.02") and m["conta_credito_id"] == c("2.1.04.02")
+    assert m["conta_debito_id"] == c("1.1.06.02") and m["conta_credito_id"] == c("2.1.04.02")
     a = mc.registrar_evento(db, "loja", 1, "fechamento_venda_assistencia", 40.0, projeto_id="Proj_C")
-    assert a["conta_debito_id"] == c("5.6.03") and a["conta_credito_id"] == c("2.1.04.05")
+    assert a["conta_debito_id"] == c("1.1.06.05") and a["conta_credito_id"] == c("2.1.04.05")
     g = mc.registrar_evento(db, "loja", 1, "fechamento_venda_garantia", 30.0, projeto_id="Proj_C")
-    assert g["conta_debito_id"] == c("5.6.01") and g["conta_credito_id"] == c("2.1.04.03")
+    assert g["conta_debito_id"] == c("1.1.06.03") and g["conta_credito_id"] == c("2.1.04.03")
     db.close()
 
 

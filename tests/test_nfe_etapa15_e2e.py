@@ -600,6 +600,14 @@ def test_wiring_faturamento_lancado_apos_nfe_produto(http_client_factory, seed, 
     orc = dbx.get(app_db.Orcamento, seed["orcamento_l2_id"])
     orc.valor_total = 100000.0; orc.cfo = 40000.0
     dbx.commit(); dbx.close()
+    # FASE D2: simula o contrato assinado — registra a venda cheia e constitui a provisão de fábrica (=CFO).
+    # É pré-requisito do matching: o CMV só é reconhecido na NF-e se o ativo diferido 1.1.06.06 existir.
+    import mod_contabil as _mc
+    ddb = app_db.get_session()
+    _ot, _oid = _mc.resolver_owner(ddb, {"loja_id": seed["loja2_id"], "rede_id": None})
+    _mc.registrar_evento(ddb, _ot, _oid, "registro_venda_contrato", 100000.0, projeto_id=proj, ref="venda:" + proj)
+    _mc.constituir_provisoes_fechamento(ddb, _ot, _oid, proj, {"custo_fabrica": 40000.0}, ref_base="pf:" + proj)
+    ddb.commit(); ddb.close()
     c = _login(http_client_factory, "dir_l2")
     _, up = _upload_xml(c, proj, _fixture_xml())
     st, b = _post(c, f"/api/projetos/{proj}/ciclo/15/emitir-nfe",
@@ -608,14 +616,15 @@ def test_wiring_faturamento_lancado_apos_nfe_produto(http_client_factory, seed, 
     st2, d = c.get(f"/api/financeiro/lancamentos?projeto={proj}")
     assert st2 == 200, d
     lans = d["lancamentos"]
-    # receita da mercadoria = 65% × Val_Cont (loja default), como 'a receber' (sem adiantamento)
-    ref_merc = f"fat:NFE-{proj}-{up['documento_id']}:areceber"
+    # FASE D2: a venda cheia foi registrada em Receita a Realizar (2.1.06) no contrato, então a NF-e baixa
+    # desse pool (adiantado) — a parcela Mercadoria (65% × Val_Cont) não gera "a receber".
+    ref_merc = f"fat:NFE-{proj}-{up['documento_id']}:adiantado"
     merc = [l for l in lans if l["ref"] == ref_merc]
-    assert len(merc) == 1 and merc[0]["origem"] == "faturamento_mercadoria_a_receber"
+    assert len(merc) == 1 and merc[0]["origem"] == "faturamento_mercadoria_adiantado"
     assert merc[0]["valor"] == 65000.0
-    # CMV = CFO congelado, 1× por projeto
-    cmv = [l for l in lans if l["ref"] == f"cmv:{proj}"]
-    assert len(cmv) == 1 and cmv[0]["origem"] == "faturamento_cmv" and cmv[0]["valor"] == 40000.0
+    # FASE D2: o CMV da fábrica é reconhecido na NF-e via matching pleno (5.1.01 × baixa do ativo 1.1.06.06)
+    cmv = [l for l in lans if l["ref"] == f"match:{proj}:custo_fabrica"]
+    assert len(cmv) == 1 and cmv[0]["origem"] == "reconhecimento_despesa_custo_fabrica" and cmv[0]["valor"] == 40000.0
     # o evento legado 'faturamento' foi aposentado do wiring (não há lançamento com o ref antigo)
     assert not [l for l in lans if l["ref"] == f"fat:NFE-{proj}-{up['documento_id']}"]
 

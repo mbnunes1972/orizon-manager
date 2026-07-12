@@ -428,9 +428,16 @@ def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
                 "com_medidor":         d.get("Com_Med_Orc"),
                 "com_proj_exec":       d.get("Com_Proj_Exec_Orc"),
                 "retencao_com_vendas": d.get("Com_Venda_Orc"),
+                # FASE D2: Custo de Fábrica (= CFO congelado) passa a ser provisionado no contrato (era só na NF-e)
+                "custo_fabrica":       round(float(getattr(orc2, "cfo", 0) or 0), 2),
                 "impostos":            d.get("Prov_Imp"),
             }
             ot, oid = mod_contabil.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+            # FASE D2: registra a venda CHEIA (Val_Cont) em Receita a Realizar (1.1.02 × 2.1.06) — não toca a DRE
+            val_cont = round(float(getattr(orc2, "valor_total", 0) or 0), 2)
+            if val_cont > 0:
+                mod_contabil.registrar_evento(db, ot, oid, "registro_venda_contrato", val_cont,
+                                              projeto_id=projeto_id, ref=ref_base + ":venda")
             mod_contabil.constituir_provisoes_fechamento(db, ot, oid, projeto_id, valores, ref_base)
             # Custo financeiro = Val_Cont − VAVO (despesa direta no contrato — o fechamento É a antecipação)
             cust_fin = round(float(getattr(orc2, "valor_total", 0) or 0) - float(d.get("VAVO") or 0), 2)
@@ -515,14 +522,10 @@ def _fin_faturamento_segmentado_seguro(loja_id, projeto_nome, segmento, ref_doc)
                 imp_merc, imp_serv = _segmentar(imp_total, vals["seg"]["pct_mercadoria"])
                 imp_seg = imp_merc if segmento == "mercadoria" else imp_serv
                 mod_contabil.efetivar_impostos_segmento(db, ot, oid, projeto_nome, imp_seg, ref_base="imp:" + ref_doc)
-            if segmento == "mercadoria":
-                cfo = vals["cfo"]
-                if cfo > 0:
-                    mod_contabil.registrar_evento(db, ot, oid, "faturamento_cmv", cfo,
-                                                  projeto_id=projeto_nome, ref="cmv:" + projeto_nome)
-                else:
-                    logging.getLogger(__name__).warning(
-                        "faturamento_cmv (%s): CFO ausente/zero — CMV não lançado", projeto_nome)
+            # FASE D2: matching pleno — reconhece TODAS as despesas planejadas (10 rubricas, incl. o CMV da
+            # fábrica) na NF-e, baixando os ativos diferidos 1.1.06.0X. Idempotente por projeto+rubrica e por
+            # saldo → seguro disparar em ambas as emissões (mercadoria/serviço). Substitui o faturamento_cmv.
+            mod_contabil.reconhecer_despesas_nfe(db, ot, oid, projeto_nome, ref_base="match:" + projeto_nome)
         finally:
             db.close()
     except Exception as e:
@@ -1653,7 +1656,12 @@ class Handler(BaseHTTPRequestHandler):
                               .order_by(Orcamento.ordem)
                               .all())
                     print("[ORC] encontrados %d orcamento(s)" % len(orcs))
-                    self.send_json({"ok": True, "orcamentos": [_orcamento_dict(o) for o in orcs]})
+                    # FASE D2 (Ajuste 1): expõe o orçamento CONTRATADO p/ o seletor travar nele por padrão
+                    # (reaproveita esta chamada — sem endpoint novo). None se o projeto ainda não tem contrato.
+                    _contrato = (db.query(Contrato).filter_by(projeto_nome=nome_safe)
+                                 .order_by(Contrato.id.desc()).first())
+                    self.send_json({"ok": True, "orcamentos": [_orcamento_dict(o) for o in orcs],
+                                    "contratado_id": (_contrato.orcamento_id if _contrato else None)})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
@@ -2656,6 +2664,29 @@ class Handler(BaseHTTPRequestHandler):
                 lan = mod_contabil.efetivar_provisao(db, ot, oid, proj, conta, dd.get("valor"), ref=ref)
                 db.commit()
                 self.send_json({"ok": True, "lancamento": lan})
+            except ValueError as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+        m = re.match(r'^/api/projetos/([^/]+)/ciclo/21/conciliar$', path)
+        if m:
+            # FASE D2 — Conciliação Final (etapa 21): resolve todo saldo remanescente das provisões do
+            # projeto (sobra→4.4.02 / falta→5.6.10) e ENCERRA o projeto (status "Concluído"). Gate financeiro.
+            from urllib.parse import unquote as _unquote
+            nome_safe = _unquote(m.group(1))
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                if _projeto_da_loja(db, nome_safe, usuario.get("loja_id")) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                resolvido = mod_contabil.conciliar_final(db, ot, oid, nome_safe, ref_base="cf:" + nome_safe)
+                _set_etapa_status(db, nome_safe, "21", "concluido", usuario.get("id"))
+                db.commit()
+                upsert_projeto_status(nome_safe, "concluido")   # status novo, distinto de "fechado" (sessão própria)
+                self.send_json({"ok": True, "resolvido": resolvido, "status": "concluido"})
             except ValueError as e:
                 db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=400)
             finally:

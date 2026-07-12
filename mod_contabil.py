@@ -10,6 +10,17 @@ PLANO_PADRAO = [
     ("1.1.03", "Estoques"), ("1.1.04", "Adiantamentos a Fornecedores"),
     ("1.1.05", "Impostos a Apropriar"),   # FASE B2.6: ativo diferido — imposto reservado no contrato,
                                           # baixado na emissão (dedução só ocorre no faturamento)
+    # FASE D2: "Custos a Apropriar" — ativo diferido espelho de 1.1.05, generalizado às 10 rubricas.
+    # No contrato: DR 1.1.06.0X × CR 2.1.04.0X (constitui a provisão sem tocar a DRE). Na NF-e: a despesa
+    # (5.6.0X ou 5.1.01 p/ fábrica) debita contra a baixa deste ativo (matching pleno). Sobrevive só até a NF-e.
+    ("1.1.06", "Custos a Apropriar"),
+    ("1.1.06.02", "Montagem a Apropriar"), ("1.1.06.03", "Garantia a Apropriar"),
+    ("1.1.06.05", "Assistência Técnica a Apropriar"), ("1.1.06.06", "Custo de Fábrica a Apropriar"),
+    ("1.1.06.07", "Frete de Fábrica a Apropriar"), ("1.1.06.08", "Frete Local a Apropriar"),
+    ("1.1.06.09", "Insumos Locais a Apropriar"), ("1.1.06.10", "Comissão de Medidor a Apropriar"),
+    ("1.1.06.11", "Comissão de Projeto/Executivo a Apropriar"),
+    ("1.1.06.12", "Retenção de Comissão de Vendas a Apropriar"),
+    ("1.1.06.14", "Outros Fornecedores a Apropriar"),
     ("1.2", "Não Circulante"),
     ("1.2.1", "Imobilizado"),
     ("1.2.1.01", "Itens de Informática"), ("1.2.1.02", "Veículos"),
@@ -34,7 +45,7 @@ PLANO_PADRAO = [
     ("2.1.04.13", "Provisão de Impostos"),   # FASE B2.6: passivo reservado no contrato; efetivado (→ 2.1.03) na emissão
     ("2.1.04.14", "Provisão de Outros Fornecedores"),   # FASE D: recebe a reclassificação do Custo de Fábrica (substituição)
     ("2.1.05", "Financiamento Total Flex a Pagar"),
-    ("2.1.06", "Adiantamento de Clientes"),
+    ("2.1.06", "Receita a Realizar"),   # FASE D2: recebe o Val_Cont cheio no contrato (era "Adiantamento de Clientes")
     ("2.2", "Não Circulante"),
     ("2.2.01", "Financiamentos de Longo Prazo (principal)"),
     ("3", "PATRIMÔNIO LÍQUIDO"),
@@ -343,17 +354,32 @@ def listar_lancamentos(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=
 # As 5 regras do .docx §5. Contas resolvidas por CÓDIGO (estável: rename não muda o
 # código; reparent/recodificar foi adiado no #1). (codigo_debito, codigo_credito, historico)
 EVENTOS = {
-    # Fechamento de venda — 3 provisões INDEPENDENTES: abre Despesa (5.6.x) × Provisão (2.1.04.x)
-    "fechamento_venda_montagem":    ("5.6.02", "2.1.04.02", "Constituição — Provisão de Montagem (fechamento de venda)"),
-    "fechamento_venda_assistencia": ("5.6.03", "2.1.04.05", "Constituição — Provisão de Assistência Técnica (fechamento de venda)"),
-    "fechamento_venda_garantia":    ("5.6.01", "2.1.04.03", "Constituição — Provisão de Garantia (fechamento de venda)"),
-    # FASE B2.4: constituição das demais provisões rastreadas — Despesa (5.6.x) × Provisão (2.1.04.x)
-    "fechamento_venda_frete_fabrica":       ("5.6.04", "2.1.04.07", "Constituição — Provisão de Frete de Fábrica"),
-    "fechamento_venda_frete_local":         ("5.6.05", "2.1.04.08", "Constituição — Provisão de Frete Local"),
-    "fechamento_venda_insumos":             ("5.6.06", "2.1.04.09", "Constituição — Provisão de Insumos Locais"),
-    "fechamento_venda_com_medidor":         ("5.6.07", "2.1.04.10", "Constituição — Provisão de Comissão de Medidor"),
-    "fechamento_venda_com_proj_exec":       ("5.6.08", "2.1.04.11", "Constituição — Provisão de Comissão de Projeto/Executivo"),
-    "fechamento_venda_retencao_com_vendas": ("5.6.09", "2.1.04.12", "Constituição — Provisão de Retenção de Comissão de Vendas"),
+    # FASE D2: constituição das 10 provisões no CONTRATO como ATIVO DIFERIDO (1.1.06.0X) × Provisão
+    # (2.1.04.0X), SEM tocar a DRE. A despesa (5.6.0X, ou 5.1.01 p/ a fábrica) só é reconhecida na NF-e
+    # (matching pleno). Espelha o padrão dos impostos (1.1.05 × 2.1.04.13). [antes: débito direto em 5.6.0X]
+    "fechamento_venda_montagem":    ("1.1.06.02", "2.1.04.02", "Constituição — Provisão de Montagem (ativo diferido)"),
+    "fechamento_venda_assistencia": ("1.1.06.05", "2.1.04.05", "Constituição — Provisão de Assistência Técnica (ativo diferido)"),
+    "fechamento_venda_garantia":    ("1.1.06.03", "2.1.04.03", "Constituição — Provisão de Garantia (ativo diferido)"),
+    "fechamento_venda_frete_fabrica":       ("1.1.06.07", "2.1.04.07", "Constituição — Provisão de Frete de Fábrica (ativo diferido)"),
+    "fechamento_venda_frete_local":         ("1.1.06.08", "2.1.04.08", "Constituição — Provisão de Frete Local (ativo diferido)"),
+    "fechamento_venda_insumos":             ("1.1.06.09", "2.1.04.09", "Constituição — Provisão de Insumos Locais (ativo diferido)"),
+    "fechamento_venda_com_medidor":         ("1.1.06.10", "2.1.04.10", "Constituição — Provisão de Comissão de Medidor (ativo diferido)"),
+    "fechamento_venda_com_proj_exec":       ("1.1.06.11", "2.1.04.11", "Constituição — Provisão de Comissão de Projeto/Executivo (ativo diferido)"),
+    "fechamento_venda_retencao_com_vendas": ("1.1.06.12", "2.1.04.12", "Constituição — Provisão de Retenção de Comissão de Vendas (ativo diferido)"),
+    "fechamento_venda_custo_fabrica":       ("1.1.06.06", "2.1.04.06", "Constituição — Provisão de Custo de Fábrica (ativo diferido)"),
+    # FASE D2: matching pleno na NF-e — reconhece a DESPESA de cada rubrica (5.6.0X, ou 5.1.01 p/ a fábrica)
+    # × baixa do ativo diferido (1.1.06.0X). A Provisão (2.1.04.0X) SOBREVIVE — é paga/reconciliada depois.
+    "reconhecimento_despesa_montagem":            ("5.6.02", "1.1.06.02", "Reconhecimento de despesa na NF-e — Montagem"),
+    "reconhecimento_despesa_garantia":            ("5.6.01", "1.1.06.03", "Reconhecimento de despesa na NF-e — Garantia"),
+    "reconhecimento_despesa_assistencia":         ("5.6.03", "1.1.06.05", "Reconhecimento de despesa na NF-e — Assistência Técnica"),
+    "reconhecimento_despesa_frete_fabrica":       ("5.6.04", "1.1.06.07", "Reconhecimento de despesa na NF-e — Frete de Fábrica"),
+    "reconhecimento_despesa_frete_local":         ("5.6.05", "1.1.06.08", "Reconhecimento de despesa na NF-e — Frete Local"),
+    "reconhecimento_despesa_insumos":             ("5.6.06", "1.1.06.09", "Reconhecimento de despesa na NF-e — Insumos Locais"),
+    "reconhecimento_despesa_com_medidor":         ("5.6.07", "1.1.06.10", "Reconhecimento de despesa na NF-e — Comissão de Medidor"),
+    "reconhecimento_despesa_com_proj_exec":       ("5.6.08", "1.1.06.11", "Reconhecimento de despesa na NF-e — Comissão de Projeto/Executivo"),
+    "reconhecimento_despesa_retencao_com_vendas": ("5.6.09", "1.1.06.12", "Reconhecimento de despesa na NF-e — Retenção de Comissão de Vendas"),
+    "reconhecimento_despesa_custo_fabrica":       ("5.1.01", "1.1.06.06", "CMV Fábrica — reconhecimento na NF-e (baixa do ativo diferido)"),
+    "reconhecimento_despesa_outros_fornecedores": ("5.1.01", "1.1.06.14", "CMV Outros Fornecedores — reconhecimento na NF-e (baixa do ativo diferido)"),
     # Impostos = PROVISÃO (Tipo D). CONTRATO: passivo nasce SEM tocar a DRE — ativo diferido (1.1.05) ×
     # Provisão de Impostos (2.1.04.13). EMISSÃO (proporcional Merc/Serv): a dedução entra na DRE
     # (4.3.01 × baixa do ativo 1.1.05) e a obrigação fiscal real crystalliza (2.1.04.13 × 2.1.03).
@@ -374,16 +400,20 @@ EVENTOS = {
     "venda_assistencia":            ("1.1.02", "4.1.02",    "Venda de assistência (caso Paga — cobrança do cliente)"),
     # ── FASE B2: Adiantamento de Clientes + receita segmentada (Mercadoria/Serviço) + CMV=CFO ──
     # Recebimento ANTES do documento fiscal: dinheiro entra como PASSIVO (obrigação de entregar).
-    "recebimento_venda":            ("1.1.01", "2.1.06",    "Recebimento do cliente (adiantamento — antes do faturamento)"),
+    # FASE D2: contrato registra a venda CHEIA (Val_Cont) em Receita a Realizar (passivo) contra Contas a
+    # Receber (ativo); a NF-e depois debita 2.1.06 × 4.1.01/4.2.01 (fato gerador). Não toca a DRE.
+    "registro_venda_contrato":      ("1.1.02", "2.1.06",    "Registro da venda no contrato — Receita a Realizar"),
+    # Recebimento (entrada + parcelas Total Flex/Aymoré) abate Contas a Receber, não a Receita a Realizar.
+    "recebimento_venda":            ("1.1.01", "1.1.02",    "Recebimento do cliente (abate Contas a Receber)"),
     # Faturamento SEGMENTADO (B1): Mercadoria → 4.1.01 (NF-e) · Serviço → 4.2.01 (NFS-e). NUNCA lançar
     # estes 4 direto no wiring — sempre via faturar_segmento() (split adiantado/a-receber + idempotência).
     "faturamento_mercadoria_adiantado": ("2.1.06", "4.1.01", "Faturamento mercadoria (NF-e) — baixa de adiantamento"),
     "faturamento_mercadoria_a_receber": ("1.1.02", "4.1.01", "Faturamento mercadoria (NF-e) — a receber"),
     "faturamento_servico_adiantado":    ("2.1.06", "4.2.01", "Faturamento serviço (NFS-e) — baixa de adiantamento"),
     "faturamento_servico_a_receber":    ("1.1.02", "4.2.01", "Faturamento serviço (NFS-e) — a receber"),
-    # CMV = CFO congelado do orçamento do contrato, UMA vez por projeto (ref "cmv:<projeto>"). O crédito
-    # em 2.1.04.06 constitui o passivo com a fábrica NO MESMO lançamento (sem transitar por 5.6).
-    "faturamento_cmv":              ("5.1.01", "2.1.04.06", "CMV Fábrica — reconhecimento no faturamento (CFO congelado)"),
+    # FASE D2: o CMV da fábrica deixou de ser um evento próprio no faturamento (faturamento_cmv, retirado).
+    # Agora o passivo 2.1.04.06 nasce no CONTRATO (fechamento_venda_custo_fabrica) e o CMV é reconhecido na
+    # NF-e via matching pleno (reconhecimento_despesa_custo_fabrica: 5.1.01 × baixa do ativo 1.1.06.06).
     # Baixa do passivo com a fábrica ao pagar: passivo × ativo, não toca o resultado.
     "pagamento_fabrica":            ("2.1.04.06", "1.1.01", "Pagamento à fábrica (baixa da Provisão de Custo de Fábrica)"),
     # FASE D: pagamento da obrigação com fornecedor (baixa de Fornecedores a Pagar) — passivo × ativo
@@ -399,6 +429,10 @@ def _conta_por_codigo(db, owner_tipo, owner_id, codigo):
     if c is None:
         raise ValueError("conta %s ausente no plano de contas do owner" % codigo)
     return c
+
+
+def _conta_existe(db, owner_tipo, owner_id, codigo):
+    return db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, codigo=codigo).first() is not None
 
 
 def registrar_evento(db, owner_tipo, owner_id, tipo_evento, valor, projeto_id=None, data=None,
@@ -473,15 +507,17 @@ _PROV_FECHAMENTO = {
     "com_medidor":         "fechamento_venda_com_medidor",
     "com_proj_exec":       "fechamento_venda_com_proj_exec",
     "retencao_com_vendas": "fechamento_venda_retencao_com_vendas",
+    "custo_fabrica":       "fechamento_venda_custo_fabrica",   # FASE D2: 10ª rubrica (era só no faturamento)
     "impostos":            "fechamento_venda_impostos",
 }
 
 
 def constituir_provisoes_fechamento(db, owner_tipo, owner_id, projeto_id, valores, ref_base):
-    """Constitui TODAS as provisões rastreadas no fechamento da venda. `valores` = {chave_rubrica: R$}
-    (do motor, computado pelo chamador). Cada uma: Despesa × Provisão (do mapa EVENTOS), idempotente por
-    ref (`ref_base:<chave>`). Valor <= 0 não lança. Custo de Fábrica NÃO entra aqui (vira CMV=CFO no
-    faturamento). Retorna {chave: valor_lançado}."""
+    """Constitui TODAS as 10 rubricas no fechamento da venda. `valores` = {chave_rubrica: R$} (do motor,
+    computado pelo chamador). Cada uma: Ativo diferido (1.1.06.0X, ou 1.1.05 p/ impostos) × Provisão
+    (2.1.04.0X) — **sem tocar a DRE** (FASE D2); a despesa vira resultado só na NF-e. Idempotente por ref
+    (`ref_base:<chave>`). Valor <= 0 não lança. Custo de Fábrica (`custo_fabrica`) É constituído aqui.
+    Retorna {chave: valor_lançado}."""
     out = {}
     for chave, valor in (valores or {}).items():
         evento = _PROV_FECHAMENTO.get(chave)
@@ -493,6 +529,45 @@ def constituir_provisoes_fechamento(db, owner_tipo, owner_id, projeto_id, valore
         registrar_evento(db, owner_tipo, owner_id, evento, v, projeto_id=projeto_id,
                          ref=ref_base + ":" + chave)
         out[chave] = v
+    return out
+
+
+# FASE D2: matching pleno na NF-e — rubrica → evento de reconhecimento de despesa (baixa do ativo diferido).
+# Impostos NÃO entram (têm faturamento_impostos_deducao/obrigacao próprios).
+_MATCHING_NFE = {
+    "montagem":            "reconhecimento_despesa_montagem",
+    "garantia":            "reconhecimento_despesa_garantia",
+    "assistencia":         "reconhecimento_despesa_assistencia",
+    "frete_fabrica":       "reconhecimento_despesa_frete_fabrica",
+    "frete_local":         "reconhecimento_despesa_frete_local",
+    "insumos":             "reconhecimento_despesa_insumos",
+    "com_medidor":         "reconhecimento_despesa_com_medidor",
+    "com_proj_exec":       "reconhecimento_despesa_com_proj_exec",
+    "retencao_com_vendas": "reconhecimento_despesa_retencao_com_vendas",
+    "custo_fabrica":       "reconhecimento_despesa_custo_fabrica",
+    # Outros Fornecedores só tem saldo em 1.1.06.14 se houve reclassificação ANTES da NF-e (substituição
+    # de parte do pedido de fábrica) — nesse caso o matching o reconhece; senão o saldo é 0 e é pulado.
+    "outros_fornecedores": "reconhecimento_despesa_outros_fornecedores",
+}
+
+
+def reconhecer_despesas_nfe(db, owner_tipo, owner_id, projeto_id, ref_base):
+    """FASE D2 — matching pleno na NF-e: reconhece de UMA vez TODAS as despesas planejadas do projeto.
+    Para cada rubrica com saldo em aberto no ativo diferido 1.1.06.0X, debita a despesa (5.6.0X, ou
+    5.1.01 p/ Custo de Fábrica) × credita a baixa do ativo. A Provisão (2.1.04.0X) SOBREVIVE (paga/
+    reconciliada depois). Idempotente por ref (`ref_base:<rubrica>`) E por saldo (rubrica já baixada →
+    nada a reconhecer). Impostos NÃO entram aqui (faturamento_impostos_deducao/obrigacao). Retorna
+    {rubrica: valor_reconhecido}."""
+    out = {}
+    for chave, evento in _MATCHING_NFE.items():
+        ativo = EVENTOS[evento][1]   # crédito do evento = ativo diferido 1.1.06.0X
+        val = round(total_lancado(db, owner_tipo, owner_id, ativo, "debito", projeto_id)
+                    - total_lancado(db, owner_tipo, owner_id, ativo, "credito", projeto_id), 2)
+        if val <= 0:
+            continue
+        registrar_evento(db, owner_tipo, owner_id, evento, val, projeto_id=projeto_id,
+                         ref=ref_base + ":" + chave)
+        out[chave] = val
     return out
 
 
@@ -559,8 +634,24 @@ def reclassificar_provisao(db, owner_tipo, owner_id, projeto_id, cod_de, cod_par
     seed_plano(db, owner_tipo, owner_id)
     cd = _conta_por_codigo(db, owner_tipo, owner_id, cod_de)
     cc = _conta_por_codigo(db, owner_tipo, owner_id, cod_para)
-    return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor, data=data, projeto_id=projeto_id,
-                  origem=_ORIGEM_RECLASS, historico="Reclassificação de provisão", ref=ref)
+    lan = lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor, data=data, projeto_id=projeto_id,
+                 origem=_ORIGEM_RECLASS, historico="Reclassificação de provisão", ref=ref)
+    # FASE D2: espelha o ativo diferido (1.1.06.XX → 1.1.06.YY) NA PROPORÇÃO ainda não baixada na NF-e —
+    # senão a rubrica de destino não é reconhecida no matching. Move só até o saldo em aberto do ativo de
+    # origem: reclass ANTES da NF-e (ativo cheio) espelha tudo; DEPOIS da NF-e (ativo já baixado) não move.
+    ativo_de = "1.1.06." + cod_de.rsplit(".", 1)[-1]
+    ativo_para = "1.1.06." + cod_para.rsplit(".", 1)[-1]
+    if _conta_existe(db, owner_tipo, owner_id, ativo_de) and _conta_existe(db, owner_tipo, owner_id, ativo_para):
+        saldo_ativo = round(total_lancado(db, owner_tipo, owner_id, ativo_de, "debito", projeto_id)
+                            - total_lancado(db, owner_tipo, owner_id, ativo_de, "credito", projeto_id), 2)
+        mv = round(min(valor, max(saldo_ativo, 0.0)), 2)
+        if mv > 0:
+            ad = _conta_por_codigo(db, owner_tipo, owner_id, ativo_para)
+            ac = _conta_por_codigo(db, owner_tipo, owner_id, ativo_de)
+            lancar(db, owner_tipo, owner_id, ad.id, ac.id, mv, data=data, projeto_id=projeto_id,
+                   origem=_ORIGEM_RECLASS, historico="Reclassificação de custo a apropriar (espelho do ativo)",
+                   ref=ref + ":ativo")
+    return lan
 
 
 def efetivar_provisao(db, owner_tipo, owner_id, projeto_id, codigo_provisao, valor, ref, data=None):
@@ -632,6 +723,28 @@ def reconciliacao(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None)
     return {"projeto_id": projeto_id, "provisoes": provs,
             "totais": {"provisionado": t("provisionado"), "efetivado": t("efetivado"),
                        "saldo": t("saldo"), "resolvido": t("resolvido")}}
+
+
+def conciliar_final(db, owner_tipo, owner_id, projeto_id, ref_base):
+    """FASE D2 — Conciliação Final (etapa 21): resolve à força TODO saldo remanescente das provisões de
+    custo do projeto (as 10 rubricas). Sobra (provisionado > efetivado) → 4.4.02 (receita); falta →
+    5.6.10 (despesa). Zera as pendências. Impostos (2.1.04.13) ficam FORA (rota fiscal própria). Idempotente
+    por ref (ref_base:<codigo>). Retorna {codigo: saldo_resolvido} (positivo=sobra, negativo=falta)."""
+    seed_plano(db, owner_tipo, owner_id)
+    excluir = _PROV_PAINEL_EXCLUI | {"2.1.04.13"}   # impostos têm efetivar_impostos_segmento
+    contas = (db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, tipo="analitica")
+              .filter(Conta.codigo.like(GRUPO_PROVISOES + ".%")).order_by(Conta.codigo).all())
+    out = {}
+    for c in contas:
+        if c.codigo in excluir:
+            continue
+        saldo = round(_mov(db, owner_tipo, owner_id, c.codigo, "credor", None, None, projeto_id=projeto_id), 2)
+        if abs(saldo) < 0.005:
+            continue
+        lan = resolver_saldo_provisao(db, owner_tipo, owner_id, projeto_id, c.codigo, ref=ref_base + ":" + c.codigo)
+        if lan is not None:
+            out[c.codigo] = saldo
+    return out
 
 
 def contas_a_pagar(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None):
