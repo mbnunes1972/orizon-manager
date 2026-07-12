@@ -642,6 +642,41 @@ def contas_a_pagar(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None
     return {"projeto_id": projeto_id, "total_em_aberto": round(total, 2)}
 
 
+def provisao_projetos(db, owner_tipo, owner_id, codigo, ini=None, fim=None):
+    """Discrimina UMA conta de provisão por PROJETO: provisionado/efetivado/saldo + detalhe por ORIGEM
+    (cada evento que tocou a conta, com débito/crédito e histórico). Alimenta o modal 'clicar na
+    provisão' do painel de Provisões."""
+    from sqlalchemy import or_
+    conta = _conta_por_codigo(db, owner_tipo, owner_id, codigo)
+    q = db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id).filter(
+        or_(Lancamento.conta_debito_id == conta.id, Lancamento.conta_credito_id == conta.id))
+    projs = {}
+    for l in _filtra_periodo(q, ini, fim).all():
+        pid = l.projeto_id or "(sem projeto)"
+        p = projs.setdefault(pid, {"projeto_id": pid, "por_origem": {}})
+        o = p["por_origem"].setdefault(l.origem or "(manual)", {"debito": 0.0, "credito": 0.0, "historico": l.historico})
+        if l.conta_debito_id == conta.id:
+            o["debito"] = round(o["debito"] + l.valor, 2)
+        else:
+            o["credito"] = round(o["credito"] + l.valor, 2)
+    out = []
+    for pid, p in projs.items():
+        # mesma regra da reconciliacao: provisionado = créditos (excl. resol_falta) − reclass-out;
+        # efetivado = débitos de custo real (excl. resol_sobra e reclass).
+        prov = round(sum(o["credito"] for org, o in p["por_origem"].items() if org != _ORIGEM_RESOL_FALTA)
+                     - sum(o["debito"] for org, o in p["por_origem"].items() if org == _ORIGEM_RECLASS), 2)
+        efet = round(sum(o["debito"] for org, o in p["por_origem"].items()
+                         if org not in (_ORIGEM_RESOL_SOBRA, _ORIGEM_RECLASS)), 2)
+        out.append({"projeto_id": pid, "provisionado": prov, "efetivado": efet,
+                    "saldo": round(prov - efet, 2), "por_origem": p["por_origem"]})
+    out.sort(key=lambda x: x["projeto_id"])
+    return {"codigo": codigo, "nome": conta.nome,
+            "totais": {"provisionado": round(sum(p["provisionado"] for p in out), 2),
+                       "efetivado": round(sum(p["efetivado"] for p in out), 2),
+                       "saldo": round(sum(p["saldo"] for p in out), 2)},
+            "projetos": out}
+
+
 # ── Provisões da venda: % configurável + auto-constituição no fechamento (v6 §6.4) ──
 _PROV_VENDA = {   # chave -> (evento de constituição, código da conta de Provisão no Passivo)
     "montagem":    ("fechamento_venda_montagem",    "2.1.04.02"),
@@ -929,6 +964,7 @@ def balanco(db, owner_tipo, owner_id, data_corte=None):
     1/2/3. O resultado do exercício (Receitas − Despesas acumuladas) entra no PL → fecha por
     partida dobrada (Ativo = Passivo + PL). `data_corte` = fim; ini=None (desde o começo)."""
     s = lambda pref, sen: _mov(db, owner_tipo, owner_id, pref, sen, None, data_corte)
+    det = lambda pref, sen: _detalhe_grupo(db, owner_tipo, owner_id, pref, sen, None, data_corte)
     ativo_circ = s("1.1", "devedor")
     ativo_ncirc = s("1.2", "devedor")
     total_ativo = round(ativo_circ + ativo_ncirc, 2)
@@ -946,6 +982,13 @@ def balanco(db, owner_tipo, owner_id, data_corte=None):
         "patrimonio_liquido": {"contas": pl_contas, "resultado_exercicio": resultado, "total": total_pl},
         "total_passivo_mais_pl": total_passivo_pl,
         "confere": abs(total_ativo - total_passivo_pl) < 0.01,
+        "detalhe": {   # composição nível 3 por grupo (modo Analítico)
+            "ativo_circulante": det("1.1", "devedor"),
+            "ativo_nao_circulante": det("1.2", "devedor"),
+            "passivo_circulante": det("2.1", "credor"),
+            "passivo_nao_circulante": det("2.2", "credor"),
+            "patrimonio_liquido": det("3", "credor"),
+        },
     }
 
 

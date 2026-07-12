@@ -2158,6 +2158,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     </div>
   </div>
 </div>
+<!-- FASE D: modal ao clicar numa provisão do painel — discrimina por projeto + origem -->
+<div id="modal-provisao-proj" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9550;align-items:center;justify-content:center;backdrop-filter:blur(3px)" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);max-width:820px;width:94%;max-height:88vh;overflow:auto;padding:20px 24px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-family:var(--font-sans);font-weight:900;font-size:16px" id="provproj-titulo">Provisão</div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-provisao-proj').style.display='none'">Fechar</button>
+    </div>
+    <div id="provproj-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+  </div>
+</div>
 <div id="modal-autorizacao" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9500;align-items:center;justify-content:center">
   <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;width:100%;max-width:380px">
     <div style="font-family:var(--font-sans);font-weight:700;font-size:15px;margin-bottom:8px">Autorização Necessária</div>
@@ -8832,8 +8842,8 @@ async function finDashboardCarregar(){
   const card = inner => '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:16px 20px;margin-bottom:12px">'+inner+'</div>';
   // FASE C: provisões agrupadas por TIPO (A/B/C/D/O), cada grupo com subtotal; um card por grupo.
   const linhaProv = p =>
-     '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-top:1px solid var(--border)">'
-    +'<div><div style="font-weight:600;color:var(--text);font-size:13px">'+esc(p.nome)+'</div>'
+     '<div onclick="abrirProvisaoModal(\''+p.codigo+'\')" title="Ver por projeto" style="cursor:pointer;display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-top:1px solid var(--border)">'
+    +'<div><div style="font-weight:600;color:var(--text);font-size:13px">'+esc(p.nome)+' <span style="font-size:10px;color:var(--muted)">›</span></div>'
     +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(p.sub)+'</div></div>'
     +'<div style="font-family:var(--font-mono);font-weight:700;font-size:14px;color:var(--text);white-space:nowrap">'+_fBRL(p.saldo_em_aberto)+'</div></div>';
   const grupoCard = g => card(
@@ -8868,6 +8878,46 @@ async function finDashboardCarregar(){
      '<div style="margin-bottom:14px">'
     +'<span style="font-size:13px;color:var(--muted)">'+d.provisoes.length+' provisões monitoradas · total em aberto <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(d.total_provisoes_abertas)+'</strong></span></div>'
     + grupos + apoio;
+}
+
+// ── FASE D: modal ao clicar numa provisão — discrimina por projeto + origem ───────────────────
+const _ORIG_LBL = {
+  faturamento_cmv:'CMV — custo de fábrica (CFO)', efetivacao_provisao:'Efetivação (custo real → Fornecedores)',
+  reclassificacao_provisao:'Reclassificação (substituição)', resolucao_provisao_sobra:'Resolução — sobra→receita',
+  resolucao_provisao_falta:'Resolução — falta→despesa',
+  fechamento_venda_montagem:'Constituição — Montagem', fechamento_venda_garantia:'Constituição — Garantia',
+  fechamento_venda_assistencia:'Constituição — Assistência', fechamento_venda_frete_fabrica:'Constituição — Frete Fábrica',
+  fechamento_venda_frete_local:'Constituição — Frete Local', fechamento_venda_insumos:'Constituição — Insumos',
+  fechamento_venda_com_medidor:'Constituição — Com. Medidor', fechamento_venda_com_proj_exec:'Constituição — Com. Proj/Exec',
+  fechamento_venda_retencao_com_vendas:'Constituição — Retenção Com. Vendas', fechamento_venda_impostos:'Constituição — Impostos',
+  faturamento_impostos_obrigacao:'Efetivação impostos (emissão)',
+};
+async function abrirProvisaoModal(codigo){
+  const modal=document.getElementById('modal-provisao-proj');
+  document.getElementById('provproj-box').innerHTML='<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  document.getElementById('provproj-titulo').textContent=codigo+' — por projeto';
+  modal.style.display='flex';
+  const pv=(await fetch('/api/financeiro/provisao-projetos?conta='+encodeURIComponent(codigo),{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({}))).provisao;
+  const box=document.getElementById('provproj-box');
+  if(!pv){ box.innerHTML='<em style="color:var(--err);font-size:12px">Falha ao carregar (reinicie o servidor se necessário).</em>'; return; }
+  document.getElementById('provproj-titulo').textContent=esc(pv.nome)+' — por projeto';
+  if(!pv.projetos.length){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Sem lançamentos nesta provisão.</em>'; return; }
+  const saldoCor=v=>Math.abs(v)<0.005?'var(--muted)':(v>0?'var(--accent)':'var(--st-quente)');
+  const projCard=p=>{
+    const origens=Object.keys(p.por_origem).map(org=>{
+      const o=p.por_origem[org];
+      return '<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;color:var(--muted)">'
+        +'<span>'+esc(_ORIG_LBL[org]||org)+'</span>'
+        +'<span style="font-family:var(--font-mono)">'+(o.credito?('provisiona '+_fBRL(o.credito)):'')+(o.debito?((o.credito?' · ':'')+'baixa '+_fBRL(o.debito)):'')+'</span></div>';
+    }).join('');
+    return '<div style="background:var(--surface-2);border-radius:10px;padding:12px 16px;margin-bottom:10px">'
+      +'<div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px"><div style="font-weight:700;font-size:13px">'+esc(p.projeto_id)+'</div>'
+      +'<div style="font-size:12px;color:var(--muted)">Prov <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(p.provisionado)+'</strong> · Efet <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(p.efetivado)+'</strong> · Saldo <strong style="font-family:var(--font-mono);color:'+saldoCor(p.saldo)+'">'+_fBRL(p.saldo)+'</strong></div></div>'
+      +'<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">'+origens+'</div></div>';
+  };
+  const t=pv.totais;
+  box.innerHTML='<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Total — Provisionado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(t.provisionado)+'</strong> · Efetivado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(t.efetivado)+'</strong> · Saldo <strong style="font-family:var(--font-mono);color:'+saldoCor(t.saldo)+'">'+_fBRL(t.saldo)+'</strong></div>'
+    +pv.projetos.map(projCard).join('');
 }
 
 // ── FASE D: Reconciliação de Provisões (Provisionado × Efetivado × Saldo × Destino) ───────────
@@ -9106,6 +9156,8 @@ async function repasseRegistrar(){
   showToast('Reparo em garantia registrado'); repasseCarregar();
 }
 
+let _balModo = 'resumido';   // 'resumido' | 'analitico'
+function balSetModo(m){ _balModo = m; balancoCarregar(); }
 async function balancoCarregar(){
   const box = document.getElementById('bal-box');
   if(!box) return;
@@ -9113,25 +9165,37 @@ async function balancoCarregar(){
   if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Módulo financeiro inativo ou sem acesso.</em>'; return; }
   const b = (await r.json().catch(()=>({}))).balanco;
   if(!b){ box.innerHTML='<em style="color:var(--muted)">Falha ao carregar o balanço.</em>'; return; }
+  const det = b.detalhe || {};
   const ln=(lbl,val,opts)=>{ opts=opts||{};
     return '<div style="display:flex;justify-content:space-between;padding:5px 10px;'
       +(opts.total?'font-weight:700;border-top:1px solid var(--border-strong)':'border-bottom:1px solid var(--border)')
       +(opts.sub?';padding-left:24px;color:var(--muted)':'')+'">'
       +'<span>'+lbl+'</span><span style="font-family:var(--font-mono);color:'+(opts.total?'var(--accent)':'var(--text)')+'">'+_fBRL(val)+'</span></div>'; };
-  const ativo = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Ativo</div>'
-    + ln('Circulante', b.ativo.circulante, {sub:true}) + ln('Não Circulante', b.ativo.nao_circulante, {sub:true})
+  // no Analítico, expande a composição (nível 3) de cada grupo
+  const comp = chave => (_balModo==='analitico'
+    ? (det[chave]||[]).map(c=>ln('<span style="font-size:11px">'+esc(c.codigo)+' · '+esc(c.nome)+'</span>', c.valor, {sub:true})).join('')
+    : '');
+  const cab = t => '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">'+t+'</div>';
+  const ativoCol = cab('Ativo')
+    + ln('Circulante', b.ativo.circulante, {sub:true}) + comp('ativo_circulante')
+    + ln('Não Circulante', b.ativo.nao_circulante, {sub:true}) + comp('ativo_nao_circulante')
     + ln('Total do Ativo', b.ativo.total, {total:true});
-  const passivo = '<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:12px 0 4px">Passivo + Patrimônio Líquido</div>'
-    + ln('Passivo Circulante', b.passivo.circulante, {sub:true}) + ln('Passivo Não Circulante', b.passivo.nao_circulante, {sub:true})
-    + ln('Patrimônio Líquido', b.patrimonio_liquido.contas, {sub:true})
+  const passivoCol = cab('Passivo + Patrimônio Líquido')
+    + ln('Passivo Circulante', b.passivo.circulante, {sub:true}) + comp('passivo_circulante')
+    + ln('Passivo Não Circulante', b.passivo.nao_circulante, {sub:true}) + comp('passivo_nao_circulante')
+    + ln('Patrimônio Líquido', b.patrimonio_liquido.contas, {sub:true}) + comp('patrimonio_liquido')
     + ln('Resultado do Exercício', b.patrimonio_liquido.resultado_exercicio, {sub:true})
     + ln('Total Passivo + PL', b.total_passivo_mais_pl, {total:true});
+  const btn=(m,lbl)=>'<button class="btn '+(_balModo===m?'btn-primary':'btn-ghost')+' btn-sm" onclick="balSetModo(\''+m+'\')">'+lbl+'</button>';
   const confere = b.confere
-    ? '<div style="font-size:10px;color:var(--accent);margin-top:8px">✓ Ativo = Passivo + PL (fecha por partida dobrada)</div>'
-    : '<div style="font-size:10px;color:var(--warn);margin-top:8px">⚠ Ativo ≠ Passivo + PL — verificar lançamentos</div>';
-  box.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Posição patrimonial acumulada'
+    ? '<div style="font-size:10px;color:var(--accent);margin-top:10px">✓ Ativo = Passivo + PL (fecha por partida dobrada)</div>'
+    : '<div style="font-size:10px;color:var(--warn);margin-top:10px">⚠ Ativo ≠ Passivo + PL — verificar lançamentos</div>';
+  box.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:10px">'+btn('resumido','Resumido')+btn('analitico','Analítico')+'</div>'
+    + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Posição patrimonial acumulada'
     +(b.data_corte?(' até '+esc(b.data_corte.slice(0,10))):' (data atual)')+'.</div>'
-    + '<div style="max-width:520px">'+ativo+passivo+confere+'</div>';
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">'
+    + '<div>'+ativoCol+'</div><div>'+passivoCol+'</div></div>'
+    + confere;
 }
 
 function reconInit(){

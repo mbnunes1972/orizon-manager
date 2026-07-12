@@ -721,6 +721,21 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/financeiro/provisao-projetos":
+            # FASE D: discrimina uma provisão por projeto (modal ao clicar no painel de Provisões).
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            from urllib.parse import parse_qs
+            usuario, db, ot, oid = ctx
+            try:
+                cod = (parse_qs(urlparse(self.path).query).get("conta") or [""])[0].strip()
+                self.send_json({"ok": True, "provisao": mod_contabil.provisao_projetos(db, ot, oid, cod)})
+            except ValueError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
         if path == "/api/expedicao/kanban":
             usuario = get_usuario_sessao(self)
             if not usuario:
