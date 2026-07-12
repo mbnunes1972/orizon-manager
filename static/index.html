@@ -92,9 +92,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
 .nav-item.sb-soon:hover{color:var(--muted)}
 .sb-soon-tag{font-size:8.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-left:auto}
 .nav-item:hover{color:var(--text)}
-/* v4 §4: item ativo = fundo --surface-2 + sombra (não borda) + texto --accent, peso 500 */
-.nav-item.active{color:var(--accent);font-weight:500;background:var(--surface-2);box-shadow:var(--shadow)}
-.nav-item.active::before{border-color:var(--accent)}
+/* item ativo/seleção = fundo --surface-2 + sombra + realce AZUL --primary (identidade de ação; ciano lia como verde) */
+.nav-item.active{color:var(--primary);font-weight:500;background:var(--surface-2);box-shadow:var(--shadow)}
+.nav-item.active::before{border-color:var(--primary)}
 .nav-item.nav-sub{padding-left:22px;font-size:12.5px}   /* submenu do módulo — indentado */
 .nav-item.nav-sub::before{width:12px;height:12px}
 .nav-item .nav-dot{display:none}   /* o ::before já é o marcador circular */
