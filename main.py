@@ -1656,7 +1656,12 @@ class Handler(BaseHTTPRequestHandler):
                               .order_by(Orcamento.ordem)
                               .all())
                     print("[ORC] encontrados %d orcamento(s)" % len(orcs))
-                    self.send_json({"ok": True, "orcamentos": [_orcamento_dict(o) for o in orcs]})
+                    # FASE D2 (Ajuste 1): expõe o orçamento CONTRATADO p/ o seletor travar nele por padrão
+                    # (reaproveita esta chamada — sem endpoint novo). None se o projeto ainda não tem contrato.
+                    _contrato = (db.query(Contrato).filter_by(projeto_nome=nome_safe)
+                                 .order_by(Contrato.id.desc()).first())
+                    self.send_json({"ok": True, "orcamentos": [_orcamento_dict(o) for o in orcs],
+                                    "contratado_id": (_contrato.orcamento_id if _contrato else None)})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:

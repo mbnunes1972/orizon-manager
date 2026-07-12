@@ -4061,19 +4061,27 @@ async function carregarOrcamentos(){
     if(!d.ok) return;
     _orcamentos = d.orcamentos || [];
     if(!_orcamentoAtivoId && _orcamentos.length > 0){
-      // 1. Preferir último orçamento que o usuário estava visualizando (localStorage)
-      const savedId = projetoAtivo
-        ? parseInt(localStorage.getItem('lastOrc_'+projetoAtivo.nome_safe)||'0') : 0;
-      const savedOrc = savedId && _orcamentos.find(o => o.id === savedId);
-      if(savedOrc){
-        _orcamentoAtivoId = savedOrc.id;
+      // FASE D2 (Ajuste 1): se o projeto TEM contrato, trava SEMPRE no orçamento contratado (a decisão já
+      // foi tomada nesse ponto), ignorando localStorage/updated_at. O seletor ▾ continua permitindo ver os
+      // outros orçamentos. Antes de existir contrato, mantém localStorage → mais recente.
+      const contratado = d.contratado_id && _orcamentos.find(o => o.id === d.contratado_id);
+      if(contratado){
+        _orcamentoAtivoId = contratado.id;
       } else {
-        // 2. Fallback: orçamento com updated_at mais recente
-        const comData = _orcamentos.filter(o => o.updated_at);
-        const ultimo = comData.length
-          ? comData.reduce((max, o) => o.updated_at > max.updated_at ? o : max, comData[0])
-          : _orcamentos[0];
-        _orcamentoAtivoId = ultimo.id;
+        // 1. Preferir último orçamento que o usuário estava visualizando (localStorage)
+        const savedId = projetoAtivo
+          ? parseInt(localStorage.getItem('lastOrc_'+projetoAtivo.nome_safe)||'0') : 0;
+        const savedOrc = savedId && _orcamentos.find(o => o.id === savedId);
+        if(savedOrc){
+          _orcamentoAtivoId = savedOrc.id;
+        } else {
+          // 2. Fallback: orçamento com updated_at mais recente
+          const comData = _orcamentos.filter(o => o.updated_at);
+          const ultimo = comData.length
+            ? comData.reduce((max, o) => o.updated_at > max.updated_at ? o : max, comData[0])
+            : _orcamentos[0];
+          _orcamentoAtivoId = ultimo.id;
+        }
       }
     }
     if(_orcamentoAtivoId) await ativarOrcamento(_orcamentoAtivoId);
