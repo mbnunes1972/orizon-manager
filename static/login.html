@@ -8,19 +8,20 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+  /* NOVA PALETA — identidade Orizon Manager (logo), design-tokens.md §2.0. Alinhado ao app; sem gold. */
   :root {
     --bg: #FFFFFF;
-    --surface: #F7F7F5;
+    --surface: #F4F7FB;
     --surface-2: #FFFFFF;
-    --border: #DDDAD2;
-    --border-strong: #C9C6BC;
-    --text: #2A2A28;
-    --muted: #6B6860;
-    --accent: #1F4B4B;
-    --accent-tint: rgba(31,75,75,.08);
+    --border: #DCE3EC;
+    --border-strong: #C6CFDB;
+    --text: #0B1D3A;
+    --muted: #5A6572;
+    --accent: #0E7C8C;
+    --accent-tint: rgba(14,124,140,.10);
     --accent-text: #FFFFFF;
-    --gold: #9C7A0C;
-    --gold-tint: rgba(156,122,12,.10);
+    --primary: #0066FF;
+    --primary-tint: rgba(0,102,255,.10);
     --shadow-sm: 0 1px 2px rgba(20,20,15,.05);
     --shadow-md: 0 6px 24px rgba(20,20,15,.08);
     --radius-sm: 6px;
@@ -30,18 +31,18 @@
     --font-mono: 'IBM Plex Mono', monospace;
   }
   [data-theme="dark"] {
-    --bg: #181C1E;
-    --surface: #1D2224;
-    --surface-2: #232A2C;
-    --border: #2A3234;
-    --border-strong: #3A4548;
-    --text: #E8EAE9;
-    --muted: #8C979A;
-    --accent: #5BB8AC;
-    --accent-tint: rgba(91,184,172,.12);
-    --accent-text: #12191A;
-    --gold: #D4B348;
-    --gold-tint: rgba(212,179,72,.14);
+    --bg: #081120;
+    --surface: #0B1D3A;
+    --surface-2: #12294A;
+    --border: #1C3459;
+    --border-strong: #2A4A73;
+    --text: #E6EBF1;
+    --muted: #8A96A3;
+    --accent: #00B8C9;
+    --accent-tint: rgba(0,184,201,.16);
+    --accent-text: #081120;
+    --primary: #0066FF;
+    --primary-tint: rgba(0,102,255,.18);
     --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
     --shadow-md: 0 10px 32px rgba(0,0,0,.4);
   }
@@ -75,7 +76,7 @@
     content: "";
     width: 14px;
     height: 1px;
-    background: var(--gold);
+    background: var(--primary);
     display: inline-block;
   }
   h1, h2, h3 { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
@@ -134,7 +135,7 @@
   .hero-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 64px; align-items: center; }
   .hero-ctas { display: flex; gap: 12px; margin-top: 32px; flex-wrap: wrap; }
   .hero-note { margin-top: 22px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
-  .hero-note svg { width: 14px; height: 14px; color: var(--gold); flex-shrink: 0; }
+  .hero-note svg { width: 14px; height: 14px; color: var(--primary); flex-shrink: 0; }
   @media (max-width: 860px) {
     .hero-grid { grid-template-columns: 1fr; gap: 40px; }
     h1 { font-size: 38px; }
@@ -173,13 +174,13 @@
     padding: 36px; box-shadow: var(--shadow-sm);
   }
   .card-process { border-top: 3px solid var(--accent); }
-  .card-fin { border-top: 3px solid var(--gold); }
+  .card-fin { border-top: 3px solid var(--primary); }
   .card-icon {
     width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;
     margin-bottom: 20px;
   }
   .card-process .card-icon { background: var(--accent-tint); color: var(--accent); }
-  .card-fin .card-icon { background: var(--gold-tint); color: var(--gold); }
+  .card-fin .card-icon { background: var(--primary-tint); color: var(--primary); }
   .card-icon svg { width: 22px; height: 22px; }
   .card h3 { font-size: 20px; margin-bottom: 6px; }
   .card > p.tag { font-size: 13px; color: var(--muted); margin-bottom: 22px; }
@@ -187,7 +188,7 @@
   .feature-list li { display: flex; gap: 12px; font-size: 14.5px; color: var(--text); line-height: 1.5; }
   .feature-list svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 2px; }
   .card-process .feature-list svg { color: var(--accent); }
-  .card-fin .feature-list svg { color: var(--gold); }
+  .card-fin .feature-list svg { color: var(--primary); }
   @media (max-width: 760px) { .split { grid-template-columns: 1fr; } }
 
   /* Mobile app teaser */
@@ -255,7 +256,7 @@
     <div class="logo">
       <svg class="logo-mark" viewBox="0 0 32 32" fill="none">
         <path d="M4 22 C4 22 9 10 16 10 C23 10 28 22 28 22" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/>
-        <circle cx="28" cy="22" r="2.6" fill="var(--gold)"/>
+        <circle cx="28" cy="22" r="2.6" fill="var(--primary)"/>
       </svg>
       Orizon Manager
     </div>
@@ -304,10 +305,10 @@
         <circle cx="160" cy="210" r="5" fill="var(--accent)"/>
         <circle cx="290" cy="120" r="5" fill="var(--accent)"/>
         <g transform="translate(400,38)">
-          <line x1="0" y1="0" x2="40" y2="0" stroke="var(--gold)" stroke-width="2.4" stroke-linecap="round"/>
-          <line x1="20" y1="-14" x2="20" y2="14" stroke="var(--gold)" stroke-width="2.4" stroke-linecap="round"/>
-          <path d="M4 0 L0 8 L8 8 Z" fill="none" stroke="var(--gold)" stroke-width="1.6"/>
-          <path d="M36 0 L32 8 L40 8 Z" fill="none" stroke="var(--gold)" stroke-width="1.6"/>
+          <line x1="0" y1="0" x2="40" y2="0" stroke="var(--primary)" stroke-width="2.4" stroke-linecap="round"/>
+          <line x1="20" y1="-14" x2="20" y2="14" stroke="var(--primary)" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M4 0 L0 8 L8 8 Z" fill="none" stroke="var(--primary)" stroke-width="1.6"/>
+          <path d="M36 0 L32 8 L40 8 Z" fill="none" stroke="var(--primary)" stroke-width="1.6"/>
         </g>
         <text x="20" y="330" font-family="'IBM Plex Mono', monospace" font-size="11" fill="var(--muted)">venda</text>
         <text x="255" y="145" font-family="'IBM Plex Mono', monospace" font-size="11" fill="var(--muted)">produção</text>
