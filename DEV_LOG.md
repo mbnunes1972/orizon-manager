@@ -1355,11 +1355,61 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > lucro líquido 93.598, Balanço fecha.
 > **A infra contábil (A→D) está COMPLETA.** Backlog contábil: **estorno de cancelamento fiscal** (B2) e
 > **sub-razão de Contas a Pagar** por fornecedor/vencimento (aging). `[CONFIRMAR CONTADOR]` pendentes seguem
-> documentados no razão. Próxima frente: a definir com o usuário.
+> documentados no razão.
 > Processo da frente: auditoria + plano por fases → OK do usuário → implementa 1 fase de cada vez, TDD, **para
 > antes de mergear** p/ conferência dos números. Dinheiro = seguir NOMENCLATURA.md + prova de não-duplicação.
 > `[CONFIRMAR CONTADOR]` pendentes (documentados no razão): receita no doc fiscal · adiantamento passivo no
 > Simples · timing dos impostos-provisão · custo financeiro direto · estorno de cancelamento fiscal.
+>
+> **🏗️ Próxima frente ATIVA (definida em 2026-07-12) — FASE D2.** Spec:
+> `docs/superpowers/specs/2026-07-12-fase-d2-provisao-completa-conciliacao-final-design.md` (desenho
+> FECHADO, sem pontos em aberto, verificado com Fable 5 usando números reais — **implementação ainda não
+> começou, próximo passo**). Projetos legados (fluxo antigo) ficam como estão, sem migração. Surgiu da
+> **Simulação
+> Claude 2** (rodada pela Vera, `.claude/agents/vera.md`, via API real até a assinatura do contrato). Três
+> ajustes: **(1)** seletor de orçamento trava sempre no orçamento **contratado** após o fechamento (hoje
+> usa localStorage/último-atualizado — frontend, baixo risco). **(2)** **provisionar TUDO no ato do
+> contrato** (as 10 rubricas, incl. Custo de Fábrica 2.1.04.06, hoje fora de `_PROV_FECHAMENTO`) com
+> **matching pleno** da despesa na NF-e (valores planejados) e ajuste depois via reconciliação (sobra→
+> 4.4.02/falta→5.6.10, mecanismo que já existe, agora pras 10 rubricas) quando o real diverge — exige
+> `2.1.06` virar "Receita a Realizar" (valor cheio) + grupo novo `1.1.06` "Custos a Apropriar" (espelha o
+> padrão de `1.1.05`/Impostos). **(3)** nova etapa do ciclo **"Conciliação Final"** (após a `20` Aprovação
+> final) que resolve à força qualquer saldo remanescente das provisões e leva o projeto a um status novo
+> no painel, **"Concluído"**. **Nota:** as contas `2.1.04.14` (Outros Fornecedores) e
+> `reclassificar_provisao` (commits `bb2f7d1`/`f00c94e`, já na `main`) **existem no código mas não têm
+> Sessão registrada aqui** — ao fechar a FASE D2, também escrever a sessão retroativa dessas duas.
+>
+> **✅ FASE D2 COMPLETA (Sessão 70) — as 6 fases mergeadas na `main` (suíte 946 verde; auditada pela Vera:
+> não-duplicação provada centavo-a-centavo, Balanço fecha em cada etapa, veredito APTA PARA MERGE).** Fase 1
+> (`af0c334`, grupo `1.1.06` + rename `2.1.06`) · Fase 2 (`afe4c1c`, constituição das 10 rubricas via
+> `1.1.06.0X`, `registro_venda_contrato`, `recebimento_venda` abate `1.1.02`) · Fase 3 (`d6bb760`, matching
+> pleno na NF-e, `reconhecer_despesas_nfe`, `faturamento_cmv` retirado) · Fase 4 (`ef09947`,
+> `reclassificar_provisao` espelha `1.1.06`, sobra/falta cobre as 10) · Fase 5 (`ba827cd`, seletor trava no
+> contratado, `contratado_id` aditivo) · Fase 6 (`25a84df`, etapa 21 "Conciliação Final" +
+> `mod_contabil.conciliar_final` + status "Concluído" distinto de "fechado"). Sessão retroativa 69 escrita
+> p/ `2.1.04.14`/`reclassificar_provisao`. 🟡 aberto (não-bloqueante, herdado da FASE D): o painel de
+> Reconciliação mostra `saldo` bruto (provisionado−efetivado) mesmo após a resolução — a resolução vive na
+> coluna `resolvido`; avaliar se num projeto "Concluído" isso confunde.
+>
+> **Backlog registrado em 2026-07-12, tratar assim que a FASE D2 fechar (sem spec própria ainda):**
+> **(1)** revisado — em vez de uma "Provisão de Custos Adicionais" genérica, são **5 rubricas novas**,
+> mesmo padrão das 10 já existentes (`2.1.04.x` + espelho `1.1.06.x`, entram em
+> `_PROV_FECHAMENTO`/matching pleno/reconciliação): **Comissão de Arquiteto** e **Retenção de Comissão de
+> Arquiteto** (espelha `2.1.04.12`, conta própria — não misturar com a retenção de comissão de vendas,
+> gatilhos diferentes) · **Fidelidade** · **Custo Viagem** · **Brinde** (já existe `5.3.12 Brindes` no
+> plano, solta, sem evento — reaproveitar como lado despesa do matching). Confirmado no motor
+> (`mod_negociacao.py`): comissão de arquiteto e fidelidade são custos reais recuperados no preço
+> (`com_arq`/`pro_fid`), não desconto ao cliente — hoje nenhuma das 5 tem lançamento contábil.
+> **⚠️ Sutileza confirmada no motor:** o toggle master "Custos Adicionais" (`incluir_custos`/`tog_cadi`)
+> **não** controla se o custo existe — só se ele é **repassado ao preço** (cobrado do cliente) ou
+> **absorvido** (empresa paga, margem cai, cliente não vê). `com_amb`/`pro_amb`/`num_via`/`num_bri` são
+> calculados pelos **toggles individuais** (`comissao_arq_ativa`, `fidelidade_ativa`, `fora_da_sede`,
+> `brinde_ativo`) e **sempre** entram em `liq_amb`, mesmo com `tog_cadi=False`. **Constituir as 4/5
+> provisões pelos toggles individuais, nunca pelo `incluir_custos`** — senão o caso "empresa absorve o
+> custo" (o que mais precisa de provisão, por não ter cobertura no preço) fica sem lançamento. **(2)**
+> mudar o **tema padrão de iniciação do sistema para claro** (hoje `Usuario.tema` default é `'escuro'` —
+> confirmado pelo usuário). **(3)** nova **aba Fiscal com as notas emitidas** (lista de `DocumentoFiscal`
+> — NF-e/NFS-e já emitidas, histórico/consulta).
 >
 > _(Frente anterior — Perfil-4/perfis por loja — abaixo. Follow-up ainda válido: re-chave do escopo operacional
 > para Função, dormente desde o Perfil-4.)_
@@ -2009,6 +2059,20 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 70 — FASE D2: provisão completa no contrato (ativo diferido) + matching pleno na NF-e + Conciliação Final
+Branch `feat/financeiro-fase-d2` (mergeada). Área sensível (dinheiro); desenho FECHADO com o usuário (spec `docs/superpowers/specs/2026-07-12-fase-d2-...md`, verificado com Fable 5); TDD; **parando antes de mergear cada fase** p/ conferência dos números. **Auditada pela Vera** (não-duplicação centavo-a-centavo, Balanço fecha em cada etapa → APTA). Suíte 909→**946**.
+**O modelo (por que 2 famílias de conta):** reconhecer a Receita cheia na NF-e exige debitar uma conta que ZERA ali; mas a Provisão de Fábrica (2.1.04.06) precisa SOBREVIVER (é o que a reconciliação monitora). Logo, Receita e Custo ganham contas de **deferimento** (ativo) separadas da Provisão (passivo).
+**Fase 1** — Plano de Contas: grupo `1.1.06 "Custos a Apropriar"` (ativo diferido, 11 subcontas espelho de `2.1.04.x`, generaliza o padrão dos impostos `1.1.05`); `2.1.06` "Adiantamento de Clientes" → **"Receita a Realizar"** (migração **pontual** idempotente, só renomeia o default antigo — não name-sync geral).
+**Fase 2** — Contrato: novo `registro_venda_contrato` (`1.1.02 × 2.1.06`, Val_Cont cheio); as 10 rubricas (9 + **Custo de Fábrica**, 10ª nova) constituídas como `1.1.06.0X × 2.1.04.0X` **sem tocar a DRE**; `recebimento_venda` passa a abater `1.1.02` (era `2.1.06`).
+**Fase 3** — NF-e: `reconhecer_despesas_nfe` (**matching pleno**) reconhece TODAS as despesas de uma vez (`5.6.0X`, ou `5.1.01` p/ fábrica) × baixa do ativo `1.1.06.0X`; a Provisão sobrevive. `faturamento_cmv` **retirado** (o CMV agora é `5.1.01 × 1.1.06.06`, sem re-creditar a provisão) → **resolve o duplo-hit**.
+**Fase 4** — `reclassificar_provisao` (`2.1.04.06→2.1.04.14`) espelha o ativo `1.1.06.06→1.1.06.14` **só na proporção ainda não baixada na NF-e** (robusto p/ reclass antes/depois da NF-e); matching reconhece Outros Fornecedores (`5.1.01 × 1.1.06.14`); sobra/falta (`resolver_saldo_provisao`) e `reconciliacao` cobrem as 10.
+**Fase 5** — Ajuste 1 (frontend): `carregarOrcamentos()` trava no **orçamento contratado** quando há contrato (backend expõe `contratado_id` no `/orcamentos`, aditivo).
+**Fase 6** — `mod_ciclo` etapa **21 "Conciliação Final"** (após a 20); `mod_contabil.conciliar_final` resolve à força o saldo remanescente das 10 (impostos fora); endpoint `POST .../ciclo/21/conciliar` (gate financeiro) concilia + encerra o projeto com status **`concluido`** (distinto de `fechado`); frontend: card + badge "Concluído". _(bug de rota corrigido: `_re` só existe no `do_POST` a partir da l.3790 → usei `re` global.)_
+**Decisão:** projetos legados (fluxo antigo, 9 rubricas batendo DRE no fechamento) **ficam como estão — sem migração retroativa**; o modelo novo vale só p/ contratos gerados daqui em diante. **🟡 aberto** (não-bloqueante): painel de Reconciliação mostra `saldo` bruto (provisionado−efetivado) mesmo pós-resolução (a resolução vive em `resolvido`) — avaliar se confunde num projeto "Concluído".
+
+## Sessão 69 (retroativa) — Outros Fornecedores (2.1.04.14) + reclassificar_provisao
+Registro retroativo dos commits `bb2f7d1`/`f00c94e` (já na `main` desde a frente anterior, sem Sessão própria). `2.1.04.14 "Provisão de Outros Fornecedores"` + `reclassificar_provisao(cod_de, cod_para, valor)` (passivo × passivo, origem `reclassificacao_provisao`, idempotente): permite a **substituição de custo** — parte da Provisão de Custo de Fábrica (2.1.04.06) migra p/ Outros Fornecedores, de modo que **cada provisão reconcilia com o seu efetivado** e a soma dos saldos = a economia total. `reconciliacao` já trata a origem reclass (provisionado = créditos + reclass-in − reclass-out). Na FASE D2 (Sessão 70) essa função ganhou o espelho do ativo diferido `1.1.06`.
 
 ## Sessão 68 — Rebrand de cor: paleta da logo Orizon Manager (dourado/laranja removidos)
 Frente de design, **só tokens** (baixo risco, frontend = Ctrl+F5). Fonte da verdade: `docs/design-tokens.md §2.0` (CANÔNICA, validada com o chat do Claude). Diff do `:root` mostrado e aprovado antes de aplicar.
