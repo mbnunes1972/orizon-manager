@@ -32,6 +32,7 @@ PLANO_PADRAO = [
     ("2.1.04.11", "Provisão de Comissão de Projeto/Executivo"),
     ("2.1.04.12", "Provisão de Retenção de Comissão de Vendas"),
     ("2.1.04.13", "Provisão de Impostos"),   # FASE B2.6: passivo reservado no contrato; efetivado (→ 2.1.03) na emissão
+    ("2.1.04.14", "Provisão de Outros Fornecedores"),   # FASE D: recebe a reclassificação do Custo de Fábrica (substituição)
     ("2.1.05", "Financiamento Total Flex a Pagar"),
     ("2.1.06", "Adiantamento de Clientes"),
     ("2.2", "Não Circulante"),
@@ -538,6 +539,28 @@ def efetivar_impostos_segmento(db, owner_tipo, owner_id, projeto_id, valor, ref_
 # ── FASE D: reconciliação (Provisionado × Efetivado × Saldo × Destino) + Contas a Pagar ───────
 _ORIGEM_RESOL_SOBRA = "resolucao_provisao_sobra"
 _ORIGEM_RESOL_FALTA = "resolucao_provisao_falta"
+_ORIGEM_RECLASS     = "reclassificacao_provisao"
+
+
+def reclassificar_provisao(db, owner_tipo, owner_id, projeto_id, cod_de, cod_para, valor, ref, data=None):
+    """Reclassifica parte de uma provisão para OUTRA (passivo × passivo — NÃO toca o resultado). Ex.:
+    substituição de custo — parte da Provisão de Custo de Fábrica (2.1.04.06) passa para a Provisão de
+    Outros Fornecedores (2.1.04.14). Débito `cod_de` (reduz a provisionado de origem), crédito `cod_para`
+    (aumenta a provisionado de destino). Idempotente por ref. Assim cada provisão reconcilia com o seu
+    efetivado, e a soma dos saldos = a economia total."""
+    if not (cod_de or "").startswith(GRUPO_PROVISOES + ".") or not (cod_para or "").startswith(GRUPO_PROVISOES + "."):
+        raise ValueError("reclassificar_provisao: contas devem ser provisões (%s.x)" % GRUPO_PROVISOES)
+    ja = lancamento_por_ref(db, owner_tipo, owner_id, ref)
+    if ja is not None:
+        return ja
+    valor = round(float(valor or 0), 2)
+    if valor <= 0:
+        return None
+    seed_plano(db, owner_tipo, owner_id)
+    cd = _conta_por_codigo(db, owner_tipo, owner_id, cod_de)
+    cc = _conta_por_codigo(db, owner_tipo, owner_id, cod_para)
+    return lancar(db, owner_tipo, owner_id, cd.id, cc.id, valor, data=data, projeto_id=projeto_id,
+                  origem=_ORIGEM_RECLASS, historico="Reclassificação de provisão", ref=ref)
 
 
 def efetivar_provisao(db, owner_tipo, owner_id, projeto_id, codigo_provisao, valor, ref, data=None):
@@ -595,8 +618,11 @@ def reconciliacao(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None)
     for c in contas:
         if c.codigo in _PROV_PAINEL_EXCLUI:
             continue
-        provisionado = tl(c.codigo, "credito", excluir_origens={_ORIGEM_RESOL_FALTA})
-        efetivado = tl(c.codigo, "debito", excluir_origens={_ORIGEM_RESOL_SOBRA})
+        # provisionado = créditos (constituição + reclass-IN) − reclass-OUT; efetivado = débitos de custo
+        # real (exclui resolução e reclassificação, que são passivo×passivo, não efetivação).
+        provisionado = round(tl(c.codigo, "credito", excluir_origens={_ORIGEM_RESOL_FALTA})
+                             - tl(c.codigo, "debito", origens={_ORIGEM_RECLASS}), 2)
+        efetivado = tl(c.codigo, "debito", excluir_origens={_ORIGEM_RESOL_SOBRA, _ORIGEM_RECLASS})
         resolvido = round(tl(c.codigo, "debito", origens={_ORIGEM_RESOL_SOBRA})
                           + tl(c.codigo, "credito", origens={_ORIGEM_RESOL_FALTA}), 2)
         provs.append({"codigo": c.codigo, "nome": c.nome, "tipo": _PROV_PAINEL_TIPO.get(c.codigo, "O"),
@@ -645,7 +671,7 @@ _PROV_PAINEL_SUB = {
 _PROV_PAINEL_TIPO = {
     "2.1.04.10": "A", "2.1.04.11": "A", "2.1.04.12": "A",             # Comissões / Pessoas
     "2.1.04.02": "B", "2.1.04.03": "B", "2.1.04.05": "B",             # Custos futuros (serviços da venda)
-    "2.1.04.06": "C", "2.1.04.07": "C", "2.1.04.08": "C", "2.1.04.09": "C",   # Aquisição / Fábrica
+    "2.1.04.06": "C", "2.1.04.07": "C", "2.1.04.08": "C", "2.1.04.09": "C", "2.1.04.14": "C",   # Aquisição / Fábrica
     "2.1.04.13": "D",                                                 # Fiscal
 }
 _PROV_TIPO_ROTULO = {"A": "Comissões / Pessoas", "B": "Custos futuros",
