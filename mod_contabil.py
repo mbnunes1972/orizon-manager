@@ -725,6 +725,28 @@ def reconciliacao(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None)
                        "saldo": t("saldo"), "resolvido": t("resolvido")}}
 
 
+def conciliar_final(db, owner_tipo, owner_id, projeto_id, ref_base):
+    """FASE D2 — Conciliação Final (etapa 21): resolve à força TODO saldo remanescente das provisões de
+    custo do projeto (as 10 rubricas). Sobra (provisionado > efetivado) → 4.4.02 (receita); falta →
+    5.6.10 (despesa). Zera as pendências. Impostos (2.1.04.13) ficam FORA (rota fiscal própria). Idempotente
+    por ref (ref_base:<codigo>). Retorna {codigo: saldo_resolvido} (positivo=sobra, negativo=falta)."""
+    seed_plano(db, owner_tipo, owner_id)
+    excluir = _PROV_PAINEL_EXCLUI | {"2.1.04.13"}   # impostos têm efetivar_impostos_segmento
+    contas = (db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, tipo="analitica")
+              .filter(Conta.codigo.like(GRUPO_PROVISOES + ".%")).order_by(Conta.codigo).all())
+    out = {}
+    for c in contas:
+        if c.codigo in excluir:
+            continue
+        saldo = round(_mov(db, owner_tipo, owner_id, c.codigo, "credor", None, None, projeto_id=projeto_id), 2)
+        if abs(saldo) < 0.005:
+            continue
+        lan = resolver_saldo_provisao(db, owner_tipo, owner_id, projeto_id, c.codigo, ref=ref_base + ":" + c.codigo)
+        if lan is not None:
+            out[c.codigo] = saldo
+    return out
+
+
 def contas_a_pagar(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None):
     """Contas a Pagar (MVP, FASE D): obrigações com fornecedores em aberto = saldo de Fornecedores a
     Pagar (2.1.01), escopado por projeto (None = consolidado). Derivado do razão — o sub-razão de títulos

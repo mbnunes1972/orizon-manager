@@ -2669,6 +2669,29 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        m = re.match(r'^/api/projetos/([^/]+)/ciclo/21/conciliar$', path)
+        if m:
+            # FASE D2 — Conciliação Final (etapa 21): resolve todo saldo remanescente das provisões do
+            # projeto (sobra→4.4.02 / falta→5.6.10) e ENCERRA o projeto (status "Concluído"). Gate financeiro.
+            from urllib.parse import unquote as _unquote
+            nome_safe = _unquote(m.group(1))
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                if _projeto_da_loja(db, nome_safe, usuario.get("loja_id")) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                resolvido = mod_contabil.conciliar_final(db, ot, oid, nome_safe, ref_base="cf:" + nome_safe)
+                _set_etapa_status(db, nome_safe, "21", "concluido", usuario.get("id"))
+                db.commit()
+                upsert_projeto_status(nome_safe, "concluido")   # status novo, distinto de "fechado" (sessão própria)
+                self.send_json({"ok": True, "resolvido": resolvido, "status": "concluido"})
+            except ValueError as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
         if path == "/api/financeiro/resolver-saldo-provisao":
             # FASE D: fecha o saldo da provisão ao resultado (sobra→4.4.02 / falta→5.6.10). Idempotente.
             ctx = _contabil_ctx(self, exige_edicao=True)

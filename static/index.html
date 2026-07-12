@@ -212,6 +212,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .proj-status-badge.frio{background:rgba(96,165,250,.12);color:var(--st-frio)}
 .proj-status-badge.convertido{background:rgba(0,184,201,.12);color:var(--st-convertido)}
 .proj-status-badge.fechado{background:rgba(91,155,255,.16);color:var(--st-fechado)}
+.proj-status-badge.concluido{background:var(--accent-tint);color:var(--accent)}
 .proj-status-badge.perdido{background:rgba(120,120,120,.12);color:var(--st-perdido)}
 .proj-status-badge.sem{background:transparent;color:var(--muted)}
 .proj-status-dd{position:absolute;top:100%;left:0;z-index:300;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);min-width:140px;overflow:hidden;display:none}
@@ -3768,6 +3769,7 @@ const _PROJ_STATUS_LABEL = {
   convertido: { label: '✓ Convertido', cls: 'convertido' },
   perdido:    { label: '✗ Perdido',    cls: 'perdido'    },
   fechado:    { label: '🔒 Fechado',  cls: 'fechado'    },
+  concluido:  { label: '✓ Concluído', cls: 'concluido'  },   // FASE D2: ciclo executado e conciliado
 };
 
 function _projStatusBadge(p){
@@ -3873,7 +3875,8 @@ function negAtualizarStatusBtn(){
   if(!btn) return;
   const s = _projetoStatusAtual;
   const labels = { quente:'🔥 Quente', morno:'● Morno', frio:'❄ Frio',
-                   convertido:'✓ Convertido', perdido:'✗ Perdido', fechado:'🔒 Fechado' };
+                   convertido:'✓ Convertido', perdido:'✗ Perdido', fechado:'🔒 Fechado',
+                   concluido:'✓ Concluído' };
   btn.textContent = (s && labels[s] ? labels[s] : '— Status') + ' ▾';
   // Seletor de Status: fundo (tint) + texto no token do estado atual (ex. --st-fechado), theme-aware.
   const tok = {quente:'--st-quente', morno:'--st-morno', frio:'--st-frio',
@@ -10315,11 +10318,12 @@ const ETAPAS_CICLO = [
   { codigo: "18",  nome: "Assistência pós Montagem",           sub: false, toggleavel: true },
   { codigo: "19",  nome: "Vistoria final",                     sub: false, toggleavel: true },
   { codigo: "20",  nome: "Aprovação final",                    sub: false, toggleavel: true },
+  { codigo: "21",  nome: "Conciliação Final",                  sub: false, acao: "conciliacao_final" },
 ];
 
 // Ordem canônica das etapas PRINCIPAIS (espelha mod_ciclo.py no backend).
 const ETAPAS_PRINCIPAIS = ["1","2","3","4","7","8","9","10",
-                           "11","12","13","14","15","16","17","18","19","20"];
+                           "11","12","13","14","15","16","17","18","19","20","21"];
 // Status que contam como "etapa concluída" (espelha STATUS_CONCLUSIVOS no backend).
 const STATUS_CONCLUSIVOS = new Set(["concluido","aprovado","assinado","vigente",
                                     "implantado","realizado","entregue","emitida"]);
@@ -10606,6 +10610,8 @@ function renderCiclo() {
         ${_cronoRespBlock(etapa.codigo, dados)}
         ${etapa.acao === 'contrato'
           ? _renderCardContrato()
+          : etapa.acao === 'conciliacao_final'
+            ? _renderCardConciliacaoFinal(dados, bloqueada)
           : (etapa.codigo === '8' || etapa.codigo === '11d')
             ? _renderCardAprovacaoFinanceira(etapa.codigo, dados, bloqueada)
           : etapa.codigo === '9'
@@ -10641,6 +10647,41 @@ function toggleCicloCard(codigo) {
   if (codigo === '7' && body && body.classList.contains('aberto')) {
     carregarDadosContrato();
   }
+}
+
+// ── FASE D2: Conciliação Final (etapa 21) — fecha os números e encerra o projeto ──
+function _renderCardConciliacaoFinal(dados, bloqueada) {
+  const concluido = dados.status === 'concluido';
+  const dt = dados.concluido_em ? new Date(dados.concluido_em).toLocaleDateString('pt-BR') : '';
+  if (concluido) {
+    return `<div style="font-size:.85rem;color:var(--muted);line-height:1.7">
+        Números finais conciliados — projeto <strong style="color:var(--accent)">Concluído</strong>${dt ? ' em ' + dt : ''}.
+      </div>`;
+  }
+  return `
+    <div style="font-size:.85rem;color:var(--muted);line-height:1.7;margin-bottom:10px">
+      Fecha os números do projeto: resolve todo saldo remanescente das provisões
+      (sobra → receita, falta → despesa) e <strong>encerra o projeto</strong> (status "Concluído").
+    </div>
+    <button class="btn btn-amber btn-sm" ${bloqueada ? 'disabled' : ''} onclick="conciliarFinal()">
+      &#x2713; Concluir Conciliação Final</button>`;
+}
+
+async function conciliarFinal() {
+  if (!projetoAtivo) return;
+  if (!(await confirmarPopup(
+        'Conciliar os números finais e ENCERRAR o projeto (status "Concluído")? '
+        + 'Resolve todo saldo remanescente das provisões.',
+        {titulo: 'Conciliação Final', okLabel: 'Conciliar e encerrar', cancelLabel: 'Cancelar'}))) return;
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/21/conciliar`,
+      {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'}, body: '{}'});
+    const j = await r.json();
+    if (!j.ok) { showToast(j.erro || 'Falha ao conciliar.', true); return; }
+    showToast('Projeto conciliado e concluído.', false);
+    _projetoStatusAtual = 'concluido'; negAtualizarStatusBtn();
+    await carregarCiclo();
+  } catch (e) { showToast('Erro: ' + e, true); }
 }
 
 // ── Cronograma do Ciclo (Modulos_Orizon_v11): datas prevista/conclusão + edição reautenticada ──
