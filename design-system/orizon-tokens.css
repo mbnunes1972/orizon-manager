@@ -1,6 +1,15 @@
 /* ============================================================
    ORIZON MANAGER — DESIGN TOKENS
-   Padrao_Design_Orizon v10 → tokens.css v1.5
+   Padrao_Design_Orizon v10 → tokens.css v1.7
+   v1.7: novo padrão de campo com RÓTULO FLUTUANTE (label dentro do
+   campo, canto superior esquerdo) — --control-h-float, substitui o
+   padrão label-acima em formulários densos. Componente "Linha de
+   Total" formalizado com tamanho único de valor, para não haver mais
+   de um tamanho de "total" na mesma tela.
+   v1.6: novo token --field-border (+ --field-border-hover), dedicado à
+   demarcação de campos editáveis nos dois temas — mais contraste que
+   o --border genérico (usado em cards/divisores), que era fraco
+   demais para comunicar onde um campo começa e termina.
    v1.1: tema escuro migra o realce de menta para COBRE/BRONZE ENVELHECIDO
    (variação F aprovada) — --accent-line #532A14 em bordas/filetes, texto
    interativo #A56B45 com piso de legibilidade, --warn afastado para
@@ -39,6 +48,8 @@
   --surface-2:     #F5F1EC;
   --border:        #E5DFD8;
   --border-strong: #D3CAC0;
+  --field-border:  #B8ADA0;   /* demarcação de campo editável — contraste mais alto que --border */
+  --field-border-hover: #948A7F;
 
   /* Texto */
   --text:          #2B2621;
@@ -102,6 +113,8 @@
   --surface-2:     #211F1D;
   --border:        #2B2926;
   --border-strong: #3B3833;
+  --field-border:  #4E4842;   /* demarcação de campo editável — contraste mais alto que --border */
+  --field-border-hover: #635B52;
 
   --text:          #EAE8E5;
   --text-2:        #A9A6A2;
@@ -177,6 +190,7 @@
   --control-h-sm: 30px;  /* barras de filtro densas */
   --control-h:    38px;  /* padrão de formulários */
   --control-h-lg: 44px;  /* ação principal de páginas de destaque */
+  --control-h-float: 52px; /* campo com rótulo flutuante — label + valor em duas linhas */
   --btn-h-sm: var(--control-h-sm);
   --btn-h:    var(--control-h);
   --btn-h-lg: var(--control-h-lg);
