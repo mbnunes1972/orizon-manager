@@ -48,6 +48,30 @@
 .check{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-body)}
 .check input{accent-color:var(--accent);width:16px;height:16px}
 
+/* ---------- Campo com rótulo flutuante (v1.7 · styleguide 04c) ----------
+   Rótulo estático DENTRO do campo (canto superior esquerdo); corta a altura
+   da linha ~pela metade em formulários densos (condições de pagamento etc.).
+   Campo calculado (readonly): fundo --surface-2 + etiqueta "calculado". */
+.field-float{position:relative}
+/* background/fonte declarados aqui (0,2,0) p/ vencer a regra global legada
+   input[type=…] (0,1,1) do app — senão o fundo do campo e a fonte mono
+   dos valores/datas cairiam na cascata antiga. */
+.field-float .input{width:100%;height:var(--control-h-float);padding:20px var(--sp-3) 6px;background:var(--surface);font-family:var(--font-mono);font-size:var(--fs-body)}
+.field-float label{position:absolute;top:7px;left:var(--sp-3);font-size:var(--fs-xs);color:var(--text-3);pointer-events:none;letter-spacing:.01em}
+.field-float .input.readonly{background:var(--surface-2);color:var(--text-2);cursor:default}
+.field-float .calc-flag{position:absolute;top:6px;right:var(--sp-3);font-size:var(--fs-xs);color:var(--text-3);pointer-events:none}
+
+/* ---------- Linha de Total (v1.7 · styleguide 07c) ----------
+   Valor num ÚNICO tamanho (--fs-h3, mono, bold) em qualquer contexto —
+   nunca dois tamanhos de "total" na mesma tela. .emphasis = box final. */
+.total-line{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-4);padding:var(--sp-3) var(--sp-4)}
+.total-line .label{font-size:var(--fs-body);font-weight:600;color:var(--text)}
+.total-line .value{font-family:var(--font-mono);font-size:var(--fs-h3);font-weight:700;color:var(--text)}
+.total-line .value .cur{font-size:var(--fs-sm);font-weight:500;color:var(--text-2);margin-right:4px}
+.total-line.emphasis{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg)}
+/* valor editável dentro da linha de total — mesmo tamanho único (vence input[type=text] global) */
+.total-line .value input{font-family:var(--font-mono);font-size:var(--fs-h3);font-weight:700;color:var(--text);background:transparent;border:0;outline:none;text-align:right;width:160px;padding:0;cursor:pointer}
+
 /* ---------- Barra de Filtros ---------- */
 .filter-bar{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--sp-3);box-shadow:var(--shadow)}
 .filter-bar .flex-search{flex:1 1 220px;min-width:180px}
