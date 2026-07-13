@@ -133,7 +133,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
 .hub-card-tag{font-size:9px;letter-spacing:.5px;color:var(--muted);text-transform:uppercase}
 .hub-card:not(.soon) .hub-card-tag{color:var(--accent)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-label.field-label{font-size:10px;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:5px}
+label.field-label{font-size:var(--fs-sm);color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:5px}
 /* Campo de Entrada (Padrao_Design_v7 §4): MESMA regra p/ texto/número/moeda/data — nunca branco fixo
    nem estilo nativo do navegador. Fundo --surface-2, borda --border (foco --accent), 36px, radius --r-sm. */
 input[type=text],input[type=password],input[type=number],input[type=email],input[type=tel],input[type=search],input[type=date],input[type=month],input[type=time],input[type=week]{
@@ -248,7 +248,7 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .proj-header-cli{font-size:12px;color:var(--muted)}
 .banner{display:flex;align-items:center;gap:20px;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 22px;margin-bottom:20px;flex-wrap:wrap}
 .banner-val{font-family:var(--font-display);font-weight:900;font-size:22px;color:var(--accent)}
-.banner-label{font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px}
+.banner-label{font-size:var(--fs-sm);color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:2px}
 .banner-sep{width:1px;height:40px;background:var(--border);margin:0 4px}
 /* Drop zone */
 .drop-zone{border:2px dashed var(--border2);border-radius:10px;padding:28px;text-align:center;transition:.15s;cursor:pointer;position:relative;margin-bottom:16px}
@@ -375,8 +375,8 @@ body{overflow:hidden}
 .mod-panel{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:18px;margin-bottom:14px}
 .mod-panel-title{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:14px}
 .mod-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
-.mod-grid label{display:block;font-size:10px;color:var(--muted);margin-bottom:4px}
-.mod-grid input,.mod-grid select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none}
+.mod-grid label{display:block;font-size:var(--fs-sm);color:var(--muted);margin-bottom:4px}
+.mod-grid input,.mod-grid select{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:var(--font-mono);font-size:var(--fs-body);outline:none}
 .mod-grid input:focus{border-color:var(--accent)}
 /* Plano de pagamento */
 .plano-wrap{border:1px solid var(--border);border-radius:8px;overflow:hidden;margin:12px 0}
@@ -386,8 +386,8 @@ body{overflow:hidden}
 .plano-tbl td{border-bottom:1px solid var(--border)}
 /* Total contrato */
 .total-contract{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;margin:14px 0 8px}
-.total-contract span{font-size:11px;color:var(--muted)}
-.total-contract input{background:transparent;border:none;color:var(--ok);font-size:22px;font-weight:900;font-family:var(--font-sans);text-align:right;outline:none;width:200px;cursor:pointer}
+.total-contract span{font-size:var(--fs-body);color:var(--muted)}
+.total-contract input{background:transparent;border:none;color:var(--ok);font-size:22px;font-weight:700;font-family:var(--font-mono);text-align:right;outline:none;width:200px;cursor:pointer}
 /* Botões de ação */
 .action-row{display:flex;gap:10px;margin-top:16px;padding-bottom:40px;flex-wrap:wrap}
 .btn-ok{background:var(--teal-bg);color:var(--ok);border:1px solid var(--teal-brd)}
@@ -401,9 +401,9 @@ body{overflow:hidden}
 /* Page-00 simplificada */
 .p00-btns{display:flex;gap:10px;margin-bottom:20px}
 .p00-form{background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:20px;margin-bottom:20px}
-.p00-form label{display:block;font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;margin-top:12px}
+.p00-form label{display:block;font-size:var(--fs-sm);letter-spacing:.5px;text-transform:uppercase;color:var(--muted);margin-bottom:4px;margin-top:12px}
 .p00-form label:first-of-type{margin-top:0}
-.p00-form input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:var(--font-mono);font-size:12px;outline:none}
+.p00-form input{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-family:var(--font-mono);font-size:var(--fs-body);outline:none}
 .p00-form input:focus{border-color:var(--accent)}
 /* Modal novo ambiente */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;display:none;align-items:center;justify-content:center}
@@ -687,7 +687,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Campos editáveis -->
     <div style="display:grid;gap:14px">
       <div>
-        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
+        <label style="font-size:var(--fs-sm);color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
                        display:block;margin-bottom:5px">Telefone</label>
         <input type="tel" id="mp-telefone" placeholder="(11) 99999-9999"
                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
@@ -697,7 +697,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                onblur="this.style.borderColor='var(--border)'">
       </div>
       <div>
-        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
+        <label style="font-size:var(--fs-sm);color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
                        display:block;margin-bottom:5px">WhatsApp</label>
         <input type="tel" id="mp-whatsapp" placeholder="(11) 99999-9999"
                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
@@ -707,7 +707,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                onblur="this.style.borderColor='var(--border)'">
       </div>
       <div>
-        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
+        <label style="font-size:var(--fs-sm);color:var(--muted);letter-spacing:.8px;text-transform:uppercase;
                        display:block;margin-bottom:5px">E-mail</label>
         <input type="email" id="mp-email" placeholder="seu@email.com"
                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
@@ -1227,9 +1227,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Resumo e total -->
     <div class="card" style="margin-bottom:14px">
       <div class="total-contract">
-        <span style="font-family:var(--font-sans);font-weight:700">Total do Contrato</span>
+        <span style="font-family:var(--font-sans);font-weight:600">Total do Contrato</span>
         <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:13px;font-weight:700;color:var(--muted)">R$</span>
+          <span style="font-size:13px;font-weight:700;color:var(--muted);font-family:var(--font-mono)">R$</span>
           <input id="neg-total-final" type="text" value="—" readonly
                  title="Clique para editar"
                  onclick="negTotalIniciarEdicao(this)"
@@ -1397,9 +1397,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="font-family:var(--font-display);font-weight:900;font-size:16px">Novo pedido à fábrica</div>
         <span onclick="expNovoFechar()" style="cursor:pointer;color:var(--muted);font-size:18px">&#x2715;</span>
       </div>
-      <label style="font-size:11px;color:var(--muted)">PROJETO</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">PROJETO</label>
       <select id="exp-novo-projeto" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px"></select>
-      <label style="font-size:11px;color:var(--muted)">NÚMERO DO PEDIDO</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">NÚMERO DO PEDIDO</label>
       <input type="text" id="exp-novo-pedido" placeholder="nº do pedido na fábrica"
              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px">
       <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Prazos planejados (informados pela fábrica)</div>
@@ -1450,18 +1450,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="font-family:var(--font-display);font-weight:900;font-size:16px">Novo caso de assistência</div>
         <span onclick="assistNovoFechar()" style="cursor:pointer;color:var(--muted);font-size:18px">&#x2715;</span>
       </div>
-      <label style="font-size:11px;color:var(--muted)">PROJETO (opcional)</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">PROJETO (opcional)</label>
       <select id="assist-novo-projeto" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px"></select>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-        <div><label style="font-size:11px;color:var(--muted)">SUB-TIPO</label>
+        <div><label style="font-size:var(--fs-sm);color:var(--muted)">SUB-TIPO</label>
           <select id="assist-novo-subtipo" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px"></select></div>
-        <div><label style="font-size:11px;color:var(--muted)">MOTIVO</label>
+        <div><label style="font-size:var(--fs-sm);color:var(--muted)">MOTIVO</label>
           <select id="assist-novo-motivo" onchange="assistNovoMotivoChange()" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px"></select></div>
       </div>
       <div id="assist-novo-tc" style="font-size:12px;color:var(--accent);font-weight:600;margin-bottom:12px"></div>
-      <label style="font-size:11px;color:var(--muted)">DESCRIÇÃO</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">DESCRIÇÃO</label>
       <input type="text" id="assist-novo-desc" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px">
-      <label style="font-size:11px;color:var(--muted)">VALOR (R$) — custo do reparo / valor da venda</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">VALOR (R$) — custo do reparo / valor da venda</label>
       <input type="number" step="0.01" min="0" id="assist-novo-valor" placeholder="pode informar depois, ao realizar"
              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 4px">
       <div id="assist-novo-status" style="font-size:11px;color:var(--muted);min-height:14px;margin:6px 0 8px"></div>
@@ -1490,11 +1490,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <span onclick="projEditarFechar()" style="cursor:pointer;color:var(--muted);font-size:18px">&#x2715;</span>
       </div>
 
-      <label style="font-size:11px;color:var(--muted)">NOME DO PROJETO</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">NOME DO PROJETO</label>
       <input type="text" id="pe-nome"
              style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px">
 
-      <label style="font-size:11px;color:var(--muted)">CLIENTE</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">CLIENTE</label>
       <input type="hidden" id="pe-cli-id">
       <div style="position:relative;margin:2px 0 12px">
         <input type="text" id="pe-cli-busca" placeholder="Buscar cliente por nome ou CPF..." autocomplete="off"
@@ -1503,7 +1503,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div id="pe-cli-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--card);border:1px solid var(--border);border-radius:8px;z-index:410;max-height:180px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,.4)"></div>
       </div>
 
-      <label style="font-size:11px;color:var(--muted)">ESPECIFICADOR (PARCEIRO)</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">ESPECIFICADOR (PARCEIRO)</label>
       <input type="hidden" id="pe-par-id">
       <div style="position:relative;margin:2px 0 4px">
         <input type="text" id="pe-par-busca" placeholder="Buscar parceiro... (vazio = sem especificador)" autocomplete="off"
@@ -1514,7 +1514,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <div style="text-align:right;margin-bottom:12px"><span onclick="peRemoverParceiro()" style="font-size:11px;color:var(--muted);cursor:pointer">remover especificador</span></div>
 
       <div id="pe-consultor-wrap" style="display:none">
-        <label style="font-size:11px;color:var(--muted)">CONSULTOR RESPONSÁVEL</label>
+        <label style="font-size:var(--fs-sm);color:var(--muted)">CONSULTOR RESPONSÁVEL</label>
         <select id="pe-consultor"
                 style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;margin:2px 0 12px"></select>
       </div>
@@ -1734,7 +1734,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           <div id="cli-inst-fields" style="display:none;">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
               <div>
-                <label style="font-size:12px;color:var(--muted)">CEP</label>
+                <label style="font-size:var(--fs-sm);color:var(--muted)">CEP</label>
                 <input id="cli-inst-cep" type="text" maxlength="9" placeholder="00000-000"
                        oninput="cliViaCepInst(this.value)"
                        style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
@@ -1742,36 +1742,36 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             </div>
             <div style="display:grid;grid-template-columns:3fr 1fr;gap:8px;margin-bottom:8px;">
               <div>
-                <label style="font-size:12px;color:var(--muted)">Logradouro</label>
+                <label style="font-size:var(--fs-sm);color:var(--muted)">Logradouro</label>
                 <input id="cli-inst-logradouro" type="text"
                        style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
               </div>
               <div>
-                <label style="font-size:12px;color:var(--muted)">Número</label>
+                <label style="font-size:var(--fs-sm);color:var(--muted)">Número</label>
                 <input id="cli-inst-numero" type="text"
                        style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
               </div>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
               <div>
-                <label style="font-size:12px;color:var(--muted)">Complemento</label>
+                <label style="font-size:var(--fs-sm);color:var(--muted)">Complemento</label>
                 <input id="cli-inst-complemento" type="text"
                        style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
               </div>
               <div>
-                <label style="font-size:12px;color:var(--muted)">Bairro</label>
+                <label style="font-size:var(--fs-sm);color:var(--muted)">Bairro</label>
                 <input id="cli-inst-bairro" type="text"
                        style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
               </div>
             </div>
             <div style="display:grid;grid-template-columns:3fr 1fr;gap:8px;">
               <div>
-                <label style="font-size:12px;color:var(--muted)">Cidade</label>
+                <label style="font-size:var(--fs-sm);color:var(--muted)">Cidade</label>
                 <input id="cli-inst-cidade" type="text"
                        style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
               </div>
               <div>
-                <label style="font-size:12px;color:var(--muted)">UF</label>
+                <label style="font-size:var(--fs-sm);color:var(--muted)">UF</label>
                 <input id="cli-inst-uf" type="text" maxlength="2"
                        style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
               </div>
@@ -1848,11 +1848,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <span onclick="cronoFechar()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:14px">Alteração de prazo exige reautenticação (Gerente+) e fica registrada na auditoria (quem, quando, valor antigo → novo).</div>
-      <label style="font-size:11px;color:var(--muted)">Nova data prevista</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">Nova data prevista</label>
       <input type="date" id="crono-nova-data" style="width:160px;box-sizing:border-box;margin-bottom:12px">
-      <label style="font-size:11px;color:var(--muted)">Login</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">Login</label>
       <input type="text" id="crono-login" style="width:100%;box-sizing:border-box;margin-bottom:10px">
-      <label style="font-size:11px;color:var(--muted)">Confirme sua senha</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">Confirme sua senha</label>
       <input type="password" id="crono-senha" onkeydown="if(event.key==='Enter')cronoSalvar()" style="width:100%;box-sizing:border-box">
       <div id="crono-erro" style="font-size:11px;min-height:16px;margin:8px 0"></div>
       <div style="display:flex;gap:10px">
@@ -1882,7 +1882,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div class="modal-box" style="max-width:360px">
     <div class="modal-title">Novo orçamento</div>
     <div style="margin-bottom:16px">
-      <label style="font-size:11px;color:var(--muted);display:block;margin-bottom:6px">Nome</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:6px">Nome</label>
       <input id="novo-orc-nome-input" class="inp" placeholder="Ex: Orçamento Entrada"
              onkeydown="if(event.key==='Enter')confirmarNovoOrc()"
              style="width:100%;box-sizing:border-box">
@@ -2204,14 +2204,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div style="font-size:11px;color:var(--text);margin-bottom:14px">Informe as credenciais de um Gerente ou Diretor:</div>
     <div style="display:grid;gap:12px;margin-bottom:16px">
       <div>
-        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Usuário autorizador</label>
+        <label style="font-size:var(--fs-sm);color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Usuário autorizador</label>
         <input type="text" id="auth-modal-login" placeholder="login.autorizador"
                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
                onkeydown="if(event.key==='Enter') document.getElementById('auth-modal-senha').focus()">
       </div>
       <div>
-        <label style="font-size:10px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Senha</label>
+        <label style="font-size:var(--fs-sm);color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Senha</label>
         <input type="password" id="auth-modal-senha" placeholder="••••••••"
                style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font-mono);font-size:13px;outline:none"
                onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
@@ -3288,7 +3288,7 @@ async function expNovoAbrir(){
   const st = document.getElementById('exp-novo-status'); if(st) st.textContent='';
   document.getElementById('exp-novo-pedido').value='';
   document.getElementById('exp-novo-prazos').innerHTML = _EXP_ETAPAS.map(e =>
-    '<div><label style="font-size:10px;color:var(--muted)">'+esc(e.lbl)+'</label>'+_expDateInput('exp-novo-'+e.prazo,'')+'</div>').join('');
+    '<div><label style="font-size:var(--fs-sm);color:var(--muted)">'+esc(e.lbl)+'</label>'+_expDateInput('exp-novo-'+e.prazo,'')+'</div>').join('');
   const sel = document.getElementById('exp-novo-projeto');
   sel.innerHTML = '<option value="">Carregando…</option>';
   try{
@@ -3336,7 +3336,7 @@ function _expDetHtml(card){
   let h = '<div style="font-size:13px;color:var(--muted);margin-top:6px">'+esc(card.projeto_nome)+(card.cliente?' · '+esc(card.cliente):'')+'</div>';
   h += _expSecTitle('Identificação');
   h += '<div style="display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center">'
-    +'<label style="font-size:11px;color:var(--muted)">Nº do pedido</label>'+ti('exp-det-pedido', card.numero_pedido)+'</div>';
+    +'<label style="font-size:var(--fs-sm);color:var(--muted)">Nº do pedido</label>'+ti('exp-det-pedido', card.numero_pedido)+'</div>';
   h += _expSecTitle('Status');
   h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
     +'<select id="exp-det-status-sel" onchange="expDetStatusChange()" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font-size:12px">'+opts+'</select>'
@@ -3352,9 +3352,9 @@ function _expDetHtml(card){
     + '</tbody></table>';
   h += _expSecTitle('Transporte');
   h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">'
-    +'<div><label style="font-size:10px;color:var(--muted)">Transportadora</label>'+ti('exp-det-transportadora',card.transporte.transportadora)+'</div>'
-    +'<div><label style="font-size:10px;color:var(--muted)">CT-e</label>'+ti('exp-det-cte',card.transporte.cte)+'</div>'
-    +'<div><label style="font-size:10px;color:var(--muted)">Rastreio</label>'+ti('exp-det-rastreio',card.transporte.rastreio)+'</div></div>';
+    +'<div><label style="font-size:var(--fs-sm);color:var(--muted)">Transportadora</label>'+ti('exp-det-transportadora',card.transporte.transportadora)+'</div>'
+    +'<div><label style="font-size:var(--fs-sm);color:var(--muted)">CT-e</label>'+ti('exp-det-cte',card.transporte.cte)+'</div>'
+    +'<div><label style="font-size:var(--fs-sm);color:var(--muted)">Rastreio</label>'+ti('exp-det-rastreio',card.transporte.rastreio)+'</div></div>';
   h += _expSecTitle('Histórico de transições');
   h += (card.historico&&card.historico.length) ? card.historico.map(t=>
     '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);font-size:12px"><span>'+(t.de?esc(t.de)+' → ':'')+'<strong>'+esc(t.para)+'</strong></span>'
@@ -3646,7 +3646,7 @@ function cadEntRender(item){
       inner = '<input type="text" id="cadf-'+c.id+'" value="'+esc(String(val))+'" maxlength="9" placeholder="00000-000" oninput="cadCepBuscar(this)" style="'+S+'">';
     else
       inner = '<input type="'+(c.tipo==='number'?'number':'text')+'" id="cadf-'+c.id+'" value="'+esc(String(val))+'" '+(c.tipo==='number'?'step="0.01"':'')+' style="'+S+'">';
-    return '<div style="'+(c.full?'grid-column:1/-1':'')+'"><label style="font-size:11px;color:var(--muted)">'+esc(c.lbl)+(c.req?' *':'')+'</label>'+inner+'</div>';
+    return '<div style="'+(c.full?'grid-column:1/-1':'')+'"><label style="font-size:var(--fs-sm);color:var(--muted)">'+esc(c.lbl)+(c.req?' *':'')+'</label>'+inner+'</div>';
   };
   let h = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 12px">'+def.campos.map(campoHtml).join('')+'</div>';
   if(def.acesso){
@@ -3655,8 +3655,8 @@ function cadEntRender(item){
       +'<label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer">'
       +'<input type="checkbox" id="cadf-acesso" '+(ac.tem_acesso?'checked':'')+' onchange="cadAcessoToggle()" style="width:15px;height:15px;accent-color:var(--accent)"> Este funcionário tem acesso ao sistema?</label>'
       +'<div id="cadf-acesso-box" style="display:'+(ac.tem_acesso?'grid':'none')+';grid-template-columns:1fr 1fr;gap:10px 12px;margin-top:10px">'
-      +'<div style="grid-column:1/-1"><label style="font-size:11px;color:var(--muted)">E-mail de login</label><input type="text" id="cadf-acesso-email" value="'+esc(ac.email||item.email||'')+'" style="'+S+'"></div>'
-      +'<div><label style="font-size:11px;color:var(--muted)">Perfil de Usuário</label><select id="cadf-acesso-perfil" style="'+S+'">'
+      +'<div style="grid-column:1/-1"><label style="font-size:var(--fs-sm);color:var(--muted)">E-mail de login</label><input type="text" id="cadf-acesso-email" value="'+esc(ac.email||item.email||'')+'" style="'+S+'"></div>'
+      +'<div><label style="font-size:var(--fs-sm);color:var(--muted)">Perfil de Usuário</label><select id="cadf-acesso-perfil" style="'+S+'">'
       + (_perfisAcessoOps.length?_perfisAcessoOps:[{slug:'consultor',rotulo:'Consultor'}]).map(o=>'<option value="'+esc(o.slug)+'"'+(ac.perfil===o.slug?' selected':'')+'>'+esc(o.rotulo)+'</option>').join('')+'</select></div>'
       +'<div style="grid-column:1/-1;font-size:10px;color:var(--muted)">Cria/atualiza a conta de login (referência ao Admin). Conta nova entra com senha inicial = dígitos do CPF.</div>'
       +'</div></div>';
@@ -5520,8 +5520,8 @@ async function atualizarAymore() {
     return _planoLinha(p, valorReal);
   }).join('');
   tbody.innerHTML += `<tr style="border-top:1px solid var(--border2)">
-    <td colspan="3" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
-    <td style="padding:10px 12px;text-align:right;font-weight:900;color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
+    <td colspan="3" style="padding:10px 12px;color:var(--muted);font-size:var(--fs-body);font-weight:600">Total pago pelo cliente</td>
+    <td style="padding:10px 12px;text-align:right;font-weight:700;font-family:var(--font-mono);color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
   </tr>`;
   window._planoPagamento = {
     tipo: 'aymore', nome_forma: 'Financiamento Aymoré',
@@ -5629,8 +5629,8 @@ async function atualizarCartao() {
     </tr>`;
   }).join('');
   tbody.innerHTML += `<tr style="border-top:1px solid var(--border2)">
-    <td colspan="2" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
-    <td style="padding:10px 12px;text-align:right;font-weight:900;color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
+    <td colspan="2" style="padding:10px 12px;color:var(--muted);font-size:var(--fs-body);font-weight:600">Total pago pelo cliente</td>
+    <td style="padding:10px 12px;text-align:right;font-weight:700;font-family:var(--font-mono);color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
   </tr>`;
   let _ccTexto = 'R$ ' + fmt(d.total_cliente);
   if (entrada > 0) _ccTexto += ' — Entrada de R$ ' + fmt(entrada);
@@ -5843,8 +5843,8 @@ function vpRenderTabela(d) {
   }).join('');
 
   tbody.innerHTML += `<tr style="border-top:1px solid var(--border2)">
-    <td colspan="3" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
-    <td style="padding:10px 12px;text-align:right;font-weight:900;color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
+    <td colspan="3" style="padding:10px 12px;color:var(--muted);font-size:var(--fs-body);font-weight:600">Total pago pelo cliente</td>
+    <td style="padding:10px 12px;text-align:right;font-weight:700;font-family:var(--font-mono);color:var(--ok)">R$ ${fmt(d.total_cliente)}</td>
   </tr>`;
 }
 
@@ -6429,8 +6429,8 @@ function tfRenderTabela(d, valorAvista, entrada) {
 
   const totalPago = Math.round(((entrada || 0) + (d.resumo ? d.resumo.total_pago : 0)) * 100) / 100;
   rows.push(`<tr style="border-top:2px solid var(--border2)">
-    <td colspan="5" style="padding:10px 12px;color:var(--muted);font-size:11px">Total pago pelo cliente</td>
-    <td colspan="4" style="padding:10px 12px;text-align:right;font-weight:900;color:var(--ok)">R$ ${fmt(totalPago)}</td>
+    <td colspan="5" style="padding:10px 12px;color:var(--muted);font-size:var(--fs-body);font-weight:600">Total pago pelo cliente</td>
+    <td colspan="4" style="padding:10px 12px;text-align:right;font-weight:700;font-family:var(--font-mono);color:var(--ok)">R$ ${fmt(totalPago)}</td>
   </tr>`);
 
   tbody.innerHTML = rows.join('');
@@ -8959,7 +8959,7 @@ async function abrirProvisaoModal(codigo){
       +'<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">'+origens+'</div></div>';
   };
   const t=pv.totais;
-  box.innerHTML='<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Total — Provisionado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(t.provisionado)+'</strong> · Efetivado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(t.efetivado)+'</strong> · Saldo <strong style="font-family:var(--font-mono);color:'+saldoCor(t.saldo)+'">'+_fBRL(t.saldo)+'</strong></div>'
+  box.innerHTML='<div style="font-size:var(--fs-body);font-weight:600;color:var(--muted);margin-bottom:12px">Total — Provisionado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(t.provisionado)+'</strong> · Efetivado <strong style="color:var(--text);font-family:var(--font-mono)">'+_fBRL(t.efetivado)+'</strong> · Saldo <strong style="font-family:var(--font-mono);color:'+saldoCor(t.saldo)+'">'+_fBRL(t.saldo)+'</strong></div>'
     +pv.projetos.map(projCard).join('');
 }
 
@@ -9068,7 +9068,7 @@ async function reconProjRender(){
   const tot=rec.totais;
   box.innerHTML='<table style="width:100%;border-collapse:collapse">'+head
     +(rows||'<tr><td colspan="5" style="padding:8px;color:var(--muted);font-size:12px">Sem provisões constituídas neste projeto ainda.</td></tr>')
-    +'</table><div style="margin-top:10px;font-size:12px;color:var(--muted)" title="Bruto '+_fBRL(tot.saldo)+'">Saldo total a reconciliar: <strong style="font-family:var(--font-mono);color:'+saldoCor(tot.saldo_aberto)+'">'+_fBRL(tot.saldo_aberto)+'</strong></div>';
+    +'</table><div style="margin-top:10px;font-size:var(--fs-body);font-weight:600;color:var(--muted)" title="Bruto '+_fBRL(tot.saldo)+'">Saldo total a reconciliar: <strong style="font-family:var(--font-mono);color:'+saldoCor(tot.saldo_aberto)+'">'+_fBRL(tot.saldo_aberto)+'</strong></div>';
 }
 
 // ── FASE D: Contas a Pagar (Fornecedores a Pagar em aberto) ───────────────────────────────────
@@ -9153,7 +9153,7 @@ function folhaRender(folha){
   box.innerHTML =
      '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;max-width:720px">Motor de cálculo: a <strong style="color:var(--text)">parte fixa</strong> vem do cadastro do Funcionário; a <strong style="color:var(--text)">parte variável</strong> = vendas líquidas fechadas do consultor no mês × % da faixa de meta (Config → Comissão de Vendas). O pagamento lança a despesa nas contas 5.3 e usa os dados bancários/PIX cadastrados — nada é digitado.</div>'
     +'<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">'
-    +'<label style="font-size:12px;color:var(--muted)">Competência</label>'
+    +'<label style="font-size:var(--fs-sm);color:var(--muted)">Competência</label>'
     +'<input type="month" value="'+esc(folha.competencia||_folhaComp)+'" onchange="folhaMudarComp(this.value)" class="inp" style="width:auto">'
     +'<button class="btn btn-primary btn-sm" onclick="folhaGerar()">Gerar folha</button></div>'
     +'<table class="proj-table"><thead><tr>'
@@ -11133,7 +11133,7 @@ async function abrirProvisoes(oid) {
     const revisaInputs = _PROV_RUBRICAS.map(rb => {
       const prev = prevItens[rb.key] != null ? Number(prevItens[rb.key]).toFixed(2) : '';
       return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <label style="font-size:.8rem;color:var(--muted);flex:1">${esc(rb.label)}</label>
+        <label style="font-size:var(--fs-sm);color:var(--muted);flex:1">${esc(rb.label)}</label>
         <input type="number" step="0.01" id="_prov-inp-${rb.key}" value="${esc(prev)}"
           style="width:120px;background:var(--input);border:1px solid var(--border);
           color:var(--fg);padding:4px 7px;border-radius:4px;font-size:.82rem;text-align:right">
@@ -11357,7 +11357,7 @@ function _renderCardMedicao(dados, bloqueada) {
   }
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 8px">Registre o parecer da medição, anexe a planta promob e confirme com a senha do medidor.</p>
-    <label style="font-size:.82rem">Parecer:
+    <label style="font-size:var(--fs-sm)">Parecer:
       <select id="med-parecer" onchange="document.getElementById('med-ambientes-wrap').style.display = this.value==='parcial' ? 'block':'none'">
         <option value="aprovado">Aprovado</option>
         <option value="reprovado">Reprovado</option>
@@ -12026,7 +12026,7 @@ function abrirAssociarParceiro(){
       ? `Atual: <strong>${esc(atual.nome)}</strong>
          <button onclick="_associarParceiro(null)" style="margin-left:8px;background:none;border:1px solid var(--err);color:var(--err);border-radius:5px;padding:3px 10px;font-size:.78rem;cursor:pointer">Remover</button>`
       : '<span style="color:var(--muted)">Nenhum parceiro associado.</span>'}</div>
-    <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Buscar parceiro</label>
+    <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Buscar parceiro</label>
     <input id="_ap-busca" type="text" autocomplete="off" oninput="_apBuscar(this.value)" placeholder="Nome ou CPF/CNPJ…"
       style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">
     <div id="_ap-result" style="max-height:190px;overflow-y:auto"></div>
@@ -12135,10 +12135,10 @@ function pedirCredenciaisGerente(opts) {
     const ov = _popupOverlay(
       '<h4 style="margin:0 0 8px;color:var(--warn);font-size:1rem">&#x1F512; ' + esc(titulo) + '</h4>' +
       '<p style="margin:0 0 12px;color:var(--muted);font-size:.82rem;white-space:pre-line">' + esc(mensagem) + '</p>' +
-      '<label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Login</label>' +
+      '<label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Login</label>' +
       '<input id="_cred-login" type="text" autocomplete="off" style="width:100%;box-sizing:border-box;' +
       'background:var(--input);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:10px">' +
-      '<label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Senha</label>' +
+      '<label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Senha</label>' +
       '<input id="_cred-senha" type="password" style="width:100%;box-sizing:border-box;' +
       'background:var(--input);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;margin-bottom:6px">' +
       '<div id="_cred-erro" style="color:var(--err);font-size:.78rem;min-height:14px;margin-bottom:8px"></div>' +
@@ -12261,7 +12261,7 @@ function renderContratoUI(contrato) {
 function _formGerarContrato() {
   return `
     <div style="display:flex;flex-direction:column;gap:8px;max-width:480px">
-      <label style="font-size:.85rem">Endereço de instalação</label>
+      <label style="font-size:var(--fs-sm)">Endereço de instalação</label>
       <div style="display:flex;gap:6px;align-items:center">
         <input id="ctrt-end-instalacao" type="text" placeholder="Rua, nº - Bairro - Cidade/UF"
           style="flex:1;background:var(--input);border:1px solid var(--border);
@@ -12270,15 +12270,15 @@ function _formGerarContrato() {
           style="background:none;border:1px solid var(--border);color:var(--muted);
           padding:4px 8px;border-radius:4px;cursor:pointer;font-size:.8rem">= Cliente</button>
       </div>
-      <label style="font-size:.85rem">Entrada (R$)</label>
+      <label style="font-size:var(--fs-sm)">Entrada (R$)</label>
       <input id="ctrt-entrada" type="number" value="0" min="0" step="100"
         style="background:var(--input);border:1px solid var(--border);
         color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
-      <label style="font-size:.85rem">Descrição das parcelas</label>
+      <label style="font-size:var(--fs-sm)">Descrição das parcelas</label>
       <input id="ctrt-parcelas" type="text" placeholder="ex: 10x de R$ 4.820,00"
         style="background:var(--input);border:1px solid var(--border);
         color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
-      <label style="font-size:.85rem">Adendo (opcional)</label>
+      <label style="font-size:var(--fs-sm)">Adendo (opcional)</label>
       <textarea id="ctrt-adendo" rows="3"
         style="background:var(--input);border:1px solid var(--border);
         color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem;resize:vertical"></textarea>
@@ -12325,11 +12325,11 @@ function abrirModalReverOrcamento() {
         Esta a&ccedil;&atilde;o requer autoriza&ccedil;&atilde;o de um Gerente ou Diretor.<br>
         O contrato atual ser&aacute; marcado como rascunho e o or&ccedil;amento poder&aacute; ser editado novamente.
       </p>
-      <label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:3px">Login do Gerente/Diretor</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Login do Gerente/Diretor</label>
       <input id="vt-login" type="text" autocomplete="off"
         style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);
         color:var(--fg);padding:7px;border-radius:4px;font-size:.9rem;margin-bottom:10px">
-      <label style="font-size:.82rem;color:var(--muted);display:block;margin-bottom:3px">Senha</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Senha</label>
       <input id="vt-senha" type="password"
         style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);
         color:var(--fg);padding:7px;border-radius:4px;font-size:.9rem;margin-bottom:6px">
@@ -12505,7 +12505,7 @@ function _campo(id, label, valor, tipo, placeholder, obrigatorio) {
   const vazio = !valor || valor === '';
   return `
     <div style="margin-bottom:12px">
-      <label style="font-size:.8rem;display:block;margin-bottom:3px;color:${obrigatorio && vazio ? 'var(--err)' : 'var(--muted)'}">
+      <label style="font-size:var(--fs-sm);display:block;margin-bottom:3px;color:${obrigatorio && vazio ? 'var(--err)' : 'var(--muted)'}">
         ${label}${obrigatorio && vazio ? ' <span style="color:var(--err)">* obrigatório</span>' : ''}
       </label>
       <input id="${id}" type="${tipo||'text'}" value="${(valor||'').replace(/"/g,'&quot;')}"
@@ -12569,7 +12569,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
           Definida na negocia&ccedil;&atilde;o (somente leitura). Para alterar, volte &agrave; negocia&ccedil;&atilde;o.
         </p>
         <div style="margin-bottom:8px">
-          <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Entrada (R$)</label>
+          <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Entrada (R$)</label>
           <input id="apr-entrada" type="text" readonly
             value="${pagAtual.entrada > 0 ? 'R$ ' + pagAtual.entrada.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : ''}"
             placeholder="R$ 0,00"
@@ -12577,7 +12577,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
         </div>
         <div style="margin-bottom:8px">
-          <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Forma de Pagamento da Entrada</label>
+          <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Forma de Pagamento da Entrada</label>
           <select id="apr-forma-entrada" disabled
             style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
@@ -12591,7 +12591,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
           </select>
         </div>
         <div style="margin-bottom:8px">
-          <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Forma das Parcelas</label>
+          <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Forma das Parcelas</label>
           <select id="apr-forma-parcelas" disabled
             style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);
             color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;opacity:.75;cursor:not-allowed">
@@ -12603,7 +12603,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
           </select>
         </div>
         <div>
-          <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Descri&ccedil;&atilde;o das parcelas</label>
+          <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Descri&ccedil;&atilde;o das parcelas</label>
           <input id="apr-parcelas" type="text" readonly value="${pagAtual.descricao.replace(/"/g,'&quot;')}"
             placeholder="ex: 10x de R$ 4.820,00"
             style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);
@@ -12612,7 +12612,7 @@ function abrirModalAprovacaoOrcamento(cliente, pagAtual) {
       </div>
 
       <div style="margin-bottom:16px">
-        <label style="font-size:.8rem;color:var(--muted);display:block;margin-bottom:3px">Adendo (opcional)</label>
+        <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Adendo (opcional)</label>
         <textarea id="apr-adendo" rows="2"
           style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);
           color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem;resize:vertical"></textarea>
@@ -12781,7 +12781,7 @@ async function coletarSignatarioOverride() {
       <div style="background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:22px 26px;min-width:340px;max-width:520px;width:92%;margin:auto">
         <h3 style="margin:0 0 12px;color:var(--accent);font-size:1rem">Dados do signatário (contrato)</h3>
         ${campos.map(([k,lbl]) => `
-          <label style="display:block;font-size:.75rem;color:var(--muted);margin:6px 0 2px">${lbl}</label>
+          <label style="display:block;font-size:var(--fs-sm);color:var(--muted);margin:6px 0 2px">${lbl}</label>
           <input id="sigov-${k}" value="${(base[k]||'').toString().replace(/"/g,'&quot;')}"
             style="width:100%;background:var(--input);border:1px solid var(--border);color:var(--fg);padding:7px;border-radius:4px;font-size:.88rem">
         `).join('')}
@@ -12807,10 +12807,10 @@ function abrirModalAssinatura(parte) {
   overlay.innerHTML = `
     <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:24px;min-width:360px;max-width:480px">
       <h4 style="margin:0 0 16px">Assinar como: <strong>${parte}</strong></h4>
-      <label style="font-size:.85rem">Nome completo</label>
+      <label style="font-size:var(--fs-sm)">Nome completo</label>
       <input id="sig-nome" type="text" placeholder="Nome completo"
         style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
-      <label style="font-size:.85rem">CPF</label>
+      <label style="font-size:var(--fs-sm)">CPF</label>
       <input id="sig-cpf" type="text" placeholder="000.000.000-00"
         style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);color:var(--fg);padding:8px;border-radius:4px;margin:4px 0 12px;font-size:.85rem">
       <label style="display:flex;gap:8px;align-items:center;margin-bottom:16px;font-size:.85rem">
@@ -13229,7 +13229,7 @@ function bfFechar() {
       </div>
       <span onclick="tfFecharModalSenha()" style="cursor:pointer;color:var(--muted);font-size:18px;margin-left:auto;line-height:1">&#x2715;</span>
     </div>
-    <label style="font-size:9px;color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:6px">SENHA DO GERENTE</label>
+    <label style="font-size:var(--fs-sm);color:var(--muted);letter-spacing:.5px;display:block;margin-bottom:6px">SENHA DO GERENTE</label>
     <input type="password" id="modal-senha-input" placeholder="Digite a senha"
            style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;
                   padding:9px 12px;color:var(--text);font-family:var(--font-mono);
@@ -13291,16 +13291,16 @@ function bfFechar() {
     <!-- Seção 1: Identificação -->
     <div style="color:var(--accent);font-weight:600;margin-bottom:8px;margin-top:4px;">1. Identificação</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      <div><label style="font-size:12px;color:var(--muted)">Data do atendimento (auto)</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Data do atendimento (auto)</label>
         <input id="bf-data" type="date" readonly style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);box-sizing:border-box;"></div>
-      <div><label style="font-size:12px;color:var(--muted)">Consultor responsável</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Consultor responsável</label>
         <input id="bf-consultor" type="text" readonly style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--muted);box-sizing:border-box;"></div>
     </div>
 
     <!-- Seção 2: Empreendimento -->
     <div style="color:var(--accent);font-weight:600;margin-bottom:8px;">2. Empreendimento</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-      <div><label style="font-size:12px;color:var(--muted)">Tipo de imóvel *</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Tipo de imóvel *</label>
         <select id="bf-tipo-imovel" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
           <option value="">Selecione...</option>
           <option value="apartamento">Apartamento</option>
@@ -13309,7 +13309,7 @@ function bfFechar() {
           <option value="loja">Loja / Varejo</option>
           <option value="outro">Outro</option>
         </select></div>
-      <div><label style="font-size:12px;color:var(--muted)">Condição do imóvel</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Condição do imóvel</label>
         <select id="bf-condicao" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
           <option value="">Selecione...</option>
           <option value="novo">Novo (em construção / na planta)</option>
@@ -13319,27 +13319,27 @@ function bfFechar() {
         </select></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
-      <div><label style="font-size:12px;color:var(--muted)">Metragem (m²)</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Metragem (m²)</label>
         <input id="bf-metragem" type="number" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);box-sizing:border-box;"></div>
-      <div><label style="font-size:12px;color:var(--muted)">Nº de ambientes</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Nº de ambientes</label>
         <input id="bf-num-ambientes" type="number" min="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);box-sizing:border-box;"></div>
     </div>
-    <div style="margin-bottom:8px;"><label style="font-size:12px;color:var(--muted)">Ambientes prioritários</label>
+    <div style="margin-bottom:8px;"><label style="font-size:var(--fs-sm);color:var(--muted)">Ambientes prioritários</label>
       <textarea id="bf-amb-prioritarios" rows="2" placeholder="Ex: cozinha, dormitório master, escritório..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);resize:vertical;box-sizing:border-box;"></textarea></div>
-    <div style="margin-bottom:16px;"><label style="font-size:12px;color:var(--muted)">Endereço do empreendimento</label>
+    <div style="margin-bottom:16px;"><label style="font-size:var(--fs-sm);color:var(--muted)">Endereço do empreendimento</label>
       <input id="bf-end-emp" type="text" placeholder="Rua, número, bairro, cidade, CEP" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);box-sizing:border-box;"></div>
 
     <!-- Seção 3: Perfil do Cliente -->
     <div style="color:var(--accent);font-weight:600;margin-bottom:8px;">3. Perfil do Cliente</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      <div><label style="font-size:12px;color:var(--muted)">Decisor final</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Decisor final</label>
         <select id="bf-decisor" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
           <option value="">Selecione...</option>
           <option value="cliente">Cliente</option>
           <option value="arquiteto">Arquiteto</option>
           <option value="socio">Sócio</option>
         </select></div>
-      <div><label style="font-size:12px;color:var(--muted)">Experiência anterior</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Experiência anterior</label>
         <select id="bf-experiencia" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
           <option value="">Selecione...</option>
           <option value="primeira_vez">Primeira vez</option>
@@ -13352,7 +13352,7 @@ function bfFechar() {
     <!-- Seção 4: Proposta e Budget -->
     <div style="color:var(--accent);font-weight:600;margin-bottom:8px;">4. Proposta e Budget</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      <div><label style="font-size:12px;color:var(--muted)">Categoria de proposta *</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Categoria de proposta *</label>
         <select id="bf-categoria" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
           <option value="">Selecione...</option>
           <option value="essencial">Essencial</option>
@@ -13360,16 +13360,16 @@ function bfFechar() {
           <option value="exclusiva">Exclusiva</option>
           <option value="atelier">Atelier</option>
         </select></div>
-      <div><label style="font-size:12px;color:var(--muted)">Budget estimado (R$) *</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Budget estimado (R$) *</label>
         <input id="bf-budget" type="number" min="0" step="1000" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);box-sizing:border-box;"></div>
     </div>
 
     <!-- Seção 5: Prazo -->
     <div style="color:var(--accent);font-weight:600;margin-bottom:8px;">5. Prazo</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
-      <div><label style="font-size:12px;color:var(--muted)">Data desejada para entrega *</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Data desejada para entrega *</label>
         <input id="bf-data-entrega" type="date" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);box-sizing:border-box;"></div>
-      <div><label style="font-size:12px;color:var(--muted)">Flexibilidade de prazo *</label>
+      <div><label style="font-size:var(--fs-sm);color:var(--muted)">Flexibilidade de prazo *</label>
         <select id="bf-flexibilidade" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);">
           <option value="">Selecione...</option>
           <option value="rigido">Rígido</option>
@@ -13380,11 +13380,11 @@ function bfFechar() {
 
     <!-- Seção 6: Observações -->
     <div style="color:var(--accent);font-weight:600;margin-bottom:8px;">6. Observações Gerais</div>
-    <div style="margin-bottom:8px;"><label style="font-size:12px;color:var(--muted)">Itens que não abre mão</label>
+    <div style="margin-bottom:8px;"><label style="font-size:var(--fs-sm);color:var(--muted)">Itens que não abre mão</label>
       <textarea id="bf-nao-abre-mao" rows="2" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);resize:vertical;box-sizing:border-box;"></textarea></div>
-    <div style="margin-bottom:8px;"><label style="font-size:12px;color:var(--muted)">Restrições ou pontos de atenção</label>
+    <div style="margin-bottom:8px;"><label style="font-size:var(--fs-sm);color:var(--muted)">Restrições ou pontos de atenção</label>
       <textarea id="bf-restricoes" rows="2" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);resize:vertical;box-sizing:border-box;"></textarea></div>
-    <div style="margin-bottom:16px;"><label style="font-size:12px;color:var(--muted)">Observações livres do consultor</label>
+    <div style="margin-bottom:16px;"><label style="font-size:var(--fs-sm);color:var(--muted)">Observações livres do consultor</label>
       <textarea id="bf-obs-livres" rows="3" placeholder="Impressões, contexto familiar..." style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--card);color:var(--text);resize:vertical;box-sizing:border-box;"></textarea></div>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;">

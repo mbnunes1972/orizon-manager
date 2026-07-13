@@ -70,7 +70,8 @@ section>h2{font-size:var(--fs-h2);font-weight:600;margin-bottom:var(--sp-2)}
 .field{display:flex;flex-direction:column;gap:6px;min-width:220px}
 .field label{font-size:var(--fs-sm);font-weight:500;color:var(--text-2)}
 .field .input{width:100%}
-.input,select.input{height:var(--control-h);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font:inherit;font-size:var(--fs-body);transition:all var(--t-fast)}
+.input,select.input{height:var(--control-h);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);font:inherit;font-size:var(--fs-body);transition:all var(--t-fast)}
+.input:hover{border-color:var(--field-border-hover)}
 .field.w-xs{min-width:0;width:var(--field-xs)}
 .field.w-sm{min-width:0;width:var(--field-sm)}
 .field.w-md{min-width:0;width:var(--field-md)}
@@ -81,11 +82,25 @@ section>h2{font-size:var(--fs-h2);font-weight:600;margin-bottom:var(--sp-2)}
 .input.w-md{width:var(--field-md)}
 .input.w-lg{width:var(--field-lg)}
 
+/* ====== Campo com rótulo flutuante (padrão de formulários densos) ====== */
+.field-float{position:relative}
+.field-float .input{width:100%;height:var(--control-h-float);padding:20px var(--sp-3) 6px}
+.field-float label{position:absolute;top:7px;left:var(--sp-3);font-size:var(--fs-xs);color:var(--text-3);pointer-events:none;letter-spacing:.01em}
+.field-float .input.readonly{background:var(--surface-2);color:var(--text-2);cursor:default}
+.field-float .calc-flag{position:absolute;top:6px;right:var(--sp-3);font-size:var(--fs-xs);color:var(--text-3)}
+
+/* ====== Linha de Total (tamanho único de valor, use em todo lugar) ====== */
+.total-line{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-4);padding:var(--sp-3) var(--sp-4)}
+.total-line .label{font-size:var(--fs-body);font-weight:600;color:var(--text)}
+.total-line .value{font-family:var(--font-mono);font-size:var(--fs-h3);font-weight:700;color:var(--text)}
+.total-line.emphasis{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.total-line .value .cur{font-size:var(--fs-sm);font-weight:500;color:var(--text-2);margin-right:4px}
+
 /* ====== Barra de Filtros (template) ====== */
 .filter-bar{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--sp-3);box-shadow:var(--shadow)}
 .filter-bar .flex-search{flex:1 1 220px;min-width:180px}
 .filter-bar .push-right{margin-left:auto}
-.range-group{display:inline-flex;height:var(--control-h);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;align-items:center;transition:all var(--t-fast)}
+.range-group{display:inline-flex;height:var(--control-h);background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);overflow:hidden;align-items:center;transition:all var(--t-fast)}
 .range-group:focus-within{border-color:var(--accent);box-shadow:var(--focus-ring)}
 .range-group .input{border:0;height:100%;background:transparent;border-radius:0;width:110px}
 .range-group.compact .input{width:96px}
@@ -173,7 +188,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
 <header class="guide-header">
   <div>
     <h1>Orizon Manager — Design System</h1>
-    <div class="sub">tokens.css v1.5 · cobre unificado nos dois temas (areia no claro, carvão no escuro) · repo <code>orizon-manager</code></div>
+    <div class="sub">tokens.css v1.7 · rótulo flutuante · linha de total unificada · repo <code>orizon-manager</code></div>
   </div>
   <div class="theme-toggle" role="group" aria-label="Tema">
     <button id="btn-light" class="active" onclick="setTheme('light')">☀ Claro</button>
@@ -287,6 +302,51 @@ table.tbl{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
       </div>
     </div>
     <p class="hint">Taxonomia por papel: <b>Ação</b> (muda dados → botão) · <b>Entrada</b> (coleta dados → campo) · <b>Indicador</b> (só informa → badge, alerta, KPI) · <b>Navegação</b> (move você → aba, sidebar, status selector). Cada família usa exclusivamente a sua escala.</p>
+  </div>
+</section>
+
+<!-- ============ 4c. CAMPO COM RÓTULO FLUTUANTE ============ -->
+<section>
+  <div class="eyebrow">04c · Componentes</div>
+  <h2>Campo com rótulo flutuante</h2>
+  <div class="rule"><span>⚑</span><span><strong>Regra geral (v1.7):</strong> em formulários densos (condições de pagamento, tabelas de dados, telas com muitos campos), o rótulo vive <strong>dentro</strong> do campo, no canto superior esquerdo — não mais acima dele. Isso corta a altura de cada linha quase pela metade sem perder legibilidade. Campos calculados (somente leitura) usam fundo <code>--surface-2</code> e a etiqueta "calculado" no canto oposto.</span></div>
+  <div class="panel">
+    <div class="row" style="align-items:flex-start;margin-bottom:var(--sp-5)">
+      <div class="field-float" style="width:220px"><label>Valor da entrada</label><input class="input" placeholder="R$ 0"></div>
+      <div class="field-float" style="width:220px"><label>Data da entrada</label><input class="input" placeholder="dd/mm/aaaa"></div>
+      <div class="field-float" style="width:220px"><label>Valor da liquidação</label><span class="calc-flag">calculado</span><input class="input readonly" value="R$ 22.704,23" readonly></div>
+    </div>
+
+    <p class="hint" style="margin-bottom:var(--sp-2)"><b>Aplicado: Condição de Pagamento — À Vista</b>, reorganizada de 3 para 2 linhas.</p>
+    <div class="stack" style="max-width:720px">
+      <div class="row">
+        <div class="field-float" style="flex:1"><label>Data da entrada</label><input class="input" placeholder="dd/mm/aaaa"></div>
+        <div class="field-float" style="flex:1"><label>Valor da entrada</label><input class="input" placeholder="R$ 0"></div>
+        <div class="field-float" style="flex:1"><label>Forma da entrada</label><select class="input"><option>Selecionar…</option><option>Pix</option><option>Cartão</option></select></div>
+      </div>
+      <div class="row">
+        <div class="field-float" style="flex:1"><label>Data da liquidação</label><input class="input" placeholder="dd/mm/aaaa"></div>
+        <div class="field-float" style="flex:1"><label>Valor da liquidação</label><span class="calc-flag" style="right:auto;left:var(--sp-3);top:auto;bottom:6px;font-size:9px">contrato − entrada</span><input class="input readonly" value="R$ 214.150,32" readonly style="padding-top:20px"></div>
+        <div class="field-float" style="flex:1"><label>Forma da liquidação</label><select class="input"><option>Selecionar…</option><option>Boleto</option><option>Transferência</option></select></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7c. LINHA DE TOTAL ============ -->
+<section>
+  <div class="eyebrow">07c · Templates</div>
+  <h2>Linha de Total</h2>
+  <div class="rule"><span>⚑</span><span><strong>Regra:</strong> o valor de uma Linha de Total tem <strong>um único tamanho</strong> (<code>--fs-h3</code>, mono, bold) em qualquer contexto — resumo compacto ou box de destaque final. Nunca dois tamanhos de "total" na mesma tela.</span></div>
+  <div class="stack">
+    <div class="total-line" style="border-bottom:1px solid var(--border)">
+      <span class="label">Total</span>
+      <span class="value"><span class="cur">R$</span>236.854,55</span>
+    </div>
+    <div class="total-line emphasis">
+      <span class="label">Total do Contrato</span>
+      <span class="value"><span class="cur">R$</span>236.854,55</span>
+    </div>
   </div>
 </section>
 
