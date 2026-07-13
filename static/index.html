@@ -10977,6 +10977,13 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
 
 function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
   const concluido = dados.status === 'concluido';
+  // Fatia 1 (spec §5/§6): espelho READ-ONLY da comparação de PE + reconciliação estimada
+  // na Aprovação Financeira (11d) — só referência gerencial, não lança nada. Reusa peComparacaoRender.
+  const peEspelho = (codigo === '11d') ? `
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <button class="btn-ciclo" onclick="peComparacaoRender()"><i class="ti ti-arrows-diff"></i> Comparar valores dos ambientes (PE) — referência</button>
+      <div id="pe-cmp-container" style="margin-top:12px"></div>
+    </div>` : '';
   const _btnProvisoes = `<button onclick="abrirProvisoes(_orcamentoAtivoId)"
     style="background:none;border:1px solid var(--border2);color:var(--ok);
     border-radius:6px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
@@ -10998,7 +11005,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
       </p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         ${reabrir}${_btnProvisoes}
-      </div>`;
+      </div>${peEspelho}`;
   }
   if (bloqueada) {
     return `
@@ -11007,7 +11014,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
       </p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         ${_btnProvisoes}
-      </div>`;
+      </div>${peEspelho}`;
   }
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px">
@@ -11020,7 +11027,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
         &#x2713; Aprovar (gerencial)
       </button>
       ${_btnProvisoes}
-    </div>`;
+    </div>${peEspelho}`;
 }
 
 async function concluirAprovacaoFinanceira(codigo) {
@@ -11534,43 +11541,53 @@ async function peComparacaoRender(){
   if(!j.ok){ cont.innerHTML = `<span style="color:var(--err)">${esc(j.erro||'Erro')}</span>`; return; }
   const fmt = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const sig = v => (v>0?'+':'') + fmt(v);
+  const fmtN = v => Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  // --- Tabela de comparação de CFO (componente .tbl do design system) ---
   const cmpRows = j.comparacao.map(l => {
-    const dCor = l.diferenca>0.005?'var(--err)':(l.diferenca<-0.005?'var(--ok)':'var(--muted)');
-    const pe  = l.pe_carregado ? `<span style="font-family:var(--font-mono)">${fmt(l.cfo_pe)}</span>`
-              : `<span style="color:var(--muted);font-size:.72rem">PE não carregado</span>`;
-    const dif = l.pe_carregado ? `<span style="font-family:var(--font-mono);color:${dCor}">${sig(l.diferenca)}</span>` : '—';
-    const up  = `<label class="btn-ciclo" style="font-size:.7rem;padding:2px 8px;cursor:pointer"><i class="ti ti-upload"></i> PE`
+    const dCor = l.diferenca>0.005?'var(--err)':(l.diferenca<-0.005?'var(--ok)':'var(--text-3)');
+    const pe  = l.pe_carregado ? fmt(l.cfo_pe)
+              : `<span style="color:var(--text-3);font-size:var(--fs-xs)">PE não carregado</span>`;
+    const dif = l.pe_carregado ? `<span style="color:${dCor}">${sig(l.diferenca)}</span>` : '—';
+    const up  = `<label class="btn-ciclo" style="font-size:var(--fs-xs);padding:2px 8px;cursor:pointer"><i class="ti ti-upload"></i> PE`
               + `<input type="file" accept=".xml" style="display:none" onchange="pePeUpload(${l.pool_ambiente_id}, this)"></label>`;
-    return `<tr style="border-top:1px solid var(--border);font-size:.8rem"><td style="padding:5px 8px">${esc(l.ambiente)}</td>`
-         + `<td style="padding:5px 8px;text-align:right;font-family:var(--font-mono)">${fmt(l.cfo_original)}</td>`
-         + `<td style="padding:5px 8px;text-align:right">${pe}</td>`
-         + `<td style="padding:5px 8px;text-align:right">${dif}</td>`
-         + `<td style="padding:5px 8px;text-align:right">${up}</td></tr>`;
+    return `<tr><td>${esc(l.ambiente)}</td>`
+         + `<td class="num">${fmt(l.cfo_original)}</td>`
+         + `<td class="num">${pe}</td>`
+         + `<td class="num">${dif}</td>`
+         + `<td style="text-align:right">${up}</td></tr>`;
   }).join('');
-  const cmpTable = `<table style="width:100%;border-collapse:collapse">`
-    + `<thead><tr style="font-size:.66rem;color:var(--muted);text-transform:uppercase">`
-    + `<th style="text-align:left;padding:5px 8px">Ambiente</th><th style="text-align:right;padding:5px 8px">CFO venda</th>`
-    + `<th style="text-align:right;padding:5px 8px">CFO PE</th><th style="text-align:right;padding:5px 8px">Δ custo</th>`
-    + `<th style="text-align:right;padding:5px 8px">Carregar</th></tr></thead><tbody>${cmpRows}</tbody></table>`;
+  const cmpTable = `<div class="table-wrap"><table class="tbl"><thead><tr>`
+    + `<th>Ambiente</th><th style="text-align:right">CFO venda</th>`
+    + `<th style="text-align:right">CFO PE</th><th style="text-align:right">Δ custo</th>`
+    + `<th style="text-align:right">Carregar</th></tr></thead><tbody>${cmpRows}</tbody></table></div>`;
+  // --- Reconciliação estimada (dashed --warn = estimativa gerencial, NÃO contábil · decisão #3) ---
   const re = j.reconciliacao_estimada;
   const reRows = re.linhas.map(l => {
-    const dCor = l.delta>0.005?'var(--err)':(l.delta<-0.005?'var(--ok)':'var(--muted)');
-    return `<tr style="border-top:1px solid var(--border);font-size:.78rem"><td style="padding:4px 8px">${esc(l.nome)}</td>`
-         + `<td style="padding:4px 8px;text-align:right;font-family:var(--font-mono)">${fmt(l.provisionado)}</td>`
-         + `<td style="padding:4px 8px;text-align:right;font-family:var(--font-mono)">${fmt(l.estimado)}</td>`
-         + `<td style="padding:4px 8px;text-align:right;font-family:var(--font-mono);color:${dCor}">${sig(l.delta)}</td></tr>`;
+    const dCor = l.delta>0.005?'var(--err)':(l.delta<-0.005?'var(--ok)':'var(--text-3)');
+    return `<tr><td>${esc(l.nome)}</td>`
+         + `<td class="num">${fmt(l.provisionado)}</td>`
+         + `<td class="num">${fmt(l.estimado)}</td>`
+         + `<td class="num" style="color:${dCor}">${sig(l.delta)}</td></tr>`;
   }).join('');
-  const mCor = re.delta_pct<-0.005?'var(--err)':(re.delta_pct>0.005?'var(--ok)':'var(--muted)');
-  const reBlock = `<div style="margin-top:14px;background:var(--surface-2);border:1px dashed var(--warn-line);border-radius:8px;padding:12px">`
-    + `<div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--warn);font-weight:700;margin-bottom:8px">`
-    + `<i class="ti ti-flask"></i> Reconciliação estimada — estimativa gerencial (não contábil)</div>`
-    + `<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px">`
-    + `<div><div style="font-size:.66rem;color:var(--muted);text-transform:uppercase">Contrato</div><div style="font-family:var(--font-mono);font-weight:700">${fmt(re.val_cont)}</div></div>`
-    + `<div><div style="font-size:.66rem;color:var(--muted);text-transform:uppercase">Margem contratada</div><div style="font-family:var(--font-mono)">${fmt(re.margem_contratada)} · ${re.margem_contratada_pct}%</div></div>`
-    + `<div><div style="font-size:.66rem;color:var(--muted);text-transform:uppercase">Margem estimada</div><div style="font-family:var(--font-mono);font-weight:700;color:${mCor}">${fmt(re.margem_estimada)} · ${re.margem_estimada_pct}% (${re.delta_pct>0?'+':''}${re.delta_pct} pts)</div></div></div>`
-    + `<table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:.64rem;color:var(--muted);text-transform:uppercase">`
-    + `<th style="text-align:left;padding:4px 8px">Rubrica</th><th style="text-align:right;padding:4px 8px">Provisionado</th>`
-    + `<th style="text-align:right;padding:4px 8px">Estimado</th><th style="text-align:right;padding:4px 8px">Δ</th></tr></thead><tbody>${reRows}</tbody></table></div>`;
+  const mCor = re.delta_pct<-0.005?'var(--err)':(re.delta_pct>0.005?'var(--ok)':'var(--text-2)');
+  const tCor = re.delta_total>0.005?'var(--err)':(re.delta_total<-0.005?'var(--ok)':'var(--text)');
+  const kpi = (lbl,val,extra='') => `<div style="flex:1;min-width:150px">`
+    + `<div style="font-size:var(--fs-xs);color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">${lbl}</div>`
+    + `<div style="font-family:var(--font-mono);font-size:var(--fs-h3);font-weight:700;${extra}">${val}</div></div>`;
+  const reBlock = `<div style="margin-top:var(--sp-4);background:var(--warn-soft);border:1px dashed var(--warn-line);border-radius:var(--radius-lg);padding:var(--sp-4)">`
+    + `<div style="font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--warn);font-weight:700;margin-bottom:var(--sp-3)">`
+    + `<i class="ti ti-flask"></i> Reconciliação estimada · estimativa gerencial (não contábil)</div>`
+    + `<div style="display:flex;gap:var(--sp-5);flex-wrap:wrap;margin-bottom:var(--sp-3)">`
+    + kpi('Valor de contrato', fmt(re.val_cont))
+    + kpi('Margem contratada', `${fmt(re.margem_contratada)} · ${re.margem_contratada_pct}%`)
+    + kpi('Margem estimada (após PEs)', `${fmt(re.margem_estimada)} · ${re.margem_estimada_pct}% <span style="font-size:var(--fs-sm)">(${re.delta_pct>0?'+':''}${re.delta_pct} pts)</span>`, `color:${mCor}`)
+    + `</div>`
+    + `<div class="table-wrap"><table class="tbl"><thead><tr>`
+    + `<th>Rubrica</th><th style="text-align:right">Provisionado</th>`
+    + `<th style="text-align:right">Estimado</th><th style="text-align:right">Δ</th></tr></thead><tbody>${reRows}</tbody></table></div>`
+    + `<div class="total-line emphasis" style="margin-top:var(--sp-3)"><span class="label">Δ total estimado (custo × contrato)</span>`
+    + `<span class="value" style="color:${tCor}"><span class="cur">R$</span>${fmtN(re.delta_total)}</span></div>`
+    + `</div>`;
   cont.innerHTML = cmpTable + reBlock;
 }
 async function pePeUpload(poolAmbienteId, inputFile){
