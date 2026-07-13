@@ -41,7 +41,7 @@ MODULOS = {
                     "arquivos": ["mod_orcamento_params.py", "mod_margens.py", "mod_negociacao.py",
                                  "mod_proposta.py", "mod_contrato.py", "mod_arvore.py",
                                  "contrato_editar.py", "_ler_aymore.py", "mod_fin",
-                                 "mod_pe_comparacao.py"],
+                                 "mod_pe_comparacao.py", "mod_parcelas.py"],
                     "tabelas": ["projetos_meta", "briefings", "pool_ambientes", "orcamentos",
                                 "orcamento_ambientes", "contratos", "contratos_assinaturas",
                                 "arquivo_pe", "parcela_projeto", "parcela_ambiente"],
