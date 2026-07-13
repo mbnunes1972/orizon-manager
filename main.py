@@ -18,7 +18,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente,
                        PerfilEmissao, CicloLogistico, CicloLogisticoTransicao, AssistenciaCaso,
                        Funcionario, Fornecedor, Terceiro, Funcao, FolhaPagamento,
-                       AtribuicaoAmbiente)
+                       AtribuicaoAmbiente, ArquivoPE)
 import mod_expedicao
 import mod_assistencias
 import mod_cadastro
@@ -61,6 +61,7 @@ import mod_tenancy
 import mod_arvore
 import mod_provisoes
 import mod_proposta
+import mod_pe_comparacao
 from mod_qualidade_xml import avaliar_qualidade_xml
 
 def _enriquecer_projetos_com_status(projetos):
@@ -709,6 +710,46 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 proj = (parse_qs(urlparse(self.path).query).get("projeto") or [None])[0]
                 self.send_json({"ok": True, "reconciliacao": mod_contabil.reconciliacao(db, ot, oid, projeto_id=proj)})
+            finally:
+                db.close()
+            return
+        m_pecmp = re.match(r'^/api/projetos/([^/]+)/pe/comparacao$', path)
+        if m_pecmp:
+            # Fatia 1 (desmembramento PE): comparação de CFO venda×PE + reconciliação ESTIMADA
+            # referenciada ao Val_Cont (#9, read-only, não lança). spec 2026-07-13.
+            nome = unquote(m_pecmp.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            import mod_contabil   # local (não é module-level); mod_tenancy/mod_pe_comparacao são globais
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                pool = (db.query(PoolAmbiente).filter_by(projeto_id=nome)
+                          .order_by(PoolAmbiente.id.asc()).all())
+                itens_cfo = [(pa.nome_exibicao or pa.nome, pa.order_total or 0.0) for pa in pool]
+                pa_nome = {pa.id: (pa.nome_exibicao or pa.nome) for pa in pool}
+                pes = db.query(ArquivoPE).filter_by(projeto_nome=nome, formato="xml_pe").all()
+                valores_pe = {pa_nome[a.pool_ambiente_id]: a.valor_atualizado
+                              for a in pes if a.valor_atualizado is not None and a.pool_ambiente_id in pa_nome}
+                linhas = mod_pe_comparacao.montar_comparacao_pe(itens_cfo, valores_pe)
+                delta_cfo = -mod_pe_comparacao.saldo_margem_estimado(linhas)
+                # reconciliação estimada (lê o razão só p/ exibir) + Val_Cont do contrato assinado
+                ot, oid = mod_contabil.resolver_owner(db, usuario)
+                rec = mod_contabil.reconciliacao(db, ot, oid, projeto_id=nome)
+                contrato = (db.query(Contrato).filter_by(projeto_nome=nome)
+                              .order_by(Contrato.id.desc()).first())
+                orc = db.get(Orcamento, contrato.orcamento_id) if contrato else None
+                val_cont = (orc.val_cont or 0.0) if orc else 0.0
+                rec_est = mod_pe_comparacao.reconciliacao_estimada(
+                    rec.get("provisoes", []), delta_cfo, val_cont)
+                self.send_json({"ok": True, "comparacao": linhas,
+                                "reconciliacao_estimada": rec_est})
             finally:
                 db.close()
             return
@@ -2391,6 +2432,62 @@ class Handler(BaseHTTPRequestHandler):
         body   = self.rfile.read(length) if length else b'{}'
 
         if handle_auth_post(self, path, body): return
+
+        m_peup = re.match(r'^/api/projetos/([^/]+)/pe/upload$', path)
+        if m_peup:
+            # Fatia 1 (desmembramento PE): upload de XML/Promob de PE FORA do pool (#2) — grava em
+            # arquivo_pe, NÃO toca pool_ambientes (não dispara _contrato_assinado). CFO extraído do XML (#4).
+            nome = unquote(m_peup.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()   # mod_tenancy/mod_pe_comparacao são module-level (não reimportar local)
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
+                if not arquivos:
+                    self.send_json({"ok": False, "erro": "Nenhum arquivo recebido"}); return
+                try:
+                    pool_ambiente_id = int(campos.get("pool_ambiente_id"))
+                except (TypeError, ValueError):
+                    self.send_json({"ok": False, "erro": "pool_ambiente_id ausente/inválido"}); return
+                pa = db.get(PoolAmbiente, pool_ambiente_id)
+                if pa is None or pa.projeto_id != nome:
+                    self.send_json({"ok": False, "erro": "Ambiente não pertence ao projeto"}, code=400); return
+                filename, conteudo = next(iter(arquivos.values()))
+                data = conteudo if isinstance(conteudo, (bytes, bytearray)) else str(conteudo).encode("utf-8")
+                is_xml  = str(filename).lower().endswith(".xml")
+                formato = "xml_pe" if is_xml else "promob_pe"
+                pe_dir = os.path.join(PROJETOS_DIR, nome, "pe", str(pool_ambiente_id))
+                os.makedirs(pe_dir, exist_ok=True)
+                dest = os.path.join(pe_dir, os.path.basename(str(filename)))
+                with open(dest, "wb") as f:
+                    f.write(data)
+                valor = None
+                if is_xml:
+                    try:
+                        valor = mod_pe_comparacao.extrair_cfo_pe(filename, data)
+                    except Exception as e:
+                        self.send_json({"ok": False, "erro": "XML de PE inválido: %s" % e}); return
+                reg = (db.query(ArquivoPE)
+                         .filter_by(projeto_nome=nome, pool_ambiente_id=pool_ambiente_id, formato=formato).first())
+                if reg is None:
+                    reg = ArquivoPE(projeto_nome=nome, pool_ambiente_id=pool_ambiente_id, formato=formato)
+                    db.add(reg)
+                reg.arquivo_path     = dest
+                reg.valor_atualizado = valor
+                reg.carregado_em     = datetime.utcnow()
+                reg.carregado_por_id = usuario.get("id")
+                db.commit()
+                self.send_json({"ok": True, "formato": formato, "valor_atualizado": valor})
+            finally:
+                db.close()
+            return
 
         # ── Expedição (Modulos_Orizon_v5, módulo 7): CicloLogistico — criar/mover/editar ──
         if path == "/api/expedicao/cards":

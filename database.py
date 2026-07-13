@@ -646,6 +646,8 @@ class CicloLogistico(Base):
     nfe_id         = Column(Integer, ForeignKey("documento_fiscal.id"), nullable=True)
     criado_em      = Column(DateTime, nullable=True)
     criado_por_id  = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    # Desmembramento parcial (spec 2026-07-13, Fatia 2): 1 linha por parcela; NULL = projeto-wide legado.
+    parcela_id     = Column(Integer,  ForeignKey("parcela_projeto.id"), nullable=True)
 
 
 class CicloLogisticoTransicao(Base):
@@ -658,6 +660,50 @@ class CicloLogisticoTransicao(Base):
     para_status        = Column(Text,     nullable=False)
     usuario_id         = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     quando             = Column(DateTime, nullable=True)
+
+
+# ── Desmembramento parcial na Revisão de PE (spec docs/superpowers/specs/2026-07-13-...) ────────
+
+class ParcelaProjeto(Base):
+    """Parcela = grupo de ambientes que percorre o ciclo (aprovação→entrega→NF-e) de forma
+    independente (decisão #1). Congela a fração do Val_Cont na criação (#5). Usada a partir da Fatia 2.
+    `saldo_margem_estimado` é DERIVADO (#9), recalculável de pool_ambientes + arquivo_pe — a coluna
+    existe só como cache opcional, nunca como fonte de verdade."""
+    __tablename__ = "parcela_projeto"
+    id                    = Column(Integer,  primary_key=True, autoincrement=True)
+    projeto_nome          = Column(Text,     nullable=False, index=True)   # nome_safe
+    ordem                 = Column(Integer,  nullable=False, default=1)     # maior ordem = "última" (#5)
+    status                = Column(String(16), nullable=False, default="aguardando")  # aguardando|em_aprovacao|liquidada
+    fracao_val_cont       = Column(Float,    nullable=False, default=0.0)   # congelada (#5)
+    val_cont_congelado    = Column(Float,    nullable=False, default=0.0)   # congelado (#5)
+    orcamento_id          = Column(Integer,  ForeignKey("orcamentos.id"), nullable=True)
+    saldo_margem_estimado = Column(Float,    nullable=True)   # cache opcional do derivado (#9)
+    criado_em             = Column(DateTime, default=datetime.utcnow)
+    criado_por_id         = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+
+
+class ParcelaAmbiente(Base):
+    """Membership N:N parcela ↔ ambiente do pool (#1)."""
+    __tablename__ = "parcela_ambiente"
+    parcela_id       = Column(Integer, ForeignKey("parcela_projeto.id"), primary_key=True)
+    pool_ambiente_id = Column(Integer, ForeignKey("pool_ambientes.id"),  primary_key=True)
+
+
+class ArquivoPE(Base):
+    """XML/Promob do Projeto Executivo — FORA do pool do orçamento (decisão #2). Documento de
+    comparação/liquidação: NÃO cria PoolAmbiente, NÃO vincula a orçamento, NÃO alimenta o motor →
+    não esbarra na trava `_contrato_assinado`. `valor_atualizado` = CFO/custo de fábrica extraído do
+    XML (Σ order_total), NÃO valor de venda (#4)."""
+    __tablename__ = "arquivo_pe"
+    id               = Column(Integer,  primary_key=True, autoincrement=True)
+    projeto_nome     = Column(Text,     nullable=False, index=True)   # nome_safe
+    pool_ambiente_id = Column(Integer,  ForeignKey("pool_ambientes.id"), nullable=False)  # a qual ambiente o PE se refere
+    formato          = Column(String(10), nullable=False)   # 'xml_pe' | 'promob_pe'
+    arquivo_path     = Column(Text,     nullable=True)
+    valor_atualizado = Column(Float,    nullable=True)       # CFO do PE (só p/ 'xml_pe'); null = não carregado
+    carregado_em     = Column(DateTime, default=datetime.utcnow)
+    carregado_por_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    __table_args__ = (UniqueConstraint("projeto_nome", "pool_ambiente_id", "formato", name="uq_arquivo_pe"),)
 
 
 class AssistenciaCaso(Base):
@@ -1010,6 +1056,11 @@ def _migrar_colunas():
             cur.execute("ALTER TABLE projetos_meta ADD COLUMN loja_id INTEGER")
         if "criado_por_id" not in prj_cols:
             cur.execute("ALTER TABLE projetos_meta ADD COLUMN criado_por_id INTEGER")
+
+        # ── ciclo_logistico (desmembramento parcial, spec 2026-07-13) ──────────
+        cur.execute("PRAGMA table_info(ciclo_logistico)")
+        if "parcela_id" not in {row[1] for row in cur.fetchall()}:
+            cur.execute("ALTER TABLE ciclo_logistico ADD COLUMN parcela_id INTEGER")
 
         # ── contratos ─────────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(contratos)")
