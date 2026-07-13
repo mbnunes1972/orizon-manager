@@ -221,6 +221,11 @@ por checagem de coluna; criação das 3 tabelas via `Base.metadata.create_all`.
 ## 5. Fatiamento (cada fatia entregável e testável sozinha)
 
 ### Fatia 1 — Comparação de CFO + reconciliação ESTIMADA (read-only) *(NÃO toca contabilidade nem ciclo)* ← entregar primeiro
+> ✅ **IMPLEMENTADA e mergeada na `main` (2026-07-13, Sessão 75).** UI no padrão design system v1.7
+> (`.tbl`, `.total-line.emphasis`, tokens). Backend puro (`mod_pe_comparacao.py`) + endpoints + `ArquivoPE`;
+> 11c com comparação + reconciliação estimada, espelho read-only na 11d. Vera: invariantes §6 OK, suíte 958
+> verde, read-only confirmado no banco. As tabelas de parcela foram criadas (dormentes) para a Fatia 2.
+
 Escopo: tabela `arquivo_pe`; extrator de **CFO** do XML-PE (Σ order_total, #4); endpoints de upload
 (fora do pool) e de comparação; UI na 11c ("Carregar XMLs atualizados", "Comparar valores dos
 ambientes" + tabela ambiente | CFO venda | CFO PE | Δ); a **reconciliação estimada** referenciada ao

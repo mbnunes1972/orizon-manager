@@ -2060,6 +2060,38 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 75 — Design system v1.7 (rótulo flutuante + Linha de Total) + Fatia 1 do desmembramento de PE (mergeada)
+
+Ordem de trabalho em 5 passos (usuário ausente). Fechados os passos 1 e 2, ambos na `main`.
+
+**Passo 1 — Design v1.7 na `main` (`d801e86`).** Aplicados os 3 itens canônicos do
+`design-system/orizon-styleguide.html` (04c/07c) + `orizon-tokens.css` changelog v1.7:
+- `.field-float` (rótulo estático DENTRO do campo, `--control-h-float` 52px) e `.total-line`
+  (valor num tamanho ÚNICO `--fs-h3` mono; `.emphasis` = box) adicionados ao `orizon-components.css`.
+- Painel **À Vista** (Negociação) migrado de `.mod-grid` 3×2 → padrão 04c: 2 linhas (Entrada /
+  Liquidação), Valor da liquidação como campo calculado readonly (`--surface-2` + etiqueta "calculado").
+- **"Total do Contrato"** migrado de `.total-contract` (valor 22px) → `.total-line.emphasis`; CSS órfão removido.
+- Vera (revisão estática): 🔴 especificidade — `.field-float .input` passou a declarar background/fonte
+  (0,2,0) p/ vencer a global legada `input[type=…]` (0,1,1); 🟡 `negTotalConfirmar` não força mais verde.
+  Ambos corrigidos. Deixado como follow-on: os outros 4 painéis de pagamento (Aymoré/Cartão/VP/TF) e as
+  KPI-tiles do fluxo seguem no padrão antigo; contraste de `--text-3` no rótulo (~3,4:1) é token canônico
+  do styleguide (decisão de design system do usuário, não alterado).
+
+**Passo 2 — Fatia 1 do desmembramento (spec `2026-07-13-desmembramento-pe-parcial-design.md`, mergeada na `main`).**
+Backend já pronto (`mod_pe_comparacao.py` puro + `ArquivoPE` + endpoints `GET .../pe/comparacao`, `POST
+.../pe/upload`; tabelas de parcela criadas mas **dormentes** até a Fatia 2). UI **nascida no padrão v1.7**:
+- **11c (Revisão de PE):** comparação de CFO por ambiente (venda × PE × Δ, `.tbl`) + upload de XML por
+  ambiente + painel "Reconciliação estimada" (dashed `--warn` = estimativa gerencial, NÃO contábil; KPIs de
+  margem contratada×estimada em R$ e %; rubricas Provisionado×Estimado×Δ; `.total-line.emphasis` no Δ total).
+- **11d (Aprovação Financeira):** espelho READ-ONLY da mesma comparação (spec §5/§6 "+ botão espelho em 11d").
+- Só a rubrica Custo de Fábrica (`2.1.04.06`) se move na Fatia 1 (decisão #4/#9); é snapshot puro, não lança
+  no razão. Vera: endpoint com `pool_ambiente_id` OK, invariantes §6 OK, **suíte 958 verde**, read-only
+  confirmado no banco. O único 🟠 (faltava o espelho 11d) foi fechado antes do merge.
+
+Pendente da ordem: passo 3 (Fatia 2 — ciclo, branch `feat/desmembramento-fatia2-ciclo`), passo 4 (Fatia 3 —
+contabilidade, branch a partir da Fatia 2), passo 5 (e2e da Vera). Fatia 2/3 ficam nas branches aguardando
+aprovação do usuário (não mergear).
+
 ## Sessão 74 — Faxina: verde hardcoded (painel de testes) + emojis nativos → ícones Tabler
 - **Verde puro fora do design system:** achado num `teste_financeiro_v4.html` — **painel de testes standalone**
   (paleta própria: monospace, laranja legado `#e8611a`, teal `#19c9a0`; não referenciado pelo produto, não
