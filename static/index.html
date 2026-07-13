@@ -10977,6 +10977,13 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
 
 function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
   const concluido = dados.status === 'concluido';
+  // Fatia 1 (spec §5/§6): espelho READ-ONLY da comparação de PE + reconciliação estimada
+  // na Aprovação Financeira (11d) — só referência gerencial, não lança nada. Reusa peComparacaoRender.
+  const peEspelho = (codigo === '11d') ? `
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <button class="btn-ciclo" onclick="peComparacaoRender()"><i class="ti ti-arrows-diff"></i> Comparar valores dos ambientes (PE) — referência</button>
+      <div id="pe-cmp-container" style="margin-top:12px"></div>
+    </div>` : '';
   const _btnProvisoes = `<button onclick="abrirProvisoes(_orcamentoAtivoId)"
     style="background:none;border:1px solid var(--border2);color:var(--ok);
     border-radius:6px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
@@ -10998,7 +11005,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
       </p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         ${reabrir}${_btnProvisoes}
-      </div>`;
+      </div>${peEspelho}`;
   }
   if (bloqueada) {
     return `
@@ -11007,7 +11014,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
       </p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         ${_btnProvisoes}
-      </div>`;
+      </div>${peEspelho}`;
   }
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px">
@@ -11020,7 +11027,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
         &#x2713; Aprovar (gerencial)
       </button>
       ${_btnProvisoes}
-    </div>`;
+    </div>${peEspelho}`;
 }
 
 async function concluirAprovacaoFinanceira(codigo) {
@@ -11505,13 +11512,97 @@ function _renderCardPE(codigo, dados, bloqueada) {
        </label>`
     : '';
 
+  // Fatia 1 (desmembramento): na Revisão de PE (11c), comparação de CFO venda×PE + reconciliação
+  // estimada (read-only, "estimativa gerencial"). spec 2026-07-13 §6/#9.
+  const peCmpBlock = (codigo === '11c') ? `
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <button class="btn-ciclo" onclick="peComparacaoRender()"><i class="ti ti-arrows-diff"></i> Comparar valores dos ambientes (PE)</button>
+      <div id="pe-cmp-container" style="margin-top:12px"></div>
+    </div>` : '';
   return `${docsHtml}${revisHtml}
     <div style="font-size:.82rem;margin-bottom:10px">${statusLabel}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       ${btnCarregar}
       ${btnFechar}
       ${btnRevisao}
-    </div>`;
+    </div>${peCmpBlock}`;
+}
+
+// ── Fatia 1 — comparação de CFO (venda × PE) + reconciliação estimada (read-only) ──────────────
+async function peComparacaoRender(){
+  if(!projetoAtivo) return;
+  const cont = document.getElementById('pe-cmp-container');
+  if(!cont) return;
+  cont.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Carregando…</span>';
+  let j;
+  try { j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/comparacao`,
+                        {credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ cont.innerHTML = '<span style="color:var(--err)">Erro ao carregar.</span>'; return; }
+  if(!j.ok){ cont.innerHTML = `<span style="color:var(--err)">${esc(j.erro||'Erro')}</span>`; return; }
+  const fmt = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const sig = v => (v>0?'+':'') + fmt(v);
+  const fmtN = v => Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  // --- Tabela de comparação de CFO (componente .tbl do design system) ---
+  const cmpRows = j.comparacao.map(l => {
+    const dCor = l.diferenca>0.005?'var(--err)':(l.diferenca<-0.005?'var(--ok)':'var(--text-3)');
+    const pe  = l.pe_carregado ? fmt(l.cfo_pe)
+              : `<span style="color:var(--text-3);font-size:var(--fs-xs)">PE não carregado</span>`;
+    const dif = l.pe_carregado ? `<span style="color:${dCor}">${sig(l.diferenca)}</span>` : '—';
+    const up  = `<label class="btn-ciclo" style="font-size:var(--fs-xs);padding:2px 8px;cursor:pointer"><i class="ti ti-upload"></i> PE`
+              + `<input type="file" accept=".xml" style="display:none" onchange="pePeUpload(${l.pool_ambiente_id}, this)"></label>`;
+    return `<tr><td>${esc(l.ambiente)}</td>`
+         + `<td class="num">${fmt(l.cfo_original)}</td>`
+         + `<td class="num">${pe}</td>`
+         + `<td class="num">${dif}</td>`
+         + `<td style="text-align:right">${up}</td></tr>`;
+  }).join('');
+  const cmpTable = `<div class="table-wrap"><table class="tbl"><thead><tr>`
+    + `<th>Ambiente</th><th style="text-align:right">CFO venda</th>`
+    + `<th style="text-align:right">CFO PE</th><th style="text-align:right">Δ custo</th>`
+    + `<th style="text-align:right">Carregar</th></tr></thead><tbody>${cmpRows}</tbody></table></div>`;
+  // --- Reconciliação estimada (dashed --warn = estimativa gerencial, NÃO contábil · decisão #3) ---
+  const re = j.reconciliacao_estimada;
+  const reRows = re.linhas.map(l => {
+    const dCor = l.delta>0.005?'var(--err)':(l.delta<-0.005?'var(--ok)':'var(--text-3)');
+    return `<tr><td>${esc(l.nome)}</td>`
+         + `<td class="num">${fmt(l.provisionado)}</td>`
+         + `<td class="num">${fmt(l.estimado)}</td>`
+         + `<td class="num" style="color:${dCor}">${sig(l.delta)}</td></tr>`;
+  }).join('');
+  const mCor = re.delta_pct<-0.005?'var(--err)':(re.delta_pct>0.005?'var(--ok)':'var(--text-2)');
+  const tCor = re.delta_total>0.005?'var(--err)':(re.delta_total<-0.005?'var(--ok)':'var(--text)');
+  const kpi = (lbl,val,extra='') => `<div style="flex:1;min-width:150px">`
+    + `<div style="font-size:var(--fs-xs);color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">${lbl}</div>`
+    + `<div style="font-family:var(--font-mono);font-size:var(--fs-h3);font-weight:700;${extra}">${val}</div></div>`;
+  const reBlock = `<div style="margin-top:var(--sp-4);background:var(--warn-soft);border:1px dashed var(--warn-line);border-radius:var(--radius-lg);padding:var(--sp-4)">`
+    + `<div style="font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--warn);font-weight:700;margin-bottom:var(--sp-3)">`
+    + `<i class="ti ti-flask"></i> Reconciliação estimada · estimativa gerencial (não contábil)</div>`
+    + `<div style="display:flex;gap:var(--sp-5);flex-wrap:wrap;margin-bottom:var(--sp-3)">`
+    + kpi('Valor de contrato', fmt(re.val_cont))
+    + kpi('Margem contratada', `${fmt(re.margem_contratada)} · ${re.margem_contratada_pct}%`)
+    + kpi('Margem estimada (após PEs)', `${fmt(re.margem_estimada)} · ${re.margem_estimada_pct}% <span style="font-size:var(--fs-sm)">(${re.delta_pct>0?'+':''}${re.delta_pct} pts)</span>`, `color:${mCor}`)
+    + `</div>`
+    + `<div class="table-wrap"><table class="tbl"><thead><tr>`
+    + `<th>Rubrica</th><th style="text-align:right">Provisionado</th>`
+    + `<th style="text-align:right">Estimado</th><th style="text-align:right">Δ</th></tr></thead><tbody>${reRows}</tbody></table></div>`
+    + `<div class="total-line emphasis" style="margin-top:var(--sp-3)"><span class="label">Δ total estimado (custo × contrato)</span>`
+    + `<span class="value" style="color:${tCor}"><span class="cur">R$</span>${fmtN(re.delta_total)}</span></div>`
+    + `</div>`;
+  cont.innerHTML = cmpTable + reBlock;
+}
+async function pePeUpload(poolAmbienteId, inputFile){
+  if(!projetoAtivo) return;
+  const f = inputFile.files[0];
+  if(!f) return;
+  const fd = new FormData();
+  fd.append('arquivo', f);
+  fd.append('pool_ambiente_id', poolAmbienteId);
+  try {
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/upload`,
+                          {method:'POST', credentials:'same-origin', body:fd}).then(r=>r.json());
+    if(j.ok){ showToast('XML de PE carregado.'); peComparacaoRender(); }
+    else { await avisoPopup(j.erro||'Erro',{titulo:'Carregar PE'}); }
+  } catch(e){ await avisoPopup('Erro ao enviar o arquivo.',{titulo:'Carregar PE'}); }
 }
 
 async function peUpload(codigo, inputFile) {
