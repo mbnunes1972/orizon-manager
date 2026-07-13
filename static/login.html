@@ -4,54 +4,31 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Orizon Manager — Gestão para redes de móveis planejados</title>
-<link rel="icon" type="image/png" href="favicon-orizon.png">
+<link rel="icon" type="image/svg+xml" href="glifo-favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Design system v1.4 (fonte única em design-system/) — antes de qualquer outro CSS -->
+<link rel="stylesheet" href="design-system/orizon-tokens.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  /* NOVA PALETA — identidade Orizon Manager (logo), design-tokens.md §2.0. Alinhado ao app; sem gold. */
+  /* Tokens legados desta landing → PONTE para o design system v1.4 (orizon-tokens.css, importado
+     no <head>). Sem hex: cores e tema vêm do orizon-tokens (claro = padrão; escuro em
+     [data-theme="dark"]). Migração de paleta: navy/azul-elétrico/ciano → CARVÃO + COBRE. */
   :root {
-    --bg: #FFFFFF;
-    --surface: #F4F7FB;
-    --surface-2: #FFFFFF;
-    --border: #DCE3EC;
-    --border-strong: #C6CFDB;
-    --text: #0B1D3A;
-    --muted: #5A6572;
-    --accent: #0E7C8C;
-    --accent-tint: rgba(14,124,140,.10);
-    --accent-text: #FFFFFF;
-    --primary: #0066FF;
-    --primary-tint: rgba(0,102,255,.10);
-    --shadow-sm: 0 1px 2px rgba(20,20,15,.05);
-    --shadow-md: 0 6px 24px rgba(20,20,15,.08);
-    --radius-sm: 6px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    --font-display: 'Inter', -apple-system, 'Segoe UI', sans-serif;
-    --font-mono: 'IBM Plex Mono', monospace;
-  }
-  [data-theme="dark"] {
-    --bg: #081120;
-    --surface: #0B1D3A;
-    --surface-2: #12294A;
-    --border: #1C3459;
-    --border-strong: #2A4A73;
-    --text: #E6EBF1;
-    --muted: #8A96A3;
-    --accent: #00B8C9;
-    --accent-tint: rgba(0,184,201,.16);
-    --accent-text: #081120;
-    --primary: #0066FF;
-    --primary-tint: rgba(0,102,255,.18);
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
-    --shadow-md: 0 10px 32px rgba(0,0,0,.4);
+    --muted:        var(--text-2);
+    --accent-tint:  var(--accent-soft);
+    --accent-text:  var(--btn-primary-text);
+    --primary:      var(--accent);        /* azul elétrico aposentado → cobre/accent */
+    --primary-tint: var(--accent-soft);
+    --shadow-sm:    var(--shadow);
+    --radius-md:    var(--radius);
+    --font-mono:    'IBM Plex Mono', ui-monospace, monospace;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
   body {
-    font-family: var(--font-display);
+    font-family: var(--font-body);
     background: var(--bg);
     color: var(--text);
     line-height: 1.5;
@@ -111,13 +88,23 @@
     max-width: 1120px; margin: 0 auto; padding: 16px 24px;
     display: flex; align-items: center; justify-content: space-between;
   }
-  .logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; letter-spacing: -0.01em; }
-  .logo-mark { width: 26px; height: 26px; flex-shrink: 0; }
-  /* Logomarca PNG com variante por tema (padrão = claro → logo escuro) */
-  .logo-img { height: 34px; width: auto; display: block; }
-  .logo-on-dark { display: none; }
-  [data-theme="dark"] .logo-on-light { display: none; }
-  [data-theme="dark"] .logo-on-dark { display: block; }
+  /* Marca v1.0 — lockup horizontal (glifo da bússola + wordmark) no nav. Glifo inline com
+     currentColor: acompanha o accent da UI (cobre no escuro; petróleo no claro enquanto o
+     tema claro do orizon-tokens não migrar para cobre). REGRAS_MARCA §5/§6 (fundo areia/carvão). */
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-glifo { width: 40px; height: 40px; flex-shrink: 0; color: var(--accent); }  /* ≥40px → peso fino válido (REGRAS_MARCA §4; asset de peso médio não existe) */
+  .logo-glifo svg { display: block; width: 100%; height: 100%; }
+  .logo-wm { display: flex; flex-direction: column; line-height: 1.05; font-family: var(--font-display); }
+  .logo-wm .wm-orizon { font-weight: 700; font-size: 16px; letter-spacing: .02em; color: var(--text); }
+  .logo-wm .wm-manager { font-weight: 600; font-size: 8.5px; letter-spacing: .34em; text-transform: uppercase; color: var(--accent); margin-top: 1px; }
+
+  /* Marca — lockup VERTICAL sobre carvão no card de login (REGRAS_MARCA §5). Glifo mono-branco. */
+  .login-brand { display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--sidebar-bg); border-radius: var(--radius-lg); padding: 22px; margin-bottom: 22px; }
+  .login-brand .lb-glifo { width: 48px; height: 48px; color: var(--sidebar-text-active); }
+  .login-brand .lb-glifo svg { display: block; width: 100%; height: 100%; }
+  .login-brand .lb-wm { display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-family: var(--font-display); }
+  .login-brand .wm-orizon { font-weight: 700; font-size: 20px; letter-spacing: .02em; color: var(--sidebar-text-active); }
+  .login-brand .wm-manager { font-weight: 600; font-size: 10px; letter-spacing: .42em; text-transform: uppercase; color: var(--sidebar-accent); margin-top: 3px; }
   .nav-links { display: flex; align-items: center; gap: 32px; font-size: 14px; font-weight: 500; color: var(--muted); }
   .nav-links a:hover { color: var(--text); }
   .nav-right { display: flex; align-items: center; gap: 14px; }
@@ -224,7 +211,7 @@
   .field label { display: block; font-size: 12.5px; font-weight: 500; color: var(--muted); margin-bottom: 7px; }
   .field input {
     width: 100%; height: 42px; border-radius: var(--radius-sm); border: 1px solid var(--border);
-    background: var(--bg); color: var(--text); padding: 0 13px; font-size: 14px; font-family: var(--font-display);
+    background: var(--bg); color: var(--text); padding: 0 13px; font-size: 14px; font-family: var(--font-body);
     outline: none; transition: border-color .15s;
   }
   .field input:focus { border-color: var(--accent); }
@@ -259,9 +246,15 @@
 
 <header>
   <nav>
-    <div class="logo">
-      <img class="logo-img logo-on-dark"  src="logo-orizon-light.png" alt="Orizon Manager">
-      <img class="logo-img logo-on-light" src="logo-orizon-dark.png"  alt="Orizon Manager">
+    <div class="logo" role="img" aria-label="Orizon Manager">
+      <span class="logo-glifo" aria-hidden="true">
+        <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="60" cy="60" r="40" fill="none" stroke="currentColor" stroke-width="3"/>
+          <polygon points="60,27 65.5,60 60,68 54.5,60" fill="currentColor"/>
+          <polygon points="60,93 64.5,62 60,54 55.5,62" fill="none" stroke="currentColor" stroke-width="1.75"/>
+        </svg>
+      </span>
+      <span class="logo-wm"><span class="wm-orizon">Orizon</span><span class="wm-manager">Manager</span></span>
     </div>
     <div class="nav-links">
       <a href="#processo">Processo</a>
@@ -422,6 +415,17 @@
       </p>
     </div>
     <div class="login-card reveal">
+      <!-- Marca v1.0 — lockup vertical sobre carvão (REGRAS_MARCA §5); glifo mono-branco inline -->
+      <div class="login-brand" role="img" aria-label="Orizon Manager">
+        <span class="lb-glifo" aria-hidden="true">
+          <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="60" cy="60" r="40" fill="none" stroke="currentColor" stroke-width="3"/>
+            <polygon points="60,27 65.5,60 60,68 54.5,60" fill="currentColor"/>
+            <polygon points="60,93 64.5,62 60,54 55.5,62" fill="none" stroke="currentColor" stroke-width="1.75"/>
+          </svg>
+        </span>
+        <span class="lb-wm"><span class="wm-orizon">Orizon</span><span class="wm-manager">Manager</span></span>
+      </div>
       <h3>Entrar</h3>
       <p>Acesse o painel da sua loja ou rede</p>
       <form id="loginForm" novalidate>
@@ -433,7 +437,7 @@
           <label for="senha">Senha</label>
           <input type="password" id="senha" placeholder="••••••••" autocomplete="current-password">
         </div>
-        <div id="loginErro" style="display:none;color:#e5484d;font-size:12.5px;margin-bottom:10px"></div>
+        <div id="loginErro" style="display:none;color:var(--err);font-size:12.5px;margin-bottom:10px"></div>
         <button type="submit" class="btn btn-primary" id="loginBtn">Entrar</button>
       </form>
       <div class="login-foot">

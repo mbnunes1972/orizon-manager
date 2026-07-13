@@ -2060,6 +2060,58 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 72 — Design system v1.4 (cobre/carvão) + Identidade visual v1.0 (glifo da bússola)
+Consolidação de duas frentes de design entregues fora do código (arquivos em `design-system/`).
+Supera o rebrand da **Sessão 68** (navy/azul-elétrico/ciano da logo antiga), que fica aposentado.
+
+- **Design system atualizado para tokens v1.4:** paleta migrada de menta/petróleo para cobre/bronze
+  sobre carvão quente (tema escuro); semânticas (erro/aviso/sucesso/info) suavizadas para
+  vinho/ocre/sálvia/azul empoeirado; grades de altura e largura de controles padronizadas; template
+  Barra de Filtros adicionado.
+- **Identidade visual do produto atualizada para v1.0:** logo azul substituído pelo glifo cobre
+  (bússola), conforme `design-system/marca/REGRAS_MARCA.md`. Emblema completo mantido apenas para uso
+  em marketing, fora do produto.
+
+**Como foi feito (implementação):**
+- **Marca:** `/logomarca` → `design-system/marca/` (fonte da verdade, ao lado do styleguide). Nenhum
+  caminho de código apontava para `logomarca/`.
+- **Tokens globais:** `orizon-tokens.css` importado no `<head>` de `index.html` (+ `login.html`) **antes
+  de qualquer outro CSS**. Como o app usa nomes de token próprios (`--muted`, `--card`, `--st-*`,
+  `--teal/amber/coral-*`…) e tema-padrão invertido, o bloco `:root` local virou uma **ponte de aliases**
+  para os tokens v1.4 (que reresolvem por tema) — migra navy/azul/ciano → carvão/cobre em bloco, sem
+  reescrever as ~250 refs `var(--…)`. `main.py` ganhou rota para servir `.css` de `design-system/`
+  (fonte única, sem cópia em `static/`).
+- **Varredura de hex/rgb:** `index.html` zerado de cor literal — removidos ~70 fallbacks mortos
+  `var(--x,#hex)` (navy/verde-terminal/ouro), semânticas hardcoded → tokens (`--err/--warn/--ok/-soft`),
+  `#fff`→`--btn-primary-text`, e 53 `rgba` coloridas mapeadas por hue → `-soft`/sólidos. `login.html`
+  idem. Restam só scrims/sombras neutras preto/branco (sem token v1.4 equivalente).
+- **Tema padrão:** por decisão do usuário, **claro** (era escuro); toggle invertido (dark = atributo
+  explícito). Títulos/KPIs adotam **Montserrat** (`--font-display`); corpo segue Inter.
+- **Marca no produto:** favicon → `glifo-favicon.svg` (copiado p/ `static/`); sidebar = lockup
+  horizontal (glifo mono-branco inline via `currentColor` + wordmark), carvão nos dois temas (§7);
+  login = lockup **vertical sobre carvão** no card (§5). Glifos a ≥40px (peso fino válido, §4); geometria
+  oficial não redesenhada.
+- **Camada de componentes + trava:** `design-system/orizon-components.css` (classes do styleguide,
+  importado global no app) + `scripts/check-design-tokens.sh` (falha em hex/rgb colorida fora do
+  `orizon-tokens.css`) instalado em `.git/hooks/pre-commit`.
+- **Verificação:** suíte **952 passed**; `main.py` OK; servidor serve `/` (index), `/login`,
+  `design-system/*.css` (200 text/css), `/glifo-favicon.svg` (svg); check de tokens **verde**.
+
+**Auditada pela Vera** (estática + `node --check` via WSL): 1 achado **bloqueante corrigido** — `.btn-ghost`
+tinha a borda só em `:root[data-theme="light"]`, que deixou de casar com o novo padrão (claro = sem
+atributo) → botão secundário sumia no claro; reescrito como base (claro, com borda) + override no escuro
+(`[data-theme="dark"] .btn-ghost{border-color:transparent}`), atende à regra inegociável #4. Também subido
+o glifo do nav do login de 30→40px (peso fino válido, §4 — asset de peso médio não existe). Diferido
+(não-bloqueante): `--text-3` no claro ~3,1:1 (abaixo de AA; valor do token no orizon-tokens.css, usado em
+`.badge-bloqueado`/`--st-perdido`); `--font-mono` do produto (IBM Plex) diverge do token
+(JetBrains, não carregado) — alinhar num passe futuro; drift potencial da cópia `static/glifo-favicon.svg`.
+
+**Tema claro migrado para COBRE (v1.5, decisão do usuário):** encerrada a pendência que o v1.4 deixava
+aberta — o tema claro do `orizon-tokens.css` sai de petróleo/menta (`--accent #0E5F50`) para **cobre**
+(marca §3: `--accent #8C5230`, `--accent-vivid` dourado `#B8823D`, hover/soft/line derivados). Claro e
+escuro agora ambos na família cobre; o descasamento marca(cobre)×UI(petróleo) que o padrão claro exporia
+deixa de existir. Botão primário segue neutro por decisão de design (v10, ≠ accent).
+
 ## Sessão 71 — Ajuste pós-merge FASE D2: painel de Reconciliação mostra saldo LÍQUIDO (+ manutenção de repo)
 Achado da Vera (não-bloqueante, herdado da FASE D). O `saldo` de cada rubrica na `reconciliacao()` é `provisionado − efetivado` e **exclui de propósito** as resoluções (`resolucao_provisao_sobra/falta`) — certo p/ não misturar resolução com efetivação real. Efeito colateral: depois que `conciliar_final`/`resolver-saldo-provisao` fechava o saldo ao resultado, o painel continuava mostrando o saldo original como se estivesse em aberto.
 **Correção (TDD):** `reconciliacao()` passa a expor **`saldo_aberto`** (líquido = o que falta resolver), descontando `resolvido` na direção do sinal (sobra `saldo>0`: `saldo − resolvido`; falta `saldo<0`: `saldo + resolvido` — `resolvido` é magnitude positiva nos dois casos). `saldo` (bruto) e `resolvido` seguem no payload p/ auditoria (+ `totais.saldo_aberto`). Frontend (Reconciliação, painel + modal do Projeto): "Saldo" exibido = `saldo_aberto`, bruto no `title`; botão **Resolver** só aparece com `saldo_aberto ≠ 0`. Teste cobre sobra/falta (total e parcial), não-resolvido, totais e **projeto conciliado → `saldo_aberto=0` em todas as rubricas**. Suíte 946→**952**.

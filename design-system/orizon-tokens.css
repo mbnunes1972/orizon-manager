@@ -1,0 +1,193 @@
+/* ============================================================
+   ORIZON MANAGER — DESIGN TOKENS
+   Padrao_Design_Orizon v10 → tokens.css v1.2
+   v1.1: tema escuro migra o realce de menta para COBRE/BRONZE ENVELHECIDO
+   (variação F aprovada) — --accent-line #532A14 em bordas/filetes, texto
+   interativo #A56B45 com piso de legibilidade, --warn afastado para
+   amarelo-ouro. Tema claro segue inalterado (petróleo) por enquanto.
+   v1.2: fundos do tema escuro migram de petróleo para CARVÃO QUENTE (H2,
+   "metade do calor") — neutros levemente aquecidos que assentam o cobre.
+   Sidebar acompanha nos dois temas.
+   v1.3: semânticas suavizadas — erro migra para VINHO (texto empoeirado
+   --err + borda profunda --err-line), warn para ocre contido, ok/info
+   dessaturados. Bordas semânticas usam sempre os tokens *-line (mais
+   escuros que o texto), seguindo a mesma lógica do cobre.
+   v1.4: dimensões padronizadas — grade única de alturas para todos os
+   controles (--control-h-*) e larguras de campo por tipo de dado
+   (--field-xs…lg). Taxonomia: Ação / Entrada / Indicador / Navegação.
+   v1.5: tema CLARO migra o acento de petróleo/menta para COBRE (marca §3:
+   --accent #8C5230, --accent-vivid dourado #B8823D) — encerra a decisão
+   pendente; claro e escuro agora ambos na família cobre.
+   ------------------------------------------------------------
+   REGRAS INEGOCIÁVEIS (v9/v10):
+   1. Nenhum componente declara cor em hex literal — sempre var(--token).
+   2. Botão primário: máximo 1 por tela. Usa tokens --btn-primary-*,
+      deliberadamente diferentes de --accent (decisão de design, não bug).
+   3. --accent vale para: menu ativo, links, foco, badges, sublinhado de aba.
+   4. Botão secundário: borda visível no tema claro; sem borda (só sombra)
+      no tema escuro — regra condicional por tema.
+   ============================================================ */
+
+/* ---------- TEMA CLARO (padrão) ---------- */
+:root,
+[data-theme="light"] {
+  /* Superfícies e fundo */
+  --bg:            #F6F8F7;
+  --surface:       #FFFFFF;
+  --surface-2:     #F0F3F2;
+  --border:        #E0E6E4;
+  --border-strong: #C7D1CE;
+
+  /* Texto */
+  --text:          #1E2523;
+  --text-2:        #5B6663;
+  --text-3:        #8A9591;
+  --text-inverse:  #FFFFFF;
+
+  /* Acento — COBRE (marca §3): navegação, links, foco, badges, aba ativa (v1.5) */
+  --accent:        #8C5230;   /* cobre sobre fundo claro (marca §3) */
+  --accent-hover:  #6F4126;   /* cobre mais escuro */
+  --accent-soft:   #F3E8E0;   /* fundo de item ativo / badge tint (cobre bem claro) */
+  --accent-on-soft:#6F4126;   /* texto de acento sobre o tint */
+  --accent-vivid:  #B8823D;   /* dourado — realces pontuais (marca §3) */
+  --accent-line:   #B0764A;   /* filetes/bordas de realce no claro */
+
+  /* Botão primário — token próprio, ≠ accent (v10) */
+  --btn-primary-bg:     #666666;   /* cinza neutro, sem matiz de marca */
+  --btn-primary-text:   #FFFFFF;
+  --btn-primary-border: transparent;
+  --btn-primary-shadow: 0 2px 8px rgba(0,0,0,.12);
+  --btn-primary-bg-hover: #4F4F4F;
+
+  /* Botão secundário */
+  --btn-secondary-bg:     var(--surface-2);
+  --btn-secondary-border: var(--border);   /* borda VISÍVEL no claro */
+
+  /* Semânticas */
+  --ok:        #1E7F4F;
+  --ok-soft:   #E3F3EA;
+  --ok-line:   #9CC7AD;
+  --warn:      #8F6E2A;   /* ocre contido em vez de âmbar */
+  --warn-soft: #F7EFDC;
+  --warn-line: #D8C08B;
+  --err:       #9C4147;   /* vinho — puxa para o vermelho sem estridência */
+  --err-soft:  #F7E9EA;
+  --err-line:  #D8A6A9;
+  --info:      #21618F;
+  --info-soft: #E4EFF7;
+  --info-line: #A9C3D8;
+
+  /* Sombras */
+  --shadow:    0 1px 3px rgba(0,0,0,.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.10);
+
+  /* Sidebar (accordion, módulos sempre visíveis — superfície escura nos dois temas) */
+  --sidebar-bg:          #141312;
+  --sidebar-text:        #B5B2AD;
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-item-active: rgba(165,107,69,.14);
+  --sidebar-accent:      #C9976D;   /* sidebar é escura nos dois temas — cobre nos dois */
+  --sidebar-border:      rgba(255,255,255,.07);
+}
+
+/* ---------- TEMA ESCURO ---------- */
+[data-theme="dark"] {
+  --bg:            #121111;
+  --surface:       #1A1918;
+  --surface-2:     #211F1D;
+  --border:        #2B2926;
+  --border-strong: #3B3833;
+
+  --text:          #EAE8E5;
+  --text-2:        #A9A6A2;
+  --text-3:        #78746F;
+  --text-inverse:  #171514;
+
+  --accent:        #A56B45;   /* cobre — links e texto interativo (piso de legibilidade) */
+  --accent-hover:  #B87E55;
+  --accent-soft:   rgba(83,42,20,.22);
+  --accent-on-soft:#C9976D;   /* texto de acento sobre o tint (cobre claro) */
+  --accent-vivid:  #C9976D;   /* cobre claro — realces de texto sobre tint */
+  --accent-line:   #532A14;   /* bronze envelhecido — bordas e filetes de realce (v11/F) */
+
+  /* Botão primário — fundo aquecido + linha bronze + sombra forte (v11/F sobre carvão H2) */
+  --btn-primary-bg:     #1C1613;
+  --btn-primary-text:   #E7DCD0;
+  --btn-primary-border: #532A14;              /* linha de realce — junto da sombra, é ela que destaca */
+  --btn-primary-shadow: 0 6px 16px rgba(0,0,0,.65);  /* mais forte que --shadow */
+  --btn-primary-bg-hover: #262019;
+
+  --btn-secondary-bg:     var(--surface-2);
+  --btn-secondary-border: transparent;   /* SEM borda no escuro, só sombra */
+
+  --ok:        #86B394;   /* sálvia empoeirada */
+  --ok-soft:   rgba(134,179,148,.12);
+  --ok-line:   #3E5C49;
+  --warn:      #C2A264;   /* ocre suave — sem amarelo estridente */
+  --warn-soft: rgba(194,162,100,.12);
+  --warn-line: #6B5528;
+  --err:       #C08183;   /* rosa-vinho empoeirado — piso de legibilidade */
+  --err-soft:  rgba(107,49,56,.20);
+  --err-line:  #6B3138;   /* vinho profundo — bordas de erro/perigo */
+  --info:      #8BA6BD;   /* azul empoeirado */
+  --info-soft: rgba(139,166,189,.12);
+  --info-line: #3C5468;
+
+  --shadow:    0 1px 3px rgba(0,0,0,.35);
+  --shadow-md: 0 6px 16px rgba(0,0,0,.45);
+
+  --sidebar-bg:          #0D0C0B;
+  --sidebar-text:        #A5A29D;
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-item-active: rgba(165,107,69,.14);
+  --sidebar-accent:      #C9976D;   /* item ativo em cobre claro */
+  --sidebar-border:      rgba(255,255,255,.06);
+}
+
+/* ---------- TOKENS INDEPENDENTES DE TEMA ---------- */
+:root {
+  /* Tipografia */
+  --font-display: "Montserrat", -apple-system, "Segoe UI", sans-serif;
+  --font-body:    "Inter", -apple-system, "Segoe UI", sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+
+  --fs-h1: 1.5rem;    /* 24px — título de página */
+  --fs-h2: 1.125rem;  /* 18px — título de seção/card */
+  --fs-h3: 0.9375rem; /* 15px — subtítulo */
+  --fs-body: 0.875rem;/* 14px — corpo padrão de UI */
+  --fs-sm: 0.8125rem; /* 13px — tabelas densas, metadados */
+  --fs-xs: 0.6875rem; /* 11px — badges, eyebrows */
+
+  /* Espaçamento (escala de 4px) */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+
+  /* Raios */
+  --radius-sm: 6px;   /* inputs, badges */
+  --radius:    10px;  /* botões, cards internos */
+  --radius-lg: 14px;  /* cards, modais */
+
+  /* Controles — grade ÚNICA de alturas, compartilhada por botões E campos.
+     Regra: na mesma linha, todo controle tem a mesma altura. */
+  --control-h-sm: 30px;  /* barras de filtro densas */
+  --control-h:    38px;  /* padrão de formulários */
+  --control-h-lg: 44px;  /* ação principal de páginas de destaque */
+  --btn-h-sm: var(--control-h-sm);
+  --btn-h:    var(--control-h);
+  --btn-h-lg: var(--control-h-lg);
+
+  /* Campos — largura pelo TIPO DE DADO, nunca decidida por tela.
+     xs: UF, qtd · sm: CEP, data · md: CPF/CNPJ, telefone
+     lg: e-mail, nome · full: endereço, observações */
+  --field-xs:  90px;
+  --field-sm:  160px;
+  --field-md:  240px;
+  --field-lg:  360px;
+
+  /* Foco (acessibilidade) */
+  --focus-ring: 0 0 0 3px var(--accent-soft), 0 0 0 1.5px var(--accent);
+
+  /* Transições */
+  --t-fast: 120ms ease;
+  --t:      200ms ease;
+}

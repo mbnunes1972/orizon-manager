@@ -1,0 +1,106 @@
+/* ============================================================
+   ORIZON MANAGER — CAMADA DE COMPONENTES v1.4
+   Classes de componente extraídas do orizon-styleguide.html.
+   Consome exclusivamente os tokens de orizon-tokens.css — NENHUM
+   hex literal aqui (é a regra checada por scripts/check-design-tokens.sh).
+   Importar SEMPRE depois do orizon-tokens.css.
+   ============================================================ */
+
+/* ---------- Utilitários de layout ---------- */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--sp-6);box-shadow:var(--shadow)}
+.row{display:flex;flex-wrap:wrap;gap:var(--sp-4);align-items:center}
+.stack{display:flex;flex-direction:column;gap:var(--sp-4)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:var(--sp-3)}
+
+/* ---------- Botões ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);height:var(--btn-h);padding:0 var(--sp-5);border-radius:var(--radius);font-family:var(--font-body);font-size:var(--fs-body);font-weight:500;cursor:pointer;transition:all var(--t-fast);border:1.5px solid transparent}
+.btn:focus-visible{outline:none;box-shadow:var(--focus-ring)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-sm{height:var(--btn-h-sm);padding:0 var(--sp-3);font-size:var(--fs-sm)}
+.btn-lg{height:var(--btn-h-lg);padding:0 var(--sp-6)}
+.btn-primary{background:var(--btn-primary-bg);color:var(--btn-primary-text);border-color:var(--btn-primary-border);box-shadow:var(--btn-primary-shadow)}
+.btn-primary:hover:not(:disabled){background:var(--btn-primary-bg-hover)}
+.btn-secondary{background:var(--btn-secondary-bg);color:var(--text);border-color:var(--btn-secondary-border);box-shadow:var(--shadow)}
+.btn-secondary:hover:not(:disabled){border-color:var(--border-strong)}
+.btn-danger{background:transparent;color:var(--err);border-color:var(--err-line)}
+.btn-danger:hover:not(:disabled){background:var(--err-soft)}
+.btn-ghost{background:transparent;color:var(--accent);border-color:transparent}
+.btn-ghost:hover:not(:disabled){background:var(--accent-soft)}
+
+/* ---------- Formulários ---------- */
+.field{display:flex;flex-direction:column;gap:6px;min-width:220px}
+.field label{font-size:var(--fs-sm);font-weight:500;color:var(--text-2)}
+.field .input{width:100%}
+.input,select.input{height:var(--control-h);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font:inherit;font-size:var(--fs-body);transition:all var(--t-fast)}
+.field.w-xs{min-width:0;width:var(--field-xs)}
+.field.w-sm{min-width:0;width:var(--field-sm)}
+.field.w-md{min-width:0;width:var(--field-md)}
+.field.w-lg{min-width:0;width:var(--field-lg)}
+.field.w-full{min-width:0;width:100%}
+.input.w-xs{width:var(--field-xs)}
+.input.w-sm{width:var(--field-sm)}
+.input.w-md{width:var(--field-md)}
+.input.w-lg{width:var(--field-lg)}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:var(--focus-ring)}
+.input.error{border-color:var(--err-line)}
+.hint{font-size:var(--fs-xs);color:var(--text-3)}
+.hint.error{color:var(--err)}
+.check{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-body)}
+.check input{accent-color:var(--accent);width:16px;height:16px}
+
+/* ---------- Barra de Filtros ---------- */
+.filter-bar{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--sp-3);box-shadow:var(--shadow)}
+.filter-bar .flex-search{flex:1 1 220px;min-width:180px}
+.filter-bar .push-right{margin-left:auto}
+.range-group{display:inline-flex;height:var(--control-h);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;align-items:center;transition:all var(--t-fast)}
+.range-group:focus-within{border-color:var(--accent);box-shadow:var(--focus-ring)}
+.range-group .input{border:0;height:100%;background:transparent;border-radius:0;width:110px}
+.range-group.compact .input{width:96px}
+.range-group .input:focus{box-shadow:none;border:0}
+.range-group .sep{width:1px;align-self:stretch;background:var(--border)}
+.range-group .arrow{color:var(--text-3);font-size:var(--fs-sm);padding:0 2px}
+
+/* ---------- Badges ---------- */
+.badge{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:999px;font-size:var(--fs-xs);font-weight:600;letter-spacing:.02em}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.badge-accent{background:var(--accent-soft);color:var(--accent)}
+.badge-ok{background:var(--ok-soft);color:var(--ok)}
+.badge-warn{background:var(--warn-soft);color:var(--warn)}
+.badge-err{background:var(--err-soft);color:var(--err)}
+.badge-info{background:var(--info-soft);color:var(--info)}
+.badge-neutral{background:var(--surface-2);color:var(--text-2);border:1px solid var(--border)}
+
+/* ---------- Abas ---------- */
+.tabs{display:flex;gap:var(--sp-5);border-bottom:1px solid var(--border)}
+.tab{padding:var(--sp-2) 2px var(--sp-3);font-size:var(--fs-body);font-weight:500;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all var(--t-fast)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab:hover:not(.active){color:var(--text)}
+
+/* ---------- Tabela ---------- */
+.table-wrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+table.tbl{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.tbl th{text-align:left;font-size:var(--fs-xs);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2);background:var(--surface-2);padding:10px var(--sp-4);border-bottom:1px solid var(--border)}
+.tbl td{padding:12px var(--sp-4);border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr:hover td{background:var(--accent-soft)}
+.tbl .num{text-align:right;font-family:var(--font-mono);font-size:var(--fs-sm)}
+
+/* ---------- Cards ---------- */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--sp-5);box-shadow:var(--shadow)}
+.card h3{font-size:var(--fs-h3);font-weight:600;margin-bottom:var(--sp-1)}
+.card .kpi{font-family:var(--font-display);font-size:1.75rem;font-weight:700;letter-spacing:-.02em}
+.card .kpi-label{font-size:var(--fs-xs);color:var(--text-2);text-transform:uppercase;letter-spacing:.07em}
+
+/* ---------- Status Selector ---------- */
+.status-selector{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:3px;gap:2px}
+.status-selector button{border:0;background:transparent;font:inherit;font-size:var(--fs-sm);font-weight:500;color:var(--text-2);padding:6px 14px;border-radius:999px;cursor:pointer;transition:all var(--t-fast)}
+.status-selector button.active{background:var(--accent-soft);color:var(--accent-on-soft);border:1px solid var(--accent-line);padding:5px 13px;font-weight:600}
+
+/* ---------- Alertas ---------- */
+.alert{display:flex;gap:var(--sp-3);padding:var(--sp-3) var(--sp-4);border-radius:var(--radius);font-size:var(--fs-sm);border:1px solid;align-items:flex-start}
+.alert b{display:block;margin-bottom:1px}
+.alert-ok{background:var(--ok-soft);border-color:var(--ok-line);color:var(--text)}
+.alert-warn{background:var(--warn-soft);border-color:var(--warn-line);color:var(--text)}
+.alert-err{background:var(--err-soft);border-color:var(--err-line);color:var(--text)}
+.alert-info{background:var(--info-soft);border-color:var(--info-line);color:var(--text)}
+

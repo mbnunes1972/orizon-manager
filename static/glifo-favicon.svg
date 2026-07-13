@@ -1,0 +1,5 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Orizon Manager">
+  <circle cx="60" cy="60" r="38" fill="none" stroke="#A5643C" stroke-width="8"/>
+  <polygon points="60,20 69,60 60,73 51,60" fill="#D3A254"/>
+  <polygon points="60,100 68,62 60,49 52,62" fill="#C9976D"/>
+</svg>

@@ -1378,6 +1378,25 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_error(404)
             return
 
+        elif path.endswith(".css") and path != "/":
+            # CSS do design system (design-system/*.css) servido da RAIZ do projeto —
+            # design-system/ é a fonte única (não duplicamos em static/).
+            rel     = os.path.normpath(path.lstrip("/")).replace("\\", "/")
+            caminho = os.path.abspath(os.path.join(_BASE_DIR, rel))
+            # trava de path traversal: precisa ficar dentro de _BASE_DIR
+            if not caminho.startswith(os.path.abspath(_BASE_DIR) + os.sep) or not os.path.exists(caminho):
+                self.send_error(404); return
+            with open(caminho, "rb") as f:
+                data = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/css; charset=utf-8")
+            self.send_header("Content-Length", len(data))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(data)
+            return
+
         elif path.endswith(".html") and path != "/":
             nome    = path.lstrip("/")
             caminho = os.path.join(_BASE_DIR, nome)

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orizon Manager — Design System v1.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="orizon-tokens.css">
+<style>
+/* ====== Base ====== */
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:var(--fs-body);line-height:1.55;transition:background var(--t),color var(--t)}
+h1,h2,h3{font-family:var(--font-display)}
+main{max-width:1080px;margin:0 auto;padding:var(--sp-8) var(--sp-6) 120px}
+
+/* ====== Header do guia ====== */
+.guide-header{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-4);padding-bottom:var(--sp-6);border-bottom:1px solid var(--border);margin-bottom:var(--sp-8)}
+.guide-header h1{font-size:var(--fs-h1);font-weight:700;letter-spacing:-.02em}
+.guide-header .sub{color:var(--text-2);font-size:var(--fs-sm);margin-top:2px}
+.theme-toggle{display:flex;align-items:center;gap:var(--sp-2);background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:4px}
+.theme-toggle button{border:0;background:transparent;color:var(--text-2);font:inherit;font-size:var(--fs-sm);font-weight:500;padding:6px 14px;border-radius:999px;cursor:pointer;transition:all var(--t-fast)}
+.theme-toggle button.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+
+/* ====== Seções ====== */
+section{margin-bottom:var(--sp-10)}
+.eyebrow{font-size:var(--fs-xs);font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);margin-bottom:var(--sp-1)}
+section>h2{font-size:var(--fs-h2);font-weight:600;margin-bottom:var(--sp-2)}
+.section-note{color:var(--text-2);font-size:var(--fs-sm);max-width:70ch;margin-bottom:var(--sp-5)}
+.rule{display:flex;gap:var(--sp-2);align-items:flex-start;background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:var(--radius-sm);padding:var(--sp-3) var(--sp-4);font-size:var(--fs-sm);color:var(--text);margin-bottom:var(--sp-5);max-width:76ch}
+.rule strong{color:var(--accent)}
+
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--sp-6);box-shadow:var(--shadow)}
+.row{display:flex;flex-wrap:wrap;gap:var(--sp-4);align-items:center}
+.stack{display:flex;flex-direction:column;gap:var(--sp-4)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:var(--sp-3)}
+
+/* ====== Swatches ====== */
+.swatch{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+.swatch .chip{height:56px}
+.swatch .meta{padding:var(--sp-2) var(--sp-3)}
+.swatch .meta b{display:block;font-size:var(--fs-sm);font-weight:600}
+.swatch .meta code{font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-2)}
+
+/* ====== Tipografia ====== */
+.type-row{display:flex;align-items:baseline;gap:var(--sp-5);padding:var(--sp-3) 0;border-bottom:1px dashed var(--border)}
+.type-row:last-child{border-bottom:0}
+.type-row .label{width:210px;flex-shrink:0;font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-2)}
+
+/* ====== Botões ====== */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);height:var(--btn-h);padding:0 var(--sp-5);border-radius:var(--radius);font-family:var(--font-body);font-size:var(--fs-body);font-weight:500;cursor:pointer;transition:all var(--t-fast);border:1.5px solid transparent}
+.btn:focus-visible{outline:none;box-shadow:var(--focus-ring)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-sm{height:var(--btn-h-sm);padding:0 var(--sp-3);font-size:var(--fs-sm)}
+.btn-lg{height:var(--btn-h-lg);padding:0 var(--sp-6)}
+
+.btn-primary{background:var(--btn-primary-bg);color:var(--btn-primary-text);border-color:var(--btn-primary-border);box-shadow:var(--btn-primary-shadow)}
+.btn-primary:hover:not(:disabled){background:var(--btn-primary-bg-hover)}
+
+.btn-secondary{background:var(--btn-secondary-bg);color:var(--text);border-color:var(--btn-secondary-border);box-shadow:var(--shadow)}
+.btn-secondary:hover:not(:disabled){border-color:var(--border-strong)}
+
+.btn-danger{background:transparent;color:var(--err);border-color:var(--err-line)}
+.btn-danger:hover:not(:disabled){background:var(--err-soft)}
+
+.btn-ghost{background:transparent;color:var(--accent);border-color:transparent}
+.btn-ghost:hover:not(:disabled){background:var(--accent-soft)}
+
+/* ====== Formulários ====== */
+.field{display:flex;flex-direction:column;gap:6px;min-width:220px}
+.field label{font-size:var(--fs-sm);font-weight:500;color:var(--text-2)}
+.field .input{width:100%}
+.input,select.input{height:var(--control-h);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font:inherit;font-size:var(--fs-body);transition:all var(--t-fast)}
+.field.w-xs{min-width:0;width:var(--field-xs)}
+.field.w-sm{min-width:0;width:var(--field-sm)}
+.field.w-md{min-width:0;width:var(--field-md)}
+.field.w-lg{min-width:0;width:var(--field-lg)}
+.field.w-full{min-width:0;width:100%}
+.input.w-xs{width:var(--field-xs)}
+.input.w-sm{width:var(--field-sm)}
+.input.w-md{width:var(--field-md)}
+.input.w-lg{width:var(--field-lg)}
+
+/* ====== Barra de Filtros (template) ====== */
+.filter-bar{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--sp-3);box-shadow:var(--shadow)}
+.filter-bar .flex-search{flex:1 1 220px;min-width:180px}
+.filter-bar .push-right{margin-left:auto}
+.range-group{display:inline-flex;height:var(--control-h);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;align-items:center;transition:all var(--t-fast)}
+.range-group:focus-within{border-color:var(--accent);box-shadow:var(--focus-ring)}
+.range-group .input{border:0;height:100%;background:transparent;border-radius:0;width:110px}
+.range-group.compact .input{width:96px}
+.range-group .input:focus{box-shadow:none;border:0}
+.range-group .sep{width:1px;align-self:stretch;background:var(--border)}
+.range-group .arrow{color:var(--text-3);font-size:var(--fs-sm);padding:0 2px}
+.input:focus{outline:none;border-color:var(--accent);box-shadow:var(--focus-ring)}
+.input.error{border-color:var(--err-line)}
+.hint{font-size:var(--fs-xs);color:var(--text-3)}
+.hint.error{color:var(--err)}
+.check{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-body)}
+.check input{accent-color:var(--accent);width:16px;height:16px}
+
+/* ====== Badges ====== */
+.badge{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 10px;border-radius:999px;font-size:var(--fs-xs);font-weight:600;letter-spacing:.02em}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.badge-accent{background:var(--accent-soft);color:var(--accent)}
+.badge-ok{background:var(--ok-soft);color:var(--ok)}
+.badge-warn{background:var(--warn-soft);color:var(--warn)}
+.badge-err{background:var(--err-soft);color:var(--err)}
+.badge-info{background:var(--info-soft);color:var(--info)}
+.badge-neutral{background:var(--surface-2);color:var(--text-2);border:1px solid var(--border)}
+
+/* ====== Tabs ====== */
+.tabs{display:flex;gap:var(--sp-5);border-bottom:1px solid var(--border)}
+.tab{padding:var(--sp-2) 2px var(--sp-3);font-size:var(--fs-body);font-weight:500;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all var(--t-fast)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.tab:hover:not(.active){color:var(--text)}
+
+/* ====== Tabela ====== */
+.table-wrap{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--surface)}
+table.tbl{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
+.tbl th{text-align:left;font-size:var(--fs-xs);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-2);background:var(--surface-2);padding:10px var(--sp-4);border-bottom:1px solid var(--border)}
+.tbl td{padding:12px var(--sp-4);border-bottom:1px solid var(--border)}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr:hover td{background:var(--accent-soft)}
+.tbl .num{text-align:right;font-family:var(--font-mono);font-size:var(--fs-sm)}
+
+/* ====== Cards ====== */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--sp-5);box-shadow:var(--shadow)}
+.card h3{font-size:var(--fs-h3);font-weight:600;margin-bottom:var(--sp-1)}
+.card .kpi{font-family:var(--font-display);font-size:1.75rem;font-weight:700;letter-spacing:-.02em}
+.card .kpi-label{font-size:var(--fs-xs);color:var(--text-2);text-transform:uppercase;letter-spacing:.07em}
+
+/* ====== Sidebar accordion (amostra) ====== */
+.sidebar-demo{width:250px;background:var(--sidebar-bg);border-radius:var(--radius-lg);padding:var(--sp-4) 0;color:var(--sidebar-text);font-size:var(--fs-body);overflow:hidden}
+.sidebar-demo .brand{font-family:var(--font-display);font-weight:700;color:var(--sidebar-text-active);padding:var(--sp-2) var(--sp-5) var(--sp-4);letter-spacing:.02em;border-bottom:1px solid var(--sidebar-border);margin-bottom:var(--sp-2)}
+.side-mod{padding:10px var(--sp-5);cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background var(--t-fast)}
+.side-mod:hover{background:rgba(255,255,255,.04)}
+.side-mod .chev{font-size:10px;opacity:.6;transition:transform var(--t-fast)}
+.side-mod.open .chev{transform:rotate(90deg)}
+.side-sub{display:none;flex-direction:column}
+.side-mod.open + .side-sub{display:flex}
+.side-sub a{padding:8px var(--sp-5) 8px 38px;color:var(--sidebar-text);text-decoration:none;font-size:var(--fs-sm);transition:all var(--t-fast)}
+.side-sub a:hover{color:var(--sidebar-text-active)}
+.side-sub a.active{background:var(--sidebar-item-active);color:var(--sidebar-accent);font-weight:600;border-left:2px solid var(--sidebar-accent)}
+
+/* ====== Kanban card ====== */
+.kanban-col{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:var(--sp-3);width:280px}
+.kanban-col .col-title{font-size:var(--fs-xs);font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-2);padding:0 var(--sp-1) var(--sp-3);display:flex;justify-content:space-between}
+.kcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:var(--sp-3) var(--sp-4);box-shadow:var(--shadow);cursor:grab;margin-bottom:var(--sp-2)}
+.kcard b{font-size:var(--fs-body);display:block;margin-bottom:2px}
+.kcard .kmeta{font-size:var(--fs-xs);color:var(--text-2);display:flex;flex-direction:column;gap:2px;margin-top:var(--sp-2)}
+.kcard .kmeta code{font-family:var(--font-mono)}
+
+/* ====== Status Selector ====== */
+.status-selector{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:3px;gap:2px}
+.status-selector button{border:0;background:transparent;font:inherit;font-size:var(--fs-sm);font-weight:500;color:var(--text-2);padding:6px 14px;border-radius:999px;cursor:pointer;transition:all var(--t-fast)}
+.status-selector button.active{background:var(--accent-soft);color:var(--accent-on-soft);border:1px solid var(--accent-line);padding:5px 13px;font-weight:600}
+
+/* ====== Alertas ====== */
+.alert{display:flex;gap:var(--sp-3);padding:var(--sp-3) var(--sp-4);border-radius:var(--radius);font-size:var(--fs-sm);border:1px solid;align-items:flex-start}
+.alert b{display:block;margin-bottom:1px}
+.alert-ok{background:var(--ok-soft);border-color:var(--ok-line);color:var(--text)}
+.alert-warn{background:var(--warn-soft);border-color:var(--warn-line);color:var(--text)}
+.alert-err{background:var(--err-soft);border-color:var(--err-line);color:var(--text)}
+.alert-info{background:var(--info-soft);border-color:var(--info-line);color:var(--text)}
+
+@media (max-width:720px){.type-row{flex-direction:column;gap:4px}.type-row .label{width:auto}}
+</style>
+</head>
+<body>
+<main>
+
+<header class="guide-header">
+  <div>
+    <h1>Orizon Manager — Design System</h1>
+    <div class="sub">tokens.css v1.4 · cobre (F) sobre carvão (H2) · semânticas suaves · dimensões padronizadas · repo <code>orizon-manager</code></div>
+  </div>
+  <div class="theme-toggle" role="group" aria-label="Tema">
+    <button id="btn-light" class="active" onclick="setTheme('light')">☀ Claro</button>
+    <button id="btn-dark" onclick="setTheme('dark')">☾ Escuro</button>
+  </div>
+</header>
+
+<!-- ============ 1. CORES ============ -->
+<section>
+  <div class="eyebrow">01 · Fundamentos</div>
+  <h2>Cores</h2>
+  <p class="section-note">Todos os componentes referenciam tokens — nunca hex literal. Alterne o tema acima e observe: os mesmos tokens resolvem para valores diferentes automaticamente.</p>
+  <div class="rule"><span>⚑</span><span><strong>Regra v9:</strong> nenhum componente declara cor literal. Sempre <code>var(--accent)</code>, <code>var(--btn-primary-bg)</code> etc. Foi exatamente um hex hardcoded que causou o bug do "+ Novo Projeto" com duas cores.</span></div>
+  <div class="grid" id="swatches"></div>
+</section>
+
+<!-- ============ 2. TIPOGRAFIA ============ -->
+<section>
+  <div class="eyebrow">02 · Fundamentos</div>
+  <h2>Tipografia</h2>
+  <p class="section-note">Montserrat para títulos e KPIs (ponte com a marca Orizon), Inter para corpo de UI, JetBrains Mono para valores numéricos e códigos.</p>
+  <div class="panel">
+    <div class="type-row"><span class="label">--fs-h1 · Montserrat 700</span><span style="font-family:var(--font-display);font-size:var(--fs-h1);font-weight:700">Título de página</span></div>
+    <div class="type-row"><span class="label">--fs-h2 · Montserrat 600</span><span style="font-family:var(--font-display);font-size:var(--fs-h2);font-weight:600">Título de seção ou card</span></div>
+    <div class="type-row"><span class="label">--fs-h3 · Inter 600</span><span style="font-size:var(--fs-h3);font-weight:600">Subtítulo de bloco</span></div>
+    <div class="type-row"><span class="label">--fs-body · Inter 400</span><span>Corpo padrão de interface — formulários, parágrafos, menus.</span></div>
+    <div class="type-row"><span class="label">--fs-sm · Inter 400</span><span style="font-size:var(--fs-sm);color:var(--text-2)">Texto secundário, células de tabela densa, metadados.</span></div>
+    <div class="type-row"><span class="label">--fs-xs · Inter 600 caps</span><span style="font-size:var(--fs-xs);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-2)">Badges · Eyebrows · Cabeçalho de tabela</span></div>
+    <div class="type-row"><span class="label">--font-mono</span><span style="font-family:var(--font-mono);font-size:var(--fs-sm)">R$ 128.450,00 · NF-e 35260601…</span></div>
+  </div>
+</section>
+
+<!-- ============ 3. BOTÕES ============ -->
+<section>
+  <div class="eyebrow">03 · Componentes</div>
+  <h2>Botões</h2>
+  <div class="rule"><span>⚑</span><span><strong>Decisão v10:</strong> o botão primário quebra deliberadamente o padrão do <code>--accent</code>. No claro, cinza neutro (contraste tonal, sem matiz de marca). No escuro, fundo aquecido quase preto — o destaque vem da <strong>linha bronze 1.5px (--accent-line) + sombra forte</strong>, não do preenchimento (variação F aprovada). Máximo <strong>1 primário por tela</strong>.</span></div>
+  <div class="panel stack">
+    <div class="row">
+      <button class="btn btn-primary">+ Novo Projeto</button>
+      <button class="btn btn-secondary">Imprimir Orçamento</button>
+      <button class="btn btn-danger">Excluir</button>
+      <button class="btn btn-ghost">Ver detalhes</button>
+    </div>
+    <div class="row">
+      <button class="btn btn-primary btn-sm">Salvar</button>
+      <button class="btn btn-primary">Salvar</button>
+      <button class="btn btn-primary btn-lg">Salvar</button>
+      <button class="btn btn-primary" disabled>Desabilitado</button>
+      <button class="btn btn-secondary" disabled>Desabilitado</button>
+    </div>
+    <p class="hint">Tamanhos: sm 30px · padrão 38px · lg 44px. Secundário: borda visível no claro, só sombra no escuro (correção v5 — caso "Imprimir Orçamento"). Perigo: transparente com borda/texto <code>--err</code>, tint no hover.</p>
+  </div>
+</section>
+
+<!-- ============ 4. FORMULÁRIOS ============ -->
+<section>
+  <div class="eyebrow">04 · Componentes</div>
+  <h2>Formulários</h2>
+  <div class="panel stack">
+    <div class="row" style="align-items:flex-start">
+      <div class="field">
+        <label for="f1">Nome do cliente</label>
+        <input id="f1" class="input" placeholder="Ex.: Maria Andrade">
+        <span class="hint">Como consta no contrato.</span>
+      </div>
+      <div class="field">
+        <label for="f2">Loja</label>
+        <select id="f2" class="input">
+          <option>São José dos Campos</option><option>Caraguatatuba</option><option>Fortaleza</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f3">CPF/CNPJ</label>
+        <input id="f3" class="input error" value="123.456">
+        <span class="hint error">CPF incompleto — informe os 11 dígitos.</span>
+      </div>
+    </div>
+    <div class="row">
+      <label class="check"><input type="checkbox" checked> Emitir NF-e centralizada</label>
+      <label class="check"><input type="checkbox"> Incluir montagem</label>
+      <label class="check"><input type="radio" name="r" checked> À vista</label>
+      <label class="check"><input type="radio" name="r"> Parcelado</label>
+    </div>
+    <p class="hint">Foco: borda <code>--accent</code> + anel <code>--focus-ring</code> (clique num campo para ver). Erro: borda e mensagem em <code>--err</code>, direta sobre como corrigir.</p>
+  </div>
+</section>
+
+<!-- ============ 4b. DIMENSÕES ============ -->
+<section>
+  <div class="eyebrow">04b · Componentes</div>
+  <h2>Dimensões — alturas e larguras padronizadas</h2>
+  <div class="rule"><span>⚑</span><span><strong>Regras:</strong> na mesma linha, todo controle (campo ou botão) tem a mesma altura — sm 30 · padrão 38 · lg 44. Largura de campo é definida pelo <strong>tipo de dado</strong> (classes <code>w-xs…w-full</code>), nunca decidida por tela. Componente nunca recebe width/height inline.</span></div>
+  <div class="panel stack">
+    <div>
+      <p class="hint" style="margin-bottom:var(--sp-2)">Alinhamento em linha — campo, select e botão na mesma grade de 38px:</p>
+      <div class="row">
+        <div class="field w-md"><input class="input" placeholder="Buscar projeto…"></div>
+        <div class="field w-sm"><select class="input"><option>Todas as lojas</option></select></div>
+        <button class="btn btn-secondary">Filtrar</button>
+      </div>
+    </div>
+    <div>
+      <p class="hint" style="margin-bottom:var(--sp-2)">Largura pelo tipo de dado — o tamanho do campo comunica o que cabe nele:</p>
+      <div class="row" style="align-items:flex-end">
+        <div class="field w-xs"><label>UF</label><input class="input" placeholder="SP"></div>
+        <div class="field w-sm"><label>CEP</label><input class="input" placeholder="12240-000"></div>
+        <div class="field w-sm"><label>Data</label><input class="input" placeholder="12/07/2026"></div>
+        <div class="field w-md"><label>CPF/CNPJ</label><input class="input" placeholder="000.000.000-00"></div>
+        <div class="field w-lg"><label>E-mail</label><input class="input" placeholder="cliente@dominio.com.br"></div>
+      </div>
+    </div>
+    <p class="hint">Taxonomia por papel: <b>Ação</b> (muda dados → botão) · <b>Entrada</b> (coleta dados → campo) · <b>Indicador</b> (só informa → badge, alerta, KPI) · <b>Navegação</b> (move você → aba, sidebar, status selector). Cada família usa exclusivamente a sua escala.</p>
+  </div>
+</section>
+
+<!-- ============ 5. BADGES E STATUS ============ -->
+<section>
+  <div class="eyebrow">05 · Componentes</div>
+  <h2>Badges e Status Selector</h2>
+  <div class="panel stack">
+    <div class="row">
+      <span class="badge badge-accent"><span class="dot"></span>Em negociação</span>
+      <span class="badge badge-ok"><span class="dot"></span>Aprovado</span>
+      <span class="badge badge-warn"><span class="dot"></span>Aguardando fábrica</span>
+      <span class="badge badge-err"><span class="dot"></span>Atrasado</span>
+      <span class="badge badge-info"><span class="dot"></span>Em trânsito</span>
+      <span class="badge badge-neutral">Rascunho</span>
+    </div>
+    <div class="row">
+      <div class="status-selector" role="group" aria-label="Status da negociação">
+        <button>Proposta</button><button class="active">Negociação</button><button>Fechado</button><button>Perdido</button>
+      </div>
+      <span class="hint">Status Selector — componente dedicado da tela de Negociação (Diagramação v8).</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6. TABS ============ -->
+<section>
+  <div class="eyebrow">06 · Componentes</div>
+  <h2>Abas</h2>
+  <div class="panel">
+    <div class="tabs">
+      <div class="tab active" onclick="pickTab(this)">Resumido</div>
+      <div class="tab" onclick="pickTab(this)">Analítico</div>
+      <div class="tab" onclick="pickTab(this)">Por projeto</div>
+    </div>
+    <p class="hint" style="margin-top:var(--sp-3)">Sublinhado da aba ativa em <code>--accent</code> — ex.: toggle Resumido/Analítico do DRE.</p>
+  </div>
+</section>
+
+<!-- ============ 7. TABELA ============ -->
+<section>
+  <div class="eyebrow">07 · Templates</div>
+  <h2>Lista / Tabela</h2>
+  <div class="table-wrap">
+    <table class="tbl">
+      <thead><tr><th>Projeto</th><th>Cliente</th><th>Loja</th><th>Status</th><th class="num">Valor</th></tr></thead>
+      <tbody>
+        <tr><td>PRJ-0341</td><td>Maria Andrade</td><td>SJC</td><td><span class="badge badge-ok"><span class="dot"></span>Aprovado</span></td><td class="num">R$ 84.200,00</td></tr>
+        <tr><td>PRJ-0342</td><td>Carlos Lima</td><td>Caraguá</td><td><span class="badge badge-accent"><span class="dot"></span>Negociação</span></td><td class="num">R$ 46.750,00</td></tr>
+        <tr><td>PRJ-0343</td><td>Studio Braga Arquitetura</td><td>Fortaleza</td><td><span class="badge badge-warn"><span class="dot"></span>Aguardando fábrica</span></td><td class="num">R$ 128.450,00</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="hint" style="margin-top:var(--sp-2)">Cabeçalho em caps <code>--fs-xs</code> sobre <code>--surface-2</code> · valores monetários sempre em <code>--font-mono</code> alinhados à direita · hover de linha com tint <code>--accent-soft</code>.</p>
+</section>
+
+<!-- ============ 7b. BARRA DE FILTROS ============ -->
+<section>
+  <div class="eyebrow">07b · Templates</div>
+  <h2>Barra de Filtros</h2>
+  <div class="rule"><span>⚑</span><span><strong>Anatomia:</strong> todos os controles na mesma altura (<code>--control-h</code>, incluindo o alternador de visualização) · busca é o único elemento flexível · pares de intervalo (mín/máx, de→até) são <strong>fundidos</strong> num <code>.range-group</code> com metades de largura igual · alternador de visualização é Navegação, não filtro — ancora à direita com <code>.push-right</code>.</span></div>
+  <div class="filter-bar">
+    <input class="input flex-search" placeholder="Buscar por projeto, cliente, CPF ou parceiro…">
+    <select class="input w-sm"><option>Status</option><option>Proposta</option><option>Negociação</option><option>Fechado</option></select>
+    <div class="range-group compact">
+      <input class="input" placeholder="R$ mín">
+      <div class="sep"></div>
+      <input class="input" placeholder="R$ máx">
+    </div>
+    <div class="range-group">
+      <input class="input" placeholder="dd/mm/aaaa">
+      <span class="arrow">→</span>
+      <input class="input" placeholder="dd/mm/aaaa">
+    </div>
+    <div class="status-selector push-right" role="group" aria-label="Visualização">
+      <button class="active">Lista</button><button>Funil</button>
+    </div>
+  </div>
+  <p class="hint" style="margin-top:var(--sp-2)">Usada em Comercial, Projetos, Financeiro e Expedição sobre as listas/tabelas. Foco no par fundido acende o grupo inteiro (<code>:focus-within</code>) — clique num campo de valor para ver.</p>
+</section>
+
+<!-- ============ 8. CARDS / DASHBOARD ============ -->
+<section>
+  <div class="eyebrow">08 · Templates</div>
+  <h2>Cards de Dashboard</h2>
+  <div class="row" style="align-items:stretch">
+    <div class="card" style="flex:1;min-width:200px">
+      <div class="kpi-label">Vendas do mês</div>
+      <div class="kpi">R$ 412 mil</div>
+      <span class="badge badge-ok" style="margin-top:8px"><span class="dot"></span>+12% vs. maio</span>
+    </div>
+    <div class="card" style="flex:1;min-width:200px">
+      <div class="kpi-label">Projetos ativos</div>
+      <div class="kpi">27</div>
+      <span class="badge badge-neutral" style="margin-top:8px">4 lojas</span>
+    </div>
+    <div class="card" style="flex:1;min-width:200px">
+      <div class="kpi-label">Entregas atrasadas</div>
+      <div class="kpi" style="color:var(--err)">3</div>
+      <span class="badge badge-err" style="margin-top:8px"><span class="dot"></span>Requer ação</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 9. SIDEBAR + KANBAN ============ -->
+<section>
+  <div class="eyebrow">09 · Templates</div>
+  <h2>Sidebar accordion &amp; Kanban (Expedição)</h2>
+  <p class="section-note">Sidebar: todos os módulos sempre visíveis; item ativo com tint + texto cobre claro (a sidebar é escura nos dois temas, então o cobre vale nos dois). Kanban: cards capturam par de datas prevista/real no movimento entre colunas.</p>
+  <div class="row" style="align-items:flex-start">
+
+    <div class="sidebar-demo">
+      <div class="brand">ORIZON MANAGER</div>
+      <div class="side-mod" onclick="this.classList.toggle('open')"><span>Comercial</span><span class="chev">▶</span></div>
+      <div class="side-sub"></div>
+      <div class="side-mod open" onclick="this.classList.toggle('open')"><span>Projetos</span><span class="chev">▶</span></div>
+      <div class="side-sub">
+        <a href="#" onclick="return false">Todos os projetos</a>
+        <a href="#" class="active" onclick="return false">Cronograma</a>
+        <a href="#" onclick="return false">Negociação</a>
+      </div>
+      <div class="side-mod" onclick="this.classList.toggle('open')"><span>Fiscal</span><span class="chev">▶</span></div>
+      <div class="side-sub"></div>
+      <div class="side-mod" onclick="this.classList.toggle('open')"><span>Expedição</span><span class="chev">▶</span></div>
+      <div class="side-sub"></div>
+      <div class="side-mod" onclick="this.classList.toggle('open')"><span>Financeiro</span><span class="chev">▶</span></div>
+      <div class="side-sub"></div>
+      <div class="side-mod" onclick="this.classList.toggle('open')"><span>Montagem</span><span class="chev">▶</span></div>
+      <div class="side-sub"></div>
+    </div>
+
+    <div class="kanban-col">
+      <div class="col-title"><span>Em trânsito</span><span>2</span></div>
+      <div class="kcard">
+        <b>PRJ-0343 · Studio Braga</b>
+        <span class="badge badge-info"><span class="dot"></span>Jamef · Fortaleza</span>
+        <div class="kmeta">
+          <span>Prevista: <code>15/07/2026</code></span>
+          <span>Real: <code>—</code></span>
+        </div>
+      </div>
+      <div class="kcard">
+        <b>PRJ-0338 · Ana Souza</b>
+        <span class="badge badge-warn"><span class="dot"></span>Milk-run SJC+RJ</span>
+        <div class="kmeta">
+          <span>Prevista: <code>12/07/2026</code></span>
+          <span>Real: <code>—</code></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============ 10. ALERTAS ============ -->
+<section>
+  <div class="eyebrow">10 · Componentes</div>
+  <h2>Alertas</h2>
+  <div class="stack" style="max-width:640px">
+    <div class="alert alert-ok"><span>✓</span><span><b>NF-e autorizada</b>Protocolo 135260012345678 registrado na SEFAZ.</span></div>
+    <div class="alert alert-info"><span>ℹ</span><span><b>Sincronização em andamento</b>Importando XML da Dalmóbile — isso leva cerca de um minuto.</span></div>
+    <div class="alert alert-warn"><span>△</span><span><b>Data prevista alterada</b>Alterações de datas exigem reautenticação de Gerente/Diretor e ficam no histórico de auditoria.</span></div>
+    <div class="alert alert-err"><span>✕</span><span><b>Falha na emissão</b>CFOP inválido para operação interestadual. Corrija o item 3 e reenvie.</span></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  document.getElementById('btn-light').classList.toggle('active',t==='light');
+  document.getElementById('btn-dark').classList.toggle('active',t==='dark');
+  renderSwatches();
+}
+function pickTab(el){
+  el.parentElement.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
+const TOKENS=[
+  ['--bg','Fundo'],['--surface','Superfície'],['--surface-2','Superfície 2'],
+  ['--border','Borda'],['--text','Texto'],['--text-2','Texto secundário'],
+  ['--accent','Acento (petróleo/cobre)'],['--accent-soft','Acento suave'],['--accent-vivid','Cobre claro'],['--accent-line','Linha de realce'],
+  ['--btn-primary-bg','Botão primário'],['--ok','Sucesso'],['--warn','Atenção'],['--err','Erro'],['--info','Info']
+];
+function renderSwatches(){
+  const cs=getComputedStyle(document.documentElement);
+  document.getElementById('swatches').innerHTML=TOKENS.map(([tok,name])=>{
+    const val=cs.getPropertyValue(tok).trim();
+    return `<div class="swatch"><div class="chip" style="background:var(${tok})"></div>
+      <div class="meta"><b>${name}</b><code>${tok}</code><br><code>${val}</code></div></div>`;
+  }).join('');
+}
+renderSwatches();
+</script>
+</body>
+</html>
