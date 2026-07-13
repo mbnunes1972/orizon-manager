@@ -11505,13 +11505,87 @@ function _renderCardPE(codigo, dados, bloqueada) {
        </label>`
     : '';
 
+  // Fatia 1 (desmembramento): na Revisão de PE (11c), comparação de CFO venda×PE + reconciliação
+  // estimada (read-only, "estimativa gerencial"). spec 2026-07-13 §6/#9.
+  const peCmpBlock = (codigo === '11c') ? `
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <button class="btn-ciclo" onclick="peComparacaoRender()"><i class="ti ti-arrows-diff"></i> Comparar valores dos ambientes (PE)</button>
+      <div id="pe-cmp-container" style="margin-top:12px"></div>
+    </div>` : '';
   return `${docsHtml}${revisHtml}
     <div style="font-size:.82rem;margin-bottom:10px">${statusLabel}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       ${btnCarregar}
       ${btnFechar}
       ${btnRevisao}
-    </div>`;
+    </div>${peCmpBlock}`;
+}
+
+// ── Fatia 1 — comparação de CFO (venda × PE) + reconciliação estimada (read-only) ──────────────
+async function peComparacaoRender(){
+  if(!projetoAtivo) return;
+  const cont = document.getElementById('pe-cmp-container');
+  if(!cont) return;
+  cont.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Carregando…</span>';
+  let j;
+  try { j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/comparacao`,
+                        {credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ cont.innerHTML = '<span style="color:var(--err)">Erro ao carregar.</span>'; return; }
+  if(!j.ok){ cont.innerHTML = `<span style="color:var(--err)">${esc(j.erro||'Erro')}</span>`; return; }
+  const fmt = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const sig = v => (v>0?'+':'') + fmt(v);
+  const cmpRows = j.comparacao.map(l => {
+    const dCor = l.diferenca>0.005?'var(--err)':(l.diferenca<-0.005?'var(--ok)':'var(--muted)');
+    const pe  = l.pe_carregado ? `<span style="font-family:var(--font-mono)">${fmt(l.cfo_pe)}</span>`
+              : `<span style="color:var(--muted);font-size:.72rem">PE não carregado</span>`;
+    const dif = l.pe_carregado ? `<span style="font-family:var(--font-mono);color:${dCor}">${sig(l.diferenca)}</span>` : '—';
+    const up  = `<label class="btn-ciclo" style="font-size:.7rem;padding:2px 8px;cursor:pointer"><i class="ti ti-upload"></i> PE`
+              + `<input type="file" accept=".xml" style="display:none" onchange="pePeUpload(${l.pool_ambiente_id}, this)"></label>`;
+    return `<tr style="border-top:1px solid var(--border);font-size:.8rem"><td style="padding:5px 8px">${esc(l.ambiente)}</td>`
+         + `<td style="padding:5px 8px;text-align:right;font-family:var(--font-mono)">${fmt(l.cfo_original)}</td>`
+         + `<td style="padding:5px 8px;text-align:right">${pe}</td>`
+         + `<td style="padding:5px 8px;text-align:right">${dif}</td>`
+         + `<td style="padding:5px 8px;text-align:right">${up}</td></tr>`;
+  }).join('');
+  const cmpTable = `<table style="width:100%;border-collapse:collapse">`
+    + `<thead><tr style="font-size:.66rem;color:var(--muted);text-transform:uppercase">`
+    + `<th style="text-align:left;padding:5px 8px">Ambiente</th><th style="text-align:right;padding:5px 8px">CFO venda</th>`
+    + `<th style="text-align:right;padding:5px 8px">CFO PE</th><th style="text-align:right;padding:5px 8px">Δ custo</th>`
+    + `<th style="text-align:right;padding:5px 8px">Carregar</th></tr></thead><tbody>${cmpRows}</tbody></table>`;
+  const re = j.reconciliacao_estimada;
+  const reRows = re.linhas.map(l => {
+    const dCor = l.delta>0.005?'var(--err)':(l.delta<-0.005?'var(--ok)':'var(--muted)');
+    return `<tr style="border-top:1px solid var(--border);font-size:.78rem"><td style="padding:4px 8px">${esc(l.nome)}</td>`
+         + `<td style="padding:4px 8px;text-align:right;font-family:var(--font-mono)">${fmt(l.provisionado)}</td>`
+         + `<td style="padding:4px 8px;text-align:right;font-family:var(--font-mono)">${fmt(l.estimado)}</td>`
+         + `<td style="padding:4px 8px;text-align:right;font-family:var(--font-mono);color:${dCor}">${sig(l.delta)}</td></tr>`;
+  }).join('');
+  const mCor = re.delta_pct<-0.005?'var(--err)':(re.delta_pct>0.005?'var(--ok)':'var(--muted)');
+  const reBlock = `<div style="margin-top:14px;background:var(--surface-2);border:1px dashed var(--warn-line);border-radius:8px;padding:12px">`
+    + `<div style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--warn);font-weight:700;margin-bottom:8px">`
+    + `<i class="ti ti-flask"></i> Reconciliação estimada — estimativa gerencial (não contábil)</div>`
+    + `<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:10px">`
+    + `<div><div style="font-size:.66rem;color:var(--muted);text-transform:uppercase">Contrato</div><div style="font-family:var(--font-mono);font-weight:700">${fmt(re.val_cont)}</div></div>`
+    + `<div><div style="font-size:.66rem;color:var(--muted);text-transform:uppercase">Margem contratada</div><div style="font-family:var(--font-mono)">${fmt(re.margem_contratada)} · ${re.margem_contratada_pct}%</div></div>`
+    + `<div><div style="font-size:.66rem;color:var(--muted);text-transform:uppercase">Margem estimada</div><div style="font-family:var(--font-mono);font-weight:700;color:${mCor}">${fmt(re.margem_estimada)} · ${re.margem_estimada_pct}% (${re.delta_pct>0?'+':''}${re.delta_pct} pts)</div></div></div>`
+    + `<table style="width:100%;border-collapse:collapse"><thead><tr style="font-size:.64rem;color:var(--muted);text-transform:uppercase">`
+    + `<th style="text-align:left;padding:4px 8px">Rubrica</th><th style="text-align:right;padding:4px 8px">Provisionado</th>`
+    + `<th style="text-align:right;padding:4px 8px">Estimado</th><th style="text-align:right;padding:4px 8px">Δ</th></tr></thead><tbody>${reRows}</tbody></table></div>`;
+  cont.innerHTML = cmpTable + reBlock;
+}
+async function pePeUpload(poolAmbienteId, inputFile){
+  if(!projetoAtivo) return;
+  const f = inputFile.files[0];
+  if(!f) return;
+  const fd = new FormData();
+  fd.append('arquivo', f);
+  fd.append('pool_ambiente_id', poolAmbienteId);
+  try {
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/upload`,
+                          {method:'POST', credentials:'same-origin', body:fd}).then(r=>r.json());
+    if(j.ok){ showToast('XML de PE carregado.'); peComparacaoRender(); }
+    else { await avisoPopup(j.erro||'Erro',{titulo:'Carregar PE'}); }
+  } catch(e){ await avisoPopup('Erro ao enviar o arquivo.',{titulo:'Carregar PE'}); }
 }
 
 async function peUpload(codigo, inputFile) {

@@ -738,6 +738,11 @@ class Handler(BaseHTTPRequestHandler):
                 valores_pe = {pa_nome[a.pool_ambiente_id]: a.valor_atualizado
                               for a in pes if a.valor_atualizado is not None and a.pool_ambiente_id in pa_nome}
                 linhas = mod_pe_comparacao.montar_comparacao_pe(itens_cfo, valores_pe)
+                # enriquece cada linha com o pool_ambiente_id (glue de UI p/ o upload por ambiente;
+                # fora do contrato da função pura, que é keyed por nome — §6)
+                _id_por_nome = {(pa.nome_exibicao or pa.nome): pa.id for pa in pool}
+                for _l in linhas:
+                    _l["pool_ambiente_id"] = _id_por_nome.get(_l["ambiente"])
                 delta_cfo = -mod_pe_comparacao.saldo_margem_estimado(linhas)
                 # reconciliação estimada (lê o razão só p/ exibir) + Val_Cont do contrato assinado
                 ot, oid = mod_contabil.resolver_owner(db, usuario)
