@@ -3,110 +3,112 @@
 <head>
 <meta charset="UTF-8">
 <title>Painel de Testes — Módulo Financeiro v4</title>
+<!-- Design system v1.5 (fonte única de cor/tipografia) — antes do CSS local do painel -->
+<link rel="stylesheet" href="design-system/orizon-tokens.css">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0b0c0f;color:#dde1ec;font-family:'Courier New',monospace;padding:24px;font-size:13px}
-h1{color:#e8611a;font-size:18px;margin-bottom:4px}
-.sub{color:#5a6178;font-size:11px;margin-bottom:20px}
+body{background:var(--bg);color:var(--text);font-family:var(--font-mono);padding:24px;font-size:13px}
+h1{color:var(--accent);font-size:18px;margin-bottom:4px}
+.sub{color:var(--text-2);font-size:11px;margin-bottom:20px}
 .tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
-.tab{padding:7px 14px;border-radius:6px;border:1px solid #1f2330;cursor:pointer;font-size:12px;color:#5a6178;background:#111318;transition:.15s}
-.tab:hover{border-color:#e8611a;color:#e8611a}
-.tab.active{background:#e8611a;color:#fff;border-color:#e8611a}
+.tab{padding:7px 14px;border-radius:6px;border:1px solid var(--border);cursor:pointer;font-size:12px;color:var(--text-2);background:var(--surface-2);transition:.15s}
+.tab:hover{border-color:var(--accent);color:var(--accent)}
+.tab.active{background:var(--accent);color:var(--btn-primary-text);border-color:var(--accent)}
 .panel{display:none}.panel.active{display:block}
 .grid2{display:grid;grid-template-columns:300px 1fr;gap:16px}
-.sep{height:1px;background:#1f2330;margin:12px 0}
+.sep{height:1px;background:var(--border);margin:12px 0}
 
 /* Cards */
 .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
 .card{border-radius:8px;padding:12px;border:1px solid}
-.card-green {background:rgba(25,201,160,.06);border-color:rgba(25,201,160,.3)}
-.card-green .lbl{color:rgba(25,201,160,.7)} .card-green .val{color:#19c9a0}
-.card-orange{background:rgba(232,97,26,.06);border-color:rgba(232,97,26,.3)}
-.card-orange .lbl{color:rgba(232,97,26,.7)} .card-orange .val{color:#e8611a}
-.card-amber {background:rgba(240,165,0,.06);border-color:rgba(240,165,0,.3)}
-.card-amber .lbl{color:rgba(240,165,0,.7)}  .card-amber .val{color:#f0a500}
-.card-blue  {background:rgba(99,179,237,.06);border-color:rgba(99,179,237,.3)}
-.card-blue .lbl{color:rgba(99,179,237,.7)}  .card-blue .val{color:#63b3ed}
-.card-neutral{background:#161921;border-color:#1f2330}
-.card-neutral .lbl{color:#5a6178} .card-neutral .val{color:#dde1ec}
+.card-green {background:var(--ok-soft);border-color:var(--ok-line)}
+.card-green .lbl{color:var(--ok)} .card-green .val{color:var(--ok)}
+.card-orange{background:var(--accent-soft);border-color:var(--accent-line)}
+.card-orange .lbl{color:var(--accent)} .card-orange .val{color:var(--accent)}
+.card-amber {background:var(--warn-soft);border-color:var(--warn-line)}
+.card-amber .lbl{color:var(--warn)}  .card-amber .val{color:var(--warn)}
+.card-blue  {background:var(--info-soft);border-color:var(--info-line)}
+.card-blue .lbl{color:var(--info)}  .card-blue .val{color:var(--info)}
+.card-neutral{background:var(--surface-2);border-color:var(--border)}
+.card-neutral .lbl{color:var(--text-2)} .card-neutral .val{color:var(--text)}
 .lbl{font-size:9px;text-transform:uppercase;letter-spacing:1px;margin-bottom:3px}
 .val{font-size:14px;font-weight:bold}
 
 /* Contrato box — destaque principal */
-.contrato-box{border-radius:10px;overflow:hidden;margin-bottom:14px;border:1px solid #1f2330}
-.contrato-avista{background:rgba(25,201,160,.06);border-bottom:1px solid #1f2330;padding:14px 16px}
-.contrato-parcelado{background:rgba(232,97,26,.06);padding:14px 16px}
-.contrato-label{font-size:9px;color:#5a6178;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
-.contrato-val{font-family:'Epilogue',sans-serif;font-weight:900;font-size:22px}
-.contrato-val.green{color:#19c9a0}
-.contrato-val.orange{color:#e8611a}
-.contrato-sub{font-size:11px;color:#5a6178;margin-top:4px}
-.toggle-btn{font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #1f2330;
-  background:transparent;color:#5a6178;cursor:pointer}
-.toggle-btn:hover{border-color:#19c9a0;color:#19c9a0}
+.contrato-box{border-radius:10px;overflow:hidden;margin-bottom:14px;border:1px solid var(--border)}
+.contrato-avista{background:var(--ok-soft);border-bottom:1px solid var(--border);padding:14px 16px}
+.contrato-parcelado{background:var(--accent-soft);padding:14px 16px}
+.contrato-label{font-size:9px;color:var(--text-2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.contrato-val{font-family:var(--font-display);font-weight:900;font-size:22px}
+.contrato-val.green{color:var(--ok)}
+.contrato-val.orange{color:var(--accent)}
+.contrato-sub{font-size:11px;color:var(--text-2);margin-top:4px}
+.toggle-btn{font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid var(--border);
+  background:transparent;color:var(--text-2);cursor:pointer}
+.toggle-btn:hover{border-color:var(--ok);color:var(--ok)}
 
 /* Campos */
 .field{margin-bottom:8px}
-.field label{display:block;font-size:11px;color:#5a6178;margin-bottom:3px}
-.field input,.field select{width:100%;background:#111318;border:1px solid #1f2330;
-  border-radius:6px;padding:6px 10px;color:#dde1ec;font-family:'Courier New',monospace;
+.field label{display:block;font-size:11px;color:var(--text-2);margin-bottom:3px}
+.field input,.field select{width:100%;background:var(--surface-2);border:1px solid var(--border);
+  border-radius:6px;padding:6px 10px;color:var(--text);font-family:var(--font-mono);
   font-size:12px;outline:none;transition:.15s}
-.field input:focus,.field select:focus{border-color:#e8611a}
-.field input[readonly]{color:#5a6178;cursor:default;border-style:dashed}
+.field input:focus,.field select:focus{border-color:var(--accent)}
+.field input[readonly]{color:var(--text-2);cursor:default;border-style:dashed}
 
 /* Botões */
-.btn{padding:7px 14px;border-radius:6px;border:none;cursor:pointer;font-family:'Courier New',monospace;font-size:12px;font-weight:bold;transition:.15s}
-.btn-p{background:#e8611a;color:#fff}.btn-p:hover{opacity:.85}
-.btn-g{background:transparent;border:1px solid #1f2330;color:#5a6178}.btn-g:hover{border-color:#e8611a;color:#e8611a}
+.btn{padding:7px 14px;border-radius:6px;border:none;cursor:pointer;font-family:var(--font-mono);font-size:12px;font-weight:bold;transition:.15s}
+.btn-p{background:var(--accent);color:var(--btn-primary-text)}.btn-p:hover{opacity:.85}
+.btn-g{background:transparent;border:1px solid var(--border);color:var(--text-2)}.btn-g:hover{border-color:var(--accent);color:var(--accent)}
 
 /* Tabela de parcelas */
 .pt{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
-.pt th{color:#5a6178;text-align:left;padding:5px 8px;border-bottom:1px solid #1f2330;font-size:10px;text-transform:uppercase;letter-spacing:1px}
-.pt td{padding:5px 8px;border-bottom:1px solid #1f2330}
-.pt tbody tr:hover td{background:rgba(255,255,255,.02)}
+.pt th{color:var(--text-2);text-align:left;padding:5px 8px;border-bottom:1px solid var(--border);font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.pt td{padding:5px 8px;border-bottom:1px solid var(--border)}
+.pt tbody tr:hover td{background:var(--surface-2)}
 .badge{font-size:10px;padding:1px 7px;border-radius:3px;display:inline-block}
-.bc{background:rgba(90,97,120,.15);color:#5a6178}
-.be{background:rgba(232,97,26,.15);color:#e8611a}
-.b1{background:rgba(240,165,0,.12);color:#f0a500}
-.bp{background:rgba(25,201,160,.1);color:#19c9a0}
+.bc{background:var(--surface-2);color:var(--text-2)}
+.be{background:var(--accent-soft);color:var(--accent)}
+.b1{background:var(--warn-soft);color:var(--warn)}
+.bp{background:var(--ok-soft);color:var(--ok)}
 
 /* Log */
-.log{background:#111318;border:1px solid #1f2330;border-radius:6px;padding:10px;
+.log{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:10px;
   font-size:11px;line-height:1.7;max-height:140px;overflow-y:auto;white-space:pre-wrap;margin-top:8px}
-.log .ok{color:#19c9a0}.log .err{color:#e05555}.log .info{color:#f0a500}
+.log .ok{color:var(--ok)}.log .err{color:var(--err)}.log .info{color:var(--warn)}
 
 /* Testes automáticos */
-.progress{height:3px;background:#1f2330;border-radius:2px;margin-bottom:14px;overflow:hidden}
-.progress-bar{height:100%;background:#19c9a0;transition:width .2s}
-.suite-wrap{margin-bottom:10px;background:#161921;border:1px solid #1f2330;border-radius:8px;overflow:hidden}
-.suite-hdr{padding:9px 14px;background:#111318;font-size:12px;font-weight:bold;border-bottom:1px solid #1f2330;display:flex;justify-content:space-between;align-items:center}
-.case-row{padding:7px 14px;border-bottom:1px solid #1f2330;font-size:11px;display:flex;justify-content:space-between;align-items:flex-start}
+.progress{height:3px;background:var(--border);border-radius:2px;margin-bottom:14px;overflow:hidden}
+.progress-bar{height:100%;background:var(--ok);transition:width .2s}
+.suite-wrap{margin-bottom:10px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.suite-hdr{padding:9px 14px;background:var(--surface-2);font-size:12px;font-weight:bold;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.case-row{padding:7px 14px;border-bottom:1px solid var(--border);font-size:11px;display:flex;justify-content:space-between;align-items:flex-start}
 .case-row:last-child{border:none}
-.case-detail{font-size:10px;color:#e05555;margin-top:3px;padding-left:8px;border-left:2px solid rgba(224,85,85,.3)}
+.case-detail{font-size:10px;color:var(--err);margin-top:3px;padding-left:8px;border-left:2px solid var(--err-line)}
 .sum-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
 
 /* Tabela de taxas */
 .taxa-table{width:100%;border-collapse:collapse;font-size:11px}
-.taxa-table th{color:#5a6178;padding:5px 8px;border-bottom:1px solid #1f2330;text-align:right;font-size:10px;text-transform:uppercase}
+.taxa-table th{color:var(--text-2);padding:5px 8px;border-bottom:1px solid var(--border);text-align:right;font-size:10px;text-transform:uppercase}
 .taxa-table th:first-child{text-align:left}
-.taxa-table td{padding:4px 8px;border-bottom:1px solid #1f2330;text-align:right}
-.taxa-table td:first-child{text-align:left;color:#5a6178}
-.taxa-table tr:hover td{background:rgba(255,255,255,.02)}
+.taxa-table td{padding:4px 8px;border-bottom:1px solid var(--border);text-align:right}
+.taxa-table td:first-child{text-align:left;color:var(--text-2)}
+.taxa-table tr:hover td{background:var(--surface-2)}
 
 /* Histórico */
 .hist-table{width:100%;border-collapse:collapse;font-size:11px}
-.hist-table th{color:#5a6178;padding:5px 8px;border-bottom:1px solid #1f2330;text-align:left;font-size:10px;text-transform:uppercase}
-.hist-table td{padding:6px 8px;border-bottom:1px solid #1f2330;vertical-align:top}
-.hist-table tr:hover td{background:rgba(255,255,255,.02)}
+.hist-table th{color:var(--text-2);padding:5px 8px;border-bottom:1px solid var(--border);text-align:left;font-size:10px;text-transform:uppercase}
+.hist-table td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top}
+.hist-table tr:hover td{background:var(--surface-2)}
 </style>
 </head>
 <body>
 
 <h1>🧪 Painel de Testes — Módulo Financeiro v4</h1>
 <div class="sub">
-  Servidor: <span id="srv-url" style="color:#e8611a"></span>
-  &nbsp;|&nbsp; <span id="srv-status" style="color:#f0a500">verificando...</span>
-  &nbsp;|&nbsp; Última execução: <span id="last-run" style="color:#5a6178">—</span>
+  Servidor: <span id="srv-url" style="color:var(--accent)"></span>
+  &nbsp;|&nbsp; <span id="srv-status" style="color:var(--warn)">verificando...</span>
+  &nbsp;|&nbsp; Última execução: <span id="last-run" style="color:var(--text-2)">—</span>
 </div>
 
 <div class="tabs">
@@ -129,7 +131,7 @@ h1{color:#e8611a;font-size:18px;margin-bottom:4px}
   <div class="sum-cards">
     <div class="card card-neutral"><div class="lbl">Total</div><div class="val" id="s-tot">—</div></div>
     <div class="card card-green"><div class="lbl">Passou</div><div class="val" id="s-pass">—</div></div>
-    <div class="card card-amber"><div class="lbl">Falhou</div><div class="val" id="s-fail" style="color:#e05555">—</div></div>
+    <div class="card card-amber"><div class="lbl">Falhou</div><div class="val" id="s-fail" style="color:var(--err)">—</div></div>
   </div>
   <div id="suite-out"></div>
 </div>
@@ -148,13 +150,13 @@ h1{color:#e8611a;font-size:18px;margin-bottom:4px}
           <input type="number" id="ay-desconto" value="10" min="0" max="100" step="0.5" oninput="ayCalcAvista()">
         </div>
         <div class="field">
-          <label style="color:#5a6178">Desc. R$</label>
+          <label style="color:var(--text-2)">Desc. R$</label>
           <input type="number" id="ay-desc-rs" value="0" readonly>
         </div>
       </div>
       <div class="field">
         <label>Valor à Vista (R$) — loja recebe — calculado automaticamente</label>
-        <input type="number" id="ay-avista" value="0" readonly style="color:#19c9a0;border-color:rgba(25,201,160,.3)">
+        <input type="number" id="ay-avista" value="0" readonly style="color:var(--ok);border-color:var(--ok-line)">
       </div>
       <div class="field">
         <label>Valor ao Cliente (R$) — com gross-up — calculado automaticamente</label>
@@ -232,13 +234,13 @@ h1{color:#e8611a;font-size:18px;margin-bottom:4px}
           <input type="number" id="cc-desconto" value="0" min="0" max="100" step="0.5" oninput="ccCalcAvista()">
         </div>
         <div class="field">
-          <label style="color:#5a6178">Desc. R$</label>
+          <label style="color:var(--text-2)">Desc. R$</label>
           <input type="number" id="cc-desc-rs" value="0" readonly>
         </div>
       </div>
       <div class="field">
         <label>Valor à Vista (R$) — loja recebe — calculado automaticamente</label>
-        <input type="number" id="cc-avista" value="0" readonly style="color:#19c9a0;border-color:rgba(25,201,160,.3)">
+        <input type="number" id="cc-avista" value="0" readonly style="color:var(--ok);border-color:var(--ok-line)">
       </div>
       <div class="field">
         <label>Valor ao Cliente (R$) — com gross-up — calculado automaticamente</label>
@@ -345,16 +347,16 @@ h1{color:#e8611a;font-size:18px;margin-bottom:4px}
 <div id="tab-taxas" class="panel">
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
     <div>
-      <h2 style="color:#19c9a0;font-size:13px;margin-bottom:10px">Aymoré — Carência 30d / Base R$100k à vista</h2>
+      <h2 style="color:var(--ok);font-size:13px;margin-bottom:10px">Aymoré — Carência 30d / Base R$100k à vista</h2>
       <table class="taxa-table">
-        <thead><tr><th>Prazo</th><th>Taxa Mens.</th><th>Retenção</th><th style="color:#19c9a0">Loja Recebe</th><th style="color:#e8611a">Cliente Paga</th><th style="color:#e8611a">Parcela</th></tr></thead>
+        <thead><tr><th>Prazo</th><th>Taxa Mens.</th><th>Retenção</th><th style="color:var(--ok)">Loja Recebe</th><th style="color:var(--accent)">Cliente Paga</th><th style="color:var(--accent)">Parcela</th></tr></thead>
         <tbody id="taxa-ay-tb"></tbody>
       </table>
     </div>
     <div>
-      <h2 style="color:#19c9a0;font-size:13px;margin-bottom:10px">Cartão de Crédito — Base R$10k à vista</h2>
+      <h2 style="color:var(--ok);font-size:13px;margin-bottom:10px">Cartão de Crédito — Base R$10k à vista</h2>
       <table class="taxa-table">
-        <thead><tr><th>Prazo</th><th>Retenção</th><th style="color:#19c9a0">Loja Recebe</th><th style="color:#e8611a">Cliente Paga</th><th style="color:#e8611a">Parcela</th></tr></thead>
+        <thead><tr><th>Prazo</th><th>Retenção</th><th style="color:var(--ok)">Loja Recebe</th><th style="color:var(--accent)">Cliente Paga</th><th style="color:var(--accent)">Parcela</th></tr></thead>
         <tbody id="taxa-cc-tb"></tbody>
       </table>
     </div>
@@ -364,7 +366,7 @@ h1{color:#e8611a;font-size:18px;margin-bottom:4px}
 <!-- ═══ HISTÓRICO ═══ -->
 <div id="tab-hist" class="panel">
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-    <h2 style="color:#19c9a0;font-size:13px">Histórico</h2>
+    <h2 style="color:var(--ok);font-size:13px">Histórico</h2>
     <button class="btn btn-g" onclick="clearHist()">Limpar</button>
   </div>
   <table class="hist-table">
@@ -386,10 +388,10 @@ document.getElementById('srv-url').textContent=BASE;
 
 fetch(BASE+'/config').then(r=>{
   document.getElementById('srv-status').textContent = r.ok?'✓ Servidor online':'✗ Erro';
-  document.getElementById('srv-status').style.color = r.ok?'#19c9a0':'#e05555';
+  document.getElementById('srv-status').style.color = r.ok?'var(--ok)':'var(--err)';
 }).catch(()=>{
   document.getElementById('srv-status').textContent='✗ Servidor offline';
-  document.getElementById('srv-status').style.color='#e05555';
+  document.getElementById('srv-status').style.color='var(--err)';
 });
 
 // Inicializar campos de valor ao cliente
@@ -486,15 +488,15 @@ function makeParcelas(tbId, lista, totalPago){
   const rows=lista.map(p=>{
     const[cls,lbl]=B[p.tipo]||B.parcela;
     return `<tr>
-      <td style="color:#5a6178">${p.num>0?p.num:'—'}</td>
+      <td style="color:var(--text-2)">${p.num>0?p.num:'—'}</td>
       <td><span class="badge ${cls}">${lbl}</span></td>
-      <td style="color:#5a6178">${p.data}</td>
-      <td style="text-align:right;color:${p.tipo==='entrada'?'#e8611a':p.tipo==='contrato'?'#5a6178':'#19c9a0'}">
+      <td style="color:var(--text-2)">${p.data}</td>
+      <td style="text-align:right;color:${p.tipo==='entrada'?'var(--accent)':p.tipo==='contrato'?'var(--text-2)':'var(--ok)'}">
         ${p.valor!==null?fmt(p.valor):'—'}</td></tr>`;
   }).join('');
   document.getElementById(tbId).innerHTML=rows+
-    `<tr><td colspan="3" style="color:#5a6178;font-size:11px;padding-top:8px">Total pago pelo cliente</td>
-      <td style="text-align:right;color:#19c9a0;font-weight:bold;padding-top:8px">${fmt(totalPago)}</td></tr>`;
+    `<tr><td colspan="3" style="color:var(--text-2);font-size:11px;padding-top:8px">Total pago pelo cliente</td>
+      <td style="text-align:right;color:var(--ok);font-weight:bold;padding-top:8px">${fmt(totalPago)}</td></tr>`;
 }
 
 function addLog(id,msg,cls=''){
@@ -507,15 +509,15 @@ function addLog(id,msg,cls=''){
 function buildChecks(items){
   return items.map(([lbl,got,exp,tol])=>{
     const ok=Math.abs(Number(got)-Number(exp))<=tol;
-    return `<div style="padding:5px 0;border-bottom:1px solid #1f2330;font-size:11px">
+    return `<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:11px">
       <div style="display:flex;justify-content:space-between">
-        <span style="color:#5a6178">${lbl}</span>
-        <span style="color:${ok?'#19c9a0':'#e05555'}">${ok?'✓ '+Number(got).toFixed(4):'✗'}</span>
+        <span style="color:var(--text-2)">${lbl}</span>
+        <span style="color:${ok?'var(--ok)':'var(--err)'}">${ok?'✓ '+Number(got).toFixed(4):'✗'}</span>
       </div>${!ok?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:3px;font-size:10px">
-        <div style="background:rgba(25,201,160,.08);border:1px solid rgba(25,201,160,.2);border-radius:3px;padding:2px 6px">
-          <div style="color:#5a6178">esperado</div><div style="color:#19c9a0">${exp}</div></div>
-        <div style="background:rgba(224,85,85,.08);border:1px solid rgba(224,85,85,.2);border-radius:3px;padding:2px 6px">
-          <div style="color:#5a6178">recebido</div><div style="color:#e05555">${Number(got).toFixed(4)}</div>
+        <div style="background:var(--ok-soft);border:1px solid var(--ok-line);border-radius:3px;padding:2px 6px">
+          <div style="color:var(--text-2)">esperado</div><div style="color:var(--ok)">${exp}</div></div>
+        <div style="background:var(--err-soft);border:1px solid var(--err-line);border-radius:3px;padding:2px 6px">
+          <div style="color:var(--text-2)">recebido</div><div style="color:var(--err)">${Number(got).toFixed(4)}</div>
         </div></div>`:''}
     </div>`;
   }).join('');
@@ -569,7 +571,7 @@ async function calcAy(){
       ]);
     } else {
       document.getElementById('ay-checks').innerHTML=
-        '<div style="color:#5a6178;font-size:11px;padding:8px 0">Defina à vista=R$100k, 8x, 20d para verificação automática</div>';
+        '<div style="color:var(--text-2);font-size:11px;padding:8px 0">Defina à vista=R$100k, 8x, 20d para verificação automática</div>';
     }
   }catch(e){addLog('ay-log','EXCEÇÃO: '+e.message,'err');}
 }
@@ -667,10 +669,10 @@ function buildTaxas(){
     return `<tr>
       <td>${n}x</td>
       <td>${(taxa*100).toFixed(4)}%</td>
-      <td style="color:#f0a500">${(ret*100).toFixed(4)}%</td>
-      <td style="color:#19c9a0">${fmt(avista)}</td>
-      <td style="color:#e8611a">${fmt(cliente)}</td>
-      <td style="color:#e8611a">${fmt(parc)}</td></tr>`;
+      <td style="color:var(--warn)">${(ret*100).toFixed(4)}%</td>
+      <td style="color:var(--ok)">${fmt(avista)}</td>
+      <td style="color:var(--accent)">${fmt(cliente)}</td>
+      <td style="color:var(--accent)">${fmt(parc)}</td></tr>`;
   }).join('');
   document.getElementById('taxa-ay-tb').innerHTML=ayRows;
 
@@ -683,10 +685,10 @@ function buildTaxas(){
     const parc=Math.round(cliente/n*100)/100;
     return `<tr>
       <td>${n}x</td>
-      <td style="color:#f0a500">${taxa_pct.toFixed(2)}%</td>
-      <td style="color:#19c9a0">${fmt(avista)}</td>
-      <td style="color:#e8611a">${fmt(cliente)}</td>
-      <td style="color:#e8611a">${fmt(parc)}</td></tr>`;
+      <td style="color:var(--warn)">${taxa_pct.toFixed(2)}%</td>
+      <td style="color:var(--ok)">${fmt(avista)}</td>
+      <td style="color:var(--accent)">${fmt(cliente)}</td>
+      <td style="color:var(--accent)">${fmt(parc)}</td></tr>`;
   }).join('');
   document.getElementById('taxa-cc-tb').innerHTML=ccRows;
 }
@@ -753,7 +755,7 @@ const SUITES=[
 async function runAll(){
   document.getElementById('suite-out').innerHTML='';
   document.getElementById('prog').style.width='0';
-  document.getElementById('run-badge').innerHTML='<span style="color:#f0a500;font-size:11px">executando...</span>';
+  document.getElementById('run-badge').innerHTML='<span style="color:var(--warn);font-size:11px">executando...</span>';
   let total=0,pass=0,fail=0,results=[];
   const totalCases=SUITES.reduce((s,x)=>s+x.casos.length,0);
   let done=0;
@@ -763,8 +765,8 @@ async function runAll(){
     const wrap=document.createElement('div');
     wrap.className='suite-wrap';
     wrap.innerHTML=`<div class="suite-hdr">
-      <span style="color:#dde1ec">${suite.nome}</span>
-      <span id="sh-${sid}" style="color:#5a6178">...</span></div>
+      <span style="color:var(--text)">${suite.nome}</span>
+      <span id="sh-${sid}" style="color:var(--text-2)">...</span></div>
       <div id="sc-${sid}"></div>`;
     document.getElementById('suite-out').appendChild(wrap);
     const casesEl=document.getElementById(`sc-${sid}`);
@@ -780,7 +782,7 @@ async function runAll(){
           headers:{'Content-Type':'application/json'},body:JSON.stringify(caso.pay)});
         const d=await r.json();
         if(!d.ok){
-          row.innerHTML=`<span>${caso.lbl}</span><span style="color:#e05555">✗ ${d.erro}</span>`;
+          row.innerHTML=`<span>${caso.lbl}</span><span style="color:var(--err)">✗ ${d.erro}</span>`;
           sf++;fail++;results.push({s:suite.nome,l:caso.lbl,ok:false,d:'API: '+d.erro});
         } else {
           const erros=[];
@@ -790,32 +792,32 @@ async function runAll(){
               erros.push(`${field}: esperado=${exp}, recebido=${got.toFixed(4)}`);
           }
           if(erros.length===0){
-            row.innerHTML=`<span style="color:#dde1ec">${caso.lbl}</span><span style="color:#19c9a0">✓</span>`;
+            row.innerHTML=`<span style="color:var(--text)">${caso.lbl}</span><span style="color:var(--ok)">✓</span>`;
             sp++;pass++;results.push({s:suite.nome,l:caso.lbl,ok:true});
           } else {
             row.innerHTML=`<div style="flex:1"><div style="display:flex;justify-content:space-between">
-              <span style="color:#dde1ec">${caso.lbl}</span><span style="color:#e05555">✗</span></div>
+              <span style="color:var(--text)">${caso.lbl}</span><span style="color:var(--err)">✗</span></div>
               <div class="case-detail">${erros.map(e=>'• '+e).join('<br>')}</div></div>`;
             sf++;fail++;results.push({s:suite.nome,l:caso.lbl,ok:false,d:erros.join(' | ')});
           }
         }
       }catch(e){
-        row.innerHTML=`<span style="color:#e05555">${caso.lbl} — ${e.message}</span>`;
+        row.innerHTML=`<span style="color:var(--err)">${caso.lbl} — ${e.message}</span>`;
         sf++;fail++;
       }
       done++;
       document.getElementById('prog').style.width=Math.round(done/totalCases*100)+'%';
     }
     document.getElementById(`sh-${sid}`).innerHTML=
-      `<span style="color:${sf===0?'#19c9a0':'#e05555'}">${sp}✓ ${sf}✗</span>`;
+      `<span style="color:${sf===0?'var(--ok)':'var(--err)'}">${sp}✓ ${sf}✗</span>`;
   }
 
   document.getElementById('s-tot').textContent=total;
   document.getElementById('s-pass').textContent=pass;
   document.getElementById('s-fail').textContent=fail;
   document.getElementById('run-badge').innerHTML=
-    `<span style="background:${fail===0?'rgba(25,201,160,.15)':'rgba(224,85,85,.15)'};
-      color:${fail===0?'#19c9a0':'#e05555'};padding:2px 10px;border-radius:4px;font-size:11px">
+    `<span style="background:${fail===0?'var(--ok-soft)':'var(--err-soft)'};
+      color:${fail===0?'var(--ok)':'var(--err)'};padding:2px 10px;border-radius:4px;font-size:11px">
       ${fail===0?'✓ TODOS PASSARAM':'✗ '+fail+' FALHA'+(fail>1?'S':'')}</span>`;
   document.getElementById('last-run').textContent=new Date().toLocaleTimeString('pt-BR');
 
@@ -836,15 +838,15 @@ function clearAuto(){
 function renderHist(){
   const tb=document.getElementById('hist-tb');
   if(!_hist.length){
-    tb.innerHTML='<tr><td colspan="5" style="color:#5a6178;text-align:center;padding:20px">Nenhuma execução ainda</td></tr>';
+    tb.innerHTML='<tr><td colspan="5" style="color:var(--text-2);text-align:center;padding:20px">Nenhuma execução ainda</td></tr>';
     return;
   }
   tb.innerHTML=_hist.map(h=>`<tr>
-    <td style="color:#5a6178;font-size:10px;white-space:nowrap">${h.ts}</td>
-    <td style="font-weight:bold;color:${h.fail===0?'#19c9a0':'#e05555'}">${h.fail===0?'✓ OK':'✗ FALHA'}</td>
-    <td style="color:#19c9a0">${h.pass}</td>
-    <td style="color:${h.fail>0?'#e05555':'#5a6178'}">${h.fail}</td>
-    <td style="color:#5a6178;font-size:10px">${h.details.length?h.details.join('<br>'):'—'}</td>
+    <td style="color:var(--text-2);font-size:10px;white-space:nowrap">${h.ts}</td>
+    <td style="font-weight:bold;color:${h.fail===0?'var(--ok)':'var(--err)'}">${h.fail===0?'✓ OK':'✗ FALHA'}</td>
+    <td style="color:var(--ok)">${h.pass}</td>
+    <td style="color:${h.fail>0?'var(--err)':'var(--text-2)'}">${h.fail}</td>
+    <td style="color:var(--text-2);font-size:10px">${h.details.length?h.details.join('<br>'):'—'}</td>
   </tr>`).join('');
 }
 
