@@ -222,6 +222,11 @@
   }
   .field input:focus { border-color: var(--accent); }
   .login-card .btn { width: 100%; margin-top: 6px; }
+  /* Primário do login = componente do design system (cinza-quente --btn-primary-*, ≠ accent —
+     regra inegociável nº 2). Sobrescreve o .btn-primary próprio da landing, que sobre o card
+     carvão resolveria --accent→--sidebar-accent (cobre claro) e daria contraste ~2,6:1. */
+  .login-card .btn-primary { background: var(--btn-primary-bg); color: var(--btn-primary-text); box-shadow: var(--btn-primary-shadow); }
+  .login-card .btn-primary:hover { background: var(--btn-primary-bg-hover); opacity: 1; }
   .login-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; font-size: 12.5px; }
   .login-foot a { color: var(--accent); font-weight: 500; }
   .login-foot a:hover { text-decoration: underline; }

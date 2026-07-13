@@ -68,6 +68,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
   --accent-soft:   var(--sidebar-item-active);
   --accent-tint:   var(--sidebar-item-active);
 }
+/* Sair (hover --err): no claro o --err é vinho escuro, ilegível sobre o carvão da sidebar.
+   Só no claro (padrão = sem atributo → :not([data-theme=dark])) reaponta --err p/ o rosa claro
+   --err-line, legível no escuro. No tema escuro, --err já é rosa-vinho claro (legível) — não mexe. */
+:root:not([data-theme="dark"]) .sidebar{ --err: var(--err-line); }
 /* Marca — lockup horizontal (REGRAS_MARCA §5): glifo + wordmark. A sidebar é escura nos dois temas,
    então o glifo mono-branco (via currentColor) e o wordmark valem nos dois. Glifo a 40px → peso fino
    válido (§4). Geometria oficial de design-system/marca/glifo-mono-branco.svg — não redesenhada. */
@@ -632,7 +636,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             style="width:100%;margin-top:8px;padding:8px;background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:var(--font-sans);font-size:11px;font-weight:700;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:6px"
             onmouseover="this.style.borderColor='var(--err)';this.style.color='var(--err)'"
             onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'"><i class="ti ti-logout"></i> Sair</button>
-    <div style="display:flex;gap:4px;margin-top:8px;background:var(--surface-2);border-radius:8px;padding:3px;box-shadow:var(--shadow)">
+    <div style="display:flex;gap:4px;margin-top:8px;background:transparent;border-radius:8px;padding:3px">
       <button id="tema-claro"  onclick="setTema('claro')"  title="Tema claro"  style="flex:1;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s">&#x2600; Claro</button>
       <button id="tema-escuro" onclick="setTema('escuro')" title="Tema escuro" style="flex:1;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s">&#x1F319; Escuro</button>
     </div>
@@ -2464,8 +2468,11 @@ function aplicarTema(tema){
   else                   root.removeAttribute('data-theme');
   // controle segmentado no rodapé da sidebar (v4 §4)
   const bc = document.getElementById('tema-claro'), be = document.getElementById('tema-escuro');
-  const on = 'background:var(--surface);color:var(--text);box-shadow:var(--shadow)';
-  const off = 'background:transparent;color:var(--muted);box-shadow:none';
+  // Pill ativo do alternador de tema (rodapé da sidebar, carvão): borda + tint + texto cobre
+  // (padrão status-selector). --surface/--shadow não servem aqui — dentro da .sidebar, --surface
+  // vira --sidebar-bg (= o próprio fundo). box-sizing:border-box global evita shift com a borda.
+  const on = 'border:1px solid var(--sidebar-accent);background:var(--sidebar-item-active);color:var(--sidebar-accent);box-shadow:none';
+  const off = 'border:1px solid transparent;background:transparent;color:var(--sidebar-text);box-shadow:none';
   if(bc) bc.style.cssText = 'flex:1;border:none;font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s;'+(tema==='claro'?on:off);
   if(be) be.style.cssText = 'flex:1;border:none;font-size:11px;font-weight:500;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .15s;'+(tema==='escuro'?on:off);
 }

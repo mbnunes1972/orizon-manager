@@ -2091,6 +2091,15 @@ Consolidação definitiva das duas frentes de design sobre a base da Sessão 72.
   e `docs/design/padrao-design-orizon-v2.md`. Specs históricas datadas **não** foram reescritas (registro).
   `modelo_proposta.docx` (marketing, caminho docx/LibreOffice) fica para um passe à parte.
 
+**Auditada pela Vera** (estática + contraste + `node --check` via WSL; confirmou 200 do design-system/*.css no
+servidor real). 3 achados corrigidos: (1) 🔴 pill ativo do alternador de tema sumia na sidebar (usava
+`--surface`→`--sidebar-bg` = o próprio fundo) → pill agora com borda+tint+texto cobre (padrão status-selector),
+trilho transparente; (2) 🔴 botão "Entrar" do login a ~2,6:1 (o `.btn-primary` próprio da landing resolvia
+`--accent`→`--sidebar-accent` como fundo) → passa a usar o componente `--btn-primary-*` (cinza-quente, 09b/regra
+nº 2); (3) 🟠 hover de "Sair" com `--err` vinho ilegível no carvão → `:root:not([data-theme=dark]) .sidebar`
+reaponta `--err`→`--err-line` (rosa claro) só no claro (no escuro o `--err` já é claro). Confirmado OK por ela:
+sidebar carvão + lockup, nav/creds legíveis, composição do login 09b, e o conteúdo herdando tokens no claro.
+
 ## Sessão 72 — Design system v1.4 (cobre/carvão) + Identidade visual v1.0 (glifo da bússola)
 Consolidação de duas frentes de design entregues fora do código (arquivos em `design-system/`).
 Supera o rebrand da **Sessão 68** (navy/azul-elétrico/ciano da logo antiga), que fica aposentado.
