@@ -5,6 +5,7 @@
 <title>Painel de Testes — Módulo Financeiro v4</title>
 <!-- Design system v1.5 (fonte única de cor/tipografia) — antes do CSS local do painel -->
 <link rel="stylesheet" href="design-system/orizon-tokens.css">
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:var(--font-mono);padding:24px;font-size:13px}
@@ -104,7 +105,7 @@ h1{color:var(--accent);font-size:18px;margin-bottom:4px}
 </head>
 <body>
 
-<h1>🧪 Painel de Testes — Módulo Financeiro v4</h1>
+<h1><i class="ti ti-flask"></i> Painel de Testes — Módulo Financeiro v4</h1>
 <div class="sub">
   Servidor: <span id="srv-url" style="color:var(--accent)"></span>
   &nbsp;|&nbsp; <span id="srv-status" style="color:var(--warn)">verificando...</span>
@@ -116,8 +117,8 @@ h1{color:var(--accent);font-size:18px;margin-bottom:4px}
   <div class="tab" onclick="showTab('aymore')">Aymoré</div>
   <div class="tab" onclick="showTab('cartao')">Cartão</div>
   <div class="tab" onclick="showTab('financeira')">Financeira Loja</div>
-  <div class="tab" onclick="showTab('taxas')">📊 Taxas</div>
-  <div class="tab" onclick="showTab('hist')">📋 Histórico</div>
+  <div class="tab" onclick="showTab('taxas')"><i class="ti ti-chart-bar"></i> Taxas</div>
+  <div class="tab" onclick="showTab('hist')"><i class="ti ti-clipboard-list"></i> Histórico</div>
 </div>
 
 <!-- ═══ TESTES AUTOMÁTICOS ═══ -->

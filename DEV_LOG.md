@@ -2060,6 +2060,27 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 74 — Faxina: verde hardcoded (painel de testes) + emojis nativos → ícones Tabler
+- **Verde puro fora do design system:** achado num `teste_financeiro_v4.html` — **painel de testes standalone**
+  (paleta própria: monospace, laranja legado `#e8611a`, teal `#19c9a0`; não referenciado pelo produto, não
+  importava tokens). O **produto (`index.html`) já estava correto** (confirmação "Aprovação financeira
+  concluída" em `color:var(--ok)`; barra de subfases e `.nav-item.done` em `var(--ok)`) — a premissa de um
+  componente de confirmação com verde fixo no produto **não se confirmou**. Corrigido migrando o painel
+  inteiro ao design system: importa `orizon-tokens.css` e tokeniza tudo (verde→`--ok`, laranja→`--accent`,
+  âmbar→`--warn`, azul→`--info`, vermelho→`--err`, bg/`-soft`, borda/`-line`; fundos→`--surface-2`; fontes→
+  `--font-mono`/`--font-display`). Fica theme-aware. Varredura repo-wide (hex saturado + nomeados `green`/
+  `lime`/… + `hsl`) não achou verde em nenhum outro arquivo de UI.
+- **Emojis nativos → ícones Tabler (currentColor).** Correção da premissa: o projeto **não usa lucide-react**
+  (não há React; frontend é `index.html` em JS puro) — o set carregado é o **Tabler** (`ti ti-*`). Trocados
+  os 18 emojis do produto (🔒/🔓→lock/lock-open, 🔥/❄→flame/snowflake, ⚠→alert-triangle, 🏢/🏪/👤→building/
+  building-store/user, 🧾/📄/📎/💾/📷→receipt/file/paperclip/device-floppy/camera, 💳→credit-card, 🚧→tools,
+  👁→eye, ✎→pencil, ✕→x): ~62 em conteúdo HTML→`<i>`, 10 `textContent` estático→`innerHTML`+ícone, 3 em
+  `title="…"` (glifo removido — ícone não renderiza em atributo), 2 em comentário. **2 casos** ficaram sem
+  ícone (dado dinâmico não escapado, mantido `textContent`/`.value`): título do painel de cartão (era `💳 `)
+  e o `input.value` "⚠ maior que base". Painel de testes: 🧪/📊/📋 (título/abas)→Tabler; ▶ e ✓/⚠ do log
+  mantidos (marcadores tipográficos). Verificado: `node --check` limpo (WSL), 0 emojis-alvo restantes, chaves
+  balanceadas, check de tokens verde, sem cor literal introduzida.
+
 ## Sessão 73 — Design system v1.5 (paleta unificada em cobre) + consolidação da marca + fix do tema claro
 Consolidação definitiva das duas frentes de design sobre a base da Sessão 72.
 

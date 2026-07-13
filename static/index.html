@@ -652,7 +652,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Fechar -->
     <button onclick="fecharModalPerfil()"
             style="position:absolute;top:16px;right:16px;background:transparent;border:none;
-                   color:var(--muted);font-size:18px;cursor:pointer;line-height:1">✕</button>
+                   color:var(--muted);font-size:18px;cursor:pointer;line-height:1"><i class="ti ti-x"></i></button>
     <div style="font-family:var(--font-sans);font-weight:700;font-size:16px;margin-bottom:24px">
       Meu Perfil
     </div>
@@ -672,7 +672,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                style="position:absolute;bottom:0;right:0;width:22px;height:22px;
                       background:var(--border2);border-radius:50%;display:flex;
                       align-items:center;justify-content:center;cursor:pointer;
-                      font-size:11px;border:2px solid var(--card)" title="Trocar foto">📷</label>
+                      font-size:11px;border:2px solid var(--card)" title="Trocar foto"><i class="ti ti-camera"></i></label>
         <input type="file" id="mp-foto-input" accept="image/*" style="display:none"
                onchange="mpTrocarFoto(event)">
       </div>
@@ -826,11 +826,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
           Status &#9660;
         </button>
         <div class="proj-status-filter-dd" id="proj-status-filter-dd">
-          <label class="proj-status-filter-item"><input type="checkbox" value="quente"     checked onchange="projAplicarFiltros()"> 🔥 Quente</label>
+          <label class="proj-status-filter-item"><input type="checkbox" value="quente"     checked onchange="projAplicarFiltros()"> <i class="ti ti-flame"></i> Quente</label>
           <label class="proj-status-filter-item"><input type="checkbox" value="morno"      checked onchange="projAplicarFiltros()"> ● Morno</label>
-          <label class="proj-status-filter-item"><input type="checkbox" value="frio"       checked onchange="projAplicarFiltros()"> ❄ Frio</label>
+          <label class="proj-status-filter-item"><input type="checkbox" value="frio"       checked onchange="projAplicarFiltros()"> <i class="ti ti-snowflake"></i> Frio</label>
           <label class="proj-status-filter-item"><input type="checkbox" value="convertido" checked onchange="projAplicarFiltros()"> ✓ Convertido</label>
-          <label class="proj-status-filter-item"><input type="checkbox" value="fechado" checked onchange="projAplicarFiltros()"> 🔒 Fechado</label>
+          <label class="proj-status-filter-item"><input type="checkbox" value="fechado" checked onchange="projAplicarFiltros()"> <i class="ti ti-lock"></i> Fechado</label>
           <label class="proj-status-filter-item"><input type="checkbox" value="perdido"    checked onchange="projAplicarFiltros()"> ✗ Perdido</label>
           <label class="proj-status-filter-item"><input type="checkbox" value="sem"        checked onchange="projAplicarFiltros()"> — Sem status</label>
         </div>
@@ -861,7 +861,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div class="page-title" id="emc-titulo">Em construção</div>
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:64px 20px;color:var(--muted);text-align:center">
       <i class="ti ti-tools" style="font-size:52px;color:var(--muted);opacity:.7"></i>
-      <div style="font-size:16px;font-weight:600;color:var(--text)">🚧 Módulo em construção</div>
+      <div style="font-size:16px;font-weight:600;color:var(--text)"<i class="ti ti-tools"></i> Módulo em construção</div>
       <div style="font-size:13px;max-width:420px">O módulo <strong id="emc-nome" style="color:var(--text)">—</strong> ainda não tem tela implementada. Está no mapa e será construído em breve.</div>
     </div>
   </div>
@@ -893,9 +893,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
             — Status &#9660;
           </button>
           <div class="proj-status-dd" id="neg-status-dd" style="right:0;left:auto">
-            <div class="proj-status-dd-item" onclick="negStatusSet('quente')">🔥 Quente</div>
+            <div class="proj-status-dd-item" onclick="negStatusSet('quente')"><i class="ti ti-flame"></i> Quente</div>
             <div class="proj-status-dd-item" onclick="negStatusSet('morno')">● Morno</div>
-            <div class="proj-status-dd-item" onclick="negStatusSet('frio')">❄ Frio</div>
+            <div class="proj-status-dd-item" onclick="negStatusSet('frio')"><i class="ti ti-snowflake"></i> Frio</div>
             <div class="proj-status-dd-item" onclick="negStatusSet('perdido')">✗ Perdido</div>
           </div>
         </div>
@@ -2060,7 +2060,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <div id="modal-params" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
   <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:598px;width:92%;max-height:90vh;overflow-y:auto;animation:mIn .18s ease">
     <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;gap:12px">
-      <div style="font-family:var(--font-display);font-weight:900;font-size:16px">Parametros da negociacao <span id="mp-ro-badge" style="display:none;font-size:11px;font-weight:600;color:var(--muted)">🔒 somente leitura</span></div>
+      <div style="font-family:var(--font-display);font-weight:900;font-size:16px">Parametros da negociacao <span id="mp-ro-badge" style="display:none;font-size:11px;font-weight:600;color:var(--muted)"><i class="ti ti-lock"></i> somente leitura</span></div>
       <div id="mp-total-ambientes" style="font-family:var(--font-mono);font-size:11px;color:var(--ok);background:var(--accent-soft);border:1px solid var(--accent);border-radius:6px;padding:3px 10px;white-space:nowrap">—</div>
     </div>
 
@@ -3784,12 +3784,12 @@ function showToast(msg, isErr){
 
 // ---- Page 00: Projetos -------------------------------------------------------
 const _PROJ_STATUS_LABEL = {
-  quente:     { label: '🔥 Quente',    cls: 'quente'     },
+  quente:     { label: '<i class="ti ti-flame"></i> Quente',    cls: 'quente'     },
   morno:      { label: '● Morno',      cls: 'morno'      },
-  frio:       { label: '❄ Frio',       cls: 'frio'       },
+  frio:       { label: '<i class="ti ti-snowflake"></i> Frio',       cls: 'frio'       },
   convertido: { label: '✓ Convertido', cls: 'convertido' },
   perdido:    { label: '✗ Perdido',    cls: 'perdido'    },
-  fechado:    { label: '🔒 Fechado',  cls: 'fechado'    },
+  fechado:    { label: '<i class="ti ti-lock"></i> Fechado',  cls: 'fechado'    },
   concluido:  { label: '✓ Concluído', cls: 'concluido'  },   // FASE D2: ciclo executado e conciliado
 };
 
@@ -3797,7 +3797,7 @@ function _projStatusBadge(p){
   const s = p.status;
   const ns = esc(p.nome_safe||'');
   if(s === 'convertido') return `<span class="proj-status-badge convertido">✓ Convertido</span>`;
-  if(s === 'fechado') return `<span class="proj-status-badge fechado">🔒 Fechado</span>`;
+  if(s === 'fechado') return `<span class="proj-status-badge fechado"><i class="ti ti-lock"></i> Fechado</span>`;
   if(!s){
     return `<span class="proj-status-badge sem" style="cursor:pointer"
                  onclick="projStatusClick(event,'${ns}')">— Definir</span>`;
@@ -3895,10 +3895,10 @@ function negAtualizarStatusBtn(){
   const btn = document.getElementById('neg-status-btn');
   if(!btn) return;
   const s = _projetoStatusAtual;
-  const labels = { quente:'🔥 Quente', morno:'● Morno', frio:'❄ Frio',
-                   convertido:'✓ Convertido', perdido:'✗ Perdido', fechado:'🔒 Fechado',
+  const labels = { quente:'<i class="ti ti-flame"></i> Quente', morno:'● Morno', frio:'<i class="ti ti-snowflake"></i> Frio',
+                   convertido:'✓ Convertido', perdido:'✗ Perdido', fechado:'<i class="ti ti-lock"></i> Fechado',
                    concluido:'✓ Concluído' };
-  btn.textContent = (s && labels[s] ? labels[s] : '— Status') + ' ▾';
+  btn.innerHTML = (s && labels[s] ? labels[s] : '— Status') + ' ▾';
   // Seletor de Status: fundo (tint) + texto no token do estado atual (ex. --st-fechado), theme-aware.
   const tok = {quente:'--st-quente', morno:'--st-morno', frio:'--st-frio',
                convertido:'--st-convertido', perdido:'--st-perdido', fechado:'--st-fechado'}[s];
@@ -5401,11 +5401,11 @@ function ayAtualizarCarencia() {
   document.getElementById('ay-carencia-badge').textContent = 'carência: ' + dias + 'd';
   const aviso = document.getElementById('ay-aviso');
   if (dias < 15) {
-    aviso.textContent = '⚠ Carência mínima Aymoré: 15 dias'; aviso.style.display='block';
+    aviso.innerHTML = '<i class="ti ti-alert-triangle"></i> Carência mínima Aymoré: 15 dias'; aviso.style.display='block';
   } else if (dias > 120) {
-    aviso.textContent = '⚠ Carência máxima Aymoré: 120 dias'; aviso.style.display='block';
+    aviso.innerHTML = '<i class="ti ti-alert-triangle"></i> Carência máxima Aymoré: 120 dias'; aviso.style.display='block';
   } else if (dias % 5 !== 0) {
-    aviso.textContent = '⚠ A Aymoré aceita carências de 5 em 5 dias (15, 20, 25... 120). Mais próximo: '+(Math.round(dias/5)*5)+'d';
+    aviso.innerHTML = '<i class="ti ti-alert-triangle"></i> A Aymoré aceita carências de 5 em 5 dias (15, 20, 25... 120). Mais próximo: '+(Math.round(dias/5)*5)+'d';
     aviso.style.display='block';
   } else {
     aviso.style.display='none';
@@ -5422,10 +5422,10 @@ function ayCarenciaChange() {
   document.getElementById('ay-data-primeira').value = _ayAddDias(dc, dias);
   document.getElementById('ay-carencia-badge').textContent = 'carência: ' + dias + 'd';
   const aviso = document.getElementById('ay-aviso');
-  if (dias < 15)        { aviso.textContent = '⚠ Carência mínima Aymoré: 15 dias'; aviso.style.display='block'; }
-  else if (dias > 120)  { aviso.textContent = '⚠ Carência máxima Aymoré: 120 dias'; aviso.style.display='block'; }
+  if (dias < 15)        { aviso.innerHTML = '<i class="ti ti-alert-triangle"></i> Carência mínima Aymoré: 15 dias'; aviso.style.display='block'; }
+  else if (dias > 120)  { aviso.innerHTML = '<i class="ti ti-alert-triangle"></i> Carência máxima Aymoré: 120 dias'; aviso.style.display='block'; }
   else if (dias % 5 !== 0) {
-    aviso.textContent = '⚠ Aymoré aceita de 5 em 5 dias. Mais próximo: '+(Math.round(dias/5)*5)+'d';
+    aviso.innerHTML = '<i class="ti ti-alert-triangle"></i> Aymoré aceita de 5 em 5 dias. Mais próximo: '+(Math.round(dias/5)*5)+'d';
     aviso.style.display='block';
   } else { aviso.style.display='none'; }
   clearTimeout(_ayTimer);
@@ -5546,7 +5546,7 @@ function cartaoMostrarPainel(mostrar) {
   if (mostrar) {
     const sel = document.getElementById('neg-pagamento');
     const desc = sel.selectedOptions[0]?.text || 'Cartão de Crédito';
-    document.getElementById('painel-cartao-titulo').textContent = '💳 ' + desc;
+    document.getElementById('painel-cartao-titulo').textContent = desc;
     const dc = document.getElementById('cc-data-contrato');
     if (!dc.value) dc.value = new Date().toISOString().split('T')[0];
     ccEntradaChange();
@@ -5752,7 +5752,7 @@ async function atualizarVP() {
 
   const statusEl = document.getElementById('vp-r-status');
   if (d.excede_prazo) {
-    statusEl.textContent = '⚠ Excede 395d';
+    statusEl.innerHTML = '<i class="ti ti-alert-triangle"></i> Excede 395d';
     statusEl.style.color = 'var(--err)';
   } else {
     statusEl.textContent = '✓ Dentro do prazo';
@@ -5762,7 +5762,7 @@ async function atualizarVP() {
   // Banner de avisos
   const aviso = document.getElementById('vp-aviso');
   if (d.avisos && d.avisos.length) {
-    aviso.innerHTML    = '⚠ ' + d.avisos.join('<br>⚠ ');
+    aviso.innerHTML    = '<i class="ti ti-alert-triangle"></i> ' + d.avisos.join('<br><i class="ti ti-alert-triangle"></i> ');
     aviso.style.display = 'block';
   } else {
     aviso.style.display = 'none';
@@ -5836,7 +5836,7 @@ function vpRenderTabela(d) {
         <input type="date" value="${esc(p.data_iso)}" max="${esc(limIso)}"
                style="background:var(--surface);border:1px solid ${bColor};border-radius:6px;padding:5px 8px;color:${tColor};font-family:inherit;font-size:12px;width:140px;outline:none"
                oninput="vpDataChange(this,${idx})">
-        ${excede ? `<span style="color:var(--err);font-size:10px;margin-left:4px">⚠ excede limite</span>` : ''}
+        ${excede ? `<span style="color:var(--err);font-size:10px;margin-left:4px"><i class="ti ti-alert-triangle"></i> excede limite</span>` : ''}
       </td>
       <td style="padding:8px 12px;text-align:right;font-weight:700;color:${color}">R$ ${fmt(p.valor)}</td>
     </tr>`;
@@ -5904,7 +5904,7 @@ function _atualizarImpostos(prefixo, valorBase) {
   _renderImpostosLock();
 }
 
-// Único exibidor dos campos de imposto: valor real (liberado) ou cadeado 🔒.
+// Único exibidor dos campos de imposto: valor real (liberado) ou cadeado.
 function _renderImpostosLock() {
   _IMPOSTOS_PREFIXOS.forEach(p => {
     const v = _impostosValores[p];
@@ -5912,11 +5912,11 @@ function _renderImpostosLock() {
     const elImp  = document.getElementById(p + '-r-impostos');
     if (!v) return;
     if (_impostosLiberados) {
-      const rel = (txt) => '<span style="cursor:pointer" title="Clique para ocultar (🔓)" onclick="_reBloquearImpostos()">' + txt + '</span>';
+      const rel = (txt) => '<span style="cursor:pointer" title="Clique para ocultar" onclick="_reBloquearImpostos()">' + txt + '</span>';
       if (elBase) elBase.innerHTML = rel('R$ ' + fmt(v.base));
       if (elImp)  elImp.innerHTML  = rel('R$ ' + fmt(v.imp));
     } else {
-      const lock = '<span style="cursor:pointer" title="Liberar com senha de diretor/gerente adm-fin" onclick="abrirModalLiberarImpostos()">🔒</span>';
+      const lock = '<span style="cursor:pointer" title="Liberar com senha de diretor/gerente adm-fin" onclick="abrirModalLiberarImpostos()"><i class="ti ti-lock"></i></span>';
       if (elBase) elBase.innerHTML = lock;
       if (elImp)  elImp.innerHTML  = lock;
     }
@@ -5926,11 +5926,11 @@ function _renderImpostosLock() {
   const elMargCont = document.getElementById('mp-a-marg-cont');
   if (_margemRealVal) {
     if (_impostosLiberados) {
-      const rel = (txt) => '<span style="cursor:pointer" title="Clique para ocultar (🔓)" onclick="_reBloquearImpostos()">' + txt + '</span>';
+      const rel = (txt) => '<span style="cursor:pointer" title="Clique para ocultar" onclick="_reBloquearImpostos()">' + txt + '</span>';
       if (elCustVar)  elCustVar.innerHTML  = rel('R$ ' + fmt(_margemRealVal.cust_var));
       if (elMargCont) elMargCont.innerHTML = rel((_margemRealVal.marg_cont * 100).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%');
     } else {
-      const lock = '<span style="cursor:pointer" title="Liberar com senha de diretor/gerente adm-fin" onclick="abrirModalLiberarImpostos()">🔒</span>';
+      const lock = '<span style="cursor:pointer" title="Liberar com senha de diretor/gerente adm-fin" onclick="abrirModalLiberarImpostos()"><i class="ti ti-lock"></i></span>';
       if (elCustVar)  elCustVar.innerHTML  = lock;
       if (elMargCont) elMargCont.innerHTML = lock;
     }
@@ -5941,10 +5941,10 @@ function _renderImpostosLock() {
   if (segFields) {
     if (_impostosLiberados) {
       segFields.style.display = '';
-      if (segLock) segLock.innerHTML = '<span style="cursor:pointer" title="Ocultar (🔓)" onclick="_reBloquearImpostos()">🔓</span>';
+      if (segLock) segLock.innerHTML = '<span style="cursor:pointer" title="Ocultar" onclick="_reBloquearImpostos()"><i class="ti ti-lock-open"></i></span>';
     } else {
       segFields.style.display = 'none';
-      if (segLock) segLock.innerHTML = '<span style="cursor:pointer" title="Liberar com senha de diretor/gerente adm-fin" onclick="abrirModalLiberarImpostos()">🔒</span>';
+      if (segLock) segLock.innerHTML = '<span style="cursor:pointer" title="Liberar com senha de diretor/gerente adm-fin" onclick="abrirModalLiberarImpostos()"><i class="ti ti-lock"></i></span>';
     }
   }
 }
@@ -6306,7 +6306,7 @@ async function atualizarTF() {
   const excede  = limIso && ultima.data_iso > limIso;
   const statusEl = document.getElementById('tf-r-status');
   if (excede) {
-    statusEl.textContent = '⚠ Excede prazo';
+    statusEl.innerHTML = '<i class="ti ti-alert-triangle"></i> Excede prazo';
     statusEl.style.color = 'var(--err)';
   } else {
     statusEl.textContent = '✓ Dentro do prazo';
@@ -6317,7 +6317,7 @@ async function atualizarTF() {
   const aviso = document.getElementById('tf-aviso');
   const msgs  = [...(d.erros || []), ...(d.avisos || [])];
   if (msgs.length) {
-    aviso.innerHTML     = '⚠ ' + msgs.join('<br>⚠ ');
+    aviso.innerHTML     = '<i class="ti ti-alert-triangle"></i> ' + msgs.join('<br><i class="ti ti-alert-triangle"></i> ');
     aviso.style.display = 'block';
   } else {
     aviso.style.display = 'none';
@@ -6576,7 +6576,7 @@ function negTotalConfirmar(valStr){
   const maxPossivel = estTotal / divisorFin;
   if(total > maxPossivel){
     el.style.color = 'var(--err)';
-    el.value = fmt(total) + ' ⚠ maior que base';
+    el.value = fmt(total) + ' maior que base';
     setTimeout(() => { el.style.color='var(--ok)'; renderTabelaNeg(); }, 2500);
     return;
   }
@@ -6768,7 +6768,7 @@ function negValidarLimiteDesconto(val){
     if(hint){
       const limiteBase = (_usuarioAtual?.limite_desconto ?? 10);
       const limiteVigente = _limiteAutorizado !== null ? _limiteAutorizado : limiteBase;
-      hint.textContent = '⚠ Limite: ' + limiteVigente + '% — clique OK para autorizar';
+      hint.innerHTML = '<i class="ti ti-alert-triangle"></i> Limite: ' + limiteVigente + '% — clique OK para autorizar';
       hint.style.display = 'block';
     }
     if(btn){ btn.style.display = 'block'; }
@@ -7550,7 +7550,7 @@ function mpSegPopular(m){
   const hint = document.getElementById('mp-seg-hint');
   if(hint){ hint.style.color = 'var(--muted)';
     hint.textContent = temOverride ? 'Override deste projeto' : 'Sem override: herda o padrão da loja'; }
-  _renderImpostosLock();   // aplica o cadeado (mostra 🔒 ou libera os campos)
+  _renderImpostosLock();   // aplica o cadeado (mostra ou libera os campos)
 }
 function mpSegSync(which){
   const em = document.getElementById('mp-pct-merc');
@@ -7932,7 +7932,7 @@ async function cliChecarCPF(val){
     );
     if(encontrado){
       _cliEncontrado = encontrado;
-      aviso.innerHTML = `⚠️ CPF já cadastrado — <strong>${esc(encontrado.nome)}</strong>
+      aviso.innerHTML = `<i class="ti ti-alert-triangle"></i> CPF já cadastrado — <strong>${esc(encontrado.nome)}</strong>
         <span onclick="cliCPFverEncontrado()"
               style="color:var(--accent);cursor:pointer;margin-left:8px">Ver cliente →</span>`;
       aviso.style.display = 'block';
@@ -8569,7 +8569,7 @@ async function adminRenderPlataforma(box){
   box.innerHTML = `
     <div class="card" style="padding:14px 16px">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-        <strong style="color:var(--accent)">🏢 Redes</strong>
+        <strong style="color:var(--accent)"<i class="ti ti-building"></i> Redes</strong>
         <button class="btn btn-ghost btn-sm" onclick="adminRedeNova()" style="font-size:11px">+ Nova rede</button>
       </div>
       <table class="cli-table"><thead><tr><th>Nome</th><th>CNPJ</th><th></th></tr></thead><tbody>
@@ -8582,7 +8582,7 @@ async function adminRenderPlataforma(box){
     </div>
     <div class="card" style="padding:14px 16px">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-        <strong style="color:var(--accent)">🏪 Lojas avulsas</strong>
+        <strong style="color:var(--accent)"><i class="ti ti-building-store"></i>Lojas avulsas</strong>
         <button class="btn btn-ghost btn-sm" onclick="adminLojaNova(null)" style="font-size:11px">+ Nova loja avulsa</button>
       </div>
       <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th></th></tr></thead><tbody>
@@ -8599,7 +8599,7 @@ async function adminRenderPlataforma(box){
     box.insertAdjacentHTML('beforeend', `
       <div class="card" style="padding:14px 16px">
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-          <strong style="color:var(--accent)">👤 Gestores gerais</strong>
+          <strong style="color:var(--accent)"><i class="ti ti-user"></i>Gestores gerais</strong>
           <button class="btn btn-ghost btn-sm" style="font-size:11px"
             onclick="abrirModalUsuario({modo:'novo', escopo:'plataforma', onSaved:adminRender})">+ Novo gestor</button>
         </div>
@@ -8648,7 +8648,7 @@ async function adminRenderRede(box){
   box.innerHTML = `
     <div class="card" style="padding:14px 16px">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-        <strong style="color:var(--accent)">🏪 Lojas da rede</strong>
+        <strong style="color:var(--accent)"><i class="ti ti-building-store"></i>Lojas da rede</strong>
         <button class="btn btn-ghost btn-sm" onclick="adminLojaNova(${rid})" style="font-size:11px">+ Nova loja</button>
       </div>
       <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th></th></tr></thead><tbody>
@@ -8667,7 +8667,7 @@ async function adminRenderRede(box){
     box.insertAdjacentHTML('beforeend', `
       <div class="card" style="padding:14px 16px">
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-          <strong style="color:var(--accent)">👤 Administradores da rede</strong>
+          <strong style="color:var(--accent)"><i class="ti ti-user"></i>Administradores da rede</strong>
           <button class="btn btn-ghost btn-sm" style="font-size:11px"
             onclick="abrirModalUsuario({modo:'novo', escopo:'rede', rede_id:${rid}, onSaved:adminRender})">+ Novo administrador</button>
         </div>
@@ -8684,7 +8684,7 @@ async function adminRenderRede(box){
     box.insertAdjacentHTML('beforeend', `
       <div class="card" style="padding:14px 16px">
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:4px">
-          <strong style="color:var(--accent)">🧾 Fiscal da rede — Emitente central</strong>
+          <strong style="color:var(--accent)"><i class="ti ti-receipt"></i>Fiscal da rede — Emitente central</strong>
           <button class="btn btn-ghost btn-sm" style="font-size:11px"
             onclick="adminFiscalCarregar('rede', ${rid})">Configurar</button>
         </div>
@@ -9235,7 +9235,7 @@ async function balancoCarregar(){
   const btn=(m,lbl)=>'<button class="btn '+(_balModo===m?'btn-primary':'btn-ghost')+' btn-sm" onclick="balSetModo(\''+m+'\')">'+lbl+'</button>';
   const confere = b.confere
     ? '<div style="font-size:10px;color:var(--accent);margin-top:10px">✓ Ativo = Passivo + PL (fecha por partida dobrada)</div>'
-    : '<div style="font-size:10px;color:var(--warn);margin-top:10px">⚠ Ativo ≠ Passivo + PL — verificar lançamentos</div>';
+    : '<div style="font-size:10px;color:var(--warn);margin-top:10px"><i class="ti ti-alert-triangle"></i> Ativo ≠ Passivo + PL — verificar lançamentos</div>';
   box.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:10px">'+btn('resumido','Resumido')+btn('analitico','Analítico')+'</div>'
     + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Posição patrimonial acumulada'
     +(b.data_corte?(' até '+esc(b.data_corte.slice(0,10))):' (data atual)')+'.</div>'
@@ -9807,7 +9807,7 @@ function _cvLinha(cells, onRemove){
   cells.forEach(html => { const td = document.createElement('td'); td.style.padding='3px 4px'; td.innerHTML = html; tr.appendChild(td); });
   const tdRem = document.createElement('td'); tdRem.style.padding='3px 4px';
   const btn = document.createElement('button');
-  btn.className='btn btn-ghost btn-sm'; btn.style.padding='2px 6px'; btn.style.fontSize='11px'; btn.textContent='✕';
+  btn.className='btn btn-ghost btn-sm'; btn.style.padding='2px 6px'; btn.style.fontSize='11px'; btn.innerHTML='<i class="ti ti-x"></i>';
   btn.onclick = () => tr.remove();
   tdRem.appendChild(btn); tr.appendChild(tdRem);
   return tr;
@@ -10882,7 +10882,7 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
         ${cliEmail? `<div style="color:var(--muted)">E-mail: <span style="color:var(--text)">${cliEmail}</span></div>` : ''}
         ${cliTel  ? `<div style="color:var(--muted)">Tel: <span style="color:var(--text)">${cliTel}</span></div>`   : ''}
       </div>
-      ${cliId ? `<button class="btn btn-ghost btn-sm" onclick="cliAbrirModal(${cliId})">✎ Editar Cadastro</button>` : ''}
+      ${cliId ? `<button class="btn btn-ghost btn-sm" onclick="cliAbrirModal(${cliId})"><i class="ti ti-pencil"></i> Editar Cadastro</button>` : ''}
       ${concluido ? `<span style="margin-left:8px;font-size:.8rem;color:var(--ok)">✓ Concluído${dt?' em '+dt:''}</span>` : ''}`;
   }
 
@@ -10901,9 +10901,9 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
          </div>`
       : `<div style="font-size:.85rem;color:var(--muted);margin-bottom:10px">Nenhum parceiro (arquiteto) associado.</div>`;
     const botao = assinado
-      ? (temPar ? '' : '<span style="font-size:.78rem;color:var(--muted)">🔒 contrato assinado — não editável</span>')
+      ? (temPar ? '' : '<span style="font-size:.78rem;color:var(--muted)"><i class="ti ti-lock"></i> contrato assinado — não editável</span>')
       : `<button class="btn btn-ghost btn-sm" onclick="abrirAssociarParceiro()">
-           ${temPar ? '✎ Alterar / remover parceiro' : '+ Inserir parceiro'}</button>`;
+           ${temPar ? '<i class="ti ti-pencil"></i> Alterar / remover parceiro' : '+ Inserir parceiro'}</button>`;
     return info + botao +
       (concluido ? `<span style="margin-left:8px;font-size:.8rem;color:var(--ok)">✓ Concluído${dt?' em '+dt:''}</span>` : '');
   }
@@ -10918,12 +10918,12 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
       <div style="margin-bottom:10px;font-size:.85rem;color:var(--muted)">
         ${concluido
           ? `<span style="color:var(--ok)">✓ Briefing completo${dt?' — preenchido em '+dt:''}</span>`
-          : `<span style="color:var(--warn)">⚠ Briefing pendente — campos obrigatórios não preenchidos</span>`}
+          : `<span style="color:var(--warn)"><i class="ti ti-alert-triangle"></i> Briefing pendente — campos obrigatórios não preenchidos</span>`}
         ${briefLocked ? `<span style="margin-left:10px;font-size:.75rem;color:var(--muted);
-          border:1px solid var(--muted);border-radius:3px;padding:1px 6px">🔒 bloqueado após 1º orçamento</span>` : ''}
+          border:1px solid var(--muted);border-radius:3px;padding:1px 6px"><i class="ti ti-lock"></i> bloqueado após 1º orçamento</span>` : ''}
       </div>
       ${cliId ? `<button class="btn btn-ghost btn-sm" onclick="cliAbrirBriefing(${cliId}, '${(cliNome).replace(/'/g,"\\'")}')">
-        ${briefLocked ? '👁 Ver Briefing' : '✎ ' + (concluido ? 'Editar' : 'Preencher') + ' Briefing'}
+        ${briefLocked ? '<i class="ti ti-eye"></i> Ver Briefing' : '<i class="ti ti-pencil"></i> ' + (concluido ? 'Editar' : 'Preencher') + ' Briefing'}
       </button>` : ''}`;
   }
 
@@ -10960,7 +10960,7 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
   const btnReabrir = (STATUS_CONCLUSIVOS.has(dados.status) && ETAPAS_PRINCIPAIS.includes(etapa.codigo))
     ? `<button onclick="abrirModalReabrir('${etapa.codigo}')"
          style="border:1px solid var(--muted);color:var(--muted);background:none;border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer;margin-top:10px;margin-left:8px">
-         🔓 Reabrir (gerente)</button>`
+         <i class="ti ti-lock-open"></i> Reabrir (gerente)</button>`
     : '';
 
   return `
@@ -10990,7 +10990,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
       ? `<button onclick="abrirModalReabrir('8')"
            style="border:1px solid var(--muted);color:var(--muted);background:none;
            border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer">
-           🔓 Reabrir (gerente)</button>`
+           <i class="ti ti-lock-open"></i> Reabrir (gerente)</button>`
       : '';
     return `
       <p style="color:var(--ok);margin:0 0 10px">
@@ -11003,7 +11003,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
   if (bloqueada) {
     return `
       <p style="color:var(--muted);font-size:.85rem;margin:0 0 10px">
-        🔒 Conclua a etapa anterior para liberar esta etapa.
+        <i class="ti ti-lock"></i> Conclua a etapa anterior para liberar esta etapa.
       </p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
         ${_btnProvisoes}
@@ -11321,7 +11321,7 @@ function _renderCardSolicitacaoMedicao(dados, bloqueada) {
   if (dados.status === 'concluido')
     return `<p style="color:var(--ok);margin:0">&#x2713; Solicitação de medição confirmada.</p>`;
   if (bloqueada)
-    return `<p style="color:var(--muted);font-size:.85rem;margin:0">🔒 Conclua a etapa anterior.</p>`;
+    return `<p style="color:var(--muted);font-size:.85rem;margin:0"><i class="ti ti-lock"></i> Conclua a etapa anterior.</p>`;
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 10px">Anexe o arquivo de solicitação e confirme com a senha do medidor.</p>
     <input type="file" id="med-solic-file" style="font-size:.82rem;margin-bottom:10px"><br>
@@ -11345,9 +11345,9 @@ async function enviarSolicitacaoMedicao() {
 function _renderCardMedicao(dados, bloqueada) {
   if (dados.status === 'concluido')
     return `<p style="color:var(--ok);margin:0 0 10px">&#x2713; Medição concluída${_medicaoCache && _medicaoCache.parecer ? ' (' + _medicaoCache.parecer + ')' : ''}.</p>
-      <button onclick="abrirModalReabrir('10')" style="border:1px solid var(--muted);color:var(--muted);background:none;border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer">🔓 Reabrir (gerente)</button>`;
+      <button onclick="abrirModalReabrir('10')" style="border:1px solid var(--muted);color:var(--muted);background:none;border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer"><i class="ti ti-lock-open"></i> Reabrir (gerente)</button>`;
   if (bloqueada)
-    return `<p style="color:var(--muted);font-size:.85rem;margin:0">🔒 Conclua a etapa anterior.</p>`;
+    return `<p style="color:var(--muted);font-size:.85rem;margin:0"><i class="ti ti-lock"></i> Conclua a etapa anterior.</p>`;
   if (_medicaoCache && _medicaoCache.parecer === 'reprovado') {
     return `
       <p style="color:var(--warn);margin:0 0 10px">Medição <strong>Reprovada</strong> — aguardando decisão comercial.</p>
@@ -11544,18 +11544,18 @@ function _renderCardImplantacao(dados, bloqueada) {
   const concluido = dados.status === 'concluido';
   const dt = dados.concluido_em ? new Date(dados.concluido_em).toLocaleDateString('pt-BR') : '';
   if (bloqueada) {
-    return `<p style="color:var(--muted);font-size:.85rem;margin:0">🔒 Conclua a etapa anterior para liberar esta etapa.</p>`;
+    return `<p style="color:var(--muted);font-size:.85rem;margin:0"><i class="ti ti-lock"></i> Conclua a etapa anterior para liberar esta etapa.</p>`;
   }
   const lista = (_pedidosXml && _pedidosXml.length)
     ? _pedidosXml.map(d => `
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;font-size:.82rem">
-          <span style="flex:1">📄 ${esc(d.nome_original)}</span>
+          <span style="flex:1"><i class="ti ti-file"></i>${esc(d.nome_original)}</span>
           <a class="btn-ciclo" style="font-size:.78rem;text-decoration:none" target="_blank" rel="noopener"
              href="/api/projetos/${encodeURIComponent(projetoAtivo ? projetoAtivo.nome_safe : '')}/ciclo/documento/${d.id}">Baixar</a>
         </div>`).join('')
     : `<p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">Nenhum pedido (XML) carregado.</p>`;
   const btnReabrir = concluido
-    ? `<button onclick="abrirModalReabrir('12')" style="border:1px solid var(--muted);color:var(--muted);background:none;border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer">🔓 Reabrir (gerente)</button>`
+    ? `<button onclick="abrirModalReabrir('12')" style="border:1px solid var(--muted);color:var(--muted);background:none;border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer"><i class="ti ti-lock-open"></i> Reabrir (gerente)</button>`
     : '';
   return `
     <div style="margin-bottom:10px">${lista}</div>
@@ -11563,7 +11563,7 @@ function _renderCardImplantacao(dados, bloqueada) {
       ? `<p style="color:var(--ok);margin:0 0 10px">✓ Pedidos encaminhados à fábrica${dt ? ' em ' + dt : ''}.</p>${btnReabrir}`
       : `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
            <label class="btn-ciclo" style="font-size:.82rem;cursor:pointer">
-             📎 Carregar Pedidos
+             <i class="ti ti-paperclip"></i>Carregar Pedidos
              <input type="file" accept=".xml" multiple style="display:none" onchange="enviarPedidosXml(this)">
            </label>
            <button onclick="encaminharPedidosFabrica()" ${_pedidosXml.length ? '' : 'disabled'}
@@ -11606,10 +11606,10 @@ function _renderCardProducao(dados, bloqueada) {
   const concluido = dados.status === 'concluido';
   const dt = dados.concluido_em ? new Date(dados.concluido_em).toLocaleDateString('pt-BR') : '';
   if (bloqueada) {
-    return `<p style="color:var(--muted);font-size:.85rem;margin:0">🔒 Conclua a etapa anterior para liberar esta etapa.</p>`;
+    return `<p style="color:var(--muted);font-size:.85rem;margin:0"><i class="ti ti-lock"></i> Conclua a etapa anterior para liberar esta etapa.</p>`;
   }
   const btnReabrir = concluido
-    ? `<button onclick="abrirModalReabrir('13')" style="border:1px solid var(--muted);color:var(--muted);background:none;border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer;margin-left:8px">🔓 Reabrir (gerente)</button>`
+    ? `<button onclick="abrirModalReabrir('13')" style="border:1px solid var(--muted);color:var(--muted);background:none;border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer;margin-left:8px"><i class="ti ti-lock-open"></i> Reabrir (gerente)</button>`
     : '';
   return `
     <p style="color:var(--muted);font-size:.82rem;margin:0 0 6px">Números dos pedidos (um por linha) — resultado da implantação na fábrica.</p>
@@ -11619,7 +11619,7 @@ function _renderCardProducao(dados, bloqueada) {
     ${concluido
       ? `<p style="color:var(--ok);margin:8px 0 0">✓ Produção concluída${dt ? ' em ' + dt : ''}.${btnReabrir}</p>`
       : `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-           <button onclick="salvarNumerosPedidos()" class="btn-ciclo" style="font-size:.82rem">💾 Salvar Números dos Pedidos</button>
+           <button onclick="salvarNumerosPedidos()" class="btn-ciclo" style="font-size:.82rem"><i class="ti ti-device-floppy"></i>Salvar Números dos Pedidos</button>
            <button onclick="producaoConcluida()"
              style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:pointer">Produção Concluída</button>
          </div>`}`;
@@ -11656,10 +11656,10 @@ function _renderCardEntrega(dados, bloqueada) {
   const concluido = dados.status === 'concluido';
   const dt = dados.concluido_em ? new Date(dados.concluido_em).toLocaleDateString('pt-BR') : '';
   if (bloqueada) {
-    return `<p style="color:var(--muted);font-size:.85rem;margin:0">🔒 Conclua a etapa anterior para liberar esta etapa.</p>`;
+    return `<p style="color:var(--muted);font-size:.85rem;margin:0"><i class="ti ti-lock"></i> Conclua a etapa anterior para liberar esta etapa.</p>`;
   }
   const btnReabrir = concluido
-    ? `<button onclick="abrirModalReabrir('14')" style="border:1px solid var(--muted);color:var(--muted);background:none;border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer;margin-left:8px">🔓 Reabrir (gerente)</button>`
+    ? `<button onclick="abrirModalReabrir('14')" style="border:1px solid var(--muted);color:var(--muted);background:none;border-radius:5px;padding:6px 14px;font-size:.8rem;cursor:pointer;margin-left:8px"><i class="ti ti-lock-open"></i> Reabrir (gerente)</button>`
     : '';
   return `
     <p style="color:var(--muted);font-size:.82rem;margin:0 0 6px">Relatório de Entrega — descreva faltas e avarias.</p>
@@ -11669,7 +11669,7 @@ function _renderCardEntrega(dados, bloqueada) {
     ${concluido
       ? `<p style="color:var(--ok);margin:8px 0 0">✓ Relatório de Entrega concluído${dt ? ' em ' + dt : ''}.${btnReabrir}</p>`
       : `<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-           <button onclick="salvarRelatorioEntrega()" class="btn-ciclo" style="font-size:.82rem">💾 Salvar Relatório de Entrega</button>
+           <button onclick="salvarRelatorioEntrega()" class="btn-ciclo" style="font-size:.82rem"><i class="ti ti-device-floppy"></i>Salvar Relatório de Entrega</button>
            <button onclick="concluirRelatorioEntrega()"
              style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:pointer">Concluir Relatório de Entrega</button>
          </div>`}`;
@@ -11677,7 +11677,7 @@ function _renderCardEntrega(dados, bloqueada) {
 
 function _renderCardEmissaoNfe(dados, bloqueada) {
   if (bloqueada) {
-    return `<p style="color:var(--muted);font-size:.85rem;margin:0">🔒 Conclua a etapa anterior para liberar esta etapa.</p>`;
+    return `<p style="color:var(--muted);font-size:.85rem;margin:0"><i class="ti ti-lock"></i> Conclua a etapa anterior para liberar esta etapa.</p>`;
   }
   const concluido = dados && (dados.status === 'emitida' || dados.status === 'concluido');
   const podeEmitir = _podeEmitirNfe();
@@ -11688,7 +11688,7 @@ function _renderCardEmissaoNfe(dados, bloqueada) {
       const cor = e.status === 'autorizado' ? 'var(--ok)' : e.status === 'erro' ? 'var(--warn)' : e.status === 'cancelado' ? 'var(--muted)' : 'var(--info)';
       const dl = (id, rot) => id ? `<a class="btn-ciclo" style="font-size:.75rem;text-decoration:none" target="_blank" rel="noopener" href="/api/projetos/${encodeURIComponent(proj)}/ciclo/documento/${id}">${rot}</a>` : '';
       return `<div style="border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px;font-size:.82rem">
-        <div>📄 ${esc(x.nome_original || '')} — <span style="color:${cor};font-weight:700">${esc(e.status || '')}</span>${e.chave ? ' · ' + esc(e.chave) : ''}</div>
+        <div><i class="ti ti-file"></i>${esc(x.nome_original || '')} — <span style="color:${cor};font-weight:700">${esc(e.status || '')}</span>${e.chave ? ' · ' + esc(e.chave) : ''}</div>
         ${e.emitente_cnpj ? `<div style="color:var(--muted);font-size:.72rem">Emitente: ${esc(e.emitente_razao || '')} · ${esc(e.emitente_cnpj)}</div>` : ''}
         ${e.mensagem_sefaz ? `<div style="color:var(--muted);font-size:.75rem">${esc(e.mensagem_sefaz)}</div>` : ''}
         <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
@@ -11698,12 +11698,12 @@ function _renderCardEmissaoNfe(dados, bloqueada) {
         </div></div>`;
     }
     return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;font-size:.82rem;flex-wrap:wrap">
-        <span style="flex:1">📄 ${esc(x.nome_original || '')}</span>
+        <span style="flex:1"><i class="ti ti-file"></i>${esc(x.nome_original || '')}</span>
         ${podeEmitir ? `<input id="nfe-markup-${x.id}" type="number" step="0.01" value="30" title="Markup %" style="width:70px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:.8rem">
           <button class="btn-ciclo" style="font-size:.8rem" onclick="emitirNfeLoja(${x.id})">Emitir NF-e da Loja</button>` : '<span style="color:var(--muted);font-size:.75rem">sem permissão para emitir</span>'}
       </div>`;
   }).join('') || `<p style="color:var(--muted);font-size:.82rem;margin:0 0 8px">Nenhuma NF-e da fábrica carregada.</p>`;
-  const upload = podeEmitir ? `<label class="btn-ciclo" style="font-size:.82rem;cursor:pointer">📎 Carregar NF-e da Fábrica<input type="file" accept=".xml" style="display:none" onchange="enviarNfeFabrica(this)"></label>` : '';
+  const upload = podeEmitir ? `<label class="btn-ciclo" style="font-size:.82rem;cursor:pointer"><i class="ti ti-paperclip"></i>Carregar NF-e da Fábrica<input type="file" accept=".xml" style="display:none" onchange="enviarNfeFabrica(this)"></label>` : '';
   let secaoNfse = '';
   if (podeEmitir) {
     const dlN = (id, rot) => id ? `<a class="btn-ciclo" style="font-size:.75rem;text-decoration:none" target="_blank" rel="noopener" href="/api/projetos/${encodeURIComponent(proj)}/ciclo/documento/${id}">${rot}</a>` : '';
@@ -11714,7 +11714,7 @@ function _renderCardEmissaoNfe(dados, bloqueada) {
     if (travado) {
       const cor = nfse.status === 'autorizado' ? 'var(--ok)' : 'var(--info)';
       corpoNfse = `<div style="border:1px solid var(--border);border-radius:6px;padding:8px;font-size:.82rem">
-        <div>🧾 NFS-e — <span style="color:${cor};font-weight:700">${esc(nfse.status || '')}</span>${nfse.chave ? ' · ' + esc(nfse.chave) : ''}</div>
+        <div><i class="ti ti-receipt"></i>NFS-e — <span style="color:${cor};font-weight:700">${esc(nfse.status || '')}</span>${nfse.chave ? ' · ' + esc(nfse.chave) : ''}</div>
         ${nfse.emitente_cnpj ? `<div style="color:var(--muted);font-size:.72rem">Emitente: ${esc(nfse.emitente_razao || '')} · ${esc(nfse.emitente_cnpj)}</div>` : ''}
         ${nfse.mensagem_sefaz ? `<div style="color:var(--muted);font-size:.75rem">${esc(nfse.mensagem_sefaz)}</div>` : ''}
         <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
@@ -11725,7 +11725,7 @@ function _renderCardEmissaoNfe(dados, bloqueada) {
     } else {
       // Sem NFS-e ou última tentativa rejeitada/cancelada → mostra (de novo) a form de emissão, com o motivo anterior.
       const motivo = nfse ? (nfse.mensagem_sefaz || (nfse.erros && nfse.erros[0] && nfse.erros[0].mensagem) || '') : '';
-      const aviso = nfse ? `<div style="color:var(--warn);font-size:.75rem;margin-bottom:6px">⚠️ Tentativa anterior: <b>${esc(nfse.status || '')}</b>${motivo ? ' — ' + esc(motivo) : ''}. Ajuste os dados e emita novamente.</div>` : '';
+      const aviso = nfse ? `<div style="color:var(--warn);font-size:.75rem;margin-bottom:6px"><i class="ti ti-alert-triangle"></i> Tentativa anterior: <b>${esc(nfse.status || '')}</b>${motivo ? ' — ' + esc(motivo) : ''}. Ajuste os dados e emita novamente.</div>` : '';
       corpoNfse = aviso + `<div style="display:flex;gap:8px;align-items:center;font-size:.82rem;flex-wrap:wrap">
         <span>Valor do serviço</span>
         <input id="nfse-valor" type="number" step="0.01" min="0" placeholder="0,00" style="width:120px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:.8rem">
