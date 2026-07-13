@@ -39,6 +39,10 @@ os 4 arquivos (Promob venda, XML venda, Promob PE, XML PE); os de venda já exis
 os novos.
 
 ### #3 — Semântica contábil da atualização = **opção (a)** *(começar pela barata, decisão do usuário)*
+*(refinado pela decisão #11 — vale ler as duas juntas: #3 continua valendo pra Fatia 1/#9, que é
+snapshot puro; a partir da confirmação formal de uma Aprovação Financeira, #11 introduz um evento de
+ajuste que a versão original desta decisão ainda não previa.)*
+
 O `valor_atualizado` do PE é **snapshot/comparação**. Não gera evento contábil de ajuste de provisão
 por liquidação. A divergência real×planejado continua **absorvida pelo mecanismo existente**
 (`resolver_saldo_provisao` + `conciliar_final`, etapa 21 — FASE D2). A opção (b) (delta-constituição/
@@ -135,6 +139,47 @@ Financeira é um **gate de escrita por etapa** (≠ da visão read-only da #9):
 Toca aprovação/ciclo + provisões → **área sensível: Vera antes de mergear + TDD**. Não faz parte da
 Fatia 1 (read-only). Fica na **Fatia 2** (junto do desmembramento operacional/aprovação por parcela).
 
+### #11 — Confirmar AF1/AF2 lança **ajuste (delta)**, só ativo×provisão, NUNCA DRE
+*(adicionado 2026-07-13, a pedido do usuário — refina #3/#10 com a mecânica contábil que faltava)*
+
+A confirmação de uma Aprovação Financeira (travar Rev1 na AF1, travar Rev2 na AF2 — #10) — quando a
+estimativa mudou desde a versão anterior — lança um evento de **ajuste pontual (delta)**: débito/
+crédito **só entre `1.1.06.0X` (ativo diferido) e `2.1.04.0X` (provisão)**, do tamanho exato da
+diferença entre o valor da versão anterior e o novo. Mesmo padrão de `reclassificar_provisao`
+(append-only, idempotente por ref, capado ao saldo em aberto). **Nunca toca DRE** — isso é
+efetivação, reservada pra decisão #12. O próprio gate de aprovação (#10, incl. step-up pro Diretor
+acima do limite) já protege a ação; não é preciso mecanismo de senha novo.
+
+Efeito prático: cada Aprovação Financeira vai corrigindo o ativo/provisão pro valor mais atual
+conhecido, em passos pequenos e auditáveis — quando a NF-e sair (#12), o saldo que ela vai baixar
+**já está certo**, sem reconciliação a posteriori contra um valor antecipado.
+
+### #12 — Matching (DRE) fica reservado pra emissão real da NF-e — sem antecipação
+*(adicionado 2026-07-13 — fecha a dúvida "o que é matching" levantada na revisão do usuário)*
+
+Nenhuma Aprovação Financeira (I, II, ou a conferência da #13) reconhece despesa na DRE
+antecipadamente. O único evento que move `5.6.0X`/`5.1.01` (DRE) × baixa `1.1.06.0X` (ativo) continua
+sendo `reconhecer_despesas_nfe`, disparado pela emissão real da NF-e — **proporcional por parcela**
+(fração congelada #5; `val` capado pela fração da parcela em vez do saldo aberto inteiro do projeto;
+ref ganha sufixo `:parcela_id`, #6). Não há risco de divergência entre "efetivado cedo" × NF-e real,
+porque não existe reconhecimento cedo — só os ajustes de ativo/provisão da #11, que já deixam o saldo
+correto esperando a NF-e.
+
+### #13 — Etapa "Conferência e Implantação do Pedido" (mesclada) + split PE × Outros Fornecedores
+*(adicionado 2026-07-13, a pedido do usuário)*
+
+A etapa 12 (Implantação do Pedido) é **renomeada** para **"Conferência e Implantação do Pedido"** —
+**sem** virar etapa nova no ciclo (mesmo ator, o financeiro, confere e em seguida libera a fábrica/
+aprova as compras, sem handoff pra outro papel entre as duas ações; etapa separada só aumentaria
+gating/cronograma/UI sem ganho real). Granularidade da **tela/etapa = 1**, granularidade do **razão
+continua = 2**: ao confirmar a conferência, o sistema lança **dois ajustes delta separados e
+auditáveis** (mesmo mecanismo da #11, mesmas contas, refs distintas) — um pela diferença de valor do
+Projeto Executivo, outro pela parte migrada pra Outros Fornecedores (`2.1.04.06→2.1.04.14` / espelho
+`1.1.06.06→1.1.06.14`, reaproveitando `reclassificar_provisao`). Preserva a rastreabilidade fina
+(quanto foi PE, quanto foi migração) com uma única tela/ação pro usuário. Uma eventual "Aprovação
+Financeira 3"/Conciliação Final revisada fica registrada como pendência de modelo a fechar depois —
+não bloqueia esta fatia.
+
 ## 4. Modelo de dados (novas tabelas)
 
 ```
@@ -189,13 +234,15 @@ Seletor "Projeto completo × Desmembrar" na 11c; modal de seleção de ambientes
 + `parcela_ambiente` com fração congelada (#5); `parcela_id` em `CicloLogistico`; sub-estado por parcela
 nas etapas 12-16; gating (etapa fecha só com todas as parcelas); lock pós-Implantação; UI do ciclo por
 parcela. Aprovação Financeira (11d) passa a ser por parcela (deixa claro qual parcela e o status das
-demais).
+demais), com o gate Rev1/Rev2/Rev3 + limites da #10 e os ajustes delta ativo×provisão da #11. Etapa 12
+renomeada "Conferência e Implantação do Pedido", com o split PE×Outros Fornecedores da #13.
 
 ### Fatia 3 — Liquidação financeira parcial *(toca CONTABILIDADE → Vera antes de mergear)*
 Faturamento/matching/impostos por **fração de parcela** (#5) com **refs dimensionadas por parcela**
-(#6), sob a **semântica (a)** (#3): reusa a mecânica FASE D2 existente proporcionada por parcela; sem
-eventos contábeis novos; divergência resolvida na Conciliação Final. Provisões "atualizadas conforme
-cada parcela" = leitura/またはproporção, não novo passivo.
+(#6), sob a **semântica (a)** (#3) + o reforço da #12 (matching/DRE só na NF-e real, nunca antecipado):
+reusa a mecânica FASE D2 existente proporcionada por parcela; nenhum evento de DRE novo — só o que já
+existe (`reconhecer_despesas_nfe`), parametrizado por fração. Os ajustes de ativo/provisão que
+antecedem a NF-e (#11/#13) já rodaram na Fatia 2; aqui só falta o matching em si.
 
 ## 6. Fatia 1 — detalhamento (TDD; é o que se implementa agora)
 
