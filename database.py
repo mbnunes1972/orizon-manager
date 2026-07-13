@@ -1058,8 +1058,11 @@ def _migrar_colunas():
             cur.execute("ALTER TABLE projetos_meta ADD COLUMN criado_por_id INTEGER")
 
         # ── ciclo_logistico (desmembramento parcial, spec 2026-07-13) ──────────
+        # Guarda contra a tabela ainda não existir (PRAGMA vazio): senão o ALTER lança
+        # "no such table" e, engolido pelo except: pass do fim, abortaria as migrações seguintes.
         cur.execute("PRAGMA table_info(ciclo_logistico)")
-        if "parcela_id" not in {row[1] for row in cur.fetchall()}:
+        _cl_cols = {row[1] for row in cur.fetchall()}
+        if _cl_cols and "parcela_id" not in _cl_cols:
             cur.execute("ALTER TABLE ciclo_logistico ADD COLUMN parcela_id INTEGER")
 
         # ── contratos ─────────────────────────────────────────────────────────
