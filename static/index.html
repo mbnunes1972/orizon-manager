@@ -52,6 +52,22 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:100vh;display:flex;overflow:hidden}
 .sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+/* v1.5: a sidebar é ESCURA nos dois temas (design system §7). Reescopa os tokens theme-following
+   para os --sidebar-* DENTRO da .sidebar → todo filho (classes e styles inline: nav, creds, rodapé)
+   resolve para a paleta escura da sidebar em ambos os temas, sem tocar cada propriedade. */
+.sidebar{
+  --surface:       var(--sidebar-bg);
+  --surface-2:     var(--sidebar-item-active);
+  --card:          var(--sidebar-item-active);
+  --text:          var(--sidebar-text-active);
+  --muted:         var(--sidebar-text);
+  --border:        var(--sidebar-border);
+  --border-strong: var(--sidebar-border);
+  --border2:       var(--sidebar-border);
+  --accent:        var(--sidebar-accent);
+  --accent-soft:   var(--sidebar-item-active);
+  --accent-tint:   var(--sidebar-item-active);
+}
 /* Marca — lockup horizontal (REGRAS_MARCA §5): glifo + wordmark. A sidebar é escura nos dois temas,
    então o glifo mono-branco (via currentColor) e o wordmark valem nos dois. Glifo a 40px → peso fino
    válido (§4). Geometria oficial de design-system/marca/glifo-mono-branco.svg — não redesenhada. */

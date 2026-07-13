@@ -1,5 +1,12 @@
 # Design Tokens — Orizon Manager | Dalmóbile
 
+> ⛔ **SUPERADO (2026-07-12).** A fonte única da paleta agora é **`design-system/orizon-tokens.css`
+> (v1.5)** — identidade **cobre** unificada nos dois temas (accent cobre), com **areia** no claro e
+> **carvão quente** no escuro; sem mais divergência entre temas. A marca vive em
+> `design-system/marca/` (glifo da bússola; `REGRAS_MARCA.md`). As tabelas abaixo (navy/azul/ciano §2.0
+> e verde-menta/dourado §2.1+) são **registro histórico** do estado anterior — mantidas para referência,
+> não são mais canônicas. Ver DEV_LOG Sessão 72/73.
+
 > **Extração fiel do estado atual do código** (2026-07-08), base para o documento de padronização.
 > Fonte: `static/index.html` (único `<style>` inline; paleta em `:root`, L9–25). **Não é uma proposta** — é o
 > que está no código hoje. As lacunas/divergências estão sinalizadas em §5; uma proposta de consolidação está no
@@ -19,6 +26,34 @@
 estão espalhados. É o principal alvo da padronização.
 
 ## 2. Cores
+
+### 2.0 Paleta navy/azul/ciano (logo antiga) · 2026-07-10 ⛔ SUPERADA (v1.5 → cobre/areia/carvão)
+> Alinhada à logo **Orizon Manager**. **Substitui** o verde-menta + dourado das tabelas §2.1–2.4 abaixo
+> (que refletem o tema antigo). O **dourado (`--gold`/`--dalm-gold`) foi REMOVIDO** — sem vínculo de marca
+> (Dalmóbile é licenciamento, não marca própria). O **laranja legado de hover (`#E8611A`, §2.4) sai** →
+> usar `--accent-tint`/`--surface-2`. Âmbar segue só para avisos; coral/vermelho para erro.
+>
+> Paleta-base da logo: navy `#0B1D3A` · azul elétrico `#0066FF` · ciano `#00B8C9` · cinza `#8A96A3` · claro `#E6EBF1`.
+
+| Token | Dark | Light | Papel |
+|---|---|---|---|
+| `--bg` | `#081120` | `#FFFFFF` | Fundo principal (página) |
+| `--surface` | `#0B1D3A` | `#F4F7FB` | Sidebar, input, cards de lista (navy no dark) |
+| `--surface-2` / `--card` | `#12294A` | `#FFFFFF` | Cards, dropdowns, modais (elevado) |
+| `--border` | `#1C3459` | `#DCE3EC` | Borda/divisor |
+| `--border-strong` / `--border2` | `#2A4A73` | `#C6CFDB` | Borda secundária/hover |
+| `--accent` | `#00B8C9` | `#0E7C8C` | Ciano de ação — menu ativo, logo, foco, valores |
+| `--accent-tint` | `rgba(0,184,201,.16)` | `rgba(14,124,140,.10)` | Fundo de estado (ativo/hover) |
+| `--primary` (btn/ação/link) | `#0066FF` | `#0066FF` | Azul elétrico — botão primário, links |
+| `--ok` | `#00B8C9` | `#0E7C8C` | Sucesso/valores (= accent) |
+| `--text` | `#E6EBF1` | `#0B1D3A` | Texto primário |
+| `--muted` | `#8A96A3` | `#5A6572` | Texto secundário/esmaecido |
+| `--info` / status "frio"/"fechado" | `#5B9BFF` | `#0066FF` | Azul de metadados (substitui o dourado no "fechado") |
+| `--warn` | `#EF9F27` | `#EF9F27` | Aviso (âmbar) — mantido |
+| `--err` | `#E2876C` | `#D64A3C` | Erro/perigo (coral/vermelho) — mantido |
+
+> **Removidos:** `--gold`, `--dalm-gold`, `--dalm-gold-light`. O status **`fechado`** deixa de ser dourado e
+> passa a azul (`--info`). Contrastes finais (WCAG) a validar na aplicação, nos dois temas.
 
 ### 2.1 Tokens do `:root` (app — index.html L10–24)
 | Token | Hex | Papel |

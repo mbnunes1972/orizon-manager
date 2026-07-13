@@ -173,7 +173,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
 <header class="guide-header">
   <div>
     <h1>Orizon Manager — Design System</h1>
-    <div class="sub">tokens.css v1.4 · cobre (F) sobre carvão (H2) · semânticas suaves · dimensões padronizadas · repo <code>orizon-manager</code></div>
+    <div class="sub">tokens.css v1.5 · cobre unificado nos dois temas (areia no claro, carvão no escuro) · repo <code>orizon-manager</code></div>
   </div>
   <div class="theme-toggle" role="group" aria-label="Tema">
     <button id="btn-light" class="active" onclick="setTheme('light')">☀ Claro</button>
@@ -441,6 +441,30 @@ table.tbl{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
   </div>
 </section>
 
+<!-- ============ 9b. LOGIN / HOME ============ -->
+<section>
+  <div class="eyebrow">09b · Templates</div>
+  <h2>Login / Página inicial</h2>
+  <p class="section-note">Composição vertical da marca (REGRAS_MARCA.md, seção 5) sobre carvão — glifo centralizado acima do wordmark. Formulário no padrão de controles: mesma altura, foco em <code>--accent</code>, botão primário ocupando a largura do card.</p>
+  <div style="max-width:360px;background:var(--sidebar-bg);border-radius:var(--radius-lg);padding:var(--sp-8) var(--sp-6);box-shadow:var(--shadow-md)">
+    <div style="text-align:center;margin-bottom:var(--sp-6)">
+      <svg viewBox="0 0 120 120" width="52" style="display:block;margin:0 auto 10px" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="60" cy="60" r="40" fill="none" stroke="#A5643C" stroke-width="3"/>
+        <polygon points="60,27 65.5,60 60,68 54.5,60" fill="#D3A254"/>
+        <polygon points="60,93 64.5,62 60,54 55.5,62" fill="none" stroke="#C9976D" stroke-width="1.75"/>
+      </svg>
+      <div style="font-family:var(--font-display);font-weight:700;font-size:1.35rem;color:#fff;letter-spacing:.02em">Orizon</div>
+      <div style="font-family:var(--font-display);font-weight:600;font-size:.65rem;color:var(--sidebar-accent);letter-spacing:.42em;margin-top:2px">MANAGER</div>
+    </div>
+    <div class="stack">
+      <div class="field"><label style="color:#B5B2AD">E-mail</label><input class="input" style="background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:#fff" placeholder="seu@email.com"></div>
+      <div class="field"><label style="color:#B5B2AD">Senha</label><input class="input" type="password" style="background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:#fff" placeholder="••••••••"></div>
+      <button class="btn btn-primary" style="width:100%;margin-top:var(--sp-2)">Entrar</button>
+    </div>
+  </div>
+  <p class="hint" style="margin-top:var(--sp-3)">Glifo em <code>glifo-fundo-escuro.svg</code> (peso fino, ≥40px). Área de respiro mínima: metade do diâmetro do círculo, conforme o manual.</p>
+</section>
+
 <!-- ============ 10. ALERTAS ============ -->
 <section>
   <div class="eyebrow">10 · Componentes</div>
@@ -469,7 +493,7 @@ function pickTab(el){
 const TOKENS=[
   ['--bg','Fundo'],['--surface','Superfície'],['--surface-2','Superfície 2'],
   ['--border','Borda'],['--text','Texto'],['--text-2','Texto secundário'],
-  ['--accent','Acento (petróleo/cobre)'],['--accent-soft','Acento suave'],['--accent-vivid','Cobre claro'],['--accent-line','Linha de realce'],
+  ['--accent','Acento (cobre)'],['--accent-soft','Acento suave'],['--accent-vivid','Dourado/cobre claro'],['--accent-line','Linha de realce'],
   ['--btn-primary-bg','Botão primário'],['--ok','Sucesso'],['--warn','Atenção'],['--err','Erro'],['--info','Info']
 ];
 function renderSwatches(){

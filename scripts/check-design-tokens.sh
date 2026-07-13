@@ -16,11 +16,13 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 # Código de UI varrido (o orizon-tokens.css NÃO entra — é onde o hex é permitido)
+# UI enviada + camada de componentes. O orizon-styleguide.html NÃO entra: é doc/demo de
+# referência (mostra swatches e o glifo de marca com cores literais, legítimo). O orizon-tokens.css
+# também não — é a fonte única onde o hex é permitido.
 FILES=(
   static/index.html
   static/login.html
   design-system/orizon-components.css
-  design-system/orizon-styleguide.html
 )
 
 # Só varre os que existem

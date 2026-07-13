@@ -1,6 +1,6 @@
 /* ============================================================
    ORIZON MANAGER — DESIGN TOKENS
-   Padrao_Design_Orizon v10 → tokens.css v1.2
+   Padrao_Design_Orizon v10 → tokens.css v1.5
    v1.1: tema escuro migra o realce de menta para COBRE/BRONZE ENVELHECIDO
    (variação F aprovada) — --accent-line #532A14 em bordas/filetes, texto
    interativo #A56B45 com piso de legibilidade, --warn afastado para
@@ -15,9 +15,11 @@
    v1.4: dimensões padronizadas — grade única de alturas para todos os
    controles (--control-h-*) e larguras de campo por tipo de dado
    (--field-xs…lg). Taxonomia: Ação / Entrada / Indicador / Navegação.
-   v1.5: tema CLARO migra o acento de petróleo/menta para COBRE (marca §3:
-   --accent #8C5230, --accent-vivid dourado #B8823D) — encerra a decisão
-   pendente; claro e escuro agora ambos na família cobre.
+   v1.5: tema claro migra de petróleo/cinza-frio para AREIA + COBRE — a
+   mesma família do escuro, só muda a temperatura de fundo. --accent
+   passa a ser cobre #8C5230 nos dois temas; botão primário vira
+   cinza-quente #5C5650 (paralelo do cinza-quente escuro). Os dois temas
+   passam a compartilhar uma única identidade cromática.
    ------------------------------------------------------------
    REGRAS INEGOCIÁVEIS (v9/v10):
    1. Nenhum componente declara cor em hex literal — sempre var(--token).
@@ -31,33 +33,36 @@
 /* ---------- TEMA CLARO (padrão) ---------- */
 :root,
 [data-theme="light"] {
-  /* Superfícies e fundo */
-  --bg:            #F6F8F7;
+  /* Superfícies e fundo — areia clara, paralelo direto do carvão H2 */
+  --bg:            #FAF8F6;
   --surface:       #FFFFFF;
-  --surface-2:     #F0F3F2;
-  --border:        #E0E6E4;
-  --border-strong: #C7D1CE;
+  --surface-2:     #F5F1EC;
+  --border:        #E5DFD8;
+  --border-strong: #D3CAC0;
 
   /* Texto */
-  --text:          #1E2523;
-  --text-2:        #5B6663;
-  --text-3:        #8A9591;
+  --text:          #2B2621;
+  --text-2:        #6B6259;
+  --text-3:        #948A7F;
   --text-inverse:  #FFFFFF;
 
-  /* Acento — COBRE (marca §3): navegação, links, foco, badges, aba ativa (v1.5) */
-  --accent:        #8C5230;   /* cobre sobre fundo claro (marca §3) */
-  --accent-hover:  #6F4126;   /* cobre mais escuro */
-  --accent-soft:   #F3E8E0;   /* fundo de item ativo / badge tint (cobre bem claro) */
-  --accent-on-soft:#6F4126;   /* texto de acento sobre o tint */
-  --accent-vivid:  #B8823D;   /* dourado — realces pontuais (marca §3) */
-  --accent-line:   #B0764A;   /* filetes/bordas de realce no claro */
+  /* Acento — cobre (navegação, links, foco, badges, aba ativa).
+     v1.5: substitui o petróleo — os dois temas passam a compartilhar
+     a mesma família cromática, só a temperatura de fundo muda. */
+  --accent:        #8C5230;
+  --accent-hover:  #6E3F22;
+  --accent-soft:   rgba(140,82,48,.12);   /* fundo de item ativo / badge tint */
+  --accent-on-soft:#8C5230;               /* texto de acento sobre o tint */
+  --accent-vivid:  #B8823D;               /* dourado — realces pontuais */
+  --accent-line:   #6E3F22;               /* filetes de realce no claro */
 
-  /* Botão primário — token próprio, ≠ accent (v10) */
-  --btn-primary-bg:     #666666;   /* cinza neutro, sem matiz de marca */
+  /* Botão primário — token próprio, ≠ accent (v10). Cinza-quente,
+     paralelo do --btn-primary-bg escuro, sem matiz de marca. */
+  --btn-primary-bg:     #5C5650;
   --btn-primary-text:   #FFFFFF;
   --btn-primary-border: transparent;
   --btn-primary-shadow: 0 2px 8px rgba(0,0,0,.12);
-  --btn-primary-bg-hover: #4F4F4F;
+  --btn-primary-bg-hover: #46413C;
 
   /* Botão secundário */
   --btn-secondary-bg:     var(--surface-2);

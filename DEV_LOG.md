@@ -2060,6 +2060,37 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 73 — Design system v1.5 (paleta unificada em cobre) + consolidação da marca + fix do tema claro
+Consolidação definitiva das duas frentes de design sobre a base da Sessão 72.
+
+- **Design system atualizado para tokens v1.5:** paleta unificada nos dois temas em torno do cobre
+  (accent), com areia no tema claro e carvão quente no tema escuro — fim da divergência entre temas.
+  Semânticas (erro/aviso/sucesso/info) em vinho/ocre/sálvia/azul empoeirado. Grades de altura e largura
+  de controles padronizadas. Template Barra de Filtros adicionado. Página de login atualizada para a
+  composição vertical da marca.
+- **Identidade visual do produto atualizada para v1.0:** logo azul substituído pelo glifo cobre
+  (bússola), conforme `design-system/marca/REGRAS_MARCA.md`. Emblema completo mantido apenas para uso
+  em marketing, fora do produto. Assets reorganizados em `design-system/marca/`.
+- **Corrigido: área de conteúdo no tema claro renderizava sem estilo (serifa, inputs nativos, sem cor).**
+  Causa-raiz: o `design-system/*.css` não chegava ao browser (404) porque o servidor rodava o `main.py`
+  anterior à rota `.css` (mudança em Python exige restart); como na Sessão 72 os *fallbacks* literais do
+  app foram trocados por aliases puros, sem os tokens o conteúdo perde fonte/cor/raio/inputs. A sidebar
+  "parecia OK" por ser quase só texto (degrada legível). Fix: servidor reiniciado com a rota `.css` ativa
+  (200 confirmado). **Descoberta adicional corrigida:** `.sidebar` usava `var(--surface)` (segue o tema →
+  branca no claro), então, com os tokens carregando, o lockup branco ficaria invisível no claro;
+  reescopei os tokens theme-following para os `--sidebar-*` dentro de `.sidebar` → sidebar escura nos dois
+  temas (§7) sem editar cada propriedade. Mesmo padrão aplicado ao card de login (09b, sobre carvão).
+
+**Também nesta sessão:**
+- Tokens v1.5 são os do usuário (areia `#FAF8F6`/`#FFFFFF`, accent cobre `#8C5230`, primário cinza-quente
+  `#5C5650`). Os aliases do produto (Sessão 72) seguem resolvendo — mesmos nomes de token.
+- Varredura de hex/rgb: `index.html` e `login.html` permanecem **sem cor literal** (check verde).
+- Trava: `check-design-tokens.sh` passou a **excluir `orizon-styleguide.html`** (doc/demo de referência,
+  mostra swatches e o glifo de marca com cores literais legítimas); varre a UI enviada + `orizon-components.css`.
+- Docs marcados como superados (banner → fonte única `orizon-tokens.css` v1.5): `docs/design-tokens.md`
+  e `docs/design/padrao-design-orizon-v2.md`. Specs históricas datadas **não** foram reescritas (registro).
+  `modelo_proposta.docx` (marketing, caminho docx/LibreOffice) fica para um passe à parte.
+
 ## Sessão 72 — Design system v1.4 (cobre/carvão) + Identidade visual v1.0 (glifo da bússola)
 Consolidação de duas frentes de design entregues fora do código (arquivos em `design-system/`).
 Supera o rebrand da **Sessão 68** (navy/azul-elétrico/ciano da logo antiga), que fica aposentado.

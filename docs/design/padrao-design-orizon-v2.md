@@ -1,5 +1,11 @@
 # Padrão de Design — Orizon (v2)
 
+> ⛔ **Paleta SUPERADA (2026-07-12).** Este doc descreve o tema **petróleo + dourado Dalmóbile** (antigo).
+> A identidade atual é **cobre** (accent) unificado nos dois temas, **areia** no claro e **carvão** no
+> escuro — fonte única em **`design-system/orizon-tokens.css` (v1.5)** e marca em
+> `design-system/marca/REGRAS_MARCA.md` (glifo da bússola; dourado só em marketing, fora do produto).
+> As regras de layout/componentes abaixo seguem válidas; só as **cores** estão desatualizadas.
+
 > Fonte: `Padrao_Design_Orizon_v2.docx` (extraído automaticamente). **Especificação oficial de front-end.**
 
 Padrão de Design — Orizon Studio
