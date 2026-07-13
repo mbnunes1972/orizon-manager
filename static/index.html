@@ -384,10 +384,7 @@ body{overflow:hidden}
 .plano-tbl{width:100%;border-collapse:collapse}
 .plano-tbl th{padding:7px 12px;font-size:9px;color:var(--muted);text-transform:uppercase;border-bottom:1px solid var(--border);text-align:left;letter-spacing:1px}
 .plano-tbl td{border-bottom:1px solid var(--border)}
-/* Total contrato */
-.total-contract{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;margin:14px 0 8px}
-.total-contract span{font-size:var(--fs-body);color:var(--muted)}
-.total-contract input{background:transparent;border:none;color:var(--ok);font-size:22px;font-weight:700;font-family:var(--font-mono);text-align:right;outline:none;width:200px;cursor:pointer}
+/* Total do Contrato: migrado p/ .total-line.emphasis (v1.7 · components.css) */
 /* Botões de ação */
 .action-row{display:flex;gap:10px;margin-top:16px;padding-bottom:40px;flex-wrap:wrap}
 .btn-ok{background:var(--teal-bg);color:var(--ok);border:1px solid var(--teal-brd)}
@@ -1195,47 +1192,50 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Painel À Vista -->
     <div class="mod-panel" id="painel-avista" style="display:none">
       <div class="mod-panel-title">&#x1F4B5; A Vista</div>
-      <div class="mod-grid">
-        <div>
-          <label>Valor da entrada</label>
-          <input type="text" id="av-entrada-valor" inputmode="numeric"
-                 placeholder="R$ 0,00" oninput="mascaraMoedaInput(this); avistaRecalcular()">
+      <!-- v1.7 · rótulo flutuante (styleguide 04c): 2 linhas — Entrada / Liquidação -->
+      <div class="stack" style="max-width:720px">
+        <div class="row">
+          <div class="field-float" style="flex:1">
+            <label>Data da entrada</label>
+            <input class="input" type="date" id="av-entrada-data" oninput="avistaRecalcular()">
+          </div>
+          <div class="field-float" style="flex:1">
+            <label>Valor da entrada</label>
+            <input class="input" type="text" id="av-entrada-valor" inputmode="numeric"
+                   placeholder="R$ 0,00" oninput="mascaraMoedaInput(this); avistaRecalcular()">
+          </div>
+          <div class="field-float" style="flex:1">
+            <label>Forma da entrada</label>
+            <select class="input" id="av-entrada-forma" onchange="avistaRecalcular()"></select>
+          </div>
         </div>
-        <div>
-          <label>Data da entrada</label>
-          <input type="date" id="av-entrada-data" oninput="avistaRecalcular()">
-        </div>
-        <div>
-          <label>Forma da entrada</label>
-          <select id="av-entrada-forma" onchange="avistaRecalcular()"></select>
-        </div>
-        <div>
-          <label>Valor da liquidacao</label>
-          <input type="text" id="av-liq-valor" readonly>
-        </div>
-        <div>
-          <label>Data da liquidacao</label>
-          <input type="date" id="av-liq-data" oninput="avistaRecalcular()">
-        </div>
-        <div>
-          <label>Forma da liquidacao</label>
-          <select id="av-liq-forma" onchange="avistaRecalcular()"></select>
+        <div class="row">
+          <div class="field-float" style="flex:1">
+            <label>Data da liquidação</label>
+            <input class="input" type="date" id="av-liq-data" oninput="avistaRecalcular()">
+          </div>
+          <div class="field-float" style="flex:1">
+            <label>Valor da liquidação</label>
+            <span class="calc-flag">calculado</span>
+            <input class="input readonly" type="text" id="av-liq-valor" readonly>
+          </div>
+          <div class="field-float" style="flex:1">
+            <label>Forma da liquidação</label>
+            <select class="input" id="av-liq-forma" onchange="avistaRecalcular()"></select>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Resumo e total -->
-    <div class="card" style="margin-bottom:14px">
-      <div class="total-contract">
-        <span style="font-family:var(--font-sans);font-weight:600">Total do Contrato</span>
-        <div style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:13px;font-weight:700;color:var(--muted);font-family:var(--font-mono)">R$</span>
-          <input id="neg-total-final" type="text" value="—" readonly
+    <!-- Resumo e total — Linha de Total v1.7 (styleguide 07c · tamanho único) -->
+    <div style="margin-bottom:14px">
+      <div class="total-line emphasis">
+        <span class="label">Total do Contrato</span>
+        <span class="value"><span class="cur">R$</span><input id="neg-total-final" type="text" value="—" readonly
                  title="Clique para editar"
                  onclick="negTotalIniciarEdicao(this)"
                  onblur="negTotalConfirmar(this.value)"
-                 onkeydown="if(event.key==='Enter')this.blur()">
-        </div>
+                 onkeydown="if(event.key==='Enter')this.blur()"></span>
       </div>
       <div id="neg-resumo-parcelas" style="display:none;text-align:right;font-family:var(--font-sans);font-weight:700;font-size:15px;color:var(--muted);margin-top:8px;padding-right:2px"></div>
     </div>
@@ -6550,7 +6550,7 @@ function negTotalConfirmar(valStr){
   el.style.borderRadius = '0';
   el.style.padding      = '0';
   el.style.cursor       = 'pointer';
-  el.style.color        = 'var(--ok)';
+  el.style.color        = '';   // v1.7: cor governada por .total-line .value (--text), sem verde residual
 
   // Parse: aceita tanto ponto quanto vírgula como decimal
   // Remove pontos de milhar e troca vírgula por ponto
