@@ -1641,7 +1641,8 @@ class Handler(BaseHTTPRequestHandler):
                             return None
                         return {"itens": json.loads(r.itens_json), "cfo": r.cfo, "val_liq": r.val_liq,
                                 "cust_var": r.cust_var, "marg_cont": r.marg_cont, "decisao": r.decisao,
-                                "criado_em": r.criado_em.isoformat() if r.criado_em else None}
+                                "criado_em": r.criado_em.isoformat() if r.criado_em else None,
+                                "travada": getattr(r, "travada_em", None) is not None}
 
                     venda = _reg("venda")
                     d = _negociacao_breakdown(orc, db)
@@ -3959,14 +3960,39 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "decisao deve ser concorda|revisa"}, code=400); return
                 cust_var, marg = _mprov.cust_var_marg_cont(cfo, vl, itens)
                 existente = db.query(ProvisaoRegistro).filter_by(orcamento_id=oid, versao=versao).first()
+                pode_autorizar = perfis.pode(aprovador.nivel, "autorizar")   # capacidade de step-up (Diretor)
+                # Fatia C (#10): versão já aprovada/travada não reedita sem step-up do Diretor
+                if existente is not None and getattr(existente, "travada_em", None) is not None and not pode_autorizar:
+                    self.send_json({"ok": False,
+                        "erro": "Versão %s já aprovada e travada — reabrir exige Diretor." % versao}, code=403); return
+                # Fatia C (#10): aumento de custo acima do limite (config) exige step-up do Diretor
+                import mod_parcelas as _mpar
+                _loja = db.get(Loja, loja_id) if loja_id else None
+                _cfg = {}
+                if _loja and _loja.config_financeira_json:
+                    try: _cfg = json.loads(_loja.config_financeira_json)
+                    except Exception: _cfg = {}
+                _af = (_cfg.get("aprovacao_financeira") or {})
+                _lim_pct = float(_af.get("limite_af1_pct", 1.0) if versao == "rev1" else _af.get("limite_af2_pct", 2.0))
+                if _mpar.exige_aprovacao_diretor(anterior.cust_var, cust_var, _lim_pct / 100.0) and not pode_autorizar:
+                    self.send_json({"ok": False,
+                        "erro": "Aumento de custo acima do limite (%.2f%%) — exige aprovação do Diretor." % _lim_pct}, code=403); return
                 if existente:
                     db.delete(existente); db.flush()
                 db.add(ProvisaoRegistro(orcamento_id=oid, versao=versao,
                     itens_json=json.dumps(itens, ensure_ascii=False),
                     cfo=cfo, val_liq=vl, cust_var=cust_var, marg_cont=marg,
-                    decisao=decisao, por_id=aprovador.id))
+                    decisao=decisao, por_id=aprovador.id, travada_em=datetime.utcnow()))
+                db.flush()
+                # Fatia C (#11): ajusta o razão (ativo × provisão, nunca DRE) p/ os valores aprovados
+                import mod_contabil as _mc
+                ot_af, own_af = _mc.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+                _seq = int(getattr(orc, "ramo_financeiro_seq", 0) or 0) + 1
+                _mc.disparar_deltas_af(db, ot_af, own_af, orc.projeto_id, itens,
+                                       ref_base="af:%s:%s:%d" % (orc.projeto_id, versao, _seq))
+                orc.ramo_financeiro_seq = _seq
                 db.commit()
-                self.send_json({"ok": True})
+                self.send_json({"ok": True, "travada": True})
             finally:
                 db.close()
             return

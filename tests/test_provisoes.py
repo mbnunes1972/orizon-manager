@@ -5,7 +5,9 @@ import mod_orcamento_params
 def test_default_tem_estrutura_completa():
     c = mod_provisoes.config_financeira_default()
     assert set(c.keys()) == {"defaults_negociacao", "provisoes", "provisoes_contabeis",
-                             "comissao_vendas", "cronograma_padrao"}   # v11: Cronograma de Projeto Padrão
+                             "comissao_vendas", "cronograma_padrao",
+                             "aprovacao_financeira"}   # Fatia C: limites AF1/AF2
+    assert c["aprovacao_financeira"] == {"limite_af1_pct": 1.0, "limite_af2_pct": 2.0}
     assert c["provisoes"]["frete_fab_pct"] == 0.0
     assert c["provisoes_contabeis"] == {"montagem_pct": 0.0, "garantia_pct": 0.0, "comissao_pct": 0.0}   # v6 §6.4 / v8 Config
     assert c["comissao_vendas"]["limitador_desconto"]["ativo"] is False

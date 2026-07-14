@@ -747,6 +747,7 @@ class ProvisaoRegistro(Base):
     decisao      = Column(String(10), nullable=True)    # 'concorda' | 'revisa' | None (venda)
     por_id       = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
     criado_em    = Column(DateTime, default=datetime.utcnow)
+    travada_em   = Column(DateTime, nullable=True)      # Fatia C (#10): versão aprovada e travada (não reedita sem Diretor)
 
     __table_args__ = (UniqueConstraint("orcamento_id", "versao", name="uq_provisao_orc_versao"),)
 
@@ -1118,6 +1119,12 @@ def _migrar_colunas():
             orc_cols = [c[1] for c in cur.execute("PRAGMA table_info(orcamentos)").fetchall()]
             if "out_forn" not in orc_cols:
                 cur.execute("ALTER TABLE orcamentos ADD COLUMN out_forn REAL DEFAULT 0")
+
+        # ── provisao_registro: trava da versão aprovada (Fatia C) ──
+        if _tabela_existe(cur, "provisao_registro"):
+            pr_cols = {c[1] for c in cur.execute("PRAGMA table_info(provisao_registro)").fetchall()}
+            if pr_cols and "travada_em" not in pr_cols:
+                cur.execute("ALTER TABLE provisao_registro ADD COLUMN travada_em DATETIME")
 
         # ── pool_ambientes: qualidade do XML ──
         cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='pool_ambientes'")

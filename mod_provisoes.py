@@ -25,6 +25,8 @@ def config_financeira_default():
         # v6 §6.4: % contábil das provisões constituídas no fechamento (Financeiro, desacoplado do preço).
         # assistencia herda provisoes.assist_pct → não fica aqui; só montagem/garantia são config nova.
         "provisoes_contabeis": {"montagem_pct": 0.0, "garantia_pct": 0.0, "comissao_pct": 0.0},
+        # Fatia C (#10): limites de aumento de custo na Aprovação Financeira que exigem step-up do Diretor.
+        "aprovacao_financeira": {"limite_af1_pct": 1.0, "limite_af2_pct": 2.0},
         "comissao_vendas": {
             "meta_mensal": 0.0,
             "faixas_comissao": [{"venda_ate": None, "pct": 0.0}],

@@ -620,6 +620,38 @@ def ajustar_provisao_delta(db, owner_tipo, owner_id, projeto_id, rubrica, valor_
 
 
 # Fatia B (resultado financeiro) — ramo do custo financeiro → evento de constituição no contrato.
+# #10/#11 (Fatia C) — mapa das chaves do painel de provisões (mod_provisoes._RUBRICAS) → rubrica contábil
+# (_PROV_FECHAMENTO). com_adm não tem provisão constituída no contrato (sem ativo diferido) → sem delta.
+_AF_ITEM_RUBRICA = {
+    "prov_mont": "montagem", "prov_gar": "garantia", "assist": "assistencia",
+    "frete_fab": "frete_fabrica", "frete_loc": "frete_local", "ins_loc": "insumos",
+    "com_med": "com_medidor", "com_proj_exec": "com_proj_exec",
+    "com_venda": "retencao_com_vendas", "prov_imp": "impostos",
+    # out_forn (Outros Fornecedores) NÃO entra: só nasce por reclassificação, sem evento de fechamento.
+}
+
+
+def disparar_deltas_af(db, owner_tipo, owner_id, projeto_id, itens_alvo, ref_base, data=None):
+    """#10/#11 — ao confirmar uma Aprovação Financeira, ajusta cada rubrica do **saldo ATUAL da provisão**
+    para o valor-alvo da versão aprovada (itens_alvo, chaves do painel). Só ativo diferido × provisão,
+    NUNCA DRE. Converge (idempotente por VALOR: re-aprovar o mesmo alvo → delta 0, mesmo com ref nova).
+    Retorna {rubrica: delta_R$}."""
+    out = {}
+    for chave, rubrica in _AF_ITEM_RUBRICA.items():
+        if chave not in (itens_alvo or {}) or rubrica not in _PROV_FECHAMENTO:
+            continue
+        alvo = round(float(itens_alvo.get(chave) or 0), 2)
+        _ativo, prov_cod, _h = EVENTOS[_PROV_FECHAMENTO[rubrica]]
+        atual = round(_mov(db, owner_tipo, owner_id, prov_cod, "credor", None, None, projeto_id=projeto_id), 2)
+        if abs(alvo - atual) < 0.005:
+            continue
+        lan = ajustar_provisao_delta(db, owner_tipo, owner_id, projeto_id, rubrica, atual, alvo,
+                                     ref=ref_base + ":" + rubrica, data=data)
+        if lan is not None:
+            out[rubrica] = round(alvo - atual, 2)
+    return out
+
+
 _RAMO_CFIN_EVENTO = {
     "financeira":       "fechamento_venda_custo_financeiro",  # despesa financeira PROVISIONADA (taxa da financeira)
     "loja_antecipacao": "fechamento_venda_custo_financeiro",  # despesa PROVISIONADA (antecipação bancária; custo real depois)

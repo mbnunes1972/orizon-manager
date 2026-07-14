@@ -100,6 +100,14 @@ tratamento oposto: é por isso que o box é necessário.
   `POST /api/orcamentos/<id>/receita-financeira` + campo "Apropriar receita" no box da AF (ramo loja).
 
 ## 4. As Aprovações Financeiras (o gate)
+> ✅ **Gate implementado (Fatia C, 2026-07-14):** o endpoint `provisoes/(rev1|rev2)` agora **trava** a
+> versão aprovada (`ProvisaoRegistro.travada_em`; reabrir exige capacidade `autorizar`/Diretor), aplica o
+> **limite** (`limite_af1_pct` 1% / `limite_af2_pct` 2%, em `config_financeira.aprovacao_financeira`) via
+> `mod_parcelas.exige_aprovacao_diretor` → step-up do Diretor, e dispara o **delta #11**
+> (`disparar_deltas_af`: ajusta cada rubrica do saldo ATUAL da provisão para o valor aprovado, ativo×provisão,
+> nunca DRE, convergente/idempotente por valor). Frontend mostra os erros do gate. Pendentes: coluna **Rev3**
+> (placeholder — fase futura), gate **por parcela** (depende da infra de parcelas da Fatia 2 do desmembramento),
+> e revisão dos 4 custos adicionais na AF1 (hoje não estão nas chaves do painel de provisões — ver §3.3).
 - **AF1 — confirma a MARGEM da venda.** Revisa os 4 custos adicionais (§3.3) + seleciona/confirma o box de
   financiamento (§3.4) + eventual pequena revisão de fábrica. Ao aprovar, **trava Rev1**. Efeito contábil:
   delta ativo×provisão (#11) das rubricas que mudaram; **nunca DRE**.
