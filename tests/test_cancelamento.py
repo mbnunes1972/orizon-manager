@@ -42,6 +42,24 @@ def test_cancelar_contrato_idempotente(app_db):
     db.close()
 
 
+def test_cancelamento_endpoint_estorna_e_trava(http_client_factory, seed, app_db):
+    # cobre o fluxo do BOTÃO com LANÇAMENTOS reais: 200 + estorno + status "cancelado". (NOTA: o lock
+    # "database is locked" do SQLite em ARQUIVO — ordem commit×upsert — NÃO reproduz aqui, pois o app_db
+    # de teste é em memória; este teste garante o contrato do endpoint, não a corrida de sessões.)
+    db = app_db.get_session()
+    ot, own = mc.resolver_owner(db, {"loja_id": seed["loja1_id"], "rede_id": None})
+    mc.seed_plano(db, ot, own)
+    mc.registrar_evento(db, ot, own, "registro_venda_contrato", 10000.0, projeto_id="Proj_L1", ref="v:Proj_L1")
+    mc.constituir_provisoes_fechamento(db, ot, own, "Proj_L1", {"custo_fabrica": 4000.0}, ref_base="pf:Proj_L1")
+    db.commit(); db.close()
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    oid = seed["orcamento_l1_id"]
+    st, d = c.post("/api/orcamentos/%d/cancelamento" % oid, {"login": "dir_l1", "senha": "senha123"})
+    assert st == 200, (st, d)
+    assert d.get("ok") and d.get("status") == "cancelado", d
+    assert d.get("revertido"), d   # estornou lançamentos de fato
+
+
 def test_cancelar_contrato_deixa_recebivel_a_devolver_se_houve_recebimento(app_db):
     # se o cliente já pagou (recebimento_venda abate 1.1.02), o estorno da Receita a Realizar deixa
     # 1.1.02 CREDOR = valor a devolver (reembolso físico → Tesouraria, módulo futuro).
