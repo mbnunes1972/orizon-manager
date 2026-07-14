@@ -11018,10 +11018,10 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
                style="width:120px;height:var(--control-h-sm);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-body)">
         <button class="btn-ciclo btn-danger" onclick="devolucaoRegistrar()"><i class="ti ti-arrow-back-up"></i> Registrar devolução</button>
       </div>
-      <div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:10px">
-        <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">Cancelamento de contrato: estorna TODOS os lançamentos e trava o projeto como "cancelado" (revender = novo projeto). Exige senha de Diretor. Indisponível após a NF-e.</div>
+      ${codigo === '8' ? `<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:10px">
+        <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">Cancelamento de contrato: estorna TODOS os lançamentos e trava o projeto como "cancelado" (revender = novo projeto). Exige senha de Diretor. Só na AF1 — depois, o cancelamento é fora do ciclo.</div>
         <button class="btn-ciclo" onclick="cancelarContrato()" style="background:var(--cancel);color:var(--cancel-on);border-color:var(--cancel);font-weight:700"><i class="ti ti-file-x"></i> Cancelar contrato</button>
-      </div>
+      </div>` : ''}
     </div>` : '';
   const _btnProvisoes = `<button onclick="abrirProvisoes(_orcamentoAtivoId, '${codigo}')"
     style="background:none;border:1px solid var(--border2);color:var(--accent);
