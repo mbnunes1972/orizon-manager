@@ -1007,7 +1007,8 @@ def _ativo_diferido_de(prov_cod):
     return "1.1.06." + prov_cod.rsplit(".", 1)[-1]
 
 
-def devolver_venda(db, owner_tipo, owner_id, projeto_id, fracao, ref_base, data=None):
+def devolver_venda(db, owner_tipo, owner_id, projeto_id, fracao, ref_base, data=None,
+                   origem=_ORIGEM_DEVOLUCAO, rotulo="Devolução"):
     """#D — devolução (parcial/total) da venda: reverte PROPORCIONALMENTE a constituição DIFERIDA (antes da
     entrega/NF-e). `fracao` (0<f<=1) = parte devolvida (por ambiente/parcela — fração #5). Reverte:
       - Receita a Realizar: DR 2.1.06 × CR 1.1.02 (reduz receita diferida + recebível);
@@ -1030,7 +1031,7 @@ def devolver_venda(db, owner_tipo, owner_id, projeto_id, fracao, ref_base, data=
             rar = _conta_por_codigo(db, owner_tipo, owner_id, "2.1.06")
             rec = _conta_por_codigo(db, owner_tipo, owner_id, "1.1.02")
             lancar(db, owner_tipo, owner_id, rar.id, rec.id, mv, data=data, projeto_id=projeto_id,
-                   origem=_ORIGEM_DEVOLUCAO, historico="Devolução — estorno de Receita a Realizar", ref=ref_r)
+                   origem=origem, historico="%s — estorno de Receita a Realizar" % rotulo, ref=ref_r)
             out["2.1.06"] = mv
     # 2) provisões diferidas × ativos
     contas = (db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, tipo="analitica")
@@ -1051,8 +1052,31 @@ def devolver_venda(db, owner_tipo, owner_id, projeto_id, fracao, ref_base, data=
         prov = _conta_por_codigo(db, owner_tipo, owner_id, c.codigo)
         ativo = _conta_por_codigo(db, owner_tipo, owner_id, ativo_cod)
         lancar(db, owner_tipo, owner_id, prov.id, ativo.id, mv, data=data, projeto_id=projeto_id,
-               origem=_ORIGEM_DEVOLUCAO, historico="Devolução — estorno de provisão diferida (%s)" % c.codigo, ref=ref_c)
+               origem=origem, historico="%s — estorno de provisão diferida (%s)" % (rotulo, c.codigo), ref=ref_c)
         out[c.codigo] = mv
+    return out
+
+
+_ORIGEM_CANCELAMENTO = "cancelamento_contrato"
+
+
+def cancelar_contrato(db, owner_tipo, owner_id, projeto_id, ref_base, data=None):
+    """Cancelamento de contrato (dentro do prazo, ANTES da NF-e): estorna TODA a constituição do contrato,
+    deixando o razão como se ele não tivesse ocorrido. Reusa `devolver_venda(f=1.0)` (Receita a Realizar +
+    provisões×ativos diferidos) com origem/rótulo próprios (distingue de devolução no razão) e adiciona o
+    estorno dos juros a apropriar do ramo loja (`reverter_juros_direto`, 2.1.07 × 1.1.07). Idempotente por
+    ref_base. **Bloqueio pós-NF-e** é do chamador (endpoint). O reembolso físico de valores já recebidos
+    (1.1.02 fica CREDOR = a devolver) é tratado pela Tesouraria (módulo futuro). Retorna {conta: valor}."""
+    out = devolver_venda(db, owner_tipo, owner_id, projeto_id, 1.0, ref_base=ref_base + ":estorno",
+                         data=data, origem=_ORIGEM_CANCELAMENTO, rotulo="Cancelamento")
+    ref_j = ref_base + ":juros"
+    if lancamento_por_ref(db, owner_tipo, owner_id, ref_j) is None:
+        saldo_juros = round(total_lancado(db, owner_tipo, owner_id, "1.1.07", "debito", projeto_id)
+                            - total_lancado(db, owner_tipo, owner_id, "1.1.07", "credito", projeto_id), 2)
+        if saldo_juros > 0:
+            registrar_evento(db, owner_tipo, owner_id, "reverter_juros_direto", saldo_juros,
+                             projeto_id=projeto_id, ref=ref_j)
+            out["1.1.07"] = saldo_juros
     return out
 
 
