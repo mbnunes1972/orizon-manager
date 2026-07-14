@@ -102,6 +102,11 @@ estáveis no banco/endpoints/gating):**
 | 14–18 | 16,17,18,19,20 | Entrega · Montagem · Assistência · Vistoria · Aprovação final | |
 | 19 | **21** | Conciliação Final | *(reabre painel · encerra)* |
 
+> **Posição × código interno:** a UI não mostra número — só o nome da etapa. A coluna "Cód" é o **identificador
+> interno** (estável no banco/endpoints/gating), com buraco em 5/6 (removidas), então de Contrato em diante o
+> código fica +2 vs a posição — ex.: Conferência é a **10ª** etapa, código interno **12**. Ao comunicar, usar
+> posição+nome; o código aparece só onde a implementação o exige.
+
 ---
 
 ## 4. Conferência (etapa 12 = AF3)
