@@ -11581,13 +11581,9 @@ function _renderCardPE(codigo, dados, bloqueada) {
          onclick="peConcluir('${codigo}')">&#x2713; ${esc(cfg.fechar)}</button>`
     : '';
 
-  const btnRevisao = (cfg.revisavel && podeRevis)
-    ? `<label class="btn-ciclo" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;
-         border-color:var(--warn);color:var(--warn)">
-        &#x21BA; Revisão
-        <input type="file" id="${inputRevisId}" style="display:none" onchange="peRevisao('${codigo}', this)">
-       </label>`
-    : '';
+  // Botão "Revisão" ELIMINADO: a revisão do PE agora é o próprio "Carregar" (sobrescreve + incrementa o
+  // indicador [Rev1, Rev2…] ao lado do nome da subfase). peRevisao/inputRevisId ficam sem uso.
+  const btnRevisao = '';
 
   // Fatia 1 (desmembramento): na Revisão de PE (11c), comparação de CFO venda×PE + reconciliação
   // estimada (read-only, "estimativa gerencial"). spec 2026-07-13 §6/#9.
