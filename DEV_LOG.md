@@ -1339,7 +1339,43 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
-## ⏸️ ESTADO ATUAL (2026-07-14) — retomar aqui
+## ⏸️ ESTADO ATUAL (2026-07-14, tarde) — retomar aqui
+
+> **Maratona 2026-07-14 (branch `feat/desmembramento-fatia2-ciclo`, suíte 1033 verde).** Sequência de
+> testes manuais do usuário + implementações:
+> - **Bug do select da sidebar** (opções invisíveis) — `color-scheme:dark` + opções opacas.
+> - **Gate do PE** (`_podePE`) usava nomes de função obsoletos → destravado p/ níveis-base.
+> - **Comparação PE enxuta** (11c): valor do projeto + Δ CFO por ambiente com % + média final (sem provisões).
+> - **Desmembramento "parcela" → "Fase"** (rótulos; endpoints/tabelas mantidos).
+> - **F0 (bug ①):** os 4 custos adicionais + Custo Financeiro viram LINHA ajustável no painel de Provisões
+>   (`itens_provisao` inclui-os; `cust_var_marg_cont` soma SÓ `_RUBRICAS` → sem double-count; `_AF_ITEM_RUBRICA`
+>   ganha os 4; custo financeiro read-only). Box inferior removido.
+> - **Revisão amarrada à etapa** (Rev1↔etapa 8 / Rev2↔11d): NÃO auto-avança p/ Rev2; reeditável pelo ger
+>   adm/fin **até a etapa ser aprovada** (trava por aprovação, não por registro; depois exige Diretor).
+> - **AF no modal:** botões só **Revisar** + **Aprovar** (Aprovar salva a revisão E aprova a etapa,
+>   `_provAprovar`); "Aprovar (gerencial)" saiu do card. **Devolução removida das AF**; **Cancelamento só na AF1**.
+> - **Cancelamento de contrato (opção B):** `mod_contabil.cancelar_contrato` (estorno total do diferido +
+>   juros; reusa `devolver_venda` f=1.0) + endpoint `POST /api/orcamentos/<id>/cancelamento` (gate Diretor,
+>   bloqueio pós-NF-e, status **"cancelado"**) + botão marrom (tokens `--cancel`). Reembolso físico → Tesouraria (futuro).
+> - **Auditoria Contábil:** `mod_contabil.auditoria_contabil(projeto_id)` (view do razão) + endpoint GET
+>   `/api/projetos/<nome>/auditoria-contabil` + botão/modal no topo do ciclo (estornos destacados). **Falta o PDF.**
+> - **UI:** verdes do "design antigo" corrigidos (botão Provisões → `--accent`; "concluída" → `--text`).
+> - **Fase A (cronograma):** `mod_cronograma.limite_etapa`/`prazo_excede_limite`/`garantir_cronograma`/`tem_cronograma`
+>   + `ParcelaProjeto.prazo_conclusao` (campo+migração). **Fase B (núcleo):** `mod_parcelas.particionar_por_selecao`.
+>
+> **Specs novas (rascunho/design, em `docs/superpowers/specs/`):** `2026-07-14-conferencia-registro-provisoes-af3`,
+> `2026-07-14-agenda-global-projetos`, `2026-07-14-fases-por-ambiente-prazos-devolucao` (as 6 decisões confirmadas
+> pelo usuário; gate do prazo = Diretor `autorizar`).
+>
+> **⏭️ PENDENTE (retomar):** **Fase B.2** (endpoint que orquestra `particionar_por_selecao`+`congelar_parcelas`+
+> gate de prazo → cria `ParcelaProjeto`; frontend: checkbox de ambientes por etapa 9+ + input de prazo). **Fase C**
+> (modal "Carregar PE" na 11c: desmembrar + Aprovar por fase dourado→verde, sem botão de revisão). **Fase D**
+> (documentos por fase). **Fase E** (Devolução/Cancelamento FORA do ciclo, supervisionado pela auditoria).
+> **PDF da auditoria.** Além do backlog anterior (FASE D2 Conferência spec `2026-07-12` — não implementada;
+> registro único ordenado de rubricas F0b; `com_adm` vira provisão `2.1.04.20` F1; bug ② efetivado).
+> **Tokens a criar (Fase C):** dourado escuro (Aprovar) + verde escuro (Aprovado).
+
+## ⏸️ ESTADO ATUAL (2026-07-14)
 
 > **🏗️ Frente ATIVA — "Resultado da Venda + Aprovações Financeiras" + desmembramento do ciclo.**
 > Branch **`feat/desmembramento-fatia2-ciclo`** (NÃO mergeada; suíte **1022 verde**). Spec:
