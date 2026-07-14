@@ -432,6 +432,13 @@ def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
                 # FASE D2: Custo de Fábrica (= CFO congelado) passa a ser provisionado no contrato (era só na NF-e)
                 "custo_fabrica":       round(float(getattr(orc2, "cfo", 0) or 0), 2),
                 "impostos":            d.get("Prov_Imp"),
+                # FASE A (resultado da venda): os 4 custos adicionais viram provisão (valores do breakdown;
+                # 0 quando o toggle do custo está desligado → não lança). JÁ deduzidos do Val_Liq, então
+                # NÃO entram no _RUBRICAS/Cust_Var (a margem gerencial já os conta) — só faltavam no razão.
+                "com_arq":             d.get("Com_Arq"),
+                "pro_fid":             d.get("Pro_Fid"),
+                "cust_via":            d.get("Cust_Via"),
+                "brinde":              d.get("Bri"),
             }
             ot, oid = mod_contabil.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
             # FASE D2: registra a venda CHEIA (Val_Cont) em Receita a Realizar (1.1.02 × 2.1.06) — não toca a DRE
