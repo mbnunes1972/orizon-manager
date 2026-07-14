@@ -629,6 +629,22 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        m_aud = re.match(r"^/api/projetos/([^/]+)/auditoria-contabil$", path)
+        if m_aud:
+            # Relatório de Auditoria Contábil do projeto — razão do projeto (view derivada, read-only).
+            from urllib.parse import unquote as _unq
+            nome_safe = _unq(m_aud.group(1))
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                if _projeto_da_loja(db, nome_safe, usuario.get("loja_id")) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                self.send_json({"ok": True, "lancamentos": mod_contabil.auditoria_contabil(db, ot, oid, nome_safe)})
+            finally:
+                db.close()
+            return
         m_razao = re.match(r"^/api/financeiro/contas/(\d+)/razao$", path)
         if m_razao:
             ctx = _contabil_ctx(self, exige_edicao=False)

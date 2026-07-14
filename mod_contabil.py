@@ -362,6 +362,27 @@ def listar_lancamentos(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=
     return [_lanc_serial(l) for l in q.limit(limite).all()]
 
 
+def auditoria_contabil(db, owner_tipo, owner_id, projeto_id):
+    """Relatório de Auditoria Contábil do PROJETO — VIEW derivada do razão (fonte única, nada novo
+    persistido): todos os lançamentos do projeto em ordem CRONOLÓGICA, cada um com conta débito/crédito
+    (código+nome), valor, origem e histórico. Inclui os estornos (devolução/cancelamento/ajuste de AF),
+    que carregam origem própria. Retorna [{id, data, debito:{cod,nome}, credito:{cod,nome}, valor,
+    origem, historico, ref}]."""
+    cmap = {c.id: (c.codigo, c.nome) for c in
+            db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id).all()}
+    lans = (db.query(Lancamento)
+            .filter_by(owner_tipo=owner_tipo, owner_id=owner_id, projeto_id=projeto_id)
+            .order_by(Lancamento.data, Lancamento.id).all())
+    out = []
+    for l in lans:
+        dc = cmap.get(l.conta_debito_id, ("?", ""))
+        cc = cmap.get(l.conta_credito_id, ("?", ""))
+        out.append({"id": l.id, "data": l.data.isoformat() if l.data else None,
+                    "debito": {"cod": dc[0], "nome": dc[1]}, "credito": {"cod": cc[0], "nome": cc[1]},
+                    "valor": l.valor, "origem": l.origem, "historico": l.historico, "ref": l.ref})
+    return out
+
+
 # ── Motor evento → lançamento (sub-projeto #3) ───────────────────────────────
 # As 5 regras do .docx §5. Contas resolvidas por CÓDIGO (estável: rename não muda o
 # código; reparent/recodificar foi adiado no #1). (codigo_debito, codigo_credito, historico)

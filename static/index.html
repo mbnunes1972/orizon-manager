@@ -10616,7 +10616,8 @@ function renderCiclo() {
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
       <button class="btn btn-ghost btn-sm" onclick="fecharCiclo()"><i class="ti ti-arrow-left"></i>Voltar</button>
       <h3 style="margin:0;color:var(--text);font-weight:800">Etapas do Projeto</h3>
-      ${_podeEditarMapaFront() && projetoAtivo ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="mapaAbrir('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-users-group"></i>Mapa de Atribuições</button>` : ''}
+      ${projetoAtivo ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="abrirAuditoria('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-report-money"></i>Auditoria Contábil</button>` : ''}
+      ${_podeEditarMapaFront() && projetoAtivo ? `<button class="btn btn-ghost btn-sm" onclick="mapaAbrir('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-users-group"></i>Mapa de Atribuições</button>` : ''}
     </div>
   `;
   for (const etapa of ETAPAS_CICLO) {
@@ -11361,6 +11362,40 @@ async function _provAcao(oid, rev, decisao) {
   }
 }
 // ---- fim Provisões versionadas -------------------------------------------
+
+// ── Relatório de Auditoria Contábil do projeto (view do razão; estornos destacados) ──
+async function abrirAuditoria(nomeSafe){
+  let j;
+  try { j = await fetch('/api/projetos/'+encodeURIComponent(nomeSafe)+'/auditoria-contabil', {credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ await avisoPopup('Erro ao carregar: '+e.message, {titulo:'Auditoria Contábil'}); return; }
+  if(!j.ok){ await avisoPopup(j.erro||'Falha ao carregar.', {titulo:'Auditoria Contábil'}); return; }
+  const fmt = v => 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const ESTORNO = {devolucao:1, cancelamento_contrato:1, ajuste_provisao_af:1, resolucao_sobra:1, resolucao_falta:1};
+  const rows = (j.lancamentos||[]).map(l => {
+    const est = ESTORNO[l.origem];
+    const dt = l.data ? new Date(l.data).toLocaleDateString('pt-BR') : '—';
+    return `<tr style="${est?'background:var(--warn-soft)':''}">`
+      + `<td style="white-space:nowrap">${dt}</td>`
+      + `<td><span style="font-family:var(--font-mono);font-size:var(--fs-xs)">${esc(l.debito.cod)}</span> ${esc(l.debito.nome)}</td>`
+      + `<td><span style="font-family:var(--font-mono);font-size:var(--fs-xs)">${esc(l.credito.cod)}</span> ${esc(l.credito.nome)}</td>`
+      + `<td class="num">${fmt(l.valor)}</td>`
+      + `<td><span style="font-size:var(--fs-xs);color:${est?'var(--warn)':'var(--text-3)'}">${esc(l.origem||'')}</span>`
+      + `${l.historico?'<br><span style="font-size:var(--fs-xs);color:var(--text-3)">'+esc(l.historico)+'</span>':''}</td></tr>`;
+  }).join('');
+  const html = `<h4 style="margin:0 0 4px;color:var(--text);font-size:1rem"><i class="ti ti-report-money"></i> Auditoria Contábil</h4>`
+    + `<p style="margin:0 0 12px;color:var(--text-3);font-size:var(--fs-xs)">Razão do projeto <strong>${esc(nomeSafe)}</strong> em ordem cronológica. Estornos (devolução/cancelamento/ajuste) destacados.</p>`
+    + `<div class="table-wrap" style="max-height:65vh;overflow:auto"><table class="tbl" style="font-size:.82rem">`
+    + `<thead><tr><th>Data</th><th>Débito</th><th>Crédito</th><th style="text-align:right">Valor</th><th>Origem / Histórico</th></tr></thead>`
+    + `<tbody>${rows || '<tr><td colspan="5" style="color:var(--text-3)">Nenhum lançamento contábil neste projeto ainda.</td></tr>'}</tbody></table></div>`
+    + `<div style="margin-top:16px;display:flex;justify-content:flex-end"><button data-act="fechar" style="background:none;border:1px solid var(--muted);color:var(--muted);border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">Fechar</button></div>`;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:99999';
+  ov.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 24px;max-width:880px;width:96%;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)">'+html+'</div>';
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.querySelector('[data-act="fechar"]').onclick = close;
+  ov.addEventListener('click', e => { if(e.target===ov) close(); });
+}
 
 let _medicaoCache = null;
 async function _carregarMedicao() {
