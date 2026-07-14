@@ -35,6 +35,36 @@ def exige_aprovacao_diretor(valor_anterior, valor_novo, limite_frac):
     return (vn - va) / va > float(limite_frac)
 
 
+def validar_particao_parcelas(pool_ambiente_ids, parcelas):
+    """#1 — valida que as parcelas PARTICIONAM o pool: cada ambiente do pool em exatamente
+    uma parcela (sem sobreposição, sem sobra), nenhuma parcela vazia, nenhum ambiente de fora
+    do pool. Partição completa é pré-requisito do invariante #5 (Σ val_cont_congelado == Val_Cont).
+
+    Args:
+        pool_ambiente_ids: iterável dos ids de ambiente do pool do projeto.
+        parcelas: lista de listas de ids (uma lista por parcela, na ordem 1..N).
+    Returns:
+        (ok: bool, erro: str|None).
+    """
+    pool = set(pool_ambiente_ids or [])
+    if not parcelas:
+        return False, "Nenhuma parcela informada."
+    vistos = set()
+    for i, amb in enumerate(parcelas, start=1):
+        if not amb:
+            return False, "Parcela %d está vazia." % i
+        for aid in amb:
+            if aid in vistos:
+                return False, "Ambiente %s está em mais de uma parcela." % aid
+            if aid not in pool:
+                return False, "Ambiente %s não pertence ao pool do projeto." % aid
+            vistos.add(aid)
+    faltando = pool - vistos
+    if faltando:
+        return False, "Ambientes fora de qualquer parcela: %s." % ", ".join(str(x) for x in sorted(faltando))
+    return True, None
+
+
 def congelar_parcelas(parcelas_ambientes, val_cont):
     """Congela fração e valor de cada parcela (#5).
 

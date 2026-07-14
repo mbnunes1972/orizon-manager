@@ -9,6 +9,7 @@ import pytest
 from mod_parcelas import (
     congelar_parcelas,
     exige_aprovacao_diretor,
+    validar_particao_parcelas,
     LIMITE_AF1_DEFAULT,
     LIMITE_AF2_DEFAULT,
 )
@@ -95,3 +96,35 @@ def test_gate_limite_af2_mais_folgado():
     # +1,5%: passa do limite AF1 (1%) mas não do AF2 (2%)
     assert exige_aprovacao_diretor(10000.0, 10150.0, LIMITE_AF1_DEFAULT) is True
     assert exige_aprovacao_diretor(10000.0, 10150.0, LIMITE_AF2_DEFAULT) is False
+
+
+# ── #1 — partição do pool em parcelas ──
+
+def test_particao_valida():
+    ok, erro = validar_particao_parcelas([1, 2, 3, 4], [[1, 2], [3, 4]])
+    assert ok is True and erro is None
+
+
+def test_particao_sobreposicao_rejeitada():
+    ok, erro = validar_particao_parcelas([1, 2, 3], [[1, 2], [2, 3]])
+    assert ok is False and "mais de uma parcela" in erro
+
+
+def test_particao_com_sobra_rejeitada():
+    ok, erro = validar_particao_parcelas([1, 2, 3, 4], [[1, 2], [3]])   # 4 fora
+    assert ok is False and "fora de qualquer parcela" in erro
+
+
+def test_particao_ambiente_estranho_ao_pool_rejeitado():
+    ok, erro = validar_particao_parcelas([1, 2], [[1], [2, 99]])
+    assert ok is False and "não pertence ao pool" in erro
+
+
+def test_particao_parcela_vazia_rejeitada():
+    ok, erro = validar_particao_parcelas([1, 2], [[1, 2], []])
+    assert ok is False and "vazia" in erro
+
+
+def test_particao_sem_parcelas_rejeitada():
+    ok, erro = validar_particao_parcelas([1, 2], [])
+    assert ok is False
