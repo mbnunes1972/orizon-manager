@@ -20,6 +20,17 @@ def test_disparar_delta_de_rubrica_alterada_sem_tocar_dre(app_db):
     db.close()
 
 
+def test_disparar_delta_custo_adicional_com_arq(app_db):
+    # F0 (bug ①): os custos adicionais (com_arq/pro_fid/cust_via/brinde) passam a ser ajustáveis na AF.
+    db = app_db.get_session(); ot, oid = "loja", 994; mc.seed_plano(db, ot, oid)
+    mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"com_arq": 500.0}, ref_base="pf:P")
+    out = mc.disparar_deltas_af(db, ot, oid, "P", {"com_arq": 800.0}, ref_base="af:P:rev1")
+    assert out == {"com_arq": 300.0}
+    assert _s(db, ot, oid, "2.1.04.15") == 800.0 and _s(db, ot, oid, "1.1.06.15") == 800.0
+    assert _s(db, ot, oid, "5.3.15") == 0.0   # DRE intacta (o delta não reconhece despesa)
+    db.close()
+
+
 def test_disparar_sem_mudanca_nao_lanca(app_db):
     db = app_db.get_session(); ot, oid = "loja", 996; mc.seed_plano(db, ot, oid)
     mc.constituir_provisoes_fechamento(db, ot, oid, "P", {"assistencia": 500.0}, ref_base="pf:P")

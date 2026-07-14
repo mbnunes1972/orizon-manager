@@ -11097,6 +11097,13 @@ const _PROV_RUBRICAS = [
   { key: 'out_forn',       label: 'Outros Fornecedores' },
   { key: 'prov_mont',      label: 'Provisão Montagem' },
   { key: 'prov_gar',       label: 'Provisão Garantia' },
+  // F0 (bug ①): custos adicionais (editáveis) + custo financeiro (LEITURA — ajuste pelo box do ramo).
+  // São Cust_Ad/Cust_Fin: aparecem como linha, mas NÃO entram no Cust_Var (backend já exclui).
+  { key: 'com_arq',        label: 'Comissão Arquiteto' },
+  { key: 'pro_fid',        label: 'Programa Fidelidade' },
+  { key: 'cust_via',       label: 'Custo de Viagem' },
+  { key: 'brinde',         label: 'Brinde' },
+  { key: 'custo_financeiro', label: 'Custo Financeiro', readonly: true },
 ];
 
 function _fmtR(v) {
@@ -11173,11 +11180,12 @@ async function abrirProvisoes(oid) {
     // Editable rubrica inputs for Revisa
     const revisaInputs = _PROV_RUBRICAS.map(rb => {
       const prev = prevItens[rb.key] != null ? Number(prevItens[rb.key]).toFixed(2) : '';
+      const ro = rb.readonly ? 'disabled title="Custo financeiro — ajuste pelo box do ramo"' : '';
       return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <label style="font-size:var(--fs-sm);color:var(--muted);flex:1">${esc(rb.label)}</label>
-        <input type="number" step="0.01" id="_prov-inp-${rb.key}" value="${esc(prev)}"
+        <input type="number" step="0.01" id="_prov-inp-${rb.key}" value="${esc(prev)}" ${ro}
           style="width:120px;background:var(--input);border:1px solid var(--border);
-          color:var(--fg);padding:4px 7px;border-radius:4px;font-size:.82rem;text-align:right">
+          color:var(--fg);padding:4px 7px;border-radius:4px;font-size:.82rem;text-align:right${rb.readonly ? ';opacity:.55;cursor:not-allowed' : ''}">
       </div>`;
     }).join('');
 

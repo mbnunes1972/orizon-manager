@@ -627,7 +627,10 @@ _AF_ITEM_RUBRICA = {
     "frete_fab": "frete_fabrica", "frete_loc": "frete_local", "ins_loc": "insumos",
     "com_med": "com_medidor", "com_proj_exec": "com_proj_exec",
     "com_venda": "retencao_com_vendas", "prov_imp": "impostos",
+    # F0 (bug ①): custos adicionais — ajustáveis na AF (mesma chave em _PROV_FECHAMENTO).
+    "com_arq": "com_arq", "pro_fid": "pro_fid", "cust_via": "cust_via", "brinde": "brinde",
     # out_forn (Outros Fornecedores) NÃO entra: só nasce por reclassificação, sem evento de fechamento.
+    # custo_financeiro NÃO entra: é LEITURA no painel (ajuste pelo box do ramo, rota própria).
 }
 
 

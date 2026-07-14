@@ -117,11 +117,22 @@ _RUBRICAS = {
     "prov_mont": "Prov_Mont", "prov_gar": "Prov_Gar",   # FASE 2: fold Montagem/Garantia (visão)
 }
 
+# F0 (bug ①): custos adicionais — base Cust_Ad (já descontados do Val_Liq pelo motor). Viram LINHA no
+# painel da AF e são provisionados/ajustáveis no razão, mas NÃO entram no Cust_Var (senão DOBRAM o custo).
+_RUBRICAS_CUST_AD = {
+    "com_arq": "Com_Arq", "pro_fid": "Pro_Fid", "cust_via": "Cust_Via", "brinde": "Bri",
+}
+# Custo financeiro — base Val_Cont; LEITURA no painel (ajuste pelo box do ramo, não digitável).
+_RUBRICA_CUST_FIN = {"custo_financeiro": "Cust_Fin"}
+
 
 def itens_provisao(siglas):
-    """Extrai as 10 rubricas de provisão do breakdown do motor (dict {rubrica: valor R$})."""
+    """Rubricas de provisão do breakdown do motor (dict {rubrica: R$}): as 12 de Cust_Var + os 4 custos
+    adicionais (Cust_Ad) + o custo financeiro. Os 5 últimos aparecem como LINHA no painel mas NÃO somam
+    no Cust_Var (ver cust_var_marg_cont) — são Cust_Ad/Cust_Fin, já fora do Val_Liq."""
     s = siglas or {}
-    return {k: round(_f(s.get(v)), 2) for k, v in _RUBRICAS.items()}
+    todas = {**_RUBRICAS, **_RUBRICAS_CUST_AD, **_RUBRICA_CUST_FIN}
+    return {k: round(_f(s.get(v)), 2) for k, v in todas.items()}
 
 
 def margens_venda(vavo, cust_ad, cust_var, val_cont):
@@ -150,9 +161,11 @@ def margens_venda(vavo, cust_ad, cust_var, val_cont):
 
 
 def cust_var_marg_cont(cfo, val_liq, itens):
-    """Recalcula (Cust_Var, Marg_Cont) a partir de itens (possivelmente editados).
-    Cust_Var = CFO + Σ itens (os itens já incluem out_forn e prov_imp)."""
-    cust_var = round(_f(cfo) + sum(_f(v) for v in (itens or {}).values()), 2)
+    """Recalcula (Cust_Var, Marg_Cont) a partir de itens (possivelmente editados). Cust_Var = CFO +
+    Σ(itens das rubricas de Cust_Var) — os custos adicionais e o custo financeiro, se vierem em `itens`,
+    são IGNORADOS aqui (são Cust_Ad/Cust_Fin, já fora do Val_Liq; somá-los dobraria o custo)."""
+    itens = itens or {}
+    cust_var = round(_f(cfo) + sum(_f(itens.get(k)) for k in _RUBRICAS), 2)
     vl = _f(val_liq)
     marg = round((vl - cust_var) / vl, 4) if vl else 0.0
     return cust_var, marg
