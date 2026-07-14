@@ -692,6 +692,22 @@ def reconhecer_custo_financeiro(db, owner_tipo, owner_id, projeto_id, ramo, valo
     return registrar_evento(db, owner_tipo, owner_id, evento, mv, projeto_id=projeto_id, ref=ref)
 
 
+def apropriar_juros_loja(db, owner_tipo, owner_id, projeto_id, valor, ref_base, data=None):
+    """#B — ramo LOJA (financiamento direto, capital próprio): ao receber a parte de JUROS de uma parcela,
+    baixa o recebível (caixa 1.1.01 × 1.1.07) e apropria a receita financeira por competência
+    (2.1.07 × 4.4.03), CAPADO ao recebível de juros em aberto (1.1.07). Sem despesa (capital próprio).
+    Idempotente por `ref_base`. Retorna o valor apropriado (ou None)."""
+    saldo_rec = round(total_lancado(db, owner_tipo, owner_id, "1.1.07", "debito", projeto_id)
+                      - total_lancado(db, owner_tipo, owner_id, "1.1.07", "credito", projeto_id), 2)
+    mv = round(min(float(valor or 0), max(saldo_rec, 0.0)), 2)
+    if mv <= 0:
+        return None
+    seed_plano(db, owner_tipo, owner_id)
+    registrar_evento(db, owner_tipo, owner_id, "receber_parcela_direto", mv, projeto_id=projeto_id, ref=ref_base + ":rec")
+    registrar_evento(db, owner_tipo, owner_id, "apropriar_receita_financeira", mv, projeto_id=projeto_id, ref=ref_base + ":ap")
+    return mv
+
+
 # FASE D2: matching pleno na NF-e — rubrica → evento de reconhecimento de despesa (baixa do ativo diferido).
 # Impostos NÃO entram (têm faturamento_impostos_deducao/obrigacao próprios).
 _MATCHING_NFE = {

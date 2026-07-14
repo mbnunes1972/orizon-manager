@@ -90,12 +90,14 @@ tratamento oposto: é por isso que o box é necessário.
   Reconhece o **valor real** (não o estimado); a diferença fica na provisão a pagar. E2E testado:
   constitui → reconhece → Conciliação Final **sem receita fictícia**. A mesma função cobre a financeira
   (`5.5.04`), pronta pra ligar quando definirmos o gatilho dela.
-- **Ramo financeira (Aymoré/Cartão) — pendente do gatilho:** a função existe; falta decidir **quando**
-  disparar (emissão da NF-e, como impostos, ou "pagamento à financeira"). A provisão `2.1.04.19` segue
-  **fora da Conciliação Final** (como impostos) até lá — sem receita fictícia.
-- **Ramo loja (próprio) — pendente da infra de parcelas:** `receber_parcela_direto`/
-  `apropriar_receita_financeira` dependem de um endpoint de "parcela recebida" (ainda não existe);
-  a receita por competência entra com essa infra.
+- **Ramo financeira (Aymoré/Cartão) — ✅ FEITO (2026-07-14):** reconhecida pela mesma
+  `reconhecer_custo_financeiro` (conta `5.5.04`), disparada pelo botão "Reconhecer despesa" do box quando
+  a financeira **liquida** (gatilho "pagamento à financeira"). A provisão `2.1.04.19` segue fora da
+  Conciliação Final (como impostos) — sem receita fictícia.
+- **Ramo loja (próprio) — ✅ FEITO (2026-07-14):** `apropriar_juros_loja(valor)` — ao receber a parte de
+  JUROS de uma parcela, baixa o recebível (`caixa × 1.1.07`) e apropria a receita financeira por
+  competência (`2.1.07 × 4.4.03`), capado ao recebível em aberto, sem despesa. Endpoint
+  `POST /api/orcamentos/<id>/receita-financeira` + campo "Apropriar receita" no box da AF (ramo loja).
 
 ## 4. As Aprovações Financeiras (o gate)
 - **AF1 — confirma a MARGEM da venda.** Revisa os 4 custos adicionais (§3.3) + seleciona/confirma o box de

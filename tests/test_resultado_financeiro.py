@@ -184,3 +184,26 @@ def test_antecipacao_ponta_a_ponta_sem_receita_ficticia(app_db):
     assert _s(db, ot, oid, "2.1.04.19") == 1000.0  # provisão (a pagar ao banco) segue aberta
     db.close()
 
+
+# ── Ramo loja: apropriação da receita de juros por parcela recebida ──
+
+def test_apropriar_juros_loja_baixa_recebivel_e_realiza_receita(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 979; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "constituir_juros_direto", 300.0, projeto_id="P", ref="jd:P")
+    mv = mc.apropriar_juros_loja(db, ot, oid, "P", 100.0, ref_base="par:P:1")
+    assert mv == 100.0
+    assert _s(db, ot, oid, "1.1.01") == 100.0    # caixa
+    assert _s(db, ot, oid, "1.1.07") == 200.0    # recebível baixado
+    assert _s(db, ot, oid, "2.1.07") == 200.0    # receita a apropriar reduz
+    assert _s(db, ot, oid, "4.4.03") == 100.0    # receita financeira realizada (competência)
+    db.close()
+
+
+def test_apropriar_juros_loja_capado_ao_recebivel(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 980; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "constituir_juros_direto", 300.0, projeto_id="P", ref="jd:P")
+    mv = mc.apropriar_juros_loja(db, ot, oid, "P", 500.0, ref_base="par:P:1")  # pede 500, só há 300
+    assert mv == 300.0
+    assert _s(db, ot, oid, "1.1.07") == 0.0 and _s(db, ot, oid, "4.4.03") == 300.0
+    db.close()
+
