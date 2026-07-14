@@ -65,6 +65,26 @@ def validar_particao_parcelas(pool_ambiente_ids, parcelas):
     return True, None
 
 
+def particionar_por_selecao(pool_ambiente_ids, selecionados_ids):
+    """Fase B — divide o pool em (SELECIONADOS p/ a ação da fase, RESTANTES p/ desmembrar em nova fase).
+    Valida: todos os selecionados pertencem ao pool; seleção não-vazia; ao menos 1 restante (senão não há
+    o que desmembrar). Preserva a ordem do pool e ignora duplicatas. Retorna
+    (ok, erro, selecionados, restantes). O congelamento (congelar_parcelas) e o gate de prazo
+    (mod_cronograma.prazo_excede_limite) são aplicados pelo chamador sobre esses dois grupos."""
+    pool = list(dict.fromkeys(pool_ambiente_ids or []))   # ordem preservada, sem duplicatas
+    sel = set(selecionados_ids or [])
+    fora = sel - set(pool)
+    if fora:
+        return False, "Ambiente(s) fora do pool: %s." % ", ".join(str(x) for x in sorted(fora)), None, None
+    selecionados = [a for a in pool if a in sel]
+    restantes = [a for a in pool if a not in sel]
+    if not selecionados:
+        return False, "Selecione ao menos um ambiente para a ação da fase.", None, None
+    if not restantes:
+        return False, "Nada a desmembrar: todos os ambientes já estão selecionados.", None, None
+    return True, None, selecionados, restantes
+
+
 def congelar_parcelas(parcelas_ambientes, val_cont):
     """Congela fração e valor de cada parcela (#5).
 
