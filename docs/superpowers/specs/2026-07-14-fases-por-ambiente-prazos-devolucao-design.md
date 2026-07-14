@@ -41,14 +41,23 @@ código diz "PE", UI diz "Projeto Executivo/Especificação Técnica" (ver nota 
 - **Concluir (Aprovar) exige a senha do PRÓPRIO usuário** (auto-confirmação, NÃO gerencial).
 - **Reabrir (após travada) exige senha GERENCIAL.**
 
-## 3. Prazos por fase (todo projeto tem cronograma)
+## 3. Prazos por fase — colunas do ciclo + cronograma DE TRÁS PARA FRENTE
 
-- **Toda fase tem prazo registrado**, dentro do **limite do contrato** (detalhe a tratar em breve).
-- O **prazo-limite de aprovação** aparece **para todos os ambientes**.
-- **Desmembrar exige indicar um novo prazo de conclusão** para os ambientes remanescentes.
-- Se esse novo prazo **exceder o limite do cronograma** do projeto → **exige senha de aprovação**
-  (step-up). `mod_cronograma` já gera `data_prevista_conclusao` por etapa a partir do D0 + Cronograma
-  Padrão; **todo projeto deve ter cronograma**.
+**Três colunas de data no ciclo (por etapa/fase):**
+- **Prazo Limite** — teto do **Cronograma Padrão** (definido pelo contrato, na aba **Cronograma** em Config).
+- **Planejado** — data planejada da fase (alvo de trabalho; pode ser antes do Limite).
+- **Executado** — data real de conclusão (`concluido_em`).
+
+**Âncora = data de ENTREGA.** A **Etapa de Assinatura do Contrato (7)** deve **estabelecer a data de
+entrega** para poder ser finalizada. O cronograma é montado **de trás para frente**: a entrega é a âncora
+e o **Prazo Limite de cada etapa** é calculado **regressivamente** a partir dela (Cronograma Padrão).
+> ⚠️ **Revisa a Fase A**, que hoje calcula PARA FRENTE (`data_prevista_conclusao = D0 + prazo_dias`) — passa
+> a ser regressivo a partir da entrega.
+
+- Toda fase tem prazo (**Planejado**) dentro do **Prazo Limite**.
+- **Desmembrar exige indicar um novo Planejado** para os remanescentes; se **exceder o Prazo Limite** →
+  **senha de aprovação** (Diretor `autorizar`).
+- **Todo projeto deve ter cronograma** (`garantir_cronograma`).
 
 ## 4. Devolução e Cancelamento — fora do ciclo (pós-AF1)
 
