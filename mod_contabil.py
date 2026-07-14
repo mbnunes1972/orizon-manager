@@ -532,6 +532,54 @@ def constituir_provisoes_fechamento(db, owner_tipo, owner_id, projeto_id, valore
     return out
 
 
+_ORIGEM_AJUSTE_AF = "ajuste_provisao_af"
+
+
+def ajustar_provisao_delta(db, owner_tipo, owner_id, projeto_id, rubrica, valor_anterior, valor_novo, ref, data=None):
+    """#11 (Fatia 2) — ajuste (delta) de UMA provisão entre versões de Aprovação Financeira.
+
+    Move SÓ entre o ativo diferido (1.1.06.0X, ou 1.1.05 p/ impostos) e a provisão (2.1.04.0X) —
+    o par exato do evento de constituição da rubrica. **NUNCA toca a DRE** (o reconhecimento de
+    despesa é a NF-e real, #12). `rubrica` usa o vocabulário de `_PROV_FECHAMENTO` (ex.: 'custo_fabrica').
+
+      delta = round(valor_novo - valor_anterior, 2)
+      - delta > 0 (aumento): constitui mais → DR ativo × CR provisão (mesma direção do fechamento).
+      - delta < 0 (redução): reverte → DR provisão × CR ativo, **capado ao saldo do ativo em aberto**
+        (não reverte além do que ainda não foi baixado na NF-e; o resto é absorvido na conciliação, #3).
+      - delta == 0 (ou cap 0): no-op.
+
+    Idempotente por `ref` (o chamador inclui o sufixo `:parcela_id`, #6). Origem própria
+    (`ajuste_provisao_af`) p/ distinguir do fechamento original no razão (auditabilidade, #11).
+    """
+    evento = _PROV_FECHAMENTO.get(rubrica)
+    if evento is None:
+        raise ValueError("ajustar_provisao_delta: rubrica desconhecida: %s" % rubrica)
+    ja = lancamento_por_ref(db, owner_tipo, owner_id, ref)
+    if ja is not None:
+        return ja                              # idempotente
+    delta = round(float(valor_novo or 0) - float(valor_anterior or 0), 2)
+    if delta == 0:
+        return None
+    seed_plano(db, owner_tipo, owner_id)
+    ativo_cod, prov_cod, _hist = EVENTOS[evento]
+    ativo = _conta_por_codigo(db, owner_tipo, owner_id, ativo_cod)
+    prov = _conta_por_codigo(db, owner_tipo, owner_id, prov_cod)
+    if delta > 0:
+        # aumento: constitui mais provisão × ativo diferido (mesma direção do fechamento_venda)
+        return lancar(db, owner_tipo, owner_id, ativo.id, prov.id, delta, data=data, projeto_id=projeto_id,
+                      origem=_ORIGEM_AJUSTE_AF,
+                      historico="Ajuste de provisão (AF) — aumento (ativo diferido × provisão)", ref=ref)
+    # redução: reverte, capado ao saldo do ativo em aberto (débito − crédito do ativo)
+    saldo_ativo = round(total_lancado(db, owner_tipo, owner_id, ativo_cod, "debito", projeto_id)
+                        - total_lancado(db, owner_tipo, owner_id, ativo_cod, "credito", projeto_id), 2)
+    mv = round(min(-delta, max(saldo_ativo, 0.0)), 2)
+    if mv <= 0:
+        return None
+    return lancar(db, owner_tipo, owner_id, prov.id, ativo.id, mv, data=data, projeto_id=projeto_id,
+                  origem=_ORIGEM_AJUSTE_AF,
+                  historico="Ajuste de provisão (AF) — redução (reversão do ativo diferido)", ref=ref)
+
+
 # FASE D2: matching pleno na NF-e — rubrica → evento de reconhecimento de despesa (baixa do ativo diferido).
 # Impostos NÃO entram (têm faturamento_impostos_deducao/obrigacao próprios).
 _MATCHING_NFE = {
