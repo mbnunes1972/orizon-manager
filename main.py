@@ -4277,6 +4277,45 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        elif re.match(r"^/api/orcamentos/(\d+)/cancelamento$", path):
+            # ── POST /api/orcamentos/<id>/cancelamento — cancelamento de contrato (estorno TOTAL). ──
+            # Gate DIRETOR (autorizar). Bloqueado após a NF-e (etapa 15). Reverte TODA a constituição do
+            # contrato (cancelar_contrato) e trava o projeto como "cancelado" (opção B — revender = novo
+            # projeto). Reembolso físico de valores recebidos → Tesouraria (módulo futuro).
+            import mod_contabil as _mc
+            import mod_ciclo as _mcic
+            m_cc = re.match(r"^/api/orcamentos/(\d+)/cancelamento$", path)
+            oid = int(m_cc.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            req = json.loads(body) if body else {}
+            db = get_session()
+            try:
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"))
+                if not aprovador or not perfis.pode(aprovador.nivel, "autorizar"):
+                    self.send_json({"ok": False, "erro": "Cancelamento de contrato exige senha de Diretor"}, code=403); return
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                orc = _obj_da_loja(db, Orcamento, oid, loja_id)
+                if orc is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                nome_safe = orc.projeto_id
+                et15 = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo="15").first()
+                if et15 and et15.status in _mcic.STATUS_CONCLUSIVOS:
+                    self.send_json({"ok": False,
+                        "erro": "NF-e já emitida — cancelamento de contrato indisponível (exige cancelamento fiscal)"}, code=409); return
+                ot, own_id = _mc.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+                out = _mc.cancelar_contrato(db, ot, own_id, nome_safe, ref_base="cancel:%s" % nome_safe)
+                upsert_projeto_status(nome_safe, "cancelado")
+                db.commit()
+                self.send_json({"ok": True, "revertido": out, "status": "cancelado"})
+            finally:
+                db.close()
+            return
+
         else:
             import re as _re
 
