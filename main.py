@@ -1621,7 +1621,11 @@ class Handler(BaseHTTPRequestHandler):
                              "cfo": float(d.get("CFO") or 0),
                              "val_liq": float(d.get("Val_Liq") or 0),
                              "cust_var": float(d.get("Cust_Var") or 0),
-                             "marg_cont": float(d.get("Marg_Cont") or 0)}
+                             "marg_cont": float(d.get("Marg_Cont") or 0),
+                             # As 3 margens da venda (visão) — Contribuição/Venda/Contrato (NOMENCLATURA §3c)
+                             "margens": _mprov.margens_venda(
+                                 d.get("VAVO"), d.get("Cust_Ad"),
+                                 float(d.get("Cust_Var") or 0), d.get("Val_Cont"))}
                     # Compara só as rubricas que o snapshot conhece: um snapshot pré-fold (10 chaves)
                     # não deve acusar "desatualizado" apenas porque 'atual' ganhou prov_mont/prov_gar
                     # (FASE 2). Snapshot novo (12 chaves) → comparação íntegra, inclui o drift das 2.

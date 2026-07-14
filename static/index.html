@@ -2155,6 +2155,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Desconto Total</span><span id="mp-a-margem" style="font-family:var(--font-mono);color:var(--warn);font-weight:700">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Custo Variável</span><span id="mp-a-cust-var" style="font-family:var(--font-mono)">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Margem de Contribuição</span><span id="mp-a-marg-cont" style="font-family:var(--font-mono)">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:2px"><span style="color:var(--text-3);font-size:var(--fs-xs)">Margem da Venda</span><span id="mp-a-marg-venda" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-2)">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:2px"><span style="color:var(--text-3);font-size:var(--fs-xs)">Margem do Contrato</span><span id="mp-a-marg-contrato" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-2)">—</span></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
           <label for="mp-out-forn" style="color:var(--muted)">Outros fornecedores (R$)</label>
           <input id="mp-out-forn" type="number" min="0" step="0.01" value="0"
@@ -5924,15 +5926,22 @@ function _renderImpostosLock() {
   // ── margem real: renderiza sob o mesmo cadeado ──
   const elCustVar  = document.getElementById('mp-a-cust-var');
   const elMargCont = document.getElementById('mp-a-marg-cont');
+  const elMargVenda = document.getElementById('mp-a-marg-venda');
+  const elMargContrato = document.getElementById('mp-a-marg-contrato');
   if (_margemRealVal) {
     if (_impostosLiberados) {
       const rel = (txt) => '<span style="cursor:pointer" title="Clique para ocultar" onclick="_reBloquearImpostos()">' + txt + '</span>';
+      const _pct = (v) => ((v || 0) * 100).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
       if (elCustVar)  elCustVar.innerHTML  = rel('R$ ' + fmt(_margemRealVal.cust_var));
-      if (elMargCont) elMargCont.innerHTML = rel((_margemRealVal.marg_cont * 100).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%');
+      if (elMargCont) elMargCont.innerHTML = rel(_pct(_margemRealVal.marg_cont));
+      if (elMargVenda) elMargVenda.innerHTML = rel(_pct(_margemRealVal.marg_venda));
+      if (elMargContrato) elMargContrato.innerHTML = rel(_pct(_margemRealVal.marg_contrato));
     } else {
       const lock = '<span style="cursor:pointer" title="Liberar com senha de diretor/gerente adm-fin" onclick="abrirModalLiberarImpostos()"><i class="ti ti-lock"></i></span>';
       if (elCustVar)  elCustVar.innerHTML  = lock;
       if (elMargCont) elMargCont.innerHTML = lock;
+      if (elMargVenda) elMargVenda.innerHTML = lock;
+      if (elMargContrato) elMargContrato.innerHTML = lock;
     }
   }
   // ── segmentação Mercadoria × Serviço: sob o MESMO cadeado (liberação por senha) ──
@@ -7425,7 +7434,12 @@ function _aplicarPreviewNaTela(s) {
   _margemAtual = margem;   // usado pelo limite de 35%
   if (id('mp-a-margem')) id('mp-a-margem').textContent =
     margem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
-  _margemRealVal = { cust_var: Number(s.Cust_Var) || 0, marg_cont: Number(s.Marg_Cont) || 0 };
+  // 3 margens (NOMENCLATURA §3c): mesma margem R$ sobre bases crescentes. marg_cont (s.Marg_Cont) já é
+  // a Margem de Contribuição (base Val_Liq = VAVO − Cust_Ad); acrescento Venda (VAVO) e Contrato (Val_Cont).
+  const _mgV = Number(s.VAVO) || 0, _mgCad = Number(s.Cust_Ad) || 0, _mgVc = Number(s.Val_Cont) || 0;
+  const _mgRs = _mgV - _mgCad - (Number(s.Cust_Var) || 0);
+  _margemRealVal = { cust_var: Number(s.Cust_Var) || 0, marg_cont: Number(s.Marg_Cont) || 0,
+                     marg_venda: _mgV ? _mgRs / _mgV : 0, marg_contrato: _mgVc ? _mgRs / _mgVc : 0 };
   _renderImpostosLock();   // aplica cadeado nos cards de margem real
   // provisão de impostos: NÃO escrever aqui com base fixa. Cada painel de pagamento
   // recalcula com o SEU total_cliente (= VAVO + Cust_Fin da modalidade = Val_Cont),
