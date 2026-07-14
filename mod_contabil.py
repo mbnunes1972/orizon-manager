@@ -740,6 +740,28 @@ def apropriar_juros_loja(db, owner_tipo, owner_id, projeto_id, valor, ref_base, 
     return mv
 
 
+def conferencia_pedido(db, owner_tipo, owner_id, projeto_id, custo_fabrica_anterior, custo_fabrica_novo,
+                       valor_outros_forn, ref_base, data=None):
+    """#13 — Conferência e Implantação do Pedido (etapa 12): DOIS lançamentos auditáveis, ambos
+    ativo × provisão, NUNCA DRE:
+      (a) ajuste do **Custo de Fábrica** pela diferença do PE (`ajustar_provisao_delta`);
+      (b) reclassificação de parte da fábrica para **Outros Fornecedores**
+          (`reclassificar_provisao 2.1.04.06→2.1.04.14`, espelhando o ativo diferido).
+    Idempotente por ref_base. Retorna {custo_fabrica_delta?, outros_fornecedores?}."""
+    out = {}
+    lan_a = ajustar_provisao_delta(db, owner_tipo, owner_id, projeto_id, "custo_fabrica",
+                                   custo_fabrica_anterior, custo_fabrica_novo, ref=ref_base + ":pe", data=data)
+    if lan_a is not None:
+        out["custo_fabrica_delta"] = round(float(custo_fabrica_novo or 0) - float(custo_fabrica_anterior or 0), 2)
+    v = round(float(valor_outros_forn or 0), 2)
+    if v > 0:
+        lan_b = reclassificar_provisao(db, owner_tipo, owner_id, projeto_id, "2.1.04.06", "2.1.04.14",
+                                       v, ref=ref_base + ":outros", data=data)
+        if lan_b is not None:
+            out["outros_fornecedores"] = v
+    return out
+
+
 # FASE D2: matching pleno na NF-e — rubrica → evento de reconhecimento de despesa (baixa do ativo diferido).
 # Impostos NÃO entram (têm faturamento_impostos_deducao/obrigacao próprios).
 _MATCHING_NFE = {

@@ -24,7 +24,7 @@ ETAPA_NOME = {
     "9": "Solicitação de medição",
     "10": "Medição",
     "11": "Projeto executivo",
-    "12": "Implantação do pedido",
+    "12": "Conferência e Implantação do Pedido",
     "13": "Produção",
     "14": "Entrega no depósito",
     "15": "Emissão da NFe do cliente",
@@ -100,7 +100,7 @@ def versao_atual(documentos, tipo):
 # capability dedicada): quem já pode avançar o ciclo executa. Só a 12 aceita
 # upload (XMLs dos pedidos); 13/14 guardam texto em CicloEtapa.observacoes.
 ETAPAS_OPERACIONAIS = {
-    "12": {"nome": "Implantação do pedido", "exige": "xml",
+    "12": {"nome": "Conferência e Implantação do Pedido", "exige": "xml",
            "tipo_doc": "implantacao_pedido_xml", "botao": "Encaminhar Pedidos à Fábrica"},
     "13": {"nome": "Produção",              "exige": "numeros",
            "botao": "Produção Concluída"},
