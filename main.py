@@ -4309,8 +4309,8 @@ class Handler(BaseHTTPRequestHandler):
                         "erro": "NF-e já emitida — cancelamento de contrato indisponível (exige cancelamento fiscal)"}, code=409); return
                 ot, own_id = _mc.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
                 out = _mc.cancelar_contrato(db, ot, own_id, nome_safe, ref_base="cancel:%s" % nome_safe)
-                upsert_projeto_status(nome_safe, "cancelado")
-                db.commit()
+                db.commit()                                     # commit os estornos ANTES (libera o lock do SQLite)
+                upsert_projeto_status(nome_safe, "cancelado")   # sessão própria (thread-safe), como no conciliar_final
                 self.send_json({"ok": True, "revertido": out, "status": "cancelado"})
             finally:
                 db.close()
