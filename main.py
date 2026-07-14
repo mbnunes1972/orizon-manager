@@ -468,6 +468,24 @@ def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
         logging.getLogger(__name__).warning("wiring fechamento (provisões+custo fin, ref=%s) falhou: %s", ref_base, e)
 
 
+def _ramo_financeiro_efetivo(orc):
+    """Ramo do custo financeiro (Fatia B): override confirmado na AF (orc.ramo_financeiro) ou o default
+    automático pela forma de pagamento (loja|financeira|avista)."""
+    if getattr(orc, "ramo_financeiro", None):
+        return orc.ramo_financeiro
+    import mod_fin as _mfin
+    try:
+        _fp = json.loads(orc.forma_pagamento) if orc.forma_pagamento else {}
+    except Exception:
+        _fp = {}
+    return _mfin.ramo_financiamento((_fp or {}).get("codigo") or "")
+
+
+def _cust_fin_orc(orc):
+    """Custo financeiro do orçamento = valor_total (Val_Cont) − VAVO."""
+    return round(float(getattr(orc, "valor_total", 0) or 0) - float(getattr(orc, "vavo", 0) or 0), 2)
+
+
 def _congelar_segmentacao_no_projeto(db, loja_id, projeto_nome):
     """FASE B2 (A6): congela a segmentação Mercadoria × Serviço EFETIVA (override do projeto vence o
     default da loja) no `parametros_json` do projeto — chamado na assinatura. Depois disso NF-e e NFS-e
@@ -1655,6 +1673,30 @@ class Handler(BaseHTTPRequestHandler):
                         "venda": venda, "rev1": _reg("rev1"), "rev2": _reg("rev2"),
                         "atual": atual, "desatualizado": desatualizado,
                         "custos_adicionais": custos_adicionais}})
+                finally:
+                    db.close()
+                return
+
+            # ── GET /api/orcamentos/<id>/ramo-financeiro — ramo atual do custo financeiro (box AF, Fatia B) ──
+            m = _re.match(r"^/api/orcamentos/(\d+)/ramo-financeiro$", path)
+            if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                oid = int(m.group(1))
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    orc = _obj_da_loja(db, Orcamento, oid, loja_id)
+                    if orc is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    self.send_json({"ok": True,
+                                    "ramo": _ramo_financeiro_efetivo(orc),
+                                    "override": bool(getattr(orc, "ramo_financeiro", None)),
+                                    "cust_fin": _cust_fin_orc(orc)})
                 finally:
                     db.close()
                 return
@@ -3925,6 +3967,45 @@ class Handler(BaseHTTPRequestHandler):
                     decisao=decisao, por_id=aprovador.id))
                 db.commit()
                 self.send_json({"ok": True})
+            finally:
+                db.close()
+            return
+
+        elif re.match(r"^/api/orcamentos/(\d+)/ramo-financeiro$", path):
+            # ── POST /api/orcamentos/<id>/ramo-financeiro — box loja×antecipação×financeira (Fatia B.2) ──
+            import mod_contabil as _mc
+            m_rf = re.match(r"^/api/orcamentos/(\d+)/ramo-financeiro$", path)
+            oid = int(m_rf.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            req = json.loads(body) if body else {}
+            ramo_novo = (req.get("ramo") or "").strip()
+            if ramo_novo not in ("loja", "loja_antecipacao", "financeira"):
+                self.send_json({"ok": False, "erro": "ramo inválido"}, code=400); return
+            db = get_session()
+            try:
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"))
+                if not aprovador:
+                    self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                orc = _obj_da_loja(db, Orcamento, oid, loja_id)
+                if orc is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                ramo_atual = _ramo_financeiro_efetivo(orc)
+                cust_fin = _cust_fin_orc(orc)
+                if ramo_novo != ramo_atual and cust_fin > 0:
+                    ot, own_id = _mc.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+                    seq = int(getattr(orc, "ramo_financeiro_seq", 0) or 0) + 1
+                    _mc.trocar_ramo_custo_financeiro(db, ot, own_id, orc.projeto_id, ramo_atual, ramo_novo,
+                                                     cust_fin, ref_base="ramofin:%s:%d" % (orc.projeto_id, seq))
+                    orc.ramo_financeiro_seq = seq
+                orc.ramo_financeiro = ramo_novo
+                db.commit()
+                self.send_json({"ok": True, "ramo": ramo_novo, "cust_fin": cust_fin})
             finally:
                 db.close()
             return

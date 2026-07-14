@@ -542,6 +542,9 @@ class Orcamento(Base):
     val_cont     = Column(Float, default=0.0)
     prov_imp     = Column(Float, default=0.0)
     out_forn     = Column(Float, default=0.0)   # Outros Fornecedores (editável Gerente Adm/Fin)
+    # Fatia B (resultado financeiro): ramo do custo financeiro confirmado na AF (box).
+    ramo_financeiro     = Column(String,  nullable=True)   # loja|loja_antecipacao|financeira (NULL = auto pela forma de pagamento)
+    ramo_financeiro_seq = Column(Integer, default=0)       # contador p/ ref idempotente de troca de ramo
     created_by      = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, nullable=True)
@@ -1091,6 +1094,8 @@ def _migrar_colunas():
             ("negociacao_json", "TEXT"),
             ("loja_id",         "INTEGER"),
             ("num_proposta",    "TEXT"),
+            ("ramo_financeiro",     "TEXT"),            # Fatia B: ramo do custo financeiro (box da AF)
+            ("ramo_financeiro_seq", "INTEGER DEFAULT 0"),
         ]:
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")
