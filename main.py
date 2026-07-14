@@ -4010,6 +4010,47 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        elif re.match(r"^/api/orcamentos/(\d+)/antecipacao$", path):
+            # ── POST /api/orcamentos/<id>/antecipacao — reconhece o custo REAL da antecipação bancária (Fatia B) ──
+            import mod_contabil as _mc
+            m_an = re.match(r"^/api/orcamentos/(\d+)/antecipacao$", path)
+            oid = int(m_an.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            req = json.loads(body) if body else {}
+            try:
+                valor = round(float(req.get("valor") or 0), 2)
+            except (TypeError, ValueError):
+                self.send_json({"ok": False, "erro": "Valor inválido"}, code=400); return
+            if valor <= 0:
+                self.send_json({"ok": False, "erro": "Informe o custo real (> 0)"}, code=400); return
+            db = get_session()
+            try:
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"))
+                if not aprovador:
+                    self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                orc = _obj_da_loja(db, Orcamento, oid, loja_id)
+                if orc is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                ramo = _ramo_financeiro_efetivo(orc)
+                if ramo not in ("loja_antecipacao", "financeira"):
+                    self.send_json({"ok": False, "erro": "Só no ramo antecipação/financeira (atual: %s)" % ramo}, code=400); return
+                ot, own_id = _mc.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+                seq = int(getattr(orc, "ramo_financeiro_seq", 0) or 0) + 1
+                lan = _mc.reconhecer_custo_financeiro(db, ot, own_id, orc.projeto_id, ramo, valor,
+                                                      ref="antecip:%s:%d" % (orc.projeto_id, seq))
+                orc.ramo_financeiro_seq = seq
+                db.commit()
+                self.send_json({"ok": True, "reconhecido": bool(lan)})
+            finally:
+                db.close()
+            return
+
         else:
             import re as _re
 

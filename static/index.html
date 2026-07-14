@@ -11650,11 +11650,41 @@ async function ramoFinanceiroRender(){
       <input type="radio" name="ramo-fin" value="${o.v}" ${o.v===j.ramo?'checked':''} style="margin-top:3px;accent-color:var(--accent)" onchange="ramoFinanceiroTrocar('${o.v}')">
       <span><span style="font-weight:600">${o.t}</span><br><span style="color:var(--text-3);font-size:var(--fs-xs)">${o.d}</span></span>
     </label>`).join('');
+  const provRamo = (j.ramo === 'loja_antecipacao' || j.ramo === 'financeira');
+  const antecipBlock = provRamo ? `
+    <div style="margin-top:var(--sp-3);border-top:1px dashed var(--border);padding-top:var(--sp-3)">
+      <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">Quando o custo real for apurado (desconto dos boletos / liquidação da financeira), reconheça a despesa:</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="antecip-valor" inputmode="numeric" placeholder="R$ 0,00" oninput="mascaraMoedaInput(this)"
+               style="width:130px;height:var(--control-h-sm);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-body)">
+        <button class="btn-ciclo" onclick="ramoAntecipacaoRegistrar()"><i class="ti ti-receipt"></i> Reconhecer despesa</button>
+      </div>
+    </div>` : '';
   cont.innerHTML = `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--sp-3) var(--sp-4)">
     <div style="font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);margin-bottom:6px">Custo financeiro ${fmt(j.cust_fin)} — como está sendo financiado?</div>
     ${rows}
     ${j.override ? '' : '<div style="color:var(--text-3);font-size:var(--fs-xs);margin-top:6px">Padrão automático pela forma de pagamento — confirme ou ajuste.</div>'}
+    ${antecipBlock}
   </div>`;
+}
+
+async function ramoAntecipacaoRegistrar(){
+  if(!_orcamentoAtivoId) return;
+  const el = document.getElementById('antecip-valor');
+  const valor = el ? (parseFloat((el.value||'').replace(/\./g,'').replace(',','.')) || 0) : 0;
+  if(!(valor > 0)){ await avisoPopup('Informe o custo real (> 0).', {titulo:'Antecipação'}); return; }
+  const cred = await pedirCredenciaisGerente({
+    titulo: 'Reconhecer custo de antecipação',
+    mensagem: 'Lança a despesa no razão. Login e senha do Gerente Adm/Financeiro ou Diretor.' });
+  if(!cred) return;
+  try {
+    const j = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/antecipacao',
+      { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ valor, login: cred.login, senha: cred.senha }) }).then(r=>r.json());
+    if(j.ok){ showToast(j.reconhecido ? 'Despesa de antecipação reconhecida.' : 'Nada a reconhecer (ativo já baixado).'); }
+    else { await avisoPopup(j.erro||'Erro', {titulo:'Antecipação'}); }
+  } catch(e){ await avisoPopup('Erro de rede.', {titulo:'Antecipação'}); }
+  ramoFinanceiroRender();
 }
 
 async function ramoFinanceiroTrocar(ramo){

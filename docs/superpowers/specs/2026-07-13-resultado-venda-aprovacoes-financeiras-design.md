@@ -82,19 +82,20 @@ tratamento oposto: é por isso que o box é necessário.
 - **No razão = Resultado Financeiro**; o painel da AF **deriva** disso a leitura "resultado adicional da
   venda" (não duplica; fonte única no razão).
 
-### 3.6 ⚠ PENDENTE — gatilhos de reconhecimento do custo financeiro (achado da Vera, e2e 2026-07-14)
-A constituição (contrato) e a troca de ramo (box da AF) estão prontas e testadas, mas o **reconhecimento**
-do custo financeiro ainda **não dispara** no app:
-- **Ramo financeira/antecipação:** o evento `reconhecimento_despesa_custo_financeiro` (`5.5.04 × baixa
-  1.1.06.19`) existe mas **não tem call-site**. Falta decidir o gatilho: quando o custo REAL é apurado
-  (financeira liquida / banco desconta os boletos) — análogo ao `efetivar_impostos_segmento` na NF-e, ou
-  um evento "pagamento à financeira/antecipação". A provisão `2.1.04.19` foi **excluída da Conciliação
-  Final** (como impostos) pra não virar receita fictícia em `4.4.02` até o reconhecimento existir.
-- **Ramo loja:** `receber_parcela_direto`/`apropriar_receita_financeira` dependem da **infra de parcelas
-  recebidas** (ainda não há endpoint de "parcela recebida") — reconhecimento da receita por competência
-  fica pra essa infra.
-Decisão de negócio pendente: o gatilho usa o valor **estimado** (Cust_Fin) ou o **custo real apurado**?
-(A #11/reconciliação absorve a diferença de qualquer forma.)
+### 3.6 Gatilhos de reconhecimento do custo financeiro (achado da Vera, e2e 2026-07-14)
+- **Antecipação bancária — ✅ FEITO (2026-07-14).** `reconhecer_custo_financeiro(ramo, valor)` reconhece
+  o **custo REAL apurado** quando a loja desconta os boletos: `5.5.03 (Custo de Antecipação de Recebíveis)
+  × baixa do ativo 1.1.06.19`, capado ao ativo em aberto; a Provisão `2.1.04.19` sobrevive (paga ao banco
+  depois). Endpoint `POST /api/orcamentos/<id>/antecipacao` (gate de aprovador) + campo no box da AF.
+  Reconhece o **valor real** (não o estimado); a diferença fica na provisão a pagar. E2E testado:
+  constitui → reconhece → Conciliação Final **sem receita fictícia**. A mesma função cobre a financeira
+  (`5.5.04`), pronta pra ligar quando definirmos o gatilho dela.
+- **Ramo financeira (Aymoré/Cartão) — pendente do gatilho:** a função existe; falta decidir **quando**
+  disparar (emissão da NF-e, como impostos, ou "pagamento à financeira"). A provisão `2.1.04.19` segue
+  **fora da Conciliação Final** (como impostos) até lá — sem receita fictícia.
+- **Ramo loja (próprio) — pendente da infra de parcelas:** `receber_parcela_direto`/
+  `apropriar_receita_financeira` dependem de um endpoint de "parcela recebida" (ainda não existe);
+  a receita por competência entra com essa infra.
 
 ## 4. As Aprovações Financeiras (o gate)
 - **AF1 — confirma a MARGEM da venda.** Revisa os 4 custos adicionais (§3.3) + seleciona/confirma o box de

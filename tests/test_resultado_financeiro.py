@@ -134,3 +134,53 @@ def test_custo_financeiro_fora_da_conciliacao_final(app_db):
     assert _s(db, ot, oid, "4.4.02") == 0.0          # SEM receita fictícia
     db.close()
 
+
+# ── Reconhecimento do custo financeiro (gatilho quando o custo real é apurado) ──
+
+def test_reconhecer_antecipacao_debita_5_5_03_e_baixa_ativo(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 974; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "fechamento_venda_custo_financeiro", 1000.0, projeto_id="P", ref="cf:P")
+    mc.reconhecer_custo_financeiro(db, ot, oid, "P", "loja_antecipacao", 1000.0, ref="ant:P")
+    assert _s(db, ot, oid, "5.5.03") == 1000.0     # Custo de Antecipação de Recebíveis (DRE)
+    assert _s(db, ot, oid, "1.1.06.19") == 0.0     # ativo diferido baixado
+    assert _s(db, ot, oid, "2.1.04.19") == 1000.0  # provisão SOBREVIVE (paga ao banco depois)
+    db.close()
+
+
+def test_reconhecer_financeira_usa_5_5_04(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 975; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "fechamento_venda_custo_financeiro", 800.0, projeto_id="P", ref="cf:P")
+    mc.reconhecer_custo_financeiro(db, ot, oid, "P", "financeira", 800.0, ref="fin:P")
+    assert _s(db, ot, oid, "5.5.04") == 800.0
+    assert _s(db, ot, oid, "1.1.06.19") == 0.0
+    db.close()
+
+
+def test_reconhecer_capado_ao_ativo_em_aberto(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 976; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "fechamento_venda_custo_financeiro", 1000.0, projeto_id="P", ref="cf:P")
+    mc.reconhecer_custo_financeiro(db, ot, oid, "P", "loja_antecipacao", 1500.0, ref="ant:P")  # pede 1500
+    assert _s(db, ot, oid, "5.5.03") == 1000.0     # reconhece só até o ativo constituído
+    assert _s(db, ot, oid, "1.1.06.19") == 0.0
+    db.close()
+
+
+def test_reconhecer_ramo_loja_nao_tem_despesa(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 977; mc.seed_plano(db, ot, oid)
+    out = mc.reconhecer_custo_financeiro(db, ot, oid, "P", "loja", 1000.0, ref="x:P")
+    assert out is None
+    assert _s(db, ot, oid, "5.5.03") == 0.0 and _s(db, ot, oid, "5.5.04") == 0.0
+    db.close()
+
+
+def test_antecipacao_ponta_a_ponta_sem_receita_ficticia(app_db):
+    # ciclo completo: constitui → reconhece antecipação → conciliar_final NÃO gera receita fictícia
+    db = app_db.get_session(); ot, oid = "loja", 978; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "fechamento_venda_custo_financeiro", 1000.0, projeto_id="P", ref="cf:P")
+    mc.reconhecer_custo_financeiro(db, ot, oid, "P", "loja_antecipacao", 1000.0, ref="ant:P")
+    mc.conciliar_final(db, ot, oid, "P", ref_base="conc:P")
+    assert _s(db, ot, oid, "5.5.03") == 1000.0     # despesa reconhecida (DRE)
+    assert _s(db, ot, oid, "4.4.02") == 0.0        # SEM receita fictícia
+    assert _s(db, ot, oid, "2.1.04.19") == 1000.0  # provisão (a pagar ao banco) segue aberta
+    db.close()
+

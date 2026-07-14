@@ -387,6 +387,7 @@ EVENTOS = {
     # FASE B (resultado financeiro) — ramo FINANCEIRA: despesa financeira diferida (constituída no contrato)
     "fechamento_venda_custo_financeiro":     ("1.1.06.19", "2.1.04.19", "Constituição — Provisão de Custo Financeiro (ativo diferido)"),
     "reconhecimento_despesa_custo_financeiro": ("5.5.04", "1.1.06.19", "Reconhecimento da despesa financeira (baixa do ativo diferido)"),
+    "reconhecimento_antecipacao":              ("5.5.03", "1.1.06.19", "Reconhecimento do custo de antecipação bancária (baixa do ativo diferido)"),
     # FASE B (resultado financeiro) — ramo LOJA (financiamento direto, capital próprio, SEM despesa):
     "constituir_juros_direto":       ("1.1.07", "2.1.07", "Financiamento direto — juros a apropriar (recebível × receita diferida)"),
     "receber_parcela_direto":        ("1.1.01", "1.1.07", "Financiamento direto — recebimento de parcela (baixa do recebível de juros)"),
@@ -662,6 +663,33 @@ def trocar_ramo_custo_financeiro(db, owner_tipo, owner_id, projeto_id, ramo_atua
         registrar_evento(db, owner_tipo, owner_id, "constituir_juros_direto", valor,
                          projeto_id=projeto_id, ref=ref_base + ":new")
     return ramo_novo
+
+
+_RAMO_CFIN_DESPESA = {
+    "loja_antecipacao": "reconhecimento_antecipacao",              # 5.5.03 Custo de Antecipação de Recebíveis
+    "financeira":       "reconhecimento_despesa_custo_financeiro", # 5.5.04 Custo Financeiro sobre Vendas
+}
+
+
+def reconhecer_custo_financeiro(db, owner_tipo, owner_id, projeto_id, ramo, valor, ref, data=None):
+    """#B — reconhece a DESPESA do custo financeiro na DRE quando o custo real é apurado (a loja desconta
+    os boletos na antecipação bancária, ou a financeira liquida): despesa (antecipação → 5.5.03;
+    financeira → 5.5.04) × baixa do ativo diferido 1.1.06.19, CAPADO ao saldo do ativo em aberto (padrão
+    do matching operacional na NF-e). A Provisão 2.1.04.19 SOBREVIVE (paga ao banco/financeira depois).
+    Ramo 'loja' (próprio) / 'avista' não tem despesa → None. Idempotente por ref."""
+    evento = _RAMO_CFIN_DESPESA.get(ramo)
+    if evento is None:
+        return None
+    ja = lancamento_por_ref(db, owner_tipo, owner_id, ref)
+    if ja is not None:
+        return ja
+    seed_plano(db, owner_tipo, owner_id)
+    saldo_ativo = round(total_lancado(db, owner_tipo, owner_id, "1.1.06.19", "debito", projeto_id)
+                        - total_lancado(db, owner_tipo, owner_id, "1.1.06.19", "credito", projeto_id), 2)
+    mv = round(min(float(valor or 0), max(saldo_ativo, 0.0)), 2)
+    if mv <= 0:
+        return None
+    return registrar_evento(db, owner_tipo, owner_id, evento, mv, projeto_id=projeto_id, ref=ref)
 
 
 # FASE D2: matching pleno na NF-e — rubrica → evento de reconhecimento de despesa (baixa do ativo diferido).
