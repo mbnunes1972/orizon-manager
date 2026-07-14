@@ -113,9 +113,28 @@ estáveis no banco/endpoints/gating):**
 
 A própria loja faz o **Projeto Executivo (PE)**; quase sempre há diferença de custo de fábrica.
 
-**4.1 Comparação PE (já existe, read-only).** `montar_comparacao_pe` / `reconciliacao_estimada`: CFO da venda ×
-CFO do PE por ambiente (`extrair_cfo_pe` = Σ `order_total`). Gera o saldo estimado, ancorado no Val_Cont. XMLs de
-teste `_PE` (CFO alterado por ambiente) em `XML/*_PE.xml`.
+**4.1 Comparação PE — tela ENXUTA (na subetapa 11c "Revisão de PE").** `montar_comparacao_pe`: CFO da venda ×
+CFO do PE por ambiente (`extrair_cfo_pe` = Σ `order_total`). A tela mostra **só**: **valor do projeto** (Val_Cont),
+**Δ de custo de fábrica por ambiente com diferença %**, e a **média final** (variação global = Δ total / CFO venda
+total). **NÃO** mostra as provisões (o bloco de reconciliação estimada foi removido daqui — confuso nesta etapa; a
+evolução de provisões/margem vive no painel de Provisões / colunas Rev). XMLs de teste `_PE` (CFO alterado por
+ambiente) em `XML/*_PE.xml`. ✅ implementado (`peComparacaoRender`, 2026-07-14).
+
+**4.1.1 Upload de PE — multi-arquivo + ciclo de trava.** "Carregar PE" abre seletor **`multiple accept=".xml"`**;
+cada XML é **casado ao ambiente pelo nome** e alimenta `arquivo_pe` (store da comparação/Conferência). Os PEs ficam
+**acessíveis para ver/substituir/remover** enquanto a **11e (Aprovação do PE pelo cliente = assinatura)** não é
+concluída; **após a 11e travam**, e alterar exige **step-up de Diretor** (`perfis.pode(nivel,"autorizar")`). _(A
+seleção múltipla+casamento pode ir antes; a trava da 11e fica na F2.)_
+
+**4.1.2 Gate do PE (pré-req, já corrigido 2026-07-14).** `_podePE` no frontend comparava o nível contra nomes de
+função obsoletos (`diretor`/`gerente_vendas`/…) → botões de PE ocultos para todos. Corrigido p/ os níveis-base
+(`executar_pe`: master/gerencial/operador; `revisar_pe`: master/gerencial), espelhando `perfis.py`. Bug latente na
+`main`. **Follow-up robusto:** backend enviar as capacidades resolvidas na sessão e o front só ler (mata a classe de
+desync); auditar outros gates com hardcode de função.
+
+**4.1.3 Desmembramento = "Fase" (terminologia).** O projeto se desmembra em **Fases** (não "parcela" — colidiria com
+as etapas do ciclo e com parcela de pagamento). Só os **rótulos visíveis** mudam; endpoints/tabelas/identificadores
+(`/parcelas`, `ParcelaProjeto`, `.desm-parc`) seguem internos, comentados no código. ✅ rótulos aplicados (2026-07-14).
 
 **4.2 Frete Fábrica — auto-recalcula + override.** Ao conferir o novo CFO, o frete fábrica (`% × CFO`,
 `mod_provisoes.py:169`) **recalcula automaticamente** (o caso da grande maioria). Um **override manual por senha**
