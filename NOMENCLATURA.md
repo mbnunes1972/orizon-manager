@@ -98,7 +98,7 @@ Margem
 | **Margem da Venda** | VAVO | `(VAVO − Cust_Ad − Cust_Var)/VAVO` | margem sobre a venda à vista |
 | **Margem do Contrato** | Val_Cont | `(Val_Cont − Cust_Ad − Cust_Var − Cust_Fin)/Val_Cont` | margem sobre o contrato assinado |
 
-Invariante: **Contribuição ≥ Venda ≥ Contrato** (bases crescentes). O `Cust_Fin` **cancela** no numerador da Margem do Contrato → é a margem operacional **sobre o contrato**, não "margem + ganho financeiro".
+Invariante (**venda com lucro**, margem R$ > 0): **Contribuição ≥ Venda ≥ Contrato** (bases crescentes). Em **prejuízo** a ordem se inverte (dividir um número negativo por base maior o deixa menos negativo) — aritmeticamente correto, mas a leitura de % assume lucro. O `Cust_Fin` **cancela** no numerador da Margem do Contrato → é a margem operacional **sobre o contrato**, não "margem + ganho financeiro".
 
 **Margem Operacional (4ª margem — NÃO é destas):** reservada pra **DRE**, após TODOS os custos, derivada do **razão** (não da negociação) — outro momento (pós-venda) e outra fonte. O **resultado financeiro** (receita no financiamento direto, despesa na financeira) é indicador à parte; somado à margem, dá a rentabilidade total.
 

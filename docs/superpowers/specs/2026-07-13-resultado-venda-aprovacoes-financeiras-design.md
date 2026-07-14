@@ -82,6 +82,20 @@ tratamento oposto: é por isso que o box é necessário.
 - **No razão = Resultado Financeiro**; o painel da AF **deriva** disso a leitura "resultado adicional da
   venda" (não duplica; fonte única no razão).
 
+### 3.6 ⚠ PENDENTE — gatilhos de reconhecimento do custo financeiro (achado da Vera, e2e 2026-07-14)
+A constituição (contrato) e a troca de ramo (box da AF) estão prontas e testadas, mas o **reconhecimento**
+do custo financeiro ainda **não dispara** no app:
+- **Ramo financeira/antecipação:** o evento `reconhecimento_despesa_custo_financeiro` (`5.5.04 × baixa
+  1.1.06.19`) existe mas **não tem call-site**. Falta decidir o gatilho: quando o custo REAL é apurado
+  (financeira liquida / banco desconta os boletos) — análogo ao `efetivar_impostos_segmento` na NF-e, ou
+  um evento "pagamento à financeira/antecipação". A provisão `2.1.04.19` foi **excluída da Conciliação
+  Final** (como impostos) pra não virar receita fictícia em `4.4.02` até o reconhecimento existir.
+- **Ramo loja:** `receber_parcela_direto`/`apropriar_receita_financeira` dependem da **infra de parcelas
+  recebidas** (ainda não há endpoint de "parcela recebida") — reconhecimento da receita por competência
+  fica pra essa infra.
+Decisão de negócio pendente: o gatilho usa o valor **estimado** (Cust_Fin) ou o **custo real apurado**?
+(A #11/reconciliação absorve a diferença de qualquer forma.)
+
 ## 4. As Aprovações Financeiras (o gate)
 - **AF1 — confirma a MARGEM da venda.** Revisa os 4 custos adicionais (§3.3) + seleciona/confirma o box de
   financiamento (§3.4) + eventual pequena revisão de fábrica. Ao aprovar, **trava Rev1**. Efeito contábil:

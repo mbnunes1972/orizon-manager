@@ -122,3 +122,15 @@ def test_troca_financeira_para_antecipacao_e_noop_contabil(app_db):
     assert _s(db, ot, oid, "1.1.06.19") == 1000.0 and _s(db, ot, oid, "2.1.04.19") == 1000.0
     db.close()
 
+
+def test_custo_financeiro_fora_da_conciliacao_final(app_db):
+    # 🔴 (Vera): a Provisão de Custo Financeiro tem rota própria (custo real apurado depois) — NÃO pode
+    # ser resolvida à força na Conciliação Final como "sobra" → viraria receita fictícia em 4.4.02.
+    db = app_db.get_session(); ot, oid = "loja", 973; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "fechamento_venda_custo_financeiro", 1000.0, projeto_id="P", ref="cf:P")
+    out = mc.conciliar_final(db, ot, oid, "P", ref_base="conc:P")
+    assert "2.1.04.19" not in out                   # fora da conciliação (como impostos)
+    assert _s(db, ot, oid, "2.1.04.19") == 1000.0    # provisão intacta (aguarda o custo real)
+    assert _s(db, ot, oid, "4.4.02") == 0.0          # SEM receita fictícia
+    db.close()
+

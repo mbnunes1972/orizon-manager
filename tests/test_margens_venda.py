@@ -30,3 +30,12 @@ def test_margem_contrato_neutraliza_o_custo_financeiro():
 def test_bases_zero_nao_dividem():
     r = mp.margens_venda(vavo=0.0, cust_ad=0.0, cust_var=0.0, val_cont=0.0)
     assert r["margem_contribuicao"] == 0.0 and r["margem_venda"] == 0.0 and r["margem_contrato"] == 0.0
+
+
+def test_em_prejuizo_a_ordem_das_margens_inverte():
+    # 🟡 (Vera): o invariante Contribuição >= Venda >= Contrato só vale com margem POSITIVA.
+    # Em prejuízo (margem R$ < 0), dividir por base maior deixa o número menos negativo → ordem inverte.
+    r = mp.margens_venda(vavo=10000.0, cust_ad=1000.0, cust_var=12000.0, val_cont=10500.0)
+    assert r["margem_rs"] == -3000.0
+    # Contribuição é a MAIS negativa; Contrato a menos negativa (o inverso do caso com lucro)
+    assert r["margem_contribuicao"] < r["margem_venda"] < r["margem_contrato"] < 0

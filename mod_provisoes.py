@@ -128,7 +128,9 @@ def margens_venda(vavo, cust_ad, cust_var, val_cont):
       - margem_contribuicao : base val_liq_loja = VAVO − Cust_Ad (base das comissões internas da loja)
       - margem_venda        : base VAVO (valor à vista)
       - margem_contrato     : base Val_Cont (inclui o custo financeiro — que se cancela no numerador)
-    Invariante: margem_contribuicao >= margem_venda >= margem_contrato (bases crescentes).
+    Invariante (quando a margem em R$ é POSITIVA): margem_contribuicao >= margem_venda >= margem_contrato
+    (bases crescentes). Em prejuízo (margem R$ < 0) a ordem se inverte — a divisão por base maior deixa o
+    número "menos negativo" —, o que é aritmeticamente correto; a leitura de % assume venda com lucro.
     NÃO confundir com a **Margem Operacional** (4ª margem), que é da DRE — após TODOS os custos, derivada
     do razão, não da negociação. Estas três são VISÃO managerial (não lançam nada); o RESULTADO financeiro
     (receita/despesa) é indicador à parte (ramo loja×financeira).
