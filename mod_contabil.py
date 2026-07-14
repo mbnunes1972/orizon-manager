@@ -24,6 +24,8 @@ PLANO_PADRAO = [
     # FASE A (resultado da venda): custos adicionais como ativo diferido (espelho das demais rubricas)
     ("1.1.06.15", "Comissão de Arquiteto a Apropriar"), ("1.1.06.16", "Programa de Fidelidade a Apropriar"),
     ("1.1.06.17", "Custo de Viagem a Apropriar"), ("1.1.06.18", "Brinde a Apropriar"),
+    ("1.1.06.19", "Custo Financeiro a Apropriar"),   # FASE B: ramo FINANCEIRA (Aymoré/Cartão) — despesa financeira diferida
+    ("1.1.07", "Recebíveis de Parcelamentos"),   # FASE B: ramo LOJA (financiamento direto) — carrega SÓ os juros (VAVO fica no 1.1.02)
     ("1.2", "Não Circulante"),
     ("1.2.1", "Imobilizado"),
     ("1.2.1.01", "Itens de Informática"), ("1.2.1.02", "Veículos"),
@@ -50,8 +52,10 @@ PLANO_PADRAO = [
     # FASE A (resultado da venda): os 4 custos adicionais viram provisão (antes só deduzidos do Val_Liq)
     ("2.1.04.15", "Provisão de Comissão de Arquiteto"), ("2.1.04.16", "Provisão de Programa de Fidelidade"),
     ("2.1.04.17", "Provisão de Custo de Viagem"), ("2.1.04.18", "Provisão de Brinde"),
+    ("2.1.04.19", "Provisão de Custo Financeiro"),   # FASE B: ramo FINANCEIRA — provisão da despesa financeira
     ("2.1.05", "Financiamento Total Flex a Pagar"),
     ("2.1.06", "Receita a Realizar"),   # FASE D2: recebe o Val_Cont cheio no contrato (era "Adiantamento de Clientes")
+    ("2.1.07", "Receita Financeira a Apropriar"),   # FASE B: ramo LOJA — juros diferidos, realizados por parcela
     ("2.2", "Não Circulante"),
     ("2.2.01", "Financiamentos de Longo Prazo (principal)"),
     ("3", "PATRIMÔNIO LÍQUIDO"),
@@ -67,6 +71,7 @@ PLANO_PADRAO = [
     ("4.4", "Outras Receitas Não Operacionais"),
     ("4.4.01", "Receita de Aluguéis"),
     ("4.4.02", "Reversão de Provisões"),   # FASE D: destino da SOBRA (provisionado > efetivado)
+    ("4.4.03", "Receita Financeira"),   # FASE B: ramo LOJA — juros do financiamento direto (competência por parcela)
     ("5", "DESPESAS / CUSTOS"),
     ("5.1", "CMV"),
     ("5.1.01", "CMV Fábrica (Dal Mobile)"), ("5.1.02", "Frete Fábrica"),
@@ -96,6 +101,7 @@ PLANO_PADRAO = [
     ("5.5", "Despesas Financeiras"),
     ("5.5.01", "Tarifas Bancárias"), ("5.5.02", "Juros de Empréstimos"),
     ("5.5.03", "Custo de Antecipação de Recebíveis"),
+    ("5.5.04", "Custo Financeiro sobre Vendas"),   # FASE B: deságio/taxa da financeira (Aymoré/Cartão)
     ("5.6", "Constituição de Provisões"),
     ("5.6.01", "Constituição — Provisão de Garantia"),
     ("5.6.02", "Constituição — Provisão de Montagem"),
@@ -378,6 +384,13 @@ EVENTOS = {
     "fechamento_venda_pro_fid":  ("1.1.06.16", "2.1.04.16", "Constituição — Provisão de Programa de Fidelidade (ativo diferido)"),
     "fechamento_venda_cust_via": ("1.1.06.17", "2.1.04.17", "Constituição — Provisão de Custo de Viagem (ativo diferido)"),
     "fechamento_venda_brinde":   ("1.1.06.18", "2.1.04.18", "Constituição — Provisão de Brinde (ativo diferido)"),
+    # FASE B (resultado financeiro) — ramo FINANCEIRA: despesa financeira diferida (constituída no contrato)
+    "fechamento_venda_custo_financeiro":     ("1.1.06.19", "2.1.04.19", "Constituição — Provisão de Custo Financeiro (ativo diferido)"),
+    "reconhecimento_despesa_custo_financeiro": ("5.5.04", "1.1.06.19", "Reconhecimento da despesa financeira (baixa do ativo diferido)"),
+    # FASE B (resultado financeiro) — ramo LOJA (financiamento direto, capital próprio, SEM despesa):
+    "constituir_juros_direto":       ("1.1.07", "2.1.07", "Financiamento direto — juros a apropriar (recebível × receita diferida)"),
+    "receber_parcela_direto":        ("1.1.01", "1.1.07", "Financiamento direto — recebimento de parcela (baixa do recebível de juros)"),
+    "apropriar_receita_financeira":  ("2.1.07", "4.4.03", "Financiamento direto — apropriação da receita financeira (competência)"),
     # FASE D2: matching pleno na NF-e — reconhece a DESPESA de cada rubrica (5.6.0X, ou 5.1.01 p/ a fábrica)
     # × baixa do ativo diferido (1.1.06.0X). A Provisão (2.1.04.0X) SOBREVIVE — é paga/reconciliada depois.
     "reconhecimento_despesa_montagem":            ("5.6.02", "1.1.06.02", "Reconhecimento de despesa na NF-e — Montagem"),
@@ -530,6 +543,9 @@ _PROV_FECHAMENTO = {
     "pro_fid":             "fechamento_venda_pro_fid",
     "cust_via":            "fechamento_venda_cust_via",
     "brinde":              "fechamento_venda_brinde",
+    # FASE B — ramo FINANCEIRA (custo financeiro é rubrica provisionada; NÃO entra no matching
+    # operacional da NF-e — tem reconhecimento próprio, como impostos)
+    "custo_financeiro":    "fechamento_venda_custo_financeiro",
 }
 
 
