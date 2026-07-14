@@ -122,6 +122,27 @@ def itens_provisao(siglas):
     return {k: round(_f(s.get(v)), 2) for k, v in _RUBRICAS.items()}
 
 
+def margens_venda(vavo, cust_ad, cust_var, val_cont):
+    """As TRÊS margens da venda — todas com o MESMO numerador (margem em R$ =
+    VAVO − Cust_Ad − Cust_Var), expressas sobre bases crescentes:
+      - margem_loja     : base val_liq_loja = VAVO − Cust_Ad (base das comissões internas da loja)
+      - margem_venda    : base VAVO (valor à vista)
+      - margem_contrato : base Val_Cont (inclui o custo financeiro — que se cancela no numerador)
+    Invariante: margem_loja >= margem_venda >= margem_contrato (bases crescentes).
+    É VISÃO (managerial) — não lança nada; o RESULTADO financeiro (receita/despesa) é indicador à parte.
+    """
+    vavo = _f(vavo); cust_ad = _f(cust_ad); cust_var = _f(cust_var); val_cont = _f(val_cont)
+    val_liq_loja = vavo - cust_ad
+    margem_rs = round(vavo - cust_ad - cust_var, 2)
+    _m = lambda base: round(margem_rs / base, 4) if base else 0.0
+    return {
+        "margem_rs": margem_rs,
+        "margem_loja": _m(val_liq_loja),
+        "margem_venda": _m(vavo),
+        "margem_contrato": _m(val_cont),
+    }
+
+
 def cust_var_marg_cont(cfo, val_liq, itens):
     """Recalcula (Cust_Var, Marg_Cont) a partir de itens (possivelmente editados).
     Cust_Var = CFO + Σ itens (os itens já incluem out_forn e prov_imp)."""
