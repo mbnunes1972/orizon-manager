@@ -11010,18 +11010,12 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
       <div id="ramo-fin-container" style="margin-top:12px"></div>
     </div>` : '';
   // Fatia D: devolução (parcial/total) — reverte proporcionalmente a constituição diferida (receita/impostos/provisões).
-  const devBox = (codigo === '8' || codigo === '11d') ? `
+  // Devolução saiu do ciclo (tratada FORA, supervisionada pela auditoria contábil). Aqui fica só o
+  // Cancelamento de contrato, e só na AF1 (etapa 8) — depois da AF1, cancelamento também é fora do ciclo.
+  const devBox = (codigo === '8') ? `
     <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-      <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">Devolução: reverte a venda na proporção informada (impostos e provisões diferidas; custo já entregue/NF-e não reverte).</div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="number" id="dev-pct" min="0" max="100" step="0.01" placeholder="% devolvido"
-               style="width:120px;height:var(--control-h-sm);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-body)">
-        <button class="btn-ciclo btn-danger" onclick="devolucaoRegistrar()"><i class="ti ti-arrow-back-up"></i> Registrar devolução</button>
-      </div>
-      ${codigo === '8' ? `<div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:10px">
-        <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">Cancelamento de contrato: estorna TODOS os lançamentos e trava o projeto como "cancelado" (revender = novo projeto). Exige senha de Diretor. Só na AF1 — depois, o cancelamento é fora do ciclo.</div>
-        <button class="btn-ciclo" onclick="cancelarContrato()" style="background:var(--cancel);color:var(--cancel-on);border-color:var(--cancel);font-weight:700"><i class="ti ti-file-x"></i> Cancelar contrato</button>
-      </div>` : ''}
+      <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">Cancelamento de contrato: estorna TODOS os lançamentos e trava o projeto como "cancelado" (revender = novo projeto). Exige senha de Diretor. Só na AF1 — depois, cancelamento e devolução são fora do ciclo.</div>
+      <button class="btn-ciclo" onclick="cancelarContrato()" style="background:var(--cancel);color:var(--cancel-on);border-color:var(--cancel);font-weight:700"><i class="ti ti-file-x"></i> Cancelar contrato</button>
     </div>` : '';
   const _btnProvisoes = `<button onclick="abrirProvisoes(_orcamentoAtivoId, '${codigo}')"
     style="background:none;border:1px solid var(--border2);color:var(--accent);
