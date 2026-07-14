@@ -4083,10 +4083,15 @@ class Handler(BaseHTTPRequestHandler):
                 cust_var, marg = _mprov.cust_var_marg_cont(cfo, vl, itens)
                 existente = db.query(ProvisaoRegistro).filter_by(orcamento_id=oid, versao=versao).first()
                 pode_autorizar = perfis.pode(aprovador.nivel, "autorizar")   # capacidade de step-up (Diretor)
-                # Fatia C (#10): versão já aprovada/travada não reedita sem step-up do Diretor
-                if existente is not None and getattr(existente, "travada_em", None) is not None and not pode_autorizar:
+                # Fatia C: a revisão é REEDITÁVEL pelo aprovador financeiro ATÉ a ETAPA de AF ser aprovada
+                # (rev1↔etapa 8, rev2↔etapa 11d). Depois de aprovada, reabrir exige Diretor (step-up).
+                import mod_ciclo as _mcic
+                _etapa_af = {"rev1": "8", "rev2": "11d"}.get(versao)
+                _etc = (db.query(CicloEtapa).filter_by(projeto_nome=orc.projeto_id, etapa_codigo=_etapa_af).first()
+                        if _etapa_af else None)
+                if _etc is not None and _etc.status in _mcic.STATUS_CONCLUSIVOS and not pode_autorizar:
                     self.send_json({"ok": False,
-                        "erro": "Versão %s já aprovada e travada — reabrir exige Diretor." % versao}, code=403); return
+                        "erro": "Etapa de AF já aprovada — reabrir a revisão exige Diretor."}, code=403); return
                 # Fatia C (#10): aumento de custo acima do limite (config) exige step-up do Diretor
                 import mod_parcelas as _mpar
                 _loja = db.get(Loja, loja_id) if loja_id else None

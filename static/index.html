@@ -11022,7 +11022,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
         <button class="btn-ciclo btn-danger" onclick="cancelarContrato()"><i class="ti ti-file-x"></i> Cancelar contrato</button>
       </div>
     </div>` : '';
-  const _btnProvisoes = `<button onclick="abrirProvisoes(_orcamentoAtivoId)"
+  const _btnProvisoes = `<button onclick="abrirProvisoes(_orcamentoAtivoId, '${codigo}')"
     style="background:none;border:1px solid var(--border2);color:var(--ok);
     border-radius:6px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
     &#x1F4CA; Provisões
@@ -11119,7 +11119,8 @@ function _fmtPct(v) {
   return Number(v).toLocaleString('pt-BR', {minimumFractionDigits:1, maximumFractionDigits:2}) + '%';
 }
 
-async function abrirProvisoes(oid) {
+async function abrirProvisoes(oid, afCodigo) {
+  window._provAfCodigo = afCodigo;   // etapa de AF que abriu (p/ amarrar Rev1↔8 / Rev2↔11d na reabertura)
   if (!oid) { showToast('Nenhum orçamento ativo.', true); return; }
   let pdata;
   try {
@@ -11139,13 +11140,12 @@ async function abrirProvisoes(oid) {
   if (rev2)  cols.push({ label: 'Rev 2', ver: rev2 });
   if (atual) cols.push({ label: 'Atual', ver: atual });
 
-  // Determine next pending revision
-  let pendingRev = null;
-  if (!rev1) pendingRev = 'rev1';
-  else if (!rev2) pendingRev = 'rev2';
-
-  // Source itens for Revisa prefill: last registered version or venda
-  const prevItens = (pendingRev === 'rev2' && rev1 ? rev1.itens : venda ? venda.itens : null) || {};
+  // Fatia C: a revisão pertence à ETAPA de AF que abriu o painel — AF1 (etapa 8) edita Rev1; AF2
+  // (etapa 11d) edita Rev2. NÃO auto-avança (a AF1 nunca cria a coluna Rev2); reeditável até o ger
+  // adm/fin aprovar a etapa (depois o backend exige Diretor pra reabrir).
+  const pendingRev = (afCodigo === '11d') ? 'rev2' : 'rev1';
+  // Prefill: a própria versão-alvo se já existe (reedição), senão a anterior (venda p/ rev1, rev1 p/ rev2)
+  const prevItens = ((prov[pendingRev]) || (pendingRev === 'rev2' ? rev1 : venda) || {}).itens || {};
 
   // Build rubrica rows
   let trows = _PROV_RUBRICAS.map(rb => {
@@ -11247,25 +11247,8 @@ async function abrirProvisoes(oid) {
     ${thCols}
   </tr></thead>`;
 
-  // Custos adicionais — destacados após a margem (já descontados do Val. Líquido).
-  const _caLinha = (lbl, v) => `<span style="color:var(--muted)">${lbl}</span>` +
-    `<span style="text-align:right;font-family:var(--font-mono)">${_fmtR(v)}</span>`;
-  const custosAdBlock = `
-    <div style="margin-top:14px;padding:10px 12px;background:var(--warn-soft);border:1px solid var(--warn);border-radius:6px">
-      <div style="font-size:.78rem;color:var(--warn);font-weight:600;margin-bottom:6px">
-        Custos adicionais <span style="font-weight:400;color:var(--muted)">(já descontados do Val. Líquido)</span>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr auto;gap:3px 14px;font-size:.82rem">
-        ${_caLinha('Comissão arquiteto', custosAd.com_arq)}
-        ${_caLinha('Fidelidade', custosAd.pro_fid)}
-        ${_caLinha('Viagem', custosAd.cust_via)}
-        ${_caLinha('Brinde', custosAd.brinde)}
-        <span style="font-weight:600;border-top:1px solid var(--border);padding-top:3px">Total</span>
-        <span style="text-align:right;font-family:var(--font-mono);font-weight:600;color:var(--warn);border-top:1px solid var(--border);padding-top:3px">${_fmtR(custosAd.total)}</span>
-        <span style="color:var(--muted);margin-top:5px;border-top:1px dashed var(--border);padding-top:5px">Custo financeiro <span style="font-size:10px">(informativo)</span></span>
-        <span style="text-align:right;font-family:var(--font-mono);margin-top:5px;border-top:1px dashed var(--border);padding-top:5px">${_fmtR(custosAd.cust_fin)}</span>
-      </div>
-    </div>`;
+  // (Box inferior de "Custos adicionais" REMOVIDO na F0: com_arq/pro_fid/cust_via/brinde e o custo
+  // financeiro agora são LINHAS nas colunas superiores — não precisa mais duplicar aqui.)
 
   // Build the full modal HTML
   const html =
@@ -11279,7 +11262,6 @@ async function abrirProvisoes(oid) {
           <tbody>${cfoRow}${trows}${valLiqRow}${custVarRow}${margContRow}</tbody>
         </table>
       </div>`) +
-    custosAdBlock +
     revisaSection +
     '<div id="_prov-erro" style="color:var(--err);font-size:.78rem;min-height:14px;margin-top:8px"></div>' +
     actionBtns +
@@ -11353,7 +11335,7 @@ async function _provAcao(oid, rev, decisao) {
     showToast('Provisão registrada com sucesso!', false);
     // Close current modal and reopen refreshed
     if (window._provModalOv) { window._provModalOv.remove(); window._provModalOv = null; }
-    await abrirProvisoes(oid);
+    await abrirProvisoes(oid, window._provAfCodigo);
   } catch(e) {
     if (erroEl) erroEl.textContent = 'Erro: ' + e.message;
   }
