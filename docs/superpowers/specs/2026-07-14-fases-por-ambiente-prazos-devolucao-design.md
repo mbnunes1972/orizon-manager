@@ -20,15 +20,26 @@ supervisionados pela auditoria contábil). Reusa `mod_parcelas` (`ParcelaProjeto
 - Enquanto houver **> 1 ambiente a concluir**, o botão **"Desmembrar em fases"** fica disponível, até
   todos concluídos.
 
-## 2. Revisão de PE (etapa 11c) — modal "Carregar PE"
+## 2. Subfase "Projeto Executivo" (ex-"Revisão de PE", código 11c) — botões + senha
 
-- Botão **"Carregar PE"** abre o **modal com os ambientes do contrato** (reusa o formato da comparação
-  CFO atual — validado como bom).
-- **Sem botão "Revisão" separado** — a aprovação ocorre **dentro do modal**.
-- O modal tem **"Desmembrar em fases"**.
-- Cada fase tem botão **"Aprovar"** com **letras em dourado escuro**; após marcado, vira **"Aprovado" em
-  verde escuro**, e as demais fases seguem pendentes de aprovar.
-- **Desmembrar** fica selecionável enquanto houver **> 1 ambiente pendente**.
+**Rename (SÓ display):** subfase 11c "Revisão de PE" → **"Projeto Executivo"**; etapa-mãe 11 → **"Especificação
+Técnica"**. Códigos/IDs mantidos (`11c`, `pe_projeto_executivo`, `SUBFASES_PE`, `arquivo_pe`, `_podePE`) —
+código diz "PE", UI diz "Projeto Executivo/Especificação Técnica" (ver nota de nomenclatura).
+
+**Botões — todos NA MESMA LINHA e do MESMO TAMANHO:**
+1. **Carregar Projeto Executivo** — sobe os XMLs para a pasta de PE; **sobrescreve em revisões**; cada
+   revisão incrementa o indicador **[Rev1, Rev2…]** ao lado do nome da subfase.
+2. **PE × PV** — compara os **valores de fábrica**: XMLs **vendidos (PV = Projeto Vendido)** × **Projeto
+   Executivo (PE)**. Abre o modal de comparação (formato CFO validado).
+3. **Desmembrar Fases** — Fase B (`particionar_por_selecao` + endpoint B.2); selecionável enquanto houver
+   **> 1 ambiente pendente**.
+4. **Aprovar** — letras em **dourado escuro**; aprova a fase (ambientes selecionados) → vira **"Aprovado"
+   em verde escuro**; as demais fases seguem pendentes. Quando **todas** aprovadas, a subfase **trava**.
+
+**Senha (modelo desta subfase):**
+- **Livre até concluir** — Carregar / PE×PV / Desmembrar **sem senha**.
+- **Concluir (Aprovar) exige a senha do PRÓPRIO usuário** (auto-confirmação, NÃO gerencial).
+- **Reabrir (após travada) exige senha GERENCIAL.**
 
 ## 3. Prazos por fase (todo projeto tem cronograma)
 
