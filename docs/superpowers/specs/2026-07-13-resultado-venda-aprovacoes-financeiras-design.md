@@ -35,6 +35,14 @@ matching na NF-e (`reconhecimento_despesa_*`).
 - **É REVISÁVEL** (correção 2026-07-13 — a versão anterior deste raciocínio dizia "imutável", errado):
   muda com o **Val_Cont** (revisão nas AFs — o `ajustar_provisao_delta` já cobre via `1.1.05 × 2.1.04.13`,
   com teste) e com **devolução** (§5).
+- **Evolução fiscal (CONSIDERADA — não cristalizar como % fixo):** hoje a carga é um **percentual
+  fixo** (`carga_trib_pct` na config da loja). Roadmap, já com ganchos no código: (1) puxar a carga do
+  **modelo fiscal por faixa de tributação** (Simples/anexo — o padrão de "faixas" já existe na comissão
+  de vendas); (2) **segmentar distribuidora (mercadoria → NF-e / `4.1.01`) × loja (serviço → NFS-e /
+  `4.2.01`)** — `faturar_segmento(mercadoria|servico)` já existe e a emissão de impostos já prevê
+  "proporcional Merc/Serv". O tratamento **revisável** dos impostos (delta #11 + devolução §5) acomoda
+  essas mudanças sem re-arquitetar: quando a carga passar a vir por faixa/segmento, o valor por versão
+  muda e o delta reconcilia; a rota fiscal (`1.1.05`/`2.1.04.13`/`4.3.01`/`2.1.03`) permanece.
 - **Nota do drift observado no qa-sim:** a coluna "valor atual" do modal é recalculada ao vivo
   (`_negociacao_breakdown → Prov_Imp`, depende do `carga_trib` dos parâmetros atuais); quando o parâmetro
   está diferente do que valia no snapshot, aparece 0 (o flag `desatualizado` sinaliza). Os snapshots
