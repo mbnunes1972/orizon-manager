@@ -18,7 +18,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente,
                        PerfilEmissao, CicloLogistico, CicloLogisticoTransicao, AssistenciaCaso,
                        Funcionario, Fornecedor, Terceiro, Funcao, FolhaPagamento,
-                       AtribuicaoAmbiente, ArquivoPE)
+                       AtribuicaoAmbiente, ArquivoPE, ParcelaProjeto, ParcelaAmbiente)
 import mod_expedicao
 import mod_assistencias
 import mod_cadastro
@@ -790,6 +790,39 @@ class Handler(BaseHTTPRequestHandler):
                     rec.get("provisoes", []), delta_cfo, val_cont)
                 self.send_json({"ok": True, "comparacao": linhas,
                                 "reconciliacao_estimada": rec_est})
+            finally:
+                db.close()
+            return
+
+        m_parc = re.match(r'^/api/projetos/([^/]+)/parcelas$', path)
+        if m_parc:
+            # Fatia 2 (desmembramento): lista as parcelas do projeto (ambientes + fração congelada #5)
+            nome = unquote(m_parc.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                pa_nome = {pa.id: (pa.nome_exibicao or pa.nome)
+                           for pa in db.query(PoolAmbiente).filter_by(projeto_id=nome).all()}
+                parcs = (db.query(ParcelaProjeto).filter_by(projeto_nome=nome)
+                           .order_by(ParcelaProjeto.ordem.asc()).all())
+                out = []
+                for p in parcs:
+                    ambs = db.query(ParcelaAmbiente).filter_by(parcela_id=p.id).all()
+                    out.append({"id": p.id, "ordem": p.ordem, "status": p.status,
+                                "fracao_val_cont": round(p.fracao_val_cont or 0.0, 6),
+                                "val_cont_congelado": round(p.val_cont_congelado or 0.0, 2),
+                                "ambientes": [{"id": a.pool_ambiente_id,
+                                               "nome": pa_nome.get(a.pool_ambiente_id, "")} for a in ambs]})
+                self.send_json({"ok": True, "parcelas": out, "desmembrado": bool(out),
+                                "pool": [{"id": i, "nome": n} for i, n in pa_nome.items()]})
             finally:
                 db.close()
             return
@@ -2501,6 +2534,61 @@ class Handler(BaseHTTPRequestHandler):
         body   = self.rfile.read(length) if length else b'{}'
 
         if handle_auth_post(self, path, body): return
+
+        m_pcreate = re.match(r'^/api/projetos/([^/]+)/parcelas$', path)
+        if m_pcreate:
+            # Fatia 2 (desmembramento): desmembra o projeto em parcelas (grupos de ambientes). Valida a
+            # partição (#1), congela a fração do Val_Cont (#5) e grava parcela_projeto + parcela_ambiente.
+            # Operacional (não lança contábil) — o efeito no ciclo/contábil vem nas etapas seguintes.
+            import mod_parcelas as _mpar
+            nome = unquote(m_pcreate.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            req = json.loads(body) if body else {}
+            parcelas_ids = req.get("parcelas") or []
+            if not isinstance(parcelas_ids, list) or len(parcelas_ids) < 2:
+                self.send_json({"ok": False, "erro": "Desmembrar exige ao menos 2 parcelas"}, code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                if db.query(ParcelaProjeto).filter_by(projeto_nome=nome).first() is not None:
+                    self.send_json({"ok": False, "erro": "Projeto já desmembrado"}, code=409); return
+                contrato = (db.query(Contrato).filter_by(projeto_nome=nome).order_by(Contrato.id.desc()).first())
+                if contrato is None:
+                    self.send_json({"ok": False, "erro": "Desmembre após o contrato assinado"}, code=409); return
+                try:
+                    parcelas_ids = [[int(x) for x in grupo] for grupo in parcelas_ids]
+                except (TypeError, ValueError):
+                    self.send_json({"ok": False, "erro": "Ambientes inválidos"}, code=400); return
+                pool_ids = [pa.id for pa in db.query(PoolAmbiente).filter_by(projeto_id=nome).all()]
+                ok, erro = _mpar.validar_particao_parcelas(pool_ids, parcelas_ids)
+                if not ok:
+                    self.send_json({"ok": False, "erro": erro}, code=400); return
+                valores, val_cont = _valores_contrato_por_ambiente(contrato.orcamento_id, db)
+                grupos_valores = [[valores.get(aid, 0.0) for aid in grupo] for grupo in parcelas_ids]
+                congeladas = _mpar.congelar_parcelas(grupos_valores, val_cont)
+                criadas = []
+                for grupo, cong in zip(parcelas_ids, congeladas):
+                    p = ParcelaProjeto(projeto_nome=nome, ordem=cong["ordem"], status="aguardando",
+                                       fracao_val_cont=cong["fracao_val_cont"],
+                                       val_cont_congelado=cong["val_cont_congelado"],
+                                       orcamento_id=contrato.orcamento_id,
+                                       criado_por_id=getattr(usuario, "id", None))
+                    db.add(p); db.flush()
+                    for aid in grupo:
+                        db.add(ParcelaAmbiente(parcela_id=p.id, pool_ambiente_id=aid))
+                    criadas.append({"id": p.id, "ordem": p.ordem, "val_cont_congelado": p.val_cont_congelado})
+                db.commit()
+                self.send_json({"ok": True, "parcelas": criadas})
+            finally:
+                db.close()
+            return
 
         m_peup = re.match(r'^/api/projetos/([^/]+)/pe/upload$', path)
         if m_peup:
@@ -7835,6 +7923,25 @@ def _ambientes_valor_para_contrato(orcamento_id, db):
     itens = [(nome_por_id.get(a.get("id"), ""), float(a.get("VAVA") or 0.0))
              for a in d.get("ambientes", [])]
     return ambientes_valor_contrato(itens, d.get("VAVO", 0.0), d.get("Val_Cont", 0.0))
+
+
+def _valores_contrato_por_ambiente(orcamento_id, db):
+    """({pool_ambiente_id: valor_de_contrato}, Val_Cont) — rateio do Val_Cont por ambiente (base da
+    fração #5 das parcelas do desmembramento). Reusa o breakdown + mod_contrato.ambientes_valor_contrato."""
+    from mod_contrato import ambientes_valor_contrato
+    orc = db.get(Orcamento, orcamento_id)
+    if not orc:
+        return {}, 0.0
+    d = _negociacao_breakdown(orc, db)
+    ambs = d.get("ambientes", [])
+    valores = ambientes_valor_contrato([("", float(a.get("VAVA") or 0.0)) for a in ambs],
+                                       d.get("VAVO", 0.0), d.get("Val_Cont", 0.0))
+    out = {}
+    for a, (_n, v) in zip(ambs, valores):
+        aid = a.get("id")
+        if aid is not None:
+            out[aid] = round(float(v or 0), 2)
+    return out, round(float(d.get("Val_Cont") or 0), 2)
 
 
 def _montar_dados_projeto_para_contrato(nome_safe: str, orcamento_id: int, db) -> tuple:

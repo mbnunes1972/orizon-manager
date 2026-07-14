@@ -11546,8 +11546,12 @@ function _renderCardPE(codigo, dados, bloqueada) {
   // estimada (read-only, "estimativa gerencial"). spec 2026-07-13 §6/#9.
   const peCmpBlock = (codigo === '11c') ? `
     <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-      <button class="btn-ciclo" onclick="peComparacaoRender()"><i class="ti ti-arrows-diff"></i> Comparar valores dos ambientes (PE)</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-ciclo" onclick="peComparacaoRender()"><i class="ti ti-arrows-diff"></i> Comparar valores dos ambientes (PE)</button>
+        <button class="btn-ciclo" onclick="peDesmembrarRender()"><i class="ti ti-layout-columns"></i> Desmembrar em parcelas</button>
+      </div>
       <div id="pe-cmp-container" style="margin-top:12px"></div>
+      <div id="pe-desm-container" style="margin-top:12px"></div>
     </div>` : '';
   return `${docsHtml}${revisHtml}
     <div style="font-size:.82rem;margin-bottom:10px">${statusLabel}</div>
@@ -11633,6 +11637,45 @@ async function pePeUpload(poolAmbienteId, inputFile){
     if(j.ok){ showToast('XML de PE carregado.'); peComparacaoRender(); }
     else { await avisoPopup(j.erro||'Erro',{titulo:'Carregar PE'}); }
   } catch(e){ await avisoPopup('Erro ao enviar o arquivo.',{titulo:'Carregar PE'}); }
+}
+
+// ── Fatia 2 (desmembramento) — desmembrar o projeto em parcelas na 11c ──
+async function peDesmembrarRender(){
+  if(!projetoAtivo) return;
+  const cont = document.getElementById('pe-desm-container');
+  if(!cont) return;
+  cont.innerHTML = '<span style="color:var(--text-3);font-size:var(--fs-sm)">Carregando…</span>';
+  let j;
+  try { j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/parcelas`,{credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ cont.innerHTML='<span style="color:var(--err)">Erro ao carregar.</span>'; return; }
+  if(!j.ok){ cont.innerHTML=`<span style="color:var(--err)">${esc(j.erro||'Erro')}</span>`; return; }
+  const fmt = v => 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(j.desmembrado){
+    const rows = j.parcelas.map(p => `<tr><td>Parcela ${p.ordem}</td><td class="num">${fmt(p.val_cont_congelado)}</td><td>${esc(p.ambientes.map(a=>a.nome).join(', '))}</td><td>${esc(p.status)}</td></tr>`).join('');
+    cont.innerHTML = `<div class="table-wrap"><table class="tbl"><thead><tr><th>Parcela</th><th style="text-align:right">Val. Contrato</th><th>Ambientes</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    return;
+  }
+  const rows = (j.pool||[]).map(a => `<tr><td>${esc(a.nome)}</td><td style="text-align:right"><input type="number" min="1" max="9" value="1" data-amb="${a.id}" class="desm-parc" style="width:60px;height:var(--control-h-sm);padding:0 8px;background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);text-align:center"></td></tr>`).join('');
+  cont.innerHTML = `<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--sp-3) var(--sp-4)">
+    <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:6px">Atribua cada ambiente a uma parcela (nº). Cada parcela percorre o ciclo (Aprovação → Entrega → NF-e) de forma independente.</div>
+    <div class="table-wrap"><table class="tbl"><thead><tr><th>Ambiente</th><th style="text-align:right">Parcela nº</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <button class="btn-ciclo" style="margin-top:10px" onclick="peDesmembrarCriar()"><i class="ti ti-check"></i> Criar parcelas</button>
+  </div>`;
+}
+
+async function peDesmembrarCriar(){
+  if(!projetoAtivo) return;
+  const inputs = [...document.querySelectorAll('.desm-parc')];
+  const grupos = {};
+  inputs.forEach(el => { const n = parseInt(el.value)||1; (grupos[n]=grupos[n]||[]).push(parseInt(el.dataset.amb)); });
+  const parcelas = Object.keys(grupos).sort((a,b)=>a-b).map(k=>grupos[k]);
+  if(parcelas.length < 2){ await avisoPopup('Use ao menos 2 números de parcela diferentes.',{titulo:'Desmembrar'}); return; }
+  try {
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/parcelas`,
+      {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({parcelas})}).then(r=>r.json());
+    if(j.ok){ showToast('Projeto desmembrado em '+j.parcelas.length+' parcelas.'); peDesmembrarRender(); }
+    else { await avisoPopup(j.erro||'Erro',{titulo:'Desmembrar'}); }
+  } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Desmembrar'}); }
 }
 
 // ── Fatia B — box do ramo do custo financeiro (loja próprio × antecipação × financeira) ──
