@@ -683,6 +683,7 @@ class ParcelaProjeto(Base):
     saldo_margem_estimado = Column(Float,    nullable=True)   # cache opcional do derivado (#9)
     criado_em             = Column(DateTime, default=datetime.utcnow)
     criado_por_id         = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    prazo_conclusao       = Column(DateTime, nullable=True)   # Fase A: prazo da fase (validado × cronograma)
 
 
 class ParcelaAmbiente(Base):
@@ -1233,6 +1234,7 @@ def _migrar_colunas():
         _add_cols("ciclo_etapas", [("data_prevista_conclusao","DATETIME"),
                                    ("funcao_responsavel_id","INTEGER"),
                                    ("responsavel_funcionario_id","INTEGER")])
+        _add_cols("parcela_projeto", [("prazo_conclusao","DATETIME")])   # Fase A: prazo da fase
 
         conn.commit()
     except Exception:

@@ -52,3 +52,36 @@ def gerar_cronograma_projeto(db, projeto_nome, cfg, d0):
         afetadas.append(reg)
     db.flush()
     return afetadas
+
+
+# ── Fase A — prazo por fase validado contra o cronograma do projeto ──────────────────────────────
+
+def limite_etapa(db, projeto_nome, etapa_codigo):
+    """Limite do cronograma (data_prevista_conclusao) da etapa do projeto; None se não houver."""
+    reg = (db.query(CicloEtapa)
+           .filter_by(projeto_nome=projeto_nome, etapa_codigo=str(etapa_codigo)).first())
+    return reg.data_prevista_conclusao if reg else None
+
+
+def prazo_excede_limite(limite, prazo):
+    """True se `prazo` ultrapassa o `limite` do cronograma. Sem limite (None) ou sem prazo (None) →
+    False (nada a exceder). Igualar o limite NÃO excede."""
+    if limite is None or prazo is None:
+        return False
+    return prazo > limite
+
+
+def tem_cronograma(db, projeto_nome):
+    """True se o projeto já tem ao menos uma etapa com data prevista (cronograma gerado)."""
+    return (db.query(CicloEtapa)
+            .filter(CicloEtapa.projeto_nome == projeto_nome,
+                    CicloEtapa.data_prevista_conclusao.isnot(None)).first() is not None)
+
+
+def garantir_cronograma(db, projeto_nome, cfg, d0):
+    """Todo projeto deve ter cronograma: se ainda não tem, gera do Cronograma Padrão (cfg) a partir do
+    d0. NÃO sobrescreve um cronograma existente. Retorna True se gerou agora, False se já existia."""
+    if tem_cronograma(db, projeto_nome):
+        return False
+    gerar_cronograma_projeto(db, projeto_nome, cfg, d0)
+    return True
