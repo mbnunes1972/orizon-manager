@@ -85,3 +85,30 @@ def garantir_cronograma(db, projeto_nome, cfg, d0):
         return False
     gerar_cronograma_projeto(db, projeto_nome, cfg, d0)
     return True
+
+
+def cronogramas(etapas, inicio, entrega, codigo_entrega):
+    """Dois cronogramas derivados do MESMO Cronograma Padrão (mesmos prazos, âncoras opostas) — puro.
+    `etapas`: lista ORDENADA de (codigo, prazo_dias). `codigo_entrega` marca a etapa de ENTREGA ao cliente
+    (âncora do regressivo; default = última). `inicio` = âncora do progressivo. Retorna
+    [{codigo, progressivo, regressivo, folga_dias}]:
+      - progressivo[i] = inicio + Σ prazos ATÉ i (inclusive) — o quanto ANTES a etapa pode terminar;
+      - regressivo[i] = entrega recuada pelos prazos entre i e a entrega (o Prazo LIMITE); etapas DEPOIS
+        da entrega avançam a partir dela;
+      - folga_dias = (regressivo − progressivo).days (negativa = o prazo não cabe no padrão)."""
+    prog = {}
+    acc = inicio
+    for cod, pz in etapas:
+        acc = acc + timedelta(days=int(pz or 0))
+        prog[cod] = acc
+    idx = next((i for i, (c, _) in enumerate(etapas) if c == codigo_entrega), len(etapas) - 1)
+    reg = {}
+    for j, (cod, _) in enumerate(etapas):
+        if j <= idx:
+            dias = sum(int(p or 0) for _, p in etapas[j + 1:idx + 1])
+            reg[cod] = entrega - timedelta(days=dias)
+        else:
+            dias = sum(int(p or 0) for _, p in etapas[idx + 1:j + 1])
+            reg[cod] = entrega + timedelta(days=dias)
+    return [{"codigo": cod, "progressivo": prog[cod], "regressivo": reg[cod],
+             "folga_dias": (reg[cod] - prog[cod]).days} for cod, _ in etapas]
