@@ -11019,7 +11019,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
       </div>
       <div style="margin-top:10px;border-top:1px dashed var(--border);padding-top:10px">
         <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">Cancelamento de contrato: estorna TODOS os lançamentos e trava o projeto como "cancelado" (revender = novo projeto). Exige senha de Diretor. Indisponível após a NF-e.</div>
-        <button class="btn-ciclo btn-danger" onclick="cancelarContrato()"><i class="ti ti-file-x"></i> Cancelar contrato</button>
+        <button class="btn-ciclo" onclick="cancelarContrato()" style="background:var(--cancel);color:var(--cancel-on);border-color:var(--cancel);font-weight:700"><i class="ti ti-file-x"></i> Cancelar contrato</button>
       </div>
     </div>` : '';
   const _btnProvisoes = `<button onclick="abrirProvisoes(_orcamentoAtivoId, '${codigo}')"
@@ -11056,14 +11056,9 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
   }
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px">
-      Confirme a aprovação financeira. Exige login e senha do Gerente Administrativo/Financeiro ou Diretor.
+      Abra as Provisões para revisar as rubricas e <strong>aprovar</strong> a etapa (o botão Aprovar fica dentro do painel). Exige Gerente Administrativo/Financeiro ou Diretor.
     </p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <button onclick="concluirAprovacaoFinanceira('${codigo}')"
-        style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:6px;
-        padding:8px 18px;font-size:.9rem;font-weight:700;cursor:pointer">
-        &#x2713; Aprovar (gerencial)
-      </button>
       ${_btnProvisoes}
     </div>${peEspelho}${ramoBox}${devBox}`;
 }
@@ -11201,22 +11196,19 @@ async function abrirProvisoes(oid, afCodigo) {
       ${revisaInputs}
     </div>`;
 
+    // Dois botões só (padronizados, mesmo tamanho): Revisar (abre a edição) e Aprovar (salva a revisão
+    // corrente E aprova a etapa de AF — dispensa "Confirmar Revisão"/"Concorda").
     actionBtns = `<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <span style="font-size:.8rem;color:var(--muted)">Próxima revisão: <strong style="color:var(--ok)">${esc(revLabel)}</strong></span>
-      <button onclick="_provAcao('${oid}','${pendingRev}','concorda')"
-        style="background:var(--accent-soft);color:var(--ok);border:1px solid var(--ok);
-        border-radius:5px;padding:6px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
-        &#x2713; Concorda
-      </button>
+      <span style="font-size:.8rem;color:var(--muted)">Revisão: <strong style="color:var(--ok)">${esc(revLabel)}</strong></span>
       <button onclick="_provToggleRevisa()"
         style="background:none;border:1px solid var(--warn);color:var(--warn);
         border-radius:5px;padding:6px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
-        &#x270F; Revisa
+        &#x270F; Revisar
       </button>
-      <button id="_prov-btn-confirmar-revisa" onclick="_provAcao('${oid}','${pendingRev}','revisa')"
-        style="display:none;background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);
+      <button onclick="_provAprovar('${oid}','${pendingRev}')"
+        style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);
         border-radius:5px;padding:6px 14px;font-size:.85rem;font-weight:700;cursor:pointer">
-        &#x2713; Confirmar Revisão
+        &#x2713; Aprovar
       </button>
     </div>`;
   }
@@ -11293,11 +11285,39 @@ async function abrirProvisoes(oid, afCodigo) {
 
 function _provToggleRevisa() {
   const wrap = document.getElementById('_prov-revisa-inputs');
-  const btn  = document.getElementById('_prov-btn-confirmar-revisa');
   if (!wrap) return;
-  const showing = wrap.style.display !== 'none';
-  wrap.style.display = showing ? 'none' : 'block';
-  if (btn) btn.style.display = showing ? 'none' : '';
+  wrap.style.display = (wrap.style.display !== 'none') ? 'none' : 'block';
+}
+
+// Aprovar: salva a revisão corrente (itens do form, ativo×provisão) E aprova a etapa de AF num passo.
+async function _provAprovar(oid, rev) {
+  const itens = {};
+  for (const rb of _PROV_RUBRICAS) {
+    const el = document.getElementById('_prov-inp-' + rb.key);
+    itens[rb.key] = el ? (parseFloat(el.value) || 0) : 0;
+  }
+  const cred = await pedirCredenciaisGerente({
+    titulo: 'Aprovar Aprovação Financeira',
+    mensagem: 'Salva a revisão e aprova a etapa. Login e senha do Gerente Adm/Financeiro ou Diretor.' });
+  if (!cred) return;
+  const erroEl = document.getElementById('_prov-erro');
+  if (erroEl) erroEl.textContent = '';
+  try {
+    let r = await fetch('/api/orcamentos/' + oid + '/provisoes/' + rev, {
+      method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ decisao: 'revisa', itens, login: cred.login, senha: cred.senha }) });
+    let d = await r.json();
+    if (!d.ok) { if (erroEl) erroEl.textContent = d.erro || 'Falha ao registrar a revisão.'; return; }
+    const cod = window._provAfCodigo;
+    r = await fetch('/api/projetos/' + encodeURIComponent(projetoAtivo.nome_safe) + '/ciclo/' + encodeURIComponent(cod), {
+      method: 'PATCH', credentials: 'same-origin', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ status: 'concluido', login: cred.login, senha: cred.senha }) });
+    d = await r.json();
+    if (!d.ok) { if (erroEl) erroEl.textContent = d.erro || 'Revisão salva, mas falha ao aprovar a etapa.'; return; }
+    showToast('Aprovação financeira concluída!', false);
+    if (window._provModalOv) { window._provModalOv.remove(); window._provModalOv = null; }
+    await carregarCiclo();
+  } catch (e) { if (erroEl) erroEl.textContent = 'Erro: ' + e.message; }
 }
 
 async function _provAcao(oid, rev, decisao) {
