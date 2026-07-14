@@ -4091,6 +4091,44 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        elif re.match(r"^/api/orcamentos/(\d+)/devolucao$", path):
+            # ── POST /api/orcamentos/<id>/devolucao — devolução (parcial/total) da venda (Fatia D) ──
+            import mod_contabil as _mc
+            m_dv = re.match(r"^/api/orcamentos/(\d+)/devolucao$", path)
+            oid = int(m_dv.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            req = json.loads(body) if body else {}
+            try:
+                fracao = round(float(req.get("fracao") or 0), 6)
+            except (TypeError, ValueError):
+                self.send_json({"ok": False, "erro": "Fração inválida"}, code=400); return
+            if not (0 < fracao <= 1):
+                self.send_json({"ok": False, "erro": "Fração deve estar entre 0 e 1 (ex.: 0.5 = 50%)"}, code=400); return
+            db = get_session()
+            try:
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"))
+                if not aprovador:
+                    self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                orc = _obj_da_loja(db, Orcamento, oid, loja_id)
+                if orc is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                ot, own_id = _mc.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+                seq = int(getattr(orc, "ramo_financeiro_seq", 0) or 0) + 1
+                out = _mc.devolver_venda(db, ot, own_id, orc.projeto_id, fracao,
+                                         ref_base="dev:%s:%d" % (orc.projeto_id, seq))
+                orc.ramo_financeiro_seq = seq
+                db.commit()
+                self.send_json({"ok": True, "revertido": out})
+            finally:
+                db.close()
+            return
+
         else:
             import re as _re
 

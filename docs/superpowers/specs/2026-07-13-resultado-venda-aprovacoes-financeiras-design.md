@@ -111,16 +111,22 @@ tratamento oposto: é por isso que o box é necessário.
   **margem** (que agora inclui os 4 custos), não sobre `cust_var`.
 - Quando o projeto está **desmembrado**, o gate roda **por parcela**.
 
-## 5. Devolução — gap a fechar (projeto dura ~1 ano)
-- No plano existem `2.1.04.04 "Provisão de Devolução"` e `4.3.02 "Devolução de Vendas"`, mas a
-  **`2.1.04.04` está morta** (mod_contabil.py:862 — "sem evento/percentual de constituição hoje, saldo
-  sempre 0") e **não há evento de devolução**.
-- Numa devolução (parcial ou total, possível ao longo do ano), é preciso **estornar proporcionalmente**:
-  a receita, os **impostos** (`4.3.02` + reversão de `2.1.04.13`/`2.1.03`) e as **provisões operacionais**
-  da parte devolvida.
-- **Recomendação:** evento de **devolução por ambiente/parcela** (reaproveita a fração congelada #5 do
-  desmembramento) que estorna proporcional — é a razão pela qual impostos precisam ser revisáveis. É o
-  buraco estrutural por trás do "problema no lançamento dos impostos".
+## 5. Devolução — ✅ FEITO (MVP, 2026-07-14)
+`mod_contabil.devolver_venda(projeto_id, fracao, ref_base)` — devolução parcial/total que reverte
+**proporcionalmente** a constituição DIFERIDA (antes da entrega/NF-e):
+- **Receita a Realizar**: `DR 2.1.06 × CR 1.1.02` (reduz receita diferida + recebível) por `f`;
+- **cada provisão do grupo com ativo diferido** (operacionais + **impostos** `2.1.04.13/1.1.05` + custos
+  adicionais + custo financeiro): `DR provisão × CR ativo`, por `f × min(provisão, ativo em aberto)`.
+- A **despesa já reconhecida na NF-e** (móvel entregue — custo real incorrido) **NÃO reverte** (o ativo
+  já foi baixado → `mv=0`; a provisão a pagar ao fornecedor segue). Idempotente por `ref_base`.
+- Endpoint `POST /api/orcamentos/<id>/devolucao {fracao}` (gate de aprovador) + campo "% devolvido" no
+  box da AF. **Resolve o buraco dos impostos** (agora revertem proporcionalmente na devolução).
+
+**Extensões futuras (documentadas):** (a) devolução de venda **já faturada** (receita reconhecida) →
+estorno via `4.3.02 "Devolução de Vendas"` + reversão da obrigação fiscal `2.1.03`; (b) seleção por
+**ambiente/parcela** (hoje é % livre — a fração #5 pode alimentar isso); (c) `2.1.04.04 "Provisão de
+Devolução"` (estimativa de devoluções esperadas) segue não usada — este MVP trata a devolução **quando
+ocorre**, não por provisão estimada.
 
 ## 6. Automação — o gerente não é contador
 O gerente adm/fin faz **só duas coisas** na AF: **seleciona/confirma** o box de financiamento e **ajusta**

@@ -935,6 +935,65 @@ def conciliar_final(db, owner_tipo, owner_id, projeto_id, ref_base):
     return out
 
 
+_ORIGEM_DEVOLUCAO = "devolucao"
+
+
+def _ativo_diferido_de(prov_cod):
+    """Ativo diferido correspondente a uma provisão: 2.1.04.13 (impostos) → 1.1.05; demais → 1.1.06.<sufixo>."""
+    if prov_cod == "2.1.04.13":
+        return "1.1.05"
+    return "1.1.06." + prov_cod.rsplit(".", 1)[-1]
+
+
+def devolver_venda(db, owner_tipo, owner_id, projeto_id, fracao, ref_base, data=None):
+    """#D — devolução (parcial/total) da venda: reverte PROPORCIONALMENTE a constituição DIFERIDA (antes da
+    entrega/NF-e). `fracao` (0<f<=1) = parte devolvida (por ambiente/parcela — fração #5). Reverte:
+      - Receita a Realizar: DR 2.1.06 × CR 1.1.02 (reduz receita diferida + recebível);
+      - cada provisão do grupo com ativo diferido (operacionais + impostos 2.1.04.13/1.1.05 + custos
+        adicionais + custo financeiro): DR provisão × CR ativo, por f × min(provisão, ativo em aberto).
+    A despesa JÁ reconhecida na NF-e (móvel entregue — custo real incorrido) NÃO reverte (ativo já baixado
+    → mv=0). Idempotente por ref_base. Retorna {conta: valor_revertido}.
+    (Revenda de item entregue → estorno de receita reconhecida em 4.3.02 fica p/ extensão futura.)"""
+    f = round(float(fracao or 0), 6)
+    if f <= 0:
+        return {}
+    seed_plano(db, owner_tipo, owner_id)
+    out = {}
+    # 1) Receita a Realizar × Contas a Receber
+    ref_r = ref_base + ":receita"
+    if lancamento_por_ref(db, owner_tipo, owner_id, ref_r) is None:
+        saldo_rar = round(_mov(db, owner_tipo, owner_id, "2.1.06", "credor", None, None, projeto_id=projeto_id), 2)
+        mv = round(f * max(saldo_rar, 0.0), 2)
+        if mv > 0:
+            rar = _conta_por_codigo(db, owner_tipo, owner_id, "2.1.06")
+            rec = _conta_por_codigo(db, owner_tipo, owner_id, "1.1.02")
+            lancar(db, owner_tipo, owner_id, rar.id, rec.id, mv, data=data, projeto_id=projeto_id,
+                   origem=_ORIGEM_DEVOLUCAO, historico="Devolução — estorno de Receita a Realizar", ref=ref_r)
+            out["2.1.06"] = mv
+    # 2) provisões diferidas × ativos
+    contas = (db.query(Conta).filter_by(owner_tipo=owner_tipo, owner_id=owner_id, tipo="analitica")
+              .filter(Conta.codigo.like(GRUPO_PROVISOES + ".%")).order_by(Conta.codigo).all())
+    for c in contas:
+        ativo_cod = _ativo_diferido_de(c.codigo)
+        if not _conta_existe(db, owner_tipo, owner_id, ativo_cod):
+            continue
+        ref_c = ref_base + ":" + c.codigo
+        if lancamento_por_ref(db, owner_tipo, owner_id, ref_c) is not None:
+            continue
+        prov_saldo = round(_mov(db, owner_tipo, owner_id, c.codigo, "credor", None, None, projeto_id=projeto_id), 2)
+        ativo_saldo = round(total_lancado(db, owner_tipo, owner_id, ativo_cod, "debito", projeto_id)
+                            - total_lancado(db, owner_tipo, owner_id, ativo_cod, "credito", projeto_id), 2)
+        mv = round(f * min(max(prov_saldo, 0.0), max(ativo_saldo, 0.0)), 2)
+        if mv <= 0:
+            continue
+        prov = _conta_por_codigo(db, owner_tipo, owner_id, c.codigo)
+        ativo = _conta_por_codigo(db, owner_tipo, owner_id, ativo_cod)
+        lancar(db, owner_tipo, owner_id, prov.id, ativo.id, mv, data=data, projeto_id=projeto_id,
+               origem=_ORIGEM_DEVOLUCAO, historico="Devolução — estorno de provisão diferida (%s)" % c.codigo, ref=ref_c)
+        out[c.codigo] = mv
+    return out
+
+
 def contas_a_pagar(db, owner_tipo, owner_id, projeto_id=None, ini=None, fim=None):
     """Contas a Pagar (MVP, FASE D): obrigações com fornecedores em aberto = saldo de Fornecedores a
     Pagar (2.1.01), escopado por projeto (None = consolidado). Derivado do razão — o sub-razão de títulos
