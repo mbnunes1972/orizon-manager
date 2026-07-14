@@ -149,6 +149,13 @@ select{
   width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);
   height:36px;padding:0 12px;color:var(--text);font-family:var(--font-sans);font-size:13px;outline:none;cursor:pointer;transition:.15s}
 select:focus{border-color:var(--accent)}
+/* Opções do popup nativo: fundo/cor por token — senão o Chrome renderiza branco-no-branco (texto some) */
+select option{background:var(--surface-2);color:var(--text)}
+/* Sidebar é escura nos DOIS temas → o popup nativo precisa renderizar em esquema escuro (color-scheme),
+   e as opções em fundo OPACO escuro + texto branco. Sem isto, herdam --surface-2 (=item-active
+   translúcido) + --text branco → branco-sobre-branco, só visível no hover. */
+.sidebar{ color-scheme:dark; }
+.sidebar select option{ background:var(--sidebar-bg); color:var(--sidebar-text-active); }
 /* Textarea: MESMO padrão dos campos — nunca branco fixo. Inline específico ainda vence. */
 textarea{
   width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-sm);
