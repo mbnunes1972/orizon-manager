@@ -391,6 +391,7 @@ EVENTOS = {
     "constituir_juros_direto":       ("1.1.07", "2.1.07", "Financiamento direto — juros a apropriar (recebível × receita diferida)"),
     "receber_parcela_direto":        ("1.1.01", "1.1.07", "Financiamento direto — recebimento de parcela (baixa do recebível de juros)"),
     "apropriar_receita_financeira":  ("2.1.07", "4.4.03", "Financiamento direto — apropriação da receita financeira (competência)"),
+    "reverter_juros_direto":         ("2.1.07", "1.1.07", "Estorno de juros a apropriar (troca de ramo do custo financeiro na AF)"),
     # FASE D2: matching pleno na NF-e — reconhece a DESPESA de cada rubrica (5.6.0X, ou 5.1.01 p/ a fábrica)
     # × baixa do ativo diferido (1.1.06.0X). A Provisão (2.1.04.0X) SOBREVIVE — é paga/reconciliada depois.
     "reconhecimento_despesa_montagem":            ("5.6.02", "1.1.06.02", "Reconhecimento de despesa na NF-e — Montagem"),
@@ -615,6 +616,52 @@ def ajustar_provisao_delta(db, owner_tipo, owner_id, projeto_id, rubrica, valor_
     return lancar(db, owner_tipo, owner_id, prov.id, ativo.id, mv, data=data, projeto_id=projeto_id,
                   origem=_ORIGEM_AJUSTE_AF,
                   historico="Ajuste de provisão (AF) — redução (reversão do ativo diferido)", ref=ref)
+
+
+# Fatia B (resultado financeiro) — ramo do custo financeiro → evento de constituição no contrato.
+_RAMO_CFIN_EVENTO = {
+    "financeira":       "fechamento_venda_custo_financeiro",  # despesa financeira PROVISIONADA (taxa da financeira)
+    "loja_antecipacao": "fechamento_venda_custo_financeiro",  # despesa PROVISIONADA (antecipação bancária; custo real depois)
+    "loja":             "constituir_juros_direto",            # receita financeira a apropriar (capital próprio, sem despesa)
+    # 'avista' → None (Cust_Fin = 0)
+}
+
+
+def evento_custo_financeiro(ramo):
+    """Evento de constituição do custo financeiro por ramo (Fatia B). None p/ 'avista'/desconhecido."""
+    return _RAMO_CFIN_EVENTO.get(ramo)
+
+
+def trocar_ramo_custo_financeiro(db, owner_tipo, owner_id, projeto_id, ramo_atual, ramo_novo, valor, ref_base, data=None):
+    """#B.2 — troca o ramo do custo financeiro DEPOIS do fechamento (box da AF). Reverte o que o
+    fechamento lançou e constitui o ramo novo. Idempotente por `ref_base`.
+      - loja → provisão (financeira/antecipação): estorna os juros a apropriar (reverter_juros_direto) e
+        constitui a Provisão de Custo Financeiro (fechamento_venda_custo_financeiro).
+      - provisão → loja: reverte a provisão (ajustar_provisao_delta → 0) e constitui os juros a apropriar.
+      - financeira ↔ loja_antecipacao: **no-op** contábil (mesma provisão; muda só a conta de despesa no
+        reconhecimento futuro).
+    Retorna o ramo efetivo (ramo_novo).
+    """
+    _PROV = {"financeira", "loja_antecipacao"}
+    if ramo_atual == ramo_novo:
+        return ramo_novo
+    de_prov, para_prov = ramo_atual in _PROV, ramo_novo in _PROV
+    if de_prov == para_prov:
+        return ramo_novo                       # ambos provisão, ou ambos loja/avista → sem mudança de razão
+    valor = round(float(valor or 0), 2)
+    if valor <= 0:
+        return ramo_novo
+    if para_prov:                              # loja → provisão
+        registrar_evento(db, owner_tipo, owner_id, "reverter_juros_direto", valor,
+                         projeto_id=projeto_id, ref=ref_base + ":rev")
+        registrar_evento(db, owner_tipo, owner_id, "fechamento_venda_custo_financeiro", valor,
+                         projeto_id=projeto_id, ref=ref_base + ":new")
+    else:                                      # provisão → loja
+        ajustar_provisao_delta(db, owner_tipo, owner_id, projeto_id, "custo_financeiro", valor, 0.0,
+                               ref=ref_base + ":rev")
+        registrar_evento(db, owner_tipo, owner_id, "constituir_juros_direto", valor,
+                         projeto_id=projeto_id, ref=ref_base + ":new")
+    return ramo_novo
 
 
 # FASE D2: matching pleno na NF-e — rubrica → evento de reconhecimento de despesa (baixa do ativo diferido).

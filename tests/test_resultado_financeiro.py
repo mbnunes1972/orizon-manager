@@ -90,3 +90,35 @@ def test_financiamento_direto_ciclo_completo_fecha_sem_despesa(app_db):
     assert _s(db, ot, oid, "1.1.01") == 300.0    # caixa recebido
     assert _s(db, ot, oid, "5.5.04") == 0.0      # ramo loja NÃO tem despesa financeira (capital próprio)
     db.close()
+
+
+# ── Troca de ramo na AF (box) — reverte um ramo e constitui o outro (Fatia B.2) ──
+
+def test_troca_loja_para_antecipacao_reverte_receita_e_constitui_provisao(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 970; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "constituir_juros_direto", 1000.0, projeto_id="P", ref="jd:P")
+    novo = mc.trocar_ramo_custo_financeiro(db, ot, oid, "P", "loja", "loja_antecipacao", 1000.0, ref_base="troca:P")
+    assert novo == "loja_antecipacao"
+    assert _s(db, ot, oid, "1.1.07") == 0.0 and _s(db, ot, oid, "2.1.07") == 0.0     # receita revertida
+    assert _s(db, ot, oid, "1.1.06.19") == 1000.0 and _s(db, ot, oid, "2.1.04.19") == 1000.0  # provisão constituída
+    db.close()
+
+
+def test_troca_financeira_para_loja_reverte_provisao_e_constitui_receita(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 971; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "fechamento_venda_custo_financeiro", 1000.0, projeto_id="P", ref="cf:P")
+    mc.trocar_ramo_custo_financeiro(db, ot, oid, "P", "financeira", "loja", 1000.0, ref_base="troca:P")
+    assert _s(db, ot, oid, "1.1.06.19") == 0.0 and _s(db, ot, oid, "2.1.04.19") == 0.0  # provisão revertida
+    assert _s(db, ot, oid, "1.1.07") == 1000.0 and _s(db, ot, oid, "2.1.07") == 1000.0  # receita constituída
+    db.close()
+
+
+def test_troca_financeira_para_antecipacao_e_noop_contabil(app_db):
+    db = app_db.get_session(); ot, oid = "loja", 972; mc.seed_plano(db, ot, oid)
+    mc.registrar_evento(db, ot, oid, "fechamento_venda_custo_financeiro", 1000.0, projeto_id="P", ref="cf:P")
+    novo = mc.trocar_ramo_custo_financeiro(db, ot, oid, "P", "financeira", "loja_antecipacao", 1000.0, ref_base="troca:P")
+    assert novo == "loja_antecipacao"
+    # ambos usam a mesma provisão → nada muda no razão (só a conta de despesa no reconhecimento futuro)
+    assert _s(db, ot, oid, "1.1.06.19") == 1000.0 and _s(db, ot, oid, "2.1.04.19") == 1000.0
+    db.close()
+
