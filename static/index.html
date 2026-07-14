@@ -11859,7 +11859,33 @@ function _renderCardImplantacao(dados, bloqueada) {
            <button onclick="encaminharPedidosFabrica()" ${_pedidosXml.length ? '' : 'disabled'}
              style="background:${_pedidosXml.length ? 'var(--accent)' : 'var(--muted)'};color:var(--btn-primary-text);border:none;font-weight:700;border-radius:5px;padding:7px 16px;font-size:.82rem;cursor:${_pedidosXml.length ? 'pointer' : 'not-allowed'}">
              Encaminhar Pedidos à Fábrica</button>
+         </div>
+         <div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:12px">
+           <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:6px">Conferência contábil (#13): ajusta o Custo de Fábrica pelo valor do PE e migra parte p/ Outros Fornecedores. Dois lançamentos auditáveis (ativo × provisão, não tocam a DRE).</div>
+           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+             <input type="text" id="conf-custo" inputmode="numeric" placeholder="Custo fábrica (PE) R$" oninput="mascaraMoedaInput(this)" style="width:150px;height:var(--control-h-sm);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-body)">
+             <input type="text" id="conf-outros" inputmode="numeric" placeholder="Migrar p/ Outros R$" oninput="mascaraMoedaInput(this)" style="width:150px;height:var(--control-h-sm);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-body)">
+             <button class="btn-ciclo" onclick="conferenciaRegistrar()"><i class="ti ti-checkup-list"></i> Confirmar conferência</button>
+           </div>
          </div>`}`;
+}
+
+async function conferenciaRegistrar(){
+  if(!projetoAtivo) return;
+  const _num = id => { const el=document.getElementById(id); return el ? (parseFloat((el.value||'').replace(/\./g,'').replace(',','.'))||0) : 0; };
+  const custo = _num('conf-custo'), outros = _num('conf-outros');
+  if(!(custo > 0) && !(outros > 0)){ await avisoPopup('Informe o custo de fábrica do PE e/ou o valor a migrar.', {titulo:'Conferência'}); return; }
+  const cred = await pedirCredenciaisGerente({
+    titulo: 'Conferência e Implantação do Pedido',
+    mensagem: 'Lança o ajuste no razão. Login e senha do Gerente Adm/Financeiro ou Diretor.' });
+  if(!cred) return;
+  try {
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/conferencia`,
+      { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ custo_fabrica_novo: custo, valor_outros_forn: outros, login: cred.login, senha: cred.senha }) }).then(r=>r.json());
+    if(j.ok){ showToast('Conferência registrada.'); }
+    else { await avisoPopup(j.erro||'Erro', {titulo:'Conferência'}); }
+  } catch(e){ await avisoPopup('Erro de rede.', {titulo:'Conferência'}); }
 }
 
 async function enviarPedidosXml(inputFile) {

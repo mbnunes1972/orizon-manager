@@ -2590,6 +2590,40 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        m_conf = re.match(r'^/api/projetos/([^/]+)/conferencia$', path)
+        if m_conf:
+            # Fatia 2 #13 — Conferência e Implantação do Pedido: ajuste do Custo de Fábrica (PE) +
+            # reclassificação p/ Outros Fornecedores. Dois lançamentos (ativo × provisão, nunca DRE).
+            import mod_contabil as _mc
+            nome = unquote(m_conf.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            req = json.loads(body) if body else {}
+            try:
+                custo_novo = round(float(req.get("custo_fabrica_novo") or 0), 2)
+                outros = round(float(req.get("valor_outros_forn") or 0), 2)
+            except (TypeError, ValueError):
+                self.send_json({"ok": False, "erro": "Valores inválidos"}, code=400); return
+            db = get_session()
+            try:
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"))
+                if not aprovador:
+                    self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                ot, own_id = _mc.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+                out = _mc.conferencia_pedido(db, ot, own_id, nome, custo_novo, outros, ref_base="conf:" + nome)
+                db.commit()
+                self.send_json({"ok": True, "lancamentos": out})
+            finally:
+                db.close()
+            return
+
         m_peup = re.match(r'^/api/projetos/([^/]+)/pe/upload$', path)
         if m_peup:
             # Fatia 1 (desmembramento PE): upload de XML/Promob de PE FORA do pool (#2) — grava em

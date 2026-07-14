@@ -740,19 +740,24 @@ def apropriar_juros_loja(db, owner_tipo, owner_id, projeto_id, valor, ref_base, 
     return mv
 
 
-def conferencia_pedido(db, owner_tipo, owner_id, projeto_id, custo_fabrica_anterior, custo_fabrica_novo,
-                       valor_outros_forn, ref_base, data=None):
+def conferencia_pedido(db, owner_tipo, owner_id, projeto_id, custo_fabrica_novo, valor_outros_forn,
+                       ref_base, data=None):
     """#13 — Conferência e Implantação do Pedido (etapa 12): DOIS lançamentos auditáveis, ambos
     ativo × provisão, NUNCA DRE:
-      (a) ajuste do **Custo de Fábrica** pela diferença do PE (`ajustar_provisao_delta`);
-      (b) reclassificação de parte da fábrica para **Outros Fornecedores**
+      (a) ajusta o **Custo de Fábrica** do saldo ATUAL da provisão (2.1.04.06) para `custo_fabrica_novo`
+          (valor do PE) — `ajustar_provisao_delta`, convergente;
+      (b) reclassifica `valor_outros_forn` da fábrica para **Outros Fornecedores**
           (`reclassificar_provisao 2.1.04.06→2.1.04.14`, espelhando o ativo diferido).
-    Idempotente por ref_base. Retorna {custo_fabrica_delta?, outros_fornecedores?}."""
+    Idempotente por ref_base (use ref estável por projeto → conferência única). Retorna
+    {custo_fabrica_delta?, outros_fornecedores?}."""
     out = {}
+    _a, prov_cod, _h = EVENTOS[_PROV_FECHAMENTO["custo_fabrica"]]   # 2.1.04.06
+    atual = round(_mov(db, owner_tipo, owner_id, prov_cod, "credor", None, None, projeto_id=projeto_id), 2)
+    novo = round(float(custo_fabrica_novo or 0), 2)
     lan_a = ajustar_provisao_delta(db, owner_tipo, owner_id, projeto_id, "custo_fabrica",
-                                   custo_fabrica_anterior, custo_fabrica_novo, ref=ref_base + ":pe", data=data)
+                                   atual, novo, ref=ref_base + ":pe", data=data)
     if lan_a is not None:
-        out["custo_fabrica_delta"] = round(float(custo_fabrica_novo or 0) - float(custo_fabrica_anterior or 0), 2)
+        out["custo_fabrica_delta"] = round(novo - atual, 2)
     v = round(float(valor_outros_forn or 0), 2)
     if v > 0:
         lan_b = reclassificar_provisao(db, owner_tipo, owner_id, projeto_id, "2.1.04.06", "2.1.04.14",
