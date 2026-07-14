@@ -89,7 +89,7 @@
   --err:       #9C4147;   /* vinho — puxa para o vermelho sem estridência */
   --err-soft:  #F7E9EA;
   --err-line:  #D8A6A9;
-  --cancel:    #6D3B7E;   /* ameixa/roxo escuro — cancelamento de contrato (distinto do coral de "danger") */
+  --cancel:    #6B4423;   /* marrom escuro — cancelamento de contrato (sério, distinto do coral de "danger") */
   --cancel-on: #FFFFFF;
   --info:      #21618F;
   --info-soft: #E4EFF7;
@@ -149,7 +149,7 @@
   --err:       #C08183;   /* rosa-vinho empoeirado — piso de legibilidade */
   --err-soft:  rgba(107,49,56,.20);
   --err-line:  #6B3138;   /* vinho profundo — bordas de erro/perigo */
-  --cancel:    #8A57A3;   /* ameixa clara — legível sobre fundo escuro */
+  --cancel:    #8B5E3C;   /* marrom médio — legível sobre fundo escuro */
   --cancel-on: #FFFFFF;
   --info:      #8BA6BD;   /* azul empoeirado */
   --info-soft: rgba(139,166,189,.12);

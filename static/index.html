@@ -11023,7 +11023,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
       </div>
     </div>` : '';
   const _btnProvisoes = `<button onclick="abrirProvisoes(_orcamentoAtivoId, '${codigo}')"
-    style="background:none;border:1px solid var(--border2);color:var(--ok);
+    style="background:none;border:1px solid var(--border2);color:var(--accent);
     border-radius:6px;padding:8px 14px;font-size:.85rem;font-weight:600;cursor:pointer">
     &#x1F4CA; Provisões
   </button>`;
@@ -11038,7 +11038,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
            <i class="ti ti-lock-open"></i> Reabrir (gerente)</button>`
       : '';
     return `
-      <p style="color:var(--ok);margin:0 0 10px">
+      <p style="color:var(--text);margin:0 0 10px">
         &#x2713; Aprovação financeira concluída${dt ? ' em ' + dt : ''}.
       </p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
