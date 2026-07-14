@@ -96,6 +96,32 @@ def listar_modalidades() -> list:
             resultado.append({'codigo': codigo, 'descricao': desc, 'tipo': tipo})
     return resultado
 
+
+# Fatia B (resultado financeiro): classificação do ramo de financiamento por modalidade.
+_TIPO_POR_CODIGO = {
+    'a_vista': 'avista', 'aymore': 'financiamento_externo',
+    'cartao_credito': 'financiamento_externo', 'cartao_credito_x': 'financiamento_externo',
+    'venda_programada': 'programado', 'total_flex': 'flex',
+}
+_RAMO_POR_TIPO = {
+    'avista': 'avista',                    # sem financiamento (Cust_Fin = 0)
+    'financiamento_externo': 'financeira', # Aymoré/Cartão — despesa financeira absorvida pela loja
+    'programado': 'loja',                  # Venda Programada — financiamento direto (capital próprio)
+    'flex': 'loja',                        # Total Flex — financiamento direto (capital próprio)
+}
+
+
+def ramo_financiamento(codigo: str) -> str:
+    """Classifica a modalidade de pagamento em ramo de financiamento (Fatia B / spec §3.4):
+      'financeira' → há DESPESA financeira (taxa/deságio da financeira);
+      'loja'       → financiamento direto, capital próprio → RECEITA financeira, sem despesa;
+      'avista'     → sem financiamento.
+    Default 'loja' (conservador — sem despesa) para código desconhecido.
+    """
+    tab = _carregar(codigo) or {}
+    tipo = tab.get('tipo', '') or _TIPO_POR_CODIGO.get(codigo, '')
+    return _RAMO_POR_TIPO.get(tipo, 'loja')
+
 # Imports diretos das funções de cálculo
 from .aymore           import calcular as calcular_aymore
 from .cartao           import calcular as calcular_cartao

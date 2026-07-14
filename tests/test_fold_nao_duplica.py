@@ -57,8 +57,9 @@ def test_dre_ja_continha_montagem_garantia_e_fold_bate(app_db):
 
 def test_constituicao_usa_vavo_nao_val_cont(app_db, seed, monkeypatch):
     """A constituição no fechamento reflete o breakdown do motor (base VAVO p/ montagem/assist/garantia,
-    NÃO Val_Cont) e lança o custo financeiro (Val_Cont − VAVO). Com Cust_Fin>0 o razão bate com a modal."""
-    import main, types
+    NÃO Val_Cont). O custo financeiro (Val_Cont − VAVO) é DIFERIDO pelo ramo (Fatia B): Total Flex é
+    financiamento da loja (capital próprio) → juros a apropriar (1.1.07 × 2.1.07), sem despesa no contrato."""
+    import main, types, json
     # (1) o motor usa VAVO (90000), não Val_Cont (99000): montagem 8%→7200, garantia 0,5%→450, assist 3%→2700
     r = mp.provisoes_orcamento({"CFO": 0.0, "Val_Liq": 1.0, "VAVO": 90000.0, "Prov_Imp": 0.0,
                                 "Val_Cont": 99000.0},
@@ -73,6 +74,7 @@ def test_constituicao_usa_vavo_nao_val_cont(app_db, seed, monkeypatch):
     loja = db.get(app_db.Loja, seed["loja1_id"]); loja.modulos_ativos = None
     orcx = db.query(app_db.Orcamento).filter_by(loja_id=seed["loja1_id"]).first()
     orcx.valor_total = 99000.0   # Val_Cont → Cust_Fin = 99000 − 90000 = 9000
+    orcx.forma_pagamento = json.dumps({"codigo": "total_flex"})   # ramo LOJA (financiamento direto)
     db.commit(); orc_id = orcx.id; db.close()
     brk = dict(r); brk["VAVO"] = 90000.0
     monkeypatch.setattr(main, "_negociacao_breakdown", lambda orc, db: brk)
@@ -83,5 +85,7 @@ def test_constituicao_usa_vavo_nao_val_cont(app_db, seed, monkeypatch):
         c = db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first()
         return round(abs(mc.saldo_conta(db, ot, oid, c.id, None, None)), 2)
     assert saldo("2.1.04.05") == 2700.0 and saldo("2.1.04.02") == 7200.0 and saldo("2.1.04.03") == 450.0
-    assert saldo("5.5.03") == 9000.0   # custo financeiro = Val_Cont − VAVO
+    # custo financeiro (Val_Cont − VAVO = 9000) — ramo LOJA (Total Flex): juros a apropriar, DIFERIDO
+    assert saldo("1.1.07") == 9000.0 and saldo("2.1.07") == 9000.0
+    assert saldo("5.5.03") == 0.0   # não é mais despesa direta no contrato (Fatia B difere o cust_fin)
     db.close()

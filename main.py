@@ -447,10 +447,20 @@ def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
                 mod_contabil.registrar_evento(db, ot, oid, "registro_venda_contrato", val_cont,
                                               projeto_id=projeto_id, ref=ref_base + ":venda")
             mod_contabil.constituir_provisoes_fechamento(db, ot, oid, projeto_id, valores, ref_base)
-            # Custo financeiro = Val_Cont − VAVO (despesa direta no contrato — o fechamento É a antecipação)
+            # Custo financeiro = Val_Cont − VAVO. Ramo pela forma de pagamento (Fatia B / spec §3.4):
+            #  - financeira (Aymoré/Cartão): DESPESA financeira diferida (provisão, rota própria);
+            #  - loja (Venda Programada/Total Flex, capital próprio): RECEITA financeira a apropriar (sem despesa).
+            # (O box de override loja×financeira na AF1 entra na etapa B.2.)
             cust_fin = round(float(getattr(orc2, "valor_total", 0) or 0) - float(d.get("VAVO") or 0), 2)
             if cust_fin > 0:
-                mod_contabil.registrar_evento(db, ot, oid, "custo_financeiro", cust_fin,
+                import mod_fin as _mfin
+                try:
+                    _fp = json.loads(orc2.forma_pagamento) if orc2.forma_pagamento else {}
+                except Exception:
+                    _fp = {}
+                _ramo = _mfin.ramo_financiamento((_fp or {}).get("codigo") or "")
+                _ev = "fechamento_venda_custo_financeiro" if _ramo == "financeira" else "constituir_juros_direto"
+                mod_contabil.registrar_evento(db, ot, oid, _ev, cust_fin,
                                               projeto_id=projeto_id, ref=ref_base + ":cfin")
         finally:
             db.close()
