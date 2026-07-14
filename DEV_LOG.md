@@ -1339,7 +1339,65 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
-## ⏸️ ESTADO ATUAL (2026-07-12) — retomar aqui
+## ⏸️ ESTADO ATUAL (2026-07-14) — retomar aqui
+
+> **🏗️ Frente ATIVA — "Resultado da Venda + Aprovações Financeiras" + desmembramento do ciclo.**
+> Branch **`feat/desmembramento-fatia2-ciclo`** (NÃO mergeada; suíte **1022 verde**). Spec:
+> `docs/superpowers/specs/2026-07-13-resultado-venda-aprovacoes-financeiras-design.md`. É a implementação do
+> "Backlog (1)" do estado de 2026-07-12 (os custos adicionais viram provisão), + o custo financeiro, as 3
+> margens, o gate de AF, a devolução e o desmembramento do ciclo em parcelas.
+>
+> **INVARIANTE MESTRE (não violar):** nada toca a DRE exceto a **NF-e real**. Todo ajuste — AF, troca de
+> ramo, conferência, devolução — é **ativo × provisão** (`1.1.06.0X × 2.1.04.0X`), nunca despesa.
+>
+> **✅ Feito na branch (commits `ab8e4b1`…`16665dd`, ver `git log main..HEAD`):**
+> - **Custos adicionais como provisão (Fatia A):** os 4 (Comissão de Arquiteto+retenção · Fidelidade · Custo
+>   Viagem · Brinde) são constituídos no contrato como ativo diferido (`1.1.06.15-19 × 2.1.04.15-19`).
+>   **Constituídos pelos toggles individuais** (`comissao_arq_ativa`/`fidelidade_ativa`/`fora_da_sede`/
+>   `brinde_ativo`), **nunca** por `incluir_custos` (senão o caso "empresa absorve" fica sem lançamento).
+>   Contas novas: `1.1.06.15-19`, `2.1.04.15-19`, `1.1.07`, `2.1.07`, `4.4.03`, `5.5.04`, `5.3.15`.
+> - **Custo financeiro, 3 ramos (Fatia B):** `mod_fin.ramo_financiamento(codigo)` resolve pela forma de
+>   pagamento → **loja** (receita financeira; juros a apropriar `1.1.07×2.1.07`; SEM despesa) · **loja_
+>   antecipacao** (despesa provisionada `5.5.03`) · **financeira** (despesa provisionada `5.5.04`). `Orcamento`
+>   ganhou `ramo_financeiro`+`ramo_financeiro_seq`. Troca de ramo idempotente. Gatilhos de reconhecimento
+>   completos (antecipação/financeira/loja) — fecharam o 🔴 da Vera (receita fictícia): `2.1.04.19` é
+>   **excluída** de `conciliar_final` (custo financeiro tem rota própria).
+> - **3 margens (Fatia B):** `mod_provisoes.margens_venda(vavo,cust_ad,cust_var,val_cont)` → **Contribuição**
+>   (base Val_Liq) ≥ **Venda** (VAVO) ≥ **Contrato** (Val_Cont) — invariante só vale com margem positiva.
+>   "Margem Operacional" reservada pra DRE (4ª). Cadeia de bases: **Val_Cont → VAVO** (−Cust_Fin) **→ Val_Liq**
+>   (−Cust_Ad). Comissões de loja sobre Val_Liq; arquiteto/fidelidade sobre VAVO; custo financeiro sobre Val_Cont.
+> - **Gate AF (Fatia C):** rev1/rev2 agora tranca (`travada_em`) + checa limite (`exige_aprovacao_diretor`,
+>   AF1=1%/AF2=2%) + dispara `disparar_deltas_af` (delta **convergente por valor** — lê saldo atual da provisão
+>   e ajusta ao alvo; idempotente; ativo×provisão). ⚠️ **Sutileza aberta:** o gate usa `perfis.pode(nivel,
+>   "autorizar")`, mas **`autorizar` NÃO é exclusivo do Diretor** (master E gerencial têm por padrão) — decidir
+>   se quer capability Diretor-específica.
+> - **Devolução (Fatia D):** `devolver_venda(fracao)` estorna proporcional, **capado ao saldo aberto**, ativo×provisão.
+> - **Desmembramento do ciclo:** Fatia 1 (`mod_parcelas`: congelar/validar partição, fração #5 com Σ==Val_Cont
+>   exato, gate AF #10) + Fatia 2 **#1** (criação de parcela, endpoint + modal na 11c) + **#13 Conferência e
+>   Implantação** (`conferencia_pedido`: ajusta Custo de Fábrica pela diferença do PE + reclassifica p/ Outros
+>   Fornecedores `2.1.04.14`, ambos ativo×provisão; endpoint + UI na etapa 12, renomeada "Conferência e
+>   Implantação do Pedido").
+> - **Fix CSS** (`16665dd`): opções de `<select>` da sidebar ficavam brancas-no-branco (só visíveis no hover)
+>   nos dois temas — a sidebar é escura sempre e re-mapeia `--surface-2→item-active` translúcido + `--text→branco`,
+>   mas o `color-scheme` seguia o tema. Fix: `.sidebar{color-scheme:dark}` + opções em fundo opaco. **Bug
+>   latente, existe na `main` também** → entra no merge da branch.
+>
+> **🔎 Teste manual em curso** pelo usuário (roteiro artifact `scratchpad/roteiro-teste-manual.html`).
+> **Credenciais:** Diretor **`pdm2026`** (Pedro da Mota, nível master) · Consultora **`mds2026`** (Marcia dos
+> Santos, operador). Achados: (a) modalidades "só à vista" = eram invisíveis, **CORRIGIDO**; (b) venda associada
+> à Marcia com Pedro logado = **ESPERADO** (venda é da criadora Marcia; Diretor vê/gere todos — escopo gerente+).
+>
+> **⏭️ PENDENTE:**
+> - **#7 (ciclo por parcela)** — única peça do desmembramento **não iniciada**: `CicloLogistico` por parcela,
+>   progresso por parcela nas etapas 12-16, `CicloEtapa` agregado, trava pós-Implantação por parcela. **Invasivo
+>   → chamar a Vera** antes.
+> - **Decisão de merge** da branch na `main` (frente madura, 1022 verde). Ao mergear: escrever a Sessão no
+>   DEV_LOG (este bloco serve de base) + **re-ingerir o grafo MCP**.
+> - Fatia C: decidir capability do gate (ver ⚠️ acima).
+>
+> _(Estado anterior 2026-07-12 — FASE D2 mergeada — logo abaixo.)_
+
+## ⏸️ ESTADO ATUAL (2026-07-12)
 
 > **🏗️ Frente ATIVA — infraestrutura contábil ponta a ponta (p/ o Projeto Simulação popular DRE/Balanço/
 > Provisões/Reconciliação pelo fluxo REAL de fechamento).** Fases: **A** (caixinhas) ✅ **no VPS**. **B1**
