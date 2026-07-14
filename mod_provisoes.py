@@ -123,13 +123,15 @@ def itens_provisao(siglas):
 
 
 def margens_venda(vavo, cust_ad, cust_var, val_cont):
-    """As TRÊS margens da venda — todas com o MESMO numerador (margem em R$ =
+    """As TRÊS margens da venda (VISÃO da negociação) — todas com o MESMO numerador (margem em R$ =
     VAVO − Cust_Ad − Cust_Var), expressas sobre bases crescentes:
-      - margem_loja     : base val_liq_loja = VAVO − Cust_Ad (base das comissões internas da loja)
-      - margem_venda    : base VAVO (valor à vista)
-      - margem_contrato : base Val_Cont (inclui o custo financeiro — que se cancela no numerador)
-    Invariante: margem_loja >= margem_venda >= margem_contrato (bases crescentes).
-    É VISÃO (managerial) — não lança nada; o RESULTADO financeiro (receita/despesa) é indicador à parte.
+      - margem_contribuicao : base val_liq_loja = VAVO − Cust_Ad (base das comissões internas da loja)
+      - margem_venda        : base VAVO (valor à vista)
+      - margem_contrato     : base Val_Cont (inclui o custo financeiro — que se cancela no numerador)
+    Invariante: margem_contribuicao >= margem_venda >= margem_contrato (bases crescentes).
+    NÃO confundir com a **Margem Operacional** (4ª margem), que é da DRE — após TODOS os custos, derivada
+    do razão, não da negociação. Estas três são VISÃO managerial (não lançam nada); o RESULTADO financeiro
+    (receita/despesa) é indicador à parte (ramo loja×financeira).
     """
     vavo = _f(vavo); cust_ad = _f(cust_ad); cust_var = _f(cust_var); val_cont = _f(val_cont)
     val_liq_loja = vavo - cust_ad
@@ -137,7 +139,7 @@ def margens_venda(vavo, cust_ad, cust_var, val_cont):
     _m = lambda base: round(margem_rs / base, 4) if base else 0.0
     return {
         "margem_rs": margem_rs,
-        "margem_loja": _m(val_liq_loja),
+        "margem_contribuicao": _m(val_liq_loja),
         "margem_venda": _m(vavo),
         "margem_contrato": _m(val_cont),
     }

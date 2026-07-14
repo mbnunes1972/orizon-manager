@@ -73,6 +73,37 @@ A base de cada provisão % é fixa. **Motor (`mod_provisoes`) e constituição c
 
 > Regra: uma provisão de **% sobre a venda** usa **VAVO**. `Val_Cont` é só para o imposto (que incide sobre o contrato, com o financeiro embutido). O `Frete Fábrica-Loja` é % do custo (CFO). Comissões já estão corretas — **não mexer**.
 
+## 3c. Cadeia de bases e as MARGENS (visão da negociação × DRE)
+
+Cada custo incide sobre o **nível certo** de uma cadeia — não sobre a venda cheia:
+
+```
+Val_Cont  (o que o cliente paga)
+  │  − Cust_Fin        (custo financeiro incide sobre Val_Cont)
+  ▼
+VAVO  (valor à vista)  ── base de Comissão de Arquiteto e Programa de Fidelidade (em cadeia, exclui viagem/brinde)
+  │  − Cust_Ad         (Com_Arq + Pro_Fid + Cust_Via + Bri)
+  ▼
+Val_Liq (= "val_liq_loja" = VAVO − Cust_Ad) ── base das COMISSÕES INTERNAS da loja (vendedor, adm, medidor, proj)
+  │  − Cust_Var        (CFO + provisões operacionais + comissões da loja)
+  ▼
+Margem
+```
+
+**As três margens da venda** (`mod_provisoes.margens_venda`) — todas a MESMA margem em R$ (`VAVO − Cust_Ad − Cust_Var`) sobre **bases crescentes**:
+
+| Margem | Base | Fórmula | Lê |
+|---|---|---|---|
+| **Margem de Contribuição** | Val_Liq (VAVO − Cust_Ad) | `(Val_Liq − Cust_Var)/Val_Liq` | eficiência operacional da loja |
+| **Margem da Venda** | VAVO | `(VAVO − Cust_Ad − Cust_Var)/VAVO` | margem sobre a venda à vista |
+| **Margem do Contrato** | Val_Cont | `(Val_Cont − Cust_Ad − Cust_Var − Cust_Fin)/Val_Cont` | margem sobre o contrato assinado |
+
+Invariante: **Contribuição ≥ Venda ≥ Contrato** (bases crescentes). O `Cust_Fin` **cancela** no numerador da Margem do Contrato → é a margem operacional **sobre o contrato**, não "margem + ganho financeiro".
+
+**Margem Operacional (4ª margem — NÃO é destas):** reservada pra **DRE**, após TODOS os custos, derivada do **razão** (não da negociação) — outro momento (pós-venda) e outra fonte. O **resultado financeiro** (receita no financiamento direto, despesa na financeira) é indicador à parte; somado à margem, dá a rentabilidade total.
+
+> **Custos adicionais** (`Com_Arq`/`Pro_Fid`/`Cust_Via`/`Bri`): têm caráter de **custo variável** (só ocorrem com venda). Na cadeia saem do VAVO para formar o Val_Liq — por isso **não** entram no `Cust_Var` (base das comissões internas). No **razão** são constituídos como provisão no contrato (FASE A — `2.1.04.15-18`), independentemente. As duas visões batem: a margem gerencial já os considera (via Val_Liq), o razão passou a booká-los.
+
 ## 4. Contexto do PROJETO (pool)
 
 | Termo | Definição |

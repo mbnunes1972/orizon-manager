@@ -10,11 +10,11 @@ def test_tres_margens_mesmo_numerador_bases_crescentes():
     # margem em R$ = VAVO - cust_ad - cust_var = 10000 - 1000 - 6000 = 3000
     assert r["margem_rs"] == 3000.0
     # bases: val_liq_loja = 9000; VAVO = 10000; val_cont = 10500
-    assert r["margem_loja"] == round(3000.0 / 9000.0, 4)      # 0.3333
-    assert r["margem_venda"] == round(3000.0 / 10000.0, 4)    # 0.3000
-    assert r["margem_contrato"] == round(3000.0 / 10500.0, 4) # 0.2857
+    assert r["margem_contribuicao"] == round(3000.0 / 9000.0, 4)  # 0.3333
+    assert r["margem_venda"] == round(3000.0 / 10000.0, 4)        # 0.3000
+    assert r["margem_contrato"] == round(3000.0 / 10500.0, 4)     # 0.2857
     # invariante: bases crescentes → margens decrescentes
-    assert r["margem_loja"] > r["margem_venda"] > r["margem_contrato"]
+    assert r["margem_contribuicao"] > r["margem_venda"] > r["margem_contrato"]
 
 
 def test_margem_contrato_neutraliza_o_custo_financeiro():
@@ -29,4 +29,4 @@ def test_margem_contrato_neutraliza_o_custo_financeiro():
 
 def test_bases_zero_nao_dividem():
     r = mp.margens_venda(vavo=0.0, cust_ad=0.0, cust_var=0.0, val_cont=0.0)
-    assert r["margem_loja"] == 0.0 and r["margem_venda"] == 0.0 and r["margem_contrato"] == 0.0
+    assert r["margem_contribuicao"] == 0.0 and r["margem_venda"] == 0.0 and r["margem_contrato"] == 0.0
