@@ -21,6 +21,9 @@ PLANO_PADRAO = [
     ("1.1.06.11", "Comissão de Projeto/Executivo a Apropriar"),
     ("1.1.06.12", "Retenção de Comissão de Vendas a Apropriar"),
     ("1.1.06.14", "Outros Fornecedores a Apropriar"),
+    # FASE A (resultado da venda): custos adicionais como ativo diferido (espelho das demais rubricas)
+    ("1.1.06.15", "Comissão de Arquiteto a Apropriar"), ("1.1.06.16", "Programa de Fidelidade a Apropriar"),
+    ("1.1.06.17", "Custo de Viagem a Apropriar"), ("1.1.06.18", "Brinde a Apropriar"),
     ("1.2", "Não Circulante"),
     ("1.2.1", "Imobilizado"),
     ("1.2.1.01", "Itens de Informática"), ("1.2.1.02", "Veículos"),
@@ -44,6 +47,9 @@ PLANO_PADRAO = [
     ("2.1.04.12", "Provisão de Retenção de Comissão de Vendas"),
     ("2.1.04.13", "Provisão de Impostos"),   # FASE B2.6: passivo reservado no contrato; efetivado (→ 2.1.03) na emissão
     ("2.1.04.14", "Provisão de Outros Fornecedores"),   # FASE D: recebe a reclassificação do Custo de Fábrica (substituição)
+    # FASE A (resultado da venda): os 4 custos adicionais viram provisão (antes só deduzidos do Val_Liq)
+    ("2.1.04.15", "Provisão de Comissão de Arquiteto"), ("2.1.04.16", "Provisão de Programa de Fidelidade"),
+    ("2.1.04.17", "Provisão de Custo de Viagem"), ("2.1.04.18", "Provisão de Brinde"),
     ("2.1.05", "Financiamento Total Flex a Pagar"),
     ("2.1.06", "Receita a Realizar"),   # FASE D2: recebe o Val_Cont cheio no contrato (era "Adiantamento de Clientes")
     ("2.2", "Não Circulante"),
@@ -77,7 +83,7 @@ PLANO_PADRAO = [
     ("5.3.07", "Marketing/Campanhas de Divulgação"), ("5.3.08", "Salário Marketing"),
     ("5.3.09", "Site e Hospedagem"), ("5.3.10", "Combustível de Venda"),
     ("5.3.11", "Uniformes"), ("5.3.12", "Brindes"), ("5.3.13", "Suprimento a Cliente"),
-    ("5.3.14", "Viagens de Especificador"),
+    ("5.3.14", "Viagens de Especificador"), ("5.3.15", "Comissão de Arquiteto"),   # FASE A: despesa da comissão de arquiteto (NF-e)
     ("5.4", "Despesas Administrativas"),
     ("5.4.01", "Aluguel"), ("5.4.02", "Energia Elétrica"), ("5.4.03", "Água"),
     ("5.4.04", "Telefonia Fixa/Móvel e Internet"), ("5.4.05", "Contabilidade"),
@@ -367,6 +373,11 @@ EVENTOS = {
     "fechamento_venda_com_proj_exec":       ("1.1.06.11", "2.1.04.11", "Constituição — Provisão de Comissão de Projeto/Executivo (ativo diferido)"),
     "fechamento_venda_retencao_com_vendas": ("1.1.06.12", "2.1.04.12", "Constituição — Provisão de Retenção de Comissão de Vendas (ativo diferido)"),
     "fechamento_venda_custo_fabrica":       ("1.1.06.06", "2.1.04.06", "Constituição — Provisão de Custo de Fábrica (ativo diferido)"),
+    # FASE A (resultado da venda): custos adicionais constituídos como ativo diferido × provisão, sem tocar a DRE
+    "fechamento_venda_com_arq":  ("1.1.06.15", "2.1.04.15", "Constituição — Provisão de Comissão de Arquiteto (ativo diferido)"),
+    "fechamento_venda_pro_fid":  ("1.1.06.16", "2.1.04.16", "Constituição — Provisão de Programa de Fidelidade (ativo diferido)"),
+    "fechamento_venda_cust_via": ("1.1.06.17", "2.1.04.17", "Constituição — Provisão de Custo de Viagem (ativo diferido)"),
+    "fechamento_venda_brinde":   ("1.1.06.18", "2.1.04.18", "Constituição — Provisão de Brinde (ativo diferido)"),
     # FASE D2: matching pleno na NF-e — reconhece a DESPESA de cada rubrica (5.6.0X, ou 5.1.01 p/ a fábrica)
     # × baixa do ativo diferido (1.1.06.0X). A Provisão (2.1.04.0X) SOBREVIVE — é paga/reconciliada depois.
     "reconhecimento_despesa_montagem":            ("5.6.02", "1.1.06.02", "Reconhecimento de despesa na NF-e — Montagem"),
@@ -380,6 +391,11 @@ EVENTOS = {
     "reconhecimento_despesa_retencao_com_vendas": ("5.6.09", "1.1.06.12", "Reconhecimento de despesa na NF-e — Retenção de Comissão de Vendas"),
     "reconhecimento_despesa_custo_fabrica":       ("5.1.01", "1.1.06.06", "CMV Fábrica — reconhecimento na NF-e (baixa do ativo diferido)"),
     "reconhecimento_despesa_outros_fornecedores": ("5.1.01", "1.1.06.14", "CMV Outros Fornecedores — reconhecimento na NF-e (baixa do ativo diferido)"),
+    # FASE A: matching dos custos adicionais na NF-e — despesa comercial × baixa do ativo diferido
+    "reconhecimento_despesa_com_arq":  ("5.3.15", "1.1.06.15", "Reconhecimento de despesa na NF-e — Comissão de Arquiteto"),
+    "reconhecimento_despesa_pro_fid":  ("5.3.04", "1.1.06.16", "Reconhecimento de despesa na NF-e — Programa de Fidelidade"),
+    "reconhecimento_despesa_cust_via": ("5.3.14", "1.1.06.17", "Reconhecimento de despesa na NF-e — Custo de Viagem"),
+    "reconhecimento_despesa_brinde":   ("5.3.12", "1.1.06.18", "Reconhecimento de despesa na NF-e — Brinde"),
     # Impostos = PROVISÃO (Tipo D). CONTRATO: passivo nasce SEM tocar a DRE — ativo diferido (1.1.05) ×
     # Provisão de Impostos (2.1.04.13). EMISSÃO (proporcional Merc/Serv): a dedução entra na DRE
     # (4.3.01 × baixa do ativo 1.1.05) e a obrigação fiscal real crystalliza (2.1.04.13 × 2.1.03).
@@ -509,6 +525,11 @@ _PROV_FECHAMENTO = {
     "retencao_com_vendas": "fechamento_venda_retencao_com_vendas",
     "custo_fabrica":       "fechamento_venda_custo_fabrica",   # FASE D2: 10ª rubrica (era só no faturamento)
     "impostos":            "fechamento_venda_impostos",
+    # FASE A (resultado da venda): os 4 custos adicionais
+    "com_arq":             "fechamento_venda_com_arq",
+    "pro_fid":             "fechamento_venda_pro_fid",
+    "cust_via":            "fechamento_venda_cust_via",
+    "brinde":              "fechamento_venda_brinde",
 }
 
 
@@ -596,6 +617,11 @@ _MATCHING_NFE = {
     # Outros Fornecedores só tem saldo em 1.1.06.14 se houve reclassificação ANTES da NF-e (substituição
     # de parte do pedido de fábrica) — nesse caso o matching o reconhece; senão o saldo é 0 e é pulado.
     "outros_fornecedores": "reconhecimento_despesa_outros_fornecedores",
+    # FASE A (resultado da venda): os 4 custos adicionais também dão baixa na NF-e
+    "com_arq":             "reconhecimento_despesa_com_arq",
+    "pro_fid":             "reconhecimento_despesa_pro_fid",
+    "cust_via":            "reconhecimento_despesa_cust_via",
+    "brinde":              "reconhecimento_despesa_brinde",
 }
 
 
