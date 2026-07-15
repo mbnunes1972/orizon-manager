@@ -2,7 +2,7 @@
 
 **Data:** 2026-07-15
 **Estado:** aprovado, não implementado
-**Escopo:** Fundação (registro de modelos por loja, provado no Contrato) + migração da Proposta comercial
+**Escopo:** Fundação (registro de modelos por loja, provado no Contrato) + corpo da Proposta comercial
 **Fora de escopo:** tipos de documento novos ("+documentos") — spec seguinte
 
 ---
@@ -31,7 +31,7 @@ multi-loja, "documentos **da loja**" não se sustenta assim.
 | D4 | **PDF não é convertido, só armazenado.** | Extração de PDF perde a hierarquia de cláusulas (volta texto corrido com cabeçalho/rodapé/número de página). O jurídico sempre tem o .docx. |
 | D5 | **`.docx`, `.odt`, `.doc`, `.rtf`, `.md`, `.txt` na entrada.** | `soffice --headless --convert-to txt` normaliza todos os formatos binários pelo mesmo caminho — um pipeline só. |
 | D6 | **Versão de modelo é imutável; o contrato fixa a versão que usou.** | `gerar_pdf_contrato()` (`mod_contrato.py:823-829`) **regenera** `CONTRATOS/contrato_<id>.pdf` sobrescrevendo pelo id, lendo o modelo do disco na hora. Sem isso, trocar o modelo reescreve as cláusulas de um contrato **já assinado**, em silêncio. |
-| D7 | **Proposta migra para Markdown + WeasyPrint.** | Completa a aposentadoria do docx já feita no contrato. `mod_proposta` já usa o mesmo dicionário de marcadores (`mod_proposta.py:12-13`) — só o renderizador difere. |
+| D7 | **Proposta ganha corpo, vindo do modelo da loja.** | *(corrigida em 2026-07-15 — ver §8.1)* A proposta **já** usa WeasyPrint; o que falta é ela ter um corpo. Hoje é capa-só (`mod_contrato.py:841` passa `""` para `<!--CORPO-->`), então não havia onde um documento importado aterrissar. |
 | D8 | **Capacidade nova `gerir_documentos`.** | Trocar cláusula de rescisão ≠ corrigir o telefone da loja. Reusar `editar_dados_loja` ampliaria em silêncio o poder de quem já a tem. |
 
 **Precedente que o desenho segue:** `Contrato.loja_snapshot_json` (`database.py:836`) já congela os
@@ -123,11 +123,12 @@ LibreOffice instalado**. Só `normalizar` toca `subprocess`.
 - `ativar(modelo_id)` — liga esta, desliga a anterior, atômico.
 - `listar(loja_id) → [modelos]`
 
-### Renderizador compartilhado
+### Renderizador — nada a extrair
 
-O genérico (markdown + mapping → HTML → WeasyPrint) sai do `mod_contrato` para um módulo
-compartilhado. A capa e as grades de parcelas/ambientes (`_html_parcelas_linhas`,
-`_html_ambientes_linhas`) **ficam** no `mod_contrato` — são do contrato, não do motor.
+Contrato e proposta **já** compartilham o mesmo shell (`contrato_template/contrato.html`) e o mesmo
+motor (`_html_corpo` + `_substituir_marcadores_html` + WeasyPrint). O contrato preenche
+`<!--CORPO-->`; a proposta passa `""`. Não há módulo a extrair — a única mudança é a proposta parar
+de passar vazio (§8).
 
 ## 5. Fluxo do wizard
 
@@ -186,15 +187,39 @@ tem o bloco de assinatura; o cadastro não muda.
 
 ## 8. Proposta comercial
 
-Ganha `proposta_template/proposta.{md,html,css}`, espelhando `contrato_template/`. O
-`modelo_proposta.docx` atual entra como **o primeiro import** — valida o pipeline com um documento
-real, não com fixture.
+### 8.1 Correção de premissa (2026-07-15)
 
-Marcadores próprios já existentes (`mod_proposta.py:18-24`): `AMBIENTES_LISTA`, `VALOR_BRUTO`,
-`DESCONTO_PCT`, `VALOR_TOTAL`, `VALIDADE` → entram no catálogo, escopo `projeto`.
+A versão original deste spec dizia que a proposta migraria de docx/LibreOffice para
+Markdown+WeasyPrint. **Estava errado**, e a fonte do erro foi o `CLAUDE.md:53` ("a proposta ainda usa
+docx/LibreOffice"), que está desatualizado.
 
-Isso deixa `mod_contrato._substituir_marcadores` (caminho python-docx) **sem chamador** → removido.
-O LibreOffice recua para a importação.
+O que é verdade, verificado no código:
+
+- **A proposta já usa WeasyPrint.** `main.py:1844-1859` chama `mod_contrato.gerar_pdf_proposta`
+  (`mod_contrato.py:845`). Não há migração de renderizador a fazer.
+- **O caminho docx está morto.** `import mod_proposta as _mprop` (`main.py:1821`) é importado e nunca
+  usado no handler. Nada em produção lê `modelo_proposta.docx`. Só `tests/test_proposta.py` mantém
+  `mod_proposta.py` vivo.
+- **A proposta é capa-só.** `montar_html_proposta` (`mod_contrato.py:834-842`) faz
+  `shell.replace("<!--CORPO-->", "")` — a proposta **não tem corpo**. Era esse o buraco: não existia
+  onde um documento importado aterrissar.
+
+### 8.2 O que a proposta ganha
+
+Corpo, vindo do modelo `proposta` da loja. `montar_html_proposta` passa a preencher `<!--CORPO-->`
+com `_html_corpo(resolver_modelo(loja_id, "proposta"))` em vez de `""`.
+
+**Loja sem modelo `proposta` → corpo vazio → PDF byte-a-byte igual ao de hoje.** Regressão zero, e é
+o mesmo mecanismo de fallback do D2.
+
+Reusa `contrato_template/contrato.html` e `_html_corpo` — **não** cria `proposta_template/`, **não**
+extrai renderizador. Toda a §4/§5 (catálogo, importação, wizard, registro) serve a proposta sem uma
+linha a mais: muda só o `tipo`.
+
+Marcadores próprios da proposta que hoje existem em `mod_proposta.py:18-24` (`AMBIENTES_LISTA`,
+`VALOR_BRUTO`, `DESCONTO_PCT`, `VALOR_TOTAL`, `VALIDADE`) **não** entram no catálogo: pertencem ao
+caminho docx morto e `_montar_mapping` não os produz. Incluí-los quebraria o teste anti-drift (§9).
+A capa da proposta usa os mesmos marcadores do contrato.
 
 ## 9. Testes (TDD)
 
@@ -209,6 +234,8 @@ O LibreOffice recua para a importação.
 | **regerar contrato antigo, com modelo novo já ativo, reproduz as cláusulas originais** | **D6 — sem este verde, o versionamento é decorativo** |
 | marcador desconhecido bloqueia ativação | §5 — evita "[FOO]" no PDF |
 | `gerir_documentos` barra quem não tem a capacidade | D8 |
+| **proposta sem modelo → HTML idêntico ao de hoje (capa-só)** | §8.2 — regressão zero |
+| proposta com modelo ativo → o corpo aparece no HTML | §8.2 |
 | `test_arquitetura_modulos` reconhece os módulos novos | padrão do projeto |
 
 Frontend não tem teste JS (CLAUDE.md) → verificação manual + `node --check` no `<script>`.
@@ -222,11 +249,12 @@ Frontend não tem teste JS (CLAUDE.md) → verificação manual + `node --check`
 5. Capacidade `gerir_documentos`
 6. Endpoints
 7. Painel + wizard (frontend)
-8. Renderizador compartilhado + migração da proposta
+8. Corpo da proposta (`montar_html_proposta` deixa de passar `""`) + card Proposta no painel
+9. Corrigir `CLAUDE.md:53` (a afirmação errada que originou §8.1)
 
-O `preview` do passo 6 usa o renderizador **do `mod_contrato`, como está hoje** — a extração do
-renderizador compartilhado (passo 8) é exigência da proposta, não do contrato. Passos 1-7 entregam o
-card Contrato clicável e funcionando sem tocar no motor de renderização.
+Os passos 1-4 entregam a garantia jurídica antes de existir tela — se algo tiver que ser cortado, é
+da tela para baixo, nunca de 1-4. O passo 8 é pequeno (uma linha de render + um `tipo` novo) porque
+o motor já é compartilhado (§4).
 
 Os passos 1-4 entregam a garantia jurídica antes de existir tela — se algo tiver que ser cortado, é
 da tela para baixo, nunca de 1-4.
@@ -239,3 +267,10 @@ o emite. Isso é gancho no ciclo/projeto + anexação — feature própria, e a 
 
 A coluna `tipo` já nasce preparada (`contrato` | `proposta` | `custom`), e o painel já nasce
 genérico: o spec seguinte acrescenta linhas e um gancho, não remodela nada.
+
+**Dívida conhecida: o caminho docx morto.** `mod_proposta.py`, `modelo_proposta.docx`,
+`mod_contrato._substituir_marcadores`/`_subst_paragrafo`/`_converter_pdf`, o import inútil em
+`main.py:1821` e os testes `tests/test_proposta.py` / `tests/test_proposta_template.py` sustentam um
+caminho que **produção não usa** (§8.1). Removê-los é limpeza, não feature — fica fora desta entrega
+para não misturar as duas. Cuidado ao fazê-lo: `_libreoffice_cmd()` **continua necessário** (é a base
+da importação, §4) e `contrato_editar.py:48-50` também o usa.
