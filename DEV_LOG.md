@@ -1374,6 +1374,32 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > **PDF da auditoria.** Além do backlog anterior (FASE D2 Conferência spec `2026-07-12` — não implementada;
 > registro único ordenado de rubricas F0b; `com_adm` vira provisão `2.1.04.20` F1; bug ② efetivado).
 > **Tokens a criar (Fase C):** dourado escuro (Aprovar) + verde escuro (Aprovado).
+>
+> **➕ Frente CRONOGRAMA (iniciada 2026-07-14 tarde; backend COMPLETO+TDD, suíte 1042 verde).**
+> - **ADR** `2026-07-14-arquitetura-ciclo-um-fluxo-duas-visoes`: ciclo é UM fluxo (fonte única, escopo do
+>   projeto), apresentado em DUAS visões — **Comercial** (etapas 1–7) × **Execução** (8+); assinatura = handoff;
+>   NÃO parte o dado. AF (8) cai em Execução. Auditoria/agenda/cronograma no nível do projeto.
+> - **Dois cronogramas** do MESMO Cronograma Padrão (âncoras opostas): `mod_cronograma.cronogramas(etapas,
+>   inicio, entrega, codigo_entrega)` → **Progressivo** (cedo, do início) + **Regressivo** (Prazo Limite, da
+>   entrega) + **Folga** (=Reg−Prog; negativa = não cabe → cronograma próprio + senha). + `cronograma_do_projeto`
+>   + `cabe_no_cronograma` + `cronograma_projeto_view` (3 colunas **Prazo Limite / Planejado / Executado** por
+>   etapa). Fase A: `limite_etapa`/`prazo_excede_limite`/`garantir_cronograma`.
+> - **Âncoras:** `Projeto.data_entrega` (regressivo, def. na assinatura) + `data_inicio` (progressivo) +
+>   `ParcelaProjeto.prazo_conclusao` + migrações. **Modelo:** DERIVAR as datas (não persistir) — guarda só
+>   âncoras + prazos (editáveis = cronograma próprio) + `concluido_em`. Entrega = etapa 16 (âncora); Recebimento
+>   = etapa 14 (marco destacado).
+> - **Spec `fases-por-ambiente-prazos-devolucao` refinada:** subfase 11c "Revisão de PE" → **"Projeto Executivo"**
+>   (etapa-mãe 11 → "Especificação Técnica"; **rename SÓ display**, IDs `pe_*` mantidos). 4 botões da subfase
+>   (mesma linha, mesmo tamanho): **Carregar Projeto Executivo** (sobrescreve; indicador [Rev1,Rev2…]), **PE×PV**
+>   (fábrica vendido×executivo), **Desmembrar Fases**, **Aprovar por fase** (dourado→verde). **Botão Revisão
+>   eliminado** (feito). **Senha:** livre até concluir; concluir = senha do PRÓPRIO usuário; reabrir = gerencial.
+>   **Devolução/cancelamento pós-AF1 = FORA do ciclo** (supervisionado pela auditoria); devolução removida das AF.
+>
+> **⏭️ PENDENTE (revisado):** **Frontend do cronograma** (endpoint `GET /api/projetos/<nome>/cronograma` + 3
+> colunas no ciclo + etapa 7: captura `data_entrega` + gate da folga + botão "Cronograma próprio"). **Fase B.2**
+> (endpoint do desmembramento por seleção + UI checkbox por etapa 9+). **Fase C** (subfase Projeto Executivo: 4
+> botões + senha). **Rename display** (Especificação Técnica/Projeto Executivo) + **Medição→subfase** (🔴
+> estrutural, separado). **PDF da auditoria.** **Navegação 2 visões** (ADR, depois). Backlog anterior mantido.
 
 ## ⏸️ ESTADO ATUAL (2026-07-14)
 
