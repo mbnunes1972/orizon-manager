@@ -15,8 +15,14 @@ CATALOGO = {
 
     # ── cliente ──────────────────────────────────────────────────────────────
     "NOME_CLIENTE":     {"rotulo": "Nome do cliente",           "escopo": "cliente"},
-    "CPF":              {"rotulo": "CPF do cliente",            "escopo": "cliente"},
-    "CPF_CLIENTE":      {"rotulo": "CPF do cliente (alias)",    "escopo": "cliente"},
+    # CPF e CPF_CLIENTE são o MESMO dado, e os DOIS estão vivos em partes
+    # diferentes do documento: [CPF] na capa (mod_contrato._html_capa, linha 669)
+    # e [CPF_CLIENTE] no corpo (contrato_template/contrato.md). Nenhum é alias de
+    # ninguém — chamar qualquer um de secundário mandaria o lojista usar o
+    # marcador errado para a parte que ele está editando. O corpo é o que se
+    # importa aqui, então ESSENCIAIS reporta CPF_CLIENTE como o canônico.
+    "CPF":              {"rotulo": "CPF do cliente (usado na capa)",  "escopo": "cliente"},
+    "CPF_CLIENTE":      {"rotulo": "CPF do cliente (usado no corpo)", "escopo": "cliente"},
     "EMAIL":            {"rotulo": "E-mail do cliente",         "escopo": "cliente"},
     "TELEFONE":         {"rotulo": "Telefone do cliente",       "escopo": "cliente"},
     "RES_LOGRADOURO":   {"rotulo": "Residencial — logradouro",  "escopo": "cliente"},
