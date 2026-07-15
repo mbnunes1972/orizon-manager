@@ -10823,7 +10823,9 @@ const _PAPEL_FUNCOES = {   // espelha mod_escopo.PAPEL_FUNCOES (§7)
   montagem:["Montador","Supervisor de Montagem"], assistencia:["Montador","Supervisor de Montagem"],
 };
 function _podeEditarMapaFront(){
-  return ["diretor","gerente_vendas","gerente_adm_fin","supervisor_montagem"]
+  // = _pode_editar_mapa no backend: Gerência+ (autorizar/aprovar_financeiro = master/gerencial) ou
+  // Supervisor de Montagem. "diretor"/"gerente_*" eram nomes de função antigos (mesmo bug do gate do PE).
+  return ["master","gerencial","supervisor_montagem"]
     .includes((_usuarioAtual && _usuarioAtual.nivel) || "");
 }
 let _mapaProfs = null, _mapaNome = null;
