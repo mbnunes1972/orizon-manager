@@ -10439,7 +10439,9 @@ function _podePE(cap) {
 }
 
 // níveis com editar_dados_loja (UX-only; backend é a trava). MANTER SINCRONIZADO com perfis.py.
-const _NFE_NIVEIS_EMITE = new Set(["diretor","super_admin","admin_rede"]);
+// = capacidade editar_dados_loja no backend (perfis.py). "diretor" NÃO é nível real (o real é master) —
+// era o mesmo bug do gate do PE, que escondia o botão "Carregar NF-e da Fábrica" para o master.
+const _NFE_NIVEIS_EMITE = new Set(["master","super_admin","admin_rede"]);
 function _podeEmitirNfe() {
   return _NFE_NIVEIS_EMITE.has((_usuarioAtual && _usuarioAtual.nivel) || '');
 }
