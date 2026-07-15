@@ -12,6 +12,7 @@ Fallback: loja sem modelo ativo cai no arquivo global de hoje
 (contrato_template/contrato.md) — nada quebra para quem não subiu nada.
 """
 import os
+import shutil
 import hashlib
 
 from sqlalchemy.exc import IntegrityError
@@ -22,6 +23,11 @@ TIPOS = ("contrato", "proposta")
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 DOCS_LOJA_DIR = os.path.join(_THIS_DIR, "documentos_loja")
+
+# Tentativas de reservar número de versão. N uploads simultâneos da mesma loja podem
+# exigir até N-1 retries (cada perdedor recua e relê o MAX). 8 cobre com folga o pior
+# caso realista — é um lojista trocando o modelo, não tráfego de máquina.
+_MAX_TENTATIVAS_VERSAO = 8
 
 
 def _validar(tipo, corpo_md):
@@ -40,11 +46,30 @@ def _proxima_versao(db, loja_id, tipo):
     return (ultima.versao + 1) if ultima else 1
 
 
+def _e_colisao_de_versao(e):
+    """A IntegrityError é a colisão de (loja, tipo, versao) — a única retentável?
+
+    Qualquer outra violação (NOT NULL, FK) não se resolve tentando de novo: queimaria
+    as tentativas à toa e sairia como "não foi possível reservar número de versão",
+    mensagem enganosa. SQLite não cita o nome da constraint na mensagem, só as colunas;
+    Postgres cita o nome — os dois formatos são cobertos.
+    """
+    msg = str(getattr(e, "orig", e))
+    baixa = msg.lower()
+    if "uq_doc_modelo_versao" in baixa:                       # Postgres
+        return True
+    return "unique constraint failed" in baixa and "documento_modelos.versao" in baixa
+
+
 def guardar_staging(loja_id, tipo, origem_nome, conteudo_bytes):
     """Guarda o arquivo subido ANTES de a versão existir.
 
     A importação analisa sem salvar a versão, então o original fica no staging
     até o lojista ativar; criar_versao o promove para v<N>/. Devolve (caminho, sha256).
+
+    DÉBITO CONHECIDO: o _staging/ não tem limpeza. Quem sobe um modelo e desiste antes
+    de criar a versão deixa o arquivo aqui para sempre. Não vaza dado (é escopado por
+    loja), mas cresce sem teto — falta uma rotina de expurgo por idade.
     """
     d = os.path.join(DOCS_LOJA_DIR, str(loja_id), tipo, "_staging")
     os.makedirs(d, exist_ok=True)
@@ -59,7 +84,6 @@ def _promover_original(staging_path, loja_id, tipo, versao, origem_nome):
     """Move o original do staging para v<N>/. Devolve o caminho final, ou None."""
     if not staging_path or not os.path.exists(staging_path):
         return None
-    import shutil
     destino_dir = os.path.join(DOCS_LOJA_DIR, str(loja_id), tipo, "v%d" % versao)
     os.makedirs(destino_dir, exist_ok=True)
     destino = os.path.join(destino_dir, os.path.basename(origem_nome or "original"))
@@ -80,9 +104,22 @@ def criar_versao(db, loja_id, tipo, corpo_md, origem_nome, usuario_id,
     o perdedor com um arquivo órfão em v<N>/ e nenhuma linha apontando pra ele —
     verificado por experimento de concorrência. O retry mora aqui, e não em cada
     chamador, porque senão todo chamador futuro teria que lembrar de tratar isso.
+
+    Invariante que isto sustenta: NUNCA existe arquivo em v<N>/ sem uma linha
+    apontando pra ele. Os três caminhos de falha, e por que nenhum quebra isso:
+      1. INSERT falha (corrida)      → nada foi movido; staging intacto; retry limpo.
+      2. _promover_original falha    → versão vale com origem_path=None; original
+                                       segue no staging; a exceção sobe.
+      3. commit do origem_path falha → o move JÁ aconteceu, então é desfeito (o
+                                       original volta pro staging) e a versão fica
+                                       com origem_path=None. Não relança — ver o
+                                       comentário no bloco.
+    Em todos, o pior caso é perder a trilha de auditoria de uma tentativa, nunca
+    abandonar arquivo sem dono.
     """
     _validar(tipo, corpo_md)
-    for _ in range(5):
+    ultima_violacao = None
+    for _ in range(_MAX_TENTATIVAS_VERSAO):
         try:
             m = DocumentoModelo(
                 loja_id=loja_id, tipo=tipo,
@@ -95,18 +132,33 @@ def criar_versao(db, loja_id, tipo, corpo_md, origem_nome, usuario_id,
             db.add(m)
             db.commit()
             break
-        except IntegrityError:
+        except IntegrityError as e:
             db.rollback()
+            if not _e_colisao_de_versao(e):
+                raise          # NOT NULL, FK...: retentar não resolve, sobe agora
+            ultima_violacao = e
     else:
         raise RuntimeError(
             "não foi possível reservar número de versão para (loja=%s, tipo=%s) "
-            "após 5 tentativas" % (loja_id, tipo))
+            "após %d tentativas" % (loja_id, tipo, _MAX_TENTATIVAS_VERSAO)
+        ) from ultima_violacao
 
-    # A linha existe. Agora o arquivo. Se isto falhar, a versão continua válida
-    # (sem trilha de origem) e o original segue no staging — nada se perde.
+    # A linha existe e já é válida sem trilha de origem. Agora o arquivo.
     if staging_path:
-        m.origem_path = _promover_original(staging_path, loja_id, tipo, m.versao, origem_nome)
-        db.commit()
+        destino = _promover_original(staging_path, loja_id, tipo, m.versao, origem_nome)
+        try:
+            m.origem_path = destino
+            db.commit()
+        except Exception:
+            db.rollback()
+            # Desfaz o move. Sem isto, o arquivo fica em v<N>/ sem linha apontando
+            # pra ele — o mesmo órfão que a ordem INSERT-primeiro resolveu.
+            if destino and os.path.exists(destino):
+                shutil.move(destino, staging_path)
+            # Não relança de propósito: a versão EXISTE e é válida; estourar aqui
+            # faria o chamador achar que nada foi criado e tentar de novo, gerando
+            # uma versão duplicada. O que se perde é só a trilha de origem desta
+            # tentativa, e o original volta pro staging — recuperável.
     return m
 
 
@@ -149,6 +201,10 @@ def resolver_modelo(db, loja_id, tipo):
     if m is not None:
         return m.corpo_md
     if tipo == "contrato":
+        # Import LOCAL de propósito, não é ruído: mod_contrato vai importar
+        # mod_documentos (para resolver o corpo do contrato pela versão), fechando
+        # mod_contrato → mod_documentos → mod_contrato. No topo isso quebra o import;
+        # aqui dentro, não. Não promova para o topo do arquivo.
         import mod_contrato
         return mod_contrato._carregar_md()
     return ""

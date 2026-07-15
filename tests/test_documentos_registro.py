@@ -171,6 +171,27 @@ def test_retry_esgotado_vira_erro_claro(db, monkeypatch):
         mod_documentos.criar_versao(db, 1, "contrato", "segunda", "b.docx", 1)
 
 
+def test_integrityerror_de_outra_constraint_nao_e_retentado(db, monkeypatch):
+    """Só a colisão de versão é retentável.
+
+    Outra violação queimaria as 5 tentativas à toa e sairia como "não foi possível
+    reservar número de versão" — mensagem enganosa. Tem que relançar na hora.
+    """
+    from sqlalchemy.exc import IntegrityError
+    tentativas = {"n": 0}
+    real_commit = db.commit
+
+    def commit_com_outra_violacao():
+        tentativas["n"] += 1
+        raise IntegrityError("INSERT ...",
+                             {}, Exception("NOT NULL constraint failed: documento_modelos.loja_id"))
+
+    monkeypatch.setattr(db, "commit", commit_com_outra_violacao)
+    with pytest.raises(IntegrityError):
+        mod_documentos.criar_versao(db, 1, "contrato", "corpo", "c.docx", 1)
+    assert tentativas["n"] == 1, "não pode retentar violação que não é a de versão"
+
+
 def test_falha_ao_promover_original_preserva_versao_e_staging(db, tmp_path, monkeypatch):
     """Move quebrou DEPOIS do commit: a versão vale, o original fica no staging."""
     monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", str(tmp_path / "docs"))
@@ -188,3 +209,67 @@ def test_falha_ao_promover_original_preserva_versao_e_staging(db, tmp_path, monk
     assert len(modelos) == 1, "a versão foi commitada antes do move — tem que existir"
     assert modelos[0].origem_path is None
     assert os.path.exists(caminho), "o original tem que continuar no staging (recuperável)"
+
+
+def test_falha_no_commit_do_origem_path_desfaz_o_move(db, tmp_path, monkeypatch):
+    """O move deu certo mas o commit do origem_path falhou.
+
+    Sem ação compensatória isto é o MESMO órfão que a ordem INSERT-primeiro
+    resolveu: arquivo em v<N>/, staging vazio, e nenhuma linha apontando.
+    """
+    docs = str(tmp_path / "docs")
+    monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", docs)
+    caminho, sha = mod_documentos.guardar_staging(1, "contrato", "meu.docx", b"bytes-z")
+
+    # falha só no SEGUNDO commit: o do INSERT tem que passar
+    real_commit = db.commit
+    estado = {"n": 0}
+
+    def commit_que_falha_na_segunda():
+        estado["n"] += 1
+        if estado["n"] == 2:
+            raise OSError("disco cheio no WAL")
+        return real_commit()
+
+    monkeypatch.setattr(db, "commit", commit_que_falha_na_segunda)
+
+    m = mod_documentos.criar_versao(db, 1, "contrato", "# C\n1.1. Ok.\n", "meu.docx", 1,
+                                    staging_path=caminho, origem_sha256=sha)
+
+    monkeypatch.undo()
+    db.expire_all()
+    modelos = mod_documentos.listar(db, 1)
+    assert len(modelos) == 1, "a versão continua válida"
+    assert modelos[0].origem_path is None, "origem_path não foi persistido"
+    assert os.path.exists(caminho), "o original tem que ter VOLTADO pro staging"
+    v1 = os.path.join(docs, "1", "contrato", "v1", "meu.docx")
+    assert not os.path.exists(v1), "arquivo órfão em v1/: o move não foi desfeito"
+
+
+# ── Imutabilidade: defesa real, não só docstring ──────────────────────────────
+
+
+def test_corpo_md_de_versao_persistida_e_imutavel(db):
+    """A garantia jurídica da frente: contrato assinado reproduz as cláusulas originais."""
+    m = mod_documentos.criar_versao(db, 1, "contrato", "ORIGINAL", "c.docx", 1)
+    with pytest.raises(ValueError, match="imut"):
+        m.corpo_md = "ADULTERADO"
+
+
+def test_corpo_md_imutavel_tambem_apos_recarregar_do_banco(db):
+    """O caminho real: objeto vindo de db.get/query, não o que acabou de ser criado."""
+    m = mod_documentos.criar_versao(db, 1, "contrato", "ORIGINAL", "c.docx", 1)
+    db.expire_all()
+    recarregado = db.get(type(m), m.id)
+    with pytest.raises(ValueError, match="imut"):
+        recarregado.corpo_md = "ADULTERADO"
+    db.rollback()
+    assert mod_documentos.corpo_da_versao(db, m.id) == "ORIGINAL"
+
+
+def test_criar_versao_normal_nao_e_barrada_pela_imutabilidade(db):
+    """A defesa não pode atrapalhar o caminho feliz (constructor + carga do banco)."""
+    m = mod_documentos.criar_versao(db, 1, "contrato", "CORPO", "c.docx", 1)
+    assert m.corpo_md == "CORPO"
+    db.expire_all()
+    assert mod_documentos.corpo_da_versao(db, m.id) == "CORPO", "carga do banco tem que passar"

@@ -4,7 +4,7 @@ Orizon Manager | Dalmóbile
 """
 
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Date, ForeignKey, Text, UniqueConstraint
-from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship
+from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship, validates
 from datetime import datetime
 import hashlib
 import os
@@ -897,6 +897,11 @@ class DocumentoModelo(Base):
     """
     __tablename__ = "documento_modelos"
 
+    # @validates é o ÚNICO do database.py — deliberado, não desleixo: nenhuma outra
+    # tabela carrega uma garantia jurídica. Aqui a imutabilidade não é preferência de
+    # estilo, é o que sustenta reproduzir as cláusulas de um contrato já assinado.
+    # Docstring não impede `m.corpo_md = "outra"; db.commit()`; isto impede.
+
     id            = Column(Integer,  primary_key=True, autoincrement=True)
     loja_id       = Column(Integer,  ForeignKey("lojas.id"), nullable=False)
     tipo          = Column(Text,     nullable=False)   # contrato | proposta
@@ -913,6 +918,22 @@ class DocumentoModelo(Base):
     __table_args__ = (
         UniqueConstraint("loja_id", "tipo", "versao", name="uq_doc_modelo_versao"),
     )
+
+    @validates("corpo_md")
+    def _corpo_e_imutavel(self, key, value):
+        """Barra a edição de corpo_md depois que a linha existe.
+
+        Dispara no setattr. `self.id is not None` só vale depois do flush, então o
+        construtor (id ainda None) passa e a carga do banco nem chega aqui — o loader
+        do SQLAlchemy não passa pelo setattr instrumentado. Verificado por experimento.
+        """
+        if self.id is not None:
+            raise ValueError(
+                "corpo_md é imutável: um contrato pode apontar para esta versão e "
+                "regerá-lo tem que reproduzir as cláusulas originais. "
+                "Para mudar o modelo, crie a próxima versão (mod_documentos.criar_versao)."
+            )
+        return value
 
 
 class Emitente(Base):
