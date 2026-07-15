@@ -112,3 +112,17 @@ def cronogramas(etapas, inicio, entrega, codigo_entrega):
             reg[cod] = entrega + timedelta(days=dias)
     return [{"codigo": cod, "progressivo": prog[cod], "regressivo": reg[cod],
              "folga_dias": (reg[cod] - prog[cod]).days} for cod, _ in etapas]
+
+
+def cronograma_do_projeto(cfg, inicio, entrega, codigo_entrega="16"):
+    """Dois cronogramas do projeto a partir do Cronograma Padrão (cfg) + âncoras (início, entrega).
+    Extrai as etapas/prazos do padrão na ordem e delega a `cronogramas()`. `codigo_entrega` default = "16"
+    (Entrega no cliente)."""
+    etapas = [(f["codigo"], f["prazo_dias"]) for f in cronograma_padrao(cfg)]
+    return cronogramas(etapas, inicio, entrega, codigo_entrega)
+
+
+def cabe_no_cronograma(resultado):
+    """True se NENHUMA etapa tem folga negativa — o prazo do cliente CABE no Cronograma Padrão. Se folga
+    negativa em alguma etapa, o projeto precisa do cronograma PRÓPRIO (edição + senha de gerente/diretor)."""
+    return all(e["folga_dias"] >= 0 for e in (resultado or []))

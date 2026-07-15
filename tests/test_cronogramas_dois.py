@@ -41,3 +41,16 @@ def test_cronogramas_etapa_depois_da_entrega_avanca():
     by = {x["codigo"]: x for x in mcr.cronogramas(etapas, inicio, entrega, "ENT")}
     assert by["ENT"]["regressivo"] == datetime(2026, 2, 1)
     assert by["MON"]["regressivo"] == datetime(2026, 2, 4)   # entrega + 3
+
+
+def test_cronograma_do_projeto_e_viabilidade():
+    cfg = {"cronograma_padrao": [
+        {"codigo": "12", "prazo_dias": 5},
+        {"codigo": "13", "prazo_dias": 20},
+        {"codigo": "16", "prazo_dias": 3},   # entrega
+    ]}
+    inicio = datetime(2026, 1, 1)
+    r = mcr.cronograma_do_projeto(cfg, inicio, datetime(2026, 3, 1), codigo_entrega="16")  # folgado
+    assert len(r) == 3 and mcr.cabe_no_cronograma(r) is True
+    r2 = mcr.cronograma_do_projeto(cfg, inicio, datetime(2026, 1, 10), codigo_entrega="16")  # apertado
+    assert mcr.cabe_no_cronograma(r2) is False

@@ -434,6 +434,8 @@ class Projeto(Base):
     parametros_json = Column(Text, nullable=True)   # parâmetros estruturais da negociação (JSON, projeto-wide)
     loja_id        = Column(Integer,    ForeignKey("lojas.id"), nullable=True)
     criado_por_id  = Column(Integer,    ForeignKey("usuarios.id"), nullable=True)   # usuário que criou o projeto (escopo por projetista)
+    data_entrega   = Column(DateTime,   nullable=True)   # âncora do cronograma REGRESSIVO (entrega ao cliente, def. na assinatura)
+    data_inicio    = Column(DateTime,   nullable=True)   # âncora do cronograma PROGRESSIVO (início; def. assinatura + carência)
 
 
 class Briefing(Base):
@@ -1235,6 +1237,7 @@ def _migrar_colunas():
                                    ("funcao_responsavel_id","INTEGER"),
                                    ("responsavel_funcionario_id","INTEGER")])
         _add_cols("parcela_projeto", [("prazo_conclusao","DATETIME")])   # Fase A: prazo da fase
+        _add_cols("projetos_meta", [("data_entrega","DATETIME"), ("data_inicio","DATETIME")])   # âncoras do cronograma
 
         conn.commit()
     except Exception:
