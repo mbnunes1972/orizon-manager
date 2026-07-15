@@ -10946,7 +10946,7 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
         ${briefLocked ? `<span style="margin-left:10px;font-size:.75rem;color:var(--muted);
           border:1px solid var(--muted);border-radius:3px;padding:1px 6px"><i class="ti ti-lock"></i> bloqueado após 1º orçamento</span>` : ''}
       </div>
-      ${cliId ? `<button class="btn btn-ghost btn-sm" onclick="cliAbrirBriefing(${cliId}, '${(cliNome).replace(/'/g,"\\'")}')">
+      ${cliId ? `<button class="btn btn-ghost btn-sm" onclick="abrirBriefingProjeto('${(projetoAtivo?.nome_safe||'').replace(/'/g,"\\'")}', '${(cliNome).replace(/'/g,"\\'")}')">
         ${briefLocked ? '<i class="ti ti-eye"></i> Ver Briefing' : '<i class="ti ti-pencil"></i> ' + (concluido ? 'Editar' : 'Preencher') + ' Briefing'}
       </button>` : ''}`;
   }
