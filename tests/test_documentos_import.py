@@ -101,3 +101,31 @@ def test_normalizar_txt_sem_bom_continua_funcionando(tmp_path):
     p = tmp_path / "modelo.txt"
     p.write_text("CONTRATO DE COMPRA E VENDA\n1.1. Teste.\n", encoding="utf-8")
     assert imp.normalizar(str(p)).startswith("CONTRATO DE COMPRA E VENDA")
+
+
+def test_normalizar_le_md_direto(tmp_path):
+    p = tmp_path / "modelo.md"
+    p.write_text("# CLÁUSULA ÚNICA\n1.1. Teste.\n", encoding="utf-8")
+    assert "1.1. Teste." in imp.normalizar(str(p))
+
+
+def test_normalizar_recusa_pdf(tmp_path):
+    p = tmp_path / "contrato.pdf"
+    p.write_bytes(b"%PDF-1.4 fake")
+    with pytest.raises(imp.FormatoNaoSuportado) as e:
+        imp.normalizar(str(p))
+    assert "PDF" in str(e.value)
+    assert ".docx" in str(e.value), "a mensagem tem que dizer o que fazer"
+
+
+def test_normalizar_recusa_extensao_desconhecida(tmp_path):
+    p = tmp_path / "planilha.xlsx"
+    p.write_bytes(b"fake")
+    with pytest.raises(imp.FormatoNaoSuportado):
+        imp.normalizar(str(p))
+
+
+def test_formatos_office_aceitos_incluem_libreoffice():
+    """O usuário pediu explicitamente .odt e outros formatos de texto."""
+    assert {".docx", ".odt", ".doc", ".rtf"} <= imp.EXTENSOES_OFFICE
+    assert ".pdf" not in imp.EXTENSOES_OFFICE
