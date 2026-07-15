@@ -9,7 +9,7 @@ concluída. Idempotente por (projeto, etapa): reexecutar recomputa a data previs
 """
 from datetime import timedelta
 
-from database import CicloEtapa
+from database import CicloEtapa, Projeto
 
 
 def cronograma_padrao(cfg):
@@ -126,3 +126,35 @@ def cabe_no_cronograma(resultado):
     """True se NENHUMA etapa tem folga negativa — o prazo do cliente CABE no Cronograma Padrão. Se folga
     negativa em alguma etapa, o projeto precisa do cronograma PRÓPRIO (edição + senha de gerente/diretor)."""
     return all(e["folga_dias"] >= 0 for e in (resultado or []))
+
+
+def cronograma_projeto_view(db, projeto_nome, cfg, codigo_entrega="16"):
+    """Dados das 3 colunas do ciclo por etapa — **Prazo Limite** (regressivo, âncora `data_entrega`),
+    **Planejado** (progressivo, âncora `data_inicio`) e **Executado** (`concluido_em`). Deriva do
+    Cronograma Padrão (cfg) + âncoras do projeto; nada persistido além das âncoras e do concluído.
+    Regressivo/folga só saem se `data_entrega` estiver definida; progressivo, se `data_inicio`. Datas em
+    ISO (ou None). Retorna [{codigo, prazo_limite, planejado, executado, folga_dias}]."""
+    p = db.get(Projeto, projeto_nome)
+    inicio = getattr(p, "data_inicio", None) if p else None
+    entrega = getattr(p, "data_entrega", None) if p else None
+    etapas = [(f["codigo"], f["prazo_dias"]) for f in cronograma_padrao(cfg)]
+    prog = {}
+    if inicio:
+        acc = inicio
+        for cod, pz in etapas:
+            acc = acc + timedelta(days=int(pz or 0))
+            prog[cod] = acc
+    reg = ({x["codigo"]: x for x in cronogramas(etapas, inicio, entrega, codigo_entrega)}
+           if (inicio and entrega) else {})
+    concl = {e.etapa_codigo: e.concluido_em
+             for e in db.query(CicloEtapa).filter_by(projeto_nome=projeto_nome).all()}
+    _iso = lambda d: d.isoformat() if d else None
+    out = []
+    for cod, _ in etapas:
+        r = reg.get(cod)
+        out.append({"codigo": cod,
+                    "prazo_limite": _iso(r["regressivo"]) if r else None,
+                    "planejado": _iso(prog.get(cod)),
+                    "executado": _iso(concl.get(cod)),
+                    "folga_dias": (r["folga_dias"] if r else None)})
+    return out

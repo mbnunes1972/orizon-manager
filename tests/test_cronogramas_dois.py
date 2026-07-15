@@ -54,3 +54,21 @@ def test_cronograma_do_projeto_e_viabilidade():
     assert len(r) == 3 and mcr.cabe_no_cronograma(r) is True
     r2 = mcr.cronograma_do_projeto(cfg, inicio, datetime(2026, 1, 10), codigo_entrega="16")  # apertado
     assert mcr.cabe_no_cronograma(r2) is False
+
+
+def test_cronograma_projeto_view(app_db):
+    from database import Projeto, CicloEtapa
+    db = app_db.get_session()
+    db.add(Projeto(nome_safe="Proj_C", data_inicio=datetime(2026, 1, 1), data_entrega=datetime(2026, 3, 1)))
+    db.add(CicloEtapa(projeto_nome="Proj_C", etapa_codigo="12", concluido_em=datetime(2026, 1, 20)))
+    db.commit()
+    cfg = {"cronograma_padrao": [{"codigo": "12", "prazo_dias": 5},
+                                 {"codigo": "13", "prazo_dias": 20},
+                                 {"codigo": "16", "prazo_dias": 3}]}
+    by = {x["codigo"]: x for x in mcr.cronograma_projeto_view(db, "Proj_C", cfg, codigo_entrega="16")}
+    assert by["12"]["planejado"] is not None      # progressivo (tem data_inicio)
+    assert by["12"]["prazo_limite"] is not None    # regressivo (tem data_entrega)
+    assert by["12"]["executado"] is not None       # concluido_em
+    assert by["12"]["folga_dias"] is not None
+    assert by["13"]["executado"] is None           # etapa não concluída
+    db.close()
