@@ -436,6 +436,7 @@ class Projeto(Base):
     criado_por_id  = Column(Integer,    ForeignKey("usuarios.id"), nullable=True)   # usuário que criou o projeto (escopo por projetista)
     data_entrega   = Column(DateTime,   nullable=True)   # âncora do cronograma REGRESSIVO (entrega ao cliente, def. na assinatura)
     data_inicio    = Column(DateTime,   nullable=True)   # âncora do cronograma PROGRESSIVO (início; def. assinatura + carência)
+    equipe_json    = Column(Text,       nullable=True)   # Equipe do Projeto: seleções dos papéis SELETORES (medidor/finalizador/montagem[N])
 
 
 class Briefing(Base):
@@ -1238,6 +1239,7 @@ def _migrar_colunas():
                                    ("responsavel_funcionario_id","INTEGER")])
         _add_cols("parcela_projeto", [("prazo_conclusao","DATETIME")])   # Fase A: prazo da fase
         _add_cols("projetos_meta", [("data_entrega","DATETIME"), ("data_inicio","DATETIME")])   # âncoras do cronograma
+        _add_cols("projetos_meta", [("equipe_json","TEXT")])   # Equipe do Projeto (seleções dos papéis seletores)
 
         conn.commit()
     except Exception:
@@ -1270,7 +1272,7 @@ _SEED_SA_SENHA = "trocar123"
 FUNCOES_PADRAO = [
     "Consultor de Vendas", "Gerente de Vendas", "Gerente Administrativo/Financeiro", "Diretor",
     "Assistente Logístico", "Conferente", "Supervisor de Montagem", "Assistente Administrativo",
-    "Projetista Executivo", "Medidor", "Montador",
+    "Projetista Executivo", "Medidor", "Montador", "SAC",
 ]
 
 def _tabela_existe(cur, nome):

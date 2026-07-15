@@ -46,7 +46,8 @@ MODULOS = {
                                  # "Projetos") foi retirado da navegação por ser tela-vazia e duplicar o
                                  # nome; seu código é dono aqui, pois Medição pertence ao ciclo comercial.
                                  "mod_medicao.py", "mod_qualidade_xml.py",
-                                 "mod_comercial_dash.py"],   # dashboard Comercial (view derivada)
+                                 "mod_comercial_dash.py",   # dashboard Comercial (view derivada)
+                                 "mod_equipe.py"],           # Equipe do Projeto (roster papel→responsável)
                     "tabelas": ["projetos_meta", "briefings", "pool_ambientes", "orcamentos",
                                 "orcamento_ambientes", "contratos", "contratos_assinaturas",
                                 "arquivo_pe", "parcela_projeto", "parcela_ambiente", "medicoes"],

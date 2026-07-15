@@ -668,6 +668,29 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        m_eq = re.match(r"^/api/projetos/([^/]+)/equipe$", path)
+        if m_eq:
+            # Equipe do Projeto: roster papel→responsáveis (automáticos derivados + seletores) +
+            # candidatos (funcionários/terceiros da loja) para os seletores.
+            from urllib.parse import unquote as _unq
+            import mod_equipe as _meq, mod_tenancy as _mten
+            nome_safe = _unq(m_eq.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = _mten.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                self.send_json({"ok": True, "equipe": _meq.equipe(db, nome_safe, loja_id),
+                                "candidatos": _meq.candidatos(db, loja_id)})
+            finally:
+                db.close()
+            return
         m_razao = re.match(r"^/api/financeiro/contas/(\d+)/razao$", path)
         if m_razao:
             ctx = _contabil_ctx(self, exige_edicao=False)
@@ -4373,6 +4396,34 @@ class Handler(BaseHTTPRequestHandler):
                 db.commit()                                     # commit os estornos ANTES (libera o lock do SQLite)
                 upsert_projeto_status(nome_safe, "cancelado")   # sessão própria (thread-safe), como no conciliar_final
                 self.send_json({"ok": True, "revertido": out, "status": "cancelado"})
+            finally:
+                db.close()
+            return
+
+        elif re.match(r"^/api/projetos/([^/]+)/equipe$", path):
+            # ── POST /api/projetos/<nome>/equipe — grava a seleção de um papel SELETOR da Equipe
+            # (medidor/finalizador/montagem). Body: {papel, selecao}. Automáticos não são graváveis. ──
+            from urllib.parse import unquote as _unq
+            import mod_equipe as _meq, mod_tenancy as _mten
+            m_eqp = re.match(r"^/api/projetos/([^/]+)/equipe$", path)
+            nome_safe = _unq(m_eqp.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            req = json.loads(body) if body else {}
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = _mten.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                ok, erro = _meq.salvar(db, nome_safe, (req.get("papel") or "").strip(), req.get("selecao"))
+                if not ok:
+                    self.send_json({"ok": False, "erro": erro}, code=400); return
+                db.commit()
+                self.send_json({"ok": True, "equipe": _meq.equipe(db, nome_safe, loja_id)})
             finally:
                 db.close()
             return

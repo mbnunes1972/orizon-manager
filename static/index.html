@@ -10682,7 +10682,8 @@ function renderCiclo() {
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
       <h3 style="margin:0;color:var(--text);font-weight:800">Etapas do Projeto</h3>
       <button class="btn btn-ghost btn-sm" onclick="fecharCiclo()"><i class="ti ti-arrow-left"></i>Voltar</button>
-      ${projetoAtivo ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="abrirCronograma('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-calendar-stats"></i>Cronograma</button>` : ''}
+      ${projetoAtivo ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="equipeAbrir('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-users"></i>Equipe</button>` : ''}
+      ${projetoAtivo ? `<button class="btn btn-ghost btn-sm" onclick="abrirCronograma('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-calendar-stats"></i>Cronograma</button>` : ''}
       ${projetoAtivo ? `<button class="btn btn-ghost btn-sm" onclick="abrirAuditoria('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-report-money"></i>Auditoria Contábil</button>` : ''}
       ${_podeEditarMapaFront() && projetoAtivo ? `<button class="btn btn-ghost btn-sm" onclick="mapaAbrir('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-users-group"></i>Mapa de Atribuições</button>` : ''}
     </div>
@@ -11490,6 +11491,93 @@ async function abrirCronograma(nomeSafe){
   const close = () => ov.remove();
   ov.querySelector('[data-act="fechar"]').onclick = close;
   ov.addEventListener('click', e => { if(e.target===ov) close(); });
+}
+
+// ── Equipe do Projeto (roster papel→responsáveis; base para a secretária IA informar o cliente) ──
+let _equipeOv = null, _equipeCand = null, _equipeNome = null;
+async function equipeAbrir(nomeSafe){
+  _equipeNome = nomeSafe;
+  let j;
+  try { j = await fetch('/api/projetos/'+encodeURIComponent(nomeSafe)+'/equipe', {credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ await avisoPopup('Erro ao carregar: '+e.message, {titulo:'Equipe'}); return; }
+  if(!j.ok){ await avisoPopup(j.erro||'Falha ao carregar.', {titulo:'Equipe'}); return; }
+  _equipeCand = j.candidatos || {funcionarios:[], terceiros:[]};
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:99999';
+  ov.innerHTML = '<div id="equipe-modal" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 24px;max-width:720px;width:96%;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)"></div>';
+  document.body.appendChild(ov);
+  _equipeOv = ov;
+  ov.addEventListener('click', e => { if(e.target===ov) equipeFechar(); });
+  _equipeRender(j.equipe);
+}
+function equipeFechar(){ if(_equipeOv){ _equipeOv.remove(); _equipeOv = null; } }
+function _equipePessoaLinha(p){
+  const contato = [p.telefone, p.email].filter(Boolean).join(' · ');
+  return '<div style="font-weight:600">'+esc(p.nome)+'</div>'
+    + (contato ? '<div style="font-size:var(--fs-xs);color:var(--text-3)">'+esc(contato)+'</div>' : '');
+}
+function _equipeOpcoes(sel){
+  const opt = (p, tipo) => {
+    const cur = sel && sel.tipo===tipo && sel.id===p.id;
+    return '<option value="'+tipo+':'+p.id+'"'+(cur?' selected':'')+'>'+esc(p.nome)+' ('+(tipo==='funcionario'?'func.':'terc.')+')</option>';
+  };
+  return '<option value="">— selecionar —</option>'
+    + (_equipeCand.funcionarios||[]).map(p=>opt(p,'funcionario')).join('')
+    + (_equipeCand.terceiros||[]).map(p=>opt(p,'terceiro')).join('');
+}
+function _equipeRender(equipe){
+  const box = document.getElementById('equipe-modal');
+  if(!box) return;
+  const papeis = (equipe && equipe.papeis) || [];
+  const bloco = p => {
+    let corpo;
+    if(p.auto){
+      corpo = p.pessoas.length
+        ? p.pessoas.map(_equipePessoaLinha).join('<div style="height:6px"></div>')
+        : '<div style="font-size:var(--fs-xs);color:var(--text-3)">— defina um funcionário com essa função no Cadastro</div>';
+    } else if(p.multi){
+      const sel = new Set(p.pessoas.map(x=>x.tipo+':'+x.id));
+      const cand = (_equipeCand.funcionarios||[]).map(x=>['funcionario',x]).concat((_equipeCand.terceiros||[]).map(x=>['terceiro',x]));
+      corpo = '<div style="display:flex;flex-direction:column;gap:4px;max-height:160px;overflow:auto">'
+        + (cand.length ? cand.map(([t,x])=>{ const v=t+':'+x.id;
+            return '<label style="display:flex;gap:6px;align-items:center;font-size:.85rem"><input type="checkbox" data-montagem="'+v+'"'+(sel.has(v)?' checked':'')+'> '+esc(x.nome)+' <span style="color:var(--text-3);font-size:var(--fs-xs)">('+(t==='funcionario'?'func.':'terc.')+')</span></label>';
+          }).join('') : '<div style="font-size:var(--fs-xs);color:var(--text-3)">— cadastre funcionários/terceiros</div>')
+        + '</div>'
+        + '<button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="_equipeSalvarMontagem()"><i class="ti ti-device-floppy"></i> Salvar equipe de montagem</button>';
+    } else {
+      const cur = p.pessoas[0] ? {tipo:p.pessoas[0].tipo, id:p.pessoas[0].id} : null;
+      corpo = '<select data-papel="'+p.papel+'" onchange="_equipeSalvarUm(this)" style="width:100%;height:var(--control-h-sm);background:var(--surface-2);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);padding:0 8px">'
+        + _equipeOpcoes(cur) + '</select>';
+    }
+    const tag = p.auto
+      ? '<span style="font-size:var(--fs-xs);color:var(--text-3);border:1px solid var(--border);border-radius:4px;padding:1px 6px">auto</span>'
+      : '<span style="font-size:var(--fs-xs);color:var(--text-3);border:1px solid var(--border);border-radius:4px;padding:1px 6px">selecionar</span>';
+    return '<div style="border:1px solid var(--border);border-radius:8px;padding:12px 14px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><strong>'+esc(p.rotulo)+'</strong>'+tag+'</div>'
+      + corpo + '</div>';
+  };
+  box.innerHTML = '<h4 style="margin:0 0 4px;color:var(--text)"><i class="ti ti-users"></i> Equipe do Projeto</h4>'
+    + '<p style="margin:0 0 14px;color:var(--text-3);font-size:var(--fs-xs)">Projeto <strong>'+esc(_equipeNome)+'</strong>. Cada papel e seu responsável — base para informar o cliente a cada definição.</p>'
+    + '<div style="display:flex;flex-direction:column;gap:10px">'+papeis.map(bloco).join('')+'</div>'
+    + '<div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="equipeFechar()">Fechar</button></div>';
+}
+function _equipeParseSel(v){ if(!v) return null; const i=v.indexOf(':'); return {tipo:v.slice(0,i), id:parseInt(v.slice(i+1),10)}; }
+async function _equipePost(papel, selecao){
+  try{
+    const r = await fetch('/api/projetos/'+encodeURIComponent(_equipeNome)+'/equipe', {
+      method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({papel, selecao}) });
+    const d = await r.json();
+    if(!d.ok){ showToast(d.erro||'Falha ao salvar.', true); return; }
+    _equipeRender(d.equipe);
+    showToast('Equipe atualizada.', false);
+  }catch(e){ showToast('Erro: '+e.message, true); }
+}
+function _equipeSalvarUm(selEl){ _equipePost(selEl.getAttribute('data-papel'), _equipeParseSel(selEl.value)); }
+function _equipeSalvarMontagem(){
+  const box = document.getElementById('equipe-modal');
+  const sels = [...box.querySelectorAll('input[data-montagem]:checked')].map(c=>_equipeParseSel(c.getAttribute('data-montagem')));
+  _equipePost('montagem', sels);
 }
 
 let _medicaoCache = null;
