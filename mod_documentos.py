@@ -12,6 +12,7 @@ Fallback: loja sem modelo ativo cai no arquivo global de hoje
 (contrato_template/contrato.md) — nada quebra para quem não subiu nada.
 """
 import os
+import re
 import shutil
 import hashlib
 
@@ -78,6 +79,52 @@ def guardar_staging(loja_id, tipo, origem_nome, conteudo_bytes):
     with open(caminho, "wb") as fh:
         fh.write(conteudo_bytes)
     return caminho, sha
+
+
+# Forma do nome que guardar_staging gera: sha256[:16] + extensão minúscula (ou sem
+# extensão, quando o arquivo subido não tinha uma). Nada além disso é staging legítimo.
+_RE_NOME_STAGING = re.compile(r"^[0-9a-f]{16}(\.[a-z0-9]+)?$")
+
+
+def resolver_staging(loja_id, tipo, nome_recebido):
+    """Caminho real de um staging a partir do nome que o CLIENTE devolveu, ou None.
+
+    Devolve None (nunca levanta) quando o nome não resolve para um arquivo legítimo
+    dentro do _staging/ desta loja. None é resposta válida, não erro: origem_path é
+    nullable e a versão vale sem trilha de origem.
+
+    NÃO CONFIE EM os.path.basename PARA CONTER O CLIENTE — foi o furo que existiu aqui:
+    basename('.') == '.' e basename('..') == '..' (não têm barra, então nada é removido).
+    Com '.', o join devolvia o PRÓPRIO diretório _staging/, os.path.exists() dizia True,
+    e criar_versao mandava o diretório inteiro — com os uploads pendentes de outras
+    importações dentro — para v<N>/ via shutil.move. Com '..', o shutil.Error subia sem
+    tratamento e derrubava a conexão. Os dois comprovados por execução contra o servidor
+    real antes desta correção; tests/test_documentos_api.py trava os dois vetores.
+
+    Três barreiras, nesta ordem (cada uma sozinha já mataria '.'/'..'; juntas cobrem o
+    que a próxima pessoa inventar):
+      1. tipo no catálogo   — antes de virar componente de caminho ('..' entraria por aqui).
+      2. forma do nome      — regex do que guardar_staging gera; mata '.', '..', caminho
+                              absoluto, string vazia e qualquer nome inventado.
+      3. confinamento real  — realpath + commonpath sob o _staging/ desta loja, e isfile
+                              (diretório não serve — foi exatamente o que o '.' explorou).
+    """
+    if tipo not in TIPOS:
+        return None
+    nome = (nome_recebido or "").strip()
+    if not _RE_NOME_STAGING.match(nome):
+        return None
+    base = os.path.join(DOCS_LOJA_DIR, str(loja_id), tipo, "_staging")
+    try:
+        base_real = os.path.realpath(base)
+        candidato = os.path.realpath(os.path.join(base, nome))
+        # commonpath levanta ValueError p/ caminhos em drives diferentes (Windows):
+        # é justamente um caso a recusar, então o except trata como "não resolve".
+        if os.path.commonpath([base_real, candidato]) != base_real:
+            return None
+    except (ValueError, OSError):
+        return None
+    return candidato if os.path.isfile(candidato) else None
 
 
 def _promover_original(staging_path, loja_id, tipo, versao, origem_nome):

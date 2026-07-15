@@ -198,9 +198,28 @@ def _html_corpo(md_texto):
     """Corpo (cláusulas com números literais) em HTML, linha a linha.
     Linhas '1.'/'1.1.'/'a)' viram <p class="cl-N"> (NÃO <li> de lista ordenada);
     '#'/'##' viram <h1>/<h2>; o número literal é preservado como texto e o
-    Markdown é aplicado só ao texto após o número (inline)."""
+    Markdown é aplicado só ao texto após o número (inline).
+
+    O corpo é ESCAPADO antes de qualquer coisa. Um modelo de contrato é texto com
+    [MARCADORES], não HTML: '**negrito**' e '# CLÁUSULA' seguem funcionando (Markdown
+    é processado depois, sobre o texto já escapado), mas <img>/<style>/<script> viram
+    texto literal visível — que é o comportamento certo, o lojista vê que colou lixo.
+
+    POR QUE ISTO EXISTE: markdown.markdown() PRESERVA HTML embutido. Enquanto o corpo
+    vinha só de contrato_template/contrato.md (conteúdo do repositório, confiável), não
+    havia vetor. Desde que a loja passou a subir o próprio modelo, o corpo é entrada de
+    usuário e ia cru para o WeasyPrint: um <img src="http://..."> ou @import url(...)
+    fazia o renderizador buscar a URL (SSRF), e url(file:///...) lia arquivo local (LFI).
+    Comprovado por execução — servidor de prova recebeu as requisições — e explorável
+    tanto no /preview quanto, depois de ativado, em TODO contrato real gerado.
+    Segunda camada, independente desta: _url_fetcher_local() em gerar_pdf_*.
+
+    quote=False de propósito: o corpo vira conteúdo de elemento, nunca valor de
+    atributo, e escapar aspas encheria um contrato de '&quot;' à toa.
+    """
+    from html import escape
     linhas = []
-    for bruta in md_texto.splitlines():
+    for bruta in escape(md_texto or "", quote=False).splitlines():
         t = bruta.strip()
         if not t:
             continue
@@ -867,6 +886,45 @@ def construir_contexto(cliente: dict, usuario: dict, forma_pagamento_json: str, 
     return ctx
 
 
+def _url_fetcher_local(url):
+    """url_fetcher do WeasyPrint restrito aos assets do template. Defesa em profundidade.
+
+    O corpo do contrato hoje vem do modelo que a LOJA subiu (entrada de usuário). O
+    escape em _html_corpo já impede HTML embutido de virar tag; este fetcher é a segunda
+    camada: mesmo que algum caminho futuro deixe escapar um <img>/@import, o renderizador
+    não busca nada fora de CONTRATO_TEMPLATE_DIR. Fecha SSRF (alcançar serviço interno) e
+    LFI (url(file:///etc/passwd)) na origem, no único ponto por onde o WeasyPrint busca
+    recurso.
+
+    O template legítimo só referencia dois assets, ambos relativos e resolvidos contra
+    base_url=CONTRATO_TEMPLATE_DIR: contrato.css (<link> em contrato.html) e
+    logo_dalmobile.png (<img> montado em _html_capa). Os dois continuam carregando —
+    tests/test_documentos_seguranca.py trava isso, senão a "correção" quebraria o
+    contrato de produção para fechar o furo.
+
+    Tudo que não for file:// sob o diretório do template é recusado: http(s):// (rede),
+    file:// fora dali (disco), e esquemas exóticos. WeasyPrint trata a exceção como
+    "asset indisponível", loga aviso e segue — o PDF sai, sem o recurso bloqueado.
+    """
+    from urllib.parse import urlparse, unquote
+    from urllib.request import url2pathname
+    from weasyprint.urls import default_url_fetcher
+
+    partes = urlparse(url)
+    if partes.scheme != "file":
+        raise ValueError("recurso externo bloqueado no documento: %s" % url)
+    try:
+        alvo = os.path.realpath(url2pathname(unquote(partes.path)))
+        base = os.path.realpath(CONTRATO_TEMPLATE_DIR)
+        # commonpath levanta ValueError p/ drives diferentes (Windows) — é caso a recusar.
+        dentro = os.path.commonpath([base, alvo]) == base
+    except (ValueError, OSError):
+        raise ValueError("recurso local bloqueado no documento: %s" % url)
+    if not dentro:
+        raise ValueError("recurso local fora do template bloqueado: %s" % url)
+    return default_url_fetcher(url)
+
+
 def gerar_pdf_contrato(contrato_id: int, ctx: dict, destino: str = None) -> str:
     """Renderiza o contrato (HTML -> PDF) via WeasyPrint. Retorna o caminho do PDF."""
     from weasyprint import HTML
@@ -874,7 +932,8 @@ def gerar_pdf_contrato(contrato_id: int, ctx: dict, destino: str = None) -> str:
     os.makedirs(destino, exist_ok=True)
     html = _montar_html_contrato(ctx)
     pdf_path = os.path.join(destino, f"contrato_{contrato_id}.pdf")
-    HTML(string=html, base_url=CONTRATO_TEMPLATE_DIR).write_pdf(pdf_path)
+    HTML(string=html, base_url=CONTRATO_TEMPLATE_DIR,
+         url_fetcher=_url_fetcher_local).write_pdf(pdf_path)
     return pdf_path
 
 
@@ -895,7 +954,8 @@ def gerar_pdf_proposta(ctx: dict, destino_pdf: str) -> str:
     _dir = os.path.dirname(destino_pdf)
     if _dir:
         os.makedirs(_dir, exist_ok=True)
-    HTML(string=montar_html_proposta(ctx), base_url=CONTRATO_TEMPLATE_DIR).write_pdf(destino_pdf)
+    HTML(string=montar_html_proposta(ctx), base_url=CONTRATO_TEMPLATE_DIR,
+         url_fetcher=_url_fetcher_local).write_pdf(destino_pdf)
     return destino_pdf
 
 

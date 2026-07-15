@@ -148,12 +148,31 @@ def test_tenancy_loja_a_nao_ve_modelo_da_loja_b(app_db, seed, http_client_factor
 
 # ── POST /api/documentos/modelos/importar ───────────────────────────────────────
 
-def test_importar_sem_capacidade_403(http_client_factory):
+def test_importar_sem_capacidade_403(app_db, seed, http_client_factory, monkeypatch, tmp_path):
+    """403 não basta: tem que provar que NADA aconteceu antes do gate.
+
+    Hoje a ordem do código já checa a capacidade antes de qualquer I/O, mas sem estas
+    asserções nada trava isso — bastaria alguém mover o guardar_staging para cima do gate
+    para um operador sem permissão passar a escrever no disco da loja, e o teste seguiria verde.
+    """
+    import mod_documentos
+    docs_dir = str(tmp_path / "docs_403")
+    monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", docs_dir)
+    db = app_db.get_session()
+    antes = db.query(app_db.DocumentoModelo).count()
+    db.close()
+
     c = _login(http_client_factory, "cons_l1")   # operador: sem gerir_documentos
     status, body = _post_multipart(
         c, "/api/documentos/modelos/importar", {"tipo": "contrato"},
         arquivo=("arquivo", "modelo.md", CORPO_OK.encode("utf-8")))
     assert status == 403, body
+
+    assert not os.path.exists(docs_dir), (
+        "403 deixou rastro em disco — o gate de capacidade está DEPOIS do guardar_staging")
+    db = app_db.get_session()
+    assert db.query(app_db.DocumentoModelo).count() == antes, "403 mexeu no banco"
+    db.close()
 
 
 def test_importar_pdf_400_com_mensagem_acionavel(http_client_factory):
@@ -237,6 +256,47 @@ def test_preview_sem_capacidade_403(http_client_factory):
     assert _json.loads(body)["ok"] is False
 
 
+def test_preview_com_corpo_malicioso_nao_faz_requisicao_externa(http_client_factory):
+    """SSRF pelo endpoint REAL — a composição, não só o mod_contrato isolado.
+
+    Era o vetor mais barato da frente: bastava um POST no /preview, sem ativar nada, para
+    o servidor buscar uma URL escolhida pelo atacante (alcance a serviço interno). Depois
+    de ativado, dispararia em todo contrato gerado. tests/test_documentos_seguranca.py
+    cobre as duas camadas na unidade; aqui prova-se que estão plugadas na rota.
+    """
+    import threading
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+
+    hits = []
+
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            hits.append(self.path)
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"hi")
+
+        def log_message(self, *a):
+            pass
+
+    sonda = HTTPServer(("127.0.0.1", 0), H)
+    porta = sonda.server_address[1]
+    threading.Thread(target=sonda.serve_forever, daemon=True).start()
+    try:
+        corpo = ('<img src="http://127.0.0.1:%d/vazou-img">\n\n'
+                 '<style>@import url("http://127.0.0.1:%d/vazou-css");</style>\n\n'
+                 '# CLAUSULA PRIMEIRA\n1.1. Texto.\n' % (porta, porta))
+        c = _login(http_client_factory, "dir_l1")
+        status, dados, _h = _post_json_raw(c, "/api/documentos/modelos/preview",
+                                           {"corpo_md": corpo})
+        assert status == 200, dados[:300]
+        assert dados[:4] == b"%PDF"
+        assert hits == [], "o /preview buscou URL externa a partir do corpo_md: %r" % hits
+    finally:
+        sonda.shutdown()
+
+
 def test_preview_gera_pdf_e_nao_salva_nada(app_db, seed, http_client_factory):
     db = app_db.get_session()
     antes = db.query(app_db.DocumentoModelo).filter_by(loja_id=seed["loja1_id"]).count()
@@ -257,13 +317,21 @@ def test_preview_gera_pdf_e_nao_salva_nada(app_db, seed, http_client_factory):
 
 # ── POST /api/documentos/modelos — cria + ativa ─────────────────────────────────
 
-def test_modelos_post_sem_capacidade_403(http_client_factory):
+def test_modelos_post_sem_capacidade_403(app_db, http_client_factory):
+    db = app_db.get_session()
+    antes = db.query(app_db.DocumentoModelo).count()
+    db.close()
+
     c = _login(http_client_factory, "cons_l1")
     status, body = c.post("/api/documentos/modelos", {
         "tipo": "contrato", "corpo_md": CORPO_OK, "origem_nome": "m.md",
         "cravados_aprovados": [],
     })
     assert status == 403, body
+
+    db = app_db.get_session()
+    assert db.query(app_db.DocumentoModelo).count() == antes, "403 criou versão"
+    db.close()
 
 
 def test_modelos_post_marcador_desconhecido_400_nada_criado(app_db, seed, http_client_factory):
@@ -306,28 +374,56 @@ def test_modelos_post_feliz_cria_ativa_e_aparece_no_get(http_client_factory):
 
 
 # ── Path traversal ───────────────────────────────────────────────────────────────
+#
+# A primeira versão desta suíte testava só o vetor COM BARRA ('../../loja2/...'), que o
+# os.path.basename() realmente resolve — passava pelo motivo certo, mas era o vetor fácil.
+# A revisão achou o furo: basename('.') == '.' e basename('..') == '..' (não têm barra,
+# então basename não remove nada). Com '.', o join devolvia o PRÓPRIO _staging/ da loja,
+# exists() dizia True, e o shutil.move levava o DIRETÓRIO INTEIRO — com os uploads
+# pendentes de outras importações — para dentro de v<N>/. Com '..', subia shutil.Error
+# não tratado e a conexão caía sem resposta. Os dois comprovados contra o servidor real.
+# Agora quem confina é mod_documentos.resolver_staging; estes testes travam os vetores.
 
-def test_staging_path_traversal_nao_escapa_da_loja(app_db, seed, http_client_factory, monkeypatch, tmp_path):
-    """'staging' vindo do cliente com componentes de diretório não pode fazer o servidor
-    promover um arquivo de fora do _staging/ da loja da sessão (nem de outra loja)."""
+@pytest.mark.parametrize("vetor", [
+    ".",                       # basename('.') == '.' -> era o _staging/ inteiro
+    "..",                      # basename('..') == '..' -> shutil.Error, conexão caída
+    "../../algo",
+    "..\\..\\algo",
+    "/etc/passwd",
+    "C:\\Windows\\win.ini",
+    "",
+    "   ",
+    "inventado.md",            # forma inválida (não é <sha16><ext>)
+    "0123456789abcdef.md/..",
+])
+def test_staging_vetor_hostil_nao_promove_nada(app_db, seed, http_client_factory,
+                                               monkeypatch, tmp_path, vetor):
+    """Nenhum vetor pode escapar do _staging/ da loja, virar 500 ou derrubar a conexão.
+
+    O contrato é: não resolveu -> segue SEM trilha de origem (origem_path None), 200.
+    A versão vale sem o original; o que não pode é tocar arquivo de fora.
+    """
     import mod_documentos
-    docs_dir = str(tmp_path / "docs_traversal")
+    docs_dir = str(tmp_path / ("docs_" + str(abs(hash(vetor)))))
     monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", docs_dir)
 
-    # Arquivo "secreto" no _staging de verdade da Loja 2, mesmo nome que será tentado.
+    # staging legítimo pendente da Loja 1 — é o que o vetor '.' arrastaria junto.
+    pendente, _sha = mod_documentos.guardar_staging(
+        seed["loja1_id"], "contrato", "pendente.md", b"UPLOAD PENDENTE DE OUTRA IMPORTACAO")
+    # e um arquivo da Loja 2, que nenhum vetor pode alcançar
     outro_dir = os.path.join(docs_dir, str(seed["loja2_id"]), "contrato", "_staging")
     os.makedirs(outro_dir, exist_ok=True)
-    secreto = os.path.join(outro_dir, "traversal_alvo.docx")
+    secreto = os.path.join(outro_dir, "segredo.docx")
     with open(secreto, "wb") as fh:
-        fh.write(b"CONTEUDO DA LOJA 2 - NAO PODE VAZAR")
+        fh.write(b"CONTEUDO DA LOJA 2")
 
     c = _login(http_client_factory, "dir_l1")   # sessão da Loja 1
     status, body = c.post("/api/documentos/modelos", {
         "tipo": "contrato", "corpo_md": CORPO_OK, "origem_nome": "modelo.md",
-        "staging": "../../%s/contrato/_staging/traversal_alvo.docx" % seed["loja2_id"],
-        "cravados_aprovados": [],
+        "staging": vetor, "cravados_aprovados": [],
     })
-    assert status == 200, body   # não existindo no destino recomposto, segue sem origem_path
+    assert status == 200, "vetor %r devia ser recusado em silêncio, não virar %s: %r" % (
+        vetor, status, body)
     assert body["ok"] is True
 
     db = app_db.get_session()
@@ -335,9 +431,100 @@ def test_staging_path_traversal_nao_escapa_da_loja(app_db, seed, http_client_fac
         m = db.get(app_db.DocumentoModelo, body["modelo"]["id"])
         assert m.loja_id == seed["loja1_id"]
         assert m.origem_path is None, (
-            "path traversal NÃO pode ter promovido o arquivo da Loja 2: origem_path=%r" % m.origem_path
-        )
+            "vetor %r promoveu algo indevido: origem_path=%r" % (vetor, m.origem_path))
     finally:
         db.close()
-    # o arquivo "secreto" da Loja 2 continua onde estava — não foi movido/consumido
-    assert os.path.exists(secreto)
+    assert os.path.isfile(pendente), (
+        "vetor %r arrastou o _staging/ da loja (upload pendente sumiu)" % vetor)
+    assert os.path.isfile(secreto), "vetor %r tocou arquivo da Loja 2" % vetor
+
+
+def test_staging_legitimo_continua_sendo_promovido(app_db, seed, http_client_factory,
+                                                   monkeypatch, tmp_path):
+    """Contraponto do teste acima: endurecer não pode matar o caminho feliz.
+
+    O nome que o importar devolve TEM que continuar promovendo o original para v<N>/ —
+    senão a trilha de auditoria (origem_path/origem_sha256) morreria em silêncio.
+    """
+    import mod_documentos
+    monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", str(tmp_path / "docs_feliz"))
+
+    c = _login(http_client_factory, "dir_l1")
+    status, imp = _post_multipart(
+        c, "/api/documentos/modelos/importar", {"tipo": "contrato"},
+        arquivo=("arquivo", "modelo_real.md", CORPO_OK.encode("utf-8")))
+    assert status == 200, imp
+
+    status, body = c.post("/api/documentos/modelos", {
+        "tipo": "contrato", "corpo_md": imp["corpo_md"], "origem_nome": imp["origem_nome"],
+        "staging": imp["staging"], "origem_sha256": imp["origem_sha256"],
+        "cravados_aprovados": [],
+    })
+    assert status == 200, body
+
+    db = app_db.get_session()
+    try:
+        m = db.get(app_db.DocumentoModelo, body["modelo"]["id"])
+        assert m.origem_path and os.path.isfile(m.origem_path), (
+            "o staging legítimo devia ter sido promovido: origem_path=%r" % m.origem_path)
+        assert "v%d" % m.versao in m.origem_path
+        assert m.origem_sha256 == imp["origem_sha256"]
+    finally:
+        db.close()
+
+
+def test_falha_de_io_ao_promover_nao_derruba_conexao_nem_duplica_versao(
+        app_db, seed, http_client_factory, monkeypatch, tmp_path):
+    """criar_versao commita a linha e SÓ DEPOIS move o original, deixando a exceção do
+    move subir (contrato travado por test_documentos_registro). Antes, o handler só
+    pegava ValueError -> OSError derrubava a conexão sem resposta.
+
+    Responder erro também seria errado: a versão JÁ existe, o lojista tentaria de novo e
+    criaria uma DUPLICADA — a armadilha que o próprio criar_versao documenta. O certo é
+    recuperar a linha, ativar e avisar.
+    """
+    import mod_documentos
+    monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", str(tmp_path / "docs_io"))
+
+    # app_db/seed são module-scoped: as versões acumulam entre os testes deste arquivo.
+    # Contar o delta é o que prova "não duplicou" — um assert de total absoluto estaria
+    # testando a ordem das fixtures, não o comportamento.
+    def _n_propostas():
+        db = app_db.get_session()
+        try:
+            return [m.id for m in mod_documentos.listar(db, seed["loja1_id"])
+                    if m.tipo == "proposta"]
+        finally:
+            db.close()
+    antes = _n_propostas()
+
+    c = _login(http_client_factory, "dir_l1")
+    status, imp = _post_multipart(
+        c, "/api/documentos/modelos/importar", {"tipo": "proposta"},
+        arquivo=("arquivo", "io.md", CORPO_OK.encode("utf-8")))
+    assert status == 200, imp
+
+    def explode(*a, **k):
+        raise OSError("disco cheio (simulado)")
+    monkeypatch.setattr(mod_documentos, "_promover_original", explode)
+
+    status, body = c.post("/api/documentos/modelos", {
+        "tipo": "proposta", "corpo_md": imp["corpo_md"], "origem_nome": imp["origem_nome"],
+        "staging": imp["staging"], "origem_sha256": imp["origem_sha256"],
+        "cravados_aprovados": [],
+    })
+    assert status == 200, "falha de I/O virou %s (antes: conexão caída): %r" % (status, body)
+    assert body["ok"] is True
+    assert "aviso" in body, "o lojista tem que saber que a trilha de origem se perdeu"
+
+    depois = _n_propostas()
+    assert len(depois) == len(antes) + 1, (
+        "a falha de I/O tinha que gerar UMA versão, não %d" % (len(depois) - len(antes)))
+
+    db = app_db.get_session()
+    try:
+        m = db.get(app_db.DocumentoModelo, body["modelo"]["id"])
+        assert m.ativo == 1, "a versão existe e é válida — tem que ficar ativa"
+        assert m.origem_path is None
+    finally:
+        db.close()

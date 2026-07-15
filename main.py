@@ -2671,6 +2671,11 @@ class Handler(BaseHTTPRequestHandler):
                 if "arquivo" not in arquivos:
                     self.send_json({"ok": False, "erro": "Anexe o arquivo do modelo."}, code=400); return
                 fname, dados = arquivos["arquivo"]
+                # DÍVIDA CONHECIDA (não desta frente): o upload não tem teto de tamanho. Nenhum
+                # POST do main.py limita Content-Length — o body é lido inteiro em memória lá no
+                # topo do do_POST, antes de qualquer rota existir. É gap sistêmico do arquivo, e
+                # resolver aqui só nesta rota daria falsa sensação de cobertura; o cap pertence ao
+                # ponto único de leitura do body. Registrado para a frente que endereçar isso.
                 staging_path, sha = _mdoc.guardar_staging(loja_id, tipo, fname, dados)
                 # importa e analisa SEM salvar versão — o lojista pode desistir na revisão.
                 try:
@@ -2791,21 +2796,35 @@ class Handler(BaseHTTPRequestHandler):
                         "analise": analise,
                     }, code=400)
                     return
-                # SEGURANÇA — path traversal: 'staging' do cliente é só o basename; o caminho é
-                # recomposto aqui a partir de DOCS_LOJA_DIR + loja_id (da SESSÃO) + tipo. Nunca se
-                # aceita o caminho pronto do cliente. Arquivo ausente -> segue sem trilha de origem.
-                staging_basename = os.path.basename((req.get("staging") or "").strip())
-                staging_path = None
-                if staging_basename:
-                    candidato = os.path.join(_mdoc.DOCS_LOJA_DIR, str(loja_id), tipo, "_staging", staging_basename)
-                    if os.path.exists(candidato):
-                        staging_path = candidato
+                # SEGURANÇA — path traversal: quem valida/confina o 'staging' do cliente é
+                # mod_documentos.resolver_staging (regex do nome + realpath/commonpath + isfile),
+                # que é o módulo dono da convenção de nome. Nunca se aceita caminho pronto do
+                # cliente, e basename() NÃO basta ('.' e '..' passam inteiros por ele — ver o
+                # docstring de resolver_staging). Não resolveu -> segue sem trilha de origem.
+                staging_path = _mdoc.resolver_staging(loja_id, tipo, req.get("staging"))
                 try:
                     modelo = _mdoc.criar_versao(db, loja_id, tipo, corpo_final, origem_nome,
                                                 usuario["id"], staging_path=staging_path,
                                                 origem_sha256=origem_sha256)
                 except ValueError as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=400); return
+                except OSError as e:
+                    # criar_versao commita a LINHA antes de mover o original (ordem deliberada,
+                    # ver o docstring dele) e deixa a exceção do move subir. Então aqui a versão
+                    # EXISTE e é válida — só ficou sem trilha de origem. Responder erro faria o
+                    # lojista tentar de novo e criar uma versão DUPLICADA: exatamente a armadilha
+                    # que criar_versao descreve. Recupera-se a linha (listar ordena versao desc,
+                    # a 1ª do tipo é a recém-criada), ativa e reporta ok com aviso.
+                    db.rollback()
+                    modelo = next((m for m in _mdoc.listar(db, loja_id) if m.tipo == tipo), None)
+                    if modelo is None:
+                        self.send_json({"ok": False, "erro": "Falha ao gravar o modelo: %s" % e}, code=500); return
+                    _mdoc.ativar(db, modelo.id)
+                    self.send_json({"ok": True, "modelo": _serializar_modelo_documento(modelo),
+                                    "aviso": "Modelo ativado, mas o arquivo original não pôde ser "
+                                             "arquivado (%s). O modelo vale; só a trilha de origem "
+                                             "desta versão se perdeu." % e})
+                    return
                 _mdoc.ativar(db, modelo.id)
                 self.send_json({"ok": True, "modelo": _serializar_modelo_documento(modelo)})
             finally:
@@ -9000,13 +9019,27 @@ def _serializar_modelo_documento(m):
 
 
 def _remover_staging_seguro(caminho):
-    """Apaga o arquivo de staging quando a importação não vira versão (conversão falhou,
-    corpo saiu vazio, ou o lojista nunca confirma). Sem isto, todo upload que não vira
-    versão fica pra sempre em _staging/ (débito já documentado em guardar_staging)."""
+    """Apaga o arquivo de staging quando a importação não vira versão (conversão falhou
+    ou o corpo saiu vazio). Sem isto, todo upload que não vira versão fica pra sempre em
+    _staging/ (débito já documentado em guardar_staging).
+
+    "Seguro" aqui é confinamento de verdade, não só engolir exceção: só apaga arquivo
+    (isfile, nunca diretório) sob DOCS_LOJA_DIR. Hoje o `caminho` só vem de
+    guardar_staging — gerado pelo servidor —, mas uma função com "seguro" no nome que
+    não confina mente para o próximo chamador, e apagar é irreversível.
+    """
+    import mod_documentos as _mdoc
+    if not caminho:
+        return
     try:
-        if caminho and os.path.exists(caminho):
-            os.remove(caminho)
-    except OSError:
+        alvo = os.path.realpath(caminho)
+        base = os.path.realpath(_mdoc.DOCS_LOJA_DIR)
+        # commonpath levanta ValueError p/ drives diferentes (Windows) — caso a recusar.
+        if os.path.commonpath([base, alvo]) != base:
+            return
+        if os.path.isfile(alvo):
+            os.remove(alvo)
+    except (OSError, ValueError):
         pass
 
 
