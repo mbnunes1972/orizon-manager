@@ -86,8 +86,34 @@ def test_adendo_presente_sai_dos_ausentes():
 
 
 def test_essencial_presente_sai_dos_ausentes():
-    corpo = " ".join("[%s]" % c for c in mod_marcadores.ESSENCIAIS)
+    # ESSENCIAIS é lista de GRUPOS equivalentes; o 1º de cada grupo é o canônico.
+    corpo = " ".join("[%s]" % g[0] for g in mod_marcadores.ESSENCIAIS)
     assert mod_marcadores.analisar_corpo(corpo, {})["ausentes"] == []
+
+
+def test_alias_satisfaz_o_essencial_do_grupo():
+    """O CATALOGO tem duas famílias para o mesmo dado (CPF/CPF_CLIENTE) justamente
+    para tolerar convenções de outras lojas. Avisar 'CPF_CLIENTE ausente' num
+    documento que usa [CPF] é aviso FALSO — e aviso falso ensina o lojista a
+    ignorar os avisos."""
+    r = mod_marcadores.analisar_corpo("Cliente [NOME_CLIENTE], CPF [CPF].", {})
+    assert "CPF_CLIENTE" not in r["ausentes"]
+    assert "CPF" not in r["ausentes"]
+
+
+def test_alias_de_testemunha_satisfaz_o_essencial():
+    corpo = "[TESTEMUNHA_1_NOME] e [NOME_TESTEMUNHA2]"
+    aus = mod_marcadores.analisar_corpo(corpo, {})["ausentes"]
+    assert "NOME_TESTEMUNHA_1" not in aus
+    assert "NOME_TESTEMUNHA_2" not in aus
+
+
+def test_ausentes_reporta_a_chave_canonica_do_grupo():
+    """Uma chave por grupo, não a família inteira — senão a tela vira sopa."""
+    aus = mod_marcadores.analisar_corpo("Nada aqui.", {})["ausentes"]
+    assert "CPF_CLIENTE" in aus
+    assert "CPF" not in aus, "só a canônica do grupo vai pra tela"
+    assert aus == [g[0] for g in mod_marcadores.ESSENCIAIS]
 
 
 def test_detecta_cnpj_da_loja_cravado_com_pontuacao_diferente():
@@ -110,6 +136,53 @@ def test_cravado_traz_o_literal_para_a_tela_mostrar():
     c = [x for x in mod_marcadores.analisar_corpo(corpo, LOJA_EXEMPLO)["cravados"]
          if x["marcador"] == "LOJA_CIDADE"][0]
     assert c["literal"] == "São José dos Campos"
+    assert c["ocorrencias"] == 1
+
+
+def test_cravado_traz_trecho_com_o_contexto_em_volta():
+    """Sem contexto o lojista aprova às cegas — e aprovar às cegas não é aprovar.
+    Caso real: bairro 'Centro' casando em 'Centro Empresarial ABC' produziria
+    '[LOJA_BAIRRO] Empresarial ABC'. Renderiza certo hoje; quando a loja mudar de
+    endereço no cadastro, todo contrato passa a dizer 'Jardim Empresarial ABC'.
+    O trecho é o que dá ao lojista como enxergar isso antes de aprovar."""
+    corpo = "A empresa fica no Centro Empresarial ABC, sala 12."
+    c = mod_marcadores.analisar_corpo(corpo, {"bairro": "Centro"})["cravados"][0]
+    assert c["marcador"] == "LOJA_BAIRRO"
+    assert len(c["trechos"]) == 1
+    assert "Empresarial ABC" in c["trechos"][0], "o trecho tem que mostrar o que vem depois"
+    assert ">>>Centro<<<" in c["trechos"][0], "a ocorrência tem que vir demarcada"
+
+
+def test_trechos_limitados_declaram_quantos_ficaram_de_fora():
+    """Truncar em silêncio seria mentir de novo, só que na tela."""
+    corpo = " ".join(["bairro Centro."] * 10)
+    c = mod_marcadores.analisar_corpo(corpo, {"bairro": "Centro"})["cravados"][0]
+    assert c["ocorrencias"] == 10
+    assert len(c["trechos"]) == 3
+    assert c["trechos_omitidos"] == 7
+
+
+def test_trecho_marca_reticencias_so_quando_ha_corte():
+    c = mod_marcadores.analisar_corpo("Centro", {"bairro": "Centro"})["cravados"][0]
+    assert c["trechos"] == [">>>Centro<<<"], "corpo inteiro cabe: sem reticências"
+
+
+def test_ocorrencias_do_cnpj_sem_pontuacao_conta_de_verdade():
+    """'ocorrencias' era 1 hardcoded neste ramo — a tela mostraria '1×' como fato."""
+    corpo = ("CNPJ 19.152.134/0001-56 ... e tambem 19152134000156 "
+             "em outro ponto do documento.")
+    c = [x for x in mod_marcadores.analisar_corpo(corpo, LOJA_EXEMPLO)["cravados"]
+         if x["marcador"] == "CNPJ_EMPRESA"][0]
+    assert c["ocorrencias"] == 2, "as duas formatações são a mesma loja"
+    assert c["so_digitos"] is True, "há ocorrência que aplicar_cravados não troca"
+
+
+def test_cnpj_so_com_pontuacao_exata_nao_marca_so_digitos():
+    """Se toda ocorrência casa exata, aplicar_cravados resolve — não é caso manual."""
+    c = [x for x in mod_marcadores.analisar_corpo(
+        "CNPJ 19.152.134/0001-56.", LOJA_EXEMPLO)["cravados"]
+        if x["marcador"] == "CNPJ_EMPRESA"][0]
+    assert c.get("so_digitos", False) is False
     assert c["ocorrencias"] == 1
 
 
@@ -153,11 +226,21 @@ def test_aplicar_cravados_respeita_a_ordem_do_mais_especifico():
     assert novo == "Sede na [LOJA_LOGRADOURO], cidade de [LOJA_CIDADE]."
 
 
-def test_ordem_de_cravaveis_vai_do_mais_especifico_ao_mais_generico():
-    """Trava a ordem declarada: 'logradouro' antes de 'bairro'/'cidade', 'nome'
-    antes de 'cidade'. Documenta a invariante direto na lista, para quem for
-    acrescentar campo novo (o mais longo/específico entra antes)."""
-    campos = [c for c, _ in mod_marcadores._CRAVAVEIS]
-    assert campos.index("logradouro") < campos.index("bairro")
-    assert campos.index("logradouro") < campos.index("cidade")
-    assert campos.index("nome") < campos.index("cidade")
+def test_aplicar_cravados_num_achado_misto_troca_so_a_ocorrencia_exata():
+    """Trava o que a docstring de aplicar_cravados promete: replace é exato, então
+    a ocorrência sem pontuação sobrevive. O documento sai meio parametrizado, meio
+    cravado — é justamente por isso que so_digitos vira aviso na tela."""
+    loja = {"cnpj": "19.152.134/0001-56"}
+    corpo = "CNPJ 19.152.134/0001-56 e tambem 19152134000156 no fim."
+    novo = mod_marcadores.aplicar_cravados(corpo, loja, ["CNPJ_EMPRESA"])
+    assert novo == "CNPJ [CNPJ_EMPRESA] e tambem 19152134000156 no fim."
+
+
+def test_ordem_de_cravaveis_esta_travada():
+    """A ordem é funcional (replace sequencial em aplicar_cravados). Mudou a
+    lista? Leia o comentário de _CRAVAVEIS antes de atualizar este teste: um
+    campo cujo literal seja substring do literal de outro TEM que vir depois dele."""
+    assert [m for _, m in mod_marcadores._CRAVAVEIS] == [
+        "CNPJ_EMPRESA", "NOME_EMPRESA", "LOJA_LOGRADOURO",
+        "LOJA_BAIRRO", "LOJA_CIDADE", "LOJA_CEP",
+    ]

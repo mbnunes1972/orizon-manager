@@ -86,15 +86,36 @@ from mod_contrato import _MARK_RE
 # Sem estes, o documento sai quebrado: cliente sem nome, contrato sem data,
 # fecho sem testemunha. O wizard avisa; não bloqueia (pode ser um modelo parcial).
 #
+# É lista de GRUPOS EQUIVALENTES, não de chaves: o CATALOGO mantém duas famílias
+# de nome para o mesmo dado (CPF/CPF_CLIENTE, NOME_TESTEMUNHA_1/TESTEMUNHA_1_NOME)
+# justamente para tolerar documentos de lojas com convenção própria. O grupo só é
+# "ausente" se NENHUM membro aparecer; um documento que usa [CPF] não pode receber
+# aviso de "CPF_CLIENTE ausente" com o dado presente e funcionando — aviso falso
+# ensina o lojista a ignorar os avisos, e aí os verdadeiros também passam batido.
+# O 1º de cada grupo é o CANÔNICO: é o único reportado em `ausentes` (a tela pede
+# uma chave por grupo, não a família inteira).
+#
+# Os canônicos escolhidos são os que o template vivo usa (contrato_template/
+# contrato.md) — é o que faz o aviso ser acionável. Nota: o rótulo do CATALOGO
+# chama CPF_CLIENTE de "(alias)" e CPF de principal, mas o template usa
+# [CPF_CLIENTE]; a rotulagem lá é que está invertida. Não mexi porque os testes
+# anti-drift travam CATALOGO×_montar_mapping e isso é outra frente.
+#
 # TEXTO_COMPLEMENTAR está aqui por um achado da revisão do Task 2: é o ponto de
 # injeção do adendo do ciclo (mod_contrato.py:744). mod_documentos_import só o
 # insere se o texto tiver o marco de fecho do modelo ATUAL ("E assim, por estarem
 # assim convencionados") — um contrato de outra loja, com redação própria, não
 # tem. Sem este aviso, o adendo some do PDF em silêncio.
-ESSENCIAIS = ["NOME_CLIENTE", "CPF_CLIENTE", "DATA_CONTRATO",
-              "NOME_EMPRESA", "CNPJ_EMPRESA",
-              "NOME_TESTEMUNHA_1", "NOME_TESTEMUNHA_2",
-              "TEXTO_COMPLEMENTAR"]
+ESSENCIAIS = [
+    ("NOME_CLIENTE",),
+    ("CPF_CLIENTE", "CPF"),
+    ("DATA_CONTRATO",),
+    ("NOME_EMPRESA",),
+    ("CNPJ_EMPRESA",),
+    ("NOME_TESTEMUNHA_1", "TESTEMUNHA_1_NOME"),
+    ("NOME_TESTEMUNHA_2", "TESTEMUNHA_2_NOME", "NOME_TESTEMUNHA2"),
+    ("TEXTO_COMPLEMENTAR",),
+]
 
 # Campos da loja que valem procurar cravados no texto → marcador correspondente.
 #
@@ -108,10 +129,11 @@ ESSENCIAIS = ["NOME_CLIENTE", "CPF_CLIENTE", "DATA_CONTRATO",
 # "São José dos Campos". Com cidade antes, o corpo vira "Rua [LOJA_CIDADE]" e o
 # replace seguinte procura "Rua São José dos Campos" — que já não existe.
 #
-# Para analisar_corpo a ordem é indiferente (str.count sobre o corpo imutável;
-# cada campo busca seu próprio literal sem interferir nos outros) — ela só afeta
-# a ordem de leitura da lista de achados na tela.
-# test_aplicar_cravados_respeita_a_ordem_do_mais_especifico trava isto.
+# Para analisar_corpo a ordem é indiferente (busca sobre o corpo imutável; cada
+# campo procura seu próprio literal sem interferir nos outros) — ela só afeta a
+# ordem de leitura da lista de achados na tela.
+# test_ordem_de_cravaveis_esta_travada trava a lista inteira; o comportamental
+# (test_aplicar_cravados_respeita_a_ordem_do_mais_especifico) prova o mecanismo.
 _CRAVAVEIS = [
     ("cnpj",       "CNPJ_EMPRESA"),
     ("nome",       "NOME_EMPRESA"),
@@ -121,8 +143,16 @@ _CRAVAVEIS = [
     ("cep",        "LOJA_CEP"),
 ]
 
-# Abaixo disto, o valor casa por acidente ("Sé", "SP", nº "12").
+# Campos cujo literal é essencialmente numérico: o documento pode pontuar
+# diferente do cadastro ("19.152.134/0001-56" vs "19152134000156").
+_NUMERICOS = ("cnpj", "cep")
+
+# Abaixo disto, o valor casa por acidente (cidade "Sé", bairro "Boa").
 _MIN_LITERAL = 4
+
+# Contexto em volta de cada ocorrência, para a tela mostrar ao lojista.
+_CTX_CHARS = 40
+_MAX_TRECHOS = 3
 
 
 def _so_digitos(s):
@@ -134,39 +164,101 @@ def _chaves_usadas(corpo_md):
             for m in _MARK_RE.finditer(corpo_md or "")]
 
 
+def _trecho(corpo, ini, fim):
+    """Trecho do corpo em volta de [ini:fim), com a ocorrência demarcada.
+
+    É o que permite ao lojista julgar a troca: 'Centro' casando em 'Centro
+    Empresarial ABC' só é reconhecível vendo o texto em volta. Word-boundary não
+    pegaria — 'Centro' ali É palavra inteira.
+    """
+    a, b = max(0, ini - _CTX_CHARS), min(len(corpo), fim + _CTX_CHARS)
+    return "%s%s>>>%s<<<%s%s" % (
+        "…" if a > 0 else "",
+        corpo[a:ini].replace("\n", " "),
+        corpo[ini:fim],
+        corpo[fim:b].replace("\n", " "),
+        "…" if b < len(corpo) else "",
+    )
+
+
+def _cravado(corpo, campo, marcador, valor, posicoes, so_digitos=False):
+    item = {"marcador": marcador, "literal": valor, "campo": campo,
+            "ocorrencias": len(posicoes),
+            "trechos": [_trecho(corpo, a, b) for a, b in posicoes[:_MAX_TRECHOS]],
+            "trechos_omitidos": max(0, len(posicoes) - _MAX_TRECHOS)}
+    if so_digitos:
+        item["so_digitos"] = True
+    return item
+
+
+def _posicoes_literal(corpo, valor):
+    pos, i = [], corpo.find(valor)
+    while i >= 0:
+        pos.append((i, i + len(valor)))
+        i = corpo.find(valor, i + len(valor))
+    return pos
+
+
+def _posicoes_numerico(corpo, valor):
+    """Acha o número no corpo tolerando pontuação diferente da do cadastro.
+
+    Casa dígito a dígito com até 2 não-dígitos de folga entre eles (o bastante
+    para ".", "/", "-", ", "). Substitui o teste antigo — `_so_digitos(valor) in
+    _so_digitos(corpo)` —, que concatenava os dígitos do documento INTEIRO e
+    podia casar uma sequência atravessando dois números não relacionados, sem
+    posição nem contexto para o lojista conferir.
+
+    Limitação residual: a folga de 2 chars ainda deixa casar "sala 19, 152134…"
+    como se fosse um CNPJ único. Não dá para eliminar por sintaxe — por isso o
+    achado vai para a tela COM trecho, para o lojista julgar, e nunca é
+    substituído automaticamente (ver aplicar_cravados).
+    """
+    nus = _so_digitos(valor)
+    if len(nus) < _MIN_LITERAL:
+        return []
+    rx = _re.compile(r"\D{0,2}".join(_re.escape(d) for d in nus))
+    return [(m.start(), m.end()) for m in rx.finditer(corpo)]
+
+
 def analisar_corpo(corpo_md, loja):
     """Analisa um corpo importado contra o catálogo e o cadastro da loja.
 
     Devolve:
       conhecidos_usados  marcadores do catálogo presentes no corpo
       desconhecidos      [FOO] sem verbete — seria impresso literal no PDF
-      ausentes           essenciais que o corpo não tem
-      cravados           dados da loja literais no texto, candidatos a marcador
+      ausentes           canônica de cada grupo de ESSENCIAIS sem nenhum membro
+                         presente no corpo
+      cravados           dados da loja literais no texto, candidatos a marcador;
+                         cada item traz `trechos` (contexto em volta, demarcado)
+                         + `trechos_omitidos`, e `so_digitos` quando há ocorrência
+                         que aplicar_cravados não vai trocar
       bloqueia_ativacao  True se há desconhecido
     """
     loja = loja or {}
-    usadas = _chaves_usadas(corpo_md)
+    corpo = corpo_md or ""
+    usadas = _chaves_usadas(corpo)
     conhecidos = [c for c in dict.fromkeys(usadas) if c in CATALOGO]
     desconhecidos = [c for c in dict.fromkeys(usadas) if c not in CATALOGO]
-    ausentes = [c for c in ESSENCIAIS if c not in usadas]
+    ausentes = [grupo[0] for grupo in ESSENCIAIS
+                if not any(chave in usadas for chave in grupo)]
 
     cravados = []
     for campo, marcador in _CRAVAVEIS:
         valor = (loja.get(campo) or "").strip()
         if len(valor) < _MIN_LITERAL:
             continue
-        n = (corpo_md or "").count(valor)
-        if n:
-            cravados.append({"marcador": marcador, "literal": valor,
-                             "ocorrencias": n, "campo": campo})
+        if campo in _NUMERICOS:
+            pos = _posicoes_numerico(corpo, valor)
+            if pos:
+                # so_digitos = há ocorrência cujo texto difere do cadastro, logo
+                # aplicar_cravados (replace exato) não a resolve: é caso manual.
+                exatos = all(corpo[a:b] == valor for a, b in pos)
+                cravados.append(_cravado(corpo, campo, marcador, valor, pos,
+                                         so_digitos=not exatos))
             continue
-        # CNPJ/CEP: o documento pode usar pontuação diferente do cadastro.
-        if campo in ("cnpj", "cep"):
-            nus = _so_digitos(valor)
-            if len(nus) >= _MIN_LITERAL and nus in _so_digitos(corpo_md):
-                cravados.append({"marcador": marcador, "literal": valor,
-                                 "ocorrencias": 1, "campo": campo,
-                                 "so_digitos": True})
+        pos = _posicoes_literal(corpo, valor)
+        if pos:
+            cravados.append(_cravado(corpo, campo, marcador, valor, pos))
     return {"conhecidos_usados": conhecidos, "desconhecidos": desconhecidos,
             "ausentes": ausentes, "cravados": cravados,
             "bloqueia_ativacao": bool(desconhecidos)}
@@ -175,11 +267,17 @@ def analisar_corpo(corpo_md, loja):
 def aplicar_cravados(corpo_md, loja, marcadores_aprovados):
     """Troca pelo marcador só os literais que o lojista aprovou.
 
-    Só troca correspondência EXATA de string (str.replace) — quando o achado
-    veio da via `so_digitos` (CNPJ/CEP com pontuação diferente do cadastro),
-    não há literal exato para substituir; a tela mostra o achado e o lojista
-    corrige à mão. Regex por dígitos arriscaria casar outro número do texto
-    (outro CNPJ, outro CEP) — num contrato, não vale o risco.
+    Só troca correspondência EXATA de string (str.replace). Achado marcado
+    `so_digitos` tem ao menos uma ocorrência escrita com pontuação diferente da
+    do cadastro: essa não tem string exata para casar e SOBREVIVE à troca — a
+    tela mostra o trecho e o lojista corrige à mão. Num achado misto as exatas
+    são trocadas e as demais ficam (por isso o aviso importa: o documento sai
+    meio parametrizado, meio cravado).
+
+    Não reuso o regex flexível de _posicoes_numerico para substituir: ele tolera
+    folga entre os dígitos e poderia casar outro número do texto. Detectar com
+    ele é seguro (o achado vai à tela com trecho, e o lojista julga);
+    substituir cegamente, num contrato assinado, não.
     """
     loja = loja or {}
     aprovados = set(marcadores_aprovados or [])
