@@ -14,6 +14,8 @@ Fallback: loja sem modelo ativo cai no arquivo global de hoje
 import os
 import hashlib
 
+from sqlalchemy.exc import IntegrityError
+
 from database import DocumentoModelo
 
 TIPOS = ("contrato", "proposta")
@@ -70,19 +72,41 @@ def criar_versao(db, loja_id, tipo, corpo_md, origem_nome, usuario_id,
     """Cria a próxima versão (inativa). Ativar é passo à parte — ver ativar().
 
     staging_path: original vindo de guardar_staging(); é promovido para v<N>/
-    aqui, quando o número da versão finalmente existe.
+    depois que a linha existe.
+
+    ORDEM DELIBERADA — linha primeiro, arquivo depois. _proxima_versao tem corrida
+    (dois uploads simultâneos leem o mesmo MAX(versao)); a UniqueConstraint pega o
+    perdedor e aqui a gente tenta de novo. Mover o arquivo ANTES do commit deixaria
+    o perdedor com um arquivo órfão em v<N>/ e nenhuma linha apontando pra ele —
+    verificado por experimento de concorrência. O retry mora aqui, e não em cada
+    chamador, porque senão todo chamador futuro teria que lembrar de tratar isso.
     """
     _validar(tipo, corpo_md)
-    versao = _proxima_versao(db, loja_id, tipo)
-    origem_path = _promover_original(staging_path, loja_id, tipo, versao, origem_nome)
-    m = DocumentoModelo(
-        loja_id=loja_id, tipo=tipo, versao=versao,
-        nome=nome or os.path.splitext(os.path.basename(origem_nome or ""))[0] or None,
-        corpo_md=corpo_md, origem_nome=origem_nome, origem_path=origem_path,
-        origem_sha256=origem_sha256, ativo=0, criado_por_id=usuario_id,
-    )
-    db.add(m)
-    db.commit()
+    for _ in range(5):
+        try:
+            m = DocumentoModelo(
+                loja_id=loja_id, tipo=tipo,
+                versao=_proxima_versao(db, loja_id, tipo),
+                nome=nome or os.path.splitext(os.path.basename(origem_nome or ""))[0] or None,
+                corpo_md=corpo_md, origem_nome=origem_nome,
+                origem_path=None,          # preenchido depois que a linha existe
+                origem_sha256=origem_sha256, ativo=0, criado_por_id=usuario_id,
+            )
+            db.add(m)
+            db.commit()
+            break
+        except IntegrityError:
+            db.rollback()
+    else:
+        raise RuntimeError(
+            "não foi possível reservar número de versão para (loja=%s, tipo=%s) "
+            "após 5 tentativas" % (loja_id, tipo))
+
+    # A linha existe. Agora o arquivo. Se isto falhar, a versão continua válida
+    # (sem trilha de origem) e o original segue no staging — nada se perde.
+    if staging_path:
+        m.origem_path = _promover_original(staging_path, loja_id, tipo, m.versao, origem_nome)
+        db.commit()
     return m
 
 
