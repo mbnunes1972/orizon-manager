@@ -774,6 +774,23 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/comercial/dashboard":
+            # Dashboard Comercial: funil de conversão + carteira por status + volume contratado.
+            # View DERIVADA da fonte única, escopada pela loja ativa (escopo_operacional).
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            import mod_comercial_dash
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                self.send_json({"ok": True, "dashboard": mod_comercial_dash.dashboard_comercial(db, loja_id)})
+            finally:
+                db.close()
+            return
         if path == "/api/financeiro/reconciliacao-provisoes":
             # FASE D: Provisionado × Efetivado × Saldo × Destino. ?projeto=<nome> → granular; sem → consolidado.
             ctx = _contabil_ctx(self, exige_edicao=False)

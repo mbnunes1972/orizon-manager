@@ -45,11 +45,12 @@ MODULOS = {
                                  # Medição (etapas 9/10 do ciclo): o antigo módulo 'producao' (rótulo UI
                                  # "Projetos") foi retirado da navegação por ser tela-vazia e duplicar o
                                  # nome; seu código é dono aqui, pois Medição pertence ao ciclo comercial.
-                                 "mod_medicao.py", "mod_qualidade_xml.py"],
+                                 "mod_medicao.py", "mod_qualidade_xml.py",
+                                 "mod_comercial_dash.py"],   # dashboard Comercial (view derivada)
                     "tabelas": ["projetos_meta", "briefings", "pool_ambientes", "orcamentos",
                                 "orcamento_ambientes", "contratos", "contratos_assinaturas",
                                 "arquivo_pe", "parcela_projeto", "parcela_ambiente", "medicoes"],
-                    "rotas": ["/api/orcamentos", "/api/contratos", "/api/medicoes"]},
+                    "rotas": ["/api/orcamentos", "/api/contratos", "/api/medicoes", "/api/comercial"]},
     "fiscal":      {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Fiscal (NF-e/NFS-e)", "faixa": "expedicao",
                     "arquivos": ["mod_fiscal.py", "mapa_fiscal.py", "emissor_focus.py",
                                  "fiscal_cripto.py", "nfe_emissao.py", "mod_nfe.py"],

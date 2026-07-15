@@ -1489,6 +1489,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <!-- Fila Omie removida (Omie em descontinuação; auto-sync de cliente desligado) -->
   </div>
 
+  <!-- PAGE 15: Comercial — DASHBOARD (funil de conversão + carteira + volume). View derivada (fonte única). -->
+  <div class="page" id="page-15">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <div class="page-title" style="margin:0">Comercial</div>
+      <button class="btn btn-ghost btn-sm" onclick="goPage(0)"><i class="ti ti-folders"></i> Ver Projetos</button>
+    </div>
+    <div id="comercial-dash"><em style="color:var(--text-3);font-size:12px">Carregando&hellip;</em></div>
+  </div>
+
   <!-- Modal: Editar campos de criação do projeto (nome, cliente, parceiro, consultor) -->
   <div id="modal-proj-editar" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
     <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:min(460px,92vw);max-height:90vh;overflow:auto;box-shadow:var(--shadow);animation:mIn .18s ease">
@@ -3221,12 +3230,13 @@ function goPage(n){
   if(n===12){ if(_adminNav) _adminNav.loja = null; finTab('prov'); }   // seções no submenu da sidebar
   if(n===13) expedicaoKanbanCarregar();
   if(n===14) assistenciasCarregar();
+  if(n===15) comercialDashCarregar();   // Comercial: dashboard
   sbSyncActive(n);   // realça/expande o módulo correspondente no acordeão da sidebar
 }
 
 // Página -> módulo de domínio que ela representa (para realçar/expandir na sidebar).
 // page-00 (Projetos) fica com o Atalho, não realça o módulo Comercial (evita realce duplicado).
-const _PAGE_MODULO = {10:'cadastro', 11:'fiscal', 12:'financeiro', 13:'expedicao', 14:'assistencias'};
+const _PAGE_MODULO = {10:'cadastro', 11:'fiscal', 12:'financeiro', 13:'expedicao', 14:'assistencias', 15:'comercial'};
 function sbSyncActive(n){
   if(n===8) { sbNavRender(); return; }   // EM CONSTRUÇÃO: mantém o módulo clicado realçado (sbModuloClick já setou)
   const mod = _PAGE_MODULO[n] || null;
@@ -4007,6 +4017,61 @@ function projAplicarFiltros(){
 
   if(_projView === 'funil') renderProjKanban(lista);
   else renderProjResultados(lista);
+}
+
+// ── Comercial: DASHBOARD (funil de conversão + carteira + volume) — view derivada da fonte única ──
+async function comercialDashAbrir(){ goPage(15); }   // goPage(15) já dispara comercialDashCarregar()
+async function comercialDashCarregar(){
+  const box = document.getElementById('comercial-dash');
+  if(box) box.innerHTML = '<em style="color:var(--text-3);font-size:12px">Carregando&hellip;</em>';
+  try{
+    const r = await fetch('/api/comercial/dashboard', {credentials:'same-origin'});
+    const d = await r.json();
+    if(!d.ok){ if(box) box.innerHTML = '<span style="color:var(--warn)">'+esc(d.erro||'Falha ao carregar')+'</span>'; return; }
+    comercialDashRender(d.dashboard);
+  }catch(e){ if(box) box.innerHTML = '<span style="color:var(--warn)">Erro: '+esc(e.message)+'</span>'; }
+}
+function _dashBRL(v){ return (v||0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'}); }
+function _dashKpi(label, valor, sub){
+  return '<div style="flex:1;min-width:150px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px">'
+    + '<div style="font-size:var(--fs-xs);color:var(--text-3);text-transform:uppercase;letter-spacing:.04em">'+label+'</div>'
+    + '<div style="font-size:var(--fs-h3);font-weight:700;font-family:var(--font-mono);margin-top:4px">'+valor+'</div>'
+    + (sub ? '<div style="font-size:var(--fs-xs);color:var(--text-3);margin-top:2px">'+sub+'</div>' : '')
+    + '</div>';
+}
+function _dashBar(label, valor, max, cor, extra){
+  const pct = max>0 ? Math.round((valor/max)*100) : 0;
+  return '<div style="margin-bottom:10px">'
+    + '<div style="display:flex;justify-content:space-between;font-size:var(--fs-sm);margin-bottom:3px">'
+    +   '<span>'+label+'</span><span style="font-family:var(--font-mono);color:var(--text-2)">'+valor+(extra?' '+extra:'')+'</span></div>'
+    + '<div style="height:12px;background:var(--surface-2);border-radius:6px;overflow:hidden">'
+    +   '<div style="height:100%;width:'+pct+'%;background:'+cor+';border-radius:6px;transition:width .4s"></div></div>'
+    + '</div>';
+}
+function comercialDashRender(d){
+  const box = document.getElementById('comercial-dash');
+  if(!box) return;
+  const f = d.funil, c = d.carteira, v = d.volume, ps = c.por_status;
+  const kpis = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">'
+    + _dashKpi('Projetos', f.total, c.total_aberto+' em aberto')
+    + _dashKpi('Conversão &rarr; Contrato', f.conv_contrato_pct+'%', f.com_contrato+' de '+f.total)
+    + _dashKpi('Volume contratado', _dashBRL(v.contratado), v.n_contratos+' contrato(s)')
+    + _dashKpi('Ticket médio', _dashBRL(v.ticket_medio), '')
+    + '</div>';
+  const funil = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px">'
+    + '<div style="font-weight:600;margin-bottom:12px">Funil de conversão</div>'
+    + _dashBar('Projetos', f.total, f.total, 'var(--text-3)')
+    + _dashBar('Com Orçamento (etapa 4)', f.com_orcamento, f.total, 'var(--accent)', '· '+f.conv_orcamento_pct+'%')
+    + _dashBar('Com Contrato (etapa 7)', f.com_contrato, f.total, 'var(--accent)', '· '+f.conv_contrato_pct+'%')
+    + '</div>';
+  const maxCart = Math.max(1, ps.quente, ps.morno, ps.frio);
+  const cart = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px">'
+    + '<div style="font-weight:600;margin-bottom:12px">Carteira por status ('+c.total_aberto+')</div>'
+    + _dashBar('Quente', ps.quente, maxCart, 'var(--accent)')
+    + _dashBar('Morno', ps.morno, maxCart, 'var(--warn)')
+    + _dashBar('Frio', ps.frio, maxCart, 'var(--text-3)')
+    + '</div>';
+  box.innerHTML = kpis + funil + cart;
 }
 
 // ── Comercial: Kanban (funil por status) — Diagramacao_v2 §1.4 ──────────────
@@ -8817,7 +8882,7 @@ const _SB_MODULOS = {
                  {id:'funcionarios', lbl:'Funcionários', ic:'id-badge',       go:()=>cadIr('funcionarios')},
                  {id:'terceiros',    lbl:'Terceiros',    ic:'user-cog',       go:()=>cadIr('terceiros')},
               ]},
-  comercial:  {ic:'shopping-cart', go:()=>goPage(0)},     // folha: abre Projetos (Increment 3: vira DASHBOARD)
+  comercial:  {ic:'chart-histogram', go:()=>comercialDashAbrir()},  // Comercial = DASHBOARD (conversão/carteira/volume); a lista+ciclo é o atalho "Projetos"
   fiscal:     {ic:'file-invoice',  go:()=>goPage(11)},    // folha: Emitente/NF-e
   estoque:    {ic:'packages'},                            // em construção
   expedicao:  {ic:'truck',         go:()=>goPage(13)},    // folha: Kanban de expedição
