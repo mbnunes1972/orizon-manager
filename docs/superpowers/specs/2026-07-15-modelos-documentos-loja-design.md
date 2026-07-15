@@ -28,7 +28,7 @@ multi-loja, "documentos **da loja**" não se sustenta assim.
 | D1 | **Sem IA em produção.** Wizard determinístico. | Documento com valor jurídico. Zero dependência de API, zero custo por conversão, testável com pytest. O projeto não tem nenhuma integração LLM hoje (`requirements.txt`). |
 | D2 | **Modelo por loja, global como fallback.** | Cumpre "documentos da loja". Loja sem modelo próprio segue idêntica a hoje → migração zero. |
 | D3 | **Importação via LibreOffice, não python-docx.** | O .docx usa numeração **automática** do Word (`numId/ilvl`): "1.1", "2.3", "a)" **não estão** em `paragraph.text`. `python-docx` produziria um contrato com as cláusulas **sem número**. Já documentado em `scripts/extrair_clausulas_docx.py:4-7`. |
-| D4 | **PDF não é convertido, só armazenado.** | Extração de PDF perde a hierarquia de cláusulas (volta texto corrido com cabeçalho/rodapé/número de página). O jurídico sempre tem o .docx. |
+| D4 | **PDF é recusado, com mensagem que diz o que fazer.** | Extração de PDF perde a hierarquia de cláusulas (volta texto corrido com cabeçalho/rodapé/número de página). O jurídico sempre tem o .docx. *(Ajustada em 2026-07-15: guardar PDF como **anexo de referência** — cogitado no brainstorming — saiu de escopo; é feature de anexos, não de modelos, e um PDF que não vira modelo não serve a esta aba. Ver §11.)* |
 | D5 | **`.docx`, `.odt`, `.doc`, `.rtf`, `.md`, `.txt` na entrada.** | `soffice --headless --convert-to txt` normaliza todos os formatos binários pelo mesmo caminho — um pipeline só. |
 | D6 | **Versão de modelo é imutável; o contrato fixa a versão que usou.** | `gerar_pdf_contrato()` (`mod_contrato.py:823-829`) **regenera** `CONTRATOS/contrato_<id>.pdf` sobrescrevendo pelo id, lendo o modelo do disco na hora. Sem isso, trocar o modelo reescreve as cláusulas de um contrato **já assinado**, em silêncio. |
 | D7 | **Proposta ganha corpo, vindo do modelo da loja.** | *(corrigida em 2026-07-15 — ver §8.1)* A proposta **já** usa WeasyPrint; o que falta é ela ter um corpo. Hoje é capa-só (`mod_contrato.py:841` passa `""` para `<!--CORPO-->`), então não havia onde um documento importado aterrissar. |
@@ -267,6 +267,11 @@ o emite. Isso é gancho no ciclo/projeto + anexação — feature própria, e a 
 
 A coluna `tipo` já nasce preparada (`contrato` | `proposta` | `custom`), e o painel já nasce
 genérico: o spec seguinte acrescenta linhas e um gancho, não remodela nada.
+
+**Anexos de referência (inclui PDF).** Guardar na aba documentos que não viram modelo (o PDF do
+jurídico, um manual, um termo escaneado) é feature de **anexos**: outra tela, outro ciclo de vida,
+nenhuma relação com marcadores ou versionamento. Sai daqui por não servir ao objetivo — um PDF que
+não vira modelo não faz nada nesta aba.
 
 **Dívida conhecida: o caminho docx morto.** `mod_proposta.py`, `modelo_proposta.docx`,
 `mod_contrato._substituir_marcadores`/`_subst_paragrafo`/`_converter_pdf`, o import inútil em
