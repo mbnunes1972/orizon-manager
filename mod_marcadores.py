@@ -54,15 +54,15 @@ CATALOGO = {
     #   - TESTEMUNHA_N_NOME/_DOC e NOME_TESTEMUNHA2: sem consumidor em nenhum template hoje.
     # As segundas seguem catalogadas só porque o mapping as produz (o teste anti-drift exige
     # paridade). Se um dia forem podadas, tirar de _montar_mapping e daqui no mesmo commit.
-    "TESTEMUNHA_1_NOME": {"rotulo": "Testemunha 1 — nome",      "escopo": "loja"},
-    "TESTEMUNHA_1_DOC":  {"rotulo": "Testemunha 1 — CPF",       "escopo": "loja"},
-    "TESTEMUNHA_2_NOME": {"rotulo": "Testemunha 2 — nome",      "escopo": "loja"},
-    "TESTEMUNHA_2_DOC":  {"rotulo": "Testemunha 2 — CPF",       "escopo": "loja"},
+    "TESTEMUNHA_1_NOME": {"rotulo": "Testemunha 1 — nome (alias de NOME_TESTEMUNHA_1)", "escopo": "loja"},
+    "TESTEMUNHA_1_DOC":  {"rotulo": "Testemunha 1 — CPF (alias de CPF_TESTEMUNHA_1)",   "escopo": "loja"},
+    "TESTEMUNHA_2_NOME": {"rotulo": "Testemunha 2 — nome (alias de NOME_TESTEMUNHA_2)", "escopo": "loja"},
+    "TESTEMUNHA_2_DOC":  {"rotulo": "Testemunha 2 — CPF (alias de CPF_TESTEMUNHA_2)",   "escopo": "loja"},
     "NOME_TESTEMUNHA_1": {"rotulo": "Testemunha 1 — nome",      "escopo": "loja"},
     "CPF_TESTEMUNHA_1":  {"rotulo": "Testemunha 1 — CPF",       "escopo": "loja"},
     "NOME_TESTEMUNHA_2": {"rotulo": "Testemunha 2 — nome",      "escopo": "loja"},
     "CPF_TESTEMUNHA_2":  {"rotulo": "Testemunha 2 — CPF",       "escopo": "loja"},
-    "NOME_TESTEMUNHA2":  {"rotulo": "Testemunha 2 — nome",      "escopo": "loja"},
+    "NOME_TESTEMUNHA2":  {"rotulo": "Testemunha 2 — nome (alias de NOME_TESTEMUNHA_2, sem underscore)", "escopo": "loja"},
 
     # ── pagamento ────────────────────────────────────────────────────────────
     "VALOR_ENTRADA":  {"rotulo": "Valor da entrada",   "escopo": "pagamento"},

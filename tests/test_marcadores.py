@@ -22,6 +22,9 @@ def test_catalogo_nao_inventa_marcador():
 
 
 def test_todo_verbete_tem_rotulo_e_escopo():
+    # "projeto" é reserva: seria o escopo dos marcadores da proposta (AMBIENTES_LISTA,
+    # VALOR_BRUTO, DESCONTO_PCT, VALOR_TOTAL, VALIDADE — hoje em mod_proposta.py:18-24)
+    # se um dia entrarem; _montar_mapping não os produz, então nenhum verbete o usa ainda.
     for chave, v in mod_marcadores.CATALOGO.items():
         assert v.get("rotulo"), f"{chave} sem rótulo"
         assert v.get("escopo") in ("cliente", "loja", "pagamento", "projeto", "documento"), \
