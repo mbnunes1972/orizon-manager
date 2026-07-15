@@ -48,9 +48,25 @@ acima). Antes de fechar frente, vale rodar `cobertura`/`rastrear_requisito` para
 implementação.
 
 ## Áreas sensíveis (contexto que evita retrabalho)
-- **Contrato:** HTML (capa) + Markdown (cláusulas) → **PDF via WeasyPrint** (assets em
-  `contrato_template/`). `weasyprint` 69 no user-site do `python3.14`. O caminho `.docx`/LibreOffice do
-  contrato foi **aposentado**; a **proposta** ainda usa docx/LibreOffice.
+- **Contrato/Proposta:** HTML (capa) + Markdown (cláusulas) → **PDF via WeasyPrint** (assets em
+  `contrato_template/`). `weasyprint` 69 no user-site do `python3.14`. O `.docx`/LibreOffice foi
+  **aposentado nos DOIS**: a proposta usa `mod_contrato.gerar_pdf_proposta` (capa + corpo do modelo da
+  loja) desde a migração da capa. `mod_proposta.py`/`modelo_proposta.docx` são **código morto** — nada em
+  produção os lê; não use de referência. O **LibreOffice segue indispensável** para IMPORTAR modelo
+  (`mod_documentos_import.normalizar`): é o único que achata a numeração automática do Word. Medido num
+  `.docx` real (2026-07-15): LibreOffice preserva **63** números de cláusula, `python-docx` só **3**.
+  O corpo agora vem do lojista → `_html_corpo` **escapa HTML** e o WeasyPrint usa `url_fetcher`
+  confinado ao `contrato_template/` (senão `<img src=http://…>` no modelo vira SSRF, e `file://` vira
+  leitura de arquivo do servidor a cada contrato gerado).
+- **Modelos de documento por loja:** `documento_modelos` (versão **imutável** — `@validates` no
+  `corpo_md` bloqueia alteração de linha persistida; uma ativa por loja+tipo).
+  `Contrato.modelo_versao_id` congela a versão que gerou o contrato → regerar um assinado reproduz as
+  cláusulas originais. **`NULL` significa duas coisas** e `mod_documentos.versao_para_contrato` as separa
+  por `gerado_em`: contrato novo (adota e fixa o ativo) vs **legado** (fica no `contrato_template/
+  contrato.md` global — adotar reescreveria cláusula já assinada). A **proposta não versiona** de
+  propósito: não é assinada, e reemitir deve pegar correções do modelo. Catálogo de marcadores em
+  `mod_marcadores.CATALOGO`, travado contra `mod_contrato._montar_mapping` por teste anti-drift.
+  Spec: `docs/superpowers/specs/2026-07-15-modelos-documentos-loja-design.md`.
 - **Negociação/motor:** cálculo puro em `mod_negociacao.py` / `mod_provisoes.py`; a tela lê do motor via
   `negPreview`/`_aplicarPreviewNaTela`. Dois caminhos de ambientes: **EP07** (`_orcAmbientesAtivos !=
   null`, orçamento moderno, valores do motor) vs **legado**. **`_negBaseValues` nunca é populado**
@@ -84,4 +100,9 @@ Para **lógica financeira intrincada** (ex.: cálculo reverso da negociação), 
 ser chamado pontualmente via subagente sem trocar o modelo da sessão. Opus/Sonnet dão conta do resto.
 
 ## Agente de QA (Vera)
-Subagente de teste em `.claude/agents/vera.md` (**local, n
+Subagente de teste em `.claude/agents/vera.md` (**local, não versionado** — `.claude/…` é ignorado pelo
+git, então cada máquina precisa do arquivo próprio). Cobre backend (pytest/TDD + `test_arquitetura_modulos`),
+fluxo de telas do frontend (navegação, escopo/tenancy, tema claro/escuro), consistência de design
+(`docs/design/`) e simulação financeira ponta a ponta (fluxo real, não script sintético). Chamar
+proativamente antes de fechar frente/mergear área sensível, ou sob demanda ("chama a Vera"). Só reporta —
+não commita/mergeia/corrige sozinha.

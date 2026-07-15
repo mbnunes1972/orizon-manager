@@ -1339,7 +1339,22 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
-## ⏸️ ESTADO ATUAL (2026-07-14, tarde) — retomar aqui
+## ⏸️ ESTADO ATUAL (2026-07-15) — retomar aqui
+
+> **Branch `feat/modelos-documentos-loja`, suíte 1187 verde.** Frente "Modelos de documentos da loja"
+> (Config › Documentos deixa de ser tela-morta): **10 das 11 tasks do plano executadas**, faltando só
+> mergear. Ver `## Sessão 78` para a narrativa e as decisões.
+>
+> **PENDENTE E IMPORTANTE — ninguém clicou na tela.** O Task 9 (painel + wizard) foi verificado no
+> nível do contrato JSON (curl contra servidor real) + `node --check`, mas **não houve verificação por
+> navegador** (nenhum agente desta sessão tinha browser automation). Antes de mergear, clicar: card
+> Contrato abre modal → subir `.docx` real → revisão mostra marcadores/cravados com trechos → "Ver PDF
+> de exemplo" → "Ativar" → card mostra "Versão 1 ativa"; subir `.pdf` → erro explicativo; logar como
+> **gerencial** → cards não clicáveis.
+>
+> Pendente também: merge na `main`, `git push`, re-ingerir o grafo MCP.
+
+## ⏸️ ESTADO ATUAL (2026-07-14, tarde)
 
 > **Maratona 2026-07-14 (branch `feat/desmembramento-fatia2-ciclo`, suíte 1033 verde).** Sequência de
 > testes manuais do usuário + implementações:
@@ -2186,6 +2201,69 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 78 — Modelos de documentos da loja (Config › Documentos deixa de ser tela-morta)
+
+Branch `feat/modelos-documentos-loja`, suíte **1187 verde** (+130). Pedido do usuário: a aba Documentos
+vira ambiente de configuração — o lojista sobe um Word, o sistema aplica o modelo Orizon e pede os dados
+complementares. Spec: `docs/superpowers/specs/2026-07-15-modelos-documentos-loja-design.md`; plano:
+`docs/superpowers/plans/2026-07-15-modelos-documentos-loja.md`.
+
+**O que entrou** (11 tasks, TDD, 1 subagente implementador + 2 revisores por task):
+`mod_marcadores` (catálogo travado contra `_montar_mapping` por teste anti-drift) · `mod_documentos_import`
+(arquivo → Markdown, via LibreOffice) · `mod_documentos` (registro versionado) · tabela `documento_modelos` ·
+`Contrato.modelo_versao_id` · capacidade `gerir_documentos` · 5 endpoints `/api/documentos/*` · painel +
+wizard · corpo da proposta.
+
+**Decisões que mudaram o desenho, e por quê:**
+
+- **Importação via LibreOffice, não `python-docx`.** O `.docx` usa numeração automática do Word
+  (`numId/ilvl`) — os números não estão em `paragraph.text`. **Medido num `.docx` real:** LibreOffice
+  preserva **63** números de cláusula; `python-docx`, **3**. Sessenta numerações sumiriam em silêncio de
+  um contrato. Isso justificou o pipeline inteiro (e deu de brinde `.odt`/`.doc`/`.rtf`).
+- **PDF é recusado**, com mensagem acionável: extração de PDF perde a hierarquia das cláusulas.
+- **Modelo por loja, global como fallback** → migração zero.
+- **Versão imutável + `Contrato.modelo_versao_id`.** `gerar_pdf_contrato` regenera o PDF pelo id lendo o
+  modelo do disco na hora: sem isso, trocar o modelo reescreveria cláusula de contrato **já assinado**.
+- **Proposta não versiona, de propósito** — não é assinada; reemitir deve pegar correções do modelo.
+
+**O que a sessão errou (e o que isso ensina).** Foram **onze afirmações falsas** pegas pelas revisões,
+quase todas em comentários/planos, não em código. As quatro que doeram:
+
+1. **`CLAUDE.md:53` dizia que a proposta usava docx/LibreOffice.** Falso desde a migração da capa —
+   `mod_proposta.py` é código morto (seu único import, `main.py:1821`, nunca era usado). Uma seção inteira
+   do spec nasceu dessa premissa e teve de ser reescrita. **Corrigido nesta sessão.**
+2. **O bug do D6 dentro da função escrita para garantir o D6.** `_resolver_corpo_contrato` caía no modelo
+   **ativo** da loja quando `_modelo_versao_id` era `None` — mas `None` é a resposta *deliberada* para
+   contrato legado. Resultado: contrato antigo regeraria com cláusula nova. **Nenhum teste unitário pegou**
+   (eles provavam que `versao_para_contrato` devolve `None`, não o que o consumidor fazia com isso); só
+   apareceu num teste que sobe o servidor de verdade.
+3. **Dois furos de segurança criados por esta frente**, demonstrados por execução: **SSRF/LFI** (o corpo
+   vinha do lojista e não era escapado → `<img src=http://…>` no modelo fazia o WeasyPrint buscar a URL a
+   cada contrato gerado) e **path traversal** (`os.path.basename(".")` devolve `"."` → mandar `staging: "."`
+   movia o `_staging/` inteiro). Ambos onde o comentário afirmava estar fechado.
+4. **O órfão reintroduzido pela própria correção do órfão**, três linhas abaixo (move-antes-do-commit no
+   segundo commit de `criar_versao`).
+
+Padrão: **verificar por execução acha o que ler não acha**. As correções mais importantes vieram de teste
+E2E, experimento de concorrência (8 threads → 5 `IntegrityError` vazando) e sonda HTTP — nenhuma de leitura
+de código. Por isso cada correção veio com teste que trava o comportamento: comentário apodrece, teste não.
+
+**Dívidas registradas (fora de escopo):**
+- **Caminho docx morto:** `mod_proposta.py`, `modelo_proposta.docx`, `_substituir_marcadores`,
+  `_converter_pdf`, `tests/test_proposta*.py`. Cuidado: `_libreoffice_cmd()` **continua necessário**
+  (base da importação) e `contrato_editar.py:48-50` também o usa.
+- **Upload sem cap de `Content-Length`** — gap sistêmico do `main.py` (nenhum POST limita), não desta frente.
+- **`documentos_loja/<loja>/<tipo>/_staging/` sem limpeza** — quem sobe e desiste deixa lixo.
+- **Flake pré-existente com causa-raiz achada:** a fixture `projetos_dir` (`conftest.py`) muta
+  `main.PROJETOS_DIR`/`storage.PROJETOS_DIR` **globalmente sem teardown** → quem usar por último decide o
+  valor para o resto da sessão. Explica os flakes de `test_isolamento_f4_e2e` e `test_projeto_editar_e2e`.
+- **`pytest.ini` novo** (`norecursedirs`): worktrees dentro da raiz (`wt-postgres-migration/`) carregavam
+  uma cópia de `tests/` e a suíte **não rodava** — 162 erros de colisão antes de coletar. O comando do
+  CLAUDE.md estava inviável nesta árvore.
+- **"+ documentos" (tipos novos)** fica para spec próprio: a pergunta em aberto é *o que dispara um
+  documento custom* — um "Termo de Medição" no painel não serve se nada no ciclo o emite. A coluna `tipo`
+  já nasce preparada.
 
 ## Sessão 77 — IA da navegação: "Orçamentos" → "Projetos", retirada do módulo vazio + dashboard Comercial
 
