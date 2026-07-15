@@ -69,6 +69,7 @@ Além das colunas acima, `perfis.py` define capacidades específicas de fluxo:
 | `aprovar_medicao_reprovada` | Gerente de Vendas, Gerente Adm/Financeiro, Diretor | Liberar a Medição quando o parecer é "Reprovado" (decisão comercial, 2º passo) |
 | `executar_pe` | Projetista Executivo, Conferente, Gerente de Vendas, Gerente Adm/Financeiro, Diretor | Carregar documentos e concluir as subfases do Projeto Executivo (11a/11b/11c/11e) — exige login+senha |
 | `revisar_pe` | Gerente de Vendas, Gerente Adm/Financeiro, Diretor | Abrir revisão nas subfases 11b/11c (reabertura em cascata do PE + relatório complementar obrigatório) — senha gerencial |
+| `gerir_documentos` | Master | Importar e ativar os modelos de contrato/proposta da loja — altera as cláusulas dos documentos gerados dali em diante; capacidade própria (não é `editar_dados_loja`) porque o risco é maior |
 
 > Gerente de **Vendas não** aprova financeiro; **Medidor não** decide o caso Reprovado.
 > **Conferente/Projetista executam** as subfases de PE mas **não** abrem revisão (só gerência+).

@@ -14,19 +14,22 @@ PERFIS = {
         "acesso_admin": True, "acesso_config": True,
         "ver_parametros": True, "autorizar": True, "aprovar_financeiro": True,
         "aprovar_medicao_reprovada": True, "gerir_usuarios": True, "gerir_perfis": True,
-        "editar_dados_loja": True, "executar_pe": True, "revisar_pe": True, "registrar_medicao": True},
+        "editar_dados_loja": True, "gerir_documentos": True,
+        "executar_pe": True, "revisar_pe": True, "registrar_medicao": True},
     "gerencial": {"rotulo": "Gerencial", "desconto_max": 20.0,
         "acesso_operacional": True, "acesso_financeiro": True, "acesso_fiscal": True,
         "acesso_admin": False, "acesso_config": False,
         "ver_parametros": True, "autorizar": True, "aprovar_financeiro": True,
         "aprovar_medicao_reprovada": True, "gerir_usuarios": False, "gerir_perfis": False,
-        "editar_dados_loja": False, "executar_pe": True, "revisar_pe": True, "registrar_medicao": True},
+        "editar_dados_loja": False, "gerir_documentos": False,
+        "executar_pe": True, "revisar_pe": True, "registrar_medicao": True},
     "operador": {"rotulo": "Operador", "desconto_max": 10.0,
         "acesso_operacional": True, "acesso_financeiro": False, "acesso_fiscal": True,
         "acesso_admin": False, "acesso_config": False,
         "ver_parametros": False, "autorizar": False, "aprovar_financeiro": False,
         "aprovar_medicao_reprovada": False, "gerir_usuarios": False, "gerir_perfis": False,
-        "editar_dados_loja": False, "executar_pe": True, "revisar_pe": False, "registrar_medicao": True},
+        "editar_dados_loja": False, "gerir_documentos": False,
+        "executar_pe": True, "revisar_pe": False, "registrar_medicao": True},
     # ── Plataforma/Rede (fora dos perfis de loja; NÃO entram na tabela perfil_acesso) ──
     "super_admin": {"rotulo": "Administrador da Plataforma", "desconto_max": 0.0,
         "acesso_operacional": False, "acesso_financeiro": False, "acesso_fiscal": False,
@@ -48,6 +51,7 @@ _DEFAULT = {"rotulo": "—", "desconto_max": 0.0, "ver_parametros": False,
             "aprovar_financeiro": False,
             "registrar_medicao": False, "aprovar_medicao_reprovada": False,
             "gerir_redes": False, "gerir_lojas": False, "editar_dados_loja": False,
+            "gerir_documentos": False,
             "executar_pe": False, "revisar_pe": False,
             "acesso_operacional": False, "acesso_financeiro": False, "acesso_fiscal": False,
             "acesso_admin": False, "acesso_config": False}
@@ -172,6 +176,8 @@ CAPACIDADES = {
         "descricao": "Liberar medição reprovada (decisão comercial)."},
     "editar_dados_loja":         {"rotulo": "Editar dados da loja",       "grupo": "Administração",
         "descricao": "Editar o cadastro/dados da loja e emitir NF-e."},
+    "gerir_documentos":          {"rotulo": "Gerir modelos de documento", "grupo": "Administração",
+        "descricao": "Importar e ativar os modelos de contrato/proposta da loja (altera as cláusulas dos documentos gerados)."},
     "executar_pe":               {"rotulo": "Executar PE",                "grupo": "Execução",
         "descricao": "Trabalhar nas subfases do Projeto Executivo."},
     "revisar_pe":                {"rotulo": "Revisar PE",                 "grupo": "Execução",
@@ -250,8 +256,8 @@ def opcoes_da_loja(loja_id):
 
 # Capacidades finas booleanas SELECIONÁVEIS no modal (exclui os acesso_* de módulo/painel e as de plataforma).
 CAPS_SELECIONAVEIS = ["ver_parametros", "autorizar", "aprovar_financeiro", "gerir_usuarios",
-                      "gerir_perfis", "editar_dados_loja", "registrar_medicao",
-                      "aprovar_medicao_reprovada", "executar_pe", "revisar_pe"]
+                      "gerir_perfis", "editar_dados_loja", "gerir_documentos",
+                      "registrar_medicao", "aprovar_medicao_reprovada", "executar_pe", "revisar_pe"]
 
 
 def capacidades_efetivas(slug):
