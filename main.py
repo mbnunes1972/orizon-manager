@@ -7351,6 +7351,21 @@ class Handler(BaseHTTPRequestHandler):
                                         "aprovar a etapa financeira (login/senha inválidos ou sem permissão).",
                             }, code=403)
                             return
+                        # Gate independente da SEQUÊNCIA: a AF só FECHA com a data de entrega DEFINIDA
+                        # E o contrato totalmente assinado (as duas partes). Vale mesmo p/ projeto que
+                        # foi assinado ANTES do gate da assinatura existir — antes essa trava vivia só
+                        # na assinatura e a AF (etapa posterior) fechava sem re-checar.
+                        _pm = db.get(Projeto, nome_safe)
+                        if _pm is None or _pm.data_entrega is None:
+                            self.send_json({"ok": False,
+                                "erro": "Defina a data de entrega esperada do cliente antes de aprovar a AF."},
+                                code=400)
+                            return
+                        if not _contrato_totalmente_assinado(nome_safe, db):
+                            self.send_json({"ok": False,
+                                "erro": "Contrato ainda não assinado pelas duas partes — não é possível "
+                                        "aprovar a AF."}, code=400)
+                            return
                     if novo_status:
                         if etapa.status == "pendente" and novo_status != "pendente":
                             etapa.iniciado_em = datetime.utcnow()

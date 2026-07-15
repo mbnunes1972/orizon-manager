@@ -1395,11 +1395,18 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 >   eliminado** (feito). **Senha:** livre até concluir; concluir = senha do PRÓPRIO usuário; reabrir = gerencial.
 >   **Devolução/cancelamento pós-AF1 = FORA do ciclo** (supervisionado pela auditoria); devolução removida das AF.
 >
-> **⏭️ PENDENTE (revisado):** **Frontend do cronograma** (endpoint `GET /api/projetos/<nome>/cronograma` + 3
-> colunas no ciclo + etapa 7: captura `data_entrega` + gate da folga + botão "Cronograma próprio"). **Fase B.2**
-> (endpoint do desmembramento por seleção + UI checkbox por etapa 9+). **Fase C** (subfase Projeto Executivo: 4
-> botões + senha). **Rename display** (Especificação Técnica/Projeto Executivo) + **Medição→subfase** (🔴
-> estrutural, separado). **PDF da auditoria.** **Navegação 2 visões** (ADR, depois). Backlog anterior mantido.
+> **✅ Feito na continuação (Sessão 76, suíte 1049 verde):** bug do briefing (etapa 3 abria o do CLIENTE →
+> projeto errado; agora `abrirBriefingProjeto`); **Cronograma Passo 2** (campo "Data de entrega esperada" +
+> Validar no card do Contrato → `POST .../data-entrega` + folga; campo SEMPRE editável); **gate da AF**
+> (`PATCH .../ciclo/<8|11d>` só fecha com data de entrega DEFINIDA **E** contrato totalmente assinado, independente
+> da sequência — `test_af_gate_data_entrega.py`); gates `_podeEditarMapaFront`/`_NFE_NIVEIS_EMITE` corrigidos.
+>
+> **⏭️ PENDENTE (revisado):** **Cronograma Passo 3** — botão **"Cronograma próprio"** (editar prazos + senha
+> gerente/diretor quando a folga é negativa); o endpoint `GET /api/projetos/<nome>/cronograma`, o modal e as 3
+> colunas (Prazo Limite/Planejada/Executada) já existem. **Fase B.2** (endpoint do desmembramento por seleção +
+> UI checkbox por etapa 9+). **Fase C** (subfase Projeto Executivo: 4 botões + senha). **Rename display**
+> (Especificação Técnica/Projeto Executivo) + **Medição→subfase** (🔴 estrutural, separado). **PDF da auditoria.**
+> **Navegação 2 visões** (ADR, depois). Backlog anterior mantido.
 
 ## ⏸️ ESTADO ATUAL (2026-07-14)
 
@@ -2179,6 +2186,31 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 76 — Continuação maratona 2026-07-14: bug do briefing + Cronograma Passo 2 (data de entrega no Contrato) + gate da AF (data E contrato assinado)
+
+Branch `feat/desmembramento-fatia2-ciclo`, suíte **1049 verde** (+3). Continuação dos testes manuais do usuário:
+
+- **Bug do briefing (projeto errado):** o card da etapa 3 chamava `cliAbrirBriefing(cliente_id)` (briefing do
+  CLIENTE) → o `POST /api/clientes/<id>/briefing` salva no briefing mais RECENTE do cliente. Como o cliente tinha
+  vários projetos, o preenchimento do Marcelo_7 caía no Marcelo_6 **sem o usuário abrir o 6** → etapa 3 seguia
+  "pendente" e travava o orçamento. Fix: etapa 3 passa a abrir `abrirBriefingProjeto(nome_safe)` (briefing DO
+  projeto). Frontend-only.
+- **Cronograma Passo 2:** card do Contrato ganhou campo **"Data de entrega esperada"** + botão **Validar** →
+  `POST /api/projetos/<nome>/data-entrega` (grava `data_entrega`+`data_inicio`, calcula folga do Cronograma
+  Padrão, retorna `cabe`/`folga_min`). A pedido do usuário o campo é **sempre editável** (removido o `disabled`
+  em `assinado`/`vigente`; Validar sempre visível); **sem prefill do briefing** (avaliado e descartado).
+- **Gate da AF (bug de teste manual: "aprovei AF sem validar a data"):** a trava de `data_entrega` vivia SÓ na
+  assinatura (`main.py` ~5806, bloqueia a assinatura que COMPLETA o contrato). A AF (etapa 8) é posterior e NÃO
+  re-checava → projeto assinado ANTES do gate existir chegava à AF sem data. **Novo gate no
+  `PATCH /api/projetos/<nome>/ciclo/<cod>`** para as AFs (8/11d, via `mod_ciclo.exige_aprovacao_financeira`): a
+  etapa só FECHA com **data de entrega DEFINIDA E contrato totalmente assinado** — "valida data E contrato
+  assinado, **independente da sequência**". TDD: `tests/test_af_gate_data_entrega.py` (sem data → 400; contrato
+  não assinado → 400; ambos → 200). O frontend já exibe o `erro` do backend no modal da AF (sem mudança).
+- **Gates audit (restante):** `_podeEditarMapaFront` e `_NFE_NIVEIS_EMITE` usavam nomes de função obsoletos
+  (`diretor`/`gerente_*`, que nunca casam) → corrigidos p/ níveis-base (`master`/`gerencial`/`admin_rede`).
+
+⚠️ Mudança em `main.py` (gate da AF) → **restart do servidor**. Frontend → **Ctrl+F5**.
 
 ## Sessão 75 — Design system v1.7 (rótulo flutuante + Linha de Total) + Fatia 1 do desmembramento de PE (mergeada)
 
