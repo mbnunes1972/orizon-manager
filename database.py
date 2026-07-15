@@ -834,6 +834,10 @@ class Contrato(Base):
     d4sign_uuid          = Column(Text,     nullable=True)   # fase futura D4Sign
     loja_id              = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
     loja_snapshot_json   = Column(Text,     nullable=True)   # snapshot dos dados da loja (F3)
+    modelo_versao_id     = Column(Integer, ForeignKey("documento_modelos.id"), nullable=True)
+    # NULL = contrato legado -> cai no contrato_template/contrato.md global.
+    # Preenchido = reproduz as cláusulas daquela versão, mesmo que a loja já
+    # tenha trocado o modelo. Ver docs/superpowers/specs/2026-07-15-modelos-documentos-loja-design.md D6.
 
     gerado_por   = relationship("Usuario",  foreign_keys=[gerado_por_id])
     orcamento    = relationship("Orcamento", foreign_keys=[orcamento_id])
@@ -1133,6 +1137,7 @@ def _migrar_colunas():
             ("num_contrato",    "VARCHAR(30)"),
             ("loja_id",         "INTEGER"),
             ("loja_snapshot_json", "TEXT"),
+            ("modelo_versao_id", "INTEGER"),
         ]:
             if col not in con_cols:
                 cur.execute(f"ALTER TABLE contratos ADD COLUMN {col} {tipo}")

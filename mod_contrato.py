@@ -736,6 +736,44 @@ def _carregar_md():
     return open(p, encoding="utf-8").read() if os.path.exists(p) else ""
 
 
+def _resolver_corpo_contrato(ctx):
+    """Markdown das cláusulas deste contrato.
+
+    Ordem: preview (tela de importação) > versão fixada no contrato (reproduz o
+    assinado) > modelo ativo da loja > contrato_template/contrato.md global
+    (contrato legado / loja sem modelo próprio). ctx['_db'] e
+    ctx['_modelo_versao_id'] vêm do chamador; sem eles o comportamento é o de hoje.
+
+    CUIDADO: quando o chamador PASSA a chave '_modelo_versao_id' (mesmo com valor
+    None — é o caso do contrato legado, onde versao_para_contrato() decidiu de
+    propósito "não fixar nada"), a resposta dele é FINAL. Cair aqui no modelo ativo
+    da loja reabriria exatamente o buraco que esta frente existe para fechar:
+    contrato legado que nunca teve versão teria a cláusula nova aplicada assim que a
+    loja subisse um modelo — comprovado por execução (E2E real: um contrato legado
+    da Loja 2, ao ganhar um modelo ativo DEPOIS de já gerado, vazava a cláusula nova
+    até esta correção). O fallback pro "ativo da loja" só faz sentido quando o
+    chamador nem tentou resolver (chave ausente) — hoje nenhum call site real faz
+    isso; é reserva pra um futuro chamador que só queira "o vigente", sem fixar.
+    """
+    if ctx.get("_corpo_md_preview") is not None:
+        return ctx["_corpo_md_preview"]
+    db = ctx.get("_db")
+    if db is None:
+        return _carregar_md()
+    import mod_documentos
+    if "_modelo_versao_id" in ctx:
+        versao_id = ctx["_modelo_versao_id"]
+        if versao_id:
+            corpo = mod_documentos.corpo_da_versao(db, versao_id)
+            if corpo is not None:
+                return corpo
+        return _carregar_md()
+    loja_id = (ctx.get("loja") or {}).get("id")
+    if loja_id:
+        return mod_documentos.resolver_modelo(db, loja_id, "contrato")
+    return _carregar_md()
+
+
 def _montar_html_contrato(ctx):
     """Monta o HTML final do contrato: capa + corpo, com [MARCADORES] substituídos."""
     from html import escape
@@ -752,7 +790,7 @@ def _montar_html_contrato(ctx):
     shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"),
                  encoding="utf-8").read()
     capa = _html_capa(ctx)
-    corpo = _html_corpo(_carregar_md())
+    corpo = _html_corpo(_resolver_corpo_contrato(ctx))
     html = shell.replace("<!--CAPA-->", capa).replace("<!--CORPO-->", corpo)
     html = _substituir_marcadores_html(html, mapping)
     # sem adendo: remove o parágrafo vazio (evita traço/espaço solto no fim)

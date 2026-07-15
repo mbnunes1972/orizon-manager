@@ -6053,7 +6053,6 @@ class Handler(BaseHTTPRequestHandler):
                     contrato.endereco_instalacao = endereco_instalacao
                     contrato.pagamento_json      = pagamento_json_str
                     contrato.adendo              = adendo
-                    contrato.gerado_em           = datetime.utcnow()
                     contrato.gerado_por_id       = usuario["id"]
                     contrato.status              = "rascunho"
                     if not contrato.loja_id:
@@ -6066,6 +6065,20 @@ class Handler(BaseHTTPRequestHandler):
                                      .filter(Contrato.num_contrato.isnot(None)).all()]
                         contrato.num_contrato = gerar_num_contrato(_existing, loja_dict.get("codigo", ""))
                     variaveis["num_contrato"] = contrato.num_contrato
+                    # Fixa a versão do modelo que gerou este contrato: regerar
+                    # depois reproduz estas cláusulas mesmo que a loja troque o
+                    # modelo. Contrato legado (já gerado, sem versão) fica no
+                    # template global. (spec D6)
+                    # PRECISA rodar ANTES de marcar gerado_em = utcnow() abaixo:
+                    # versao_para_contrato usa contrato.gerado_em (ainda None
+                    # aqui p/ contrato novo; já preenchido de uma geração
+                    # anterior p/ regeração) para distinguir "nunca gerado"
+                    # (adota e fixa o modelo ativo) de "legado" (fica no global).
+                    import mod_documentos as _mdoc
+                    variaveis["_db"] = db
+                    variaveis["_modelo_versao_id"] = _mdoc.versao_para_contrato(
+                        db, contrato, contrato.loja_id or loja_id)
+                    contrato.gerado_em = datetime.utcnow()
                     db.commit()
                     pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
                     contrato.pdf_path = pdf_path
@@ -7529,6 +7542,14 @@ class Handler(BaseHTTPRequestHandler):
                         "consultor_nome":  usuario.get("nome", ""),
                         "_ambientes":      _ambientes_valor_para_contrato(contrato.orcamento_id, db),
                     })
+                    # Fixa a versão do modelo que gerou este contrato: regerar
+                    # depois reproduz estas cláusulas mesmo que a loja troque o
+                    # modelo. Contrato legado (já gerado, sem versão) fica no
+                    # template global. (spec D6)
+                    import mod_documentos as _mdoc
+                    variaveis["_db"] = db
+                    variaveis["_modelo_versao_id"] = _mdoc.versao_para_contrato(
+                        db, contrato, contrato.loja_id or loja_id)
                     pdf_path = gerar_pdf_contrato(contrato.id, variaveis)
                     contrato.pdf_path = pdf_path
                     if not contrato.loja_id:

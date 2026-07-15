@@ -210,6 +210,28 @@ def resolver_modelo(db, loja_id, tipo):
     return ""
 
 
+def versao_para_contrato(db, contrato, loja_id):
+    """Qual versão de modelo vale para ESTE contrato. Fixa, se for o caso.
+
+    - já fixada          -> ela (reproduz o assinado, mesmo com modelo novo ativo)
+    - nunca gerado       -> modelo ativo da loja, e FIXA em contrato.modelo_versao_id
+    - legado (já gerado, -> None: cai no template global. NUNCA adotar modelo novo
+      sem versão)           num contrato já gerado — reescreveria cláusula assinada.
+
+    Devolve o id da versão, ou None para 'usar o template global'.
+    """
+    if contrato.modelo_versao_id:
+        return contrato.modelo_versao_id
+    if contrato.gerado_em is not None:
+        return None
+    m = ativo_de(db, loja_id, "contrato")
+    if m is None:
+        return None
+    contrato.modelo_versao_id = m.id
+    db.commit()
+    return m.id
+
+
 def listar(db, loja_id):
     """Modelos da loja, mais novo primeiro. Escopado por loja (tenancy)."""
     return (db.query(DocumentoModelo)
