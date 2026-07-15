@@ -67,3 +67,37 @@ def test_texto_sem_o_marco_de_inicio_e_usado_inteiro():
 
 def test_corpo_vazio_nao_explode():
     assert imp.extrair_corpo("") == ""
+
+
+def test_sem_marco_de_fecho_nao_insere_texto_complementar_de_proposito():
+    """DELIBERADO, não lacuna: sem o fecho não há onde ancorar o [TEXTO_COMPLEMENTAR].
+
+    Adivinhar a posição (ex.: anexar no fim) colocaria o adendo do ciclo em lugar
+    arbitrário de um documento jurídico. Quem avisa o lojista é o wizard
+    (mod_marcadores.analisar_corpo), não este módulo.
+    """
+    md = imp.extrair_corpo(
+        "CONTRATO DE COMPRA E VENDA\n\n"
+        "# CLÁUSULA ÚNICA – DO OBJETO\n"
+        "1.1. Redação própria da loja, sem o fecho padrão.\n"
+    )
+    assert "[TEXTO_COMPLEMENTAR]" not in md
+    assert "1.1. Redação própria da loja, sem o fecho padrão." in md
+    assert "# CLÁUSULA ÚNICA – DO OBJETO" in md
+
+
+def test_normalizar_txt_descarta_o_bom(tmp_path):
+    """O .txt do LibreOffice começa com BOM; o U+FEFF não pode vazar para o corpo."""
+    p = tmp_path / "modelo.txt"
+    p.write_text("CONTRATO DE COMPRA E VENDA\n1.1. Teste.\n", encoding="utf-8-sig")
+    texto = imp.normalizar(str(p))
+    assert "﻿" not in texto
+    assert texto.startswith("CONTRATO DE COMPRA E VENDA")
+    # e o BOM não atrapalha o corte da capa
+    assert imp.extrair_corpo(texto).startswith("CONTRATO DE COMPRA E VENDA")
+
+
+def test_normalizar_txt_sem_bom_continua_funcionando(tmp_path):
+    p = tmp_path / "modelo.txt"
+    p.write_text("CONTRATO DE COMPRA E VENDA\n1.1. Teste.\n", encoding="utf-8")
+    assert imp.normalizar(str(p)).startswith("CONTRATO DE COMPRA E VENDA")

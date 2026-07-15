@@ -20,6 +20,16 @@ import re
 import subprocess
 import tempfile
 
+# Os dois marcos abaixo são a REDAÇÃO DO MODELO ATUAL, não uma lei da natureza: a loja
+# pode subir contrato com redação própria e não tê-los. Comportamento quando faltam:
+#
+#   início ausente → usa o texto inteiro (nada a cortar).
+#   fecho  ausente → NÃO insere [TEXTO_COMPLEMENTAR]. Deliberado: sem âncora, adivinhar
+#                    a posição (ex.: anexar no fim) colocaria o adendo do ciclo em lugar
+#                    arbitrário de um documento jurídico. Quem avisa o lojista é o wizard
+#                    (mod_marcadores.analisar_corpo) — este módulo converte, não valida.
+#                    A separação é proposital.
+#
 # Onde o corpo começa: tudo antes disto é capa (gerada pelo HTML, não pelo modelo).
 _MARCO_INICIO = "CONTRATO DE COMPRA E VENDA"
 # O adendo do ciclo entra imediatamente antes do fecho de assinaturas.
@@ -69,10 +79,14 @@ def normalizar(path: str) -> str:
 
     .md/.txt: leitura direta. .docx/.odt/.doc/.rtf: LibreOffice headless.
     .pdf: recusado — a extração perde a hierarquia das cláusulas.
+
+    utf-8-sig nas leituras: o .txt do LibreOffice vem com BOM, e com utf-8 puro o
+    U+FEFF invisível vazaria para o corpo (e quebraria o startswith do marco de
+    início). utf-8-sig lê normalmente arquivos sem BOM.
     """
     ext = os.path.splitext(path)[1].lower()
     if ext in EXTENSOES_TEXTO:
-        with open(path, encoding="utf-8") as fh:
+        with open(path, encoding="utf-8-sig") as fh:
             return fh.read()
     if ext == ".pdf":
         raise FormatoNaoSuportado(
@@ -103,7 +117,7 @@ def normalizar(path: str) -> str:
         destino = os.path.join(outdir, base)
         if not os.path.exists(destino):
             raise RuntimeError("LibreOffice não produziu o .txt esperado: %s" % destino)
-        with open(destino, encoding="utf-8") as fh:
+        with open(destino, encoding="utf-8-sig") as fh:
             return fh.read()
     finally:
         import shutil
