@@ -10680,8 +10680,8 @@ function renderCiclo() {
   if (!panel) return;
   panel.innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-      <button class="btn btn-ghost btn-sm" onclick="fecharCiclo()"><i class="ti ti-arrow-left"></i>Voltar</button>
       <h3 style="margin:0;color:var(--text);font-weight:800">Etapas do Projeto</h3>
+      <button class="btn btn-ghost btn-sm" onclick="fecharCiclo()"><i class="ti ti-arrow-left"></i>Voltar</button>
       ${projetoAtivo ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="abrirCronograma('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-calendar-stats"></i>Cronograma</button>` : ''}
       ${projetoAtivo ? `<button class="btn btn-ghost btn-sm" onclick="abrirAuditoria('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-report-money"></i>Auditoria Contábil</button>` : ''}
       ${_podeEditarMapaFront() && projetoAtivo ? `<button class="btn btn-ghost btn-sm" onclick="mapaAbrir('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-users-group"></i>Mapa de Atribuições</button>` : ''}
