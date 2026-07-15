@@ -39,7 +39,8 @@ MODULOS = {
                               "/api/fornecedores", "/api/terceiros", "/api/funcoes"]},
     "comercial":   {"camada": "dominio", "depende_de": ["cadastro"], "rotulo": "Comercial (Vendas)", "faixa": "vendas",
                     "arquivos": ["mod_orcamento_params.py", "mod_margens.py", "mod_negociacao.py",
-                                 "mod_proposta.py", "mod_contrato.py", "mod_marcadores.py", "mod_arvore.py",
+                                 "mod_proposta.py", "mod_contrato.py", "mod_marcadores.py",
+                                 "mod_documentos_import.py", "mod_arvore.py",
                                  "contrato_editar.py", "_ler_aymore.py", "mod_fin",
                                  "mod_pe_comparacao.py", "mod_parcelas.py",
                                  # Medição (etapas 9/10 do ciclo): o antigo módulo 'producao' (rótulo UI
