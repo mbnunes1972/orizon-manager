@@ -2072,6 +2072,36 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 
+<!-- Modal: Modelo de documento da loja (Task 9) — histórico de versões + wizard de importação -->
+<div id="modal-doc-modelo" class="modal-overlay" style="display:none" onclick="if(event.target===this)fecharModalDocModelo()">
+  <div class="modal-box" style="max-width:720px;max-height:90vh;overflow-y:auto">
+    <div class="modal-hdr">
+      <div class="modal-title" id="docm-titulo">Modelo de documento</div>
+      <span class="modal-close" onclick="fecharModalDocModelo()">&#x2715;</span>
+    </div>
+
+    <div id="docm-vigente" style="margin-bottom:14px"></div>
+
+    <div style="margin-bottom:6px">
+      <strong style="font-size:13px;color:var(--text)">Histórico de versões</strong>
+    </div>
+    <div id="docm-historico" style="margin-bottom:18px"></div>
+
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:14px">
+      <strong style="font-size:13px;color:var(--text)">Importar novo modelo</strong>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;margin-bottom:10px">
+        Aceita <code>.docx</code>, <code>.odt</code>, <code>.doc</code>, <code>.rtf</code>, <code>.md</code> ou <code>.txt</code>.
+        <strong style="color:var(--text)">PDF não é aceito</strong> — a extração de um PDF perde a numeração das cláusulas.
+      </div>
+      <input type="file" id="docm-arquivo" accept=".docx,.odt,.doc,.rtf,.md,.txt" onchange="docmArquivoSelecionado()">
+      <button class="btn btn-primary btn-sm" id="docm-importar-btn" style="margin-left:8px" onclick="docmImportar()" disabled>Importar modelo</button>
+      <div id="docm-importar-status" style="font-size:11px;margin-top:8px;min-height:14px"></div>
+    </div>
+
+    <div id="docm-wizard" style="display:none;border-top:1px solid var(--border);padding-top:14px"></div>
+  </div>
+</div>
+
 <!-- Modal: Parametros da negociacao -->
 <div id="modal-params" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
   <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:598px;width:92%;max-height:90vh;overflow-y:auto;animation:mIn .18s ease">
@@ -2912,20 +2942,296 @@ function cfgComissaoRender(){
     +'Comissão de vendas por metas: faixas de % por faixa de venda mensal + limitador conforme o desconto concedido.</div>'
     +'<button class="btn btn-primary btn-sm" onclick="abrirModalComissao('+(lid||'null')+')">Configurar comissão de vendas</button>';
 }
-function cfgDocumentosRender(){
+// ── Config › Documentos (Task 9): painel de modelos da loja + wizard de importação ────────────
+// GET /api/documentos/modelos devolve TODAS as versões (ativa e histórico) da loja; GET
+// /api/documentos/marcadores devolve o catálogo (pra rotular ausentes/cravados na tela).
+// pode_gerir vem do backend (capacidade gerir_documentos) — sem ela, cards não abrem.
+let _docModelos = null;
+let _docCatalogo = null;
+let _docPodeGerir = false;
+let _docUsuariosNome = null;   // cache best-effort id->nome (pode falhar sem gerir_usuarios)
+let _docmCtx = null;           // contexto do modal aberto: {tipo, corpo_md, origem_nome, staging, origem_sha256, analise}
+
+async function _docCarregarUsuariosNomeCache(){
+  if(_docUsuariosNome) return _docUsuariosNome;
+  _docUsuariosNome = {};
+  try{
+    const d = await (await fetch('/api/admin/usuarios',{credentials:'same-origin'})).json();
+    if(d && d.ok) (d.usuarios||[]).forEach(u => { _docUsuariosNome[u.id] = u.nome; });
+  }catch(e){ /* sem gerir_usuarios: cai no fallback "usuário #N" */ }
+  return _docUsuariosNome;
+}
+
+async function cfgDocumentosRender(){
   const box = document.getElementById('cfg-panel-documentos'); if(!box) return;
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const [d, cat] = await Promise.all([
+    fetch('/api/documentos/modelos',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({})),
+    fetch('/api/documentos/marcadores',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({})),
+    _docCarregarUsuariosNomeCache()
+  ]);
+  if(!d.ok){ box.innerHTML = '<em style="color:var(--err);font-size:12px">'+esc(d.erro||'Erro ao carregar modelos.')+'</em>'; return; }
+  _docModelos = d.modelos || [];
+  _docPodeGerir = !!d.pode_gerir;
+  if(cat && cat.ok) _docCatalogo = cat.catalogo || {};
   box.innerHTML =
-     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:640px">Modelos dos documentos de processo.</div>'
-    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,220px);gap:12px">'
-    + [['Contrato','ti-file-text','HTML + Markdown → PDF (WeasyPrint)'],
-       ['Proposta comercial','ti-file-invoice','modelo .docx'],
-       ['Demais documentos','ti-files','do processo']].map(d=>
-      '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 16px">'
-      +'<i class="ti '+d[1]+'" style="font-size:20px;color:var(--muted)"></i>'
-      +'<div style="font-weight:600;font-size:13px;color:var(--text);margin-top:6px">'+d[0]+'</div>'
-      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+d[2]+'</div>'
-      +'<div style="font-size:10px;color:var(--warn);margin-top:8px">edição de modelos — em construção</div></div>').join('')
+     '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:640px">Modelos dos documentos de processo.'
+    + (_docPodeGerir ? '' : ' <strong style="color:var(--text)">Somente leitura</strong> — sem a capacidade de gerir documentos, os cards abaixo não abrem.')
+    + '</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fill,240px);gap:12px">'
+    + _docCardHtml('contrato', 'Contrato', 'ti-file-text', 'HTML + Markdown → PDF (WeasyPrint)')
+    + _docCardHtml('proposta', 'Proposta comercial', 'ti-file-invoice', 'modelo .docx')
+    + '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 16px;opacity:.7">'
+      +'<i class="ti ti-files" style="font-size:20px;color:var(--muted)"></i>'
+      +'<div style="font-weight:600;font-size:13px;color:var(--text);margin-top:6px">Demais documentos</div>'
+      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">do processo</div>'
+      +'<div style="font-size:10px;color:var(--warn);margin-top:8px">edição de modelos — em construção</div></div>'
     +'</div>';
+}
+
+function _docModeloAtivo(tipo){
+  return (_docModelos||[]).find(m => m.tipo===tipo && m.ativo);
+}
+
+function _docQuemQuando(m){
+  const nome = (_docUsuariosNome && _docUsuariosNome[m.criado_por_id]) || ('usuário #'+m.criado_por_id);
+  const quando = m.criado_em ? new Date(m.criado_em).toLocaleString('pt-BR') : '—';
+  return 'por '+esc(nome)+' em '+quando;
+}
+
+function _docCardHtml(tipo, titulo, icone, desc){
+  const ativo = _docModeloAtivo(tipo);
+  const clicavel = _docPodeGerir;
+  const info = ativo ? ('Versão '+ativo.versao+' ativa'+(ativo.nome?' — '+esc(ativo.nome):'')) : 'Modelo padrão do sistema';
+  const rodape = ativo ? ('<div style="font-size:10px;color:var(--muted);margin-top:4px">'+_docQuemQuando(ativo)+'</div>') : '';
+  return '<div '+(clicavel ? ('onclick="abrirModalDocModelo(\''+tipo+'\')" style="cursor:pointer;') : 'style="')
+    +'background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 16px'+(clicavel?'':';opacity:.7')+'">'
+    +'<i class="ti '+icone+'" style="font-size:20px;color:var(--muted)"></i>'
+    +'<div style="font-weight:600;font-size:13px;color:var(--text);margin-top:6px">'+esc(titulo)+'</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(desc)+'</div>'
+    +'<div style="font-size:11px;color:'+(ativo?'var(--ok)':'var(--muted)')+';margin-top:8px;font-weight:600">'+info+'</div>'
+    + rodape
+    +'</div>';
+}
+
+// ── Modal: histórico + importação + wizard de revisão ─────────────────────────────────────────
+function abrirModalDocModelo(tipo){
+  if(!_docPodeGerir) return;
+  _docmCtx = {tipo, corpo_md:null, origem_nome:null, staging:null, origem_sha256:null, analise:null};
+  document.getElementById('docm-titulo').textContent = tipo==='contrato' ? 'Contrato' : 'Proposta comercial';
+  document.getElementById('docm-arquivo').value = '';
+  document.getElementById('docm-importar-btn').disabled = true;
+  const status = document.getElementById('docm-importar-status');
+  status.textContent = ''; status.style.color = 'var(--muted)';
+  document.getElementById('docm-wizard').style.display = 'none';
+  document.getElementById('docm-wizard').innerHTML = '';
+  _docmRenderVigenteHistorico(tipo);
+  document.getElementById('modal-doc-modelo').style.display = 'flex';
+}
+function fecharModalDocModelo(){
+  document.getElementById('modal-doc-modelo').style.display = 'none';
+}
+function docmArquivoSelecionado(){
+  const f = document.getElementById('docm-arquivo').files[0];
+  document.getElementById('docm-importar-btn').disabled = !f;
+  document.getElementById('docm-wizard').style.display = 'none';
+  document.getElementById('docm-wizard').innerHTML = '';
+}
+
+function _docmRenderVigenteHistorico(tipo){
+  const versoes = (_docModelos||[]).filter(m=>m.tipo===tipo);
+  const ativo = versoes.find(m=>m.ativo);
+  document.getElementById('docm-vigente').innerHTML = ativo
+    ? ('<div style="font-size:12px;color:var(--text)">Versão vigente: <strong>Versão '+ativo.versao+'</strong>'
+       +(ativo.nome?' — '+esc(ativo.nome):'')+'<br><span style="color:var(--muted);font-size:11px">'+_docQuemQuando(ativo)+'</span></div>')
+    : '<div style="font-size:12px;color:var(--muted)">Nenhuma versão ativa — usando o modelo padrão do sistema.</div>';
+  const hist = document.getElementById('docm-historico');
+  if(!versoes.length){
+    hist.innerHTML = '<div style="font-size:11px;color:var(--muted)">Nenhuma versão enviada ainda.</div>';
+    return;
+  }
+  hist.innerHTML =
+    '<table class="proj-table" style="width:100%"><thead><tr><th>Versão</th><th>Nome</th><th>Origem</th><th>Quem / quando</th></tr></thead><tbody>'
+    + versoes.map(m => '<tr class="proj-row"><td style="padding:6px 8px">'+m.versao
+        +(m.ativo?' <span style="color:var(--ok);font-size:10px;font-weight:700">&#9679; ativa</span>':'')+'</td>'
+      + '<td style="padding:6px 8px">'+esc(m.nome||'—')+'</td>'
+      + '<td style="padding:6px 8px;font-size:11px;color:var(--muted)">'+esc(m.origem_nome||'—')+'</td>'
+      + '<td style="padding:6px 8px;font-size:11px;color:var(--muted)">'+_docQuemQuando(m)+'</td></tr>').join('')
+    + '</tbody></table>';
+}
+
+async function docmImportar(){
+  const f = document.getElementById('docm-arquivo').files[0];
+  if(!f || !_docmCtx) return;
+  const btn = document.getElementById('docm-importar-btn');
+  const status = document.getElementById('docm-importar-status');
+  btn.disabled = true;
+  status.textContent = 'Importando e analisando…';
+  status.style.color = 'var(--muted)';
+  const fd = new FormData();
+  fd.append('arquivo', f, f.name);
+  fd.append('tipo', _docmCtx.tipo);
+  try{
+    const r = await fetch('/api/documentos/modelos/importar', {method:'POST', credentials:'same-origin', body: fd});
+    const d = await r.json().catch(()=>({}));
+    if(!d.ok){
+      status.textContent = d.erro || 'Falha ao importar o arquivo.';
+      status.style.color = 'var(--err)';
+      btn.disabled = false;
+      return;
+    }
+    status.textContent = '';
+    _docmCtx.corpo_md = d.corpo_md;
+    _docmCtx.origem_nome = d.origem_nome;
+    _docmCtx.staging = d.staging;
+    _docmCtx.origem_sha256 = d.origem_sha256;
+    _docmCtx.analise = d.analise;
+    btn.disabled = false;
+    _docmRenderWizard();
+  }catch(e){
+    status.textContent = 'Erro de rede ao importar.';
+    status.style.color = 'var(--err)';
+    btn.disabled = false;
+  }
+}
+
+function _docmRotulo(chave){
+  return (_docCatalogo && _docCatalogo[chave] && _docCatalogo[chave].rotulo) || chave;
+}
+
+// Trecho vem como "…antes>>>ocorrência<<<depois…" (mod_marcadores._trecho) — os delimitadores
+// são texto puro do backend, não HTML; por isso a demarcação é resolvida ANTES do esc() de
+// cada pedaço (senão '>>>' incluiria os '>'/'<' e o split quebraria).
+function _docmTrechoHtml(trecho){
+  const t = trecho || '';
+  const iIni = t.indexOf('>>>');
+  const iFim = t.indexOf('<<<');
+  if(iIni < 0 || iFim < 0 || iFim < iIni) return esc(t);
+  const antes = t.slice(0, iIni);
+  const meio = t.slice(iIni+3, iFim);
+  const depois = t.slice(iFim+3);
+  return esc(antes)
+    + '<mark style="background:var(--warn-soft);color:var(--warn);padding:0 2px;border-radius:3px">'+esc(meio)+'</mark>'
+    + esc(depois);
+}
+
+function _docmCravadoHtml(c){
+  const rotulo = _docmRotulo(c.marcador);
+  const disabled = c.so_digitos ? 'disabled' : '';
+  const trechosHtml = (c.trechos||[]).map(t =>
+    '<div style="font-family:var(--font-mono);font-size:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;margin-top:4px;white-space:pre-wrap;color:var(--text)">'
+    + _docmTrechoHtml(t) + '</div>').join('');
+  const omitidos = c.trechos_omitidos > 0
+    ? '<div style="font-size:10px;color:var(--muted);margin-top:2px">+ '+c.trechos_omitidos+' ocorrência(s) não mostradas aqui.</div>' : '';
+  const avisoDigitos = c.so_digitos
+    ? '<div style="font-size:10px;color:var(--warn);margin-top:4px">Encontrado com pontuação diferente do cadastro — a troca automática não alcança esta ocorrência; corrija manualmente no documento antes de reimportar.</div>' : '';
+  return '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px">'
+    + '<label style="display:flex;gap:8px;align-items:flex-start;cursor:'+(c.so_digitos?'default':'pointer')+'">'
+    + '<input type="checkbox" class="docm-cravado-chk" data-marcador="'+esc(c.marcador)+'" '+disabled+' style="margin-top:2px">'
+    + '<span style="font-size:12px;color:var(--text)"><strong>'+esc(rotulo)+'</strong> — "'+esc(c.literal)+'" ('+c.ocorrencias+' ocorrência'+(c.ocorrencias>1?'s':'')+')</span>'
+    + '</label>'
+    + trechosHtml + omitidos + avisoDigitos
+    + '</div>';
+}
+
+function _docmRenderWizard(){
+  const box = document.getElementById('docm-wizard');
+  const a = _docmCtx.analise || {desconhecidos:[],ausentes:[],cravados:[],bloqueia_ativacao:false,conhecidos_usados:[]};
+  let html = '<strong style="font-size:13px;color:var(--text)">Revisão antes de ativar</strong>';
+
+  if(a.desconhecidos.length){
+    html += '<div style="background:var(--err-soft);border:1px solid var(--err-line);border-radius:8px;padding:10px 12px;margin-top:10px">'
+      + '<div style="color:var(--err);font-weight:600;font-size:12px">Marcadores desconhecidos — bloqueiam a ativação</div>'
+      + '<div style="font-size:11px;color:var(--text);margin-top:4px">Sairiam impressos literalmente no PDF: '
+      + a.desconhecidos.map(c=>'<code>['+esc(c)+']</code>').join(', ')
+      + '. Corrija o texto no documento original ou revise o cravamento abaixo e reimporte.</div></div>';
+  }
+  if(a.ausentes.length){
+    html += '<div style="background:var(--warn-soft);border:1px solid var(--warn-line);border-radius:8px;padding:10px 12px;margin-top:10px">'
+      + '<div style="color:var(--warn);font-weight:600;font-size:12px">Marcadores essenciais ausentes — não bloqueiam, mas o documento pode sair incompleto</div>'
+      + '<div style="font-size:11px;color:var(--text);margin-top:4px">' + a.ausentes.map(c=>esc(_docmRotulo(c))).join(', ') + '</div></div>';
+  }
+  if(a.cravados.length){
+    html += '<div style="margin-top:14px"><strong style="font-size:12px;color:var(--text)">Dados da loja encontrados no texto (cravados)</strong>'
+      + '<div style="font-size:11px;color:var(--muted);margin-top:2px">Aprove cada troca para o sistema substituir o texto literal pelo marcador — confira o trecho antes de aprovar, a contagem sozinha não mostra se a troca vai corromper outra cláusula.</div>'
+      + a.cravados.map(c => _docmCravadoHtml(c)).join('') + '</div>';
+  }
+  if(!a.desconhecidos.length && !a.ausentes.length && !a.cravados.length){
+    html += '<div style="font-size:12px;color:var(--ok);margin-top:10px">Nenhum problema encontrado na análise.</div>';
+  }
+
+  html += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'
+    + '<button class="btn btn-ghost btn-sm" onclick="docmVerPdfExemplo()">Ver PDF de exemplo</button>'
+    + '<button class="btn btn-primary btn-sm" id="docm-ativar-btn" onclick="docmAtivar()"'
+      +(a.bloqueia_ativacao?' disabled title="Corrija os marcadores desconhecidos antes de ativar."':'')+'>Ativar</button>'
+    + '</div>';
+  if(a.bloqueia_ativacao){
+    html += '<div style="font-size:11px;color:var(--err);text-align:right;margin-top:4px">Ativação bloqueada — marcador desconhecido no texto.</div>';
+  }
+
+  box.innerHTML = html;
+  box.style.display = '';
+}
+
+async function docmVerPdfExemplo(){
+  if(!_docmCtx || !_docmCtx.corpo_md) return;
+  showToast('Gerando PDF de exemplo…', false);
+  try{
+    const r = await fetch('/api/documentos/modelos/preview', {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({corpo_md:_docmCtx.corpo_md, tipo:_docmCtx.tipo})});
+    if(!r.ok){
+      const d = await r.json().catch(()=>({}));
+      showToast('Erro ao gerar PDF: '+(d.erro||r.status), true);
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  }catch(e){
+    showToast('Erro de rede ao gerar PDF.', true);
+  }
+}
+
+async function docmAtivar(){
+  if(!_docmCtx || !_docmCtx.corpo_md) return;
+  const cravadosAprovados = Array.from(document.querySelectorAll('.docm-cravado-chk:checked')).map(el=>el.getAttribute('data-marcador'));
+  const btn = document.getElementById('docm-ativar-btn');
+  if(btn) btn.disabled = true;
+  try{
+    const r = await fetch('/api/documentos/modelos', {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        tipo: _docmCtx.tipo, corpo_md: _docmCtx.corpo_md,
+        origem_nome: _docmCtx.origem_nome, origem_sha256: _docmCtx.origem_sha256,
+        staging: _docmCtx.staging, cravados_aprovados: cravadosAprovados
+      })});
+    const d = await r.json().catch(()=>({}));
+    if(!d.ok){
+      showToast('Erro: '+(d.erro||'falha ao ativar'), true);
+      if(btn) btn.disabled = false;
+      return;
+    }
+    _docModelos = null;   // invalida cache — o próximo cfgDocumentosRender relê do servidor
+    if(d.aviso){
+      // Aviso não pode ser engolido pelo toast (some em 3s): fica fixo na tela até o
+      // lojista confirmar que leu, e só então fecha e recarrega o painel.
+      document.getElementById('docm-wizard').innerHTML =
+         '<div style="background:var(--warn-soft);border:1px solid var(--warn-line);border-radius:8px;padding:12px 14px">'
+        + '<div style="color:var(--warn);font-weight:600;font-size:12px">Modelo ativado, com aviso</div>'
+        + '<div style="font-size:12px;color:var(--text);margin-top:6px">'+esc(d.aviso)+'</div>'
+        + '<button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="fecharModalDocModelo();cfgDocumentosRender()">Entendi</button>'
+        + '</div>';
+      showToast('Modelo ativado — leia o aviso.', true);
+    } else {
+      showToast('Modelo ativado.', false);
+      fecharModalDocModelo();
+      cfgDocumentosRender();
+    }
+  }catch(e){
+    showToast('Erro de rede ao ativar.', true);
+    if(btn) btn.disabled = false;
+  }
 }
 
 // Admin › Perfis de Usuário — CRUD de perfis de acesso configuráveis por loja (Task 10).
@@ -10387,6 +10693,7 @@ document.addEventListener('keydown', function(e){
     ['modal-novo-ambiente',    fecharModalNovoAmbiente],
     ['modal-usuario',          fecharModalUsuario],
     ['modal-comissao',         fecharModalComissao],
+    ['modal-doc-modelo',       fecharModalDocModelo],
     ['modal-params',           () => fecharModalParams(false)],
   ];
   for(const [id, fn] of ESC_MAP){
