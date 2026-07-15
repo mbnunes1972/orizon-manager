@@ -12577,20 +12577,7 @@ async function carregarDadosContrato() {
                           { credentials: 'same-origin' });
     const d = await r.json();
     renderContratoUI(d.contrato);
-    _ctPrefillEntregaDoBriefing();
   } catch(e) { showToast('Erro ao carregar contrato: ' + e.message, true); }
-}
-
-// A "Data de entrega esperada" do contrato puxa a "data de entrega desejada" do briefing como DEFAULT
-// (só se o campo estiver vazio — não sobrescreve uma data já definida/validada).
-async function _ctPrefillEntregaDoBriefing(){
-  const inp = document.getElementById('ct-data-entrega');
-  if (!inp || inp.value || !projetoAtivo) return;
-  try {
-    const j = await fetch('/api/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/briefing', {credentials:'same-origin'}).then(r=>r.json());
-    const dd = (j && j.ok && j.briefing) ? (j.briefing.data_entrega_desejada||'') : '';
-    if (dd && !inp.value) inp.value = String(dd).slice(0,10);
-  } catch(e){}
 }
 
 // Passo 2 (cronograma): define/valida a data de entrega no card do Contrato → mostra a folga.
@@ -12657,9 +12644,9 @@ function renderContratoUI(contrato) {
       <div style="font-size:var(--fs-sm);font-weight:600;margin-bottom:4px">Data de entrega esperada (cliente)</div>
       <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:8px">Obrigatória para finalizar a assinatura — o cronograma é montado regressivamente a partir dela.</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <input type="date" id="ct-data-entrega" value="${(contrato.data_entrega||'').slice(0,10)}" ${['assinado','vigente'].includes(status)?'disabled':''}
+        <input type="date" id="ct-data-entrega" value="${(contrato.data_entrega||'').slice(0,10)}"
           style="height:var(--control-h-sm);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-body)">
-        ${!['assinado','vigente'].includes(status) ? `<button class="btn-ciclo" onclick="salvarDataEntrega()"><i class="ti ti-calendar-check"></i> Validar</button>` : ''}
+        <button class="btn-ciclo" onclick="salvarDataEntrega()"><i class="ti ti-calendar-check"></i> Validar</button>
         <span id="ct-entrega-result" style="font-size:var(--fs-xs)"></span>
       </div>
     </div>
