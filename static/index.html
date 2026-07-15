@@ -12577,7 +12577,20 @@ async function carregarDadosContrato() {
                           { credentials: 'same-origin' });
     const d = await r.json();
     renderContratoUI(d.contrato);
+    _ctPrefillEntregaDoBriefing();
   } catch(e) { showToast('Erro ao carregar contrato: ' + e.message, true); }
+}
+
+// A "Data de entrega esperada" do contrato puxa a "data de entrega desejada" do briefing como DEFAULT
+// (só se o campo estiver vazio — não sobrescreve uma data já definida/validada).
+async function _ctPrefillEntregaDoBriefing(){
+  const inp = document.getElementById('ct-data-entrega');
+  if (!inp || inp.value || !projetoAtivo) return;
+  try {
+    const j = await fetch('/api/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/briefing', {credentials:'same-origin'}).then(r=>r.json());
+    const dd = (j && j.ok && j.briefing) ? (j.briefing.data_entrega_desejada||'') : '';
+    if (dd && !inp.value) inp.value = String(dd).slice(0,10);
+  } catch(e){}
 }
 
 // Passo 2 (cronograma): define/valida a data de entrega no card do Contrato → mostra a folga.
