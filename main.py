@@ -2602,6 +2602,38 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            # ── Modelos de documento por loja (Task 8) ──────────────────────────
+            # GET /api/documentos/marcadores — catálogo do que existe, p/ a tela do wizard
+            if path == "/api/documentos/marcadores":
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                import mod_marcadores as _mmarc
+                self.send_json({"ok": True, "catalogo": _mmarc.CATALOGO})
+                return
+
+            # GET /api/documentos/modelos — modelos da loja da sessão (tenancy)
+            if path == "/api/documentos/modelos":
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                import mod_documentos as _mdoc
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    modelos = _mdoc.listar(db, loja_id)
+                    self.send_json({
+                        "ok": True,
+                        "pode_gerir": perfis.pode(ator.get("nivel"), "gerir_documentos"),
+                        "modelos": [_serializar_modelo_documento(m) for m in modelos],
+                    })
+                finally:
+                    db.close()
+                return
+
             self.send_response(404)
             self.end_headers()
 
@@ -2613,6 +2645,172 @@ class Handler(BaseHTTPRequestHandler):
         body   = self.rfile.read(length) if length else b'{}'
 
         if handle_auth_post(self, path, body): return
+
+        # ── Modelos de documento por loja (Task 8) ──────────────────────────────
+        # Os 3 POST exigem sessão + capacidade 'gerir_documentos' (só master por padrão).
+        if path == "/api/documentos/modelos/importar":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            import mod_documentos as _mdoc
+            import mod_documentos_import as _mdocimp
+            import mod_marcadores as _mmarc
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if not perfis.pode(ator.get("nivel"), "gerir_documentos"):
+                    self.send_json({"ok": False, "erro": "Sem permissão para gerir documentos"}, code=403); return
+                arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
+                tipo = (campos.get("tipo") or "").strip()
+                if tipo not in _mdoc.TIPOS:
+                    self.send_json({"ok": False, "erro": "tipo inválido: %r (aceitos: %s)" %
+                                    (tipo, ", ".join(_mdoc.TIPOS))}, code=400); return
+                if "arquivo" not in arquivos:
+                    self.send_json({"ok": False, "erro": "Anexe o arquivo do modelo."}, code=400); return
+                fname, dados = arquivos["arquivo"]
+                staging_path, sha = _mdoc.guardar_staging(loja_id, tipo, fname, dados)
+                # importa e analisa SEM salvar versão — o lojista pode desistir na revisão.
+                try:
+                    texto = _mdocimp.normalizar(staging_path)
+                    corpo_md = _mdocimp.extrair_corpo(texto)
+                except _mdocimp.FormatoNaoSuportado as e:
+                    _remover_staging_seguro(staging_path)
+                    self.send_json({"ok": False, "erro": str(e)}, code=400); return
+                except Exception as e:
+                    _remover_staging_seguro(staging_path)
+                    self.send_json({"ok": False, "erro": "Falha ao converter o arquivo: %s" % e}, code=400); return
+                if not (corpo_md or "").strip():
+                    _remover_staging_seguro(staging_path)
+                    self.send_json({"ok": False, "erro": "Não foi possível extrair conteúdo do documento."}, code=400); return
+                loja_dict = _loja_dict_para_contrato(db, loja_id)
+                analise = _mmarc.analisar_corpo(corpo_md, loja_dict)
+                self.send_json({
+                    "ok": True, "corpo_md": corpo_md, "origem_nome": fname, "tipo": tipo,
+                    "staging": os.path.basename(staging_path),   # só o basename — nunca o caminho
+                    "origem_sha256": sha, "analise": analise,
+                })
+            finally:
+                db.close()
+            return
+
+        if path == "/api/documentos/modelos/preview":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if not perfis.pode(ator.get("nivel"), "gerir_documentos"):
+                    self.send_json({"ok": False, "erro": "Sem permissão para gerir documentos"}, code=403); return
+                req = json.loads(body) if body else {}
+                corpo_md = req.get("corpo_md") or ""
+                loja_dict = _loja_dict_para_contrato(db, loja_id)
+                # Cliente de EXEMPLO (o preview não pertence a nenhum projeto real); a loja é a
+                # de verdade — é o que deixa o lojista conferir os cravados (CNPJ, endereço...).
+                cliente_exemplo = {
+                    "nome": "Cliente de Exemplo", "cpf": "000.000.000-00",
+                    "email": "cliente@exemplo.com", "telefone": "(12) 90000-0000",
+                    "logradouro": "Rua Exemplo", "numero": "123", "complemento": "",
+                    "bairro": "Centro", "cidade": loja_dict.get("cidade", "") or "Cidade Exemplo",
+                    "estado": loja_dict.get("estado", "") or "SP", "cep": "00000-000",
+                    "inst_mesmo_residencial": True,
+                }
+                usuario_ctx = {"nome": usuario.get("nome", ""),
+                               "telefone": _get_usuario_telefone(usuario["id"], db),
+                               "email": usuario.get("email", "") or ""}
+                # Import LOCAL (não o construir_contexto do topo do arquivo): outro bloco
+                # deste mesmo do_POST (main.py ~6188) reimporta 'construir_contexto' localmente,
+                # o que — pela regra de escopo do Python — torna o nome LOCAL a do_POST inteiro
+                # e quebra a referência ao global aqui em cima com UnboundLocalError. Confirmado
+                # por execução (pytest), não por leitura.
+                from mod_contrato import construir_contexto
+                ctx = construir_contexto(cliente_exemplo, usuario_ctx, "", loja_dict)
+                ctx["num_contrato"] = "EXEMPLO"
+                ctx["_ambientes"] = [("Ambiente de exemplo", 15000.0)]
+                # NÃO passa ctx['_db'] nem ctx['_modelo_versao_id']: _corpo_md_preview é
+                # checado primeiro em _resolver_corpo_contrato e nunca toca o banco/versão real.
+                ctx["_corpo_md_preview"] = corpo_md
+                import tempfile, shutil
+                outdir = tempfile.mkdtemp(prefix="doc_preview_")
+                try:
+                    pdf_path = gerar_pdf_contrato("preview", ctx, destino=outdir)
+                    with open(pdf_path, "rb") as fh:
+                        dados_pdf = fh.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/pdf")
+                    self.send_header("Content-Length", len(dados_pdf))
+                    self.send_header("Content-Disposition", 'inline; filename="preview.pdf"')
+                    self.end_headers()
+                    self.wfile.write(dados_pdf)
+                finally:
+                    shutil.rmtree(outdir, ignore_errors=True)
+            except Exception as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        if path == "/api/documentos/modelos":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            import mod_documentos as _mdoc
+            import mod_marcadores as _mmarc
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if not perfis.pode(ator.get("nivel"), "gerir_documentos"):
+                    self.send_json({"ok": False, "erro": "Sem permissão para gerir documentos"}, code=403); return
+                req = json.loads(body) if body else {}
+                tipo = (req.get("tipo") or "").strip()
+                if tipo not in _mdoc.TIPOS:
+                    self.send_json({"ok": False, "erro": "tipo inválido: %r (aceitos: %s)" %
+                                    (tipo, ", ".join(_mdoc.TIPOS))}, code=400); return
+                corpo_md = req.get("corpo_md") or ""
+                origem_nome = req.get("origem_nome") or None
+                origem_sha256 = req.get("origem_sha256") or None
+                cravados_aprovados = req.get("cravados_aprovados") or []
+                loja_dict = _loja_dict_para_contrato(db, loja_id)
+                corpo_final = _mmarc.aplicar_cravados(corpo_md, loja_dict, cravados_aprovados)
+                analise = _mmarc.analisar_corpo(corpo_final, loja_dict)
+                if analise["bloqueia_ativacao"]:
+                    self.send_json({
+                        "ok": False,
+                        "erro": "O documento tem marcador desconhecido (%s), que sairia impresso "
+                                "literal no PDF. Corrija o texto ou aprove o cravamento antes de ativar." %
+                                ", ".join(analise["desconhecidos"]),
+                        "analise": analise,
+                    }, code=400)
+                    return
+                # SEGURANÇA — path traversal: 'staging' do cliente é só o basename; o caminho é
+                # recomposto aqui a partir de DOCS_LOJA_DIR + loja_id (da SESSÃO) + tipo. Nunca se
+                # aceita o caminho pronto do cliente. Arquivo ausente -> segue sem trilha de origem.
+                staging_basename = os.path.basename((req.get("staging") or "").strip())
+                staging_path = None
+                if staging_basename:
+                    candidato = os.path.join(_mdoc.DOCS_LOJA_DIR, str(loja_id), tipo, "_staging", staging_basename)
+                    if os.path.exists(candidato):
+                        staging_path = candidato
+                try:
+                    modelo = _mdoc.criar_versao(db, loja_id, tipo, corpo_final, origem_nome,
+                                                usuario["id"], staging_path=staging_path,
+                                                origem_sha256=origem_sha256)
+                except ValueError as e:
+                    self.send_json({"ok": False, "erro": str(e)}, code=400); return
+                _mdoc.ativar(db, modelo.id)
+                self.send_json({"ok": True, "modelo": _serializar_modelo_documento(modelo)})
+            finally:
+                db.close()
+            return
 
         m_pcreate = re.match(r'^/api/projetos/([^/]+)/parcelas$', path)
         if m_pcreate:
@@ -8787,6 +8985,29 @@ def _loja_dict_para_contrato(db, loja_id):
         "testemunha1_nome": loja.testemunha1_nome or "", "testemunha1_cpf": loja.testemunha1_cpf or "",
         "testemunha2_nome": loja.testemunha2_nome or "", "testemunha2_cpf": loja.testemunha2_cpf or "",
     }
+
+
+def _serializar_modelo_documento(m):
+    """Dict raso de um DocumentoModelo para a tela (Task 9). NUNCA inclui corpo_md
+    aqui — a listagem é só metadado; o corpo completo vai na resposta de importar/preview."""
+    return {
+        "id": m.id, "tipo": m.tipo, "versao": m.versao, "nome": m.nome,
+        "origem_nome": m.origem_nome, "origem_sha256": m.origem_sha256,
+        "ativo": bool(m.ativo),
+        "criado_em": m.criado_em.isoformat() if m.criado_em else None,
+        "criado_por_id": m.criado_por_id,
+    }
+
+
+def _remover_staging_seguro(caminho):
+    """Apaga o arquivo de staging quando a importação não vira versão (conversão falhou,
+    corpo saiu vazio, ou o lojista nunca confirma). Sem isto, todo upload que não vira
+    versão fica pra sempre em _staging/ (débito já documentado em guardar_staging)."""
+    try:
+        if caminho and os.path.exists(caminho):
+            os.remove(caminho)
+    except OSError:
+        pass
 
 
 # == MAIN ==
