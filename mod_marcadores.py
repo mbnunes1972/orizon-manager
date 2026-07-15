@@ -97,12 +97,21 @@ ESSENCIAIS = ["NOME_CLIENTE", "CPF_CLIENTE", "DATA_CONTRATO",
               "TEXTO_COMPLEMENTAR"]
 
 # Campos da loja que valem procurar cravados no texto → marcador correspondente.
-# Ordem importa: NOME_EMPRESA (razão social, longa e específica) vem antes de
-# LOJA_LOGRADOURO/LOJA_CIDADE para não deixar diferença de precedência causar
-# confusão de leitura; na prática cada campo busca seu próprio literal (contagem
-# via str.count), então um não interfere no resultado do outro — mas manter o
-# nome fantasia/razão social primeiro deixa a lista de achados mais legível na
-# tela (o dado mais "identificador" da loja aparece primeiro).
+#
+# A ORDEM É FUNCIONAL, NÃO COSMÉTICA — NÃO REORDENE. Vai do literal mais
+# específico/longo (CNPJ, razão social, logradouro) para o mais genérico/curto
+# (bairro, cidade, CEP), porque aplicar_cravados faz replace SEQUENCIAL mutando
+# o corpo: um literal curto trocado antes destrói a string exata de um literal
+# longo que o contém, e o longo passa a ser pulado EM SILÊNCIO.
+#
+# Contraexemplo: loja com logradouro "Rua São José dos Campos" e cidade
+# "São José dos Campos". Com cidade antes, o corpo vira "Rua [LOJA_CIDADE]" e o
+# replace seguinte procura "Rua São José dos Campos" — que já não existe.
+#
+# Para analisar_corpo a ordem é indiferente (str.count sobre o corpo imutável;
+# cada campo busca seu próprio literal sem interferir nos outros) — ela só afeta
+# a ordem de leitura da lista de achados na tela.
+# test_aplicar_cravados_respeita_a_ordem_do_mais_especifico trava isto.
 _CRAVAVEIS = [
     ("cnpj",       "CNPJ_EMPRESA"),
     ("nome",       "NOME_EMPRESA"),

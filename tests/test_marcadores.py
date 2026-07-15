@@ -135,3 +135,29 @@ def test_aplicar_cravados_ignora_o_que_nao_foi_aprovado():
     novo = mod_marcadores.aplicar_cravados(corpo, LOJA_EXEMPLO, ["LOJA_CIDADE"])
     assert "[LOJA_CIDADE]" in novo
     assert "INSPIRIUM MÓVEIS PLANEJADOS E DECORAÇÃO LTDA" in novo, "não aprovado, não troca"
+
+
+def test_aplicar_cravados_respeita_a_ordem_do_mais_especifico():
+    """A ordem de _CRAVAVEIS é funcional, não cosmética: aplicar_cravados faz
+    replace SEQUENCIAL mutando o corpo. Se o literal curto ('São José dos Campos')
+    fosse trocado antes, o literal longo que o contém ('Rua São José dos Campos')
+    não existiria mais no texto e seria pulado em silêncio.
+
+    Inverter logradouro/cidade em _CRAVAVEIS faz este teste falhar — é o objetivo.
+    """
+    loja = {"logradouro": "Rua São José dos Campos", "cidade": "São José dos Campos"}
+    corpo = "Sede na Rua São José dos Campos, cidade de São José dos Campos."
+    novo = mod_marcadores.aplicar_cravados(corpo, loja, ["LOJA_LOGRADOURO", "LOJA_CIDADE"])
+    assert "[LOJA_LOGRADOURO]" in novo, "o logradouro (mais longo) tem que ser trocado"
+    assert "[LOJA_CIDADE]" in novo
+    assert novo == "Sede na [LOJA_LOGRADOURO], cidade de [LOJA_CIDADE]."
+
+
+def test_ordem_de_cravaveis_vai_do_mais_especifico_ao_mais_generico():
+    """Trava a ordem declarada: 'logradouro' antes de 'bairro'/'cidade', 'nome'
+    antes de 'cidade'. Documenta a invariante direto na lista, para quem for
+    acrescentar campo novo (o mais longo/específico entra antes)."""
+    campos = [c for c, _ in mod_marcadores._CRAVAVEIS]
+    assert campos.index("logradouro") < campos.index("bairro")
+    assert campos.index("logradouro") < campos.index("cidade")
+    assert campos.index("nome") < campos.index("cidade")
