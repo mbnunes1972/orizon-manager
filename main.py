@@ -4360,6 +4360,42 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        elif re.match(r"^/api/projetos/([^/]+)/data-entrega$", path):
+            # ── POST /api/projetos/<nome>/data-entrega — define a data de entrega esperada do cliente e
+            # valida contra o Cronograma Padrão (folga). Base do regressivo + do gate "cronograma próprio". ──
+            from urllib.parse import unquote as _unq
+            import mod_cronograma as _mcr, mod_tenancy as _mten
+            m_de = re.match(r"^/api/projetos/([^/]+)/data-entrega$", path)
+            nome_safe = _unq(m_de.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            req = json.loads(body) if body else {}
+            data_entrega = _parse_data(req.get("data_entrega"))
+            if not data_entrega:
+                self.send_json({"ok": False, "erro": "Informe a data de entrega esperada (AAAA-MM-DD)."}, code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = _mten.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                proj = db.get(Projeto, nome_safe)
+                proj.data_entrega = data_entrega
+                if not proj.data_inicio:
+                    proj.data_inicio = datetime.utcnow()   # default do início (âncora do progressivo)
+                cfg = _cfg_financeira_loja(db, loja_id)
+                view = _mcr.cronograma_do_projeto(cfg, proj.data_inicio, data_entrega)
+                cabe = _mcr.cabe_no_cronograma(view)
+                folga_min = min((e["folga_dias"] for e in view), default=None)
+                db.commit()
+                self.send_json({"ok": True, "cabe": cabe, "folga_min": folga_min})
+            finally:
+                db.close()
+            return
+
         else:
             import re as _re
 
@@ -5761,6 +5797,16 @@ class Handler(BaseHTTPRequestHandler):
                     if ja_assinou:
                         self.send_json({"ok": False, "erro": f"Parte '{parte}' já assinou"}, code=400)
                         return
+                    # Guard (cronograma): a assinatura que COMPLETA o contrato (loja+cliente) exige a data
+                    # de entrega esperada do cliente já definida (âncora do cronograma regressivo).
+                    _completaria = {"loja", "cliente"}.issubset(
+                        {a.parte for a in contrato.assinaturas} | {parte})
+                    if _completaria:
+                        _pm = db.get(Projeto, nome_safe)
+                        if _pm is None or _pm.data_entrega is None:
+                            self.send_json({"ok": False,
+                                "erro": "Defina a data de entrega esperada do cliente antes de finalizar a assinatura."}, code=400)
+                            return
                     timestamp = datetime.utcnow().isoformat()
                     ip        = self.client_address[0] if self.client_address else ""
                     hash_sig  = calcular_hash_assinatura(nome, cpf, contrato.id, timestamp)
