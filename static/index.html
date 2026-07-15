@@ -10616,7 +10616,8 @@ function renderCiclo() {
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
       <button class="btn btn-ghost btn-sm" onclick="fecharCiclo()"><i class="ti ti-arrow-left"></i>Voltar</button>
       <h3 style="margin:0;color:var(--text);font-weight:800">Etapas do Projeto</h3>
-      ${projetoAtivo ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="abrirAuditoria('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-report-money"></i>Auditoria Contábil</button>` : ''}
+      ${projetoAtivo ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="abrirCronograma('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-calendar-stats"></i>Cronograma</button>` : ''}
+      ${projetoAtivo ? `<button class="btn btn-ghost btn-sm" onclick="abrirAuditoria('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-report-money"></i>Auditoria Contábil</button>` : ''}
       ${_podeEditarMapaFront() && projetoAtivo ? `<button class="btn btn-ghost btn-sm" onclick="mapaAbrir('${esc(projetoAtivo.nome_safe)}')"><i class="ti ti-users-group"></i>Mapa de Atribuições</button>` : ''}
     </div>
   `;
@@ -10745,11 +10746,11 @@ function _cronoLabelEtapa(codigo, dados) {
   const parts = [];
   if (prev) {
     const editar = _podeAutorizarFront()
-      ? ` <i class="ti ti-pencil" title="Editar data prevista (requer reautenticação)" style="cursor:pointer;font-size:12px;color:var(--muted)" onclick="event.stopPropagation();cronoAbrirEdicao('${codigo}','${dados.data_prevista_conclusao || ''}')"></i>`
+      ? ` <i class="ti ti-pencil" title="Editar data planejada (requer reautenticação)" style="cursor:pointer;font-size:12px;color:var(--muted)" onclick="event.stopPropagation();cronoAbrirEdicao('${codigo}','${dados.data_prevista_conclusao || ''}')"></i>`
       : '';
-    parts.push(`<span title="Data prevista de conclusão"><i class="ti ti-calendar-event" style="font-size:11px"></i> ${prev}${editar}</span>`);
+    parts.push(`<span title="Planejada — extraída do cronograma"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3)">Planejada</span> <i class="ti ti-calendar-event" style="font-size:11px"></i> ${prev}${editar}</span>`);
   }
-  if (conc) parts.push(`<span style="color:var(--accent)" title="Concluída em"><i class="ti ti-check" style="font-size:11px"></i> ${conc}</span>`);
+  if (conc) parts.push(`<span style="color:var(--accent)" title="Executada"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.04em">Executada</span> <i class="ti ti-check" style="font-size:11px"></i> ${conc}</span>`);
   return `<span class="ciclo-crono" style="margin-left:auto;display:inline-flex;gap:12px;font-size:11px;color:var(--muted);align-items:center">${parts.join('')}</span>`;
 }
 
@@ -11385,6 +11386,38 @@ async function abrirAuditoria(nomeSafe){
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:99999';
   ov.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 24px;max-width:880px;width:96%;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)">'+html+'</div>';
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.querySelector('[data-act="fechar"]').onclick = close;
+  ov.addEventListener('click', e => { if(e.target===ov) close(); });
+}
+
+// ── Cronograma do projeto (Prazo Limite / Planejada / Executada / Folga por etapa) ──
+async function abrirCronograma(nomeSafe){
+  let j;
+  try { j = await fetch('/api/projetos/'+encodeURIComponent(nomeSafe)+'/cronograma', {credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ await avisoPopup('Erro ao carregar: '+e.message, {titulo:'Cronograma'}); return; }
+  if(!j.ok){ await avisoPopup(j.erro||'Falha ao carregar.', {titulo:'Cronograma'}); return; }
+  const nomeEt = c => { const e = ETAPAS_CICLO.find(x=>x.codigo===c); return e ? e.nome : ('Etapa '+c); };
+  const d = iso => iso ? new Date(iso).toLocaleDateString('pt-BR') : '—';
+  const rows = (j.cronograma||[]).map(l => {
+    const fCor = (l.folga_dias==null) ? 'var(--text-3)' : (l.folga_dias<0 ? 'var(--err)' : 'var(--ok)');
+    const fTxt = (l.folga_dias==null) ? '—' : (l.folga_dias>0?'+':'')+l.folga_dias+'d';
+    return `<tr><td>${esc(nomeEt(l.codigo))}</td>`
+      + `<td class="num">${d(l.prazo_limite)}</td>`
+      + `<td class="num">${d(l.planejado)}</td>`
+      + `<td class="num">${d(l.executado)}</td>`
+      + `<td class="num" style="color:${fCor}">${fTxt}</td></tr>`;
+  }).join('');
+  const html = `<h4 style="margin:0 0 4px;color:var(--text);font-size:1rem"><i class="ti ti-calendar-stats"></i> Cronograma</h4>`
+    + `<p style="margin:0 0 12px;color:var(--text-3);font-size:var(--fs-xs)">Projeto <strong>${esc(nomeSafe)}</strong>. <strong>Planejada</strong> (do cronograma) · <strong>Prazo Limite</strong> (regressivo, da entrega) · <strong>Executada</strong> · <strong>Folga</strong> (negativa = não cabe).</p>`
+    + `<div class="table-wrap" style="max-height:65vh;overflow:auto"><table class="tbl" style="font-size:.82rem">`
+    + `<thead><tr><th>Etapa</th><th style="text-align:right">Prazo Limite</th><th style="text-align:right">Planejada</th><th style="text-align:right">Executada</th><th style="text-align:right">Folga</th></tr></thead>`
+    + `<tbody>${rows || '<tr><td colspan="5" style="color:var(--text-3)">Sem cronograma — defina a data de entrega na Assinatura do Contrato.</td></tr>'}</tbody></table></div>`
+    + `<div style="margin-top:16px;display:flex;justify-content:flex-end"><button data-act="fechar" style="background:none;border:1px solid var(--muted);color:var(--muted);border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">Fechar</button></div>`;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:99999';
+  ov.innerHTML = '<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px 24px;max-width:820px;width:96%;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.6)">'+html+'</div>';
   document.body.appendChild(ov);
   const close = () => ov.remove();
   ov.querySelector('[data-act="fechar"]').onclick = close;

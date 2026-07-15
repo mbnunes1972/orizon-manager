@@ -645,6 +645,29 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        m_crono = re.match(r"^/api/projetos/([^/]+)/cronograma$", path)
+        if m_crono:
+            # Cronograma do projeto — por etapa: Prazo Limite (regressivo) / Planejado (progressivo) /
+            # Executado. View derivada do Cronograma Padrão + âncoras do projeto (read-only, operacional).
+            from urllib.parse import unquote as _unq
+            import mod_cronograma as _mcr, mod_tenancy as _mten
+            nome_safe = _unq(m_crono.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = _mten.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                cfg = _cfg_financeira_loja(db, loja_id)
+                self.send_json({"ok": True, "cronograma": _mcr.cronograma_projeto_view(db, nome_safe, cfg)})
+            finally:
+                db.close()
+            return
         m_razao = re.match(r"^/api/financeiro/contas/(\d+)/razao$", path)
         if m_razao:
             ctx = _contabil_ctx(self, exige_edicao=False)

@@ -129,32 +129,26 @@ def cabe_no_cronograma(resultado):
 
 
 def cronograma_projeto_view(db, projeto_nome, cfg, codigo_entrega="16"):
-    """Dados das 3 colunas do ciclo por etapa — **Prazo Limite** (regressivo, âncora `data_entrega`),
-    **Planejado** (progressivo, âncora `data_inicio`) e **Executado** (`concluido_em`). Deriva do
-    Cronograma Padrão (cfg) + âncoras do projeto; nada persistido além das âncoras e do concluído.
-    Regressivo/folga só saem se `data_entrega` estiver definida; progressivo, se `data_inicio`. Datas em
-    ISO (ou None). Retorna [{codigo, prazo_limite, planejado, executado, folga_dias}]."""
+    """Dados das 3 datas do ciclo por etapa — **Planejada** (`CicloEtapa.data_prevista_conclusao`, do
+    Cronograma Padrão gerado na assinatura), **Prazo Limite** (regressivo, âncora `Projeto.data_entrega`)
+    e **Executada** (`concluido_em`). Folga = Limite − Planejada. Regressivo/folga só saem se `data_entrega`
+    estiver definida. Datas em ISO (ou None). Retorna [{codigo, prazo_limite, planejado, executado,
+    folga_dias}]."""
     p = db.get(Projeto, projeto_nome)
-    inicio = getattr(p, "data_inicio", None) if p else None
     entrega = getattr(p, "data_entrega", None) if p else None
     etapas = [(f["codigo"], f["prazo_dias"]) for f in cronograma_padrao(cfg)]
-    prog = {}
-    if inicio:
-        acc = inicio
-        for cod, pz in etapas:
-            acc = acc + timedelta(days=int(pz or 0))
-            prog[cod] = acc
-    reg = ({x["codigo"]: x for x in cronogramas(etapas, inicio, entrega, codigo_entrega)}
-           if (inicio and entrega) else {})
-    concl = {e.etapa_codigo: e.concluido_em
-             for e in db.query(CicloEtapa).filter_by(projeto_nome=projeto_nome).all()}
+    # Prazo Limite = regressivo (depende só da entrega); reusa cronogramas() e usa só o regressivo.
+    reg = ({x["codigo"]: x["regressivo"] for x in cronogramas(etapas, entrega, entrega, codigo_entrega)}
+           if entrega else {})
+    cetapas = {e.etapa_codigo: e for e in db.query(CicloEtapa).filter_by(projeto_nome=projeto_nome).all()}
     _iso = lambda d: d.isoformat() if d else None
     out = []
     for cod, _ in etapas:
-        r = reg.get(cod)
-        out.append({"codigo": cod,
-                    "prazo_limite": _iso(r["regressivo"]) if r else None,
-                    "planejado": _iso(prog.get(cod)),
-                    "executado": _iso(concl.get(cod)),
-                    "folga_dias": (r["folga_dias"] if r else None)})
+        ce = cetapas.get(cod)
+        planejada = getattr(ce, "data_prevista_conclusao", None) if ce else None
+        limite = reg.get(cod)
+        executada = getattr(ce, "concluido_em", None) if ce else None
+        folga = (limite - planejada).days if (limite and planejada) else None
+        out.append({"codigo": cod, "prazo_limite": _iso(limite), "planejado": _iso(planejada),
+                    "executado": _iso(executada), "folga_dias": folga})
     return out
