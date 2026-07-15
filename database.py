@@ -888,6 +888,33 @@ class CicloRevisao(Base):
     aberta_por = relationship("Usuario", foreign_keys=[aberta_por_id])
 
 
+class DocumentoModelo(Base):
+    """Modelo de documento de uma loja (contrato/proposta), versionado.
+
+    IMUTÁVEL: uma versão nunca muda de corpo_md depois de criada. Editar é criar
+    a versão seguinte. É o que dá sentido a Contrato.modelo_versao_id — se a linha
+    fosse mutável, o ponteiro não garantiria a reprodução do contrato assinado.
+    """
+    __tablename__ = "documento_modelos"
+
+    id            = Column(Integer,  primary_key=True, autoincrement=True)
+    loja_id       = Column(Integer,  ForeignKey("lojas.id"), nullable=False)
+    tipo          = Column(Text,     nullable=False)   # contrato | proposta
+    versao        = Column(Integer,  nullable=False)   # sequencial por (loja_id, tipo)
+    nome          = Column(Text,     nullable=True)
+    corpo_md      = Column(Text,     nullable=False)
+    origem_nome   = Column(Text,     nullable=True)
+    origem_path   = Column(Text,     nullable=True)
+    origem_sha256 = Column(Text,     nullable=True)
+    ativo         = Column(Integer,  nullable=False, default=0)
+    criado_em     = Column(DateTime, default=datetime.utcnow)
+    criado_por_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("loja_id", "tipo", "versao", name="uq_doc_modelo_versao"),
+    )
+
+
 class Emitente(Base):
     """Identidade fiscal de 1 CNPJ. Emite documentos; NÃO é a loja vendedora."""
     __tablename__ = "emitente"
