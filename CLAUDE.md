@@ -73,15 +73,15 @@ implementação.
   Final"** (`mod_contabil.conciliar_final`, endpoint `.../ciclo/21/conciliar`) resolve à força o saldo
   remanescente das 10 e encerra o projeto com status **`concluido`** (distinto de `fechado`). Projetos
   legados (fluxo antigo) **não migram**. Detalhes: spec `docs/superpowers/specs/2026-07-12-fase-d2-*.md`.
+- **Banco de dados (decisão 2026-07-15, ainda não implementada):** decidido migrar **SQLite → PostgreSQL**
+  (autohospedado na mesma VPS, sem custo adicional) — motivo: rigor de constraint/transação para o motor
+  contábil de partida dobrada + `JSONB` para os campos `*_json` hoje em `Text`. **Enquanto não migrado, o
+  banco de produção continua SQLite** — não assumir Postgres em código novo até o cutover. Plano e
+  rationale completos: `docs/superpowers/specs/2026-07-15-migracao-postgresql.md`.
 
 ## Dicas de modelo
 Para **lógica financeira intrincada** (ex.: cálculo reverso da negociação), o **Fable 5** rende — pode
 ser chamado pontualmente via subagente sem trocar o modelo da sessão. Opus/Sonnet dão conta do resto.
 
 ## Agente de QA (Vera)
-Subagente de teste em `.claude/agents/vera.md` (**local, não versionado** — `.claude/…` é ignorado pelo
-git, então cada máquina precisa do arquivo próprio). Cobre backend (pytest/TDD + `test_arquitetura_modulos`),
-fluxo de telas do frontend (navegação, escopo/tenancy, tema claro/escuro), consistência de design
-(`docs/design/`) e simulação financeira ponta a ponta (fluxo real, não script sintético). Chamar
-proativamente antes de fechar frente/mergear área sensível, ou sob demanda ("chama a Vera"). Só reporta —
-não commita/mergeia/corrige sozinha.
+Subagente de teste em `.claude/agents/vera.md` (**local, n
