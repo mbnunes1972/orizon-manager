@@ -539,7 +539,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <nav class="sb-nav">
     <div class="sb-secao">
       <div class="sb-nav-title">Atalhos</div>
-      <div class="nav-item" id="nav-00" onclick="goPage(0)"><i class="ti ti-diamond"></i>Orçamentos</div>
+      <div class="nav-item" id="nav-00" onclick="goPage(0)"><i class="ti ti-diamond"></i>Projetos</div>
     </div>
 
     <!-- Lista PLANA dos módulos de domínio (Modulos_Orizon_v4): sem cabeçalho de faixa, todo módulo
@@ -749,7 +749,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <!-- PAGE 00: Projetos -->
   <div class="page active" id="page-00">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-      <div class="page-title" style="margin:0">Orçamentos</div>
+      <div class="page-title" style="margin:0">Projetos</div>
       <button class="btn btn-primary btn-sm" onclick="mostrarFormNovoProjeto()">+ Novo Projeto</button>
     </div>
     <div id="form-novo-projeto" class="p00-form" style="display:none">
@@ -3005,7 +3005,7 @@ async function salvarFuncaoPerfil(id, slug){
 
 // ── Modal Perfil de acesso (criar/editar) — prefixo "pfa" evita colisão com o modal
 // "Meu Perfil" (#modal-perfil / abrirModalPerfil / fecharModalPerfil, conta do usuário logado).
-const _PFA_GRUPO_OPERACIONAIS = ['captacao','cadastro','comercial','producao','estoque','expedicao','montagem','assistencias'];
+const _PFA_GRUPO_OPERACIONAIS = ['captacao','cadastro','comercial','estoque','expedicao','montagem','assistencias'];
 const _PFA_GRUPO_FISCAL_FIN   = ['fiscal','financeiro','folha'];
 
 function _pfaRenderModulos(modulosMarcados){
@@ -8817,8 +8817,7 @@ const _SB_MODULOS = {
                  {id:'funcionarios', lbl:'Funcionários', ic:'id-badge',       go:()=>cadIr('funcionarios')},
                  {id:'terceiros',    lbl:'Terceiros',    ic:'user-cog',       go:()=>cadIr('terceiros')},
               ]},
-  comercial:  {ic:'shopping-cart', go:()=>goPage(0)},     // folha: abre Projetos
-  producao:   {ic:'ruler-measure'},                       // "Projetos" (PE/Medição) — em construção
+  comercial:  {ic:'shopping-cart', go:()=>goPage(0)},     // folha: abre Projetos (Increment 3: vira DASHBOARD)
   fiscal:     {ic:'file-invoice',  go:()=>goPage(11)},    // folha: Emitente/NF-e
   estoque:    {ic:'packages'},                            // em construção
   expedicao:  {ic:'truck',         go:()=>goPage(13)},    // folha: Kanban de expedição

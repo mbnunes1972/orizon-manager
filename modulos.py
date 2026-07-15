@@ -41,15 +41,15 @@ MODULOS = {
                     "arquivos": ["mod_orcamento_params.py", "mod_margens.py", "mod_negociacao.py",
                                  "mod_proposta.py", "mod_contrato.py", "mod_arvore.py",
                                  "contrato_editar.py", "_ler_aymore.py", "mod_fin",
-                                 "mod_pe_comparacao.py", "mod_parcelas.py"],
+                                 "mod_pe_comparacao.py", "mod_parcelas.py",
+                                 # Medição (etapas 9/10 do ciclo): o antigo módulo 'producao' (rótulo UI
+                                 # "Projetos") foi retirado da navegação por ser tela-vazia e duplicar o
+                                 # nome; seu código é dono aqui, pois Medição pertence ao ciclo comercial.
+                                 "mod_medicao.py", "mod_qualidade_xml.py"],
                     "tabelas": ["projetos_meta", "briefings", "pool_ambientes", "orcamentos",
                                 "orcamento_ambientes", "contratos", "contratos_assinaturas",
-                                "arquivo_pe", "parcela_projeto", "parcela_ambiente"],
-                    "rotas": ["/api/orcamentos", "/api/contratos"]},
-    "producao":    {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Projetos", "faixa": "execucao_projeto",
-                    "arquivos": ["mod_medicao.py", "mod_qualidade_xml.py"],
-                    "tabelas": ["medicoes"],
-                    "rotas": ["/api/medicoes"]},
+                                "arquivo_pe", "parcela_projeto", "parcela_ambiente", "medicoes"],
+                    "rotas": ["/api/orcamentos", "/api/contratos", "/api/medicoes"]},
     "fiscal":      {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Fiscal (NF-e/NFS-e)", "faixa": "expedicao",
                     "arquivos": ["mod_fiscal.py", "mapa_fiscal.py", "emissor_focus.py",
                                  "fiscal_cripto.py", "nfe_emissao.py", "mod_nfe.py"],
@@ -65,9 +65,9 @@ MODULOS = {
                               "/api/financeiro/provisoes-venda", "/api/financeiro/dashboard"]},
     # domínios NOVOS — fronteira só (stub, sem código/tabela hoje). Montagem e Assistências substituem
     # o antigo "posvenda" (que virou FAIXA, não módulo — Modulos_Orizon_v4).
-    "estoque":     {"camada": "dominio", "depende_de": ["cadastro", "producao"], "rotulo": "Estoque", "faixa": "expedicao",
+    "estoque":     {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Estoque", "faixa": "expedicao",
                     "arquivos": [], "tabelas": [], "rotas": []},
-    "expedicao":   {"camada": "dominio", "depende_de": ["producao", "estoque", "fiscal"], "rotulo": "Expedição", "faixa": "expedicao",
+    "expedicao":   {"camada": "dominio", "depende_de": ["comercial", "estoque", "fiscal"], "rotulo": "Expedição", "faixa": "expedicao",
                     "arquivos": ["mod_expedicao.py"],
                     "tabelas": ["ciclo_logistico", "ciclo_logistico_transicao"],
                     "rotas": ["/api/expedicao"]},
@@ -87,8 +87,8 @@ MODULOS = {
 SHELL = {"main.py", "seed.py", "reset_ep07.py", "modulos.py"}
 
 # mod_nfe é COMPARTILHADO (parser=produção, pricing=fiscal): lotado em 'fiscal' no manifesto, mas
-# 'producao' também pode importá-lo. Declarado aqui para o teste de fronteira aceitar ambos.
-COMPARTILHADOS = {"mod_nfe.py": ["fiscal", "producao"]}
+# 'comercial' (dono da medição/qualidade de XML) também pode importá-lo.
+COMPARTILHADOS = {"mod_nfe.py": ["fiscal", "comercial"]}
 
 NUCLEO = frozenset(n for n, v in MODULOS.items() if v["camada"] == "nucleo")
 DOMINIOS = frozenset(n for n, v in MODULOS.items() if v["camada"] == "dominio")
@@ -134,7 +134,7 @@ def modulo_do_path(path):
 
 # Ordem estável dos domínios para a UI (DOMINIOS é frozenset, sem ordem). Sidebar plana usa esta ordem
 # (achatada por faixa no hub_layout). Captação primeiro (entrada do funil); Montagem/Assistências ao fim.
-DOMINIOS_ORDEM = ["captacao", "cadastro", "comercial", "producao", "fiscal",
+DOMINIOS_ORDEM = ["captacao", "cadastro", "comercial", "fiscal",
                   "estoque", "expedicao", "montagem", "assistencias", "financeiro", "folha"]
 
 

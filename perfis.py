@@ -53,7 +53,7 @@ _DEFAULT = {"rotulo": "—", "desconto_max": 0.0, "ver_parametros": False,
             "acesso_admin": False, "acesso_config": False}
 
 # Acesso a MÓDULO/PAINEL (matriz rev2 §2) — mapeia id de módulo → capacidade acesso_* do perfil.
-_MODULOS_OPERACIONAIS = frozenset({"captacao", "cadastro", "comercial", "producao",
+_MODULOS_OPERACIONAIS = frozenset({"captacao", "cadastro", "comercial",
                                    "estoque", "expedicao", "montagem", "assistencias"})
 _MODULO_ACESSO = {"financeiro": "acesso_financeiro", "folha": "acesso_financeiro",
                   "fiscal": "acesso_fiscal"}

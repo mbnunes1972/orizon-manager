@@ -1360,7 +1360,7 @@ def _run_migracoes(conn):
     # 2026-07-10: semeia os 3 perfis padrão nas lojas existentes (rev3 §2). Idempotente por (loja_id, slug).
     if "perfil_acesso_seed_v1" not in aplicadas and _tabela_existe(cur, "perfil_acesso") and _tabela_existe(cur, "lojas"):
         import json as _json
-        _OP = ["captacao", "cadastro", "comercial", "producao", "estoque", "expedicao", "montagem", "assistencias"]
+        _OP = ["captacao", "cadastro", "comercial", "estoque", "expedicao", "montagem", "assistencias"]
         _SPEC = [("master", "Master", "master", _OP + ["fiscal", "financeiro", "folha", "admin", "config"]),
                  ("gerencial", "Gerencial", "gerencial", _OP + ["fiscal", "financeiro", "folha"]),
                  ("operador", "Operador", "operador", _OP + ["fiscal"])]

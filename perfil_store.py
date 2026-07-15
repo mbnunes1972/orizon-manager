@@ -5,7 +5,7 @@ from database import PerfilAcesso
 import mod_perfis
 
 # Definição dos 3 perfis padrão (rev3 §2). base == slug para os de sistema.
-_OPERACIONAIS = ["captacao", "cadastro", "comercial", "producao",
+_OPERACIONAIS = ["captacao", "cadastro", "comercial",
                  "estoque", "expedicao", "montagem", "assistencias"]
 PERFIS_PADRAO = [
     {"slug": "master", "nome": "Master", "base": "master",

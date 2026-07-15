@@ -61,7 +61,9 @@ def test_faixa_por_dominio():
 def test_hub_layout_agrupa_por_faixa():
     g = m.hub_layout(list(m.DOMINIOS))
     faixas = [x["faixa"] for x in g]
-    assert faixas == ["vendas", "execucao_projeto", "expedicao", "montagem", "financeiro"]
+    # 'execucao_projeto' saiu do hub: seu único módulo ('producao'/"Projetos") foi retirado da navegação
+    # (medição rehospedada em 'comercial'); a faixa sem módulo ativo não aparece.
+    assert faixas == ["vendas", "expedicao", "montagem", "financeiro"]
     vendas = next(x for x in g if x["faixa"] == "vendas")
     ids = [mm["id"] for mm in vendas["modulos"]]
     assert ids == ["captacao", "cadastro", "comercial"] and vendas["rotulo"] == "Vendas"
