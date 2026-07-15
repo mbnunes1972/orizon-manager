@@ -30,6 +30,10 @@ Leia isto. Cada item já custou retrabalho a alguém.
 
 **7. Não existe teste JS.** O Task 9 (frontend) é verificado no navegador + `node --check` no `<script>` extraído.
 
+**8. Use `db.get(Modelo, id)`, não `db.query(Modelo).get(id)`.** A suíte cospe ~50k `LegacyAPIWarning` porque o segundo é a API legada do SQLAlchemy 1.x. O projeto já usa a forma moderna nas partes novas (`_loja_dict_para_contrato`, `main.py:8756`). Código novo não nasce depreciado.
+
+**9. Leia arquivo de texto com `encoding="utf-8-sig"`, não `"utf-8"`.** O `.txt` que o LibreOffice gera começa com BOM; com `utf-8` puro o `U+FEFF` invisível vaza para o corpo do documento. (Achado da revisão do Task 2.)
+
 ---
 
 ## Estrutura de arquivos
@@ -576,6 +580,20 @@ def test_aponta_marcador_essencial_ausente():
     assert "NOME_TESTEMUNHA_1" in r["ausentes"]
 
 
+def test_avisa_quando_falta_o_ponto_de_injecao_do_adendo():
+    """Achado da revisão do Task 2: mod_documentos_import só insere
+    [TEXTO_COMPLEMENTAR] se o texto tiver o marco de fecho do modelo atual.
+    Contrato de outra loja não tem -> sem este aviso, o adendo do ciclo
+    (mod_contrato.py:744) some do PDF em silêncio."""
+    corpo = "# CLÁUSULA ÚNICA\n1.1. Contrato de outra loja, com fecho próprio.\n"
+    assert "TEXTO_COMPLEMENTAR" in mod_marcadores.analisar_corpo(corpo, {})["ausentes"]
+
+
+def test_adendo_presente_sai_dos_ausentes():
+    corpo = "1.1. Texto.\n\n[TEXTO_COMPLEMENTAR]\n\nFecho."
+    assert "TEXTO_COMPLEMENTAR" not in mod_marcadores.analisar_corpo(corpo, {})["ausentes"]
+
+
 def test_essencial_presente_sai_dos_ausentes():
     corpo = " ".join("[%s]" % c for c in mod_marcadores.ESSENCIAIS)
     assert mod_marcadores.analisar_corpo(corpo, {})["ausentes"] == []
@@ -646,9 +664,16 @@ from mod_contrato import _MARK_RE
 
 # Sem estes, o documento sai quebrado: cliente sem nome, contrato sem data,
 # fecho sem testemunha. O wizard avisa; não bloqueia (pode ser um modelo parcial).
+#
+# TEXTO_COMPLEMENTAR entrou aqui por um achado da revisão do Task 2: é o ponto de
+# injeção do adendo do ciclo (mod_contrato.py:744). mod_documentos_import só insere
+# [TEXTO_COMPLEMENTAR] se o texto tiver o marco de fecho do modelo atual ("E assim,
+# por estarem assim convencionados") — um contrato de outra loja, com redação
+# própria, não tem. Sem este aviso, o adendo SOME do PDF em silêncio.
 ESSENCIAIS = ["NOME_CLIENTE", "CPF_CLIENTE", "DATA_CONTRATO",
               "NOME_EMPRESA", "CNPJ_EMPRESA",
-              "NOME_TESTEMUNHA_1", "NOME_TESTEMUNHA_2"]
+              "NOME_TESTEMUNHA_1", "NOME_TESTEMUNHA_2",
+              "TEXTO_COMPLEMENTAR"]
 
 # Campos da loja que valem procurar cravados no texto → marcador correspondente.
 _CRAVAVEIS = [
@@ -1013,7 +1038,7 @@ def criar_versao(db, loja_id, tipo, corpo_md, origem_nome, usuario_id,
 
 def ativar(db, modelo_id):
     """Liga esta versão e desliga a anterior do mesmo (loja, tipo)."""
-    m = db.query(DocumentoModelo).get(modelo_id)
+    m = db.get(DocumentoModelo, modelo_id)
     if m is None:
         raise ValueError("modelo não encontrado: %s" % modelo_id)
     (db.query(DocumentoModelo)
@@ -1036,7 +1061,7 @@ def ativo_de(db, loja_id, tipo):
 
 def corpo_da_versao(db, modelo_versao_id):
     """Corpo de uma versão específica — o caminho de reprodução do contrato antigo."""
-    m = db.query(DocumentoModelo).get(modelo_versao_id)
+    m = db.get(DocumentoModelo, modelo_versao_id)
     return m.corpo_md if m else None
 
 
