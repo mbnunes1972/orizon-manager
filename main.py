@@ -1818,7 +1818,6 @@ class Handler(BaseHTTPRequestHandler):
             m = _re.match(r"^/api/orcamentos/(\d+)/proposta/pdf$", path)
             if m:
                 import tempfile, shutil
-                import mod_proposta as _mprop
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
@@ -1853,6 +1852,7 @@ class Handler(BaseHTTPRequestHandler):
                         orc.num_proposta = _gnp(_existing)
                         db.commit()
                     ctx["num_contrato"] = orc.num_proposta   # marcador [NUM_CONTRATO] da capa
+                    ctx["_db"] = db   # corpo da proposta vem do modelo da loja (se houver)
                     outdir = tempfile.mkdtemp(prefix="proposta_")
                     try:
                         pdf_path = os.path.join(outdir, "proposta_%d.pdf" % oid)

@@ -937,14 +937,32 @@ def gerar_pdf_contrato(contrato_id: int, ctx: dict, destino: str = None) -> str:
     return pdf_path
 
 
+def _resolver_corpo_proposta(ctx):
+    """Markdown do corpo da proposta. Sem _db ou sem loja_id -> "" (capa-só,
+    como sempre foi). A proposta não tem fallback pro template global: o
+    contrato.md global é do CONTRATO; proposta sem modelo próprio não tem corpo."""
+    db = ctx.get("_db")
+    loja_id = (ctx.get("loja") or {}).get("id")
+    if db is None or not loja_id:
+        return ""
+    import mod_documentos    # local: mod_documentos importa mod_contrato (ciclo)
+    return mod_documentos.resolver_modelo(db, loja_id, "proposta")
+
+
 def montar_html_proposta(ctx):
-    """HTML da proposta comercial = PRIMEIRA PÁGINA do contrato (capa), sem as cláusulas do corpo.
+    """HTML da proposta comercial = PRIMEIRA PÁGINA do contrato (capa), seguida do
+    corpo (cláusulas) do modelo 'proposta' ativo da loja, se houver. Sem modelo (ou
+    sem ctx['_db']): capa-só, PDF de uma página, como sempre foi.
     O número no canto superior direito usa ctx['num_contrato'] (deve conter o num_proposta 'PV...')."""
     from html import escape
     mapping = {k: escape(str(v)) for k, v in _montar_mapping(ctx, ctx.get("_pag", {})).items()}
     shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"), encoding="utf-8").read()
-    capa = _html_capa(ctx).replace('<div class="quebra-capa"></div>', "")   # uma página só
-    html = shell.replace("<!--CAPA-->", capa).replace("<!--CORPO-->", "")
+    corpo_md = _resolver_corpo_proposta(ctx)
+    capa = _html_capa(ctx)
+    if not corpo_md:
+        capa = capa.replace('<div class="quebra-capa"></div>', "")   # uma página só
+    corpo = _html_corpo(corpo_md) if corpo_md else ""
+    html = shell.replace("<!--CAPA-->", capa).replace("<!--CORPO-->", corpo)
     return _substituir_marcadores_html(html, mapping)
 
 
