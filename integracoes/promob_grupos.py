@@ -322,7 +322,10 @@ def main():
     # Nome do arquivo de saída baseado no primeiro projeto
     nome_base = re.sub(r'[^\w\s-]', '', ambientes[0]['projeto'])[:40].strip().replace(' ', '_')
     nome_saida = f"orcamento_{nome_base}_{datetime.now().strftime('%Y%m%d_%H%M')}.json"
-    caminho_saida = os.path.join(os.path.dirname(os.path.abspath(__file__)), nome_saida)
+    # DOIS dirname: grava na RAIZ, não dentro de integracoes/ (este arquivo mudou
+    # de lugar em 2026-07-15 e o caminho relativo a __file__ seguiu junto).
+    _raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    caminho_saida = os.path.join(_raiz, nome_saida)
 
     with open(caminho_saida, 'w', encoding='utf-8') as f:
         json.dump(saida, f, ensure_ascii=False, indent=2)

@@ -8,7 +8,8 @@ from cryptography.fernet import Fernet
 try:
     from storage import _BASE_DIR
 except ImportError:
-    _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    # DOIS dirname: este arquivo vive em fiscal/, e config/ está na RAIZ.
+    _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 _KEYFILE = os.path.join(_BASE_DIR, "config", "fiscal.key")
 

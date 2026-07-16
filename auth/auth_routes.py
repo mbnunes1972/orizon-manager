@@ -32,7 +32,13 @@ from database import get_session, Usuario, Loja, Rede, membership_loja_ids, LogA
 from . import perfis
 
 # ── Caminho do login.html ─────────────────────────────────────────────────────
-_LOGIN_HTML = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "login.html")
+# DOIS dirname: este arquivo vive em auth/, e o static/ está na RAIZ do projeto.
+# Com um só, apontava para auth/static/login.html — inexistente — e o
+# `except FileNotFoundError` de _serve_login devolvia 404 em SILÊNCIO: a página de
+# entrada sumia sem erro no log. Foi o que quebrou na mudança para pacote
+# (2026-07-15). Mesmo padrão do mod_fin/base.py.
+_RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_LOGIN_HTML = os.path.join(_RAIZ, "static", "login.html")
 
 
 def get_usuario_sessao(handler) -> dict | None:

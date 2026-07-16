@@ -6,7 +6,8 @@ import json
 try:
     from storage import _BASE_DIR
 except ImportError:  # fallback fora do app
-    _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    # DOIS dirname: este arquivo vive em integracoes/, e o .json fica na RAIZ.
+    _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 FOCUS_CONFIG_FILE = os.path.join(_BASE_DIR, "focus_config.json")
 
