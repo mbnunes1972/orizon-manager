@@ -1,18 +1,23 @@
 """
-mod_contrato.py — Geração de contrato via template HTML/Markdown, renderizado em
-PDF com WeasyPrint.
+mod_contrato.py — Geração de contrato E proposta via template HTML/Markdown,
+renderizado em PDF com WeasyPrint.
 
-Ainda expõe um pequeno motor de substituição de marcadores em .docx
-(_substituir_marcadores/_subst_paragrafo) e a conversão via LibreOffice
-(_converter_pdf/_libreoffice_cmd/LibreOfficeIndisponivel) — não usados mais pelo
-contrato, mas reaproveitados por mod_proposta.py (Proposta comercial, ainda em
-.docx). Não remover sem migrar a Proposta primeiro.
+Contrato: capa (contrato.html) + corpo (cláusulas em Markdown). Proposta: a mesma
+capa, sem quebra, + corpo opcional do modelo da loja. O corpo dos dois sai de
+mod_documentos.resolver_modelo() quando a loja tem modelo próprio; senão, do
+contrato_template/contrato.md global.
+
+O motor de marcadores em .docx (_substituir_marcadores/_subst_paragrafo) e a
+conversão .docx→PDF (_converter_pdf) foram REMOVIDOS em 2026-07-15 junto com
+mod_proposta.py: produção não os usava desde a migração da capa para WeasyPrint.
+
+_libreoffice_cmd/LibreOfficeIndisponivel FICARAM e não são legado — são a base da
+IMPORTAÇÃO de modelo (mod_documentos_import.normalizar).
 """
 
 import os
 import json
 import platform
-import subprocess
 import hashlib
 from datetime import datetime
 
@@ -274,114 +279,6 @@ def _substituir_marcadores_html(html, mapping):
         chave = m.group(1).strip().upper().replace(" ", "_")
         return mapping[chave] if chave in mapping else m.group(0)
     return _MARK_RE.sub(repl, html)
-
-
-# ── Motor de substituição de marcadores em .docx (legado — usado por mod_proposta) ──
-
-def _subst_paragrafo(par, mapping, coletor=None):
-    """Reconstrói o parágrafo em segmentos (texto fixo × valor substituído),
-    preservando a formatação (``rPr``) de CADA run original.
-
-    Cada trecho de texto herda o estilo do run de onde veio (rótulo cinza pequeno
-    continua cinza pequeno; valor em negrito continua negrito). O valor substituído
-    herda o estilo do run onde o marcador começava. Quando ``coletor`` é fornecido,
-    o run do VALOR substituído é anexado a ele (isola o valor para torná-lo editável).
-    O texto resultante (``par.text``) é idêntico ao da substituição direta.
-    """
-    txt = par.text
-    if "[" not in txt:
-        return
-    import copy as _copy
-    from docx.oxml.ns import qn as _qn
-
-    runs = list(par.runs)
-    # mapa caractere -> run original de onde veio (para preservar formatação por run)
-    char_run = []
-    for r in runs:
-        char_run.extend([r] * len(r.text))
-    if len(char_run) != len(txt):
-        # desalinhamento (conteúdo não-run: hyperlink/campo) → não arrisca reformatar
-        char_run = None
-
-    def _src(i):
-        if char_run and 0 <= i < len(char_run):
-            return char_run[i]
-        return runs[0] if runs else None
-
-    # segmentos: (texto, run_fonte, eh_valor) — quebrando trechos fixos por run de origem
-    segs = []
-    def _emit_fixo(sub, ini):
-        if not sub:
-            return
-        if not char_run:
-            segs.append((sub, runs[0] if runs else None, False))
-            return
-        k = 0
-        for j in range(1, len(sub) + 1):
-            if j == len(sub) or char_run[ini + j] is not char_run[ini + j - 1]:
-                segs.append((sub[k:j], char_run[ini + k], False))
-                k = j
-
-    pos = 0
-    for m in _MARK_RE.finditer(txt):
-        if m.start() > pos:
-            _emit_fixo(txt[pos:m.start()], pos)
-        chave = m.group(1).strip().upper().replace(" ", "_")
-        if chave in mapping:
-            segs.append((mapping[chave], _src(m.start()), True))
-        else:
-            _emit_fixo(m.group(0), m.start())
-        pos = m.end()
-    if pos < len(txt):
-        _emit_fixo(txt[pos:], pos)
-
-    # captura o rPr de cada run fonte ANTES de remover os runs originais
-    rpr_por_run = {}
-    for _, src, _v in segs:
-        if src is not None and id(src) not in rpr_por_run:
-            el = src._r.find(_qn('w:rPr'))
-            rpr_por_run[id(src)] = _copy.deepcopy(el) if el is not None else None
-
-    # limpa runs existentes e recria os segmentos preservando a formatação de origem
-    for r in runs:
-        r._r.getparent().remove(r._r)
-    for seg_txt, src, eh_valor in segs:
-        run = par.add_run(seg_txt)
-        rpr = rpr_por_run.get(id(src)) if src is not None else None
-        if rpr is not None:
-            velho = run._r.find(_qn('w:rPr'))
-            if velho is not None:
-                run._r.remove(velho)
-            run._r.insert(0, _copy.deepcopy(rpr))
-        if eh_valor and coletor is not None:
-            coletor.append(run)
-
-
-def _substituir_marcadores(doc, mapping, coletor=None):
-    """Substitui [MARCADOR] (case-insensitive, tolera '[[') no corpo, tabelas e headers.
-    Chaves do mapping SEM colchetes, em MAIÚSCULAS. Marcador sem chave é mantido."""
-    for par in doc.paragraphs:
-        _subst_paragrafo(par, mapping, coletor)
-    for t in doc.tables:
-        for row in t.rows:
-            for cell in row.cells:
-                for par in cell.paragraphs:
-                    _subst_paragrafo(par, mapping, coletor)
-    from docx.text.paragraph import Paragraph as _Paragraph
-    _W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
-    for sec in doc.sections:
-        for hdr in (sec.header, sec.first_page_header, sec.even_page_header):
-            for par in hdr.paragraphs:
-                _subst_paragrafo(par, mapping)
-            for tbl in hdr.tables:
-                for row in tbl.rows:
-                    for cell in row.cells:
-                        for par in cell.paragraphs:
-                            _subst_paragrafo(par, mapping)
-            # Text boxes (wps:txbx / mc:AlternateContent) hold markers in w:txbxContent
-            for txbx in hdr._element.findall(f'.//{{{_W}}}txbxContent'):
-                for p_el in txbx.findall(f'{{{_W}}}p'):
-                    _subst_paragrafo(_Paragraph(p_el, None), mapping)
 
 
 # ── Parser de pagamento ───────────────────────────────────────────────────────
@@ -977,15 +874,22 @@ def gerar_pdf_proposta(ctx: dict, destino_pdf: str) -> str:
     return destino_pdf
 
 
-# ── LibreOffice (legado — usado por mod_proposta para converter proposta.docx) ─
+# ── LibreOffice ───────────────────────────────────────────────────────────────
+#
+# NÃO é legado: é a base da IMPORTAÇÃO de modelo de documento
+# (mod_documentos_import.normalizar) — o único caminho que achata a numeração
+# automática do Word em texto literal. Medido num .docx real: LibreOffice
+# preserva 63 números de cláusula, python-docx preserva 3.
+# Também usado por contrato_editar.py:49 para abrir o .docx no app local.
+# A conversão .docx→PDF (_converter_pdf) morreu junto com mod_proposta.
 
 class LibreOfficeIndisponivel(Exception):
     def __init__(self, docx_path: str):
         self.docx_path = docx_path
         super().__init__(
             "LibreOffice não encontrado no servidor.\n"
-            "O arquivo Word (.docx) foi gerado e está disponível para download.\n"
-            "Instale o LibreOffice no servidor para gerar PDF automaticamente."
+            "É necessário para importar modelo de documento (.docx/.odt/.doc/.rtf):\n"
+            "só ele achata a numeração automática do Word em texto."
         )
 
 
@@ -998,26 +902,3 @@ def _libreoffice_cmd() -> str:
             if os.path.exists(p):
                 return p
     return "libreoffice"
-
-
-def _converter_pdf(docx_path: str, outdir: str = None) -> str:
-    """Converte um .docx EXISTENTE em PDF (não regenera). Retorna o caminho do PDF.
-    outdir default = CONTRATOS_DIR (comportamento do contrato inalterado)."""
-    destino = outdir or CONTRATOS_DIR
-    try:
-        subprocess.run(
-            [_libreoffice_cmd(), "--headless", "--convert-to", "pdf",
-             "--outdir", destino, docx_path],
-            check=True, capture_output=True, timeout=120,
-        )
-    except FileNotFoundError:
-        raise LibreOfficeIndisponivel(docx_path)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(
-            f"LibreOffice falhou:\n{e.stderr.decode(errors='replace')}"
-        ) from e
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("LibreOffice demorou mais de 120s")
-
-    base = os.path.splitext(os.path.basename(docx_path))[0]
-    return os.path.join(destino, f"{base}.pdf")

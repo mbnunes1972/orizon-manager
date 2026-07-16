@@ -60,7 +60,6 @@ import mod_usuarios
 import mod_tenancy
 import mod_arvore
 import mod_provisoes
-import mod_proposta
 import mod_pe_comparacao
 from mod_qualidade_xml import avaliar_qualidade_xml
 

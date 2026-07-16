@@ -1,12 +1,16 @@
-import os
 import pytest
 
-
-@pytest.fixture(autouse=True)
-def _template_existe():
-    # garante que o template foi gerado (Task 2); senão pula o e2e
-    if not os.path.exists(os.path.join(os.path.dirname(__file__), "..", "modelo_proposta.docx")):
-        pytest.skip("modelo_proposta.docx ausente")
+# NÃO reintroduzir um skip condicionado a modelo_proposta.docx.
+#
+# Havia aqui uma fixture autouse que pulava o e2e inteiro se o
+# modelo_proposta.docx não existisse. Era resquício de quando o endpoint
+# /api/orcamentos/<id>/proposta/pdf gerava a proposta em .docx. Ele usa
+# WeasyPrint desde a migração da capa (mod_contrato.gerar_pdf_proposta), e o
+# docx foi removido em 2026-07-15 junto com mod_proposta.py.
+#
+# Se o skip tivesse ficado, estes testes passariam a PULAR para sempre no dia em
+# que o docx sumisse — a suíte seguiria verde com o e2e da proposta desligado, em
+# silêncio. Foi o que quase aconteceu.
 
 
 def _setup_ambiente(app_db, seed):

@@ -22,9 +22,11 @@ def test_catalogo_nao_inventa_marcador():
 
 
 def test_todo_verbete_tem_rotulo_e_escopo():
-    # "projeto" é reserva: seria o escopo dos marcadores da proposta (AMBIENTES_LISTA,
-    # VALOR_BRUTO, DESCONTO_PCT, VALOR_TOTAL, VALIDADE — hoje em mod_proposta.py:18-24)
-    # se um dia entrarem; _montar_mapping não os produz, então nenhum verbete o usa ainda.
+    # "projeto" é reserva: seria o escopo de marcadores calculados a partir do
+    # orçamento (ambientes, valor bruto, desconto, validade) se um dia entrarem.
+    # Existiram no mod_proposta.py, que era o caminho .docx morto, REMOVIDO em
+    # 2026-07-15 — não os ressuscite de lá. Hoje _montar_mapping não produz
+    # nenhum marcador de escopo "projeto", então nenhum verbete o usa.
     for chave, v in mod_marcadores.CATALOGO.items():
         assert v.get("rotulo"), f"{chave} sem rótulo"
         assert v.get("escopo") in ("cliente", "loja", "pagamento", "projeto", "documento"), \
