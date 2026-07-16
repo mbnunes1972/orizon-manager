@@ -9192,6 +9192,7 @@ async function orizonRedesCarregar(){
     </div>`;
 }
 
+let _orzLojaFiltro = '';   // '' = todas; 'avulsas'; ou id (string) da rede
 async function orizonLojasCarregar(){
   const box = document.getElementById('orz-panel-lojas'); if(!box) return;
   box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
@@ -9199,17 +9200,36 @@ async function orizonLojasCarregar(){
     fetch('/api/admin/lojas', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({lojas:[]})),
     fetch('/api/admin/redes', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({redes:[]})),
   ]);
-  const redeNome = {}; (dr.redes||[]).forEach(r=>redeNome[r.id]=r.nome);
+  const redes = dr.redes || [];
+  const redeNome = {}; redes.forEach(r=>redeNome[r.id]=r.nome);
+  let lojas = dl.lojas || [];
+  if (_orzLojaFiltro === 'avulsas')      lojas = lojas.filter(l=>!l.rede_id);
+  else if (_orzLojaFiltro)               lojas = lojas.filter(l=>String(l.rede_id)===_orzLojaFiltro);
+  const filtroOpts = `<option value="">Todas</option><option value="avulsas" ${_orzLojaFiltro==='avulsas'?'selected':''}>Avulsas</option>`+
+    redes.map(r=>`<option value="${r.id}" ${String(r.id)===_orzLojaFiltro?'selected':''}>${esc(r.nome)}</option>`).join('');
+  const redeSelOpts = `<option value="">— Avulsa —</option>`+
+    redes.map(r=>`<option value="${r.id}">${esc(r.nome)}</option>`).join('');
   box.innerHTML = `
     <div class="card" style="padding:14px 16px">
-      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
         <strong style="color:var(--accent)"><i class="ti ti-building-store"></i>Lojas</strong>
-        <button class="btn btn-ghost btn-sm" onclick="orizonLojaNova()" style="font-size:11px">+ Nova loja</button>
+        <span style="color:var(--muted);font-size:12px">Grupo:</span>
+        <select onchange="_orzLojaFiltro=this.value; orizonLojasCarregar()" style="padding:4px 8px">${filtroOpts}</select>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('orz-nova-loja').style.display=''" style="font-size:11px">+ Nova loja</button>
+      </div>
+      <div id="orz-nova-loja" style="display:none;margin-bottom:10px;padding:10px;border:1px solid var(--border);border-radius:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input id="orz-nl-nome" placeholder="Nome da loja" style="padding:4px 8px">
+          <input id="orz-nl-codigo" placeholder="Código (3 letras)" style="padding:4px 8px;width:130px">
+          <select id="orz-nl-rede" style="padding:4px 8px">${redeSelOpts}</select>
+          <button class="btn btn-primary btn-sm" onclick="orizonLojaCriar()" style="font-size:11px">Criar</button>
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('orz-nova-loja').style.display='none'" style="font-size:11px">Cancelar</button>
+        </div>
       </div>
       <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th>Grupo (rede)</th></tr></thead><tbody>
-      ${(dl.lojas||[]).map(l=>`<tr><td>${esc(l.nome)}</td><td style="color:var(--muted)">${esc(l.codigo||'—')}</td>
+      ${lojas.map(l=>`<tr><td>${esc(l.nome)}</td><td style="color:var(--muted)">${esc(l.codigo||'—')}</td>
         <td style="color:var(--muted)">${esc(l.rede_id ? (redeNome[l.rede_id]||'—') : 'Avulsa')}</td></tr>`).join('')
-        || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma loja.</td></tr>'}
+        || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma loja neste filtro.</td></tr>'}
       </tbody></table>
     </div>`;
 }
@@ -9245,11 +9265,15 @@ async function orizonRedeNova(){
   showToast('Rede criada.', false); orizonRedesCarregar();
 }
 
-async function orizonLojaNova(){
-  const nome   = prompt('Nome da loja:'); if(!nome) return;
-  const codigo = prompt('Código (3 letras, único — usado na numeração do contrato):'); if(!codigo) return;
+async function orizonLojaCriar(){
+  const nome   = (document.getElementById('orz-nl-nome').value || '').trim();
+  const codigo = (document.getElementById('orz-nl-codigo').value || '').trim();
+  const redeId = document.getElementById('orz-nl-rede').value;
+  if(!nome || !codigo){ await avisoPopup('Informe nome e código.', {titulo:'Lojas'}); return; }
+  const body = { nome, codigo };
+  if (redeId) body.rede_id = parseInt(redeId, 10);
   const r = await fetch('/api/admin/lojas', {method:'POST', credentials:'same-origin',
-    headers:{'Content-Type':'application/json'}, body: JSON.stringify({nome, codigo})});
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
   const d = await r.json();
   if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Lojas'}); return; }
   showToast('Loja criada.', false); orizonLojasCarregar();
