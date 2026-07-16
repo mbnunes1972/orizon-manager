@@ -1842,7 +1842,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <!-- PAGE 09: Config — parâmetros de negócio (Modulos_Orizon_v8: Núcleo, distinto de Admin) -->
   <div class="page" id="page-09">
     <div class="page-title" style="margin:0">Config</div>
-    <div class="page-sub">Parâmetros de regra de negócio da loja.</div>
+    <div class="page-sub">Parâmetros de regra de negócio da empresa.</div>
+    <div id="cfg-emp-seletor"></div>
     <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin:12px 0 16px;flex-wrap:wrap">
       <button class="home-tab ativo" id="cfg-tab-provisoes"  onclick="cfgTab('provisoes')">Provisões</button>
       <button class="home-tab"       id="cfg-tab-comissao"   onclick="cfgTab('comissao')">Comissão de Vendas</button>
@@ -2825,7 +2826,7 @@ async function cfgSalvarLimites(){
 
 // ── Config (Modulos_Orizon_v8): parâmetros de negócio — Provisões · Comissão · Documentos ────
 let _cfgTabAtual = 'provisoes';
-function cfgRender(){ cfgTab(_cfgTabAtual || 'provisoes'); }
+function cfgRender(){ _empSeletorPreencher('cfg-emp-seletor'); cfgTab(_cfgTabAtual || 'provisoes'); }
 function cfgTab(qual){
   _cfgTabAtual = qual;
   ['provisoes','comissao','cronograma','funcoes','documentos'].forEach(q => {
@@ -9111,6 +9112,44 @@ async function adminLojaNova(redeId){
   showToast('Loja criada.', false); adminRender();
 }
 
+// ── Seletor de empresa (topo de Admin e Config) — "terminal de acesso" à empresa/grupo ──
+let _empresas = null;   // cache [{loja_id,nome,rede_id,rede_nome}]
+function _empresaAtivaId(){ return _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id) || null; }
+async function empresasCarregar(){
+  if (_empresas) return _empresas;
+  try { const r = await fetch('/api/admin/empresas', {credentials:'same-origin'});
+        const d = await r.json(); _empresas = d.ok ? d.empresas : []; }
+  catch(e){ _empresas = []; }
+  return _empresas;
+}
+async function empresaSeletorHTML(){
+  const emps = await empresasCarregar();
+  const cur = _empresaAtivaId();
+  const wrap = 'display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px';
+  if (emps.length <= 1){
+    const nome = (emps[0] && emps[0].nome) || 'Minha empresa';
+    return `<div class="emp-seletor" style="${wrap}"><span style="color:var(--muted)">Empresa:</span> <strong>${esc(nome)}</strong></div>`;
+  }
+  const grupos = {};
+  emps.forEach(e => { const g = e.rede_nome || 'Sem grupo'; (grupos[g] = grupos[g] || []).push(e); });
+  const opts = Object.keys(grupos).sort().map(g =>
+    `<optgroup label="${esc(g)}">`+grupos[g].map(e =>
+      `<option value="${e.loja_id}" ${e.loja_id==cur?'selected':''}>${esc(e.nome)}</option>`).join('')+`</optgroup>`).join('');
+  return `<div class="emp-seletor" style="${wrap}"><span style="color:var(--muted)">Empresa:</span>
+    <select onchange="empresaTrocar(this.value)" style="padding:4px 8px"><option value="">— escolher —</option>${opts}</select></div>`;
+}
+async function _empSeletorPreencher(containerId){
+  const el = document.getElementById(containerId); if(!el) return;
+  el.innerHTML = await empresaSeletorHTML();
+}
+function empresaTrocar(id){
+  _lojaAtiva = id ? parseInt(id,10) : null;
+  if (_lojaAtiva) localStorage.setItem('loja_ativa', String(_lojaAtiva));
+  const p7 = document.getElementById('page-07'), p9 = document.getElementById('page-09');
+  if (p7 && p7.classList.contains('active')) adminRender();
+  if (p9 && p9.classList.contains('active') && typeof cfgRender === 'function') cfgRender();
+}
+
 // ── Painel Orizon (administração do sistema — só super_admin) ─────────────────
 function goPageOrizon(){
   const nav = document.getElementById('nav-orizon');
@@ -9219,6 +9258,7 @@ async function orizonLojaNova(){
 async function adminRenderLoja(box){
   const lid = _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id);
   box.innerHTML = `
+    <div id="admin-emp-seletor"></div>
     <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:12px">
       <button class="home-tab ativo" id="loja-tab-dados" onclick="adminLojaTab('dados')">Dados da empresa</button>
       <button class="home-tab" id="loja-tab-usuarios" onclick="adminLojaTab('usuarios')">Usuários</button>
@@ -9234,6 +9274,7 @@ async function adminRenderLoja(box){
     <div id="loja-panel-modulos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>`;
   adminLojaCarregarDados(lid);
   adminUsuariosCarregar();   // popula #admin-usuarios-lista (função já existente)
+  _empSeletorPreencher('admin-emp-seletor');
 }
 
 function adminLojaTab(qual){
