@@ -32,7 +32,7 @@ PERFIS = {
         "executar_pe": True, "revisar_pe": False, "registrar_medicao": True},
     # ── Plataforma/Rede (fora dos perfis de loja; NÃO entram na tabela perfil_acesso) ──
     "super_admin": {"rotulo": "Administrador da Plataforma", "desconto_max": 0.0,
-        "acesso_operacional": False, "acesso_financeiro": False, "acesso_fiscal": False,
+        "acesso_operacional": True, "acesso_financeiro": True, "acesso_fiscal": True,
         "acesso_admin": True, "acesso_config": True,
         "gerir_usuarios": True, "gerir_perfis": True, "editar_dados_loja": True,
         "gerir_redes": True, "gerir_lojas": True},
@@ -66,6 +66,8 @@ _MODULO_ACESSO = {"financeiro": "acesso_financeiro", "folha": "acesso_financeiro
 def acessa_modulo(slug, modulo_id):
     """True se o perfil `slug` pode abrir o módulo de domínio `modulo_id` (matriz §2).
     Registro DB (perfil_acesso) manda quando existir; núcleo/desconhecido nunca é bloqueado."""
+    if slug == "super_admin":
+        return True
     info = _reg().get(slug)
     if info is not None:
         try:
@@ -84,6 +86,8 @@ def acessa_modulo(slug, modulo_id):
 
 def acessa_painel(slug, painel):
     """True se o perfil abre o painel 'admin' (page-07) ou 'config' (page-09)."""
+    if slug == "super_admin":
+        return True
     info = _reg().get(slug)
     if info is not None:
         return painel in info["modulos"]
@@ -135,7 +139,10 @@ def base(slug):
 
 
 def pode(slug, capacidade):
-    """Override do perfil (capacidades_json) manda; senão cai na base PERFIS[base]."""
+    """Override do perfil (capacidades_json) manda; senão cai na base PERFIS[base].
+    super_admin é irrestrito (god-mode): sempre True."""
+    if slug == "super_admin":
+        return True
     info = _reg().get(slug)
     if info and capacidade in info["caps"]:
         return bool(info["caps"][capacidade])
