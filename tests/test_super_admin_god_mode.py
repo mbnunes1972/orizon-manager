@@ -25,3 +25,17 @@ def test_bypass_nao_vaza_para_outros_perfis():
     assert perfis.pode("operador", "gerir_perfis") is False
     assert perfis.acessa_modulo("operador", "financeiro") is False
     assert perfis.acessa_painel("operador", "admin") is False
+
+
+def test_super_admin_adota_loja_do_header():
+    # sem membership e sem loja própria, mas com header → loja ativa = header
+    assert mod_tenancy.resolver_loja_ativa([], 5, None, is_super=True) == 5
+    # sem header → sem loja ativa (precisa escolher uma loja no console)
+    assert mod_tenancy.resolver_loja_ativa([], None, None, is_super=True) is None
+
+
+def test_resolver_loja_ativa_nao_super_inalterado():
+    # comportamento pré-existente preservado p/ usuário de loja
+    assert mod_tenancy.resolver_loja_ativa([], 5, None) is None          # header sem acesso → None
+    assert mod_tenancy.resolver_loja_ativa([7], None, 7) == 7            # default acessível
+    assert mod_tenancy.resolver_loja_ativa([7], 7, None) == 7            # header acessível

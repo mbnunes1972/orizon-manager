@@ -207,12 +207,16 @@ def escopo_operacional(ator):
     return (loja_id, None)
 
 
-def resolver_loja_ativa(memberships, header_loja_id, default_loja_id):
+def resolver_loja_ativa(memberships, header_loja_id, default_loja_id, is_super=False):
     """Decide a loja ativa de uma requisição operacional.
 
-    acessíveis = memberships ∪ {default}. header presente → só vale se acessível
-    (senão None → 403). Sem header → default se acessível; senão membership única; senão None.
+    super_admin (is_super) é irrestrito: adota a loja do header como ativa (ou None
+    se nenhuma escolhida). Demais: acessíveis = memberships ∪ {default}; header só
+    vale se acessível (senão None → 403); sem header → default acessível; senão
+    membership única; senão None.
     """
+    if is_super:
+        return header_loja_id
     acessiveis = set(memberships or [])
     if default_loja_id is not None:
         acessiveis.add(default_loja_id)

@@ -8609,7 +8609,8 @@ def _ator_dict(db, usuario_sessao, header_loja_id=None):
         return {"nivel": usuario_sessao.get("nivel"), "loja_id": None,
                 "rede_id": None, "active_loja_id": None, "lojas_ids": []}
     membership = membership_loja_ids(db, u.id)
-    active = mod_tenancy.resolver_loja_ativa(membership, header_loja_id, u.loja_id)
+    is_super = (u.nivel == "super_admin")
+    active = mod_tenancy.resolver_loja_ativa(membership, header_loja_id, u.loja_id, is_super=is_super)
     return {"nivel": u.nivel, "loja_id": u.loja_id, "rede_id": u.rede_id,
             "active_loja_id": active, "lojas_ids": membership}
 
