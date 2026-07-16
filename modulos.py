@@ -23,8 +23,8 @@ MODULOS = {
                     "arquivos": ["mod_ciclo.py", "mod_cronograma.py"],
                     "tabelas": ["ciclo_etapas", "ciclo_documentos", "ciclo_revisoes"], "rotas": []},
     "integracoes": {"camada": "nucleo", "depende_de": [],
-                    "arquivos": ["emissor_fiscal.py", "focus_client.py", "focus_config.py",
-                                 "mod_omie.py", "promob_grupos.py"],
+                    # PACOTE (reorganização 2026-07-15) — ver o comentário em "fiscal".
+                    "arquivos": ["integracoes"],
                     "tabelas": [], "rotas": []},
     "plataforma":  {"camada": "nucleo", "depende_de": [],
                     "arquivos": ["database.py", "storage.py"],

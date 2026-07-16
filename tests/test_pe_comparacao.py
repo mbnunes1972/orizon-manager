@@ -27,7 +27,7 @@ def test_reconciliacao_estimada_so_cfo_se_move_e_ancora_no_val_cont():
     assert r["margem_contratada_pct"] == 50.0                         # 50000/100000
     assert r["margem_estimada_pct"] == 48.0                           # 48000/100000
     assert r["delta_pct"] == -2.0                                     # pontos percentuais de margem perdidos
-from promob_grupos import ler_xml_str
+from integracoes.promob_grupos import ler_xml_str
 
 
 def test_extrai_cfo_de_venda_nao_o_total():

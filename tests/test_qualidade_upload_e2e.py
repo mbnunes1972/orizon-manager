@@ -20,7 +20,7 @@ XML_RUIM = '''<PROJECT DESCRIPTION="Teste" DATE="01/01/2026"><CATEGORY DESCRIPTI
 
 def test_upload_xml_ruim_marca_bloqueado(http_client_factory, seed, app_db, monkeypatch):
     from mod_qualidade_xml import avaliar_qualidade_xml
-    from promob_grupos import ler_xml_str
+    from integracoes.promob_grupos import ler_xml_str
     amb = ler_xml_str("ruim.xml", XML_RUIM)
     itens = [it for g in amb.get("grupos", []) for it in g.get("itens", [])]
     r = avaliar_qualidade_xml(itens)

@@ -197,7 +197,8 @@ def projetos_dir(app_db, seed, tmp_path_factory):
     se os dois projetos existirem em disco (o de loja 1 deve ser filtrado para a loja 2).
     Depende de `app_db` para garantir que `import main` ocorra após o rebind do banco."""
     import json as _json2
-    import storage, main, mod_omie
+    import storage, main
+    from integracoes import mod_omie
     tmp = str(tmp_path_factory.mktemp("projetos"))
     for mod in (storage, main, mod_omie):
         if hasattr(mod, "PROJETOS_DIR"):

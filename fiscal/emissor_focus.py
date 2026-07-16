@@ -1,7 +1,7 @@
 """emissor_focus.py — implementação concreta de EmissorFiscal sobre a Focus NFe (Fase 3b).
 Monta o payload (mapa_fiscal) e transmite via FocusClient (Fase 2). Sem regra fiscal aqui."""
 from . import mapa_fiscal
-from emissor_fiscal import EmissorFiscal, resultado_de_focus
+from integracoes.emissor_fiscal import EmissorFiscal, resultado_de_focus
 
 
 class EmissorFocusNfe(EmissorFiscal):

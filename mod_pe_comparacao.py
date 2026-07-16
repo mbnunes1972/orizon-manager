@@ -37,7 +37,7 @@ def extrair_cfo_pe(arq_nome, xml_conteudo):
     """Extrai o CFO (custo de fábrica) de um XML de PE — Σ dos `order_total` dos itens, exatamente
     como o pool calcula `PoolAmbiente.order_total` (main.py:3927-3931). NÃO é o `total` (venda-bruta).
     Reusa o parser oficial `promob_grupos.ler_xml_str`. Decisão #4."""
-    from promob_grupos import ler_xml_str
+    from integracoes.promob_grupos import ler_xml_str
     amb = ler_xml_str(arq_nome, xml_conteudo)
     return round(sum(item.get("order_total", 0.0)
                      for grupo in amb.get("grupos", [])

@@ -32,7 +32,7 @@ def test_acessorio_valor_zero_nao_acusa():
     assert r["qa_custo_sem_venda"] == 0 and r["qa_selo"] == "ok"
 
 def _itens_do_xml(nome):
-    from promob_grupos import ler_xml
+    from integracoes.promob_grupos import ler_xml
     amb = ler_xml(os.path.join("PROJETOS", "LELEU", "xmls", nome))
     return [it for g in amb.get("grupos", []) for it in g.get("itens", [])]
 

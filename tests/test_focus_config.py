@@ -1,7 +1,7 @@
 import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import pytest
-import focus_config as fc
+from integracoes import focus_config as fc
 
 
 def test_base_url_de():

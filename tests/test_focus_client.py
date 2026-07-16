@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import pytest
 import requests
-import focus_client as fc
+from integracoes import focus_client as fc
 
 
 class FakeResp:

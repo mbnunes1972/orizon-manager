@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 import storage
 from database import DocumentoFiscal, Emitente, CicloDocumento
-from emissor_fiscal import StatusNota, ResultadoEmissao, resultado_de_focus
+from integracoes.emissor_fiscal import StatusNota, ResultadoEmissao, resultado_de_focus
 
 _TIPO_XML = "nfe_loja_xml"
 _TIPO_DANFE = "nfe_loja_danfe"

@@ -20,7 +20,7 @@ from storage import (
     _save_grupos_cache, so_digitos, normalizar, _sha256_str,
     get_omie_key, get_omie_secret, get_sleep_interval, set_sleep_interval
 )
-from promob_grupos import GRUPOS, ler_xml_str
+from .promob_grupos import GRUPOS, ler_xml_str
 
 # == OMIE API LAYER ==
 def omie_post(endpoint, call, params, log_cb, no_rotate=False, timeout=10):

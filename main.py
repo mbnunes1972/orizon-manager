@@ -39,7 +39,7 @@ from storage import (
     get_omie_key, get_omie_secret,
     so_digitos, normalizar
 )
-from mod_omie import (
+from integracoes.mod_omie import (
     omie_post, buscar_cliente_cpf, pesquisar_clientes, criar_cliente,
     garantir_conta_corrente, buscar_categoria, criar_pedido,
     garantir_grupos_omie, exportar_ambientes, gerar_excel,
@@ -4790,7 +4790,7 @@ class Handler(BaseHTTPRequestHandler):
                 arq_nome, arq_conteudo = arquivos[0]
                 nome_base = re.sub(r"\.xml$", "", arq_nome, flags=re.IGNORECASE).strip()
 
-                from promob_grupos import ler_xml_str
+                from integracoes.promob_grupos import ler_xml_str
                 try:
                     amb = ler_xml_str(arq_nome, arq_conteudo)
                 except Exception as e:
@@ -8285,7 +8285,7 @@ def _params_iniciais_projeto(db, projeto_nome, loja_id):
     % do arquiteto = o do próprio parceiro; se ausente, o default da loja. Fidelidade entra
     sempre que houver parceiro. São apenas os valores INICIAIS: uma vez salvos em
     parametros_json, passam a ser respeitados como estão (as edições persistem)."""
-    import mod_omie
+    from integracoes import mod_omie
     from mod_orcamento_params import parametros_default_loja
     par = parametros_default_loja(_cfg_financeira_loja(db, loja_id))
     proj_json = mod_omie._carregar_projeto(projeto_nome) or {}

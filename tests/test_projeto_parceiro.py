@@ -46,7 +46,7 @@ def test_associar_parceiro_ok(app_db, seed, projetos_dir, http_client_factory):
     assert st == 200 and b.get("ok"), b
     assert b["parceiro"]["id"] == pid
     # persistiu no projeto.json
-    import mod_omie
+    from integracoes import mod_omie
     proj = mod_omie._carregar_projeto(seed["projeto_l1"])
     assert proj.get("parceiro_id") == pid
     # remover

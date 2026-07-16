@@ -3,7 +3,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import uuid as _uuid, json as _json
 import urllib.request, urllib.error
 from fiscal import nfe_emissao
-from emissor_fiscal import resultado_de_focus
+from integracoes.emissor_fiscal import resultado_de_focus
 
 
 class FakeClient:

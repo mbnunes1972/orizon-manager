@@ -128,8 +128,8 @@ def focus_client_para_emitente(db, emitente_id):
     """Monta um FocusClient a partir do Emitente: token do ambiente_ativo, decriptado,
     e base_url do ambiente. ValueError se não há emitente ou token para o ambiente."""
     from . import fiscal_cripto
-    import focus_config
-    from focus_client import FocusClient
+    from integracoes import focus_config
+    from integracoes.focus_client import FocusClient
     from database import Emitente
     em = db.get(Emitente, emitente_id)
     if not em:

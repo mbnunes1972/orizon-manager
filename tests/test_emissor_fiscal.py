@@ -1,7 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import pytest
-import emissor_fiscal as ef
+from integracoes import emissor_fiscal as ef
 
 
 def test_statusnota_valores():
