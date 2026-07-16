@@ -593,6 +593,24 @@ def mod_perfis_opcoes():
                                           {"id": "config", "rotulo": "Painel Config"}]}
 
 
+def porta_do_ambiente(environ=None):
+    """Porta de bind, lida de ORIZON_PORT (default 8765) — espelha ORIZON_HOST.
+    Permite subir uma 2ª instância no mesmo servidor (pré-homologação em :8766).
+    Valor inválido/fora de 1-65535 dá erro CLARO no bootstrap: não cai calado numa
+    porta errada (mesma lição do header de loja inexistente)."""
+    environ = os.environ if environ is None else environ
+    raw = environ.get("ORIZON_PORT")
+    if not raw:                       # ausente ou "" → default
+        return 8765
+    try:
+        p = int(raw)
+    except (TypeError, ValueError):
+        raise ValueError("ORIZON_PORT inválido: %r (esperado inteiro 1-65535)" % (raw,))
+    if not (1 <= p <= 65535):
+        raise ValueError("ORIZON_PORT fora de faixa: %d (esperado 1-65535)" % p)
+    return p
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -9087,7 +9105,9 @@ def main():
     # (migrações margens->orcamento e margens->parametros removidas na faxina: a coluna
     #  Orcamento.margens foi removida; parâmetros vêm de Projeto.parametros_json e o desconto
     #  de Orcamento.desconto_pct.)
-    port   = 8765
+    # Porta de bind configurável via ORIZON_PORT (default 8765). Permite 2 instâncias
+    # no mesmo servidor (ex.: INTEGRAÇÃO :8765 e PRÉ-HOMOLOGAÇÃO :8766).
+    port   = porta_do_ambiente()
     # Host de bind configurável: padrão 127.0.0.1 (dev local seguro);
     # em produção defina ORIZON_HOST=0.0.0.0 para aceitar acesso externo.
     host   = os.environ.get("ORIZON_HOST", "127.0.0.1")
