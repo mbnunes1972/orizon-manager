@@ -18,8 +18,8 @@ Quatro ambientes, do menos ao mais protegido. Cada push tem um destino claro.
 | # | Ambiente | Onde | Banco | Quem usa / propósito | Como atualiza |
 |---|----------|------|-------|----------------------|---------------|
 | 1 | **DEV (local)** | `localhost:8765` na máquina de cada dev | SQLite (`orizon.db`) | Cada dev: testes rápidos + **Vera** (QA principal) | Manual, local |
-| 2 | **INTEGRAÇÃO** | `167.88.33.121` — instância A | Postgres | Devs descentralizados: integração contínua | **Auto** do `main` |
-| 3 | **PRÉ-HOMOLOGAÇÃO** | `167.88.33.121` — instância B (porta/serviço + DB próprios) | Postgres | Leigos executando roteiros: aceite formal | **Tag fixada**, gated por você |
+| 2 | **INTEGRAÇÃO** | `167.88.33.121:8765` — instância A | Postgres | Devs descentralizados: integração contínua | **Auto** do `main` |
+| 3 | **PRÉ-HOMOLOGAÇÃO** | `167.88.33.121:8766` — instância B (serviço + DB próprios) | Postgres | Leigos executando roteiros: aceite formal | **Tag fixada**, gated por você |
 | 4 | **PRODUÇÃO** | `orizonsolution.com.br` (`179.197.77.9`) | Postgres | Dados reais; go-live 01/08/2026 | **Tag**, deploy manual, protegido |
 
 **Fluxo do código:** `feature branch → main (INTEGRAÇÃO) → tag → PRÉ-HOMOLOGAÇÃO → mesma tag → PRODUÇÃO`.
@@ -36,6 +36,16 @@ Quatro ambientes, do menos ao mais protegido. Cada push tem um destino claro.
 - **Produção é 100% protegida:** nenhum teste destrutivo, sem acesso SSH compartilhado dos devs, deploy
   só de tag aprovada. A "camada extra de pré-homologação" prevista (servidor dedicado) pode nascer depois
   promovendo a instância B para uma VPS própria, sem mudar este conceito.
+
+### Pré-requisitos para levantar a instância B (PRÉ-HOMOLOGAÇÃO) — PENDENTE
+A instância A (INTEGRAÇÃO) já roda na `8765`. Para subir a B na `8766` no mesmo servidor faltam duas
+mudanças (cada uma é tarefa própria: branch + TDD, não remendo):
+1. **Parametrizar a porta.** Hoje `main.py` tem `port = 8765` **fixo** (só o *host* é env via `ORIZON_HOST`).
+   Criar `ORIZON_PORT` (default 8765), espelhando o `ORIZON_HOST`. Instância B sobe com `ORIZON_PORT=8766`.
+2. **Banco separado por instância.** As duas não podem compartilhar `orizon.db` (homolog contaminaria a
+   integração). B aponta para banco próprio (`DATABASE_URL`/arquivo distinto). O servidor antigo é **SQLite
+   hoje**; a spec pede **Postgres** na homolog por paridade com a prod — a migração do servidor antigo entra
+   nesta conta. Ver `2026-07-15-migracao-postgresql.md`.
 
 ---
 
