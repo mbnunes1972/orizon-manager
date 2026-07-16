@@ -2843,7 +2843,7 @@ function cfgTab(qual){
 // ── Config → Cronograma de Projeto Padrão (v11 prazo + v12 função responsável por fase) ──
 async function cfgCronogramaRender(){
   const box = document.getElementById('cfg-panel-cronograma'); if(!box) return;
-  const lid = (_adminNav && _adminNav.loja && _adminNav.loja.id) || (_usuarioAtual && _usuarioAtual.loja_id);
+  const lid = _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id);
   if(!lid){ box.innerHTML='<em style="color:var(--muted);font-size:12px">Loja não identificada.</em>'; return; }
   box.innerHTML='<em style="color:var(--muted);font-size:12px">Carregando…</em>';
   await cadFuncoesGarantir();   // catálogo de funções (Tabela de Funções) p/ o dropdown
@@ -8912,13 +8912,9 @@ async function parCarregarOpcoesTenant(){
 let _adminNav = { nivel: 1, rede: null, loja: null, projeto: null };   // rede/loja={id,nome}; projeto={nome,status}
 
 function adminCarregarConsole(){
-  // aterrissagem por perfil
-  const u = _usuarioAtual || {};
-  if (u.pode_gerir_redes)            _adminNav = { nivel: 1, rede: null, loja: null };
-  else if (u.pode_gerir_lojas && u.rede_id)
-                                     _adminNav = { nivel: 2, rede: { id: u.rede_id, nome: '' }, loja: null };
-  else if (u.loja_id)               _adminNav = { nivel: 3, rede: null, loja: { id: u.loja_id, nome: '' } };
-  else                              _adminNav = { nivel: 3, rede: null, loja: null };
+  // Admin é SEMPRE o painel plano de 4 abas, escopado pela empresa selecionada (seletor no topo).
+  // O drill-down de plataforma/rede migrou para o Painel Orizon.
+  _adminNav = { loja: null };
   adminRender();
 }
 
@@ -8957,12 +8953,10 @@ async function adminEntrarLoja(id, nome){
 }
 
 function adminRender(){
-  adminBreadcrumb();
+  // Painel Admin plano: sempre as 4 abas da empresa selecionada (o drill-down foi p/ o Painel Orizon).
+  const bc = document.getElementById('admin-breadcrumb'); if (bc) bc.innerHTML = '';
   const box = document.getElementById('admin-console');
-  if (_adminNav.nivel === 1)      adminRenderPlataforma(box);
-  else if (_adminNav.nivel === 2) adminRenderRede(box);
-  else if (_adminNav.nivel === 4) adminRenderProjeto(box);
-  else                            adminRenderLoja(box);
+  adminRenderLoja(box);
 }
 
 function adminEntrarProjeto(nome, status){
@@ -9223,11 +9217,11 @@ async function orizonLojaNova(){
 }
 
 async function adminRenderLoja(box){
-  const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  const lid = _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id);
   box.innerHTML = `
     <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:12px">
-      <button class="home-tab ativo" id="loja-tab-dados" onclick="adminLojaTab('dados')">Dados da loja</button>
-      <button class="home-tab" id="loja-tab-usuarios" onclick="adminLojaTab('usuarios')">Usuários da loja</button>
+      <button class="home-tab ativo" id="loja-tab-dados" onclick="adminLojaTab('dados')">Dados da empresa</button>
+      <button class="home-tab" id="loja-tab-usuarios" onclick="adminLojaTab('usuarios')">Usuários</button>
       <button class="home-tab" id="loja-tab-perfis" onclick="adminLojaTab('perfis')">Perfis de Usuário</button>
       <button class="home-tab" id="loja-tab-modulos" onclick="adminLojaTab('modulos')">Módulos</button>
     </div>
@@ -9256,7 +9250,7 @@ function adminLojaTab(qual){
 async function adminLojaProjetosCarregar(){
   const panel = document.getElementById('loja-panel-projetos');
   if (!panel) return;
-  const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  const lid = _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id);
   if (!lid){ panel.innerHTML = '<em style="color:var(--muted)">Loja não identificada.</em>'; return; }
   const r = await fetch('/api/admin/lojas/'+lid+'/projetos', {credentials:'same-origin'});
   if (r.status === 403){ panel.innerHTML = '<em style="color:var(--muted)">Sem acesso a esta loja.</em>'; return; }
@@ -10023,7 +10017,7 @@ let _cfgFin = null;
 async function adminFinanceiroCarregar(){
   // v8: a configuração de % vive em Config → Provisões (#cfg-panel-provisoes), não mais no Financeiro/Admin.
   const panel = document.getElementById('cfg-panel-provisoes');
-  const lid = (_adminNav && _adminNav.loja && _adminNav.loja.id) || (_usuarioAtual && _usuarioAtual.loja_id);
+  const lid = _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id);
   if (!panel || !lid) return;
   const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {credentials:'same-origin'});
   if (r.status === 403){ panel.innerHTML = '<em style="color:var(--muted)">Sem acesso.</em>'; return; }
@@ -10075,7 +10069,7 @@ async function adminFinanceiroSalvar(lid){
 let _modsCfg = null;
 
 async function adminModulosCarregar() {
-  const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  const lid = _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id);
   const box = document.getElementById('loja-panel-modulos');
   if (!lid || !box) return;
   try {
@@ -10118,7 +10112,7 @@ function adminModulosMudou() {
 }
 
 async function adminModulosSalvar() {
-  const lid = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  const lid = _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id);
   const ativos = _modsSelecionados();
   try {
     const r = await fetch(`/api/admin/lojas/${lid}/modulos`, {
@@ -10149,7 +10143,7 @@ function _fiscPanel(kind){ return document.getElementById(kind==='rede' ? 'rede-
 
 async function adminFiscalCarregar(kind, id){
   kind = kind || 'loja';
-  if (kind === 'loja' && id == null) id = _adminNav.loja?.id || (_usuarioAtual && _usuarioAtual.loja_id);
+  if (kind === 'loja' && id == null) id = _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id);
   if (kind === 'rede' && id == null) id = _adminNav.rede?.id;
   _fiscCtx = { kind, id };
   const panel = _fiscPanel(kind);
