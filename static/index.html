@@ -550,6 +550,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <div class="sb-nav-title">Admin</div>
       <div class="nav-item" id="nav-07" onclick="goPage(7)" style="display:none"><i class="ti ti-settings"></i>Admin</div>
       <div class="nav-item" id="nav-cfg" onclick="goPage(9)" style="display:none"><i class="ti ti-adjustments"></i>Config</div>
+      <div class="nav-item" id="nav-orizon" onclick="goPageOrizon()" style="display:none"><i class="ti ti-building-cog"></i>Painel Orizon</div>
     </div>
   </nav>
 
@@ -1856,6 +1857,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="cfg-panel-documentos" style="display:none"></div>
   </div>
 
+  <!-- Painel Orizon (só super_admin): administração do sistema — redes, lojas, gestores -->
+  <div class="page" id="page-orizon">
+    <div class="page-title" style="margin:0">Painel Orizon</div>
+    <div class="page-sub">Administração do sistema — redes, lojas e gestores.</div>
+    <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin:12px 0 16px;flex-wrap:wrap">
+      <button class="home-tab ativo" id="orz-tab-redes"    onclick="orizonTab('redes')">Redes</button>
+      <button class="home-tab"       id="orz-tab-lojas"    onclick="orizonTab('lojas')">Lojas</button>
+      <button class="home-tab"       id="orz-tab-gestores" onclick="orizonTab('gestores')">Gestores gerais</button>
+    </div>
+    <div id="orz-panel-redes"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+    <div id="orz-panel-lojas" style="display:none"></div>
+    <div id="orz-panel-gestores" style="display:none"></div>
+  </div>
+
   <!-- Modal: editar data prevista de conclusão (Cronograma do Ciclo, v11) — reautenticação Gerente+ -->
   <div id="modal-crono" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:26px;max-width:400px;width:92%;animation:mIn .18s ease">
@@ -2565,6 +2580,9 @@ async function carregarUsuarioAutenticado(){
     if (_navAdmin) _navAdmin.style.display = (_usuarioAtual && _usuarioAtual.acessa_admin === false) ? 'none' : '';
     const _navCfg = document.getElementById('nav-cfg');
     if (_navCfg) _navCfg.style.display = (_usuarioAtual && _usuarioAtual.acessa_config === false) ? 'none' : '';
+    // Painel Orizon (administração do sistema): só quem tem gerir_redes (exclusivo do super_admin).
+    const _navOrizon = document.getElementById('nav-orizon');
+    if (_navOrizon) _navOrizon.style.display = (_usuarioAtual && _usuarioAtual.pode_gerir_redes) ? '' : 'none';
     _aplicarModulosNoMenu();
     sbNavRender();               // monta o acordeão dos módulos (usa _usuarioAtual.hub)
     carregarConsultores();       // seletor de consultor (criação/edição); só gerente+ atribui
@@ -9097,6 +9115,111 @@ async function adminLojaNova(redeId){
   const d = await r.json();
   if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Lojas'}); return; }
   showToast('Loja criada.', false); adminRender();
+}
+
+// ── Painel Orizon (administração do sistema — só super_admin) ─────────────────
+function goPageOrizon(){
+  const nav = document.getElementById('nav-orizon');
+  if (nav && nav.classList.contains('locked')) return;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const pg = document.getElementById('page-orizon'); if (pg) pg.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+  if (nav) nav.classList.add('active');
+  const sbParams = document.getElementById('sb-params'); if (sbParams) sbParams.style.display = 'none';
+  _sbModuloAberto = null; _sbSecaoAtiva = null;                 // Orizon: nenhum módulo realçado
+  if (typeof sbNavRender === 'function') sbNavRender();
+  orizonTab('redes');
+}
+
+function orizonTab(qual){
+  ['redes','lojas','gestores'].forEach(q => {
+    const t = document.getElementById('orz-tab-'+q), p = document.getElementById('orz-panel-'+q);
+    if (t) t.classList.toggle('ativo', q===qual);
+    if (p) p.style.display = q===qual ? '' : 'none';
+  });
+  if (qual==='redes')    orizonRedesCarregar();
+  if (qual==='lojas')    orizonLojasCarregar();
+  if (qual==='gestores') orizonGestoresCarregar();
+}
+
+async function orizonRedesCarregar(){
+  const box = document.getElementById('orz-panel-redes'); if(!box) return;
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const d = await fetch('/api/admin/redes', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({redes:[]}));
+  box.innerHTML = `
+    <div class="card" style="padding:14px 16px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+        <strong style="color:var(--accent)"><i class="ti ti-building"></i>Redes</strong>
+        <button class="btn btn-ghost btn-sm" onclick="orizonRedeNova()" style="font-size:11px">+ Nova rede</button>
+      </div>
+      <table class="cli-table"><thead><tr><th>Nome</th><th>CNPJ</th></tr></thead><tbody>
+      ${(d.redes||[]).map(r=>`<tr><td>${esc(r.nome)}</td><td style="color:var(--muted)">${esc(r.cnpj||'—')}</td></tr>`).join('')
+        || '<tr><td colspan="2" style="color:var(--muted)">Nenhuma rede.</td></tr>'}
+      </tbody></table>
+    </div>`;
+}
+
+async function orizonLojasCarregar(){
+  const box = document.getElementById('orz-panel-lojas'); if(!box) return;
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const [dl, dr] = await Promise.all([
+    fetch('/api/admin/lojas', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({lojas:[]})),
+    fetch('/api/admin/redes', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({redes:[]})),
+  ]);
+  const redeNome = {}; (dr.redes||[]).forEach(r=>redeNome[r.id]=r.nome);
+  box.innerHTML = `
+    <div class="card" style="padding:14px 16px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+        <strong style="color:var(--accent)"><i class="ti ti-building-store"></i>Lojas</strong>
+        <button class="btn btn-ghost btn-sm" onclick="orizonLojaNova()" style="font-size:11px">+ Nova loja</button>
+      </div>
+      <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th>Grupo (rede)</th></tr></thead><tbody>
+      ${(dl.lojas||[]).map(l=>`<tr><td>${esc(l.nome)}</td><td style="color:var(--muted)">${esc(l.codigo||'—')}</td>
+        <td style="color:var(--muted)">${esc(l.rede_id ? (redeNome[l.rede_id]||'—') : 'Avulsa')}</td></tr>`).join('')
+        || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma loja.</td></tr>'}
+      </tbody></table>
+    </div>`;
+}
+
+async function orizonGestoresCarregar(){
+  const box = document.getElementById('orz-panel-gestores'); if(!box) return;
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const g = await fetch('/api/admin/usuarios?escopo=plataforma', {credentials:'same-origin'})
+    .then(r=>r.json()).catch(()=>({usuarios:[]}));
+  box.innerHTML = `
+    <div class="card" style="padding:14px 16px">
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+        <strong style="color:var(--accent)"><i class="ti ti-user"></i>Gestores gerais</strong>
+        <button class="btn btn-ghost btn-sm" style="font-size:11px"
+          onclick="abrirModalUsuario({modo:'novo', escopo:'plataforma', onSaved:orizonGestoresCarregar})">+ Novo gestor</button>
+      </div>
+      <table class="cli-table"><thead><tr><th>Nome</th><th>Login</th><th></th></tr></thead><tbody>
+      ${(g.usuarios||[]).map(u=>`<tr><td>${esc(u.nome)}</td><td style="color:var(--muted)">${esc(u.login)}</td>
+        <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
+          onclick='abrirModalUsuarioEditar(${_attrJson(u)}, orizonGestoresCarregar)'>Editar</button></td></tr>`).join('')
+        || '<tr><td colspan="3" style="color:var(--muted)">Nenhum gestor geral.</td></tr>'}
+      </tbody></table>
+    </div>`;
+}
+
+async function orizonRedeNova(){
+  const nome = prompt('Nome da rede:'); if(!nome) return;
+  const cnpj = prompt('CNPJ (opcional):') || '';
+  const r = await fetch('/api/admin/redes', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({nome, cnpj})});
+  const d = await r.json();
+  if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Redes'}); return; }
+  showToast('Rede criada.', false); orizonRedesCarregar();
+}
+
+async function orizonLojaNova(){
+  const nome   = prompt('Nome da loja:'); if(!nome) return;
+  const codigo = prompt('Código (3 letras, único — usado na numeração do contrato):'); if(!codigo) return;
+  const r = await fetch('/api/admin/lojas', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({nome, codigo})});
+  const d = await r.json();
+  if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Lojas'}); return; }
+  showToast('Loja criada.', false); orizonLojasCarregar();
 }
 
 async function adminRenderLoja(box){
