@@ -39,3 +39,26 @@ def test_resolver_loja_ativa_nao_super_inalterado():
     assert mod_tenancy.resolver_loja_ativa([], 5, None) is None          # header sem acesso → None
     assert mod_tenancy.resolver_loja_ativa([7], None, 7) == 7            # default acessível
     assert mod_tenancy.resolver_loja_ativa([7], 7, None) == 7            # header acessível
+
+
+def test_super_admin_cria_e_le_perfil_na_loja_escolhida(http_client_factory, seed, app_db):
+    db = app_db.get_session()
+    l1 = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    db.close()
+    c = http_client_factory(); c.login("super", "senha123")
+    c.loja_ativa = l1                                   # "entra" na loja L1
+    # cria um perfil de acesso NA loja L1
+    st, out = c.post("/api/admin/perfis", {"nome": "Vendas Plus", "base": "operador",
+                                           "modulos": ["cadastro", "comercial"]})
+    assert st == 201 and out["ok"], (st, out)
+    # a matriz da loja L1 agora inclui o perfil recém-criado
+    st, m = c.get("/api/admin/perfis")
+    assert st == 200 and m["ok"]
+    nomes = {p["nome"] for p in m["perfis"]}
+    assert "Vendas Plus" in nomes, nomes
+
+
+def test_super_admin_sem_loja_selecionada_erro_ao_criar_perfil(http_client_factory, seed):
+    c = http_client_factory(); c.login("super", "senha123")   # sem c.loja_ativa
+    st, out = c.post("/api/admin/perfis", {"nome": "X", "base": "operador", "modulos": []})
+    assert out["ok"] is False and "loja" in (out.get("erro", "").lower())

@@ -575,6 +575,15 @@ def _ler_loja_ativa_header(handler):
     return int(raw) if raw.isdigit() else None
 
 
+def _loja_admin_alvo(usuario):
+    """Loja-alvo de uma operação de Admin escopada por LOJA (Perfis de Usuário).
+    super_admin opera na loja selecionada no console (header X-Loja-Ativa); demais
+    perfis usam a própria loja."""
+    if usuario.get("nivel") == "super_admin":
+        return _REQ_LOJA_ATIVA or usuario.get("loja_id")
+    return usuario.get("loja_id")
+
+
 def mod_perfis_opcoes():
     import modulos
     from auth import mod_perfis
@@ -1406,7 +1415,7 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
                 self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-            lid = usuario.get("loja_id")
+            lid = _loja_admin_alvo(usuario)
             _m = perfis.matriz_loja(lid)
             self.send_json({"ok": True, "perfis": _m["perfis"], "capacidades": _m["capacidades"],
                             "caps_selecionaveis": _m["caps_selecionaveis"],
@@ -1418,7 +1427,7 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
                 self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-            _m = perfis.matriz_loja(usuario.get("loja_id"))
+            _m = perfis.matriz_loja(_loja_admin_alvo(usuario))
             self.send_json({"ok": True, "perfis": _m["perfis"], "capacidades": _m["capacidades"],
                             "caps_selecionaveis": _m["caps_selecionaveis"],
                             "modulos_opcoes": mod_perfis_opcoes(),
@@ -5402,7 +5411,10 @@ class Handler(BaseHTTPRequestHandler):
                 db = get_session()
                 try:
                     from auth import perfil_store
-                    p, err = perfil_store.criar_perfil(db, usuario.get("loja_id"),
+                    lid = _loja_admin_alvo(usuario)
+                    if lid is None:
+                        self.send_json({"ok": False, "erro": "Selecione uma loja para criar o perfil."}); return
+                    p, err = perfil_store.criar_perfil(db, lid,
                                 req.get("nome", ""), req.get("base", ""), req.get("modulos", []),
                                 capacidades=req.get("capacidades"))
                     if not p:

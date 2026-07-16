@@ -157,6 +157,7 @@ class HttpClient:
     def __init__(self, base):
         self.base = base
         self.cookie = None
+        self.loja_ativa = None   # X-Loja-Ativa opcional
 
     def _req(self, method, path, body=None):
         data = _json.dumps(body).encode() if body is not None else None
@@ -165,6 +166,8 @@ class HttpClient:
             req.add_header("Content-Type", "application/json")
         if self.cookie:
             req.add_header("Cookie", self.cookie)
+        if self.loja_ativa is not None:
+            req.add_header("X-Loja-Ativa", str(self.loja_ativa))
         try:
             resp = urllib.request.urlopen(req, timeout=5)
             status, raw, headers = resp.status, resp.read(), resp.headers
