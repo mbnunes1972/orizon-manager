@@ -1,5 +1,5 @@
 import json
-import perfis
+from auth import perfis
 import mod_cadastro
 import storage
 

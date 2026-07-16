@@ -1,4 +1,4 @@
-import perfis
+from auth import perfis
 
 
 def test_capacidades_cobrem_todas_usadas_e_sao_reais():

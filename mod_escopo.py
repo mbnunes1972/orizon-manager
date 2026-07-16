@@ -6,7 +6,7 @@ Perfil (perfis.py) × Função (Funcao) × Escopo (posse + Mapa de Atribuições
 
 Isolamento por loja (F4) é aplicado ANTES, pelo tenancy — aqui é o escopo DENTRO da loja.
 """
-import perfis
+from auth import perfis
 
 # Papéis operacionais do Mapa de Atribuições (Regras §4).
 PAPEIS = ("projeto_executivo", "medicao", "montagem", "assistencia")

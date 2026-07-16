@@ -7,7 +7,7 @@ As rotas em main.py fazem o I/O (consultas, gravação) e chamam estas funções
 
 import re
 
-import perfis
+from auth import perfis
 
 _RE_CODIGO = re.compile(r"^[A-Za-z]{3}$")   # código de loja = exatamente 3 letras
 

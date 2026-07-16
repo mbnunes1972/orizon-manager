@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import mod_usuarios as mu
+from auth import mod_usuarios as mu
 
 
 def test_validar_novo_usuario_ok():

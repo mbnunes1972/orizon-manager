@@ -1,5 +1,5 @@
 # tests/test_perfis_tenancy.py
-import perfis
+from auth import perfis
 
 
 def test_perfis_novos_existem():
@@ -40,7 +40,7 @@ def test_perfis_novos_sem_poder_operacional():
 
 
 def test_usuario_dict_expoe_tenant_e_flags():
-    from auth import _usuario_dict
+    from auth.auth import _usuario_dict
     from database import Usuario
     u = Usuario(id=9, nome="SA", login="sad2026", nivel="super_admin",
                 loja_id=None, rede_id=None)

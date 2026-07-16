@@ -2,7 +2,7 @@ import json
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import database
-import perfil_store
+from auth import perfil_store
 
 
 def _sess():

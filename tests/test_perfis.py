@@ -1,4 +1,4 @@
-import perfis
+from auth import perfis
 
 
 def test_slugs_sao_os_perfis_novos():
@@ -66,7 +66,7 @@ def test_usuario_delega_perfis():
 
 
 def test_usuario_dict_inclui_rotulo_e_gerir():
-    from auth import _usuario_dict
+    from auth.auth import _usuario_dict
     from database import Usuario
     d = _usuario_dict(Usuario(id=1, nome="Ana", login="ana", nivel="master"))
     assert d["rotulo"] == "Master" and d["pode_gerir_usuarios"] is True and d["limite_desconto"] == 50.0

@@ -1,5 +1,5 @@
 import sqlite3
-import auth
+from auth import auth
 
 def test_usuarios_tem_coluna_tema(app_db):
     conn = sqlite3.connect(app_db.DB_PATH)

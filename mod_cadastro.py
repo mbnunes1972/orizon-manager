@@ -4,7 +4,7 @@ Fronteira obrigatória: Funcionário (RH) ≠ Usuário (conta de login, Admin/N�
 referência (Usuario.funcionario_id / Funcionario.usuario_id), NUNCA duplicando dado pessoal.
 """
 import re
-import perfis
+from auth import perfis
 from database import Funcionario, Fornecedor, Terceiro, Usuario, Funcao
 
 # Sub-entidades reutilizáveis (Modulos_Orizon_v10): Endereço + Dados Bancários

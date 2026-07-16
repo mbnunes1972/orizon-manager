@@ -66,8 +66,8 @@ def seed(app_db):
     # Semeia os perfis padrão (master/gerencial/operador) por loja — fiel à produção, onde a
     # migração já semeia as lojas reais. Sem isto o registro DB fica vazio e perfis.py cai
     # inteiro no fallback hardcoded, mascarando bugs de wiring por-loja (Task 7).
-    import perfil_store
-    import perfis as _perfis
+    from auth import perfil_store
+    from auth import perfis as _perfis
     for _lid in (l1.id, l2.id):
         perfil_store.seed_perfis_loja(db, _lid)
     _perfis.recarregar()

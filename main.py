@@ -9,7 +9,7 @@ import email
 from email import policy as _email_policy
 from datetime import datetime, date, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
+from auth.auth_routes import handle_auth_get, handle_auth_post, get_usuario_sessao
 from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        PoolAmbiente, OrcamentoAmbiente, Projeto, upsert_projeto_status,
                        CicloEtapa, Contrato, ContratoAssinatura, Usuario, Briefing,
@@ -55,8 +55,8 @@ from mod_contrato import (calcular_hash_assinatura,
                           construir_contexto, _formatar_valor)
 import mod_ciclo
 import mod_medicao
-import perfis
-import mod_usuarios
+from auth import perfis
+from auth import mod_usuarios
 import mod_tenancy
 import mod_arvore
 import mod_provisoes
@@ -576,7 +576,8 @@ def _ler_loja_ativa_header(handler):
 
 
 def mod_perfis_opcoes():
-    import modulos, mod_perfis
+    import modulos
+    from auth import mod_perfis
     doms = [{"id": d["id"], "rotulo": d["rotulo"]} for d in modulos.dominios_com_rotulo()]
     return {"dominios": doms, "paineis": [{"id": "admin", "rotulo": "Painel Administração"},
                                           {"id": "config", "rotulo": "Painel Config"}]}
@@ -5400,7 +5401,7 @@ class Handler(BaseHTTPRequestHandler):
                 req = json.loads(body) if body else {}
                 db = get_session()
                 try:
-                    import perfil_store
+                    from auth import perfil_store
                     p, err = perfil_store.criar_perfil(db, usuario.get("loja_id"),
                                 req.get("nome", ""), req.get("base", ""), req.get("modulos", []),
                                 capacidades=req.get("capacidades"))
@@ -7788,7 +7789,7 @@ class Handler(BaseHTTPRequestHandler):
                 req = json.loads(body) if body else {}
                 db = get_session()
                 try:
-                    import perfil_store
+                    from auth import perfil_store
                     p, err = perfil_store.editar_perfil(db, usuario.get("loja_id"), m_perfil.group(1),
                                 nome=req.get("nome"), modulos=req.get("modulos"),
                                 capacidades=req.get("capacidades"))
@@ -8668,7 +8669,7 @@ def _sem_acesso_modulo(usuario, modulo_id, handler=None):
     if perfis.acessa_modulo((usuario or {}).get("nivel"), modulo_id):
         return False
     if handler is not None:
-        from auth_routes import get_token_from_cookie
+        from auth.auth_routes import get_token_from_cookie
         token = get_token_from_cookie(handler.headers.get("Cookie", ""))
         if _stepup_valido(token, modulo_id):
             return False

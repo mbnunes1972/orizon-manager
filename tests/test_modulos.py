@@ -18,7 +18,6 @@ def test_nucleo_nao_e_desligavel():
 
 
 def test_modulo_de_arquivo():
-    assert m.modulo_de_arquivo("perfis.py") == "auth"
     assert m.modulo_de_arquivo("mod_tenancy.py") == "tenancy"
     assert m.modulo_de_arquivo("main.py") is None
     assert m.modulo_de_arquivo("inexistente.py") is None
@@ -33,6 +32,8 @@ def test_modulo_de_arquivo_dentro_de_pacote():
     assert m.modulo_de_arquivo("fiscal/mod_fiscal.py") == "fiscal"
     assert m.modulo_de_arquivo("fiscal/nfe_emissao.py") == "fiscal"
     assert m.modulo_de_arquivo("fiscal") == "fiscal"
+    assert m.modulo_de_arquivo("auth/perfis.py") == "auth"
+    assert m.modulo_de_arquivo("integracoes/promob_grupos.py") == "integracoes"
     assert m.modulo_de_arquivo("mod_fin/aymore.py") == "comercial"
     assert m.modulo_de_arquivo("mod_fin") == "comercial"
     # separador do Windows não pode mudar o dono

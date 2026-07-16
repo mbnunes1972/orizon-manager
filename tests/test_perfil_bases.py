@@ -1,4 +1,4 @@
-import perfis
+from auth import perfis
 
 
 def test_bases_existem_com_caps_finas():

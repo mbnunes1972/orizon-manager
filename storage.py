@@ -4,7 +4,7 @@ Para migrar para nuvem: substituir apenas as funções storage_*() e session_*()
 """
 import os, json, re, hashlib, unicodedata
 import sys
-import perfis   # fonte única dos perfis de acesso (Regras_Funcoes_Perfis_Atribuicoes §8)
+from auth import perfis   # fonte única dos perfis de acesso (Regras_Funcoes_Perfis_Atribuicoes §8)
 
 # == CONSTANTES E CAMINHOS ==
 if getattr(sys, 'frozen', False):

@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-import database, perfil_store, perfis
+import database
+from auth import perfil_store, perfis
 
 
 def _bind_mem(monkeypatch):
@@ -50,7 +51,8 @@ def test_plataforma_fallback_sem_registro(monkeypatch):
 
 
 def test_override_de_capacidade_fina(monkeypatch):
-    import json, database, perfil_store
+    import json, database
+    from auth import perfil_store
     S = _bind_mem(monkeypatch)
     db = S()
     db.add(database.PerfilAcesso(loja_id=1, slug="operador_plus", nome="Operador+",

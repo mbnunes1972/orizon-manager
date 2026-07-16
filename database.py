@@ -8,7 +8,7 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker, relationship, validate
 from datetime import datetime
 import hashlib
 import os
-import perfis
+from auth import perfis
 
 def _hash_senha(senha: str) -> str:
     """SHA-256 hex de uma senha. Fonte única de hashing (Usuario + bootstrap/seed)."""
@@ -792,7 +792,10 @@ class Lancamento(Base):
     conta_credito_id = Column(Integer, ForeignKey("conta.id"), nullable=False)
     valor            = Column(Float,      nullable=False)
     projeto_id       = Column(String,     nullable=True)    # nome_safe (dimensão gerencial)
-    origem           = Column(String(30), nullable=False, default="manual")   # 'manual' | tipo de evento
+    origem           = Column(String(64), nullable=False, default="manual")   # 'manual' | tipo de evento
+    # 2026-07-15: alargado de String(30) — SQLite nunca validou o limite, mas vários EVENTOS de
+    # mod_contabil.py passam de 30 chars (ex.: 'reconhecimento_despesa_retencao_com_vendas', 42
+    # chars); achado ao validar a suíte contra Postgres de verdade (Etapa 4 da migração).
     historico        = Column(Text,       nullable=True)
     ref              = Column(String(80), nullable=True)   # idempotência do wiring (ex.: 'fat:NFE-<proj>-<id>')
     motivo           = Column(String(30), nullable=True)   # dimensão do reparo em garantia: 'defeito_fabrica'|'outro' (§6.2)
@@ -1037,7 +1040,7 @@ def init_db():
     else:
         _seed_loja_padrao()   # equivalente portável da tenancy_v1_2026 (loja seed + backfill)
     try:
-        import perfis
+        from auth import perfis
         perfis.recarregar()   # invalida o cache do registro de perfis (perfil_acesso pode ter mudado)
     except Exception:
         pass

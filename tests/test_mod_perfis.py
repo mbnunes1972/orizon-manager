@@ -1,4 +1,4 @@
-import mod_perfis
+from auth import mod_perfis
 
 
 def test_slug_unico_gera_sufixo():
