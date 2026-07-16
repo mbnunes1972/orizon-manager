@@ -6697,7 +6697,7 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                import mod_nfe, mapa_fiscal, nfe_emissao, mod_fiscal
+                from fiscal import mod_nfe, mapa_fiscal, nfe_emissao, mod_fiscal
                 arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
                 db = get_session()
                 try:
@@ -6799,7 +6799,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
                 if not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                import mod_nfe, mapa_fiscal, nfe_emissao, mod_fiscal
+                from fiscal import mod_nfe, mapa_fiscal, nfe_emissao, mod_fiscal
                 try:
                     req = json.loads(body) if body else {}
                 except Exception:
@@ -6884,7 +6884,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
                 if not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                import mapa_fiscal, nfe_emissao, mod_fiscal
+                from fiscal import mapa_fiscal, nfe_emissao, mod_fiscal
                 try:
                     req = json.loads(body) if body else {}
                 except Exception:
@@ -6982,7 +6982,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
                 if not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                import nfe_emissao
+                from fiscal import nfe_emissao
                 try:
                     req = json.loads(body) if body else {}
                 except Exception:
@@ -7021,7 +7021,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
                 if not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
                     self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
-                import nfe_emissao
+                from fiscal import nfe_emissao
                 try:
                     req = json.loads(body) if body else {}
                 except Exception:
@@ -7112,7 +7112,7 @@ class Handler(BaseHTTPRequestHandler):
         # ── PUT /api/admin/lojas/<id>/perfil-fiscal — config não-secreta ──────
         m_pf = re.match(r"^/api/admin/lojas/(\d+)/perfil-fiscal$", path)
         if m_pf:
-            import mod_fiscal
+            from fiscal import mod_fiscal
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
@@ -7144,7 +7144,7 @@ class Handler(BaseHTTPRequestHandler):
         # ── PUT /api/admin/redes/<id>/perfil-fiscal — config do Emitente central ──
         m_rpf = re.match(r"^/api/admin/redes/(\d+)/perfil-fiscal$", path)
         if m_rpf:
-            import mod_fiscal
+            from fiscal import mod_fiscal
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
@@ -8814,7 +8814,7 @@ def _fiscal_criar_emitente(db, obj, attr, rede_id):
 
 def _fiscal_get(em):
     """Payload do GET do perfil fiscal. NUNCA vaza token (só *_definido)."""
-    import mod_fiscal, fiscal_cripto
+    from fiscal import mod_fiscal, fiscal_cripto
     if not em:
         padrao = mod_fiscal.emitente_padrao_teste()
         placeholders = padrao.pop("placeholders")
@@ -8853,7 +8853,7 @@ def _fiscal_put_config(em, req):
 
 def _fiscal_put_segredos(em, req):
     """Grava tokens cifrados (write-only). None limpa; "" mantém."""
-    import fiscal_cripto
+    from fiscal import fiscal_cripto
     for campo, col in (("focus_token_homolog", "focus_token_homolog_enc"),
                        ("focus_token_prod", "focus_token_prod_enc")):
         if campo in req:
@@ -8866,7 +8866,7 @@ def _fiscal_put_segredos(em, req):
 
 def _fiscal_put_ambiente(em, amb):
     """Troca o ambiente ativo. Retorna (ok, erro). Guarda produção via placeholders."""
-    import mod_fiscal
+    from fiscal import mod_fiscal
     if amb == "producao":
         placeholders = json.loads(em.placeholders_json or "[]")
         if not mod_fiscal.pode_ativar_producao(placeholders):

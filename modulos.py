@@ -56,8 +56,11 @@ MODULOS = {
                     "rotas": ["/api/orcamentos", "/api/contratos", "/api/medicoes", "/api/comercial",
                               "/api/documentos"]},
     "fiscal":      {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Fiscal (NF-e/NFS-e)", "faixa": "expedicao",
-                    "arquivos": ["mod_fiscal.py", "mapa_fiscal.py", "emissor_focus.py",
-                                 "fiscal_cripto.py", "nfe_emissao.py", "mod_nfe.py"],
+                    # PACOTE (piloto da reorganização, 2026-07-15) — mesmo padrão do mod_fin:
+                    # entra pelo nome do diretório. O ratchet de arquitetura EXPANDE o dir
+                    # nos .py de dentro (tests/test_arquitetura_modulos._arquivos_do_modulo),
+                    # então empacotar não tira o módulo da verificação.
+                    "arquivos": ["fiscal"],
                     "tabelas": ["emitente", "perfil_emissao", "documento_fiscal"],
                     "rotas": ["/api/projetos/", "/api/admin/lojas/", "/api/admin/redes/"]},
     "financeiro":  {"camada": "dominio", "depende_de": ["comercial"], "rotulo": "Financeiro", "faixa": "financeiro",
@@ -105,11 +108,19 @@ def desligavel(modulo):
 
 
 def modulo_de_arquivo(arquivo):
-    """Nome do módulo dono do arquivo (.py ou pacote), ou None se for shell/desconhecido."""
+    """Nome do módulo dono do arquivo (.py ou pacote), ou None se for shell/desconhecido.
+
+    Aceita caminho DENTRO de pacote — 'fiscal/mod_nfe.py' → 'fiscal' —, porque o
+    manifesto registra o pacote pelo diretório. Sem isso, todo arquivo empacotado
+    ficava órfão: era o caso de `mod_fin/aymore.py` (→ None) desde que o mod_fin
+    virou pacote, e passaria a ser o do fiscal/ na reorganização de 2026-07-15.
+    """
+    arquivo = arquivo.replace("\\", "/")
     base = arquivo[:-3] if arquivo.endswith(".py") else arquivo
+    raiz_pacote = arquivo.split("/")[0] if "/" in arquivo else None
     for nome, v in MODULOS.items():
         for a in v["arquivos"]:
-            if a == arquivo or (a == base):
+            if a == arquivo or a == base or (raiz_pacote and a == raiz_pacote):
                 return nome
     return None
 

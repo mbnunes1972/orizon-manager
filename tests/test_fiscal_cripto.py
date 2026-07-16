@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import pytest
 from cryptography.fernet import Fernet
-import fiscal_cripto as fcr
+from fiscal import fiscal_cripto as fcr
 
 
 @pytest.fixture(autouse=True)

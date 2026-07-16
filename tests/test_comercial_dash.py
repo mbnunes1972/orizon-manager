@@ -2,7 +2,15 @@
 orcamentos, contratos, ciclo_etapas). Escopo por loja. Funil de conversão + carteira por status +
 volume contratado/ticket médio."""
 import mod_comercial_dash as cd
-from database import Projeto, Orcamento, Contrato, CicloEtapa
+from database import Projeto, Orcamento, Contrato, CicloEtapa, Loja
+
+
+def _nova_loja(db, nome):
+    """Projeto/Orcamento/Contrato.loja_id são FK reais (lojas.id) — cria a loja de verdade em
+    vez de um literal fabricado (Postgres valida FK; SQLite nunca validou)."""
+    l = Loja(nome=nome)
+    db.add(l); db.flush()
+    return l.id
 
 
 def _seed_dash(db, loja):
@@ -25,8 +33,9 @@ def _seed_dash(db, loja):
 def test_dashboard_comercial_funil_carteira_volume(app_db):
     db = app_db.get_session()
     try:
-        _seed_dash(db, 7777)
-        d = cd.dashboard_comercial(db, 7777)
+        loja = _nova_loja(db, "Loja Dash A")
+        _seed_dash(db, loja)
+        d = cd.dashboard_comercial(db, loja)
         assert d["funil"] == {"total": 3, "com_orcamento": 2, "com_contrato": 1,
                               "conv_orcamento_pct": 66.7, "conv_contrato_pct": 33.3}
         assert d["carteira"]["por_status"] == {"quente": 1, "morno": 1, "frio": 1}
@@ -39,10 +48,12 @@ def test_dashboard_comercial_funil_carteira_volume(app_db):
 def test_dashboard_comercial_escopo_por_loja(app_db):
     db = app_db.get_session()
     try:
-        _seed_dash(db, 7778)
-        db.add(Projeto(nome_safe="OUTRA", status="quente", loja_id=9001)); db.commit()
-        d = cd.dashboard_comercial(db, 7778)
-        assert d["funil"]["total"] == 3   # não conta a projeto da loja 9001
+        loja = _nova_loja(db, "Loja Dash B")
+        _seed_dash(db, loja)
+        outra = _nova_loja(db, "Loja Dash Outra")
+        db.add(Projeto(nome_safe="OUTRA", status="quente", loja_id=outra)); db.commit()
+        d = cd.dashboard_comercial(db, loja)
+        assert d["funil"]["total"] == 3   # não conta o projeto da outra loja
     finally:
         db.close()
 

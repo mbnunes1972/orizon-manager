@@ -1,7 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import pytest
-import emissor_focus
+from fiscal import emissor_focus
 from emissor_fiscal import EmissorFiscal, StatusNota
 
 

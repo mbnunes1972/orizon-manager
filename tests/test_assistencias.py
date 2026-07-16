@@ -19,45 +19,65 @@ def _saldo(db, oid, cod):
     return mc.saldo_conta(db, "loja", oid, c.id) if c else 0.0
 
 
+def _nova_loja_e_usuario(app_db, db, tag):
+    """AssistenciaCaso.loja_id e .criado_por_id são FK reais (lojas/usuarios) — cria as duas
+    linhas de verdade em vez de literais fabricados (Postgres valida FK; SQLite não)."""
+    loja = app_db.Loja(nome="Loja Assist %s" % tag)
+    db.add(loja); db.flush()
+    u = app_db.Usuario(nome="User Assist %s" % tag, login="assist_%s" % tag, nivel="operador",
+                       loja_id=loja.id, ativo=1)
+    u.set_senha("senha123")
+    db.add(u); db.flush()
+    return loja.id, u.id
+
+
 def test_realizar_loja_baixa_provisao_assistencia(app_db):
-    db = app_db.get_session(); mc.seed_plano(db, "loja", 70)
-    caso = ma.criar_caso(db, 70, None, "montagem", "erro_montagem", "x", 300.0, 1)
-    ok, err = ma.realizar_caso(db, "loja", 70, caso)
+    db = app_db.get_session()
+    loja_id, usuario_id = _nova_loja_e_usuario(app_db, db, "1")
+    mc.seed_plano(db, "loja", loja_id)
+    caso = ma.criar_caso(db, loja_id, None, "montagem", "erro_montagem", "x", 300.0, usuario_id)
+    ok, err = ma.realizar_caso(db, "loja", loja_id, caso)
     assert ok, err
     # Débito 2.1.04.05 (baixa provisão assist. técnica) -> saldo do passivo cai 300
-    assert _saldo(db, 70, "2.1.04.05") == -300.0
+    assert _saldo(db, loja_id, "2.1.04.05") == -300.0
     assert caso.status == "realizado"
     db.close()
 
 
 def test_realizar_fabrica_baixa_provisao_garantia(app_db):
-    db = app_db.get_session(); mc.seed_plano(db, "loja", 71)
-    caso = ma.criar_caso(db, 71, None, "pos_conclusao", "defeito_fabricacao", "x", 500.0, 1)
+    db = app_db.get_session()
+    loja_id, usuario_id = _nova_loja_e_usuario(app_db, db, "2")
+    mc.seed_plano(db, "loja", loja_id)
+    caso = ma.criar_caso(db, loja_id, None, "pos_conclusao", "defeito_fabricacao", "x", 500.0, usuario_id)
     assert caso.tipo_custo == "fabrica"
-    ma.realizar_caso(db, "loja", 71, caso)
-    assert _saldo(db, 71, "2.1.04.03") == -500.0        # provisão de garantia baixada
-    rel = ma.a_cobrar_fabrica(db, 71)
+    ma.realizar_caso(db, "loja", loja_id, caso)
+    assert _saldo(db, loja_id, "2.1.04.03") == -500.0        # provisão de garantia baixada
+    rel = ma.a_cobrar_fabrica(db, loja_id)
     assert rel["total"] == 500.0 and rel["qtd"] == 1     # entra no "a cobrar da fábrica"
     db.close()
 
 
 def test_realizar_paga_gera_venda_sem_provisao(app_db):
-    db = app_db.get_session(); mc.seed_plano(db, "loja", 72)
-    caso = ma.criar_caso(db, 72, None, "montagem", "complemento", "x", 250.0, 1)
+    db = app_db.get_session()
+    loja_id, usuario_id = _nova_loja_e_usuario(app_db, db, "3")
+    mc.seed_plano(db, "loja", loja_id)
+    caso = ma.criar_caso(db, loja_id, None, "montagem", "complemento", "x", 250.0, usuario_id)
     assert caso.tipo_custo == "paga"
-    ma.realizar_caso(db, "loja", 72, caso)
-    assert _saldo(db, 72, "1.1.02") == 250.0             # Contas a Receber
-    assert _saldo(db, 72, "4.1.02") == 250.0             # Receita com Vendas de Assistência
-    assert ma.a_cobrar_fabrica(db, 72)["total"] == 0.0   # Paga não entra no repasse da fábrica
+    ma.realizar_caso(db, "loja", loja_id, caso)
+    assert _saldo(db, loja_id, "1.1.02") == 250.0             # Contas a Receber
+    assert _saldo(db, loja_id, "4.1.02") == 250.0             # Receita com Vendas de Assistência
+    assert ma.a_cobrar_fabrica(db, loja_id)["total"] == 0.0   # Paga não entra no repasse da fábrica
     db.close()
 
 
 def test_realizar_idempotente(app_db):
-    db = app_db.get_session(); mc.seed_plano(db, "loja", 73)
-    caso = ma.criar_caso(db, 73, None, "montagem", "erro_projeto", "x", 100.0, 1)
-    ma.realizar_caso(db, "loja", 73, caso)
-    ma.realizar_caso(db, "loja", 73, caso)               # 2ª vez não duplica
-    assert _saldo(db, 73, "2.1.04.05") == -100.0
+    db = app_db.get_session()
+    loja_id, usuario_id = _nova_loja_e_usuario(app_db, db, "4")
+    mc.seed_plano(db, "loja", loja_id)
+    caso = ma.criar_caso(db, loja_id, None, "montagem", "erro_projeto", "x", 100.0, usuario_id)
+    ma.realizar_caso(db, "loja", loja_id, caso)
+    ma.realizar_caso(db, "loja", loja_id, caso)               # 2ª vez não duplica
+    assert _saldo(db, loja_id, "2.1.04.05") == -100.0
     db.close()
 
 

@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import uuid as _uuid, json as _json
 import urllib.request, urllib.error
-import nfe_emissao
+from fiscal import nfe_emissao
 from emissor_fiscal import resultado_de_focus
 
 
@@ -43,7 +43,7 @@ def _fixture_xml():
 def _perfil(app_db, loja_id, ambiente="homologacao"):
     """Garante que a loja tem um Emitente próprio (o do seed) com o ambiente pedido e tokens,
     e que loja.emitente_id aponta para ele. A emissão resolve o Emitente (não o PerfilFiscal)."""
-    import fiscal_cripto
+    from fiscal import fiscal_cripto
     db = app_db.get_session()
     loja = db.get(app_db.Loja, loja_id)
     em = db.get(app_db.Emitente, loja.emitente_id) if loja.emitente_id else None
@@ -338,7 +338,7 @@ def test_emitir_produto_sob_emitente_central_da_rede(http_client_factory, seed, 
     """Multi-CNPJ: loja com Emitente próprio (self) + PerfilEmissao(owner=rede, produto)→central.
     A emissão de produto deve sair sob o CNPJ da CENTRAL (não o self da loja):
     DocumentoFiscal.emitente_id == central e o payload capturado tem o CNPJ da central."""
-    import fiscal_cripto
+    from fiscal import fiscal_cripto
     monkeypatch.setattr(nfe_emissao, "_emissor_para", lambda db, eid: FakeEmissorCaptura())
     FakeEmissorCaptura._ultima.clear()
     proj = seed["projeto_l2"]

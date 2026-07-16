@@ -21,8 +21,8 @@ _NOME_DEST_HOMOLOG = "NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL
 
 
 def _emissor_para(db, emitente_id):
-    import mod_fiscal
-    from emissor_focus import EmissorFocusNfe
+    from . import mod_fiscal
+    from .emissor_focus import EmissorFocusNfe
     return EmissorFocusNfe(mod_fiscal.focus_client_para_emitente(db, emitente_id))
 
 

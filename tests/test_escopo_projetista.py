@@ -40,14 +40,23 @@ def test_filtrar_projetos_por_loja_escopo_projetista(app_db):
     try:
         l = app_db.Loja(nome="L Escopo")
         db.add(l); db.flush()
+        # criado_por_id é FK real (usuarios.id) — cria os dois usuários de verdade em vez de
+        # literais 10/20 fabricados (Postgres valida FK; SQLite nunca validou).
+        u_cons = app_db.Usuario(nome="Cons Dono", login="cons_dono_escopo", nivel="operador",
+                                loja_id=l.id, ativo=1)
+        u_cons.set_senha("senha123")
+        u_outro = app_db.Usuario(nome="Cons Outro", login="cons_outro_escopo", nivel="operador",
+                                 loja_id=l.id, ativo=1)
+        u_outro.set_senha("senha123")
+        db.add_all([u_cons, u_outro]); db.flush()
         db.add_all([
-            app_db.Projeto(nome_safe="P_own",    loja_id=l.id, criado_por_id=10),
-            app_db.Projeto(nome_safe="P_other",  loja_id=l.id, criado_por_id=20),
+            app_db.Projeto(nome_safe="P_own",    loja_id=l.id, criado_por_id=u_cons.id),
+            app_db.Projeto(nome_safe="P_other",  loja_id=l.id, criado_por_id=u_outro.id),
             app_db.Projeto(nome_safe="P_legacy", loja_id=l.id, criado_por_id=None),
         ])
         db.commit()
         projetos = [{"nome_safe": n} for n in ("P_own", "P_other", "P_legacy")]
-        cons10 = {"nivel": "operador", "id": 10}
+        cons10 = {"nivel": "operador", "id": u_cons.id}
         gerente = {"nivel": "gerencial", "id": 30}
         vis_cons = {p["nome_safe"] for p in
                     main._filtrar_projetos_por_loja(projetos, db, l.id, ator=cons10)}

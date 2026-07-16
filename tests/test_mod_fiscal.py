@@ -1,6 +1,6 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-import mod_fiscal as mf
+from fiscal import mod_fiscal as mf
 
 
 def test_emitente_padrao_teste():

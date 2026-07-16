@@ -107,7 +107,7 @@ def test_loja_override_get_reflete_e_opcoes(http_client_factory, seed, app_db):
 
 # ── Resolução ponta a ponta (via mod_fiscal.resolver_emitente direto) ─────
 def test_resolucao_ponta_a_ponta(http_client_factory, seed, app_db):
-    import mod_fiscal
+    from fiscal import mod_fiscal
     rid = seed["rede_id"]
     lid = seed["loja2_id"]
     self_id = seed["emitente_l2_id"]

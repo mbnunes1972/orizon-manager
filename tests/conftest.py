@@ -6,10 +6,19 @@ import pytest
 
 @pytest.fixture(scope="module")
 def app_db(tmp_path_factory):
-    """Rebinda a engine de `database` para um SQLite temporário e cria o schema.
+    """Rebinda a engine de `database` para um banco de teste e cria o schema.
     Como get_session/init_db lêem os globais em tempo de chamada, o rebind vale
-    para todo o processo (inclusive o servidor em thread)."""
-    from sqlalchemy import create_engine
+    para todo o processo (inclusive o servidor em thread).
+
+    Por padrão usa SQLite temporário (rápido, isolado por módulo — arquivo novo a
+    cada módulo). Se a env var TEST_DATABASE_URL estiver setada (ex.:
+    'postgresql+psycopg2://orizon:...@localhost/orizon_test', um banco DEDICADO
+    de teste, nunca o de dev/produção), roda a suíte contra Postgres de verdade —
+    útil pra validar o dialeto real antes de confiar num deploy (ver
+    docs/superpowers/specs/2026-07-15-migracao-postgresql.md). Nesse modo, dropa
+    e recria o schema a cada módulo pra manter o mesmo isolamento que o arquivo
+    SQLite novo dá de graça."""
+    from sqlalchemy import create_engine, text
     from sqlalchemy.orm import sessionmaker
     import database
 
@@ -18,10 +27,23 @@ def app_db(tmp_path_factory):
     # um futuro teste que use get_session() sem isolamento próprio.
     orig = (database.DB_PATH, database.ENGINE, database.Session)
 
-    db_file = str(tmp_path_factory.mktemp("f4db") / "test.db")
-    database.DB_PATH = db_file
-    database.ENGINE = create_engine(f"sqlite:///{db_file}", echo=False)
-    database.Session = sessionmaker(bind=database.ENGINE)
+    test_url = os.environ.get("TEST_DATABASE_URL")
+    if test_url:
+        database.DB_PATH = None
+        database.ENGINE = create_engine(test_url, echo=False)
+        database.Session = sessionmaker(bind=database.ENGINE)
+        # drop_all() falha aqui: há FK circular real no schema (ex.: Usuario.funcionario_id <->
+        # Funcionario.usuario_id) que o SQLAlchemy não consegue ordenar pra DROP (SQLite nunca
+        # validou isso). Derruba o schema inteiro via CASCADE — o Postgres resolve a ordem sozinho.
+        with database.ENGINE.begin() as conn:
+            conn.execute(text("DROP SCHEMA public CASCADE"))
+            conn.execute(text("CREATE SCHEMA public"))
+    else:
+        db_file = str(tmp_path_factory.mktemp("f4db") / "test.db")
+        database.DB_PATH = db_file
+        database.ENGINE = create_engine(f"sqlite:///{db_file}", echo=False)
+        database.Session = sessionmaker(bind=database.ENGINE)
+
     database.init_db()
     yield database
 

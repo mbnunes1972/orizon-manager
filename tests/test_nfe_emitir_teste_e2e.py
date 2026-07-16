@@ -2,7 +2,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import uuid as _uuid, json as _json
 import urllib.request, urllib.error
-import nfe_emissao
+from fiscal import nfe_emissao
 from emissor_fiscal import resultado_de_focus
 
 
@@ -51,7 +51,7 @@ def _fixture_xml():
 def _perfil(app_db, loja_id):
     """Garante o Emitente próprio da loja (do seed) em homologação com tokens; a emissão
     resolve o Emitente (não o PerfilFiscal)."""
-    import fiscal_cripto
+    from fiscal import fiscal_cripto
     db = app_db.get_session()
     loja = db.get(app_db.Loja, loja_id)
     em = db.get(app_db.Emitente, loja.emitente_id) if loja.emitente_id else None

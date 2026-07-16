@@ -1,6 +1,6 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-import mod_fiscal
+from fiscal import mod_fiscal
 
 
 def _setup(app_db):
@@ -58,7 +58,7 @@ def test_resolver_plano_conta_docs(app_db):
 
 
 def test_focus_client_para_emitente_usa_token_do_ambiente(app_db):
-    import fiscal_cripto
+    from fiscal import fiscal_cripto
     db = app_db.get_session()
     e = app_db.Emitente(cnpj="X", ambiente_ativo="homologacao",
                         focus_token_homolog_enc=fiscal_cripto.encrypt("TOKHOMOLOG"))

@@ -4,11 +4,31 @@ import modulos as m
 
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 PY_RAIZ = {p.name for p in RAIZ.glob("*.py")}
-NOMES_LOCAIS = {p.stem for p in RAIZ.glob("*.py")} | {"mod_fin"}
+
+# Pacotes locais (dir com __init__.py) detectados, não hardcoded: antes havia um
+# `| {"mod_fin"}` na mão, que só o mod_fin ganhava — qualquer pacote novo ficava
+# invisível para os testes de dependência abaixo.
+PACOTES_LOCAIS = {d.name for d in RAIZ.iterdir()
+                  if d.is_dir() and (d / "__init__.py").exists()}
+NOMES_LOCAIS = {p.stem for p in RAIZ.glob("*.py")} | PACOTES_LOCAIS
 
 
 def _arquivos_do_modulo(nome):
-    return set(m.MODULOS[nome]["arquivos"])
+    """Arquivos do módulo. Entrada que é PACOTE (diretório) expande para os .py de dentro.
+
+    Sem essa expansão, os testes de dependência (que fazem `if not
+    arquivo.endswith(".py"): continue`) PULAVAM o pacote inteiro — o ratchet ficava
+    verde sem checar uma linha do que está lá dentro. Era o caso do mod_fin desde
+    que virou pacote: nunca foi verificado.
+    """
+    out = set()
+    for a in m.MODULOS[nome]["arquivos"]:
+        p = RAIZ / a
+        if p.is_dir():
+            out |= {f.relative_to(RAIZ).as_posix() for f in p.rglob("*.py")}
+        else:
+            out.add(a)
+    return out
 
 
 def _imports_locais(arquivo):
@@ -66,7 +86,11 @@ def test_dominios_so_importam_o_que_declaram():
     dono = {}
     for nome, v in m.MODULOS.items():
         for a in v["arquivos"]:
-            dono[a if a.endswith(".py") else a] = nome
+            dono[a] = nome
+            # Pacote: registra também o nome-base, porque um `from fiscal import X`
+            # chega aqui como o import de "fiscal", não de "fiscal.py".
+            if (RAIZ / a).is_dir():
+                dono[pathlib.Path(a).name] = nome
     violacoes = []
     for nome in m.DOMINIOS:
         permitidos = set(m.MODULOS[nome]["depende_de"]) | m.NUCLEO | {nome}

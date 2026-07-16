@@ -1,7 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from types import SimpleNamespace
-import mapa_fiscal as mp
+from fiscal import mapa_fiscal as mp
 
 
 def _emit(**kw):

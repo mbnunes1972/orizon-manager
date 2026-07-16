@@ -1,6 +1,6 @@
 """FASE B2.3 — reescalonamento dos itens da NF-e para a parcela Mercadoria (pura, sem I/O).
 Σ round(qCom·preco_venda_unit, 2) == total_alvo EXATO (mesma soma que a nota fiscal usa)."""
-import mod_nfe
+from fiscal import mod_nfe
 
 
 def _total(itens):

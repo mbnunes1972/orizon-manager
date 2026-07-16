@@ -23,7 +23,10 @@ def test_opcoes_acesso_derivadas_sem_orfao_gerente():
 
 def test_func_sync_acesso_valida_contra_perfis_py(app_db):
     db = app_db.get_session()
-    f = app_db.Funcionario(loja_id=1, nome="Fulano", status="ativo")
+    # Funcionario.loja_id é FK real (lojas.id) — cria a loja de verdade em vez do literal `1`.
+    loja = app_db.Loja(nome="Loja Perfis Fonte Unica")
+    db.add(loja); db.flush()
+    f = app_db.Funcionario(loja_id=loja.id, nome="Fulano", status="ativo")
     db.add(f); db.flush()
     # slug órfão antigo → rejeitado
     ok, err = mod_cadastro.func_sync_acesso(

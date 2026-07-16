@@ -127,7 +127,7 @@ def resolver_plano(db, projeto, tem_produto=True, tem_servico=False):
 def focus_client_para_emitente(db, emitente_id):
     """Monta um FocusClient a partir do Emitente: token do ambiente_ativo, decriptado,
     e base_url do ambiente. ValueError se não há emitente ou token para o ambiente."""
-    import fiscal_cripto
+    from . import fiscal_cripto
     import focus_config
     from focus_client import FocusClient
     from database import Emitente

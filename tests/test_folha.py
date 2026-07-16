@@ -53,9 +53,14 @@ def test_gerar_folha_um_por_funcionario_ativo_idempotente(seed, app_db):
 
 def test_pagar_posta_nas_contas_5_3(app_db):
     db = app_db.get_session(); mc.seed_plano(db, "loja", 91)
-    f = app_db.Funcionario(loja_id=1, nome="X", remuneracao_tipo="fixa_variavel", status="ativo", pix="x@pix")
+    # Funcionario.loja_id / FolhaPagamento.loja_id são FK reais (lojas.id) — cria a loja de
+    # verdade em vez do literal fabricado `1` (91 acima é só o owner_id do plano de contas,
+    # sem FK). Não precisa coincidir com o id da loja.
+    loja = app_db.Loja(nome="Loja Folha Pagar")
+    db.add(loja); db.flush()
+    f = app_db.Funcionario(loja_id=loja.id, nome="X", remuneracao_tipo="fixa_variavel", status="ativo", pix="x@pix")
     db.add(f); db.flush()
-    reg = app_db.FolhaPagamento(loja_id=1, funcionario_id=f.id, competencia="2026-07",
+    reg = app_db.FolhaPagamento(loja_id=loja.id, funcionario_id=f.id, competencia="2026-07",
                                 parte_fixa=2000.0, parte_variavel=300.0, total=2300.0, status="aberta")
     db.add(reg); db.flush()
     mod_folha.pagar(db, "loja", 91, reg)

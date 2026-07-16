@@ -1,6 +1,6 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-import mapa_fiscal as mp
+from fiscal import mapa_fiscal as mp
 
 
 def _nota(uf_emit="SP", uf_dest="SP", doc_tipo="cpf"):

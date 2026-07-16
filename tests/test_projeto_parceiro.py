@@ -15,7 +15,10 @@ def test_enriquecer_cliente_do_projeto_usa_dados_vivos(app_db):
     import main
     db = app_db.get_session()
     try:
-        c = app_db.Cliente(nome="Ana", telefone="111", email="a@x", loja_id=1)
+        # Cliente.loja_id é FK real (lojas.id) — cria a loja de verdade em vez do literal `1`.
+        loja = app_db.Loja(nome="Loja Cliente Vivo")
+        db.add(loja); db.flush()
+        c = app_db.Cliente(nome="Ana", telefone="111", email="a@x", loja_id=loja.id)
         db.add(c); db.flush()
         proj = {"cliente_id": c.id, "cliente": {"id": c.id, "nome": "Ana", "telefone": "OLD"}}
         c.telefone = "999-NOVO"; db.commit()
