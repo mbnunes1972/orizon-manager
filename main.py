@@ -1433,6 +1433,27 @@ class Handler(BaseHTTPRequestHandler):
                             "modulos_opcoes": mod_perfis_opcoes(),
                             "pode_editar": perfis.pode(usuario.get("nivel"), "gerir_perfis")})
 
+        elif path == "/api/admin/empresas":
+            # Lojas que o ator pode administrar — alimenta o seletor de empresa (topo de Admin/Config).
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                redes = {r.id: r.nome for r in db.query(Rede).all()}
+                empresas = []
+                for lo in db.query(Loja).order_by(Loja.nome.asc()).all():
+                    if not mod_tenancy.pode_ver_loja(ator, {"id": lo.id, "rede_id": lo.rede_id}):
+                        continue
+                    empresas.append({"loja_id": lo.id, "nome": lo.nome,
+                                     "rede_id": lo.rede_id,
+                                     "rede_nome": redes.get(lo.rede_id, "") if lo.rede_id else ""})
+                self.send_json({"ok": True, "empresas": empresas})
+            finally:
+                db.close()
+            return
+
         elif path == "/api/admin/usuarios/perfis-permitidos":
             usuario = get_usuario_sessao(self)
             if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
