@@ -30,13 +30,17 @@ def test_capacidades_administrativas():
 
 
 def test_perfis_novos_sem_poder_operacional():
-    for slug in ("super_admin", "admin_rede"):
-        assert perfis.desconto_max(slug) == 0.0
-        assert perfis.pode(slug, "autorizar")                 is False
-        assert perfis.pode(slug, "aprovar_financeiro")        is False
-        assert perfis.pode(slug, "registrar_medicao")         is False
-        assert perfis.pode(slug, "aprovar_medicao_reprovada") is False
-        assert perfis.pode(slug, "ver_parametros")            is False
+    # admin_rede (plataforma/rede) NÃO tem poderes operacionais/comerciais.
+    assert perfis.desconto_max("admin_rede") == 0.0
+    for cap in ("autorizar", "aprovar_financeiro", "registrar_medicao",
+                "aprovar_medicao_reprovada", "ver_parametros"):
+        assert perfis.pode("admin_rede", cap) is False, cap
+    # super_admin é god-mode (decisão 2026-07-16): irrestrito → toda capacidade True.
+    # O desconto_max segue 0 (o bypass é só em pode(), não em desconto_max()).
+    assert perfis.desconto_max("super_admin") == 0.0
+    for cap in ("autorizar", "aprovar_financeiro", "registrar_medicao",
+                "aprovar_medicao_reprovada", "ver_parametros"):
+        assert perfis.pode("super_admin", cap) is True, cap
 
 
 def test_usuario_dict_expoe_tenant_e_flags():

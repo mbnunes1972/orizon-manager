@@ -144,14 +144,16 @@ def test_override_exige_perfil_e_motivo(http_client_factory, seed, app_db):
 
 
 def test_override_negado_sem_permissao(http_client_factory, seed, app_db):
-    """super_admin sem aprovar_financeiro recebe 403 ao tentar qa-override."""
+    """operador sem aprovar_financeiro recebe 403 ao tentar qa-override.
+    (super_admin virou god-mode em 2026-07-16 — tem aprovar_financeiro —, então o
+    ator negativo passou a ser o operador cons_l1, que legitimamente não tem a capacidade.)"""
     db = app_db.get_session()
     pa = app_db.PoolAmbiente(projeto_id="Proj_L1", nome="R4", nome_exibicao="R4", xml_path="x",
                              ambientes_json="{}", budget_total=100, order_total=100,
                              qa_selo="bloqueado", qa_pct_sem_acrescimo=100.0)
     db.add(pa); db.commit(); pid = pa.id; db.close()
-    # super não tem aprovar_financeiro
-    c = _login(http_client_factory, "super")
+    # operador (cons_l1) não tem aprovar_financeiro; o endpoint só faz esse gate de capacidade
+    c = _login(http_client_factory, "cons_l1")
     st, body = c.post(f"/api/pool/{pid}/qa-override", {"motivo": "tentativa"})
     assert body.get("ok") is False
     assert st == 403
