@@ -580,7 +580,8 @@ def _loja_admin_alvo(usuario):
     super_admin opera na loja selecionada no console (header X-Loja-Ativa); demais
     perfis usam a própria loja."""
     if usuario.get("nivel") == "super_admin":
-        return _REQ_LOJA_ATIVA or usuario.get("loja_id")
+        # header PRESENTE (mesmo 0) vence; só cai pra loja própria quando AUSENTE (None).
+        return _REQ_LOJA_ATIVA if _REQ_LOJA_ATIVA is not None else usuario.get("loja_id")
     return usuario.get("loja_id")
 
 
@@ -7802,7 +7803,7 @@ class Handler(BaseHTTPRequestHandler):
                 db = get_session()
                 try:
                     from auth import perfil_store
-                    p, err = perfil_store.editar_perfil(db, usuario.get("loja_id"), m_perfil.group(1),
+                    p, err = perfil_store.editar_perfil(db, _loja_admin_alvo(usuario), m_perfil.group(1),
                                 nome=req.get("nome"), modulos=req.get("modulos"),
                                 capacidades=req.get("capacidades"))
                     if not p:
@@ -8623,6 +8624,10 @@ def _ator_dict(db, usuario_sessao, header_loja_id=None):
     membership = membership_loja_ids(db, u.id)
     is_super = (u.nivel == "super_admin")
     active = mod_tenancy.resolver_loja_ativa(membership, header_loja_id, u.loja_id, is_super=is_super)
+    # super_admin confia no header pra "entrar" na loja; mas header apontando loja inexistente
+    # não pode virar loja ativa 'válida' (viraria tela vazia silenciosa) — trata como sem loja.
+    if is_super and active is not None and db.get(Loja, active) is None:
+        active = None
     return {"nivel": u.nivel, "loja_id": u.loja_id, "rede_id": u.rede_id,
             "active_loja_id": active, "lojas_ids": membership}
 

@@ -87,7 +87,14 @@ def handle_auth_get(handler, path: str) -> bool:
                           "rede_id": l.rede_id, "rede_nome": redes.get(l.rede_id, "")}
                          for l in lojas_obj]
                 usuario["lojas"] = lojas
-                usuario["loja_ativa_id"] = usuario.get("loja_id")
+                # super_admin "entra" numa loja pelo header X-Loja-Ativa (não tem loja própria);
+                # sem isso o hub ignorava os modulos_ativos da loja e mostrava tudo ligado.
+                _raw_loja = (handler.headers.get("X-Loja-Ativa") or "").strip()
+                _hdr_loja = int(_raw_loja) if _raw_loja.isdigit() else None
+                if usuario.get("nivel") == "super_admin" and _hdr_loja is not None:
+                    usuario["loja_ativa_id"] = _hdr_loja
+                else:
+                    usuario["loja_ativa_id"] = usuario.get("loja_id")
                 # módulos ativos da loja ativa (topologia) — default tudo-ligado se sem loja/config
                 import mod_tenancy, modulos as _mod
                 from . import perfis as _perfis   # irmão do pacote: relativo (2026-07-15)
