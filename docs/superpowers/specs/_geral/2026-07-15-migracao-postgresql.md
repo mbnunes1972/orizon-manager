@@ -59,3 +59,43 @@ Fecha a lacuna de eficiência levantada, sem mexer na concorrência do servidor 
 segue como está — frente separada, não é pré-requisito desta). JSON vira `JSONB` só numa frente futura
 opcional. **Enquanto a migração não for executada, o banco de produção continua SQLite** — não assumir
 Postgres em código novo até o cutover.
+
+---
+
+## Estado do trabalho em 2026-07-15 (worktrees removidas na faxina)
+
+Houve duas worktrees (`wt-postgres-migration/`, `.claude/worktrees/postgres-migration/`, idênticas, 107 MB)
+com o início da implementação **nunca commitado**. Elas foram removidas na faxina; o conteúdo útil está
+registrado aqui para quem retomar.
+
+**1. Chave do cutover — `DATABASE_URL` ausente = SQLite (dev), presente = Postgres (produção):**
+
+```python
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+DB_PATH      = os.path.join(BASE_DIR, "orizon.db")
+DATABASE_URL = os.environ.get("DATABASE_URL")
+ENGINE       = create_engine(DATABASE_URL or f"sqlite:///{DB_PATH}", echo=False)
+Session      = sessionmaker(bind=ENGINE)
+```
+
+**2. A descoberta que vale mais que o resto — as migrações precisam de guarda por dialeto.**
+`_migrar_pre_schema`/`_migrar_colunas`/`_migrar_dados` usam `sqlite3.connect(DB_PATH)` + `PRAGMA`
+**diretamente**. Só fazem sentido para upgradar um `orizon.db` SQLite já existente. Num Postgres novo o
+schema nasce correto via `create_all()`, e rodá-las contra Postgres **criaria um `orizon.db` SQLite vazio
+e órfão ao lado** — porque `sqlite3.connect` cria o arquivo se não existir. Guarda:
+
+```python
+    if ENGINE.dialect.name == "sqlite":
+        _migrar_pre_schema()   # renames de TABELA antes do create_all
+    Base.metadata.create_all(ENGINE)
+    if ENGINE.dialect.name == "sqlite":
+        _migrar_colunas()
+        _migrar_dados()
+```
+
+**3. `requirements.txt`:** `psycopg2-binary` + `alembic`; no servidor, `apt install python3-psycopg2
+python3-alembic`.
+
+**4. Atenção — a base mudou.** Aquele trabalho partia de `db4fb78`. Depois vieram `documento_modelos`
+(`Contrato.modelo_versao_id`, `UniqueConstraint(loja_id, tipo, versao)`, `@validates` em `corpo_md`) e um
+bloco novo em `_migrar_colunas` para `contratos`. Rebase obrigatório; a tabela nova entra no cutover junto.
