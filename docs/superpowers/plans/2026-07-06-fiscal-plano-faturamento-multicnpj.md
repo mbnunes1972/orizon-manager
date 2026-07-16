@@ -6,7 +6,7 @@
 
 **Architecture:** Aditivo primeiro (Emitente + resolução, sem consumir), depois generaliza `NfeEmissao→documento_fiscal`, depois **troca** a emissão de produto para resolver o emitente por documento, por fim limpa `perfil_fiscal`. Suíte verde a cada tarefa. Branch `feat/fiscal-emitente-multicnpj`.
 
-**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/2026-07-06-fiscal-plano-faturamento-multicnpj-design.md`.
+**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/fiscal/2026-07-06-fiscal-plano-faturamento-multicnpj-design.md`.
 
 **Ler antes:** o spec acima; `database.py` (modelos `PerfilFiscal` ~501-539, `NfeEmissao` ~542-561, `Loja` ~194, `Rede` ~183, `_migrar_colunas`/`_migrar_dados` ~570+); `mod_fiscal.py` (`perfil_padrao_teste`, `focus_client_para_loja`); `mapa_fiscal.py` (`montar_nota` 9-45, `montar_payload`); `nfe_emissao.py` (`_emissor_para`, `emitir`, `consultar`, `cancelar`); `main.py` endpoint `…/ciclo/15/emitir-nfe` (~4160-4290) e o `emitir-teste` (Fase 4). Testes atuais: `tests/test_perfil_fiscal_model.py`, `test_perfil_fiscal_e2e.py`, `test_mod_fiscal.py`, `test_mapa_fiscal.py`, `test_nfe_emissao*.py`, `test_nfe_etapa15_e2e.py`, `test_nfe_emitir_teste_e2e.py`.
 
@@ -353,7 +353,7 @@ git commit -m "feat(nfe): painel etapa 15 mostra o emitente de cada documento"
 - [ ] **Step 2:** spec → Status **IMPLEMENTADO**; `DEV_LOG` nova `## Sessão N` (Emitente/Plano de Faturamento multi-CNPJ; contratos de API trocados; migração preservou o token do smoke); `BACKLOG` — novo épico **EP-11** (multi-CNPJ) marcando US-32 (NFS-e) como dependente desta base.
 - [ ] **Step 3: Commit** + **re-ingerir MCP** após o merge.
 ```
-git add DEV_LOG.md docs/superpowers/specs/2026-07-06-fiscal-plano-faturamento-multicnpj-design.md docs/historias/BACKLOG.md database.py
+git add DEV_LOG.md docs/superpowers/specs/fiscal/2026-07-06-fiscal-plano-faturamento-multicnpj-design.md docs/historias/BACKLOG.md database.py
 git commit -m "docs(fiscal): multi-CNPJ como implementado (DEV_LOG + spec + backlog EP-11) + limpeza PerfilFiscal"
 ```
 

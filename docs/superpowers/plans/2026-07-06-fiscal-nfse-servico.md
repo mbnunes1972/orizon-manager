@@ -6,7 +6,7 @@
 
 **Architecture:** Backend puro primeiro (client + mapa NFS-e) → serviço (emissor + `nfe_emissao` ramifica) → endpoint + estado → frontend. Verde a cada tarefa. Branch `feat/fiscal-nfse-servico`.
 
-**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/2026-07-06-fiscal-nfse-servico-design.md`.
+**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/fiscal/2026-07-06-fiscal-nfse-servico-design.md`.
 
 **Ler antes:** o spec; `focus_client.py` (`enviar_nfe`/`consultar_nfe`/`cancelar_nfe`/`aguardar_processamento` — espelhar p/ nfse); `mapa_fiscal.py` (`montar_nota`/`montar_payload`, `_so_digitos`, `_dest_fiscal`); `emissor_fiscal.py` (`EmissorFiscal.emitir_nfse_servico` = NotImplementedError; `resultado_de_focus` normalizer; `ResultadoEmissao`); `emissor_focus.py` (`EmissorFocusNfe`); `nfe_emissao.py` (`emitir`/`consultar`/`cancelar`, `_guardar_docs_autorizado`, `_TIPO_*`); `main.py` (`…/ciclo/15/emitir-nfe`, `GET …/ciclo/15/nfe`); `Emitente` (campos serviço: inscricao_municipal, cnae_servico, cod_servico_municipio, aliquota_iss, municipio_ibge). **Baseline 578 passed.** Teste `python3 -m pytest -q` (fallback `C:\Users\mbn19\AppData\Local\Python\pythoncore-3.14-64\python.exe -m pytest -q`). `git add` só os arquivos da mudança.
 

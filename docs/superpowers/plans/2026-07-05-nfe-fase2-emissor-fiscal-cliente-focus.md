@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 (stdlib: `abc`, `dataclasses`, `enum`, `os`, `json`, `time`), `requests` (já usado no `mod_omie`), pytest. Sem dependências novas.
 
-**Base para ler antes:** spec `docs/superpowers/specs/2026-07-05-nfe-fase2-emissor-fiscal-cliente-focus-design.md`. Padrão de HTTP+retry a espelhar: `mod_omie.py:26` (`omie_post`). Padrão de config em JSON: `storage.py` (`omie_config.json`, `_BASE_DIR`). `requests` 2.33.1 instalado.
+**Base para ler antes:** spec `docs/superpowers/specs/fiscal/2026-07-05-nfe-fase2-emissor-fiscal-cliente-focus-design.md`. Padrão de HTTP+retry a espelhar: `mod_omie.py:26` (`omie_post`). Padrão de config em JSON: `storage.py` (`omie_config.json`, `_BASE_DIR`). `requests` 2.33.1 instalado.
 
 **Lembrete de ambiente:** módulos Python novos **não exigem restart de servidor** para os testes (a suíte é pura). Rodar a suíte: `python3 -m pytest -q` (baseline atual **431 passed**). `python3` do Bash pode ser o stub do WindowsApps — se `pytest` falhar por isso, usar o interpretador real conforme nota no DEV_LOG.
 
@@ -663,7 +663,7 @@ git commit -m "feat(nfe): FocusClient.baixar + aguardar_processamento (polling)"
 ## Task 6: Fechamento — DEV_LOG + status do spec + nota de smoke test
 
 **Files:**
-- Modify: `DEV_LOG.md`, `docs/superpowers/specs/2026-07-05-nfe-fase2-emissor-fiscal-cliente-focus-design.md`
+- Modify: `DEV_LOG.md`, `docs/superpowers/specs/fiscal/2026-07-05-nfe-fase2-emissor-fiscal-cliente-focus-design.md`
 
 - [ ] **Step 1: Run full suite (verde antes de documentar)**
 
@@ -686,7 +686,7 @@ Documentar (no DEV_LOG, na sessão): com `focus_config.json` de homologação pr
 - [ ] **Step 5: Commit**
 
 ```bash
-git add DEV_LOG.md docs/superpowers/specs/2026-07-05-nfe-fase2-emissor-fiscal-cliente-focus-design.md
+git add DEV_LOG.md docs/superpowers/specs/fiscal/2026-07-05-nfe-fase2-emissor-fiscal-cliente-focus-design.md
 git commit -m "docs(nfe): DEV_LOG sessao N + spec Fase 2 como implementado"
 ```
 

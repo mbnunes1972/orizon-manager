@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 + SQLAlchemy/SQLite, pytest. Reusa `mod_nfe` (Fase 1), `mapa_fiscal` (Fase 3b), `emissor_focus.EmissorFocusNfe` (Fase 3b), `mod_fiscal.focus_client_para_loja` (Sub-frente I), `emissor_fiscal` (Fase 2), `storage` (`storage_salvar_binario`, `PROJETOS_DIR`).
 
-**Base para ler antes:** spec `docs/superpowers/specs/2026-07-05-nfe-fase4-emissao-real-design.md`. Modelo `CicloDocumento` (`database.py`: projeto_nome, etapa_codigo, tipo, arquivo_path, nome_original, enviado_por_id, enviado_em). `ResultadoEmissao`/`StatusNota`/`resultado_de_focus` em `emissor_fiscal.py`. Padrão de upload append-only (etapa 12) em `main.py` (`_parse_multipart_arquivos`, `_ator_dict`, `mod_tenancy.pode_editar_dados_loja`, `get_session`). Fixtures: `tests/conftest.py` (`app_db`, `seed` com `loja2_id`/`projeto_l2`=`Proj_L2`/`cliente_l2_id`/`dir_l2`, `projetos_dir` que rebinda `PROJETOS_DIR` e cria os projetos em disco). Fixture de XML: `tests/fixtures/nfe/nfe_basica.xml` (Fase 1).
+**Base para ler antes:** spec `docs/superpowers/specs/fiscal/2026-07-05-nfe-fase4-emissao-real-design.md`. Modelo `CicloDocumento` (`database.py`: projeto_nome, etapa_codigo, tipo, arquivo_path, nome_original, enviado_por_id, enviado_em). `ResultadoEmissao`/`StatusNota`/`resultado_de_focus` em `emissor_fiscal.py`. Padrão de upload append-only (etapa 12) em `main.py` (`_parse_multipart_arquivos`, `_ator_dict`, `mod_tenancy.pode_editar_dados_loja`, `get_session`). Fixtures: `tests/conftest.py` (`app_db`, `seed` com `loja2_id`/`projeto_l2`=`Proj_L2`/`cliente_l2_id`/`dir_l2`, `projetos_dir` que rebinda `PROJETOS_DIR` e cria os projetos em disco). Fixture de XML: `tests/fixtures/nfe/nfe_basica.xml` (Fase 1).
 
 **Lembrete de ambiente:** modelos/endpoints Python → **restart** para verificação manual; a suíte e2e sobe o próprio servidor. Baseline **507 passed**. `python3` do Bash pode ser o stub WindowsApps (usar o interpretador real, nota no DEV_LOG).
 
@@ -602,7 +602,7 @@ git commit -m "feat(nfe): endpoint POST .../nfe/emitir-teste (emissao de teste e
 ## Task 5: Fechamento — DEV_LOG + status do spec
 
 **Files:**
-- Modify: `DEV_LOG.md`, `docs/superpowers/specs/2026-07-05-nfe-fase4-emissao-real-design.md`
+- Modify: `DEV_LOG.md`, `docs/superpowers/specs/fiscal/2026-07-05-nfe-fase4-emissao-real-design.md`
 
 - [ ] **Step 1: Run full suite (verde antes de documentar)**
 
@@ -623,7 +623,7 @@ o token no perfil da loja (painel → Credenciais Focus). Atualizar contagens se
 - [ ] **Step 4: Commit**
 
 ```bash
-git add DEV_LOG.md docs/superpowers/specs/2026-07-05-nfe-fase4-emissao-real-design.md
+git add DEV_LOG.md docs/superpowers/specs/fiscal/2026-07-05-nfe-fase4-emissao-real-design.md
 git commit -m "docs(nfe): DEV_LOG + spec Fase 4 como implementado"
 ```
 

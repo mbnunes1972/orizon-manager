@@ -14,7 +14,7 @@ watcher (mtime+lock+debounce+timeout) que chama `_converter_pdf`.
 **Tech Stack:** Python 3, python-docx + lxml (OOXML), http.server/SQLAlchemy, LibreOffice;
 JS vanilla; pytest.
 
-**Spec:** `docs/superpowers/specs/2026-06-18-contrato-editavel-protegido-design.md`
+**Spec:** `docs/superpowers/specs/contrato-documentos/2026-06-18-contrato-editavel-protegido-design.md`
 
 ---
 

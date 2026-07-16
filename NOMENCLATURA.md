@@ -7,7 +7,7 @@
 > número, ele deve **vir do motor** (ou de uma função pura testada que o motor exponha), nunca
 > recalculado em paralelo no frontend.
 >
-> Base formal: `docs/superpowers/specs/2026-06-22-mecanismo-negociacao-design.md` (§3/§4).
+> Base formal: `docs/superpowers/specs/negociacao/2026-06-22-mecanismo-negociacao-design.md` (§3/§4).
 
 ## 1. Fluxo (quem é dono do quê)
 

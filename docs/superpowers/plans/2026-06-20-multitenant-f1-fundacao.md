@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python, SQLAlchemy (ORM + `Base.metadata.create_all`), sqlite3 (migrações raw), pytest (testes com SQLite in-memory / temp file).
 
-**Spec:** `docs/superpowers/specs/2026-06-20-multitenant-f1-fundacao-design.md`
+**Spec:** `docs/superpowers/specs/multitenant/2026-06-20-multitenant-f1-fundacao-design.md`
 
 ---
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12, SQLAlchemy, `http.server`, pytest; frontend HTML/CSS/JS inline.
 
-**Spec:** `docs/superpowers/specs/2026-07-04-projeto-executivo-subfases-design.md`
+**Spec:** `docs/superpowers/specs/ciclo/2026-07-04-projeto-executivo-subfases-design.md`
 
 ---
 
@@ -951,7 +951,7 @@ git commit -m "feat(pe): acoes de upload, conclusao e revisao no frontend"
 
 - [ ] **Step 2: `DEV_LOG.md`** — adicionar `## Sessão N — Subfases do Projeto Executivo` com [ESTADO]/[DECIDIDO]/[ARQUIVOS], e atualizar o `RESUMO ATUAL`/`ESTADO ATUAL`.
 
-- [ ] **Step 3: Spec** — no cabeçalho de `docs/superpowers/specs/2026-07-04-projeto-executivo-subfases-design.md`, trocar o status para **implementado (Sessão N)**.
+- [ ] **Step 3: Spec** — no cabeçalho de `docs/superpowers/specs/ciclo/2026-07-04-projeto-executivo-subfases-design.md`, trocar o status para **implementado (Sessão N)**.
 
 - [ ] **Step 4: Suíte verde + commit**
 
@@ -959,7 +959,7 @@ Run: `python3 -m pytest -q`
 Expected: tudo verde.
 
 ```bash
-git add docs/USUARIOS.md DEV_LOG.md docs/superpowers/specs/2026-07-04-projeto-executivo-subfases-design.md
+git add docs/USUARIOS.md DEV_LOG.md docs/superpowers/specs/ciclo/2026-07-04-projeto-executivo-subfases-design.md
 git commit -m "docs: subfases do Projeto Executivo (capabilities, DEV_LOG, spec)"
 ```
 

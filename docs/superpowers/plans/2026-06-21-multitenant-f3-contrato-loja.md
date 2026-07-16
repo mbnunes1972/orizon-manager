@@ -4,7 +4,7 @@
 
 **Goal:** Fazer o contrato ler nome/CNPJ/código/telefone/e-mail e testemunhas (nome+CPF) da loja do consultor — removendo as constantes de `mod_contrato.py` — e gravar um snapshot da loja em cada contrato.
 
-**Architecture:** `mod_contrato.py` continua **puro** (sem banco): recebe um dict `loja` do `main.py`. O `main.py` resolve a loja do consultor, valida (avisa mas deixa gerar), grava `Contrato.loja_snapshot_json` a cada geração e passa a loja para `construir_contexto`/`gerar_num_contrato`. O front trata a confirmação "loja incompleta". Spec: `docs/superpowers/specs/2026-06-21-multitenant-f3-contrato-loja-design.md`.
+**Architecture:** `mod_contrato.py` continua **puro** (sem banco): recebe um dict `loja` do `main.py`. O `main.py` resolve a loja do consultor, valida (avisa mas deixa gerar), grava `Contrato.loja_snapshot_json` a cada geração e passa a loja para `construir_contexto`/`gerar_num_contrato`. O front trata a confirmação "loja incompleta". Spec: `docs/superpowers/specs/multitenant/2026-06-21-multitenant-f3-contrato-loja-design.md`.
 
 **Tech Stack:** Python 3 (stdlib http.server), SQLAlchemy + sqlite3, python-docx, pytest, HTML/JS vanilla.
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 `http.server` + SQLAlchemy + sqlite3 (migração raw); pytest; frontend HTML/CSS/JS vanilla (`static/index.html`, sem harness JS → verificação manual/Playwright).
 
-**Spec:** `docs/superpowers/specs/2026-06-17-briefing-obrigatorio-projeto-design.md`
+**Spec:** `docs/superpowers/specs/ciclo/2026-06-17-briefing-obrigatorio-projeto-design.md`
 **Branch:** `feat/briefing-obrigatorio-projeto` (já criada).
 
 **Campos obrigatórios do briefing** (`_BRIEFING_OBRIGATORIOS`, main.py:2396): `tipo_imovel`, `budget_declarado`, `categoria_proposta`, `data_entrega_desejada`, `flexibilidade_prazo`. "Briefing OK" = os 5 preenchidos (`_briefing_dict(b)["completo"]`).

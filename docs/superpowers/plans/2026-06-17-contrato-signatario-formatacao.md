@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 + python-docx; `http.server`; pytest; frontend HTML/CSS/JS vanilla. Documento verificado gerando o `.docx` e inspecionando (python-docx).
 
-**Spec:** `docs/superpowers/specs/2026-06-17-contrato-signatario-formatacao-design.md`
+**Spec:** `docs/superpowers/specs/contrato-documentos/2026-06-17-contrato-signatario-formatacao-design.md`
 **Branch:** `feat/contrato-signatario-formatacao` (já criada).
 
 ---

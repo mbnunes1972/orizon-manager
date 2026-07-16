@@ -6,7 +6,7 @@
 
 **Architecture:** Backend primeiro (endpoints da rede reusando a lógica do painel da loja via helper + endpoints de perfil-emissão com opções e upsert/delete de `PerfilEmissao`) → frontend (painel Fiscal da rede parametrizado + selects Produto/Serviço). Verde a cada tarefa. Branch `feat/fiscal-perfil-emissao-ui`.
 
-**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/2026-07-06-fiscal-perfil-emissao-ui-design.md`.
+**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/fiscal/2026-07-06-fiscal-perfil-emissao-ui-design.md`.
 
 **Ler antes:** o spec; `main.py` handlers do painel da **loja** (US-36): `GET …/lojas/<id>/perfil-fiscal` (~1494), `PUT …/perfil-fiscal` (~4392), `PUT …/perfil-fiscal/segredos` (~4428), `PUT …/perfil-fiscal/ambiente` (~4470) — todos resolvem `db.get(Emitente, loja.emitente_id)`; `database.py` (`Rede.emitente_central_id` ~193, `PerfilEmissao` ~582, `Emitente`, `Loja.emitente_id`); `mod_fiscal.resolver_emitente` (~51, precedência loja→rede→self) + `emitente_padrao_teste`; `perfis.pode(nivel,"gerir_lojas")` + `mod_tenancy` (escopo de rede); `static/index.html` `adminFiscalCarregar/Salvar/SalvarSegredos/AtivarAmbiente` (~6988-7090) e a navegação admin rede/loja (~6686-6740). **Baseline 561 passed.** Teste `python3 -m pytest -q` (fallback `C:\Users\mbn19\AppData\Local\Python\pythoncore-3.14-64\python.exe -m pytest -q`). `git add` só os arquivos da mudança.
 

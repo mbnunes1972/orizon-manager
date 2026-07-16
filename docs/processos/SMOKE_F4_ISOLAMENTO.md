@@ -22,7 +22,7 @@
 > sem-regressão na loja legítima; colisão de CPF cross-loja não vaza o cliente da outra loja
 > (409 sem dados). Este documento segue útil para acelerar o diagnóstico se algum bug aparecer.
 
-Spec/plano: `docs/superpowers/specs/2026-06-21-multitenant-f4-isolamento-design.md` e
+Spec/plano: `docs/superpowers/specs/multitenant/2026-06-21-multitenant-f4-isolamento-design.md` e
 `docs/superpowers/plans/2026-06-21-multitenant-f4-isolamento.md`.
 
 ---

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 puro (`http.server`), SQLAlchemy + SQLite, WeasyPrint, LibreOffice headless (só na importação), pytest. Frontend: `static/index.html` (arquivo único, HTML+CSS+JS inline).
 
-**Spec:** `docs/superpowers/specs/2026-07-15-modelos-documentos-loja-design.md`
+**Spec:** `docs/superpowers/specs/contrato-documentos/2026-07-15-modelos-documentos-loja-design.md`
 
 ---
 
@@ -1246,7 +1246,7 @@ Na classe `Contrato` (linha ~825), após `loja_snapshot_json`:
     modelo_versao_id     = Column(Integer, ForeignKey("documento_modelos.id"), nullable=True)
     # NULL = contrato legado -> cai no contrato_template/contrato.md global.
     # Preenchido = reproduz as cláusulas daquela versão, mesmo que a loja já
-    # tenha trocado o modelo. Ver docs/superpowers/specs/2026-07-15-modelos-documentos-loja-design.md D6.
+    # tenha trocado o modelo. Ver docs/superpowers/specs/contrato-documentos/2026-07-15-modelos-documentos-loja-design.md D6.
 ```
 
 Em `_migrar_colunas()` (`database.py:1003`), acrescentar um bloco no mesmo padrão dos existentes:
@@ -2234,7 +2234,7 @@ Remove o import morto de mod_proposta no handler."
   `Contrato.modelo_versao_id` congela a versão que gerou o contrato → regerar um assinado reproduz as
   cláusulas originais. `NULL` = legado → `contrato_template/contrato.md` global. Catálogo de
   marcadores em `mod_marcadores.CATALOGO`, travado contra `mod_contrato._montar_mapping` por teste.
-  Spec: `docs/superpowers/specs/2026-07-15-modelos-documentos-loja-design.md`.
+  Spec: `docs/superpowers/specs/contrato-documentos/2026-07-15-modelos-documentos-loja-design.md`.
 ```
 
 - [ ] **Step 2: DEV_LOG**

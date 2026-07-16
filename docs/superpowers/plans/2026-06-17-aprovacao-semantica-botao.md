@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 `http.server` + SQLAlchemy; frontend HTML/CSS/JS vanilla (`static/index.html`, sem harness JS). Verificação de runtime via API/Playwright na fase final.
 
-**Spec:** `docs/superpowers/specs/2026-06-17-aprovacao-semantica-botao-design.md`
+**Spec:** `docs/superpowers/specs/_geral/2026-06-17-aprovacao-semantica-botao-design.md`
 **Branch:** `feat/aprovacao-semantica-botao` (já criada).
 
 **Nota sobre testes:** as mudanças de backend são marcações de etapa *inline* num handler HTTP — o projeto não tem harness HTTP e esses handlers não são cobertos por unit tests (convenção do repo; os *helpers* puros é que são testados). Portanto Task 1 garante suíte verde + sintaxe, e o comportamento end-to-end (5+6 concluídas; desfazer reseta 5) é confirmado na **fase de verificação final** via drive de API/Playwright (como no Sub-projeto B). Tasks 2/3 (frontend) seguem o mesmo padrão: integridade de sintaxe + verificação manual/Playwright.

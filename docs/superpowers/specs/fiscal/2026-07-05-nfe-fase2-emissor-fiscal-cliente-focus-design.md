@@ -8,7 +8,7 @@
 **Guinada de arquitetura (2026-07-05):** o motor fiscal deixou de ser o Omie e passou a ser a **Focus
 NFe** (API REST direta). A Focus é camada de **transmissão/autorização** — **não calcula imposto** (nós
 fornecemos o bloco fiscal por item). Roadmap completo em
-`docs/superpowers/specs/2026-07-05-nfe-fase1-parser-precificacao-design.md` §1.
+`docs/superpowers/specs/fiscal/2026-07-05-nfe-fase1-parser-precificacao-design.md` §1.
 
 Esta fase entrega a **fronteira de emissão (contrato) + o transporte HTTP** — isolada, testável **sem**
 parser e **sem** regra fiscal. Ela **não** monta o payload com impostos (isso é a Fase 3) nem toca UI

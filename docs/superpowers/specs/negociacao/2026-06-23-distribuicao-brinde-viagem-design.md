@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-23
 **Status:** Em revisão (design)
-**Base:** `docs/superpowers/specs/2026-06-22-mecanismo-negociacao-design.md` (motor).
+**Base:** `docs/superpowers/specs/negociacao/2026-06-22-mecanismo-negociacao-design.md` (motor).
 **Branch:** `feat/fase2-autosave-negociacao` (continuação da Fase 2). **Rollback:** tag `pre-refator-negociacao`.
 
 ## 1. Problema

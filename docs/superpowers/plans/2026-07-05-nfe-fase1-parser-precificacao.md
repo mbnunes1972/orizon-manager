@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 stdlib (`re`, `xml.etree.ElementTree`), pytest. Sem dependências novas.
 
-**Base para ler antes:** spec `docs/superpowers/specs/2026-07-05-nfe-fase1-parser-precificacao-design.md`. Padrão de parse XML: `promob_grupos.py` (usa `xml.etree.ElementTree`). Os 5 XMLs reais estão em `E:/2026/desenvolvimento/nfe-dalmobile` (**fora do git** — só para conferência manual; **não** usar como fixture de teste).
+**Base para ler antes:** spec `docs/superpowers/specs/fiscal/2026-07-05-nfe-fase1-parser-precificacao-design.md`. Padrão de parse XML: `promob_grupos.py` (usa `xml.etree.ElementTree`). Os 5 XMLs reais estão em `E:/2026/desenvolvimento/nfe-dalmobile` (**fora do git** — só para conferência manual; **não** usar como fixture de teste).
 
 **Estrutura real confirmada (de uma NF-e real):** `nfeProc versao="3.10"` com namespace `http://www.portalfiscal.inf.br/nfe`; `infNFe/ide/{nNF,serie,dhEmi,natOp}`, `infNFe/emit/{CNPJ,xNome,CRT}`, `infNFe/dest/{xNome,CNPJ|CPF}`; cada `infNFe/det[@nItem]/prod/{cProd,xProd,NCM,CFOP,uCom,qCom,vUnCom,vProd}`, `det/imposto/IPI/IPITrib/vIPI` (pode faltar → IPI 0), `det/infAdProd`.
 
@@ -501,7 +501,7 @@ git commit -m "feat(nfe): preview (pipeline + totais) + CLI de eyeball"
 ## Task 5: Fechamento — DEV_LOG + status do spec
 
 **Files:**
-- Modify: `DEV_LOG.md`, `docs/superpowers/specs/2026-07-05-nfe-fase1-parser-precificacao-design.md`
+- Modify: `DEV_LOG.md`, `docs/superpowers/specs/fiscal/2026-07-05-nfe-fase1-parser-precificacao-design.md`
 
 - [ ] **Step 1: Run full suite (verde antes de documentar)**
 
@@ -523,7 +523,7 @@ mergeável; falta Fase 3, que depende do perfil fiscal do contador + token da Fo
 - [ ] **Step 4: Commit**
 
 ```bash
-git add DEV_LOG.md docs/superpowers/specs/2026-07-05-nfe-fase1-parser-precificacao-design.md
+git add DEV_LOG.md docs/superpowers/specs/fiscal/2026-07-05-nfe-fase1-parser-precificacao-design.md
 git commit -m "docs(nfe): DEV_LOG + spec Fase 1 como implementado"
 ```
 

@@ -6,7 +6,7 @@
 
 **Architecture:** Util puro `validacao_doc.py` → aplicar nos handlers de create/edit (`main.py`) → frontend inline no cliente. Verde a cada tarefa. Branch `feat/validacao-cpf-cnpj`.
 
-**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/2026-07-06-validacao-cpf-cnpj-design.md`.
+**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/fiscal/2026-07-06-validacao-cpf-cnpj-design.md`.
 
 **Ler antes:** o spec (tem o código do util pronto); `main.py` handlers de create/edit — Cliente `POST /api/clientes` (~2024) + `POST /api/clientes/<id>/editar` (~2196); Parceiro (~2304 create + editar); Usuário (create/edit — grep `Usuario(`); Rede (~3266); Loja (~3291); `static/index.html` modal de cliente (`cli-cpf`/`cli-cnpj`/`cli-aviso-cpf` ~1297). **Baseline 601 passed.** Teste `python3 -m pytest -q` (fallback `C:\Users\mbn19\AppData\Local\Python\pythoncore-3.14-64\python.exe -m pytest -q`). `git add` só os arquivos da mudança.
 

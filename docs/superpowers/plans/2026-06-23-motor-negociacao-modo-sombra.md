@@ -103,7 +103,7 @@ Expected: FAIL (`ModuleNotFoundError: No module named 'mod_negociacao'`).
 """mod_negociacao.py — Motor de cálculo da negociação (PURO, sem I/O).
 
 Cálculo por ambiente (gross-up divisivo), agregado por orçamento. Siglas conforme
-docs/superpowers/specs/2026-06-22-mecanismo-negociacao-design.md (§3/§4).
+docs/superpowers/specs/negociacao/2026-06-22-mecanismo-negociacao-design.md (§3/§4).
 """
 
 

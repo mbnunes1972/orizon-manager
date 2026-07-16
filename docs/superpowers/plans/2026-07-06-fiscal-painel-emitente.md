@@ -6,7 +6,7 @@
 
 **Architecture:** Retarget dos 3 endpoints `…/perfil-fiscal[/segredos|/ambiente]` de `PerfilFiscal → Emitente` (via `loja.emitente_id`, cria se faltar) → campos novos no form → remoção do modelo `PerfilFiscal` morto. Verde a cada tarefa. Branch `feat/fiscal-painel-emitente`.
 
-**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/2026-07-06-fiscal-painel-emitente-design.md`.
+**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/fiscal/2026-07-06-fiscal-painel-emitente-design.md`.
 
 **Ler antes:** o spec; `main.py` handlers `GET/PUT /api/admin/lojas/<id>/perfil-fiscal` (~1494-1530), `PUT …/perfil-fiscal/segredos` (~4377), `PUT …/perfil-fiscal/ambiente` (~4413/4455); `mod_fiscal.py` (`perfil_padrao_teste`, `validar_config`, `pode_ativar_producao`, `focus_client_para_loja` a remover, `focus_client_para_emitente` a manter); `database.py` (`PerfilFiscal` ~500 a remover, `Emitente` ~544, `Loja.emitente_id`); `static/index.html` (`adminFiscalCarregar/Salvar/SalvarSegredos/AtivarAmbiente` ~6988-7090); `fiscal_cripto` (encrypt/token_definido). **Baseline 562 passed.** Teste `python3 -m pytest -q` (fallback `C:\Users\mbn19\AppData\Local\Python\pythoncore-3.14-64\python.exe -m pytest -q`). `git add` só os arquivos da mudança.
 

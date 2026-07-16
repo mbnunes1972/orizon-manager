@@ -7,7 +7,7 @@
 > bug aparecer**, o diagnóstico seja rápido: passos esperados, mapa sintoma→local, inspeção do
 > banco e edges conhecidos.
 
-Spec/plano: `docs/superpowers/specs/2026-06-21-multitenant-f3-contrato-loja-design.md` e
+Spec/plano: `docs/superpowers/specs/multitenant/2026-06-21-multitenant-f3-contrato-loja-design.md` e
 `docs/superpowers/plans/2026-06-21-multitenant-f3-contrato-loja.md`.
 
 ---

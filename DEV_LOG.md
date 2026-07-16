@@ -203,7 +203,7 @@
 ---
 
 ### Sessão 2026-06-21 (sessão 24 — F4: isolamento operacional) — **fecha o multi-tenant**
-**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão de **segurança** + qualidade por task → verificação). Spec/plano em `docs/superpowers/specs/2026-06-21-multitenant-f4-isolamento-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f4-isolamento.md`. Branch `feat/multitenant-f4-isolamento` (16 commits).
+**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão de **segurança** + qualidade por task → verificação). Spec/plano em `docs/superpowers/specs/multitenant/2026-06-21-multitenant-f4-isolamento-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f4-isolamento.md`. Branch `feat/multitenant-f4-isolamento` (16 commits).
 
 **Origem:** 4ª e última fase. F1 (schema) → F2 (UI/API de tenancy, escopo só nas telas admin) → F3 (contrato puxa da loja) → **F4 aplica escopo por loja em TODAS as queries operacionais**, que eram globais.
 
@@ -223,7 +223,7 @@
 **Achado pré-existente (fora da F4, decisão do usuário):** `contrato_editar.py:validar_gerencial` usa nomes de perfil antigos (`"gerente"`/`"admin"`) → hoje só `diretor` edita contrato. Política a definir.
 
 ### Sessão 2026-06-21 (sessão 23 — F3: contrato puxa da loja)
-**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação). Spec/plano em `docs/superpowers/specs/2026-06-21-multitenant-f3-contrato-loja-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f3-contrato-loja.md`. Branch `feat/multitenant-f3-contrato-loja`.
+**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação). Spec/plano em `docs/superpowers/specs/multitenant/2026-06-21-multitenant-f3-contrato-loja-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f3-contrato-loja.md`. Branch `feat/multitenant-f3-contrato-loja`.
 
 **Origem:** 3ª das 4 fases do multi-tenant. A F2 (sessão 22) tornou os dados da loja editáveis (incl. testemunhas/CPF); a F3 faz o contrato **consumir** esses dados em vez das constantes hard-coded. Não toca isolamento operacional (F4).
 
@@ -240,7 +240,7 @@
 **Edge conhecido (registrado p/ revisão final):** loja **sem código** + geração confirmada → `num_contrato` sai com prefixo vazio (`-AAAA-…`); ocorre só se a loja não tiver código (validação avisa). Mantido o comportamento leniente por coerência com a Decisão 2.
 
 ### Sessão 2026-06-21 (sessão 22 — F2: perfis e CRUD de tenancy)
-**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação → merge). Spec/plano em `docs/superpowers/specs/2026-06-21-multitenant-f2-tenancy-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f2-tenancy.md`.
+**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação → merge). Spec/plano em `docs/superpowers/specs/multitenant/2026-06-21-multitenant-f2-tenancy-design.md` e `docs/superpowers/plans/2026-06-21-multitenant-f2-tenancy.md`.
 
 **Origem:** 2ª das 4 fases do programa multi-tenant. A F1 (sessão 21) criou o schema; a F2 **expõe a tenancy na UI/API**, sem tocar nenhuma query operacional (isolamento real é a F4).
 
@@ -256,7 +256,7 @@
 **Fixes em revisão (achados e corrigidos durante o ciclo):** import local `urlparse` sombreava o do módulo e quebrava **todo** o `do_GET` (corrigido p/ `parse_qs` só); guard `.isdigit()` no `?rede_id=` (evita 500 por `int()` em input livre); marcador da migração `tenancy_v2` movido p/ dentro do guard de colunas (não marcar aplicada sem agir); **create de parceiro atômico** (`flush`+commit único) p/ não deixar órfão; prefetch das lojas no escopo de usuários (evita N+1); diretor pode parceiro de abrangência rede da própria loja.
 
 ### Sessão 2026-06-20 (sessão 21 — F1: fundação da plataforma multi-tenant)
-**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação → merge). Spec/plano em `docs/superpowers/specs/2026-06-20-multitenant-f1-fundacao-design.md` e `docs/superpowers/plans/2026-06-20-multitenant-f1-fundacao.md`.
+**Processo:** pipeline superpowers (brainstorm → spec → plano → subagentes com revisão em duas etapas por task → verificação → merge). Spec/plano em `docs/superpowers/specs/multitenant/2026-06-20-multitenant-f1-fundacao-design.md` e `docs/superpowers/plans/2026-06-20-multitenant-f1-fundacao.md`.
 
 **Origem:** o pedido "configurador de lojas" (tirar nome/CNPJ/testemunhas das constantes de `mod_contrato.py`) foi explorado e revelou a intenção de uma **plataforma multi-tenant com isolamento total** — `Plataforma → Rede → Loja`, com lojas independentes (avulsas) e escalável para muitas redes/lojas; cada loja tem seus usuários. Decomposto em **4 fases**, cada uma com seu ciclo: **F1 fundação de dados** (esta) · F2 perfis + CRUD de redes/lojas · F3 contrato puxa da loja · F4 isolamento (escopo por loja em todas as queries).
 
@@ -756,7 +756,7 @@ quebravam com nome com espaço (onclick aspas duplas + JSON.stringify) → aspas
 - **Arquivos:** `mod_arvore.py` (novo); `tests/test_arvore.py`, `tests/test_arvore_e2e.py` (novos);
   `main.py` (rotas `GET /api/admin/lojas/<id>/projetos` e `/api/admin/projetos/<nome>/etapas`);
   `static/index.html` (aterrissagem `_aterrissarPorPapel`, nível 4 da árvore, fix dos botões Entrar).
-- **Docs:** `docs/superpowers/specs/2026-06-24-super-admin-aterrissagem-arvore-design.md`;
+- **Docs:** `docs/superpowers/specs/multitenant/2026-06-24-super-admin-aterrissagem-arvore-design.md`;
   `docs/superpowers/plans/2026-06-24-super-admin-aterrissagem-arvore.md`.
 
 ### Frente B — Acesso multi-loja (loja ativa por requisição)
@@ -773,7 +773,7 @@ edição não dropa memberships fora do escopo do ator de loja, coerção de `lo
   header nos 4 dispatch, rotas de usuário, contrato); `auth_routes.py` (`/api/auth/me`);
   `static/index.html` (interceptor + seletor + modal); `tests/test_multi_loja.py`,
   `tests/test_multi_loja_e2e.py` (novos); `tests/test_isolamento_f4.py` (3 dicts unit ajustados).
-- **Docs:** `docs/superpowers/specs/2026-06-24-acesso-multi-loja-design.md`;
+- **Docs:** `docs/superpowers/specs/multitenant/2026-06-24-acesso-multi-loja-design.md`;
   `docs/superpowers/plans/2026-06-24-acesso-multi-loja.md`.
 
 ### Frente C — Config financeira da loja / provisões / margem real / comissões (EM SPEC)
@@ -791,8 +791,8 @@ consultor + fechamento de ciclo (provisório→definitivo); fase 3 = custo finan
 - **Doc/referência (novo):** `docs/modulos/financeiro/PROVISOES_E_VARIAVEIS.md` (tabela + rotina de
   comissão + faseamento).
 - **Material âncora:** `FUTURO_CALCULO_FINANCEIRO.md`, `NOMENCLATURA.md`,
-  `docs/modulos/financeiro/SPEC.md`, `docs/superpowers/specs/2026-06-15-ciclo-completo-projeto-design.md`
-  (§Provisões financeiras), `docs/superpowers/specs/2026-06-22-mecanismo-negociacao-design.md`.
+  `docs/modulos/financeiro/SPEC.md`, `docs/superpowers/specs/ciclo/2026-06-15-ciclo-completo-projeto-design.md`
+  (§Provisões financeiras), `docs/superpowers/specs/negociacao/2026-06-22-mecanismo-negociacao-design.md`.
 - **Spec/plano:** ainda **não escritos** (próximo passo do brainstorm).
 
 ## Sessão 33 — Testes (config financeira) + ajustes de leitura/contrato
@@ -1061,7 +1061,7 @@ escopo por projetista.
 
 Rodada de UI da negociação (5 commits direto na `main`, após o merge da Sessão 42) + 1 correção.
 Frontend-only (`static/index.html`), verificação manual. Spec:
-`docs/superpowers/specs/2026-07-03-negociacao-ui-uniforme-design.md`.
+`docs/superpowers/specs/negociacao/2026-07-03-negociacao-ui-uniforme-design.md`.
 
 - **Faixa superior:** Valor Bruto → Desconto → Valor à Vista → **Valor Total do Contrato** (célula
   nova à direita; nas modalidades com financiamento = total parcelado; no À Vista = Valor à Vista).
@@ -1128,7 +1128,7 @@ Sessão de infraestrutura/processo (sem mudança de código de app; suíte segue
 
 ## Sessão 45 — Subfases do Projeto Executivo (etapa 11) — branch `feat/pe-subfases`
 
-Frente desenhada via brainstorming (spec `docs/superpowers/specs/2026-07-04-projeto-executivo-subfases-design.md`)
+Frente desenhada via brainstorming (spec `docs/superpowers/specs/ciclo/2026-07-04-projeto-executivo-subfases-design.md`)
 e implementada por **subagentes** (plano `docs/superpowers/plans/2026-07-04-projeto-executivo-subfases.md`),
 task a task com review de spec + qualidade. **Ainda em branch — não mergeada na `main`.**
 
@@ -1157,7 +1157,7 @@ task a task com review de spec + qualidade. **Ainda em branch — não mergeada 
 
 ## Sessão 46 — Etapas operacionais 12/13/14 (Implantação · Produção · Entrega) — branch `feat/etapas-operacionais`
 
-Frente desenhada via brainstorming (spec `docs/superpowers/specs/2026-07-05-etapas-operacionais-implantacao-producao-entrega-design.md`)
+Frente desenhada via brainstorming (spec `docs/superpowers/specs/ciclo/2026-07-05-etapas-operacionais-implantacao-producao-entrega-design.md`)
 e implementada por **subagentes** (plano `docs/superpowers/plans/2026-07-05-etapas-operacionais-implantacao-producao-entrega.md`),
 task a task com review de spec + qualidade. **Mergeada na `main`** (fast-forward de 9 commits) após
 verificação manual no navegador ("Funcionou"); branch `feat/etapas-operacionais` **deletada**; push +
@@ -1427,7 +1427,7 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 
 > **🏗️ Frente ATIVA — "Resultado da Venda + Aprovações Financeiras" + desmembramento do ciclo.**
 > Branch **`feat/desmembramento-fatia2-ciclo`** (NÃO mergeada; suíte **1022 verde**). Spec:
-> `docs/superpowers/specs/2026-07-13-resultado-venda-aprovacoes-financeiras-design.md`. É a implementação do
+> `docs/superpowers/specs/financeiro/2026-07-13-resultado-venda-aprovacoes-financeiras-design.md`. É a implementação do
 > "Backlog (1)" do estado de 2026-07-12 (os custos adicionais viram provisão), + o custo financeiro, as 3
 > margens, o gate de AF, a devolução e o desmembramento do ciclo em parcelas.
 >
@@ -1504,7 +1504,7 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > Simples · timing dos impostos-provisão · custo financeiro direto · estorno de cancelamento fiscal.
 >
 > **🏗️ Próxima frente ATIVA (definida em 2026-07-12) — FASE D2.** Spec:
-> `docs/superpowers/specs/2026-07-12-fase-d2-provisao-completa-conciliacao-final-design.md` (desenho
+> `docs/superpowers/specs/financeiro/2026-07-12-fase-d2-provisao-completa-conciliacao-final-design.md` (desenho
 > FECHADO, sem pontos em aberto, verificado com Fable 5 usando números reais — **implementação ainda não
 > começou, próximo passo**). Projetos legados (fluxo antigo) ficam como estão, sem migração. Surgiu da
 > **Simulação
@@ -1572,7 +1572,7 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 >
 > **Os três eixos (modelo vigente):** **Perfil** (acesso, `perfis.py`/`Usuario.nivel` — diretoria/gerencial/
 > consultor/suporte) × **Função** (cargo, tabela `Funcao`) × **Escopo de visibilidade** (posse +
-> `atribuicoes_ambiente`/`mod_escopo`). Specs em `docs/superpowers/specs/2026-07-10-*`.
+> `atribuicoes_ambiente`/`mod_escopo`). Specs em `docs/superpowers/specs/perfis/2026-07-10-*`.
 >
 > **⚠️ Próxima frente pendente (retomar aqui):** **re-chave do escopo operacional para Função.** No Perfil-4
 > os operacionais (Medidor/Projetista/Supervisor) viraram **Consultor=posse**, então a visibilidade-por-Mapa
@@ -2206,7 +2206,7 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 
 Branch `feat/modelos-documentos-loja`, suíte **1187 verde** (+130). Pedido do usuário: a aba Documentos
 vira ambiente de configuração — o lojista sobe um Word, o sistema aplica o modelo Orizon e pede os dados
-complementares. Spec: `docs/superpowers/specs/2026-07-15-modelos-documentos-loja-design.md`; plano:
+complementares. Spec: `docs/superpowers/specs/contrato-documentos/2026-07-15-modelos-documentos-loja-design.md`; plano:
 `docs/superpowers/plans/2026-07-15-modelos-documentos-loja.md`.
 
 **O que entrou** (11 tasks, TDD, 1 subagente implementador + 2 revisores por task):
@@ -2467,7 +2467,7 @@ Achado da Vera (não-bloqueante, herdado da FASE D). O `saldo` de cada rubrica n
 **Manutenção de repo (ambiente, sem commit):** `.git/objects/pack/multi-pack-index` velho (pré-merge da D2) dava `error: improper chunk offset` no `fsck`/`log` (git caía p/ ler os packs direto, comandos corretos) — regenerado com `git multi-pack-index write`.
 
 ## Sessão 70 — FASE D2: provisão completa no contrato (ativo diferido) + matching pleno na NF-e + Conciliação Final
-Branch `feat/financeiro-fase-d2` (mergeada). Área sensível (dinheiro); desenho FECHADO com o usuário (spec `docs/superpowers/specs/2026-07-12-fase-d2-...md`, verificado com Fable 5); TDD; **parando antes de mergear cada fase** p/ conferência dos números. **Auditada pela Vera** (não-duplicação centavo-a-centavo, Balanço fecha em cada etapa → APTA). Suíte 909→**946**.
+Branch `feat/financeiro-fase-d2` (mergeada). Área sensível (dinheiro); desenho FECHADO com o usuário (spec `docs/superpowers/specs/financeiro/2026-07-12-fase-d2-provisao-completa-conciliacao-final-design.md`, verificado com Fable 5); TDD; **parando antes de mergear cada fase** p/ conferência dos números. **Auditada pela Vera** (não-duplicação centavo-a-centavo, Balanço fecha em cada etapa → APTA). Suíte 909→**946**.
 **O modelo (por que 2 famílias de conta):** reconhecer a Receita cheia na NF-e exige debitar uma conta que ZERA ali; mas a Provisão de Fábrica (2.1.04.06) precisa SOBREVIVER (é o que a reconciliação monitora). Logo, Receita e Custo ganham contas de **deferimento** (ativo) separadas da Provisão (passivo).
 **Fase 1** — Plano de Contas: grupo `1.1.06 "Custos a Apropriar"` (ativo diferido, 11 subcontas espelho de `2.1.04.x`, generaliza o padrão dos impostos `1.1.05`); `2.1.06` "Adiantamento de Clientes" → **"Receita a Realizar"** (migração **pontual** idempotente, só renomeia o default antigo — não name-sync geral).
 **Fase 2** — Contrato: novo `registro_venda_contrato` (`1.1.02 × 2.1.06`, Val_Cont cheio); as 10 rubricas (9 + **Custo de Fábrica**, 10ª nova) constituídas como `1.1.06.0X × 2.1.04.0X` **sem tocar a DRE**; `recebimento_venda` passa a abater `1.1.02` (era `2.1.06`).

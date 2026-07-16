@@ -1,7 +1,7 @@
 # Texto de fechamento — Fatia 2 (desmembramento operacional) — PARA APROVAÇÃO
 
 > Branch `feat/desmembramento-fatia2-ciclo` (a partir da `main` com Fatia 1 mergeada).
-> Spec: `docs/superpowers/specs/2026-07-13-desmembramento-pe-parcial-design.md` (decisões #1/#5/#7/#10/#11/#13).
+> Spec: `docs/superpowers/specs/ciclo/2026-07-13-desmembramento-pe-parcial-design.md` (decisões #1/#5/#7/#10/#11/#13).
 > **Estado: camada de LÓGICA PURA + NÚCLEO CONTÁBIL prontos e testados (TDD). A fiação (endpoints,
 > migração, ciclo por parcela, gate na tela de AF, #13) e o FRONTEND ainda faltam.** Vera ainda não
 > rodou (a fatia não está usável ponta a ponta). **Não mergear.**

@@ -6,7 +6,7 @@
 
 **Architecture:** Aditivo no modelo (Cliente/Emitente) → ramificação pura no `mapa_fiscal` (montar_nota já recebe o `cliente`, sem mudar assinatura) → UI do cadastro → validação do contrato → IE na emissão. Verde a cada tarefa. Branch `feat/fiscal-destinatario-contribuinte`.
 
-**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/2026-07-06-fiscal-destinatario-contribuinte-design.md`.
+**Tech Stack:** Python 3 + SQLAlchemy/SQLite, `http.server`, pytest; frontend HTML/JS inline. Base: spec `docs/superpowers/specs/fiscal/2026-07-06-fiscal-destinatario-contribuinte-design.md`.
 
 **Ler antes:** o spec; `database.py` (`Cliente` ~132-161, `Emitente`, `_migrar_colunas`); `mapa_fiscal.py` (`montar_nota` 15-49, `montar_payload` 55-115, `_so_digitos`); `main.py` (POST/PUT `/api/clientes`; fluxo de contrato com o branch `sem_cpf` ~1583/1648; endpoint `…/ciclo/15/emitir-nfe`); `static/index.html` (modal cliente `cli-*` ~1276-1310). **Baseline 546 passed.** Teste `python3 -m pytest -q` (fallback `C:\Users\mbn19\AppData\Local\Python\pythoncore-3.14-64\python.exe -m pytest -q`). `git add` só os arquivos da mudança.
 

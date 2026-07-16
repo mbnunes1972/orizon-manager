@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3, `http.server.BaseHTTPRequestHandler` (sem framework), SQLAlchemy (ORM), sqlite3 (migrações raw), pytest, SPA vanilla JS (`static/index.html`), Playwright para verificação de UI.
 
-**Spec:** `docs/superpowers/specs/2026-06-21-multitenant-f2-tenancy-design.md`
+**Spec:** `docs/superpowers/specs/multitenant/2026-06-21-multitenant-f2-tenancy-design.md`
 
 ---
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 + SQLAlchemy + sqlite3 (migração raw), `http.server` (sem framework), pytest, HTML/CSS/JS vanilla.
 
-**Spec:** `docs/superpowers/specs/2026-06-17-etapas-ordem-gating-design.md`
+**Spec:** `docs/superpowers/specs/ciclo/2026-06-17-etapas-ordem-gating-design.md`
 
 **Branch:** `feat/etapas-ordem-gating` (já criada).
 

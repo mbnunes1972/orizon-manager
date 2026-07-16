@@ -72,7 +72,7 @@ O Claude Code lê os arquivos diretamente — não precisa colar o conteúdo.
 - Nunca editar arquivos diretamente no servidor — sempre via git pull
 - Branch padrão: `main`
 
-### Servidor de produção/DEV
+### Servidor de DEV
 - IP: `167.88.33.121` | Porta: `8765` | URL: `http://167.88.33.121:8765`
 - Acesso: `ssh root@167.88.33.121` | Projeto em `/root/orizon-manager`
 - App roda em screen `orizon-manager` (Detached), iniciado com `ORIZON_HOST=0.0.0.0` (bind externo)
@@ -125,11 +125,124 @@ screen -S orizon-manager -dm bash -c 'cd /root/orizon-manager && ORIZON_HOST=0.0
 sleep 3; ss -ltnp | grep 8765; tail -8 app.log
 ```
 
+### Servidor de produção (orizonsolution.com.br) — em provisionamento (2026-07-15)
+- IP: `179.197.77.9` (Hostinger) | VPS **dedicada** (nada mais rodando nela) | Ubuntu 24.04
+- Domínio `orizonsolution.com.br` — **DNS ainda não apontado** (passo 0 abaixo).
+- Diferente do servidor de DEV **de propósito** — nasce já no padrão profissional, não é o mesmo setup
+  replicado: **PostgreSQL** (não SQLite, ver `docs/superpowers/specs/_geral/2026-07-15-migracao-postgresql.md`),
+  **systemd** (não `screen` — sobrevive a reboot e reinicia sozinho se cair), **nginx + HTTPS** na frente
+  (a porta 8765 do Python NÃO fica exposta direto à internet), `ufw` + `fail2ban`, backup automático.
+- Acesso: `ssh root@179.197.77.9`, **só por chave** (login por senha será desabilitado no passo 1 — a
+  chave já foi confirmada funcionando antes de desabilitar).
+- **Pré-requisito ainda pendente:** o código com suporte a `DATABASE_URL` (conexão Postgres) está só
+  local, não commitado (branch `feat/migracao-postgresql-v2`, worktree `wt-postgres-migration`) — precisa
+  estar commitado/mergeado antes do Passo 2 (deploy do app).
+
+#### Passo 0 — DNS (fora do servidor, no painel do registrador do domínio)
+Criar registros A: `orizonsolution.com.br` → `179.197.77.9` e `www.orizonsolution.com.br` →
+`179.197.77.9`. Propagação pode levar de minutos a algumas horas — dá pra rodar os Passos 1 e 2
+enquanto espera; o Passo 3 (certificado HTTPS) só funciona depois do DNS propagar.
+
+#### Passo 1 — Provisionamento base (rodar uma vez, via SSH)
+```bash
+apt update && apt upgrade -y && dpkg --configure -a   # garante que não sobrou nada pendente
+apt install -y postgresql postgresql-contrib nginx certbot python3-certbot-nginx ufw fail2ban \
+  python3-docx python3-openpyxl python3-requests python3-sqlalchemy python3-psycopg2 \
+  weasyprint python3-markdown git
+
+# Postgres: usuário + banco dedicados (troque a senha)
+sudo -u postgres psql -c "CREATE USER orizon WITH PASSWORD 'TROQUE_ESTA_SENHA';"
+sudo -u postgres psql -c "CREATE DATABASE orizon OWNER orizon;"
+
+# Firewall: só SSH + HTTP/HTTPS (a 8765 fica só em localhost, atrás do nginx)
+ufw allow OpenSSH
+ufw allow 'Nginx Full'
+ufw --force enable
+
+# Hardening SSH — só desabilite senha DEPOIS de confirmar que a chave funciona numa
+# segunda janela SSH aberta em paralelo (mesma lição do incidente de hoje: nunca feche
+# a única sessão viva antes de confirmar a próxima)
+sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+systemctl restart ssh
+```
+
+#### Passo 2 — Deploy do app (depois que o código do DATABASE_URL estiver commitado)
+```bash
+cd /root
+git clone https://github.com/mbnunes1972/orizon-manager.git
+cd orizon-manager
+git checkout feat/migracao-postgresql-v2   # trocar por 'main' assim que mergeado
+pip install alembic --break-system-packages
+
+cat > /etc/systemd/system/orizon.service <<'EOF'
+[Unit]
+Description=Orizon Manager
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/root/orizon-manager
+Environment=ORIZON_HOST=127.0.0.1
+Environment=DATABASE_URL=postgresql+psycopg2://orizon:TROQUE_ESTA_SENHA@localhost/orizon
+ExecStart=/usr/bin/python3 main.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Primeiro start cria o schema limpo no Postgres (create_all, sem migração de dados legados)
+# e semeia os usuários iniciais — TROCAR AS SENHAS DE EXEMPLO ANTES DE USO REAL.
+systemctl daemon-reload
+systemctl enable --now orizon
+sleep 3; systemctl status orizon --no-pager; curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:8765
+```
+
+#### Passo 3 — nginx + HTTPS (só depois do DNS propagado — Passo 0)
+```bash
+cat > /etc/nginx/sites-available/orizon <<'EOF'
+server {
+    listen 80;
+    server_name orizonsolution.com.br www.orizonsolution.com.br;
+    location / {
+        proxy_pass http://127.0.0.1:8765;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/orizon /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+certbot --nginx -d orizonsolution.com.br -d www.orizonsolution.com.br   # HTTPS + redirect automático
+```
+
+#### Passo 4 — Backup automático (pg_dump diário)
+```bash
+mkdir -p /root/backups
+cat > /root/backup_orizon.sh <<'EOF'
+#!/bin/bash
+DATA=$(date +%Y%m%d_%H%M%S)
+sudo -u postgres pg_dump orizon | gzip > /root/backups/orizon_$DATA.sql.gz
+find /root/backups -name "orizon_*.sql.gz" -mtime +14 -delete
+EOF
+chmod +x /root/backup_orizon.sh
+(crontab -l 2>/dev/null; echo "0 3 * * * /root/backup_orizon.sh") | crontab -
+```
+⚠️ Isso é backup **local** (mesmo disco da VPS) — protege contra erro de aplicação/banco, mas não
+contra falha da própria VPS. Ainda falta sincronizar pra fora (ex.: S3/Backblaze) — pendente, não
+bloqueia o go-live.
+
 ### Banco de dados
-- SQLite: `orizon.db` na raiz — **NÃO versionado** (está no `.gitignore`); cada ambiente
-  tem o seu. Não comitar `orizon.db`.
+- **Servidor de DEV:** SQLite: `orizon.db` na raiz — **NÃO versionado** (está no `.gitignore`); cada
+  ambiente tem o seu. Não comitar `orizon.db`.
+- **Servidor de produção:** PostgreSQL (ver seção acima) — nasce limpo, sem dados do DEV.
 - Para recriar usuários (ou um banco novo): `python3 seed.py` (cria schema via `init_db` + usuários)
-- Migrações: SQLAlchemy + `_migrar_colunas`/`schema_migrations` (já configurado)
+- Migrações: SQLAlchemy + `_migrar_colunas`/`schema_migrations` (SQLite, legado) — Postgres usa Alembic
+  a partir da migração (ver ADR).
 
 ### Dependências
 - Listadas em `requirements.txt`. Local: `python3 -m pip install -r requirements.txt` (o contrato usa

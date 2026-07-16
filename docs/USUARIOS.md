@@ -10,7 +10,7 @@
 >
 > **Três eixos (não confundir):** **Perfil** (acesso, `perfis.py` / `Usuario.nivel`) × **Função**
 > (cargo, tabela `Funcao`, herdada do Funcionário) × **Escopo de visibilidade** (posse do projeto +
-> Mapa de Atribuições). Ver `docs/superpowers/specs/2026-07-10-fase1-mapa-atribuicoes-escopo.md`.
+> Mapa de Atribuições). Ver `docs/superpowers/specs/perfis/2026-07-10-fase1-mapa-atribuicoes-escopo.md`.
 
 > **Perfil-4 (rev2 §2):** Perfil = **nível de ACESSO** (não é cargo). São **4 perfis de loja**
 > definidos por acesso a módulo/painel; os cargos antigos (Diretor, Medidor, …) viraram **Função**

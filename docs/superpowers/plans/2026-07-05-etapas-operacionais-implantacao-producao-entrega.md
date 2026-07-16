@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python `http.server` + SQLAlchemy/SQLite (backend), `static/index.html` (HTML+JS inline), pytest.
 
-**Base para ler antes:** spec `docs/superpowers/specs/2026-07-05-etapas-operacionais-implantacao-producao-entrega-design.md`. Padrões existentes a espelhar: PE upload em `main.py:3765-3810`, PATCH ciclo em `main.py:4183-4260`, GET `/ciclo/pe` em `main.py:1348-1386`, guardas puras em `mod_ciclo.py:66-93`, testes puros em `tests/test_ciclo.py`, e2e em `tests/test_ciclo_pe_e2e.py`, fixtures em `tests/conftest.py`.
+**Base para ler antes:** spec `docs/superpowers/specs/ciclo/2026-07-05-etapas-operacionais-implantacao-producao-entrega-design.md`. Padrões existentes a espelhar: PE upload em `main.py:3765-3810`, PATCH ciclo em `main.py:4183-4260`, GET `/ciclo/pe` em `main.py:1348-1386`, guardas puras em `mod_ciclo.py:66-93`, testes puros em `tests/test_ciclo.py`, e2e em `tests/test_ciclo_pe_e2e.py`, fixtures em `tests/conftest.py`.
 
 **Lembrete de ambiente:** mudança em Python (`main.py`/`mod_ciclo.py`) **exige restart** do servidor para verificação manual; os testes e2e sobem o próprio servidor (fixture `http_client_factory`), então `pytest` pega o código novo sem restart. Frontend (`index.html`) é lido do disco a cada request → só **Ctrl+F5**.
 
@@ -759,7 +759,7 @@ git commit -m "feat(ciclo): paineis das etapas 12/13/14 no frontend (Implantacao
 
 **Files:**
 - Modify: `DEV_LOG.md` — nova `## Sessão N` + atualizar `⏸️ ESTADO ATUAL`
-- Modify: `docs/superpowers/specs/2026-07-05-etapas-operacionais-implantacao-producao-entrega-design.md` — cabeçalho `Status: IMPLEMENTADO`
+- Modify: `docs/superpowers/specs/ciclo/2026-07-05-etapas-operacionais-implantacao-producao-entrega-design.md` — cabeçalho `Status: IMPLEMENTADO`
 
 - [ ] **Step 1: Run the full suite (verde antes de documentar)**
 
@@ -779,7 +779,7 @@ Adicionar `## Sessão N — Etapas operacionais 12/13/14 (branch feat/etapas-ope
 - [ ] **Step 4: Commit**
 
 ```bash
-git add DEV_LOG.md docs/superpowers/specs/2026-07-05-etapas-operacionais-implantacao-producao-entrega-design.md
+git add DEV_LOG.md docs/superpowers/specs/ciclo/2026-07-05-etapas-operacionais-implantacao-producao-entrega-design.md
 git commit -m "docs(ciclo): DEV_LOG sessao N + spec das etapas operacionais como implementado"
 ```
 

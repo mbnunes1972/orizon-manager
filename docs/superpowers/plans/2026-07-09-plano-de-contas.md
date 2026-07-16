@@ -15,7 +15,7 @@ seed do plano-padrão (do `.docx` §2/§2.1) materializado por owner na 1ª vez,
 `static/index.html`; testes `pytest` (fixtures `app_db`, `http_client_factory`). **Baseline 687.** Branch:
 `feat/financeiro-plano-contas`. **Mudança em Python → restart do servidor** ao testar no navegador.
 
-**Design:** `docs/superpowers/specs/2026-07-09-plano-de-contas-design.md`. **Fonte de verdade:**
+**Design:** `docs/superpowers/specs/financeiro/2026-07-09-plano-de-contas-design.md`. **Fonte de verdade:**
 `Especificacao_Financeiro_Orizon_v2.docx` §2/§2.1.
 
 ---
@@ -621,7 +621,7 @@ git commit -m "feat(financeiro): tela Plano de Contas (aba na page-12, arvore ad
 
 ## Task 5: Docs — DEV_LOG + spec status + backlog do módulo
 
-**Files:** Modify `DEV_LOG.md`, `docs/superpowers/specs/2026-07-09-plano-de-contas-design.md`.
+**Files:** Modify `DEV_LOG.md`, `docs/superpowers/specs/financeiro/2026-07-09-plano-de-contas-design.md`.
 
 - [ ] **Step 1:** No design, marcar **Status: IMPLEMENTADO** (data), e registrar o **corte consciente**: "mover conta
   (reparent/recodificar) não entra no #1 — `editar_conta` cobre nome+ordem; mover fica p/ o #2/futuro".
@@ -630,7 +630,7 @@ git commit -m "feat(financeiro): tela Plano de Contas (aba na page-12, arvore ad
   Lançamentos … #6 Reconciliação). Sinalizar que o `.docx` é a fonte de verdade do plano de contas.
 - [ ] **Step 3: Commit.**
 ```bash
-git add DEV_LOG.md docs/superpowers/specs/2026-07-09-plano-de-contas-design.md
+git add DEV_LOG.md docs/superpowers/specs/financeiro/2026-07-09-plano-de-contas-design.md
 git commit -m "docs(financeiro): Plano de Contas implementado (sub-projeto 1) — DEV_LOG + spec status"
 ```
 

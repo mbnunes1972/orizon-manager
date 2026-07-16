@@ -138,7 +138,7 @@ Decisão tomada no **primeiro item do plano** via teste-canário (seção 3.1).
 
 ## 9. Referências
 
-- Spec F4: `docs/superpowers/specs/2026-06-21-multitenant-f4-isolamento-design.md`
+- Spec F4: `docs/superpowers/specs/multitenant/2026-06-21-multitenant-f4-isolamento-design.md`
 - Plano F4: `docs/superpowers/plans/2026-06-21-multitenant-f4-isolamento.md`
 - Smoke manual (matriz origem): `docs/processos/SMOKE_F4_ISOLAMENTO.md`
 - Peças: `mod_tenancy.escopo_operacional`, `main._obj_da_loja`, `main._projeto_da_loja`,

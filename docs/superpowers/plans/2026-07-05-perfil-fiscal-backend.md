@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 + SQLAlchemy/SQLite, `cryptography.Fernet` (já instalada, 48.0.0), `requests` (via focus_client da Fase 2), pytest.
 
-**Base para ler antes:** spec `docs/superpowers/specs/2026-07-05-perfil-fiscal-backend-design.md`. Padrão de endpoint admin-loja a espelhar: `main.py:3998-4023` (`PUT …/config-financeira` — auth, `perfis.pode(nivel,"editar_dados_loja")`, `_ator_dict`, `db.get(Loja, id)`, `mod_tenancy.pode_editar_dados_loja(ator, {"id","rede_id"})`, commit). Modelos: `database.py` (Loja em ~183-218; padrão de teste de modelo com engine temp em `tests/test_ciclo.py:200`). Fixtures e2e: `tests/conftest.py` (`http_client_factory` com `.get/.put`; `seed` tem `loja1_id`,`loja2_id`,`dir_l2` (diretor loja2, tem `editar_dados_loja`), `cons_l1` (consultor loja1, sem a cap); `app_db` module-scoped expõe `get_session()` e os modelos).
+**Base para ler antes:** spec `docs/superpowers/specs/fiscal/2026-07-05-perfil-fiscal-backend-design.md`. Padrão de endpoint admin-loja a espelhar: `main.py:3998-4023` (`PUT …/config-financeira` — auth, `perfis.pode(nivel,"editar_dados_loja")`, `_ator_dict`, `db.get(Loja, id)`, `mod_tenancy.pode_editar_dados_loja(ator, {"id","rede_id"})`, commit). Modelos: `database.py` (Loja em ~183-218; padrão de teste de modelo com engine temp em `tests/test_ciclo.py:200`). Fixtures e2e: `tests/conftest.py` (`http_client_factory` com `.get/.put`; `seed` tem `loja1_id`,`loja2_id`,`dir_l2` (diretor loja2, tem `editar_dados_loja`), `cons_l1` (consultor loja1, sem a cap); `app_db` module-scoped expõe `get_session()` e os modelos).
 
 **Lembrete de ambiente:** modelos/endpoints Python → **restart do servidor** para verificação manual; a suíte e2e sobe o próprio servidor. Baseline atual **470 passed**. Se `python3` do Bash for o stub WindowsApps, usar o interpretador real (nota no DEV_LOG).
 
@@ -782,7 +782,7 @@ Expected: verde (baseline 470 + os novos).
 ## Task 6: Fechamento — DEV_LOG + status do spec
 
 **Files:**
-- Modify: `DEV_LOG.md`, `docs/superpowers/specs/2026-07-05-perfil-fiscal-backend-design.md`
+- Modify: `DEV_LOG.md`, `docs/superpowers/specs/fiscal/2026-07-05-perfil-fiscal-backend-design.md`
 
 - [ ] **Step 1: Run full suite (verde antes de documentar)**
 
@@ -806,7 +806,7 @@ Pendências: Sub-frente II (painel), Fase 3b (mapa fiscal + `EmissorFocusNfe`), 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add DEV_LOG.md docs/superpowers/specs/2026-07-05-perfil-fiscal-backend-design.md
+git add DEV_LOG.md docs/superpowers/specs/fiscal/2026-07-05-perfil-fiscal-backend-design.md
 git commit -m "docs(fiscal): DEV_LOG + spec Sub-frente I do Painel Fiscal como implementado"
 ```
 

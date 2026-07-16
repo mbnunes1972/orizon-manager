@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 + `http.server` (sem framework), SQLAlchemy, pytest; frontend HTML/CSS/JS vanilla em `static/index.html` (sem harness JS → verificação manual).
 
-**Spec:** `docs/superpowers/specs/2026-06-17-cadastro-completo-aprovacao-design.md`
+**Spec:** `docs/superpowers/specs/_geral/2026-06-17-cadastro-completo-aprovacao-design.md`
 **Branch:** `feat/cadastro-completo-aprovacao` (já criada).
 
 ---

@@ -62,7 +62,7 @@
 > **Perfil** (nível de ACESSO — `perfis.py`/`Usuario.nivel`) × **Função** (cargo — tabela `Funcao`,
 > Config › Funções) × **Escopo de visibilidade** (posse `criado_por_id` + Mapa de Atribuições
 > `atribuicoes_ambiente`/`mod_escopo`). Fonte única dos perfis: `perfis.py`. Detalhes em `docs/USUARIOS.md`
-> e `docs/superpowers/specs/2026-07-10-perfil-4-niveis-acesso.md`.
+> e `docs/superpowers/specs/perfis/2026-07-10-perfil-4-niveis-acesso.md`.
 
 ### 3.1 Perfis de acesso — 4 níveis por módulo/painel
 
@@ -219,7 +219,7 @@ Baseado no documento `1_FLUXO_DE_PROCESSOS.docx`. O sistema deve suportar e even
   **não calcula** — só edita os insumos (auto-save) e **exibe** a saída do motor.
 - Nomenclatura fechada (siglas): por orçamento `VBVO, CFO, VBNO, VAVO, Com_Arq, Pro_Fid, Cust_Via,
   Bri, Cust_Ad, Val_Liq, Desc_Tot, Markup, Cust_Fin, Val_Cont, Prov_Imp`; por ambiente
-  `VBVA, CFA, VBNA, VAVA`. Definição completa em `docs/superpowers/specs/2026-06-22-mecanismo-negociacao-design.md`.
+  `VBVA, CFA, VBNA, VAVA`. Definição completa em `docs/superpowers/specs/negociacao/2026-06-22-mecanismo-negociacao-design.md`.
 - Insumos salvos = fonte de verdade: `parametros_json` (projeto), `orc.desconto_pct`, descontos
   por ambiente, `forma_pagamento`. O preview (`POST /api/orcamentos/<id>/negociacao-preview`) e os
   saves devolvem o **breakdown** do motor; `_aplicarPreviewNaTela` é o único exibidor no frontend.

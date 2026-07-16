@@ -66,7 +66,7 @@ implementação.
   contrato.md` global — adotar reescreveria cláusula já assinada). A **proposta não versiona** de
   propósito: não é assinada, e reemitir deve pegar correções do modelo. Catálogo de marcadores em
   `mod_marcadores.CATALOGO`, travado contra `mod_contrato._montar_mapping` por teste anti-drift.
-  Spec: `docs/superpowers/specs/2026-07-15-modelos-documentos-loja-design.md`.
+  Spec: `docs/superpowers/specs/contrato-documentos/2026-07-15-modelos-documentos-loja-design.md`.
 - **Negociação/motor:** cálculo puro em `mod_negociacao.py` / `mod_provisoes.py`; a tela lê do motor via
   `negPreview`/`_aplicarPreviewNaTela`. Dois caminhos de ambientes: **EP07** (`_orcAmbientesAtivos !=
   null`, orçamento moderno, valores do motor) vs **legado**. **`_negBaseValues` nunca é populado**
@@ -88,12 +88,13 @@ implementação.
   Fornecedores) espelha o ativo `1.1.06.06→1.1.06.14` só na proporção não baixada. **Etapa 21 "Conciliação
   Final"** (`mod_contabil.conciliar_final`, endpoint `.../ciclo/21/conciliar`) resolve à força o saldo
   remanescente das 10 e encerra o projeto com status **`concluido`** (distinto de `fechado`). Projetos
-  legados (fluxo antigo) **não migram**. Detalhes: spec `docs/superpowers/specs/2026-07-12-fase-d2-*.md`.
+  legados (fluxo antigo) **não migram**. Detalhes: spec
+  `docs/superpowers/specs/financeiro/2026-07-12-fase-d2-provisao-completa-conciliacao-final-design.md`.
 - **Banco de dados (decisão 2026-07-15, ainda não implementada):** decidido migrar **SQLite → PostgreSQL**
   (autohospedado na mesma VPS, sem custo adicional) — motivo: rigor de constraint/transação para o motor
   contábil de partida dobrada + `JSONB` para os campos `*_json` hoje em `Text`. **Enquanto não migrado, o
   banco de produção continua SQLite** — não assumir Postgres em código novo até o cutover. Plano e
-  rationale completos: `docs/superpowers/specs/2026-07-15-migracao-postgresql.md`.
+  rationale completos: `docs/superpowers/specs/_geral/2026-07-15-migracao-postgresql.md`.
 
 ## Dicas de modelo
 Para **lógica financeira intrincada** (ex.: cálculo reverso da negociação), o **Fable 5** rende — pode

@@ -3,8 +3,8 @@
 **Data:** 2026-06-21
 **Status:** ✅ Implementado e mergeado na `main` (sessões 23–25). Ver DEV_LOG (F3 contrato puxa da loja).
 **Origem:** terceira fase do programa multi-tenant. A F1
-(`docs/superpowers/specs/2026-06-20-multitenant-f1-fundacao-design.md`) criou as tabelas e
-colunas de tenant; a F2 (`docs/superpowers/specs/2026-06-21-multitenant-f2-tenancy-design.md`)
+(`docs/superpowers/specs/multitenant/2026-06-20-multitenant-f1-fundacao-design.md`) criou as tabelas e
+colunas de tenant; a F2 (`docs/superpowers/specs/multitenant/2026-06-21-multitenant-f2-tenancy-design.md`)
 expôs a tenancy na UI/API e tornou os **dados da loja editáveis** (incl. testemunhas/CPF),
 destravando esta fase. A F3 faz `mod_contrato.py` **abandonar as constantes** e gerar o
 contrato a partir dos dados da **loja**.

@@ -15,7 +15,7 @@ preenche a grade por posição e substitui todos os demais marcadores via
 **Tech Stack:** Python 3, python-docx, http.server/SQLAlchemy/sqlite; JS vanilla;
 pytest; Playwright (verificação).
 
-**Spec:** `docs/superpowers/specs/2026-06-17-pagamento-grade-contrato-design.md`
+**Spec:** `docs/superpowers/specs/contrato-documentos/2026-06-17-pagamento-grade-contrato-design.md`
 
 ---
 

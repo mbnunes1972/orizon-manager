@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-23
 **Status:** Em revisão (design)
-**Base:** `docs/superpowers/specs/2026-06-22-mecanismo-negociacao-design.md` (§12 descreve Fases B/C).
+**Base:** `docs/superpowers/specs/negociacao/2026-06-22-mecanismo-negociacao-design.md` (§12 descreve Fases B/C).
 **Escopo:** Fazer a **tela de negociação e o modal de parâmetros usarem o motor `mod_negociacao`**
 (não mais o cálculo legado do frontend), com a persistência (`valor_total`/`valor_liquido`)
 e o contrato passando a refletir o motor. O motor já está validado em modo sombra.

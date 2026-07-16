@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 stdlib, pytest. Reusa `emissor_fiscal.py` (Fase 2: `EmissorFiscal`, `resultado_de_focus`, `StatusNota`) e `focus_client.FocusClient` (Fase 2, só como tipo injetado — mockado nos testes).
 
-**Base para ler antes:** spec `docs/superpowers/specs/2026-07-05-nfe-fase3b-mapa-fiscal-design.md`. Contrato/DTO da Fase 2: `emissor_fiscal.py` (`EmissorFiscal` ABC, `resultado_de_focus`, `StatusNota`, `ResultadoEmissao`). Estrutura dos itens do preview (Fase 1): `mod_nfe.preview` → itens com chaves `cProd, xProd, ncm, uCom, qCom, preco_venda_unit` (entre outras). Campos do PerfilFiscal (Sub-frente I): `razao_social, regime_tributario, inscricao_estadual, csosn_padrao, cfop_dentro_uf, cfop_fora_uf`. `Loja`: `cnpj, nome, logradouro, numero, bairro, cidade, estado, cep`. `Cliente`: `nome, cpf, logradouro, numero, bairro, cidade, estado, cep` (sem `cnpj` no modelo — o código usa `getattr` para cobrir PJ futura).
+**Base para ler antes:** spec `docs/superpowers/specs/fiscal/2026-07-05-nfe-fase3b-mapa-fiscal-design.md`. Contrato/DTO da Fase 2: `emissor_fiscal.py` (`EmissorFiscal` ABC, `resultado_de_focus`, `StatusNota`, `ResultadoEmissao`). Estrutura dos itens do preview (Fase 1): `mod_nfe.preview` → itens com chaves `cProd, xProd, ncm, uCom, qCom, preco_venda_unit` (entre outras). Campos do PerfilFiscal (Sub-frente I): `razao_social, regime_tributario, inscricao_estadual, csosn_padrao, cfop_dentro_uf, cfop_fora_uf`. `Loja`: `cnpj, nome, logradouro, numero, bairro, cidade, estado, cep`. `Cliente`: `nome, cpf, logradouro, numero, bairro, cidade, estado, cep` (sem `cnpj` no modelo — o código usa `getattr` para cobrir PJ futura).
 
 **Lembrete de ambiente:** módulos puros → **não exigem restart**. Rodar: `python3 -m pytest -q` (baseline **493 passed**). Se o `python3` do Bash for o stub WindowsApps, usar o interpretador real (nota no DEV_LOG).
 
@@ -455,7 +455,7 @@ git commit -m "feat(nfe): EmissorFocusNfe (concreto EmissorFiscal sobre a Focus)
 ## Task 4: Fechamento — DEV_LOG + status do spec
 
 **Files:**
-- Modify: `DEV_LOG.md`, `docs/superpowers/specs/2026-07-05-nfe-fase3b-mapa-fiscal-design.md`
+- Modify: `DEV_LOG.md`, `docs/superpowers/specs/fiscal/2026-07-05-nfe-fase3b-mapa-fiscal-design.md`
 
 - [ ] **Step 1: Run full suite (verde antes de documentar)**
 
@@ -479,7 +479,7 @@ UI etapa 15); regimes Normal/Presumido e correção fiscal fina com o contador. 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add DEV_LOG.md docs/superpowers/specs/2026-07-05-nfe-fase3b-mapa-fiscal-design.md
+git add DEV_LOG.md docs/superpowers/specs/fiscal/2026-07-05-nfe-fase3b-mapa-fiscal-design.md
 git commit -m "docs(nfe): DEV_LOG + spec Fase 3b como implementado"
 ```
 

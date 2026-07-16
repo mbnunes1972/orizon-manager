@@ -4,7 +4,7 @@
 
 **Goal:** Aplicar escopo por loja em todas as queries operacionais — listagens filtradas, acesso por id/`nome_safe` com 404 cross-loja, criação carimbando a loja do ator, e 403 para perfis administrativos.
 
-**Architecture:** Helpers reutilizáveis (puros onde dá) aplicados endpoint a endpoint, espelhando o padrão da F2. A lógica de escopo fica testável (funções que **retornam valor**); o handler envia 403/404. Spec: `docs/superpowers/specs/2026-06-21-multitenant-f4-isolamento-design.md`.
+**Architecture:** Helpers reutilizáveis (puros onde dá) aplicados endpoint a endpoint, espelhando o padrão da F2. A lógica de escopo fica testável (funções que **retornam valor**); o handler envia 403/404. Spec: `docs/superpowers/specs/multitenant/2026-06-21-multitenant-f4-isolamento-design.md`.
 
 **Tech Stack:** Python 3 (stdlib http.server), SQLAlchemy + sqlite3, pytest.
 
