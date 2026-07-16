@@ -121,11 +121,14 @@ git fetch --tags && git checkout <TAG_DE_HOMOLOG>     # ex.: git checkout v2026.
 ufw allow 8766/tcp 2>/dev/null
 # Banco PRÓPRIO da B — arquivo SQLite separado (DB_PATH segue a DATABASE_URL sqlite, fix de
 # 2026-07-16: as migracoes sqlite3 miram o arquivo certo, sem tocar o orizon.db da instancia A).
-export ORIZON_HOMOLOG_DB="sqlite:////root/orizon-homolog/orizon_homolog.db"
+# FICA FORA da arvore do clone git (nao dentro de /root/orizon-homolog): senao um `git clean -fd`
+# ali apagaria o banco da B, e `git status` mostraria o .db+journal/wal como ruido nao rastreado.
+mkdir -p /root/orizon-homolog-data
+export ORIZON_HOMOLOG_DB="sqlite:////root/orizon-homolog-data/orizon_homolog.db"
 DATABASE_URL="$ORIZON_HOMOLOG_DB" python3 seed.py        # cria schema + usuarios no banco da B
 # Sobe em screen proprio, porta 8766, banco proprio:
 screen -S orizon-homolog -dm bash -c 'cd /root/orizon-homolog && \
-  ORIZON_HOST=0.0.0.0 ORIZON_PORT=8766 DATABASE_URL="sqlite:////root/orizon-homolog/orizon_homolog.db" \
+  ORIZON_HOST=0.0.0.0 ORIZON_PORT=8766 DATABASE_URL="sqlite:////root/orizon-homolog-data/orizon_homolog.db" \
   python3 main.py > app.log 2>&1'
 sleep 3; ss -ltnp | grep 8766; tail -8 app.log
 curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:8766   # esperado: 302
