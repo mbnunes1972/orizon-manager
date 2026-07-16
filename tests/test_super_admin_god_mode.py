@@ -62,3 +62,36 @@ def test_super_admin_sem_loja_selecionada_erro_ao_criar_perfil(http_client_facto
     c = http_client_factory(); c.login("super", "senha123")   # sem c.loja_ativa
     st, out = c.post("/api/admin/perfis", {"nome": "X", "base": "operador", "modulos": []})
     assert out["ok"] is False and "loja" in (out.get("erro", "").lower())
+
+
+def test_super_admin_cria_usuario_de_loja(http_client_factory, seed, app_db):
+    """Desbloqueio reportado ('criar usuários'): super_admin cria conta numa loja."""
+    db = app_db.get_session()
+    l1 = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    db.close()
+    c = http_client_factory(); c.login("super", "senha123")
+    c.loja_ativa = l1
+    st, body = c.post("/api/admin/usuarios", {
+        "nome": "Vendedor Novo", "login": "vend_novo@l1.com", "senha": "senha123",
+        "nivel": "operador", "loja_id": l1,
+    })
+    assert st == 200 and body["ok"] is True, (st, body)
+    db2 = app_db.get_session()
+    novo = db2.query(app_db.Usuario).filter_by(login="vend_novo@l1.com").first()
+    lid = novo.loja_id if novo else None
+    db2.close()
+    assert novo is not None and lid == l1
+
+
+def test_super_admin_acessa_cadastro_ao_entrar_na_loja(http_client_factory, seed, app_db):
+    """'parece não acessar o cadastro': sem loja ativa → 403; ao entrar numa loja
+    (header X-Loja-Ativa) o Cadastro (GET /api/funcionarios) abre (200)."""
+    db = app_db.get_session()
+    l1 = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    db.close()
+    c = http_client_factory(); c.login("super", "senha123")
+    st_sem, _ = c.get("/api/funcionarios")          # sem loja escolhida → operacional barrado
+    assert st_sem == 403
+    c.loja_ativa = l1                               # "entra" na loja L1
+    st_com, body = c.get("/api/funcionarios")
+    assert st_com == 200 and body["ok"] is True, (st_com, body)
