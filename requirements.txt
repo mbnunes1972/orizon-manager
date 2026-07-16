@@ -1,13 +1,17 @@
 # Dependências de runtime do Orizon Manager
 # Local (dev): pip install -r requirements.txt
 # Servidor (Ubuntu 24.04 / PEP 668): instalar via apt —
-#   apt install -y python3-docx python3-openpyxl python3-requests python3-sqlalchemy weasyprint python3-markdown
+#   apt install -y python3-docx python3-openpyxl python3-requests python3-sqlalchemy weasyprint python3-markdown python3-psycopg2 python3-alembic
 python-docx
 openpyxl
 requests
 SQLAlchemy
 weasyprint
 markdown
+
+# PostgreSQL (migração 2026-07-15, ver docs/superpowers/specs/2026-07-15-migracao-postgresql.md)
+psycopg2-binary
+alembic
 
 # Apenas para rodar a suíte de testes (não é necessário em produção):
 # pytest

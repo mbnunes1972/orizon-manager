@@ -16,10 +16,14 @@ def _hash_senha(senha: str) -> str:
 
 
 # ── Conexão ──────────────────────────────────────────────────────────────────
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH  = os.path.join(BASE_DIR, "orizon.db")
-ENGINE   = create_engine(f"sqlite:///{DB_PATH}", echo=False)
-Session  = sessionmaker(bind=ENGINE)
+# Migração 2026-07-15 (docs/superpowers/specs/2026-07-15-migracao-postgresql.md): DATABASE_URL ausente
+# = comportamento antigo (SQLite local, dev). DATABASE_URL setada (produção, pós-cutover) = Postgres,
+# ex.: postgresql+psycopg2://orizon:<senha>@localhost/orizon
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+DB_PATH      = os.path.join(BASE_DIR, "orizon.db")
+DATABASE_URL = os.environ.get("DATABASE_URL")
+ENGINE       = create_engine(DATABASE_URL or f"sqlite:///{DB_PATH}", echo=False)
+Session      = sessionmaker(bind=ENGINE)
 
 # ── Base ─────────────────────────────────────────────────────────────────────
 class Base(DeclarativeBase):
@@ -1020,10 +1024,16 @@ class DocumentoFiscal(Base):
 
 # ── Inicialização ─────────────────────────────────────────────────────────────
 def init_db():
-    _migrar_pre_schema()      # renames de TABELA antes do create_all (senão ele cria a nova vazia)
+    # As migrações abaixo (_migrar_pre_schema/_migrar_colunas/_migrar_dados) usam sqlite3.connect(DB_PATH)
+    # + PRAGMA diretamente — só fazem sentido pra upgradar um orizon.db SQLite já existente. Num banco
+    # Postgres novo o schema já nasce correto via create_all(); rodar essas funções contra Postgres
+    # criaria um orizon.db SQLite vazio e órfão do lado (sqlite3.connect cria o arquivo se não existir).
+    if ENGINE.dialect.name == "sqlite":
+        _migrar_pre_schema()   # renames de TABELA antes do create_all (senão ele cria a nova vazia)
     Base.metadata.create_all(ENGINE)
-    _migrar_colunas()
-    _migrar_dados()
+    if ENGINE.dialect.name == "sqlite":
+        _migrar_colunas()
+        _migrar_dados()
     try:
         import perfis
         perfis.recarregar()   # invalida o cache do registro de perfis (perfil_acesso pode ter mudado)
