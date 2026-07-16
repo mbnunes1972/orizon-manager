@@ -8918,17 +8918,18 @@ function adminBreadcrumb(){
 }
 
 function adminIrNivel(n){
-  if (n === 1) { _adminNav.rede = null; _adminNav.loja = null; _adminNav.projeto = null; }
-  if (n === 2) { _adminNav.loja = null; _adminNav.projeto = null; }
+  if (n === 1) { _adminNav.rede = null; _adminNav.loja = null; _adminNav.projeto = null; _lojaAtiva = null; }
+  if (n === 2) { _adminNav.loja = null; _adminNav.projeto = null; _lojaAtiva = null; }
   if (n === 3) { _adminNav.projeto = null; }
   _adminNav.nivel = n;
   adminRender();
 }
 
-function adminEntrarRede(id, nome){ _adminNav.rede = { id, nome }; _adminNav.nivel = 2; _adminNav.loja = null; adminRender(); }
+function adminEntrarRede(id, nome){ _adminNav.rede = { id, nome }; _adminNav.nivel = 2; _adminNav.loja = null; _lojaAtiva = null; adminRender(); }
 async function adminEntrarLoja(id, nome){
   _adminNav.loja = { id, nome };
   _adminNav.nivel = 3;
+  _lojaAtiva = id;               // super_admin passa a operar DENTRO desta loja (header X-Loja-Ativa)
   try {
     const r = await fetch(`/api/admin/lojas/${id}/modulos`, { credentials:'same-origin' });
     const d = await r.json();
