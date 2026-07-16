@@ -105,6 +105,40 @@ sleep 3; ss -ltnp | grep 8765; tail -8 app.log
 curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:8765   # esperado: 302
 ```
 
+#### Instância B — PRÉ-HOMOLOGAÇÃO (`:8766`) no MESMO servidor de DEV
+Duas instâncias isoladas no `167.88.33.121` (ver `docs/superpowers/specs/_geral/2026-07-16-plano-de-testes.md`):
+a **A** (INTEGRAÇÃO, `:8765`, `/root/orizon-manager`, auto do `main`) e a **B** (PRÉ-HOMOLOGAÇÃO,
+`:8766`, **clone separado** `/root/orizon-homolog`, roda uma **tag fixada** — não o `main`).
+> **Por que clone separado:** a A faz `git reset --hard origin/main` a cada deploy; se as duas
+> compartilhassem o diretório, o deploy da A trocaria o código da B. Portas via **`ORIZON_PORT`**
+> (implementado 2026-07-16), banco via **`DATABASE_URL`** — cada instância no seu.
+```bash
+# Uma vez: clonar a 2ª cópia e entrar na tag de homologação
+cd /root
+git clone https://github.com/mbnunes1972/orizon-manager.git orizon-homolog
+cd orizon-homolog
+git fetch --tags && git checkout <TAG_DE_HOMOLOG>     # ex.: git checkout v2026.07.16-homolog
+ufw allow 8766/tcp 2>/dev/null
+# Banco PRÓPRIO da B — arquivo SQLite separado (DB_PATH segue a DATABASE_URL sqlite, fix de
+# 2026-07-16: as migracoes sqlite3 miram o arquivo certo, sem tocar o orizon.db da instancia A).
+export ORIZON_HOMOLOG_DB="sqlite:////root/orizon-homolog/orizon_homolog.db"
+DATABASE_URL="$ORIZON_HOMOLOG_DB" python3 seed.py        # cria schema + usuarios no banco da B
+# Sobe em screen proprio, porta 8766, banco proprio:
+screen -S orizon-homolog -dm bash -c 'cd /root/orizon-homolog && \
+  ORIZON_HOST=0.0.0.0 ORIZON_PORT=8766 DATABASE_URL="sqlite:////root/orizon-homolog/orizon_homolog.db" \
+  python3 main.py > app.log 2>&1'
+sleep 3; ss -ltnp | grep 8766; tail -8 app.log
+curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:8766   # esperado: 302
+```
+**Atualizar a B (promover novo build):** no `/root/orizon-homolog`, `git fetch --tags && git checkout
+<NOVA_TAG>`, mate o screen `orizon-homolog` e suba de novo (NUNCA `git reset --hard origin/main` aqui —
+a B é build tagueado, não o `main`). **Parar a B sem afetar a A:** `screen -S orizon-homolog -X quit`
+(o `pkill -f main.py` do runbook da A mataria as DUAS — na B use o nome do screen).
+> **Paridade com produção (alvo):** a spec pede **Postgres** na pré-homologação (motor contábil). O
+> arquivo SQLite separado acima é a **ponte** (isola já, sem instalar Postgres no servidor antigo).
+> Para a paridade plena, trocar a `DATABASE_URL` por um Postgres dedicado (`orizon_homolog`), instalando
+> Postgres no servidor antigo — mesma linha do Passo 1 do servidor de produção.
+
 #### Runbook de migração de nome — UMA vez (`omie_v3` → `orizon-manager`)
 > Rodar **uma única vez** ao migrar o nome. O servidor ainda tem os nomes antigos; depois disto,
 > use o runbook de deploy acima normalmente.
