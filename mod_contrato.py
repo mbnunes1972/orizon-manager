@@ -876,12 +876,13 @@ def gerar_pdf_proposta(ctx: dict, destino_pdf: str) -> str:
 
 # ── LibreOffice ───────────────────────────────────────────────────────────────
 #
-# NÃO é legado: é a base da IMPORTAÇÃO de modelo de documento
-# (mod_documentos_import.normalizar) — o único caminho que achata a numeração
-# automática do Word em texto literal. Medido num .docx real: LibreOffice
-# preserva 63 números de cláusula, python-docx preserva 3.
-# Também usado por contrato_editar.py:49 para abrir o .docx no app local.
-# A conversão .docx→PDF (_converter_pdf) morreu junto com mod_proposta.
+# NÃO é legado, apesar de o nome sugerir: é a base da IMPORTAÇÃO de modelo de
+# documento (mod_documentos_import.normalizar) — o único caminho que achata a
+# numeração automática do Word em texto literal. Medido num .docx real:
+# LibreOffice preserva 63 números de cláusula, python-docx preserva 3.
+#
+# ÚNICO consumidor hoje: mod_documentos_import. A conversão .docx→PDF
+# (_converter_pdf) e o contrato_editar.py morreram na faxina de 2026-07-15.
 
 class LibreOfficeIndisponivel(Exception):
     def __init__(self, docx_path: str):

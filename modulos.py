@@ -41,7 +41,7 @@ MODULOS = {
                     "arquivos": ["mod_orcamento_params.py", "mod_margens.py", "mod_negociacao.py",
                                  "mod_contrato.py", "mod_marcadores.py",
                                  "mod_documentos_import.py", "mod_documentos.py", "mod_arvore.py",
-                                 "contrato_editar.py", "_ler_aymore.py", "mod_fin",
+                                 "_ler_aymore.py", "mod_fin",
                                  "mod_pe_comparacao.py", "mod_parcelas.py",
                                  # Medição (etapas 9/10 do ciclo): o antigo módulo 'producao' (rótulo UI
                                  # "Projetos") foi retirado da navegação por ser tela-vazia e duplicar o
