@@ -37,15 +37,22 @@ Quatro ambientes, do menos ao mais protegido. Cada push tem um destino claro.
   só de tag aprovada. A "camada extra de pré-homologação" prevista (servidor dedicado) pode nascer depois
   promovendo a instância B para uma VPS própria, sem mudar este conceito.
 
-### Pré-requisitos para levantar a instância B (PRÉ-HOMOLOGAÇÃO) — PENDENTE
-A instância A (INTEGRAÇÃO) já roda na `8765`. Para subir a B na `8766` no mesmo servidor faltam duas
-mudanças (cada uma é tarefa própria: branch + TDD, não remendo):
-1. **Parametrizar a porta.** Hoje `main.py` tem `port = 8765` **fixo** (só o *host* é env via `ORIZON_HOST`).
-   Criar `ORIZON_PORT` (default 8765), espelhando o `ORIZON_HOST`. Instância B sobe com `ORIZON_PORT=8766`.
-2. **Banco separado por instância.** As duas não podem compartilhar `orizon.db` (homolog contaminaria a
-   integração). B aponta para banco próprio (`DATABASE_URL`/arquivo distinto). O servidor antigo é **SQLite
-   hoje**; a spec pede **Postgres** na homolog por paridade com a prod — a migração do servidor antigo entra
-   nesta conta. Ver `2026-07-15-migracao-postgresql.md`.
+### Levantar a instância B (PRÉ-HOMOLOGAÇÃO) — CÓDIGO PRONTO, falta provisionar
+Os dois pré-requisitos de **código** estão implementados e na `main` (2026-07-16):
+1. ✅ **Porta parametrizável** — `ORIZON_PORT` (default 8765) em `main.py` (`porta_do_ambiente`). B sobe com
+   `ORIZON_PORT=8766`. Valor inválido/fora de faixa → erro claro no bootstrap.
+2. ✅ **Banco separado por instância** — `database._resolver_config_db`: com `DATABASE_URL=sqlite:///<arquivo>`,
+   `DB_PATH` segue o arquivo, então as migrações `sqlite3` não tocam o `orizon.db` da instância A
+   (contaminação cruzada). Postgres também isola (via `DATABASE_URL`).
+
+**Falta (não é código):** provisionar a instância B no servidor `167.88.33.121` — clone separado
+`/root/orizon-homolog` na tag de homolog, `:8766`, banco próprio. **Runbook pronto** em `DEV_RULES.md`
+(subseção "Instância B — PRÉ-HOMOLOGAÇÃO (:8766)"). Precisa de sessão SSH interativa (não automatizável
+sem risco no servidor compartilhado).
+
+**Paridade:** a ponte é um **SQLite separado** (isola já, sem instalar Postgres no servidor antigo); o alvo
+da spec é **Postgres** na homolog — trocar a `DATABASE_URL` por um Postgres dedicado quando o servidor
+antigo migrar. Ver `2026-07-15-migracao-postgresql.md`.
 
 ---
 
