@@ -691,7 +691,7 @@ Branch `feat/fase2-autosave-negociacao`. Continuação da faxina single-source.
 Branch `faxina/schema-fase2`. Objetivo (do usuário): **nomenclatura bem definida** + um
 **mecanismo para sempre falarmos a mesma língua**, eliminando legado sem trazer falhas.
 
-- **`NOMENCLATURA.md` (raiz)** — glossário **canônico** das siglas fechadas (VBVA/VBNA/VAVA,
+- **`docs/referencia/NOMENCLATURA.md`** — glossário **canônico** das siglas fechadas (VBVA/VBNA/VAVA,
   VBVO/VBNO/VAVO, Com_Arq/Pro_Fid/Cust_Via/Bri/Cust_Ad/Val_Liq/Desc_Tot/Markup/Cust_Fin/Val_Cont/
   Prov_Imp), contexto do pool (`n_total_proj`/`vbvo_proj`), onde cada parâmetro fica salvo, a
   nomenclatura **removida** (não reusar) e o **mecanismo**: o motor `mod_negociacao` é a fonte única;

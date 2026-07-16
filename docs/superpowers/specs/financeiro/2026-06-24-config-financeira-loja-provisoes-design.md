@@ -61,7 +61,7 @@ um valor de venda dado, mas a acumulação mensal e o ciclo provisório→defini
   negociação + taxas de provisão + configuradores de comissão). Simples de ler/versionar; conjunto
   fixo e pequeno.
 - **Condições de pagamento por loja** (tabela `condicoes_financeiras` com `loja_id`) ficam **fora da
-  v1** (fase futura — ver `FUTURO_CALCULO_FINANCEIRO.md`).
+  v1** (fase futura — ver `docs/modulos/financeiro/FUTURO_CALCULO_FINANCEIRO.md`).
 
 **Módulo puro novo `mod_provisoes.py`** (recebe dados, devolve dados — testável sem HTTP):
 - `provisoes_orcamento(siglas, cfg)` → dict com `Frete_Fab_Orc`, `Com_Adm_Orc`, `Com_Med_Orc`,
