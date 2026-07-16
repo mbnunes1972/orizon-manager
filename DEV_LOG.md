@@ -1344,6 +1344,11 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > **Tudo na `main`, suíte 1184 verde, pushado.** Sessões 78 (modelos de documento) e 79 (faxina +
 > pacotes) fechadas. Ver essas seções para as decisões.
 >
+> **Frente em andamento (Sessão 80) — super_admin god-mode:** branch `feat/super-admin-acesso-pleno`
+> (suíte **1188 verde**), desbloqueia super_admin p/ criar perfis/usuários e acessar o Cadastro (liberdade
+> plena "por enquanto"). **NÃO mergeada ainda** — pendente verificação manual no navegador + merge/push.
+> Detalhes e decisões na seção `## Sessão 80` abaixo.
+>
 > **PENDENTE Nº 1 — ninguém clicou na tela dos modelos de documento.** Toda a frente da Sessão 78 foi
 > verificada no nível do contrato JSON (curl contra servidor real) + `node --check`, nunca por
 > navegador. O pipeline de importação foi provado ponta a ponta num `.docx` real (LibreOffice → 42
@@ -2220,6 +2225,47 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 80 — super_admin acesso pleno (god-mode) — desbloqueio urgente (branch `feat/super-admin-acesso-pleno`)
+Pedido do usuário: o **super_admin não conseguia criar perfis nem usuários e "não acessava o cadastro"**;
+quer o perfil com **liberdade plena e irrestrita por enquanto** (revisitar limites / eventual 2º perfil de
+admin depois). Diagnóstico achou **3 causas-raiz somadas**, não uma:
+1. **super_admin nunca ganhava loja ativa.** `mod_tenancy.resolver_loja_ativa` só resolve loja para quem é
+   membro (memberships ∪ default); super_admin não tem loja própria nem membership → `active_loja_id` sempre
+   None, nem passando o header `X-Loja-Ativa` → sem escopo operacional → **Cadastro morto**.
+2. **`acesso_operacional=False`** no dict de `super_admin` em `perfis.py` (+ várias capacidades finas False).
+3. **Endpoints de Perfis escopavam por `usuario.loja_id`** (=None p/ super_admin): `GET /api/admin/perfis`,
+   `GET /api/admin/perfis-matriz` e `POST /api/admin/perfis` → painel vinha **vazio** e criar perfil gravava
+   **órfão** (`IntegrityError: NOT NULL perfil_acesso.loja_id`).
+
+**Solução (TDD, por subagentes, suíte 1184→1188 verde):**
+- **`auth/perfis.py`:** bypass explícito do slug `super_admin` em `pode`, `acessa_modulo`, `acessa_painel`
+  (retornam True) — god-mode irrestrito. Flags `acesso_operacional/financeiro/fiscal` do dict viram True
+  (honestidade da matriz read-only; o bypass já cobre o enforcement). Bypass **só** no slug exato
+  `super_admin` — `_eh_super_admin` (deriva de `gerir_redes`) e `admin_rede` intactos; teste garante que
+  operador/gerencial não ganham acesso lateral.
+- **`mod_tenancy.resolver_loja_ativa(..., is_super=False)`:** super_admin **adota a loja do header** como
+  ativa (ou None se nenhuma escolhida). `main._ator_dict` passa `is_super = (u.nivel == "super_admin")`.
+- **`main.py`:** helper `_loja_admin_alvo(usuario)` — super_admin usa a loja do header (`_REQ_LOJA_ATIVA`),
+  demais usam a própria; os 3 endpoints de Perfis passam a usá-lo, e o POST erra claro se nenhuma loja
+  selecionada ("Selecione uma loja para criar o perfil.").
+- **`static/index.html`:** `adminEntrarLoja` seta `_lojaAtiva=id` (o interceptor de fetch já envia
+  `X-Loja-Ativa` nas chamadas do console Admin); `adminIrNivel(1/2)` e `adminEntrarRede` limpam `_lojaAtiva`.
+  `node --check` OK (via WSL).
+- **Testes** (`tests/test_super_admin_god_mode.py`, novo): unit do bypass; unit do `resolver_loja_ativa`
+  (super e não-super); e2e — super_admin cria perfil e lê a matriz na loja escolhida; erro sem loja; cria
+  **usuário** de loja; **Cadastro** (`GET /api/funcionarios`) dá **403 sem loja / 200 ao entrar na loja**.
+  `HttpClient` (conftest) ganhou header `X-Loja-Ativa` opcional. **Fallout do god-mode corrigido:**
+  `test_perfis_novos_sem_poder_operacional` (separa admin_rede restrito de super_admin irrestrito) e
+  `test_override_negado_sem_permissao` (ator negativo super→operador `cons_l1`).
+
+**[DECIDIDO]** god-mode total agora (escolha do usuário sobre "mínimo cirúrgico"); reuso do canal `_lojaAtiva`
+(super_admin "entra" numa loja e opera como ela). **[FORA DE ESCOPO]** `admin_rede` (não pedido); limites/2º
+perfil de admin (futuro). **[PENDENTE]** verificação manual no navegador (o backend está coberto por e2e, mas
+ninguém clicou); merge na `main` + push + re-ingerir grafo. **[ARQUIVOS]** `auth/perfis.py`, `mod_tenancy.py`,
+`main.py`, `static/index.html`, `tests/test_super_admin_god_mode.py`(novo), `tests/conftest.py`,
+`tests/test_perfis_tenancy.py`, `tests/test_qualidade_upload_e2e.py`,
+`docs/superpowers/plans/2026-07-16-super-admin-acesso-pleno.md`(novo).
 
 ## Sessão 79 — Faxina do projeto + piloto de pacotes (raiz 49→32 .py)
 
