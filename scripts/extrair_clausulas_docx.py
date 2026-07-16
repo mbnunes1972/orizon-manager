@@ -7,7 +7,7 @@ inclui). Por isso a fonte da migração é o export em TEXTO do LibreOffice, que
 "achata" a numeração automática em texto literal. Gere o .txt antes:
 
     soffice --headless --convert-to "txt:Text (encoded):UTF8" \
-        --outdir CONTRATOS modelo_contrato_mapeado.docx
+        --outdir CONTRATOS docs/especificacoes/modelo_contrato_mapeado.docx
 
 Este script lê esse .txt, corta a capa (mantém do 'CONTRATO DE COMPRA E VENDA' em
 diante), transforma títulos 'CLÁUSULA ...' em headings `#`, tira a indentação das

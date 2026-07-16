@@ -18,7 +18,7 @@ from docx.oxml import OxmlElement     # noqa: E402
 from docx.oxml.ns import qn           # noqa: E402
 from docx.text.paragraph import Paragraph  # noqa: E402
 
-MODELO = os.path.join(os.path.dirname(__file__), "..", "modelo_contrato_mapeado.docx")
+MODELO = os.path.join(os.path.dirname(__file__), "..", "docs", "especificacoes", "modelo_contrato_mapeado.docx")
 
 _LABELS = ("CPF/CNPJ:", "CNPJ:", "CPF:")
 _TOKENS = ("INSPIRIUM", "[NOME_CLIENTE]", "[NOME_TESTEMUNHA")

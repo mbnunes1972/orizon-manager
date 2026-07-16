@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from docx import Document  # noqa: E402
 
-MODELO = os.path.join(os.path.dirname(__file__), "..", "modelo_contrato_mapeado.docx")
+MODELO = os.path.join(os.path.dirname(__file__), "..", "docs", "especificacoes", "modelo_contrato_mapeado.docx")
 
 
 def _inserir_em_paragrafo(par):
