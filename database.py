@@ -1034,6 +1034,8 @@ def init_db():
     if ENGINE.dialect.name == "sqlite":
         _migrar_colunas()
         _migrar_dados()
+    else:
+        _seed_loja_padrao()   # equivalente portável da tenancy_v1_2026 (loja seed + backfill)
     try:
         import perfis
         perfis.recarregar()   # invalida o cache do registro de perfis (perfil_acesso pode ter mudado)
@@ -1606,6 +1608,46 @@ def _migrar_dados():
         conn.close()
     _backfill_loja_operacional()
     _drop_coluna_margens_orcamentos()
+
+
+def _seed_loja_padrao():
+    """Loja seed (dados reais da INSPIRIUM/Dalmóbile) + backfill de loja_id — equivalente em SQLAlchemy
+    puro (funciona em qualquer dialeto) da migração 'tenancy_v1_2026' que só roda em SQLite via
+    _migrar_dados/_run_migracoes (raw sqlite3 + placeholders '?', não portável). Idempotente: só cria
+    a loja se ainda não existir nenhuma. Chamada pelo init_db() para bancos que não são SQLite."""
+    db = Session()
+    try:
+        loja = db.query(Loja).order_by(Loja.id).first()
+        if loja is None:
+            loja = Loja(nome=_SEED_LOJA_NOME, cnpj=_SEED_LOJA_CNPJ, codigo=_SEED_LOJA_CODIGO,
+                        telefone=_SEED_LOJA_TEL, email=_SEED_LOJA_EMAIL,
+                        testemunha1_nome=_SEED_TEST1_NOME, testemunha1_cpf=_SEED_TEST1_CPF,
+                        testemunha2_nome=_SEED_TEST2_NOME, testemunha2_cpf=_SEED_TEST2_CPF,
+                        ativo=1)
+            db.add(loja)
+            db.commit()
+        loja_id = loja.id
+
+        # Usuario à parte: super_admin/admin_rede são papéis de plataforma/rede, SEM loja própria
+        # por desenho (loja_id NULL de propósito) — não entram no backfill.
+        (db.query(Usuario)
+           .filter(Usuario.loja_id.is_(None))
+           .filter(Usuario.nivel.notin_(("super_admin", "admin_rede")))
+           .update({"loja_id": loja_id}, synchronize_session=False))
+        for modelo in (Cliente, Projeto, Orcamento, Contrato):
+            db.query(modelo).filter(modelo.loja_id.is_(None)).update({"loja_id": loja_id})
+        db.commit()
+
+        for p in db.query(Parceiro).all():
+            if p.abrangencia is None:
+                p.abrangencia = "loja"
+            vinculo = db.query(ParceiroLoja).filter_by(parceiro_id=p.id, loja_id=loja_id).first()
+            if vinculo is None:
+                db.add(ParceiroLoja(parceiro_id=p.id, loja_id=loja_id,
+                                    comissao_padrao_pct=p.comissao_padrao_pct or 0.0, ativo=1))
+        db.commit()
+    finally:
+        db.close()
 
 
 def get_session():
