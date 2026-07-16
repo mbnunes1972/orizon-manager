@@ -24,3 +24,45 @@ nfe_amostras/
 
 # brainstorm visual companion / sdd scratch
 .superpowers/
+
+# ── Faxina 2026-07-15 ─────────────────────────────────────────────────────────
+# Regra: material de TRABALHO do usuário e dado de projeto ficam no disco, fora
+# do git. Não é lixo — é insumo. Mesma lógica que já valia p/ XML/… e ~$*.docx
+# na lista de "não commitar ruído" do CLAUDE.md, agora estendida ao resto da
+# mesma categoria (o CLAUDE.md mandava conviver com o ruído; aqui ele some).
+
+# Especificações de negócio do usuário (fonte dos requisitos, não código).
+# NÃO usar '*.docx': há .docx que são FIXTURE e precisam continuar versionados —
+# config/contrato_template.docx (lido por database.py), modelo_contrato_mapeado.docx
+# (scripts/extrair_clausulas_docx.py), modelo_proposta.docx, CONTRATOS/contrato_1.docx
+# (tests/test_editar_contrato.py). Ignorar em bloco quebraria a suíte num clone novo.
+/Modulos_Orizon_v*.docx
+/Especificacao_Financeiro_Orizon_v*.docx
+/Diagramacao_e_Navegacao_Orizon_v*.docx
+/Regras_Funcoes_Perfis_Atribuicoes_Orizon_v*.docx
+/Provisoes_Custo_Fabrica_Margem_Orizon_v*.docx
+/Controle_Entrega_Material_Orizon_v*.docx
+~$*.docx
+
+# XML de projeto (Promob): os 22 MB são os *_PE.xml. Os XML SEM sufixo _PE são
+# FIXTURE de teste (test_qualidade_xml, test_pe_comparacao, test_contrato) e ficam
+# versionados — por isso o padrão é específico, não '/XML/'.
+/XML/*_PE.xml
+
+# Snapshot histórico dos docs
+docsLeonardo_md/
+
+# Referências visuais de design
+orizon_design_reference_*.png
+
+# Worktrees criadas dentro da raiz: carregam uma cópia de tests/ e QUEBRAM a
+# coleta do pytest (colisão de basename). Ver pytest.ini/norecursedirs.
+wt-*/
+.claude/
+
+# Logs e bancos de teste
+*.log
+*.err
+/test_*.db
+/test_*.db-journal
+*.tmp
