@@ -1339,20 +1339,39 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
-## ⏸️ ESTADO ATUAL (2026-07-15) — retomar aqui
+## ⏸️ ESTADO ATUAL (2026-07-16) — retomar aqui
 
-> **Branch `feat/modelos-documentos-loja`, suíte 1187 verde.** Frente "Modelos de documentos da loja"
-> (Config › Documentos deixa de ser tela-morta): **10 das 11 tasks do plano executadas**, faltando só
-> mergear. Ver `## Sessão 78` para a narrativa e as decisões.
+> **Tudo na `main`, suíte 1184 verde, pushado.** Sessões 78 (modelos de documento) e 79 (faxina +
+> pacotes) fechadas. Ver essas seções para as decisões.
 >
-> **PENDENTE E IMPORTANTE — ninguém clicou na tela.** O Task 9 (painel + wizard) foi verificado no
-> nível do contrato JSON (curl contra servidor real) + `node --check`, mas **não houve verificação por
-> navegador** (nenhum agente desta sessão tinha browser automation). Antes de mergear, clicar: card
-> Contrato abre modal → subir `.docx` real → revisão mostra marcadores/cravados com trechos → "Ver PDF
-> de exemplo" → "Ativar" → card mostra "Versão 1 ativa"; subir `.pdf` → erro explicativo; logar como
-> **gerencial** → cards não clicáveis.
+> **PENDENTE Nº 1 — ninguém clicou na tela dos modelos de documento.** Toda a frente da Sessão 78 foi
+> verificada no nível do contrato JSON (curl contra servidor real) + `node --check`, nunca por
+> navegador. O pipeline de importação foi provado ponta a ponta num `.docx` real (LibreOffice → 42
+> cláusulas → marcadores/cravados detectados), mas a **interface** que o expõe nunca foi exercitada por
+> um humano. Roteiro: Config › Documentos → card Contrato abre modal → subir `.docx` real → revisão
+> mostra marcadores ausentes/desconhecidos e dados da loja cravados com trechos → "Ver PDF de exemplo"
+> → "Ativar" → card mostra "Versão 1 ativa"; subir `.pdf` → erro explicativo; logar como **gerencial**
+> → cards não clicáveis.
 >
-> Pendente também: merge na `main`, `git push`, re-ingerir o grafo MCP.
+> **PENDENTE Nº 2 — reorganização de pacotes está NO MEIO.** 3 dos 4 domínios grandes viraram pacote
+> (`fiscal/`, `integracoes/`, `auth/`); falta o **`comercial` (15 arquivos)** — o mais arriscado (ciclos
+> `mod_contrato`↔`mod_documentos`, e `mod_fin/` já empacotado dentro). **Recomendação registrada: NÃO
+> empacotar o comercial sem antes tratar os caminhos relativos a `__file__`** — foi um deles
+> (`_LOGIN_HTML`) que derrubou a página de entrada nesta sessão, em silêncio, com a suíte verde. Os 4
+> módulos da importação de contrato (`mod_contrato`, `mod_documentos`, `mod_documentos_import`,
+> `mod_marcadores`) seguem na raiz e funcionam; empacotá-los quebraria `CONTRATO_TEMPLATE_DIR` do mesmo
+> jeito (e `_carregar_md` engole arquivo ausente como string vazia → contrato sairia SEM cláusulas,
+> verde). `tests/test_caminhos_de_pacote.py` é o ratchet que pega isso — mas só dentro de pacote.
+>
+> Pendente também: re-ingerir o grafo MCP (código mudou de lugar — o grafo está obsoleto).
+>
+> **Nota:** a frente PostgreSQL commitou na `main` em paralelo (`c9f3324`, backfill de loja seed em
+> banco não-SQLite). Não é desta sessão; as branches `feat/migracao-postgresql{,-v2}` seguem vivas.
+
+## ⏸️ ESTADO ATUAL (2026-07-15)
+
+> **(superado pelo de 2026-07-16 acima — mantido por referência.)** Frente "Modelos de documentos da
+> loja" pronta mas ainda não mergeada; a Sessão 79 mergeou e seguiu com a faxina.
 
 ## ⏸️ ESTADO ATUAL (2026-07-14, tarde)
 
@@ -2201,6 +2220,62 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 79 — Faxina do projeto + piloto de pacotes (raiz 49→32 .py)
+
+Suíte **1184 verde**, tudo na `main`. Sessão de higiene, a pedido do usuário ("quero uma verdadeira
+faxina, arquivos organizados"). Quatro frentes, todas com o mesmo padrão de achado: **a operação que
+deixa verde escondia uma verificação desligada, e a verdade só apareceu executando de verdade.**
+
+**1. Faxina do working tree.** `git status` de ~50 linhas → 1. A causa do ruído eterno era fixável e
+o CLAUDE.md mandava conviver com ela: `/CONTRATOS/` estava no `.gitignore` **e** rastreado (commitado
+antes da regra; `.gitignore` não desrastreia). `git rm --cached` no ruído + `.gitignore` cirúrgico.
+Descoberto por execução (esconder 15 candidatos e rodar a suíte): 13 `.docx`/XML eram órfãos, mas
+`modelo_proposta.docx` era fixture — `*.docx` em bloco teria quebrado a suíte num clone novo.
+Recuperados **do lixo**: `docs/audit/` (Auditoria Florence, 8 auditorias, citada pelo DEV_LOG, estava
+só no disco) e `SIMULACAO_CLAUDE_LOG.md`. Removidos 107 MB de worktrees do Postgres (o achado técnico
+delas foi pro spec da migração antes de apagar; as branches foram destravadas).
+
+**2. Specs organizados.** `docs/superpowers/specs/` de 75 arquivos soltos → 8 subpastas por área, via
+`git mv` (histórico preservado). 84 referências corrigidas, conferidas por `os.path.exists`. Os 3
+wildcards (`fase-d2-*`, `2026-07-10-*`) precisaram de mão — e um deles JÁ era impreciso, a subpasta o
+deixou correto.
+
+**3. Faxina da raiz.** 105 → 75 itens: `.docx` → `docs/especificacoes/`, `.md` soltos → `docs/`
+(cada um pra pasta do assunto que já existia), `.bat` → `scripts/`. **Duas referências não precisaram
+de conserto — o movimento as consertou**: apontavam pro lugar novo antes do arquivo chegar lá.
+Conferir o CONTEXTO de cada citação antes de substituir evitou um `sed` cego trocar link certo por
+errado.
+
+**4. Piloto de pacotes.** 3 dos 4 domínios grandes viraram pacote: `fiscal/` (6), `integracoes/` (5),
+`auth/` (6). Raiz 49 → 32 `.py`. Seguiu o precedente do `mod_fin/`. Decisões e sustos:
+
+- **Empacotar DESLIGAVA a trava de arquitetura.** `test_arquitetura_modulos` fazia `if not
+  arquivo.endswith(".py"): continue` — um pacote é diretório, então o ratchet PULAVA o pacote inteiro
+  e ficava verde sem checar. Não era hipótese: o `mod_fin/` estava fora do ratchet desde que virou
+  pacote, escondido por um `| {"mod_fin"}` hardcoded. **Consertado ANTES de mover** (expande diretório
+  nos .py; detecta pacote por `__init__.py`). O mesmo buraco estava em `modulos.modulo_de_arquivo`.
+- **O `auth` cobrou 3 bugs**, todos da colisão "pacote E módulo se chamam `auth`": o script de
+  reescrita comeu a própria saída (`from auth.auth import perfis`); um comentário no fim da linha
+  derrotou o regex (`storage.py`); e um `as` dentro de lista por vírgula (`import ..., perfis as
+  _perfis`) não casou. **E minha varredura de conferência tinha os mesmos bugs do script** — disse "0
+  pendentes" com o servidor caindo. Só o traceback real do servidor contou a verdade.
+- **A PÁGINA DE ENTRADA quebrou, e o usuário achou, não a suíte.** Mover `auth_routes.py` pra `auth/`
+  quebrou `_LOGIN_HTML = join(dirname(__file__), "static", "login.html")` — passou a apontar pra
+  `auth/static/`. O `except FileNotFoundError` de `_serve_login` devolvia **404 em silêncio**: `/` →
+  302 → `/login` → 404, com 1181 testes verdes. Eu ajustei todos os imports e esqueci uma classe
+  inteira: os **caminhos relativos a `__file__`** (4 deles). Import quebrado explode alto; caminho
+  quebrado devolve 404 educado. Corrigidos (sobem um nível, como o `mod_fin/base.py` sempre fez) +
+  `tests/test_caminhos_de_pacote.py` (ratchet que pega `dirname(__file__)` sozinho dentro de pacote).
+
+**A verificação mentiu de 3 jeitos diferentes numa sessão:** `.pyc` obsoleto (conteúdo reordenado do
+mesmo tamanho não invalida o bytecode), **servidor fantasma** (dois `python.exe` velhos na 8765 que o
+`pkill -f "python3 main.py"` não pegava), e **verificador com o mesmo bug do código**. Lição:
+*o que confirma não pode compartilhar o defeito do que é confirmado.*
+
+**Fora de escopo (recomendação registrada):** NÃO empacotar o `comercial` sem tratar os caminhos
+`__file__` — `mod_contrato.CONTRATO_TEMPLATE_DIR` quebraria igual, e `_carregar_md` engole arquivo
+ausente como `""` → contrato sairia sem cláusulas, verde.
 
 ## Sessão 78 — Modelos de documentos da loja (Config › Documentos deixa de ser tela-morta)
 

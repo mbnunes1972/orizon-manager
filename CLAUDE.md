@@ -9,6 +9,17 @@ Sistema de vendas de móveis planejados (loja Dalmóbile). **Backend** Python pu
 (sem framework), SQLAlchemy + SQLite (`orizon.db`). **Frontend** é um único arquivo `static/index.html`
 (HTML+CSS+JS inline). Multi-loja/rede (tenancy). Ciclo do projeto em etapas.
 
+## Layout do código (reorganização 2026-07-15, EM ANDAMENTO)
+A maioria dos módulos ainda é `.py` na **raiz**, classificados por domínio em `modulos.py` (um teste,
+`test_arquitetura_modulos`, garante que nenhum fique órfão e que o ratchet de dependência valha). Três
+domínios já viraram **pacote**: `fiscal/`, `integracoes/`, `auth/` (+ o `mod_fin/` antigo). Import de
+fora: `from fiscal import mod_nfe`; entre irmãos, relativo: `from . import mapa_fiscal`. Falta empacotar
+o `comercial` (15 arquivos) — os 4 módulos da importação de contrato (`mod_contrato`,
+`mod_documentos`, `mod_documentos_import`, `mod_marcadores`) seguem na raiz.
+**ARMADILHA ao empacotar:** caminho relativo a `__file__` dentro de pacote aponta pra pasta do pacote,
+não a raiz — suba um nível (`dirname(dirname(__file__))`). Um `__file__` errado devolve 404/`""` em
+SILÊNCIO (foi o que sumiu a página de entrada). `test_caminhos_de_pacote.py` é o ratchet disso.
+
 ## Ambiente e execução
 - Use **`python3`** (nunca `python`). WSL/Ubuntu.
 - Servidor local: `python3 main.py` → `http://localhost:8765` (bind `127.0.0.1`; em produção
