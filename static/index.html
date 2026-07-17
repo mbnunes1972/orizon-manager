@@ -3077,11 +3077,28 @@ async function cfgFuncaoToggle(id, novo){
 }
 let _cfgRemFuncoes = [];
 let _rmFaixas = [];
+let _cfgRemLid = null;
 async function cfgComissaoRender(){   // Config › Remunerações
   const box = document.getElementById('cfg-panel-comissao'); if(!box) return;
   box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
   const d = await (await fetch('/api/funcoes',{credentials:'same-origin'})).json().catch(()=>({}));
   _cfgRemFuncoes = (d && d.ok && d.itens) ? d.itens : [];
+  // Adiantamento Oficial (config-financeira da loja)
+  _cfgRemLid = _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id);
+  let ofAtivo=false, ofPct=40;
+  if(_cfgRemLid){
+    const cf = await (await fetch('/api/admin/lojas/'+_cfgRemLid+'/config-financeira',{credentials:'same-origin'})).json().catch(()=>({}));
+    _cfgFin = (cf && cf.config) || _cfgFin || {};
+    const fl = (_cfgFin.folha)||{};
+    ofAtivo = !!fl.adiantamento_oficial_ativo; ofPct = (fl.adiantamento_oficial_pct!=null?fl.adiantamento_oficial_pct:40);
+  }
+  const boxOficial =
+     '<div style="border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px;max-width:680px">'
+    +'<div style="font-weight:700;font-size:13px;margin-bottom:6px">Adiantamento Oficial</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Adiantamento padrão da loja sobre o salário fixo de funcionários em carteira (registrados), abatido automaticamente no líquido.</div>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:12px"><input type="checkbox" id="cfg-of-ativo" '+(ofAtivo?'checked':'')+' style="width:15px;height:15px;accent-color:var(--accent)"> Ativar por padrão</label>'
+    +'<div style="display:flex;gap:8px;align-items:flex-end;margin-top:8px"><label style="font-size:11px;color:var(--muted)">% do salário fixo<br><input type="number" step="0.01" id="cfg-of-pct" value="'+ofPct+'" style="width:90px;padding:5px 8px"></label>'
+    +'<button class="btn btn-primary btn-sm" onclick="cfgAdiantamentoSalvar()">Salvar</button></div></div>';
   const resumo = f => {
     const p = [];
     if (f.salario_fixo) p.push('fixo '+_fBRL(f.salario_fixo));
@@ -3097,8 +3114,20 @@ async function cfgComissaoRender(){   // Config › Remunerações
     +'<td style="text-align:right;padding:9px 12px"><button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cfgRemuneracaoEditar('+f.id+')">Remuneração</button></td></tr>').join('')
     || '<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma função. Cadastre em Config › Funções.</td></tr>';
   box.innerHTML =
-    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:680px">Remuneração por função: salário fixo, comissão (por meta ou % simples) e benefícios. O Consultor de Vendas usa a comissão de vendas por metas (que também vale na negociação).</div>'
+     boxOficial
+    +'<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:680px">Remuneração por função: salário fixo, comissão (por meta ou % simples) e benefícios. O Consultor de Vendas usa a comissão de vendas por metas (que também vale na negociação).</div>'
     +'<table class="proj-table" style="max-width:680px"><thead><tr><th>Função</th><th>Resumo</th><th style="width:130px"></th></tr></thead><tbody>'+linhas+'</tbody></table>';
+}
+async function cfgAdiantamentoSalvar(){
+  if(!_cfgRemLid || !_cfgFin){ showToast('Loja não identificada.', true); return; }
+  _cfgFin.folha = Object.assign({}, _cfgFin.folha||{}, {
+    adiantamento_oficial_ativo: document.getElementById('cfg-of-ativo').checked,
+    adiantamento_oficial_pct: parseFloat(document.getElementById('cfg-of-pct').value)||0 });
+  const r = await fetch('/api/admin/lojas/'+_cfgRemLid+'/config-financeira', {method:'PUT', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(_cfgFin)});
+  const d = await r.json().catch(()=>({}));
+  if(r.ok && d.ok!==false){ showToast('Adiantamento Oficial salvo.', false); }
+  else { showToast((d&&d.erro)||'Erro ao salvar.', true); }
 }
 function cfgRemuneracaoEditar(id){
   const f = _cfgRemFuncoes.find(x=>x.id===id) || {};
@@ -10028,6 +10057,18 @@ function folhaRender(folha){
       : (it.status==='paga'
           ? _fBRL(it.base_comissao||0)
           : '<input type="number" step="0.01" value="'+(it.base_comissao||0)+'" class="inp" style="width:120px;text-align:right;font-family:var(--font-mono);padding:3px 6px" onchange="folhaSalvarBase('+it.id+',this.value)">');
+    const ads = it.adiantamentos||[];
+    const adsList = ads.map(a =>
+       '<div style="display:flex;gap:5px;align-items:center;font-size:10.5px;padding:1px 0">'
+      +'<span style="color:var(--muted);margin-right:auto">'+esc(a.tipo)+' '+_fBRL(a.valor||0)+(a.quitado?' ✓':'')+'</span>'
+      +(it.status==='paga'?'':'<label style="display:flex;align-items:center;gap:3px;color:var(--muted)"><input type="checkbox" '+(a.abater?'checked':'')+' onchange="adiantamentoToggleAbater('+a.id+',this.checked)" style="width:12px;height:12px"> abater</label>'
+        +'<span onclick="adiantamentoRemover('+a.id+')" style="cursor:pointer;color:var(--muted)" title="remover">&times;</span>')
+      +'</div>').join('');
+    const adiantCel =
+       '<div style="font-family:var(--font-mono);font-weight:700">'+_fBRL(it.liquido_pagar!=null?it.liquido_pagar:(it.total||0))+'</div>'
+      +(it.saldo_debito?'<div style="font-size:10.5px;color:var(--err)">saldo dev.: '+_fBRL(it.saldo_debito)+'</div>':'')
+      +adsList
+      +(it.status==='paga'?'':'<button class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:3px" onclick="adiantamentoAdd('+it.funcionario_id+',\''+esc(it.competencia||'')+'\')">+ adiant.</button>');
     return '<tr class="proj-row">'
       +'<td style="padding:8px 10px;color:var(--text);font-weight:500">'+esc(it.funcionario||'—')+'</td>'
       +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(it.parte_fixa||0)+'</td>'
@@ -10036,9 +10077,10 @@ function folhaRender(folha){
       +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(it.parte_variavel||0)+'</td>'
       +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);color:var(--muted)">'+_fBRL(it.beneficios||0)+'</td>'
       +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);font-weight:700">'+_fBRL(it.total||0)+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;min-width:160px">'+adiantCel+'</td>'
       +'<td style="padding:8px 10px;font-size:11px;color:var(--muted)">'+esc(it.pagamento||'—')+'</td>'
       +'<td style="padding:8px 10px;text-align:right">'+acao+'</td></tr>';
-  }).join('') || '<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma folha para esta competência. Clique em “Gerar folha”.</td></tr>';
+  }).join('') || '<tr><td colspan="10" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma folha para esta competência. Clique em “Gerar folha”.</td></tr>';
   box.innerHTML =
      '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;max-width:760px">Motor de cálculo: a remuneração vem da <strong style="color:var(--text)">Função</strong> do funcionário (Config → Remunerações) — <strong style="color:var(--text)">salário fixo</strong>, <strong style="color:var(--text)">benefícios</strong> (AT/VA/PS) e comissão. A <strong style="color:var(--text)">parte variável</strong> é a soma dos itens de <strong style="color:var(--text)">Comissões</strong>: a do Consultor (vendas líquidas × %) e as de cada <strong style="color:var(--text)">papel</strong> (PE/Medição/Montagem/Assistência), preparadas automaticamente ao concluir cada etapa do ciclo (base = valor dos ambientes atribuídos × % da função). Cada base é <strong style="color:var(--text)">editável</strong>. O pagamento lança a despesa nas contas 5.3 e usa os dados bancários/PIX cadastrados.</div>'
     +'<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">'
@@ -10048,13 +10090,14 @@ function folhaRender(folha){
     +'<table class="proj-table"><thead><tr>'
     +'<th>Funcionário</th><th style="text-align:right">Parte fixa</th><th>Comissões</th>'
     +'<th style="text-align:right">Faixa</th><th style="text-align:right">Parte variável</th><th style="text-align:right">Benefícios</th>'
-    +'<th style="text-align:right">Total</th><th>Pagamento</th><th style="width:80px"></th></tr></thead><tbody>'+linhas+'</tbody>'
+    +'<th style="text-align:right">Total</th><th style="text-align:right">Líquido a pagar</th><th>Pagamento</th><th style="width:80px"></th></tr></thead><tbody>'+linhas+'</tbody>'
     +'<tfoot><tr style="border-top:2px solid var(--border-strong);font-weight:700">'
     +'<td style="padding:9px 10px">Totais</td>'
     +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(folha.total_fixa||0)+'</td><td></td><td></td>'
     +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(folha.total_variavel||0)+'</td>'
     +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(folha.total_beneficios||0)+'</td>'
-    +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono);color:var(--accent)">'+_fBRL(folha.total_geral||0)+'</td>'
+    +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(folha.total_geral||0)+'</td>'
+    +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono);color:var(--accent)">'+_fBRL(folha.total_liquido||0)+'</td>'
     +'<td colspan="2"></td></tr></tfoot></table>';
 }
 
@@ -10072,6 +10115,43 @@ async function comissaoSalvarBase(id, valor){
   const d = await r.json().catch(()=>({}));
   if(r.ok && !d.erro){ folhaGerar(); }   // regenera a folha p/ resomar a parte variável (Σ itens)
   else { showToast((d&&d.erro)||'Erro ao salvar comissão.', true); }
+}
+
+function adiantamentoAdd(funcId, comp){
+  const ex=document.getElementById('modal-adiant'); if(ex) ex.remove();
+  const lf='display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)';
+  const S='padding:6px 8px;width:100%;box-sizing:border-box';
+  const ov=document.createElement('div'); ov.id='modal-adiant';
+  ov.style.cssText='position:fixed;inset:0;z-index:650;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+  ov.innerHTML=`<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:22px;max-width:400px;width:92%">
+    <div style="font-family:var(--font-display);font-weight:900;font-size:15px;margin-bottom:12px">Adiantamento / Empréstimo</div>
+    <label style="${lf};margin-bottom:8px"><span>Tipo</span><select id="adiant-tipo" style="${S}"><option value="adiantamento">Adiantamento</option><option value="emprestimo">Empréstimo</option></select></label>
+    <label style="${lf};margin-bottom:8px"><span>Valor (R$)</span><input id="adiant-valor" type="number" step="0.01" value="0" style="${S}"></label>
+    <label style="${lf};margin-bottom:8px"><span>Competência de abate (AAAA-MM)</span><input id="adiant-abate" type="month" value="${esc(comp||'')}" style="${S}"></label>
+    <label style="${lf};margin-bottom:8px"><span>Observação</span><input id="adiant-obs" type="text" style="${S}"></label>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-adiant').remove()">Cancelar</button><button class="btn btn-primary btn-sm" onclick="adiantamentoSalvar(${funcId},'${esc(comp||'')}')">Salvar</button></div></div>`;
+  document.body.appendChild(ov);
+}
+async function adiantamentoSalvar(funcId, comp){
+  const valor=parseFloat(document.getElementById('adiant-valor').value)||0;
+  if(valor<=0){ showToast('Informe um valor.', true); return; }
+  const body={funcionario_id:funcId, tipo:document.getElementById('adiant-tipo').value, competencia:comp,
+    valor, abater:true, competencia_abate:document.getElementById('adiant-abate').value||comp,
+    observacao:document.getElementById('adiant-obs').value||''};
+  const r=await fetch('/api/adiantamentos',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({}));
+  if(r.ok && d.ok!==false){ document.getElementById('modal-adiant').remove(); folhaMesCarregar(); }
+  else { showToast((d&&d.erro)||'Erro ao salvar.', true); }
+}
+async function adiantamentoToggleAbater(id, on){
+  const r=await fetch('/api/adiantamentos/'+id,{method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({abater:on})});
+  const d=await r.json().catch(()=>({}));
+  if(r.ok && d.ok!==false){ folhaMesCarregar(); } else { showToast((d&&d.erro)||'Erro.', true); }
+}
+async function adiantamentoRemover(id){
+  const r=await fetch('/api/adiantamentos/'+id,{method:'PATCH',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({remover:true})});
+  const d=await r.json().catch(()=>({}));
+  if(r.ok && d.ok!==false){ folhaMesCarregar(); } else { showToast((d&&d.erro)||'Erro.', true); }
 }
 
 async function repasseCarregar(){
