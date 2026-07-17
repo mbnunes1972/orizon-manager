@@ -8,7 +8,7 @@ A **Folha de Pagamento** tem motor/endpoints/tela prontos (`mod_folha`, `/api/fo
 ## Decisões (do brainstorming)
 1. **A Folha paga FUNCIONÁRIOS** (entidade RH). O cadastro de Funcionário é **restaurado dentro do módulo Folha de Pagamento** (é RH, junto de onde se paga; o Cadastro segue sem Funcionários). O modelo `Funcionario` **já existe** (só a UI saiu) — reaproveitado.
 2. **A remuneração é configurada por FUNÇÃO**, num painel **Config › "Remunerações"** (renomeia "Comissão de Vendas"): lista de funções → modal de remuneração por função.
-3. **Parte fixa** (salário base) mora na **Função** — todos com a mesma função ganham o mesmo fixo **agora**. **[FUTURO]** níveis por função (diferenciação por experiência) — o desenho não deve impedir (ver "Extensões").
+3. **Parte fixa** (salário base) é **um campo do próprio modal de remuneração da função** (ao lado da Comissão) e mora na **Função** — todos com a mesma função ganham o mesmo fixo **agora**. Os campos de salário do **Funcionário** (`remuneracao_fixa/tipo/var`) ficam **legado/ignorados** pela Folha. **[FUTURO]** níveis por função (diferenciação por experiência) — o desenho não deve impedir (ver "Extensões").
 4. **Comissão/variável:** o motor atual (`comissao_vendas` por faixas de meta, em `config_financeira_json`) **está correto** e alimenta a função **Consultor de Vendas** — mantido. Outras funções comissionadas (item 2): config de comissão **fixa (%)** ou **por meta**, com **base** = valor líquido de vendas OU valor de fábrica — **armazenada** nesta rodada (cálculo na Folha para não-consultor fica como extensão).
 5. **Benefícios** (AT = Auxílio Transporte, VA = Vale Alimentação, PS = Plano de Saúde): por Função, cada um com **checkbox + valor R$**. **Compõem a despesa de salários** (entram no total da Folha). **[PENDENTE contador]** contas contábeis exatas dos benefícios e o tratamento no contra-cheque — por ora somam na despesa de salários (conta a definir, default abaixo).
 
@@ -16,7 +16,8 @@ A **Folha de Pagamento** tem motor/endpoints/tela prontos (`mod_folha`, `/api/fo
 ### `Funcao` (novas colunas — migração SQLite **e** Postgres, via `_add_cols` + `_migrar_colunas_pg`)
 - `salario_fixo` (Float) — parte fixa mensal da função.
 - `beneficios_json` (Text/JSON) — `{"at":{"on":bool,"valor":float}, "va":{...}, "ps":{...}}`.
-- `comissao_json` (Text/JSON) — comissão das funções **não-consultor**: `{"tipo":"fixa"|"meta", "base":"liquido"|"fabrica", "pct":float | "faixas":[{"venda_ate":float|None,"pct":float}]}`. (A função Consultor de Vendas **não** usa este campo — usa o `comissao_vendas` da loja, mantido.)
+- `comissao_json` (Text/JSON) — comissão das funções **não-consultor**: `{"por_meta":bool, "base":"liquido"|"fabrica", "pct":float | "faixas":[{"venda_ate":float|None,"pct":float}]}`. (A função Consultor de Vendas **não** usa este campo — usa o `comissao_vendas` da loja, mantido — ver roteamento no painel.)
+- `usa_comissao_vendas` (Bool, default False) — marca a função cuja comissão vem do `comissao_vendas` da loja (semeada True na "Consultor de Vendas").
 - _(Já existem do item 1: `perfil_padrao`, `remuneracao_padrao`, `regime_trabalho`, `regime_contratacao`, `descricao`. O `remuneracao_padrao` (tipo) passa a ser derivável/coadjuvante; a fonte de valor é `salario_fixo` + comissão + benefícios.)_
 
 ### `Funcionario` (reuso; sem novas colunas)
@@ -27,11 +28,12 @@ Por um marcador estável, não pelo texto do nome. Opção: um campo `Funcao.eh_
 
 ## Config › "Remunerações" (renomeia painel Comissão de Vendas)
 - `cfg-tab-comissao` → rótulo **"Remunerações"**; `cfgComissaoRender` vira **lista de funções** (de `/api/funcoes`), cada linha com **"Configurar remuneração"**.
-- **Modal de remuneração da função** (`POST /api/funcoes/<id>` estendido, via `funcao_aplicar`):
-  - **Parte fixa** (R$) → `salario_fixo`.
-  - **Comissão:**
-    - Se `usa_comissao_vendas` (Consultor): mostra/edita as **faixas de meta** atuais (o modal de comissão já existente `abrirModalComissao`, embutido/reusado) — grava no `config_financeira_json.comissao_vendas` da loja (inalterado).
-    - Senão: **tipo** (fixa/meta), **base** (líquido/fábrica), **%** ou **faixas** → `comissao_json`.
+- **Modal de remuneração da função** — **um só, igual para toda função** (do usuário: "adicionar uma faixa Salário Fixo e outra Comissão"); `POST /api/funcoes/<id>` estendido via `funcao_aplicar`:
+  - **Salário Fixo** (R$) → `salario_fixo`.
+  - **Comissão:** checkbox **"por meta?"** (true/false) + **base** (líquido/fábrica):
+    - **por meta = não:** um **% simples**.
+    - **por meta = sim:** **faixas** `[{venda_ate, pct}]`.
+    - **Roteamento do dado (importante):** para a função **Consultor de Vendas** (`usa_comissao_vendas = True`) a comissão **É** o `config_financeira_json.comissao_vendas` da loja — que **também alimenta a negociação/margem** (`resolver_comissao_venda`, main.py:8425). Então o modal do Consultor **edita esse config da loja** (não pode migrar pra fora, senão quebra o cálculo do negócio). Para as demais funções, grava em `comissao_json` (usado só na Folha/futuro).
   - **Benefícios:** AT/VA/PS, cada um checkbox + valor R$ → `beneficios_json`.
 - Fonte única: tudo por função; nada digitado no funcionário.
 
