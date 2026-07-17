@@ -98,6 +98,29 @@ def test_preparar_comissao_etapa_sem_comissao_nao_cria(seed, app_db):
     db.close()
 
 
+def test_set_etapa_status_dispara_comissao(seed, app_db):
+    import main
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
+    fn = app_db.Funcao(loja_id=loja, nome="Montador", usa_comissao_vendas=0,
+                       comissao_json=json.dumps({"por_meta": False, "pct": 2.0}), status="ativo")
+    db.add(fn); db.flush()
+    f = app_db.Funcionario(loja_id=loja, nome="Mnt", funcao_id=fn.id, status="ativo"); db.add(f); db.flush()
+    db.add(app_db.Projeto(nome_safe="PHook", loja_id=loja, status="fechado"))
+    db.add(app_db.PoolAmbiente(projeto_id="PHook", nome="a", nome_exibicao="Sala",
+                               xml_path="x", ambientes_json="[]", order_total=5000.0))
+    db.add(app_db.AtribuicaoAmbiente(loja_id=loja, projeto_nome="PHook", papel="montagem",
+                                     funcionario_id=f.id, pool_ambiente_id=None))
+    db.add(app_db.CicloEtapa(projeto_nome="PHook", etapa_codigo="17", status="em_andamento",
+                             funcao_responsavel_id=fn.id, responsavel_funcionario_id=f.id))
+    db.commit()
+    main._set_etapa_status(db, "PHook", "17", "concluido", None); db.commit()
+    item = db.query(app_db.ComissaoFolha).filter_by(projeto_nome="PHook", etapa_codigo="17").first()
+    assert item is not None and item.valor == 100.0   # 5000 × 2%
+    assert item.competencia is not None
+    db.close()
+
+
 def test_cancelar_comissao_etapa(seed, app_db):
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id

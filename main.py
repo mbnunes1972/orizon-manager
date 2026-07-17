@@ -313,6 +313,13 @@ def _set_etapa_status(db, nome_safe, codigo, status, responsavel_id):
     if status in mod_ciclo.STATUS_CONCLUSIVOS:
         etapa.concluido_em = datetime.utcnow()
         etapa.responsavel_id = responsavel_id
+        try:                       # Fase 4: comissão do papel na conclusão da etapa (nunca bloqueia)
+            import mod_comissao
+            db.flush()             # concluido_em disponível
+            proj = db.query(Projeto).filter_by(nome_safe=nome_safe).first()
+            mod_comissao.preparar_comissao_etapa(db, (proj.loja_id if proj else None), etapa)
+        except Exception as _e:
+            print("[COMISSAO] preparar falhou:", _e)
     return etapa
 
 
@@ -5765,6 +5772,13 @@ class Handler(BaseHTTPRequestHandler):
                             e.iniciado_em    = None
                             e.concluido_em   = None
                             e.responsavel_id = None
+                            try:               # Fase 4: cancela comissão do papel reaberto (se não paga)
+                                import mod_comissao
+                                if e.responsavel_funcionario_id:
+                                    mod_comissao.cancelar_comissao_etapa(db, e.projeto_nome, e.etapa_codigo,
+                                                                         e.responsavel_funcionario_id)
+                            except Exception as _e:
+                                print("[COMISSAO] cancelar falhou:", _e)
                     log = LogAcaoGerencial(
                         solicitante_id=solicitante["id"],
                         autorizador_id=autorizador.id,
