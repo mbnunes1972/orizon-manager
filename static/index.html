@@ -9097,7 +9097,7 @@ async function adminRenderPlataforma(box){
   box.innerHTML = `
     <div class="card" style="padding:14px 16px">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
-        <strong style="color:var(--accent)"<i class="ti ti-building"></i> Redes</strong>
+        <strong style="color:var(--accent)"><i class="ti ti-building"></i> Redes</strong>
         <button class="btn btn-ghost btn-sm" onclick="adminRedeNova()" style="font-size:11px">+ Nova rede</button>
       </div>
       <table class="cli-table"><thead><tr><th>Nome</th><th>CNPJ</th><th></th></tr></thead><tbody>
@@ -13535,37 +13535,6 @@ function renderContratoUI(contrato) {
   `;
 }
 
-function _formGerarContrato() {
-  return `
-    <div style="display:flex;flex-direction:column;gap:8px;max-width:480px">
-      <label style="font-size:var(--fs-sm)">Endereço de instalação</label>
-      <div style="display:flex;gap:6px;align-items:center">
-        <input id="ctrt-end-instalacao" type="text" placeholder="Rua, nº - Bairro - Cidade/UF"
-          style="flex:1;background:var(--input);border:1px solid var(--border);
-          color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
-        <button onclick="copiarEnderecoCliente()" title="Copiar endereço do cliente"
-          style="background:none;border:1px solid var(--border);color:var(--muted);
-          padding:4px 8px;border-radius:4px;cursor:pointer;font-size:.8rem">= Cliente</button>
-      </div>
-      <label style="font-size:var(--fs-sm)">Entrada (R$)</label>
-      <input id="ctrt-entrada" type="number" value="0" min="0" step="100"
-        style="background:var(--input);border:1px solid var(--border);
-        color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
-      <label style="font-size:var(--fs-sm)">Descrição das parcelas</label>
-      <input id="ctrt-parcelas" type="text" placeholder="ex: 10x de R$ 4.820,00"
-        style="background:var(--input);border:1px solid var(--border);
-        color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem">
-      <label style="font-size:var(--fs-sm)">Adendo (opcional)</label>
-      <textarea id="ctrt-adendo" rows="3"
-        style="background:var(--input);border:1px solid var(--border);
-        color:var(--fg);padding:6px;border-radius:4px;font-size:.85rem;resize:vertical"></textarea>
-      <button onclick="gerarContrato()" class="btn-ciclo" style="align-self:flex-start">
-        Gerar Contrato
-      </button>
-    </div>
-  `;
-}
-
 function mascaraMoedaInput(el) {
   // Remove tudo exceto dígitos e vírgula
   const raw = el.value.replace(/[^0-9,]/g, '');
@@ -13670,24 +13639,6 @@ function _renderAssinaturas(lista) {
            </button>
          </div>`;
   }).join('');
-}
-
-async function copiarEnderecoCliente() {
-  try {
-    const rProj = await fetch(`/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}`,
-                              { credentials: 'same-origin' });
-    const dProj = await rProj.json();
-    const clienteId = dProj.projeto && dProj.projeto.cliente_id;
-    if (!clienteId) { showToast('Projeto sem cliente vinculado.', true); return; }
-    const rCli = await fetch(`/api/clientes/${clienteId}`, { credentials: 'same-origin' });
-    const dCli = await rCli.json();
-    const c = dCli.cliente;
-    if (!c) { showToast('Cliente não encontrado.', true); return; }
-    const end = [c.logradouro, c.numero, c.bairro, c.cidade, c.estado].filter(Boolean).join(', ');
-    const input = document.getElementById('ctrt-end-instalacao');
-    if (input && end) { input.value = end; }
-    else showToast('Endereço do cliente não cadastrado.', true);
-  } catch(e) { showToast('Erro ao buscar endereço: ' + e.message, true); }
 }
 
 // ── Aprovação de Orçamento (novo fluxo — contrato) ───────────────────────────
