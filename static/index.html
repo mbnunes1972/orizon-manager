@@ -3023,12 +3023,57 @@ async function cfgFuncaoNova(){
 }
 async function cfgFuncaoEditar(id){
   const f = _cfgFuncoesItens.find(x=>x.id===id) || {};
-  const nome = prompt('Nome da função:', f.nome||'');
-  if(nome===null) return;
-  const t = nome.trim(); if(!t) return;
-  const d = await (await fetch('/api/funcoes/'+id,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({nome:t})})).json().catch(()=>({}));
-  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
-  _funcoesCache = null; cfgFuncoesRender();
+  const dp = await fetch('/api/admin/perfis',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({perfis:[]}));
+  const perfis = dp.perfis || [];
+  const PAP = [['projeto_executivo','Projeto Executivo (PE)'],['medicao','Medição'],['montagem','Montagem'],['assistencia','Assistência']];
+  const atrib = new Set(f.atribuicoes||[]);
+  const lf = 'display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)';
+  const optSel = (val,opts) => '<option value="">—</option>'+opts.map(([v,l])=>`<option value="${v}" ${val===v?'selected':''}>${esc(l)}</option>`).join('');
+  const ex = document.getElementById('modal-funcao'); if(ex) ex.remove();
+  const ov = document.createElement('div');
+  ov.id = 'modal-funcao';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+  ov.innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:24px;max-width:480px;width:94%;max-height:90vh;overflow:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-family:var(--font-display);font-weight:900;font-size:16px">Editar Função</div>
+        <span onclick="document.getElementById('modal-funcao').remove()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
+      </div>
+      <input type="hidden" id="fn-id" value="${f.id}">
+      <label style="${lf};margin-bottom:8px"><span>Nome</span><input id="fn-nome" value="${esc(f.nome||'')}" style="padding:5px 8px"></label>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Atribuições (papéis)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:10px">
+        ${PAP.map(([v,l])=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" data-papel="${v}" ${atrib.has(v)?'checked':''}> ${esc(l)}</label>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px">
+        <label style="${lf}"><span>Perfil de usuário</span><select id="fn-perfil" style="padding:5px 8px"><option value="">— nenhum —</option>${perfis.map(p=>`<option value="${p.slug}" ${(f.perfil_padrao||'')===p.slug?'selected':''}>${esc(p.nome)}</option>`).join('')}</select></label>
+        <label style="${lf}"><span>Padrão de remuneração</span><select id="fn-remun" style="padding:5px 8px">${optSel(f.remuneracao_padrao,[['fixa','Fixa'],['variavel','Variável'],['fixa_variavel','Fixa + Variável']])}</select></label>
+        <label style="${lf}"><span>Regime de trabalho</span><select id="fn-regtrab" style="padding:5px 8px">${optSel(f.regime_trabalho,[['presencial','Presencial'],['remoto','Remoto'],['misto','Misto']])}</select></label>
+        <label style="${lf}"><span>Regime de contratação</span><select id="fn-regcontr" style="padding:5px 8px">${optSel(f.regime_contratacao,[['registrado','Registrado'],['terceirizacao','Terceirização']])}</select></label>
+      </div>
+      <div id="fn-erro" style="color:var(--muted);font-size:12px;min-height:16px;margin:10px 0"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-funcao').remove()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="cfgFuncaoSalvar()">Salvar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+}
+async function cfgFuncaoSalvar(){
+  const id = document.getElementById('fn-id').value;
+  const erro = document.getElementById('fn-erro');
+  const nome = (document.getElementById('fn-nome').value||'').trim();
+  if(!nome){ erro.textContent='Informe o nome.'; return; }
+  const atribuicoes = Array.from(document.querySelectorAll('#modal-funcao input[data-papel]:checked')).map(c=>c.getAttribute('data-papel'));
+  const body = { nome, atribuicoes,
+    perfil_padrao: document.getElementById('fn-perfil').value,
+    remuneracao_padrao: document.getElementById('fn-remun').value,
+    regime_trabalho: document.getElementById('fn-regtrab').value,
+    regime_contratacao: document.getElementById('fn-regcontr').value };
+  const d = await (await fetch('/api/funcoes/'+id,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json().catch(()=>({}));
+  if(!d.ok){ erro.textContent = d.erro||'Erro ao salvar.'; return; }
+  document.getElementById('modal-funcao').remove();
+  _funcoesCache = null; showToast('Função atualizada.', false); cfgFuncoesRender();
 }
 async function cfgFuncaoToggle(id, novo){
   const d = await (await fetch('/api/funcoes/'+id,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:novo})})).json().catch(()=>({}));
