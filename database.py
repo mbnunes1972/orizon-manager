@@ -240,6 +240,10 @@ class Funcao(Base):
     regime_trabalho    = Column(String(20),  nullable=True)   # presencial | remoto | misto
     regime_contratacao = Column(String(20),  nullable=True)   # registrado | terceirizacao
     descricao          = Column(Text,        nullable=True)   # descrição livre do que a função faz
+    salario_fixo        = Column(Float,   nullable=True)   # parte fixa mensal da função
+    beneficios_json     = Column(Text,    nullable=True)   # {"at":{"on","valor"},"va":..,"ps":..}
+    comissao_json       = Column(Text,    nullable=True)   # {"por_meta","base","pct"|"faixas"} (não-consultor)
+    usa_comissao_vendas = Column(Integer, default=0)       # 1 = comissão vem do comissao_vendas da loja (Consultor)
     criado_em = Column(DateTime,    default=datetime.utcnow)
 
 
@@ -1333,7 +1337,11 @@ def _migrar_colunas():
                                    ("remuneracao_padrao", "VARCHAR(20)"),
                                    ("regime_trabalho", "VARCHAR(20)"),
                                    ("regime_contratacao", "VARCHAR(20)"),
-                                   ("descricao", "TEXT")])
+                                   ("descricao", "TEXT"),
+                                   ("salario_fixo", "REAL"),
+                                   ("beneficios_json", "TEXT"),
+                                   ("comissao_json", "TEXT"),
+                                   ("usa_comissao_vendas", "INTEGER")])
         # Cronograma do Ciclo (Modulos_Orizon_v11): data prevista de conclusão por etapa
         # + Responsável por função (Modulos_Orizon_v12): função exigida + funcionário escolhido
         _add_cols("ciclo_etapas", [("data_prevista_conclusao","DATETIME"),
@@ -1661,6 +1669,10 @@ def _migrar_colunas_pg():
         "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS regime_trabalho VARCHAR(20)",
         "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS regime_contratacao VARCHAR(20)",
         "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS descricao TEXT",
+        "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS salario_fixo DOUBLE PRECISION",
+        "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS beneficios_json TEXT",
+        "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS comissao_json TEXT",
+        "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS usa_comissao_vendas INTEGER DEFAULT 0",
     ]
     with ENGINE.begin() as conn:
         for s in stmts:

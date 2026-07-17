@@ -189,12 +189,24 @@ def terc_aplicar(db, t, req, loja_id):
 
 # ── Tabela de Funções (Config) ───────────────────────────────────────────────
 def funcao_serialize(f, db=None):
+    def _load(s):
+        try: return _json.loads(s or "null")
+        except Exception: return None
+    com = _load(getattr(f, "comissao_json", None)) or {}
+    ben = _load(getattr(f, "beneficios_json", None)) or {}
     return {"id": f.id, "nome": f.nome, "status": f.status or "ativo",
             "perfil_padrao": getattr(f, "perfil_padrao", None),
             "descricao": getattr(f, "descricao", None),
             "remuneracao_padrao": getattr(f, "remuneracao_padrao", None),
             "regime_trabalho": getattr(f, "regime_trabalho", None),
-            "regime_contratacao": getattr(f, "regime_contratacao", None)}
+            "regime_contratacao": getattr(f, "regime_contratacao", None),
+            "salario_fixo": getattr(f, "salario_fixo", None),
+            "usa_comissao_vendas": bool(getattr(f, "usa_comissao_vendas", 0)),
+            "comissao": {"por_meta": bool(com.get("por_meta")),
+                         "base": com.get("base") if com.get("base") in ("liquido", "fabrica") else "liquido",
+                         "pct": com.get("pct"), "faixas": com.get("faixas") or []},
+            "beneficios": {k: {"on": bool((ben.get(k) or {}).get("on")),
+                               "valor": float((ben.get(k) or {}).get("valor") or 0.0)} for k in ("at", "va", "ps")}}
 
 
 def funcao_aplicar(db, f, req, loja_id):
@@ -214,6 +226,22 @@ def funcao_aplicar(db, f, req, loja_id):
         v = _s(req.get("regime_trabalho")); f.regime_trabalho = v if v in _REG_TRAB else None
     if "regime_contratacao" in req:
         v = _s(req.get("regime_contratacao")); f.regime_contratacao = v if v in _REG_CONTR else None
+    if "salario_fixo" in req:
+        f.salario_fixo = _f(req.get("salario_fixo"))
+    if "comissao" in req:
+        cm = req.get("comissao") or {}
+        base = cm.get("base"); base = base if base in ("liquido", "fabrica") else "liquido"
+        out = {"por_meta": bool(cm.get("por_meta")), "base": base}
+        if out["por_meta"]:
+            out["faixas"] = [{"venda_ate": _f(fx.get("venda_ate")), "pct": _f(fx.get("pct")) or 0.0}
+                             for fx in (cm.get("faixas") or []) if isinstance(fx, dict)]
+        else:
+            out["pct"] = _f(cm.get("pct")) or 0.0
+        f.comissao_json = _json.dumps(out)
+    if "beneficios" in req:
+        bn = req.get("beneficios") or {}
+        f.beneficios_json = _json.dumps({k: {"on": bool((bn.get(k) or {}).get("on")),
+                                             "valor": _f((bn.get(k) or {}).get("valor")) or 0.0} for k in ("at", "va", "ps")})
 
 
 def listar_funcoes(db, loja_id, ativos_only=False):
