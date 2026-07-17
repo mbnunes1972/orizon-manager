@@ -4,13 +4,18 @@
 **Formato:** cada cenário é para um testador **leigo** executar clicando exatamente o que está escrito, e
 marcar ✅ OK / ❌ NOK + observação. Ver o *template* na `2026-07-16-plano-de-testes.md` (Seção 4).
 
-> ⚠️ **Antes de começar — três coisas que confundem:**
+> ⚠️ **Antes de começar — coisas que confundem:**
 > 1. **Login é o CÓDIGO, não o e-mail.** O campo se chama "E-mail" e mostra um exemplo de e-mail, mas você
->    digita o **código de login** (ex.: `sad2026`). Ignore o formato de e-mail.
+>    digita o **código de login** (ex.: `sad2026`). Ignore o formato de e-mail (o sistema aceita).
 > 2. **Criar Rede e Loja abre uma "janelinha" do navegador** (aquele pop-up cinza de digitar texto), não um
->    formulário bonito dentro do sistema. É normal.
-> 3. **"PDV" não existe como item separado** no sistema — só existem **Rede** e **Loja**. Neste roteiro o
->    "PDV" é criado como **mais uma loja**. *(A confirmar com o responsável se o PDV deve ser tratado diferente.)*
+>    formulário dentro do sistema. É normal.
+> 3. **Na trilha do topo, os nomes aparecem prefixados:** uma rede chamada "Dalmóbile" aparece como
+>    **"Rede Dalmóbile"**; uma loja "Dalmóbile Taubaté" aparece como **"Loja Dalmóbile Taubaté"**. Por isso os
+>    nomes de exemplo abaixo **não** repetem a palavra "Rede"/"Loja".
+> 4. **"PV / PDV" (ponto de venda) ainda NÃO existe no sistema** — hoje só há **Rede** e **Loja**. Um PV é um
+>    *braço de venda* de uma loja (equipe e endereço próprios, **mesmo CNPJ da loja**), e isso é uma
+>    funcionalidade **a implementar** (ver "Pendências" no fim). Por isso este roteiro cria **as 4 lojas** e
+>    **não** cria o PV (criá-lo como uma loja separada daria CNPJ errado).
 
 **Usuários já existentes no ambiente (criados pela carga inicial):**
 
@@ -55,17 +60,17 @@ com o item **"Admin"** (engrenagem). A trilha no topo mostra **"Plataforma"**.
 1. Na barra lateral, clique em **"Admin"** (engrenagem).
 2. Confirme que a trilha no topo mostra **"Plataforma"**. Localize o quadro **"Redes"** (deve dizer "Nenhuma rede.").
 3. Clique no botão **"+ Nova rede"**.
-4. Vai abrir uma **janelinha do navegador** perguntando **"Nome da rede:"** — digite: `Rede Dalmóbile` e confirme (OK).
+4. Vai abrir uma **janelinha do navegador** perguntando **"Nome da rede:"** — digite: `Dalmóbile` e confirme (OK).
 5. Abre outra janelinha **"CNPJ (opcional):"** — pode deixar em branco e confirmar (OK).
 
-**Resultado esperado:** aparece a mensagem **"Rede criada."** e a rede **"Rede Dalmóbile"** passa a aparecer na
-tabela (colunas "Nome" e "CNPJ"), com um botão **"Entrar ›"** ao lado.
+**Resultado esperado:** aparece a mensagem **"Rede criada."** e a rede aparece na tabela (colunas "Nome" e
+"CNPJ"), com um botão **"Entrar ›"** ao lado. Na trilha do topo ela aparece como **"Rede Dalmóbile"**.
 
 **Registro:** ☐ OK ☐ NOK — Observação: __________________________________
 
 ---
 
-## PH-03 — Criar as 4 lojas + o "PDV" (5 lojas no total)
+## PH-03 — Criar as 4 lojas
 
 | Campo | Conteúdo |
 |-------|----------|
@@ -73,14 +78,13 @@ tabela (colunas "Nome" e "CNPJ"), com um botão **"Entrar ›"** ao lado.
 | **Pré-condições** | Ter criado a rede (PH-02) |
 
 > **Nota:** cada loja precisa de um **código de 3 letras único** (usado na numeração do contrato). Repita os
-> passos abaixo **5 vezes**, uma por loja da lista.
+> passos abaixo **4 vezes**, uma por loja da lista. *(O PV/PDV não entra aqui — ver o item 4 do aviso inicial.)*
 
 **Lista de lojas a criar (nome → código):**
 1. `Dalmóbile São José` → `DSJ`
 2. `Dalmóbile Taubaté` → `DTA`
 3. `Dalmóbile Jacareí` → `DJA`
 4. `Dalmóbile Caçapava` → `DCA`
-5. `PDV Shopping` → `PDV`  *(este é o "PDV" — criado como loja)*
 
 **Passos (repetir para cada loja da lista):**
 1. Na trilha do topo, clique em **"Rede Dalmóbile"** (para operar dentro da rede) — ou clique **"Entrar ›"** na linha da rede.
@@ -89,7 +93,7 @@ tabela (colunas "Nome" e "CNPJ"), com um botão **"Entrar ›"** ao lado.
 4. Na janelinha **"Código (3 letras, único…):"**, digite o **código** (ex.: `DSJ`) e confirme.
 5. Confirme a mensagem **"Loja criada."** e repita para a próxima loja da lista.
 
-**Resultado esperado:** ao final, a tabela **"Lojas da rede"** mostra as **5 lojas** (nome + código), cada uma
+**Resultado esperado:** ao final, a tabela **"Lojas da rede"** mostra as **4 lojas** (nome + código), cada uma
 com botão **"Entrar ›"**.
 
 **Registro:** ☐ OK ☐ NOK — Observação: __________________________________
@@ -111,8 +115,8 @@ com botão **"Entrar ›"**.
    - **Nome:** `Maria Consultora`
    - **Login:** `maria.dsj`
    - **Senha:** `teste123`
-   - **Perfil:** escolha **"Operador"** na lista *(Operador = consultor de vendas; as opções são Master, Gerencial, Operador)*.
-   - Os demais campos (Telefone, E-mail, CPF…) são opcionais.
+   - **Perfil:** escolha **"Operador"** na lista *(as opções são **Master**, **Gerencial**, **Operador**; Operador = consultor de vendas)*.
+   - Os demais campos (Telefone, E-mail, CPF…) são opcionais aqui.
 5. Clique no botão de salvar da janela.
 
 **Resultado esperado:** aparece **"Usuário criado."** e **"Maria Consultora"** passa a aparecer na lista de
@@ -134,18 +138,23 @@ usuários da loja. *(Opcional: repita criando um **"Master"** e um **"Gerencial"
 
 **Passos:**
 1. No console **"Admin"**, na tabela de lojas, clique **"Entrar ›"** em **"Dalmóbile Taubaté"**.
-2. Observe a **trilha no topo**: deve passar a mostrar **"…› Dalmóbile Taubaté"**.
+2. Observe a **trilha no topo**: deve passar a mostrar **"… › Loja Dalmóbile Taubaté"**.
 3. Para sair da loja, clique em **"Rede Dalmóbile"** (ou **"Plataforma"**) na própria trilha.
 
-**Resultado esperado:** ao entrar, a trilha mostra o nome da loja e você opera **dentro** dela; ao clicar no
-nível acima da trilha, você volta ao contexto da rede/plataforma.
+**Resultado esperado:** ao entrar, a trilha mostra **"Loja Dalmóbile Taubaté"** e você opera **dentro** dela; ao
+clicar no nível acima da trilha, você volta ao contexto da rede/plataforma.
 
 **Registro:** ☐ OK ☐ NOK — Observação: __________________________________
 
 ---
 
 ## Encerramento
-- [ ] Todos os cenários acima marcados ✅ OK.
+- [ ] Cenários PH-01 a PH-05 marcados ✅ OK.
 - [ ] Bugs/estranhezas anotados nas observações (com print, se possível).
+
+## Pendências conhecidas
+- **PV / Ponto de Venda:** ainda **não implementado**. Um PV é um braço de venda de uma loja (equipe e
+  endereço próprios, **mesmo CNPJ da loja**, que compõe a NF-e). Enquanto a funcionalidade não existir, o
+  "1 PDV" do go-live **não** é criável — não o crie como loja separada (daria CNPJ diferente).
 - Próximo roteiro: **`roteiro-PH-ciclo-venda.md`** (a venda de ponta a ponta), que usa uma dessas lojas e um
   usuário criado aqui.
