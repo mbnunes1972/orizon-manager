@@ -20,7 +20,7 @@ def test_editar_funcao_campos_novos(http_client_factory, seed, app_db):
     fid = _criar_funcao(app_db)
     c = http_client_factory(); c.login("dir_l1", "senha123")   # master
     st, out = c.post(f"/api/funcoes/{fid}", {
-        "atribuicoes": ["projeto_executivo", "medicao", "xxx_invalido"],
+        "descricao": "Elabora o projeto executivo e acompanha a obra.",
         "remuneracao_padrao": "fixa_variavel",
         "regime_trabalho": "misto",
         "regime_contratacao": "terceirizacao",
@@ -28,7 +28,7 @@ def test_editar_funcao_campos_novos(http_client_factory, seed, app_db):
     })
     assert out.get("ok"), out
     fn = next(x for x in _funcoes(c) if x["id"] == fid)
-    assert set(fn["atribuicoes"]) == {"projeto_executivo", "medicao"}   # inválido filtrado
+    assert fn["descricao"] == "Elabora o projeto executivo e acompanha a obra."
     assert fn["remuneracao_padrao"] == "fixa_variavel"
     assert fn["regime_trabalho"] == "misto"
     assert fn["regime_contratacao"] == "terceirizacao"

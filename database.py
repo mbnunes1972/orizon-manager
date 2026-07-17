@@ -239,6 +239,7 @@ class Funcao(Base):
     remuneracao_padrao = Column(String(20),  nullable=True)   # fixa | variavel | fixa_variavel
     regime_trabalho    = Column(String(20),  nullable=True)   # presencial | remoto | misto
     regime_contratacao = Column(String(20),  nullable=True)   # registrado | terceirizacao
+    descricao          = Column(Text,        nullable=True)   # descrição livre do que a função faz
     criado_em = Column(DateTime,    default=datetime.utcnow)
 
 
@@ -1331,7 +1332,8 @@ def _migrar_colunas():
                                    ("atribuicoes_json", "TEXT"),
                                    ("remuneracao_padrao", "VARCHAR(20)"),
                                    ("regime_trabalho", "VARCHAR(20)"),
-                                   ("regime_contratacao", "VARCHAR(20)")])
+                                   ("regime_contratacao", "VARCHAR(20)"),
+                                   ("descricao", "TEXT")])
         # Cronograma do Ciclo (Modulos_Orizon_v11): data prevista de conclusão por etapa
         # + Responsável por função (Modulos_Orizon_v12): função exigida + funcionário escolhido
         _add_cols("ciclo_etapas", [("data_prevista_conclusao","DATETIME"),
@@ -1658,6 +1660,7 @@ def _migrar_colunas_pg():
         "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS remuneracao_padrao VARCHAR(20)",
         "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS regime_trabalho VARCHAR(20)",
         "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS regime_contratacao VARCHAR(20)",
+        "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS descricao TEXT",
     ]
     with ENGINE.begin() as conn:
         for s in stmts:

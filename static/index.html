@@ -2621,10 +2621,12 @@ async function carregarUsuarioAutenticado(){
     // Perfil-4 (rev2 §2): navegação Admin/Config pela matriz de acesso do perfil (acessa_admin/config).
     // Esconde só quando o backend diz explicitamente NÃO (=== false); flag ausente (backend antigo/
     // pré-restart) NÃO esconde — evita "sumir os painéis" numa janela de deploy.
+    // super_admin: Admin/Config saem da sidebar por padrão — aparecem só ao "Administrar" uma loja (Painel Orizon).
+    const _ehSuper = !!(_usuarioAtual && _usuarioAtual.pode_gerir_redes);
     const _navAdmin = document.getElementById('nav-07');
-    if (_navAdmin) _navAdmin.style.display = (_usuarioAtual && _usuarioAtual.acessa_admin === false) ? 'none' : '';
+    if (_navAdmin) _navAdmin.style.display = (_ehSuper || (_usuarioAtual && _usuarioAtual.acessa_admin === false)) ? 'none' : '';
     const _navCfg = document.getElementById('nav-cfg');
-    if (_navCfg) _navCfg.style.display = (_usuarioAtual && _usuarioAtual.acessa_config === false) ? 'none' : '';
+    if (_navCfg) _navCfg.style.display = (_ehSuper || (_usuarioAtual && _usuarioAtual.acessa_config === false)) ? 'none' : '';
     // Painel Orizon (administração do sistema): só quem tem gerir_redes (exclusivo do super_admin).
     const _navOrizon = document.getElementById('nav-orizon');
     if (_navOrizon) _navOrizon.style.display = (_usuarioAtual && _usuarioAtual.pode_gerir_redes) ? '' : 'none';
@@ -3025,8 +3027,6 @@ async function cfgFuncaoEditar(id){
   const f = _cfgFuncoesItens.find(x=>x.id===id) || {};
   const dp = await fetch('/api/admin/perfis',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({perfis:[]}));
   const perfis = dp.perfis || [];
-  const PAP = [['projeto_executivo','Projeto Executivo (PE)'],['medicao','Medição'],['montagem','Montagem'],['assistencia','Assistência']];
-  const atrib = new Set(f.atribuicoes||[]);
   const lf = 'display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)';
   const optSel = (val,opts) => '<option value="">—</option>'+opts.map(([v,l])=>`<option value="${v}" ${val===v?'selected':''}>${esc(l)}</option>`).join('');
   const ex = document.getElementById('modal-funcao'); if(ex) ex.remove();
@@ -3041,10 +3041,7 @@ async function cfgFuncaoEditar(id){
       </div>
       <input type="hidden" id="fn-id" value="${f.id}">
       <label style="${lf};margin-bottom:8px"><span>Nome</span><input id="fn-nome" value="${esc(f.nome||'')}" style="padding:5px 8px"></label>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Atribuições (papéis)</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:10px">
-        ${PAP.map(([v,l])=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" data-papel="${v}" ${atrib.has(v)?'checked':''}> ${esc(l)}</label>`).join('')}
-      </div>
+      <label style="${lf};margin-bottom:10px"><span>Descrição (o que a função faz)</span><textarea id="fn-descricao" rows="2" style="padding:5px 8px;resize:vertical">${esc(f.descricao||'')}</textarea></label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px">
         <label style="${lf}"><span>Perfil de usuário</span><select id="fn-perfil" style="padding:5px 8px"><option value="">— nenhum —</option>${perfis.map(p=>`<option value="${p.slug}" ${(f.perfil_padrao||'')===p.slug?'selected':''}>${esc(p.nome)}</option>`).join('')}</select></label>
         <label style="${lf}"><span>Padrão de remuneração</span><select id="fn-remun" style="padding:5px 8px">${optSel(f.remuneracao_padrao,[['fixa','Fixa'],['variavel','Variável'],['fixa_variavel','Fixa + Variável']])}</select></label>
@@ -3064,8 +3061,7 @@ async function cfgFuncaoSalvar(){
   const erro = document.getElementById('fn-erro');
   const nome = (document.getElementById('fn-nome').value||'').trim();
   if(!nome){ erro.textContent='Informe o nome.'; return; }
-  const atribuicoes = Array.from(document.querySelectorAll('#modal-funcao input[data-papel]:checked')).map(c=>c.getAttribute('data-papel'));
-  const body = { nome, atribuicoes,
+  const body = { nome, descricao: document.getElementById('fn-descricao').value,
     perfil_padrao: document.getElementById('fn-perfil').value,
     remuneracao_padrao: document.getElementById('fn-remun').value,
     regime_trabalho: document.getElementById('fn-regtrab').value,
@@ -9295,6 +9291,7 @@ function empEscolher(id, ctx){
 function orizonAdministrarLoja(id){
   _lojaAtiva = id ? parseInt(id,10) : null;
   if (_lojaAtiva) localStorage.setItem('loja_ativa', String(_lojaAtiva));
+  ['nav-07','nav-cfg'].forEach(nid => { const n = document.getElementById(nid); if(n) n.style.display=''; });  // revela Admin/Config da loja
   goPage(7);   // Admin (4 abas da empresa: Dados da empresa / Usuários / Perfis de Usuário / Módulos)
 }
 document.addEventListener('click', function(ev){
@@ -9319,6 +9316,9 @@ function goPageOrizon(){
   if (nav) nav.classList.add('active');
   const sbParams = document.getElementById('sb-params'); if (sbParams) sbParams.style.display = 'none';
   _sbModuloAberto = null; _sbSecaoAtiva = null;                 // Orizon: nenhum módulo realçado
+  if (_usuarioAtual && _usuarioAtual.pode_gerir_redes) {       // volta à visão de sistema: esconde Admin/Config da loja
+    ['nav-07','nav-cfg'].forEach(nid => { const n = document.getElementById(nid); if(n) n.style.display='none'; });
+  }
   if (typeof sbNavRender === 'function') sbNavRender();
   orizonTab('redes');
 }
@@ -10720,7 +10720,8 @@ async function adminUsuariosCarregar() {
   const box = document.getElementById('admin-usuarios-lista');
   if (!box) return;
   try {
-    const r = await fetch('/api/admin/usuarios', { credentials: 'same-origin' });
+    const lid = _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id);   // escopa à empresa ativa (não traz plataforma)
+    const r = await fetch('/api/admin/usuarios' + (lid ? ('?escopo=loja&loja_id=' + lid) : ''), { credentials: 'same-origin' });
     const d = await r.json();
     if (!d.ok) { box.innerHTML = '<em style="color:var(--err)">' + esc(d.erro || 'Erro') + '</em>'; return; }
     box.innerHTML = `
