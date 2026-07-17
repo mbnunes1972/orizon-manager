@@ -3122,7 +3122,7 @@ function cfgRemuneracaoEditar(id){
   const ex=document.getElementById('modal-remun'); if(ex) ex.remove();
   const ov=document.createElement('div'); ov.id='modal-remun';
   ov.style.cssText='position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
-  ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:24px;max-width:480px;width:94%;max-height:90vh;overflow:auto">
+  ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:24px;max-width:560px;width:94%;max-height:90vh;overflow:auto">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
       <div style="font-family:var(--font-display);font-weight:900;font-size:16px">Remuneração — ${esc(f.nome||'')}</div>
       <span onclick="document.getElementById('modal-remun').remove()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
@@ -3150,8 +3150,8 @@ function _rmRenderFaixas(){
   let prev=0;
   box.innerHTML=_rmFaixas.map((fx,i)=>{
     const deLbl='De R$ '+Number(prev||0).toLocaleString('pt-BR');
-    const html=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:5px;font-size:12px;flex-wrap:wrap">
-      <span style="color:var(--muted);min-width:118px">${deLbl}</span><span style="color:var(--muted)">até R$</span>
+    const html=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:5px;font-size:12px;flex-wrap:nowrap">
+      <span style="color:var(--muted);min-width:112px;white-space:nowrap">${deLbl}</span><span style="color:var(--muted);white-space:nowrap">até R$</span>
       <input type="number" step="0.01" value="${fx.venda_ate!=null?fx.venda_ate:''}" placeholder="(vazio = acima)" onchange="_rmFaixas[${i}].venda_ate=this.value===''?null:parseFloat(this.value); _rmRenderFaixas()" style="width:130px;padding:4px 8px">
       <span style="color:var(--muted)">→</span>
       <input type="number" step="0.01" value="${fx.pct!=null?fx.pct:''}" placeholder="%" onchange="_rmFaixas[${i}].pct=parseFloat(this.value)||0" style="width:70px;padding:4px 8px"><span style="color:var(--muted)">%</span>
@@ -10735,7 +10735,12 @@ function cvAdicionarLimite(desc_acima, redutor){
   ]);
   document.getElementById('cv-limites-tbody').appendChild(tr);
 }
-function abrirModalComissao(lid){
+async function abrirModalComissao(lid){
+  // Carrega a config financeira da loja (senão faixas/limitador aparecem vazios e o salvar corromperia).
+  try{
+    const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {credentials:'same-origin'});
+    _cfgFin = (await r.json().catch(()=>({}))).config || _cfgFin || {};
+  }catch(e){ _cfgFin = _cfgFin || {}; }
   const cv = _cfgFin.comissao_vendas || (_cfgFin.comissao_vendas = {
     meta_mensal: 0,
     faixas_comissao: [{venda_ate: null, pct: 0}],
@@ -10779,7 +10784,12 @@ async function salvarModalComissao(lid){
     limitador_desconto: {ativo, base_desconto: base, limites}
   };
   fecharModalComissao();
-  await adminFinanceiroSalvar(lid);
+  // Salva só via config-financeira (NÃO adminFinanceiroSalvar — aquele lê o DOM das provisões, ausente aqui).
+  const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {method:'PUT', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(_cfgFin)});
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ showToast(d.erro||'Erro ao salvar comissão de vendas.', true); return; }
+  showToast('Comissão de vendas salva.', false);
 }
 
 async function adminRenderProjeto(box){
