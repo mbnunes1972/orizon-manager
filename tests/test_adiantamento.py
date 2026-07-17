@@ -94,6 +94,24 @@ def test_pagar_quita_adiantamentos_da_competencia(seed, app_db):
     db.close()
 
 
+def test_adiantamento_crud_endpoint(http_client_factory, seed, app_db):
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    f = app_db.Funcionario(loja_id=loja, nome="CrudFunc", status="ativo"); db.add(f); db.commit(); fid = f.id; db.close()
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/adiantamentos", {"funcionario_id": fid, "tipo": "emprestimo",
+        "competencia": "2026-07", "valor": 500.0, "abater": True, "competencia_abate": "2026-08"})
+    assert st in (200, 201), d
+    aid = d["id"]
+    st2, d2 = c.patch("/api/adiantamentos/%d" % aid, {"abater": False})
+    assert st2 == 200 and d2["abater"] is False
+    st3, d3 = c.patch("/api/adiantamentos/%d" % aid, {"remover": True})
+    assert st3 == 200 and d3.get("removido") is True
+    db2 = app_db.get_session()
+    assert db2.query(app_db.AdiantamentoFuncionario).filter_by(id=aid).first() is None
+    db2.close()
+
+
 def test_quitar_da_competencia(seed, app_db):
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id

@@ -18,6 +18,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente,
                        PerfilEmissao, CicloLogistico, CicloLogisticoTransicao, AssistenciaCaso,
                        Funcionario, Fornecedor, Terceiro, Funcao, FolhaPagamento, ComissaoFolha,
+                       AdiantamentoFuncionario,
                        AtribuicaoAmbiente, ArquivoPE, ParcelaProjeto, ParcelaAmbiente)
 import mod_expedicao
 import mod_assistencias
@@ -3162,6 +3163,36 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": err}, code=400); return
                 db.commit()
                 self.send_json({"ok": True})
+            except Exception as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        # ── Adiantamentos/Empréstimos: criar (Fase 5) ───────────────────────────────────
+        if path == "/api/adiantamentos":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                r = json.loads(body or b'{}')
+                fid = int(r.get("funcionario_id") or 0)
+                if not db.query(Funcionario).filter_by(id=fid, loja_id=loja_id).first():
+                    self.send_json({"ok": False, "erro": "Funcionário inválido"}, code=400); return
+                a = AdiantamentoFuncionario(
+                    loja_id=loja_id, funcionario_id=fid,
+                    tipo=(r.get("tipo") or "adiantamento"), competencia=(r.get("competencia") or ""),
+                    valor=float(r.get("valor") or 0.0), abater=(1 if r.get("abater", True) else 0),
+                    competencia_abate=(r.get("competencia_abate") or r.get("competencia") or None),
+                    observacao=(r.get("observacao") or None))
+                db.add(a); db.commit()
+                self.send_json({"ok": True, "id": a.id, "tipo": a.tipo, "valor": a.valor,
+                                "abater": bool(a.abater)}, code=201)
             except Exception as e:
                 db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
             finally:
@@ -7602,6 +7633,38 @@ class Handler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(length) if length else b'{}'
+
+            # ── Adiantamentos: editar (abater/quitado/valor/competência) ou remover (Fase 5) ──
+            m = re.match(r'^/api/adiantamentos/(\d+)$', path)
+            if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    a = db.query(AdiantamentoFuncionario).filter_by(id=int(m.group(1)), loja_id=loja_id).first()
+                    if a is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    r = json.loads(body or b'{}')
+                    if r.get("remover"):
+                        db.delete(a); db.commit()
+                        self.send_json({"ok": True, "removido": True}); return
+                    if "abater" in r:            a.abater = 1 if r["abater"] else 0
+                    if "quitado" in r:           a.quitado = 1 if r["quitado"] else 0
+                    if "valor" in r:             a.valor = float(r["valor"] or 0.0)
+                    if "competencia_abate" in r: a.competencia_abate = r["competencia_abate"] or None
+                    db.commit()
+                    self.send_json({"ok": True, "id": a.id, "abater": bool(a.abater),
+                                    "quitado": bool(a.quitado), "valor": a.valor})
+                except Exception as e:
+                    db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
 
             # ── Comissão: editar base ajustada de um item e recalcular valor (Fase 4) ──
             m = re.match(r'^/api/comissao/(\d+)$', path)
