@@ -130,8 +130,15 @@ DATABASE_URL="$ORIZON_HOMOLOG_DB" python3 seed.py        # cria schema + usuario
 screen -S orizon-homolog -dm bash -c 'cd /root/orizon-homolog && \
   ORIZON_HOST=0.0.0.0 ORIZON_PORT=8766 DATABASE_URL="sqlite:////root/orizon-homolog-data/orizon_homolog.db" \
   python3 main.py > app.log 2>&1'
-sleep 3; ss -ltnp | grep 8766; tail -8 app.log
-curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:8766   # esperado: 302
+# Espera por CONDICAO (nao `sleep 3` cego): o 1o boot importa muita coisa e pode passar de 3s —
+# um curl cedo demais devolve 000 (falso alarme de "nao subiu"). Faz poll ate a porta responder.
+for i in $(seq 1 30); do
+  code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8766 || true)
+  [ "$code" = "302" ] && break
+  sleep 1
+done
+ss -ltnp | grep 8766; tail -8 app.log
+echo "HTTP: $code (esperado 302)"   # se ficar em 000 apos 30s, veja o traceback em app.log
 ```
 **Atualizar a B (promover novo build):** no `/root/orizon-homolog`, `git fetch --tags && git checkout
 <NOVA_TAG>`, mate o screen `orizon-homolog` e suba de novo (NUNCA `git reset --hard origin/main` aqui —
