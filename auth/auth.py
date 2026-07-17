@@ -46,8 +46,27 @@ def fazer_login(login: str, senha: str) -> dict:
         return {
             "ok":      True,
             "token":   token,
+            "precisa_trocar_senha": bool(usuario.senha_provisoria),
             "usuario": _usuario_dict(usuario)
         }
+    finally:
+        db.close()
+
+
+def trocar_senha(usuario_id: int, nova_senha: str):
+    """Define nova senha e limpa a flag senha_provisoria. Retorna (ok, erro)."""
+    nova = (nova_senha or "").strip()
+    if len(nova) < 6:
+        return False, "A senha deve ter ao menos 6 caracteres."
+    db = get_session()
+    try:
+        u = db.get(Usuario, usuario_id)
+        if not u:
+            return False, "Usuário não encontrado."
+        u.set_senha(nova)
+        u.senha_provisoria = 0
+        db.commit()
+        return True, None
     finally:
         db.close()
 
@@ -189,6 +208,7 @@ def _usuario_dict(u: Usuario) -> dict:
         "pode_gerir_redes":    perfis.pode(u.nivel, "gerir_redes"),
         "pode_gerir_lojas":    perfis.pode(u.nivel, "gerir_lojas"),
         "pode_editar_dados_loja": perfis.pode(u.nivel, "editar_dados_loja"),
+        "precisa_trocar_senha": bool(getattr(u, "senha_provisoria", 0)),
     }
 
 

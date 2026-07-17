@@ -163,6 +163,21 @@ def handle_auth_post(handler, path: str, body: bytes) -> bool:
         _send_json(handler, {"ok": True})
         return True
 
+    if path == "/api/auth/trocar-senha":
+        usuario = get_usuario_sessao(handler)
+        if not usuario:
+            _send_json(handler, {"ok": False, "erro": "Não autenticado."}, 401)
+            return True
+        try:
+            dados = json.loads(body)
+        except Exception:
+            _send_json(handler, {"ok": False, "erro": "JSON inválido."}, 400)
+            return True
+        from . import auth as _auth
+        ok, erro = _auth.trocar_senha(usuario["id"], dados.get("nova_senha", ""))
+        _send_json(handler, {"ok": True} if ok else {"ok": False, "erro": erro}, 200 if ok else 400)
+        return True
+
     if path == "/api/auth/preferencias":
         usuario = get_usuario_sessao(handler)
         if not usuario:

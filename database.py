@@ -60,6 +60,7 @@ class Usuario(Base):
     cpf           = Column(String(20),  nullable=True)
     whatsapp      = Column(String(20),  nullable=True)
     ativo         = Column(Integer,     default=1)
+    senha_provisoria = Column(Integer,  default=0)   # 1 = precisa trocar a senha no 1º login
     funcionario_id = Column(Integer,    ForeignKey("funcionarios.id"), nullable=True)  # RH (Cadastro) que esta conta representa
     # Função (cargo) da CONTA quando não há Funcionário vinculado (Perfil-4 rev2 §2): a coluna Função
     # de Usuários da Loja usa Funcionario.funcao_id se houver vínculo, senão este funcao_id.
@@ -1136,6 +1137,8 @@ def _migrar_colunas():
             cur.execute("ALTER TABLE usuarios ADD COLUMN tema VARCHAR(10) DEFAULT 'escuro'")
         if "funcionario_id" not in usr_cols:
             cur.execute("ALTER TABLE usuarios ADD COLUMN funcionario_id INTEGER")   # boundary Funcionário↔Usuário (v9)
+        if "senha_provisoria" not in usr_cols:
+            cur.execute("ALTER TABLE usuarios ADD COLUMN senha_provisoria INTEGER DEFAULT 0")
 
         # ── projetos_meta ─────────────────────────────────────────────────────
         cur.execute("PRAGMA table_info(projetos_meta)")
