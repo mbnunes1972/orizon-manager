@@ -20,9 +20,26 @@ def _hash_senha(senha: str) -> str:
 # = comportamento antigo (SQLite local, dev). DATABASE_URL setada (produção, pós-cutover) = Postgres,
 # ex.: postgresql+psycopg2://orizon:<senha>@localhost/orizon
 BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
-DB_PATH      = os.path.join(BASE_DIR, "orizon.db")
+
+
+def _resolver_config_db(database_url, default_db_path):
+    """Resolve (db_path, engine_url) a partir da DATABASE_URL, para permitir banco
+    SEPARADO por instância (ex.: INTEGRAÇÃO :8765 e PRÉ-HOMOLOGAÇÃO :8766 no mesmo
+    servidor — ver Plano de Testes / instância B).
+
+    `sqlite:///<arquivo>`: db_path SEGUE esse arquivo. É crucial — as migrações de
+    init_db (_migrar_pre_schema/_migrar_colunas/_migrar_dados) usam `sqlite3.connect(DB_PATH)`
+    direto; se db_path ficasse no orizon.db default enquanto o engine usa outro arquivo,
+    a instância B mexeria no banco da instância A (contaminação cruzada).
+    Postgres/None: db_path fica no default (em não-sqlite as migrações sqlite3 são puladas)."""
+    if database_url and database_url.startswith("sqlite:///"):
+        return database_url[len("sqlite:///"):], database_url
+    return default_db_path, (database_url or f"sqlite:///{default_db_path}")
+
+
 DATABASE_URL = os.environ.get("DATABASE_URL")
-ENGINE       = create_engine(DATABASE_URL or f"sqlite:///{DB_PATH}", echo=False)
+DB_PATH, _ENGINE_URL = _resolver_config_db(DATABASE_URL, os.path.join(BASE_DIR, "orizon.db"))
+ENGINE       = create_engine(_ENGINE_URL, echo=False)
 Session      = sessionmaker(bind=ENGINE)
 
 # ── Base ─────────────────────────────────────────────────────────────────────

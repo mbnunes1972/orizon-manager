@@ -18,8 +18,8 @@ Quatro ambientes, do menos ao mais protegido. Cada push tem um destino claro.
 | # | Ambiente | Onde | Banco | Quem usa / propósito | Como atualiza |
 |---|----------|------|-------|----------------------|---------------|
 | 1 | **DEV (local)** | `localhost:8765` na máquina de cada dev | SQLite (`orizon.db`) | Cada dev: testes rápidos + **Vera** (QA principal) | Manual, local |
-| 2 | **INTEGRAÇÃO** | `167.88.33.121` — instância A | Postgres | Devs descentralizados: integração contínua | **Auto** do `main` |
-| 3 | **PRÉ-HOMOLOGAÇÃO** | `167.88.33.121` — instância B (porta/serviço + DB próprios) | Postgres | Leigos executando roteiros: aceite formal | **Tag fixada**, gated por você |
+| 2 | **INTEGRAÇÃO** | `167.88.33.121:8765` — instância A | Postgres | Devs descentralizados: integração contínua | **Auto** do `main` |
+| 3 | **PRÉ-HOMOLOGAÇÃO** | `167.88.33.121:8766` — instância B (serviço + DB próprios) | Postgres | Leigos executando roteiros: aceite formal | **Tag fixada**, gated por você |
 | 4 | **PRODUÇÃO** | `orizonsolution.com.br` (`179.197.77.9`) | Postgres | Dados reais; go-live 01/08/2026 | **Tag**, deploy manual, protegido |
 
 **Fluxo do código:** `feature branch → main (INTEGRAÇÃO) → tag → PRÉ-HOMOLOGAÇÃO → mesma tag → PRODUÇÃO`.
@@ -36,6 +36,23 @@ Quatro ambientes, do menos ao mais protegido. Cada push tem um destino claro.
 - **Produção é 100% protegida:** nenhum teste destrutivo, sem acesso SSH compartilhado dos devs, deploy
   só de tag aprovada. A "camada extra de pré-homologação" prevista (servidor dedicado) pode nascer depois
   promovendo a instância B para uma VPS própria, sem mudar este conceito.
+
+### Levantar a instância B (PRÉ-HOMOLOGAÇÃO) — CÓDIGO PRONTO, falta provisionar
+Os dois pré-requisitos de **código** estão implementados e na `main` (2026-07-16):
+1. ✅ **Porta parametrizável** — `ORIZON_PORT` (default 8765) em `main.py` (`porta_do_ambiente`). B sobe com
+   `ORIZON_PORT=8766`. Valor inválido/fora de faixa → erro claro no bootstrap.
+2. ✅ **Banco separado por instância** — `database._resolver_config_db`: com `DATABASE_URL=sqlite:///<arquivo>`,
+   `DB_PATH` segue o arquivo, então as migrações `sqlite3` não tocam o `orizon.db` da instância A
+   (contaminação cruzada). Postgres também isola (via `DATABASE_URL`).
+
+**Falta (não é código):** provisionar a instância B no servidor `167.88.33.121` — clone separado
+`/root/orizon-homolog` na tag de homolog, `:8766`, banco próprio. **Runbook pronto** em `DEV_RULES.md`
+(subseção "Instância B — PRÉ-HOMOLOGAÇÃO (:8766)"). Precisa de sessão SSH interativa (não automatizável
+sem risco no servidor compartilhado).
+
+**Paridade:** a ponte é um **SQLite separado** (isola já, sem instalar Postgres no servidor antigo); o alvo
+da spec é **Postgres** na homolog — trocar a `DATABASE_URL` por um Postgres dedicado quando o servidor
+antigo migrar. Ver `2026-07-15-migracao-postgresql.md`.
 
 ---
 

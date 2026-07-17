@@ -580,7 +580,8 @@ def _loja_admin_alvo(usuario):
     super_admin opera na loja selecionada no console (header X-Loja-Ativa); demais
     perfis usam a própria loja."""
     if usuario.get("nivel") == "super_admin":
-        return _REQ_LOJA_ATIVA or usuario.get("loja_id")
+        # header PRESENTE (mesmo 0) vence; só cai pra loja própria quando AUSENTE (None).
+        return _REQ_LOJA_ATIVA if _REQ_LOJA_ATIVA is not None else usuario.get("loja_id")
     return usuario.get("loja_id")
 
 
@@ -590,6 +591,24 @@ def mod_perfis_opcoes():
     doms = [{"id": d["id"], "rotulo": d["rotulo"]} for d in modulos.dominios_com_rotulo()]
     return {"dominios": doms, "paineis": [{"id": "admin", "rotulo": "Painel Administração"},
                                           {"id": "config", "rotulo": "Painel Config"}]}
+
+
+def porta_do_ambiente(environ=None):
+    """Porta de bind, lida de ORIZON_PORT (default 8765) — espelha ORIZON_HOST.
+    Permite subir uma 2ª instância no mesmo servidor (pré-homologação em :8766).
+    Valor inválido/fora de 1-65535 dá erro CLARO no bootstrap: não cai calado numa
+    porta errada (mesma lição do header de loja inexistente)."""
+    environ = os.environ if environ is None else environ
+    raw = environ.get("ORIZON_PORT")
+    if not raw:                       # ausente ou "" → default
+        return 8765
+    try:
+        p = int(raw)
+    except (TypeError, ValueError):
+        raise ValueError("ORIZON_PORT inválido: %r (esperado inteiro 1-65535)" % (raw,))
+    if not (1 <= p <= 65535):
+        raise ValueError("ORIZON_PORT fora de faixa: %d (esperado 1-65535)" % p)
+    return p
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -7823,7 +7842,7 @@ class Handler(BaseHTTPRequestHandler):
                 db = get_session()
                 try:
                     from auth import perfil_store
-                    p, err = perfil_store.editar_perfil(db, usuario.get("loja_id"), m_perfil.group(1),
+                    p, err = perfil_store.editar_perfil(db, _loja_admin_alvo(usuario), m_perfil.group(1),
                                 nome=req.get("nome"), modulos=req.get("modulos"),
                                 capacidades=req.get("capacidades"))
                     if not p:
@@ -8644,6 +8663,10 @@ def _ator_dict(db, usuario_sessao, header_loja_id=None):
     membership = membership_loja_ids(db, u.id)
     is_super = (u.nivel == "super_admin")
     active = mod_tenancy.resolver_loja_ativa(membership, header_loja_id, u.loja_id, is_super=is_super)
+    # super_admin confia no header pra "entrar" na loja; mas header apontando loja inexistente
+    # não pode virar loja ativa 'válida' (viraria tela vazia silenciosa) — trata como sem loja.
+    if is_super and active is not None and db.get(Loja, active) is None:
+        active = None
     return {"nivel": u.nivel, "loja_id": u.loja_id, "rede_id": u.rede_id,
             "active_loja_id": active, "lojas_ids": membership}
 
@@ -9103,7 +9126,9 @@ def main():
     # (migrações margens->orcamento e margens->parametros removidas na faxina: a coluna
     #  Orcamento.margens foi removida; parâmetros vêm de Projeto.parametros_json e o desconto
     #  de Orcamento.desconto_pct.)
-    port   = 8765
+    # Porta de bind configurável via ORIZON_PORT (default 8765). Permite 2 instâncias
+    # no mesmo servidor (ex.: INTEGRAÇÃO :8765 e PRÉ-HOMOLOGAÇÃO :8766).
+    port   = porta_do_ambiente()
     # Host de bind configurável: padrão 127.0.0.1 (dev local seguro);
     # em produção defina ORIZON_HOST=0.0.0.0 para aceitar acesso externo.
     host   = os.environ.get("ORIZON_HOST", "127.0.0.1")

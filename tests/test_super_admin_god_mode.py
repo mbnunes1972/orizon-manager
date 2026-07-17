@@ -95,3 +95,69 @@ def test_super_admin_acessa_cadastro_ao_entrar_na_loja(http_client_factory, seed
     c.loja_ativa = l1                               # "entra" na loja L1
     st_com, body = c.get("/api/funcionarios")
     assert st_com == 200 and body["ok"] is True, (st_com, body)
+
+
+# ── Correções da auditoria (Vera, 2026-07-16) ──────────────────────────────────
+
+def test_super_admin_edita_perfil_na_loja_escolhida(http_client_factory, seed, app_db):
+    """🔴 Bloqueante: o PUT de edição usava usuario.loja_id (None p/ super_admin) e nunca
+    casava (PerfilAcesso.loja_id é NOT NULL). Deve escopar pela loja do header, como o POST."""
+    db = app_db.get_session()
+    l1 = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    db.close()
+    c = http_client_factory(); c.login("super", "senha123")
+    c.loja_ativa = l1
+    st, out = c.post("/api/admin/perfis", {"nome": "Vendas Edita", "base": "operador",
+                                           "modulos": ["cadastro"]})
+    assert st == 201 and out["ok"], (st, out)
+    db = app_db.get_session()
+    slug = db.query(app_db.PerfilAcesso).filter_by(nome="Vendas Edita").first().slug
+    db.close()
+    # a UI edita perfil via PATCH /api/admin/perfis/<slug> (index.html) — não PUT
+    st2, out2 = c._req("PATCH", "/api/admin/perfis/%s" % slug,
+                       {"nome": "Vendas Edita 2", "modulos": ["cadastro", "comercial"]})
+    assert st2 == 200 and out2.get("ok"), (st2, out2)
+    assert out2["perfil"]["nome"] == "Vendas Edita 2"
+
+
+def test_super_admin_loja_inexistente_no_header_barra_operacional(http_client_factory, seed):
+    """🟠 #1: header X-Loja-Ativa apontando loja inexistente não deve virar loja ativa
+    'válida' (tela vazia silenciosa) — o operacional fecha (403), como sem loja."""
+    c = http_client_factory(); c.login("super", "senha123")
+    c.loja_ativa = 999999                            # loja que não existe
+    st, _ = c.get("/api/funcionarios")
+    assert st == 403
+
+
+def test_loja_admin_alvo_header_zero_nao_cai_para_loja_propria(servidor, monkeypatch):
+    """🟠 #2: distinguir header AUSENTE (None) de header PRESENTE porém 0 — usar
+    `is not None`, não `or` (0 é falsy). Header presente é respeitado verbatim."""
+    import main
+    monkeypatch.setattr(main, "_REQ_LOJA_ATIVA", 0)
+    assert main._loja_admin_alvo({"nivel": "super_admin", "loja_id": 9}) == 0
+    monkeypatch.setattr(main, "_REQ_LOJA_ATIVA", None)
+    assert main._loja_admin_alvo({"nivel": "super_admin", "loja_id": 9}) == 9
+
+
+def test_auth_me_super_admin_reflete_modulos_da_loja_ativa(http_client_factory, seed, app_db):
+    """🟠 #3: /api/auth/me deve ler X-Loja-Ativa p/ super_admin, refletindo os
+    modulos_ativos da loja em que ele entrou — não sempre 'tudo ligado'."""
+    import json as _json
+    db = app_db.get_session()
+    l1 = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    loja = db.get(app_db.Loja, l1)
+    orig = loja.modulos_ativos
+    loja.modulos_ativos = _json.dumps(["cadastro", "comercial"])   # financeiro desligado
+    db.commit(); db.close()
+    try:
+        c = http_client_factory(); c.login("super", "senha123")
+        c.loja_ativa = l1
+        st, body = c.get("/api/auth/me")
+        assert st == 200 and body["ok"], (st, body)
+        mods = set(body["usuario"]["modulos_ativos"])
+        assert "cadastro" in mods, mods
+        assert "financeiro" not in mods, mods
+    finally:
+        db = app_db.get_session()
+        db.get(app_db.Loja, l1).modulos_ativos = orig
+        db.commit(); db.close()
