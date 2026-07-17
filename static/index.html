@@ -9259,7 +9259,7 @@ async function empresaSeletorHTML(ctx){
   const curNome = atual ? atual.nome : '';
   return `<div class="emp-seletor" style="position:relative;max-width:340px;margin-bottom:12px;font-size:13px">
     <input id="emp-inp-${ctx}" type="text" autocomplete="off" placeholder="Empresa — buscar por nome ou CNPJ…"
-      value="${esc(curNome)}" oninput="empBusca('${ctx}')" onfocus="empBusca('${ctx}')"
+      value="${esc(curNome)}" oninput="empBusca('${ctx}')" onfocus="this.select();empBusca('${ctx}',true)"
       style="width:100%;padding:6px 10px;box-sizing:border-box">
     <div id="emp-drop-${ctx}" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;max-height:280px;overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);margin-top:2px"></div>
   </div>`;
@@ -9270,10 +9270,11 @@ async function _empSeletorPreencher(containerId){
   el.innerHTML = await empresaSeletorHTML(ctx);
 }
 function _empDigitos(s){ return (s||'').replace(/\D/g,''); }
-function empBusca(ctx){
+function empBusca(ctx, todas){
   const inp = document.getElementById('emp-inp-'+ctx), drop = document.getElementById('emp-drop-'+ctx);
   if(!inp || !drop) return;
-  const q = (inp.value||'').trim().toLowerCase(), qd = _empDigitos(inp.value);
+  const raw = todas ? '' : (inp.value||'');   // no foco (todas) ignora o valor pré-preenchido -> mostra todas
+  const q = raw.trim().toLowerCase(), qd = _empDigitos(raw);
   const cur = _empresaAtivaId();
   const match = (_empresas||[]).filter(e =>
     (!q && !qd) || (q && (e.nome||'').toLowerCase().indexOf(q) !== -1) ||
