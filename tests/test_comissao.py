@@ -121,6 +121,57 @@ def test_set_etapa_status_dispara_comissao(seed, app_db):
     db.close()
 
 
+def test_gerar_folha_soma_itens_de_comissao(seed, app_db):
+    import mod_folha, mod_provisoes
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
+    fn = app_db.Funcao(loja_id=loja, nome="Montador", salario_fixo=1000.0, usa_comissao_vendas=0, status="ativo")
+    db.add(fn); db.flush()
+    f = app_db.Funcionario(loja_id=loja, nome="Mnt", funcao_id=fn.id, status="ativo"); db.add(f); db.flush()
+    for i, v in enumerate((150.0, 250.0)):
+        db.add(app_db.ComissaoFolha(loja_id=loja, funcionario_id=f.id, competencia="2026-07",
+               origem="papel", papel="montagem", projeto_nome="P%d" % i, etapa_codigo="17",
+               base=0.0, pct=0.0, valor=v, status="previsto", ref_etapa="P%d:17:%d" % (i, f.id)))
+    db.commit()
+    cfg = mod_provisoes.config_financeira_default()
+    mod_folha.gerar_folha(db, loja, "2026-07", cfg); db.commit()
+    reg = db.query(app_db.FolhaPagamento).filter_by(funcionario_id=f.id, competencia="2026-07").first()
+    assert reg.parte_variavel == 400.0        # 150 + 250
+    assert reg.total == 1400.0                # fixa 1000 + 400
+    # item cancelado não soma
+    db.query(app_db.ComissaoFolha).filter_by(ref_etapa="P0:17:%d" % f.id).first().status = "cancelado"
+    db.commit()
+    mod_folha.gerar_folha(db, loja, "2026-07", cfg); db.commit()
+    db.refresh(reg)
+    assert reg.parte_variavel == 250.0
+    db.close()
+
+
+def test_gerar_folha_consultor_vira_item_venda(seed, app_db):
+    import mod_folha, mod_provisoes
+    from datetime import datetime
+    db = app_db.get_session()
+    u = db.query(app_db.Usuario).filter_by(login="cons_l1").first()
+    loja = u.loja_id
+    fn = app_db.Funcao(loja_id=loja, nome="Consultor de Vendas", salario_fixo=2000.0,
+                       usa_comissao_vendas=1, status="ativo")
+    db.add(fn); db.flush()
+    f = app_db.Funcionario(loja_id=loja, nome="Vend", funcao_id=fn.id, usuario_id=u.id, status="ativo")
+    db.add(f); db.flush()
+    db.add(app_db.Projeto(nome_safe="PV", loja_id=loja, criado_por_id=u.id,
+                          status="fechado", status_at=datetime(2026, 7, 10)))
+    db.add(app_db.Orcamento(projeto_id="PV", nome="O", ordem=1, loja_id=loja, valor_liquido=10000.0))
+    db.commit()
+    cfg = mod_provisoes.config_financeira_default()
+    cfg["comissao_vendas"]["faixas_comissao"] = [{"venda_ate": None, "pct": 3.0}]
+    mod_folha.gerar_folha(db, loja, "2026-07", cfg); db.commit()
+    item = db.query(app_db.ComissaoFolha).filter_by(ref_etapa="venda:%d:2026-07" % f.id).first()
+    assert item is not None and item.origem == "venda" and item.valor == 300.0
+    reg = db.query(app_db.FolhaPagamento).filter_by(funcionario_id=f.id, competencia="2026-07").first()
+    assert reg.parte_variavel == 300.0 and reg.total == 2300.0    # fixa 2000 + comissão 300
+    db.close()
+
+
 def test_cancelar_comissao_etapa(seed, app_db):
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id

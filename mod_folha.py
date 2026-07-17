@@ -10,7 +10,7 @@ from datetime import datetime
 
 import mod_contabil
 import mod_provisoes
-from database import Funcionario, Funcao, Projeto, Orcamento, FolhaPagamento
+from database import Funcionario, Funcao, Projeto, Orcamento, FolhaPagamento, ComissaoFolha
 
 _STATUS_VENDA = ("fechado", "convertido")   # projeto considerado "venda fechada"
 
@@ -105,9 +105,39 @@ def editar_base(db, loja_id, reg, base, cfg):
     return True, None
 
 
+def _total_itens_comissao(db, loja_id, funcionario_id, competencia):
+    """Σ valor dos itens de comissão (comissao_folha) do funcionário na competência (exclui cancelados)."""
+    itens = (db.query(ComissaoFolha)
+             .filter_by(loja_id=loja_id, funcionario_id=funcionario_id, competencia=competencia)
+             .filter(ComissaoFolha.status != "cancelado").all())
+    return round(sum(float(i.valor or 0.0) for i in itens), 2)
+
+
+def _upsert_item_venda(db, loja_id, f, competencia, cfg):
+    """Consultor: garante um item origem='venda' com a comissão de vendas do mês (idempotente por ref)."""
+    funcao = db.get(Funcao, f.funcao_id) if f.funcao_id else None
+    if not (funcao and funcao.usa_comissao_vendas):
+        return
+    base = vendas_liquido_consultor(db, loja_id, f.usuario_id, competencia)
+    pct = mod_provisoes.resolver_comissao_venda(cfg, base, 0.0)
+    ref = "venda:%d:%s" % (f.id, competencia)
+    item = db.query(ComissaoFolha).filter_by(ref_etapa=ref).first()
+    if item is None:
+        item = ComissaoFolha(loja_id=loja_id, funcionario_id=f.id, competencia=competencia,
+                             origem="venda", papel="venda", ref_etapa=ref)
+        db.add(item)
+    if item.status == "confirmado":
+        return
+    base_ef = item.base_ajustada if item.base_ajustada is not None else base
+    item.competencia = competencia; item.base = base; item.pct = pct
+    item.valor = round(base_ef * pct / 100.0, 2); item.status = "previsto"
+    db.flush()
+
+
 def gerar_folha(db, loja_id, competencia, cfg):
     """Gera/atualiza a folha do período — um registro por Funcionário ATIVO. Idempotente por
-    (funcionario, competencia); folha já PAGA não é recalculada."""
+    (funcionario, competencia); folha já PAGA não é recalculada. A parte variável = Σ itens
+    comissao_folha (comissão do Consultor entra como item origem='venda')."""
     out = []
     for f in db.query(Funcionario).filter_by(loja_id=loja_id, status="ativo").all():
         reg = db.query(FolhaPagamento).filter_by(funcionario_id=f.id, competencia=competencia).first()
@@ -116,10 +146,14 @@ def gerar_folha(db, loja_id, competencia, cfg):
             db.add(reg)
         if reg.status == "paga":
             out.append(reg); continue
-        c = calcular_folha(db, loja_id, f, competencia, cfg)
+        _upsert_item_venda(db, loja_id, f, competencia, cfg)
+        c = calcular_folha(db, loja_id, f, competencia, cfg)   # fixa + benefícios (variável tratada via itens)
+        variavel = _total_itens_comissao(db, loja_id, f.id, competencia)
         reg.parte_fixa = c["parte_fixa"]; reg.vendas_liq = c["vendas_liq"]; reg.faixa_pct = c["faixa_pct"]
-        reg.base_comissao = c["base_comissao"]; reg.parte_variavel = c["parte_variavel"]
-        reg.beneficios = c["beneficios"]; reg.total = c["total"]; reg.status = "aberta"
+        reg.base_comissao = c["base_comissao"]; reg.parte_variavel = variavel
+        reg.beneficios = c["beneficios"]
+        reg.total = round((c["parte_fixa"] or 0.0) + variavel + (c["beneficios"] or 0.0), 2)
+        reg.status = "aberta"
         db.flush()
         out.append(reg)
     return out
