@@ -314,6 +314,27 @@ class ComissaoFolha(Base):
     __table_args__ = (UniqueConstraint("ref_etapa", name="uq_comissao_ref_etapa"),)
 
 
+class AdiantamentoFuncionario(Base):
+    """Adiantamento/empréstimo a funcionário (Fase 5). 'oficial' = 40% do salário fixo (auto, carteira);
+    'adiantamento' = adiantamento avulso; 'emprestimo' = empréstimo (pode atravessar meses). abater/
+    competencia_abate controlam a dedução do líquido; quitado marca a baixa quando a folha é paga."""
+    __tablename__ = "adiantamento_funcionario"
+    id                = Column(Integer,  primary_key=True, autoincrement=True)
+    loja_id           = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
+    funcionario_id    = Column(Integer,  ForeignKey("funcionarios.id"), nullable=False)
+    tipo              = Column(String(14), nullable=False, default="adiantamento")  # oficial|adiantamento|emprestimo
+    competencia       = Column(String(7), nullable=False)          # 'AAAA-MM' concedido
+    valor             = Column(Float,    nullable=True, default=0.0)
+    abater            = Column(Integer,  nullable=False, default=1)  # 1 = deduz do líquido (editável)
+    competencia_abate = Column(String(7), nullable=True)           # folha que deduz
+    quitado           = Column(Integer,  nullable=False, default=0)  # 1 = baixado (folha paga)
+    observacao        = Column(Text,     nullable=True)
+    ref               = Column(String(120), nullable=True)         # idempotência do oficial: 'oficial:<func>:<comp>'
+    criado_em         = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("ref", name="uq_adiantamento_ref"),)
+
+
 class Funcionario(Base):
     """Cadastro de RH (Modulos_Orizon_v9, módulo 2). NÃO é conta de login — o Usuário (Admin/Núcleo)
     referencia o Funcionário via usuario_id/funcionario_id, sem duplicar dado pessoal."""

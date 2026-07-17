@@ -32,6 +32,8 @@ def config_financeira_default():
             "faixas_comissao": [{"venda_ate": None, "pct": 0.0}],
             "limitador_desconto": {"ativo": False, "base_desconto": "Desc_Orc", "limites": []},
         },
+        # Folha (Fase 5): adiantamento oficial (40% do salário fixo em carteira, opcional por loja).
+        "folha": {"adiantamento_oficial_ativo": False, "adiantamento_oficial_pct": 40.0},
         # Cronograma de Projeto Padrão (Modulos_Orizon_v11): prazo em dias a partir de D0 (assinatura
         # do contrato) por etapa do ciclo. Na assinatura, cada etapa ganha data_prevista = D0 + prazo.
         "cronograma_padrao": [
