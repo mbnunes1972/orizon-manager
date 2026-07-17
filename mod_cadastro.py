@@ -4,8 +4,14 @@ Fronteira obrigatória: Funcionário (RH) ≠ Usuário (conta de login, Admin/N�
 referência (Usuario.funcionario_id / Funcionario.usuario_id), NUNCA duplicando dado pessoal.
 """
 import re
+import json as _json
 from auth import perfis
 from database import Funcionario, Fornecedor, Terceiro, Usuario, Funcao
+
+_PAPEIS = ("projeto_executivo", "medicao", "montagem", "assistencia")
+_REMUN = ("fixa", "variavel", "fixa_variavel")
+_REG_TRAB = ("presencial", "remoto", "misto")
+_REG_CONTR = ("registrado", "terceirizacao")
 
 # Sub-entidades reutilizáveis (Modulos_Orizon_v10): Endereço + Dados Bancários
 ENDERECO_CAMPOS = ("cep", "logradouro", "numero", "complemento", "bairro", "cidade", "uf")
@@ -183,8 +189,16 @@ def terc_aplicar(db, t, req, loja_id):
 
 # ── Tabela de Funções (Config) ───────────────────────────────────────────────
 def funcao_serialize(f, db=None):
+    try:
+        atrib = _json.loads(getattr(f, "atribuicoes_json", None) or "[]")
+    except Exception:
+        atrib = []
     return {"id": f.id, "nome": f.nome, "status": f.status or "ativo",
-            "perfil_padrao": getattr(f, "perfil_padrao", None)}
+            "perfil_padrao": getattr(f, "perfil_padrao", None),
+            "atribuicoes": atrib,
+            "remuneracao_padrao": getattr(f, "remuneracao_padrao", None),
+            "regime_trabalho": getattr(f, "regime_trabalho", None),
+            "regime_contratacao": getattr(f, "regime_contratacao", None)}
 
 
 def funcao_aplicar(db, f, req, loja_id):
@@ -196,6 +210,15 @@ def funcao_aplicar(db, f, req, loja_id):
         f.status = (_s(req.get("status")) or "ativo")
     if "perfil_padrao" in req:
         f.perfil_padrao = _s(req.get("perfil_padrao")) or None
+    if "atribuicoes" in req:
+        vals = req.get("atribuicoes") or []
+        f.atribuicoes_json = _json.dumps([p for p in vals if p in _PAPEIS])
+    if "remuneracao_padrao" in req:
+        v = _s(req.get("remuneracao_padrao")); f.remuneracao_padrao = v if v in _REMUN else None
+    if "regime_trabalho" in req:
+        v = _s(req.get("regime_trabalho")); f.regime_trabalho = v if v in _REG_TRAB else None
+    if "regime_contratacao" in req:
+        v = _s(req.get("regime_contratacao")); f.regime_contratacao = v if v in _REG_CONTR else None
 
 
 def listar_funcoes(db, loja_id, ativos_only=False):

@@ -235,6 +235,10 @@ class Funcao(Base):
     nome      = Column(String(80),  nullable=False)
     status    = Column(String(10),  nullable=False, default="ativo")   # ativo | inativo
     perfil_padrao = Column(String(40), nullable=True)   # slug do perfil_acesso default da função
+    atribuicoes_json   = Column(Text,        nullable=True)   # JSON: papéis (mod_escopo.PAPEIS)
+    remuneracao_padrao = Column(String(20),  nullable=True)   # fixa | variavel | fixa_variavel
+    regime_trabalho    = Column(String(20),  nullable=True)   # presencial | remoto | misto
+    regime_contratacao = Column(String(20),  nullable=True)   # registrado | terceirizacao
     criado_em = Column(DateTime,    default=datetime.utcnow)
 
 
@@ -1323,7 +1327,11 @@ def _migrar_colunas():
         # Perfil-4 (rev2 §2): Função (cargo) da conta quando não há Funcionário vinculado
         _add_cols("usuarios",     [("funcao_id","INTEGER")])
         # Perfis configuráveis por loja (rev3 §2): slug do perfil_acesso default da função
-        _add_cols("funcoes",      [("perfil_padrao", "VARCHAR(40)")])
+        _add_cols("funcoes",      [("perfil_padrao", "VARCHAR(40)"),
+                                   ("atribuicoes_json", "TEXT"),
+                                   ("remuneracao_padrao", "VARCHAR(20)"),
+                                   ("regime_trabalho", "VARCHAR(20)"),
+                                   ("regime_contratacao", "VARCHAR(20)")])
         # Cronograma do Ciclo (Modulos_Orizon_v11): data prevista de conclusão por etapa
         # + Responsável por função (Modulos_Orizon_v12): função exigida + funcionário escolhido
         _add_cols("ciclo_etapas", [("data_prevista_conclusao","DATETIME"),
@@ -1646,6 +1654,10 @@ def _migrar_colunas_pg():
     stmts = [
         "ALTER TABLE lojas ADD COLUMN IF NOT EXISTS responsavel VARCHAR(120)",
         "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS senha_provisoria INTEGER DEFAULT 0",
+        "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS atribuicoes_json TEXT",
+        "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS remuneracao_padrao VARCHAR(20)",
+        "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS regime_trabalho VARCHAR(20)",
+        "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS regime_contratacao VARCHAR(20)",
     ]
     with ENGINE.begin() as conn:
         for s in stmts:
