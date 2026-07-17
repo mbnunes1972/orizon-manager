@@ -2226,6 +2226,38 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 81 — Reforma de navegação (Painel Orizon + Admin plano + seletor) + 9 tópicos (Grupos A e C)
+Sequência de frentes de UI/admin, todas mergeadas na `main` por FF a partir de worktrees isoladas.
+
+**Navegação consistente (Fase 1)** — spec/plano em `docs/superpowers/{specs,plans}/2026-07-16-navegacao-*`.
+O **Painel Admin** deixou de ser drill-down (Plataforma→Rede→Loja) e virou **plano de 4 abas** iguais p/
+todo perfil: **Dados da empresa · Usuários · Perfis de Usuário · Módulos** (renomeados de "…da loja").
+A administração **do sistema** (redes/lojas/gestores) saiu para um **Painel Orizon** novo na sidebar, só
+`super_admin` (gate `pode_gerir_redes`). **Seletor de empresa** no topo de Admin/Config arma o `X-Loja-Ativa`
+(reaproveita o god-mode da Sessão 80) → Admin/Config passam a funcionar p/ o super_admin escolhendo a
+empresa. Backend: `GET /api/admin/empresas` (lojas administráveis, com `cnpj`) + caps de aba no `/auth/me`.
+**[DECIDIDO]** super_admin=técnico (Orizon) × gestor de rede=negócios (**dashboard consolidado = frente
+futura**); admin_rede usa Admin/Config padrão escopado à sua rede. **[PENDENTE] Fase 2:** abas de Admin/Config
+visíveis a todo perfil com **cadeado + step-up** (não feita).
+
+**Grupo A (4 ajustes cosméticos):** Funcionários fora do módulo Cadastro (sidebar + aba interna; entidade
+permanece); ícone da Folha `wallet→cash-banknote`; rótulos `modulos.py` "Comercial (Vendas)"→"Comercial",
+"Fiscal (NF-e/NFS-e)"→"Fiscal"; sidebar 220→250px (cabe "Folha de Pagamento").
+
+**Grupo C (cadastro de loja/rede — itens 7,8,9):** (C1) `cnpj` no `GET /api/admin/empresas`; (C2) seletor de
+empresa vira **combobox buscável por nome/CNPJ** (agrupado por rede) no canto sup. esq.; (C3) `Usuario.senha_provisoria`
++ migração, login/`auth/me` sinalizam `precisa_trocar_senha`, `POST /api/auth/trocar-senha`; (C4) **modal
+bloqueante de troca de senha no 1º login**; (C5) `POST /api/admin/lojas` **completo** (endereço/contato/
+responsável/módulos + cria **1º diretor** `master` com senha provisória) e o `PATCH /api/admin/lojas/<id>`
+existente estendido (responsável+módulos, respeitando gating `gerir_lojas`×`editar_dados_loja`) — `Loja.responsavel`
+nova coluna+migração; (C6) **modal "Cadastro de Loja"** completo no Orizon › Lojas (+Editar por linha); (C7)
+aba **Redes ganha "+ Loja nesta rede"** abrindo o mesmo modal pré-preenchido. **[DECIDIDO]** dados no nível da
+loja (fiscal segue no Painel Fiscal); diretor com senha provisória (troca no 1º login); item 2 (Comissões)
+só front nesta rodada; item 1 (Funções) "Atribuições"=papéis operacionais. Suíte **1212 verde**.
+
+**[PENDENTE]** Itens **1 (Config › Funções editáveis)** e **2 (Config › Comissões)** dos 9 tópicos; **Fase 2**
+das travas de navegação; **re-ingerir grafo MCP**.
+
 ## Sessão 80 — super_admin acesso pleno (god-mode) — desbloqueio urgente (branch `feat/super-admin-acesso-pleno`)
 Pedido do usuário: o **super_admin não conseguia criar perfis nem usuários e "não acessava o cadastro"**;
 quer o perfil com **liberdade plena e irrestrita por enquanto** (revisitar limites / eventual 2º perfil de
