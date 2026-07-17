@@ -5520,8 +5520,29 @@ class Handler(BaseHTTPRequestHandler):
                         cnpj=(req.get("cnpj") or "").strip() or None,
                         telefone=(req.get("telefone") or "").strip() or None,
                         email=(req.get("email") or "").strip() or None,
+                        responsavel=(req.get("responsavel") or "").strip() or None,
+                        cep=(req.get("cep") or "").strip() or None,
+                        logradouro=(req.get("logradouro") or "").strip() or None,
+                        numero=(req.get("numero") or "").strip() or None,
+                        complemento=(req.get("complemento") or "").strip() or None,
+                        bairro=(req.get("bairro") or "").strip() or None,
+                        cidade=(req.get("cidade") or "").strip() or None,
+                        estado=((req.get("estado") or req.get("uf") or "").strip() or None),
                     )
-                    db.add(l); db.commit()
+                    if isinstance(req.get("modulos"), list):
+                        l.modulos_ativos = json.dumps([str(m) for m in req["modulos"]])
+                    db.add(l); db.flush()   # precisa do l.id p/ o diretor
+                    dir_req = req.get("diretor") or {}
+                    dir_login = (dir_req.get("login") or "").strip()
+                    if dir_login:
+                        if db.query(Usuario).filter(Usuario.login == dir_login).first() is not None:
+                            self.send_json({"ok": False, "erro": "Já existe uma conta com este e-mail (diretor)."}); return
+                        senha_ini = validacao_doc._digitos(l.cnpj or "") or "orizon123"
+                        u = Usuario(nome=(dir_req.get("nome") or dir_login).strip(), login=dir_login,
+                                    email=dir_login, nivel="master", loja_id=l.id, ativo=1, senha_provisoria=1)
+                        u.set_senha(senha_ini); db.add(u); db.flush()
+                        db.add(UsuarioLoja(usuario_id=u.id, loja_id=l.id))
+                    db.commit()
                     self.send_json({"ok": True, "loja": _loja_dict(l)})
                 finally:
                     db.close()
@@ -8014,7 +8035,7 @@ class Handler(BaseHTTPRequestHandler):
                         if _e:
                             self.send_json({"ok": False, "erro": _e}, code=400)
                             return
-                    for campo in ("nome", "cnpj", "telefone", "email", "cep", "logradouro",
+                    for campo in ("nome", "cnpj", "telefone", "email", "responsavel", "cep", "logradouro",
                                   "numero", "complemento", "bairro", "cidade", "estado",
                                   "testemunha1_nome", "testemunha1_cpf",
                                   "testemunha2_nome", "testemunha2_cpf"):
@@ -8039,6 +8060,8 @@ class Handler(BaseHTTPRequestHandler):
                         if "ativo" in req:   l.ativo = 1 if req["ativo"] else 0
                         if "rede_id" in req and mod_tenancy._eh_super_admin(ator):
                             l.rede_id = req["rede_id"]
+                        if isinstance(req.get("modulos"), list):
+                            l.modulos_ativos = json.dumps([str(mo) for mo in req["modulos"]])
                     db.commit()
                     self.send_json({"ok": True, "loja": _loja_dict(l)})
                 finally:

@@ -400,6 +400,7 @@ class Loja(Base):
     codigo      = Column(String(8),   nullable=True, unique=True)   # 3 letras p/ num contrato
     telefone    = Column(String(20),  nullable=True)
     email       = Column(String(120), nullable=True)
+    responsavel = Column(String(120), nullable=True)
     cep         = Column(String(9),   nullable=True)
     logradouro  = Column(String(200), nullable=True)
     numero      = Column(String(20),  nullable=True)
@@ -1269,6 +1270,8 @@ def _migrar_colunas():
                 cur.execute("ALTER TABLE lojas ADD COLUMN emitente_id INTEGER")
             if "modulos_ativos" not in loja_cols:
                 cur.execute("ALTER TABLE lojas ADD COLUMN modulos_ativos TEXT")
+            if "responsavel" not in loja_cols:
+                cur.execute("ALTER TABLE lojas ADD COLUMN responsavel VARCHAR(120)")
             # Segmentação Mercadoria × Serviço: colunas + seed 65/35 nas lojas existentes (backfill).
             if "pct_mercadoria" not in loja_cols:
                 cur.execute("ALTER TABLE lojas ADD COLUMN pct_mercadoria REAL")
