@@ -81,7 +81,20 @@ def _nota(ref):
 
 def _reset(app_db, ref, proj):
     db = app_db.get_session()
-    db.query(app_db.DocumentoFiscal).filter_by(ref=ref).delete()
+    # xml_doc_id/danfe_doc_id/fabrica_doc_id são FK reais (ciclo_documentos.id) — antes de apagar
+    # os ciclo_documentos da etapa 15, limpa qualquer documento_fiscal (de QUALQUER ref, não só o
+    # desta chamada) que ainda aponte pra eles por QUALQUER uma das três colunas, senão o DELETE de
+    # ciclo_documentos viola FK e aborta a transação (Postgres valida; SQLite não), deixando a
+    # sessão pendurada (idle in transaction) e travando o próximo módulo.
+    DF = app_db.DocumentoFiscal
+    cdoc_ids = [r[0] for r in db.query(app_db.CicloDocumento.id)
+                  .filter_by(projeto_nome=proj, etapa_codigo="15").all()]
+    if cdoc_ids:
+        (db.query(DF)
+           .filter(DF.xml_doc_id.in_(cdoc_ids) | DF.danfe_doc_id.in_(cdoc_ids)
+                   | DF.fabrica_doc_id.in_(cdoc_ids))
+           .delete(synchronize_session=False))
+    db.query(DF).filter_by(ref=ref).delete()
     db.query(app_db.CicloDocumento).filter_by(projeto_nome=proj, etapa_codigo="15").delete()
     db.commit(); db.close()
 
@@ -177,10 +190,14 @@ def test_cancelar_atualiza_registro(app_db, seed, projetos_dir):
 
 def test_consultar_resolve_emissor_pelo_emitente_id(app_db, seed, projetos_dir, monkeypatch):
     # o switch reg.loja_id -> reg.emitente_id: consultar SEM emissor injetado resolve pelo emitente do documento
-    proj = seed["projeto_l2"]; lid = seed["loja2_id"]
+    # emitente_id é FK real (emitente.id) — usa o emitente da OUTRA loja (seed) em vez de um literal
+    # fabricado (Postgres valida FK; SQLite não), provando que resolve pelo emitente do documento
+    # e não pelo da loja (emitente_l1_id != emitente da loja2).
+    proj = seed["projeto_l2"]; lid = seed["loja2_id"]; outro_emitente_id = seed["emitente_l1_id"]
     _reset(app_db, "R-7", proj)
     db = app_db.get_session()
-    db.add(app_db.DocumentoFiscal(ref="R-7", projeto_nome=proj, loja_id=lid, emitente_id=777, status="processando"))
+    db.add(app_db.DocumentoFiscal(ref="R-7", projeto_nome=proj, loja_id=lid,
+                                  emitente_id=outro_emitente_id, status="processando"))
     db.commit()
     capturado = {}
     def _fake_emissor_para(_db, emitente_id):
@@ -188,7 +205,7 @@ def test_consultar_resolve_emissor_pelo_emitente_id(app_db, seed, projetos_dir, 
         return FakeEmissor()
     monkeypatch.setattr(nfe_emissao, "_emissor_para", _fake_emissor_para)
     nfe_emissao.consultar(db, "R-7")
-    assert capturado["eid"] == 777      # resolveu pelo emitente do documento, não pela loja (lid != 777)
+    assert capturado["eid"] == outro_emitente_id   # resolveu pelo emitente do documento, não pela loja
     db.close()
 
 
@@ -203,10 +220,15 @@ def test_emitir_grava_fabrica_doc_id(app_db, seed, projetos_dir):
     proj = seed["projeto_l2"]; lid = seed["loja2_id"]
     _reset(app_db, "R-F1", proj); eid = _perfil(app_db, lid, "homologacao")
     db = app_db.get_session()
+    # fabrica_doc_id é FK real (ciclo_documentos.id) — cria a linha de verdade em vez de um
+    # literal fabricado (Postgres valida FK; SQLite não).
+    cdoc = app_db.CicloDocumento(projeto_nome=proj, etapa_codigo="15", tipo="doc_fabrica",
+                                 arquivo_path="fabrica/doc.pdf", nome_original="doc.pdf")
+    db.add(cdoc); db.flush()
     nfe_emissao.emitir(db, lid, proj, _nota("R-F1"), emitente_id=eid, emissor=FakeEmissor(),
-                       fabrica_doc_id=99)
+                       fabrica_doc_id=cdoc.id)
     reg = db.query(app_db.DocumentoFiscal).filter_by(ref="R-F1").first()
-    assert reg.fabrica_doc_id == 99 and reg.emitente_id == eid
+    assert reg.fabrica_doc_id == cdoc.id and reg.emitente_id == eid
     db.close()
 
 

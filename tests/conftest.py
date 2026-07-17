@@ -35,6 +35,23 @@ def app_db(tmp_path_factory):
         # drop_all() falha aqui: há FK circular real no schema (ex.: Usuario.funcionario_id <->
         # Funcionario.usuario_id) que o SQLAlchemy não consegue ordenar pra DROP (SQLite nunca
         # validou isso). Derruba o schema inteiro via CASCADE — o Postgres resolve a ordem sozinho.
+        #
+        # Antes do DROP: mata qualquer outra conexão pendurada neste banco de teste (dedicado só
+        # pra isso). Em Postgres, um SELECT já abre transação de verdade — se um teste do módulo
+        # anterior falhou num assert NO MEIO da função (antes de chegar no db.close() do fim), a
+        # sessão fica "idle in transaction" seguranco lock e o DROP SCHEMA trava indefinidamente
+        # (nunca acontecia em SQLite: cada módulo usa um arquivo novo). Achado validando a suíte
+        # contra Postgres de verdade (Etapa 4 da migração) — trava reproduzida e diagnosticada via
+        # pg_stat_activity mostrando `idle in transaction` + `DROP SCHEMA` esperando lock.
+        # só mata conexões do MESMO role (current_user) — um pg_terminate_backend em processo de
+        # role SUPERUSER (ex.: autovacuum) dá InsufficientPrivilege e derruba a query inteira (o
+        # SELECT aborta no meio), quebrando o setup do módulo inteiro em cascata. Restringir a
+        # usename = current_user é tudo que precisamos mesmo (só limpar sessão de teste anterior).
+        with database.ENGINE.begin() as conn:
+            conn.execute(text(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = current_database() AND pid <> pg_backend_pid() "
+                "AND usename = current_user"))
         with database.ENGINE.begin() as conn:
             conn.execute(text("DROP SCHEMA public CASCADE"))
             conn.execute(text("CREATE SCHEMA public"))

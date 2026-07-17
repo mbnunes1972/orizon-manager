@@ -31,7 +31,6 @@ def test_membership_lista_lojas(app_db, seed):
 
 
 def test_backfill_cria_uma_membership_por_loja_id(app_db, seed):
-    import sqlite3
     # usuário com loja_id e SEM membership (simula estado pré-migração)
     db = app_db.get_session()
     try:
@@ -41,8 +40,10 @@ def test_backfill_cria_uma_membership_por_loja_id(app_db, seed):
         uid = u.id
     finally:
         db.close()
-    # roda o backfill direto sobre a conexão sqlite
-    con = sqlite3.connect(database.DB_PATH)
+    # roda o backfill direto sobre a conexão — _backfill_usuario_lojas é SQL portável (INSERT/SELECT/
+    # NOT EXISTS, sem sintaxe SQLite), então usa raw_connection() da ENGINE (funciona nos dois
+    # dialetos) em vez de sqlite3.connect(DB_PATH) direto (None em Postgres, ver conftest.py).
+    con = database.ENGINE.raw_connection()
     try:
         database._backfill_usuario_lojas(con.cursor()); con.commit()
     finally:
@@ -53,7 +54,7 @@ def test_backfill_cria_uma_membership_por_loja_id(app_db, seed):
         # idempotente: rodar de novo não duplica
     finally:
         db.close()
-    con = sqlite3.connect(database.DB_PATH)
+    con = database.ENGINE.raw_connection()
     try:
         database._backfill_usuario_lojas(con.cursor()); con.commit()
     finally:

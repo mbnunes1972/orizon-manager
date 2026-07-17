@@ -1,10 +1,9 @@
-import sqlite3
+from sqlalchemy import inspect
 from auth import auth
 
 def test_usuarios_tem_coluna_tema(app_db):
-    conn = sqlite3.connect(app_db.DB_PATH)
-    cols = {row[1] for row in conn.execute("PRAGMA table_info(usuarios)")}
-    conn.close()
+    # introspecção via SQLAlchemy — funciona nos dois dialetos (DB_PATH é None em Postgres)
+    cols = {c["name"] for c in inspect(app_db.ENGINE).get_columns("usuarios")}
     assert "tema" in cols
 
 def test_usuario_dict_inclui_tema_default_escuro(app_db):

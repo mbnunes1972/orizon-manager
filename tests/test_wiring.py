@@ -1,4 +1,4 @@
-import sqlite3
+from sqlalchemy import inspect
 import mod_contabil as mc
 
 
@@ -21,7 +21,6 @@ def test_ref_diferente_gera_novo(app_db):
 
 
 def test_lancamento_tem_coluna_ref(app_db):
-    conn = sqlite3.connect(app_db.DB_PATH)
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(lancamento)")}
-    conn.close()
+    # introspecção via SQLAlchemy — funciona nos dois dialetos (DB_PATH é None em Postgres)
+    cols = {c["name"] for c in inspect(app_db.ENGINE).get_columns("lancamento")}
     assert "ref" in cols

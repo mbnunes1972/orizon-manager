@@ -101,11 +101,24 @@ implementação.
   remanescente das 10 e encerra o projeto com status **`concluido`** (distinto de `fechado`). Projetos
   legados (fluxo antigo) **não migram**. Detalhes: spec
   `docs/superpowers/specs/financeiro/2026-07-12-fase-d2-provisao-completa-conciliacao-final-design.md`.
-- **Banco de dados (decisão 2026-07-15, ainda não implementada):** decidido migrar **SQLite → PostgreSQL**
-  (autohospedado na mesma VPS, sem custo adicional) — motivo: rigor de constraint/transação para o motor
-  contábil de partida dobrada + `JSONB` para os campos `*_json` hoje em `Text`. **Enquanto não migrado, o
-  banco de produção continua SQLite** — não assumir Postgres em código novo até o cutover. Plano e
-  rationale completos: `docs/superpowers/specs/_geral/2026-07-15-migracao-postgresql.md`.
+- **Banco de dados:** migração **SQLite → PostgreSQL** decidida e **em produção** (VPS dedicada,
+  `orizonsolution.com.br`) desde 2026-07-15. Local (WSL) e produção já rodam Postgres; `DATABASE_URL` (env
+  var) seleciona o dialeto — ausente = SQLite (dev-VPS antiga, `167.88.33.121`, ainda não migrada). Suíte
+  pytest tem validação opt-in contra Postgres real via `TEST_DATABASE_URL` (`tests/conftest.py`) — achou e
+  corrigiu divergências reais de dialeto (FK enforcement real, `DROP SCHEMA CASCADE` por FK circular,
+  `Lancamento.origem` estourando `VARCHAR(30)`, vários testes com FK fabricada que só SQLite deixa passar).
+  **Alembic ainda não tem baseline** (Etapa 2, pendente). Plano/rationale: `docs/superpowers/specs/_geral/
+  2026-07-15-migracao-postgresql.md`.
+- **Segmentação Mercadoria/Serviço + distribuidora Orizon Soluções (decisão 2026-07-16, não implementada):**
+  motor fiscal já segrega Val_Cont em mercadoria/serviço (`mod_orcamento_params.SEGMENTACAO_DEFAULT`
+  65/35, override por Diretor) e já usa isso pra separar NF-e de NFS-e — mas o **contrato** entregue ao
+  cliente ainda não mostra esse split, e uma 2ª pessoa jurídica (**Orizon Soluções**, CNPJ em abertura)
+  vai assumir o papel de distribuidora (mercadoria), a loja segue com o serviço. Infra fiscal pra isso **já
+  existe** (`Rede.emitente_central_id`, spec de 2026-07-06) — falta só o lado do contrato (2ª CONTRATADA +
+  marcadores de valor), gated pela presença do `Emitente` da distribuidora (sem CNPJ ainda = contrato
+  continua como hoje). Redação jurídica final e substância econômica real da Orizon Soluções ainda
+  pendentes de advogado/contador. Spec: `docs/superpowers/specs/contrato-documentos/
+  2026-07-16-segmentacao-distribuidora-contrato-design.md`.
 
 ## Dicas de modelo
 Para **lógica financeira intrincada** (ex.: cálculo reverso da negociação), o **Fable 5** rende — pode

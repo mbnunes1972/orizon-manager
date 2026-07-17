@@ -80,8 +80,11 @@ def _sem_emitente(app_db, loja_id):
 
 def _reset15(app_db, proj):
     db = app_db.get_session()
-    db.query(app_db.CicloDocumento).filter_by(projeto_nome=proj, etapa_codigo="15").delete()
+    # documento_fiscal.xml_doc_id/danfe_doc_id/fabrica_doc_id são FK reais pra ciclo_documentos.id —
+    # tem que apagar o FILHO (documento_fiscal) antes do PAI (ciclo_documentos), senão viola FK
+    # (Postgres valida; SQLite não, por isso a ordem errada nunca deu erro até agora).
     db.query(app_db.DocumentoFiscal).filter_by(projeto_nome=proj).delete()
+    db.query(app_db.CicloDocumento).filter_by(projeto_nome=proj, etapa_codigo="15").delete()
     db.commit(); db.close()
 
 

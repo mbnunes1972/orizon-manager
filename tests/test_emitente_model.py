@@ -1,5 +1,13 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+import pytest
+
+# _run_migracoes é raw sqlite3 (PRAGMA/placeholders '?') — só faz sentido upgradando um orizon.db
+# SQLite existente (database.py só a chama quando ENGINE.dialect.name == "sqlite"). Em Postgres não
+# há equivalente pra testar aqui (o caminho novo é _seed_loja_padrao, coberto em outro teste).
+requer_sqlite = pytest.mark.skipif(
+    os.environ.get("TEST_DATABASE_URL") is not None,
+    reason="_run_migracoes é exclusivo do caminho SQLite (raw sqlite3); não se aplica a Postgres")
 
 
 def test_emitente_persiste_campos_fiscais(app_db):
@@ -23,6 +31,7 @@ def test_loja_e_rede_referenciam_emitente(app_db):
     s.close()
 
 
+@requer_sqlite
 def test_migracao_perfil_fiscal_para_emitente_idempotente(app_db):
     """Backfill perfil_fiscal -> emitente: cria Emitente, seta loja.emitente_id, preserva o
     token e o endereço da loja (estado -> uf), e é idempotente (rodar 2x não duplica)."""
@@ -76,6 +85,7 @@ def test_migracao_perfil_fiscal_para_emitente_idempotente(app_db):
     s.close()
 
 
+@requer_sqlite
 def test_migracao_emitente_sem_perfil_fiscal_nao_estoura(app_db):
     """Idempotente e robusto: banco sem perfil_fiscal correspondente não gera Emitente órfão."""
     import sqlite3

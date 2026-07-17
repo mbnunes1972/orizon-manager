@@ -4,7 +4,12 @@ import pytest
 
 
 def test_canary_banco_isolado(app_db):
-    assert "orizon.db" not in app_db.DB_PATH
+    # SQLite: garante que não é o arquivo de produção. Postgres (DB_PATH é None por desenho, ver
+    # conftest.py): a mesma garantia é o nome do banco de teste nunca ser o de produção ("orizon").
+    if app_db.DB_PATH is not None:
+        assert "orizon.db" not in app_db.DB_PATH
+    else:
+        assert app_db.ENGINE.url.database != "orizon"
     db = app_db.get_session()
     loja = app_db.Loja(nome="Canary")
     db.add(loja); db.commit()

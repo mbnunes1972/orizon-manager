@@ -2,36 +2,40 @@
 (Consultor = criado_por; Gerente Comercial/SAC/Supervisor = funcionário da loja com a função);
 seletores (medidor/finalizador/montagem[N]) são escolhidos e guardados em projetos_meta.equipe_json."""
 import mod_equipe as eq
-from database import Projeto, Funcionario, Terceiro, Funcao, Usuario
+from database import Projeto, Funcionario, Terceiro, Funcao, Usuario, Loja
 
 
-def _mkfunc(db, loja, nome):
-    f = Funcao(loja_id=loja, nome=nome, status="ativo"); db.add(f); db.flush(); return f.id
+def _mkfunc(db, loja_id, nome):
+    f = Funcao(loja_id=loja_id, nome=nome, status="ativo"); db.add(f); db.flush(); return f.id
 
 
-def _seed_eq(db, loja):
-    gv = _mkfunc(db, loja, "Gerente de Vendas")
-    sac = _mkfunc(db, loja, "SAC")
-    sup = _mkfunc(db, loja, "Supervisor de Montagem")
-    med = _mkfunc(db, loja, "Medidor")
-    db.add(Funcionario(loja_id=loja, nome="Gerente Ger", funcao_id=gv, telefone="1"))
-    db.add(Funcionario(loja_id=loja, nome="Sac Sac", funcao_id=sac))
-    db.add(Funcionario(loja_id=loja, nome="Super Sup", funcao_id=sup))
-    fm = Funcionario(loja_id=loja, nome="Med Func", funcao_id=med); db.add(fm)
-    t1 = Terceiro(loja_id=loja, nome="Montador T1"); db.add(t1)
-    t2 = Terceiro(loja_id=loja, nome="Montador T2"); db.add(t2)
-    u = Usuario(nome="Consultor Criador", login="cc_eq_%d" % loja, senha_hash="x", nivel="operador")
+def _seed_eq(db, tag):
+    """loja_id é FK real (lojas.id) — cria a loja de verdade em vez de usar o literal `tag` direto
+    como loja_id (Postgres valida FK; SQLite não). `tag` segue só como sufixo p/ nomes únicos."""
+    loja = Loja(nome="Loja EQ %s" % tag); db.add(loja); db.flush()
+    loja_id = loja.id
+    gv = _mkfunc(db, loja_id, "Gerente de Vendas")
+    sac = _mkfunc(db, loja_id, "SAC")
+    sup = _mkfunc(db, loja_id, "Supervisor de Montagem")
+    med = _mkfunc(db, loja_id, "Medidor")
+    db.add(Funcionario(loja_id=loja_id, nome="Gerente Ger", funcao_id=gv, telefone="1"))
+    db.add(Funcionario(loja_id=loja_id, nome="Sac Sac", funcao_id=sac))
+    db.add(Funcionario(loja_id=loja_id, nome="Super Sup", funcao_id=sup))
+    fm = Funcionario(loja_id=loja_id, nome="Med Func", funcao_id=med); db.add(fm)
+    t1 = Terceiro(loja_id=loja_id, nome="Montador T1"); db.add(t1)
+    t2 = Terceiro(loja_id=loja_id, nome="Montador T2"); db.add(t2)
+    u = Usuario(nome="Consultor Criador", login="cc_eq_%s" % tag, senha_hash="x", nivel="operador")
     db.add(u); db.flush()
-    db.add(Projeto(nome_safe="EQ_%d" % loja, status="quente", loja_id=loja, criado_por_id=u.id))
+    db.add(Projeto(nome_safe="EQ_%s" % tag, status="quente", loja_id=loja_id, criado_por_id=u.id))
     db.commit()
-    return {"fm": fm.id, "t1": t1.id, "t2": t2.id, "u": u.id}
+    return {"loja_id": loja_id, "fm": fm.id, "t1": t1.id, "t2": t2.id, "u": u.id}
 
 
 def test_equipe_automaticos_resolvem(app_db):
     db = app_db.get_session()
     try:
-        _seed_eq(db, 6001)
-        by = {p["papel"]: p for p in eq.equipe(db, "EQ_6001", 6001)["papeis"]}
+        ids = _seed_eq(db, 6001)
+        by = {p["papel"]: p for p in eq.equipe(db, "EQ_6001", ids["loja_id"])["papeis"]}
         assert [x["nome"] for x in by["gerente_comercial"]["pessoas"]] == ["Gerente Ger"]
         assert [x["nome"] for x in by["sac"]["pessoas"]] == ["Sac Sac"]
         assert [x["nome"] for x in by["supervisor_montagem"]["pessoas"]] == ["Super Sup"]
@@ -51,7 +55,7 @@ def test_equipe_salva_seletores(app_db):
         ok2, _ = eq.salvar(db, "EQ_6002", "montagem",
                            [{"tipo": "terceiro", "id": ids["t1"]}, {"tipo": "terceiro", "id": ids["t2"]}])
         db.commit(); assert ok2
-        by = {p["papel"]: p for p in eq.equipe(db, "EQ_6002", 6002)["papeis"]}
+        by = {p["papel"]: p for p in eq.equipe(db, "EQ_6002", ids["loja_id"])["papeis"]}
         assert [x["nome"] for x in by["medidor"]["pessoas"]] == ["Med Func"]
         assert [x["nome"] for x in by["montagem"]["pessoas"]] == ["Montador T1", "Montador T2"]
     finally:
@@ -84,8 +88,8 @@ def test_endpoint_equipe_get_e_rejeita_automatico(http_client_factory, seed, app
 def test_candidatos_lista_funcionarios_e_terceiros(app_db):
     db = app_db.get_session()
     try:
-        _seed_eq(db, 6004)
-        c = eq.candidatos(db, 6004)
+        ids = _seed_eq(db, 6004)
+        c = eq.candidatos(db, ids["loja_id"])
         assert any(x["nome"] == "Med Func" for x in c["funcionarios"])
         assert {x["nome"] for x in c["terceiros"]} == {"Montador T1", "Montador T2"}
     finally:

@@ -112,11 +112,15 @@ def test_cronograma_padrao_normaliza_e_ignora_invalido():
 
 def test_gerar_cronograma_herda_funcao_responsavel(app_db):
     db = app_db.get_session()
+    # funcao_responsavel_id é FK real (funcoes.id) — cria a função de verdade em vez de um
+    # literal fabricado (Postgres valida FK; SQLite não).
+    funcao = app_db.Funcao(nome="Funcao Cronograma", status="ativo")
+    db.add(funcao); db.flush()
     d0 = datetime(2026, 7, 1)
-    cfg = _cfg([{"codigo": "10", "prazo_dias": 10, "funcao_id": 42}])
+    cfg = _cfg([{"codigo": "10", "prazo_dias": 10, "funcao_id": funcao.id}])
     mod_cronograma.gerar_cronograma_projeto(db, "ProjFn", cfg, d0); db.commit()
     e10 = db.query(app_db.CicloEtapa).filter_by(projeto_nome="ProjFn", etapa_codigo="10").first()
-    assert e10.funcao_responsavel_id == 42               # função herdada do padrão no D0
+    assert e10.funcao_responsavel_id == funcao.id         # função herdada do padrão no D0
     assert e10.responsavel_funcionario_id is None         # funcionário nasce vazio
     db.close()
 

@@ -1,9 +1,8 @@
-import sqlite3
+from sqlalchemy import inspect
 
 def test_usuarios_tem_colunas_contato(app_db):
-    conn = sqlite3.connect(app_db.DB_PATH)
-    cols = {row[1] for row in conn.execute("PRAGMA table_info(usuarios)")}
-    conn.close()
+    # introspecção via SQLAlchemy — funciona nos dois dialetos (DB_PATH é None em Postgres)
+    cols = {c["name"] for c in inspect(app_db.ENGINE).get_columns("usuarios")}
     assert {"email", "cpf", "whatsapp"} <= cols
 
 def test_usuario_persiste_contato(app_db):
