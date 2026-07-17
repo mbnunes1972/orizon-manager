@@ -17,7 +17,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        membership_loja_ids, UsuarioLoja, ProvisaoRegistro,
                        CicloDocumento, CicloRevisao, DocumentoFiscal, Emitente,
                        PerfilEmissao, CicloLogistico, CicloLogisticoTransicao, AssistenciaCaso,
-                       Funcionario, Fornecedor, Terceiro, Funcao, FolhaPagamento,
+                       Funcionario, Fornecedor, Terceiro, Funcao, FolhaPagamento, ComissaoFolha,
                        AtribuicaoAmbiente, ArquivoPE, ParcelaProjeto, ParcelaAmbiente)
 import mod_expedicao
 import mod_assistencias
@@ -7589,6 +7589,34 @@ class Handler(BaseHTTPRequestHandler):
             path = urlparse(self.path).path
             length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(length) if length else b'{}'
+
+            # ── Comissão: editar base ajustada de um item e recalcular valor (Fase 4) ──
+            m = re.match(r'^/api/comissao/(\d+)$', path)
+            if m:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                import mod_comissao
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    it = db.query(ComissaoFolha).filter_by(id=int(m.group(1)), loja_id=loja_id).first()
+                    if it is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    base = float((json.loads(body or b'{}')).get("base_ajustada") or 0.0)
+                    ok, err = mod_comissao.editar_item(db, it, base)
+                    if not ok:
+                        self.send_json({"ok": False, "erro": err}, code=409); return
+                    db.commit()
+                    self.send_json({"ok": True, "id": it.id, "base_ajustada": it.base_ajustada, "valor": it.valor})
+                except Exception as e:
+                    db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+                finally:
+                    db.close()
+                return
 
             # ── Folha de Pagamento: editar base da comissão e recalcular (Fase 3) ──
             m = re.match(r'^/api/folha/(\d+)$', path)

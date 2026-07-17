@@ -172,6 +172,52 @@ def test_gerar_folha_consultor_vira_item_venda(seed, app_db):
     db.close()
 
 
+def test_editar_item_recalcula_valor(seed, app_db):
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
+    it = app_db.ComissaoFolha(loja_id=loja, funcionario_id=1, competencia="2026-07",
+         origem="papel", papel="montagem", base=10000.0, pct=2.0, valor=200.0,
+         status="previsto", ref_etapa="Z:17:1")
+    db.add(it); db.flush()
+    ok, err = mod_comissao.editar_item(db, it, 15000.0)
+    assert ok and err is None and it.base_ajustada == 15000.0 and it.valor == 300.0   # 15000 × 2%
+    it.status = "confirmado"
+    ok2, _ = mod_comissao.editar_item(db, it, 1.0)
+    assert ok2 is False
+    db.close()
+
+
+def test_comissao_patch_endpoint(http_client_factory, seed, app_db):
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    f = app_db.Funcionario(loja_id=loja, nome="PatchCom", status="ativo"); db.add(f); db.flush()
+    it = app_db.ComissaoFolha(loja_id=loja, funcionario_id=f.id, competencia="2026-07",
+         origem="papel", papel="montagem", base=10000.0, pct=2.0, valor=200.0,
+         status="previsto", ref_etapa="EP:17:%d" % f.id)
+    db.add(it); db.commit(); iid = it.id; db.close()
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.patch("/api/comissao/%d" % iid, {"base_ajustada": 15000.0})
+    assert st == 200, d
+    assert d["base_ajustada"] == 15000.0 and d["valor"] == 300.0
+
+
+def test_serialize_folha_inclui_comissoes(seed, app_db):
+    import mod_folha
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
+    f = app_db.Funcionario(loja_id=loja, nome="Q", status="ativo"); db.add(f); db.flush()
+    reg = app_db.FolhaPagamento(loja_id=loja, funcionario_id=f.id, competencia="2026-08",
+          parte_fixa=0.0, parte_variavel=200.0, total=200.0, status="aberta"); db.add(reg); db.flush()
+    db.add(app_db.ComissaoFolha(loja_id=loja, funcionario_id=f.id, competencia="2026-08",
+           origem="papel", papel="montagem", projeto_nome="PX", etapa_codigo="17",
+           base=10000.0, pct=2.0, valor=200.0, status="previsto", ref_etapa="PX:17:%d" % f.id))
+    db.commit()
+    d = mod_folha.serialize(db, reg)
+    assert len(d["comissoes"]) == 1
+    assert d["comissoes"][0]["papel"] == "montagem" and d["comissoes"][0]["valor"] == 200.0
+    db.close()
+
+
 def test_cancelar_comissao_etapa(seed, app_db):
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id

@@ -187,11 +187,18 @@ def _pagamento_str(f):
 
 def serialize(db, reg):
     f = db.get(Funcionario, reg.funcionario_id)
+    itens_com = (db.query(ComissaoFolha)
+                 .filter_by(funcionario_id=reg.funcionario_id, competencia=reg.competencia)
+                 .filter(ComissaoFolha.status != "cancelado")
+                 .order_by(ComissaoFolha.id.asc()).all())
+    comissoes = [{"id": i.id, "origem": i.origem, "papel": i.papel, "projeto": i.projeto_nome,
+                  "etapa": i.etapa_codigo, "base": i.base, "base_ajustada": i.base_ajustada,
+                  "pct": i.pct, "valor": i.valor, "status": i.status} for i in itens_com]
     return {"id": reg.id, "funcionario_id": reg.funcionario_id, "funcionario": (f.nome if f else ""),
             "competencia": reg.competencia, "parte_fixa": reg.parte_fixa, "vendas_liq": reg.vendas_liq,
             "base_comissao": reg.base_comissao, "faixa_pct": reg.faixa_pct,
             "parte_variavel": reg.parte_variavel, "beneficios": reg.beneficios, "total": reg.total,
-            "status": reg.status, "pagamento": _pagamento_str(f)}
+            "comissoes": comissoes, "status": reg.status, "pagamento": _pagamento_str(f)}
 
 
 def listar(db, loja_id, competencia):
