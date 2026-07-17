@@ -40,3 +40,14 @@ def test_comissao_por_meta_e_base_invalida(http_client_factory, seed, app_db):
     assert fn["comissao"]["por_meta"] is True
     assert fn["comissao"]["base"] == "liquido"          # base inválida -> default liquido
     assert len(fn["comissao"]["faixas"]) == 2
+
+
+def test_consultor_vendas_usa_comissao_da_loja(seed, app_db):
+    from seed import criar_funcoes_seed
+    from database import Funcao, Session
+    db = Session()
+    lid = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    criar_funcoes_seed(db, lid)   # idempotente
+    cv = db.query(Funcao).filter_by(loja_id=lid, nome="Consultor de Vendas").first()
+    assert cv is not None and bool(cv.usa_comissao_vendas) is True
+    db.close()

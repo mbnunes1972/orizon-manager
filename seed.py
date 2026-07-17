@@ -48,7 +48,9 @@ def criar_funcoes_seed(db, loja_id):
     for nome in FUNCOES_PADRAO:
         if nome in existentes:
             continue
-        db.add(Funcao(loja_id=loja_id, nome=nome, status="ativo"))
+        usa_comissao_vendas = 1 if nome == "Consultor de Vendas" else 0
+        db.add(Funcao(loja_id=loja_id, nome=nome, status="ativo",
+                      usa_comissao_vendas=usa_comissao_vendas))
         criadas += 1
     db.commit()
     return criadas

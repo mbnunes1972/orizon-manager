@@ -1431,6 +1431,13 @@ def _run_migracoes(conn):
                     cur.execute("INSERT INTO funcoes(loja_id, nome, status) VALUES(?,?,'ativo')", (lid, nome))
         cur.execute("INSERT INTO schema_migrations(id) VALUES('funcoes_seed_v1')")
 
+    # 2026-07-17: backfill da flag usa_comissao_vendas no Consultor de Vendas (F1.2) — a comissão
+    # dele vem do comissao_vendas da loja, não do comissao_json genérico das demais funções.
+    if "comissao_vendas_flag_v1" not in aplicadas and _tabela_existe(cur, "funcoes") \
+            and "usa_comissao_vendas" in _cols_de(cur, "funcoes"):
+        cur.execute("UPDATE funcoes SET usa_comissao_vendas=1 WHERE nome='Consultor de Vendas'")
+        cur.execute("INSERT INTO schema_migrations(id) VALUES('comissao_vendas_flag_v1')")
+
     # 2026-07-10: Perfil-4 (rev2 §2) — colapsa os ~13 níveis-cargo em 4 perfis de acesso; o cargo
     # antigo vira Função (usuarios.funcao_id, só p/ contas sem Funcionário vinculado). Idempotente.
     if "perfis_v3_2026" not in aplicadas and _tabela_existe(cur, "usuarios"):
