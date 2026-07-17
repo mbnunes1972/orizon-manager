@@ -1057,6 +1057,7 @@ def init_db():
         _migrar_colunas()
         _migrar_dados()
     else:
+        _migrar_colunas_pg()  # Postgres: ADD COLUMN das colunas novas (create_all não altera existentes)
         _seed_loja_padrao()   # equivalente portável da tenancy_v1_2026 (loja seed + backfill)
     try:
         from auth import perfis
@@ -1634,6 +1635,21 @@ def _migrar_dados():
         conn.close()
     _backfill_loja_operacional()
     _drop_coluna_margens_orcamentos()
+
+
+def _migrar_colunas_pg():
+    """Postgres: ADD COLUMN IF NOT EXISTS das colunas novas do modelo. `create_all()` não altera
+    tabelas já existentes, e o caminho de `_migrar_colunas()` é só-SQLite (PRAGMA). Idempotente.
+    Espelha as colunas adicionadas via `_migrar_colunas` que precisam existir no Postgres já povoado."""
+    if ENGINE.dialect.name == "sqlite":
+        return
+    stmts = [
+        "ALTER TABLE lojas ADD COLUMN IF NOT EXISTS responsavel VARCHAR(120)",
+        "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS senha_provisoria INTEGER DEFAULT 0",
+    ]
+    with ENGINE.begin() as conn:
+        for s in stmts:
+            conn.exec_driver_sql(s)
 
 
 def _seed_loja_padrao():
