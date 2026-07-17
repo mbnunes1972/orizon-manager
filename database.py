@@ -289,6 +289,31 @@ class FolhaPagamento(Base):
     pago_em        = Column(DateTime,    nullable=True)
 
 
+class ComissaoFolha(Base):
+    """Item de comissão de um funcionário numa competência (Fase 4). Um funcionário pode ter vários
+    (por etapa/projeto). origem='papel' vem da conclusão de etapa (Mapa); origem='venda' é a comissão
+    do Consultor. A parte variável da Folha = Σ valor dos itens (status != 'cancelado')."""
+    __tablename__ = "comissao_folha"
+
+    id             = Column(Integer,  primary_key=True, autoincrement=True)
+    loja_id        = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
+    funcionario_id = Column(Integer,  ForeignKey("funcionarios.id"), nullable=False)
+    competencia    = Column(String(7), nullable=False)          # 'AAAA-MM' = mês de concluido_em
+    origem         = Column(String(10), nullable=False, default="papel")  # papel | venda
+    papel          = Column(String(30), nullable=True)          # projeto_executivo|medicao|montagem|assistencia|venda
+    projeto_nome   = Column(Text,     nullable=True)            # nome_safe (rastreabilidade)
+    etapa_codigo   = Column(String(8), nullable=True)           # etapa que disparou (papel); NULL p/ venda
+    base           = Column(Float,    nullable=True, default=0.0)   # Σ order_total dos ambientes (ou vendas líq.)
+    base_ajustada  = Column(Float,    nullable=True)            # override manual da base
+    pct            = Column(Float,    nullable=True, default=0.0)
+    valor          = Column(Float,    nullable=True, default=0.0)   # base_efetiva × pct/100
+    status         = Column(String(12), nullable=False, default="previsto")  # previsto|confirmado|cancelado
+    ref_etapa      = Column(String(120), nullable=True)        # idempotência: '<projeto>:<etapa>:<func>' ou 'venda:<func>:<comp>'
+    criado_em      = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint("ref_etapa", name="uq_comissao_ref_etapa"),)
+
+
 class Funcionario(Base):
     """Cadastro de RH (Modulos_Orizon_v9, módulo 2). NÃO é conta de login — o Usuário (Admin/Núcleo)
     referencia o Funcionário via usuario_id/funcionario_id, sem duplicar dado pessoal."""
