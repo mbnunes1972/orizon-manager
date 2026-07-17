@@ -1340,7 +1340,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
     <!-- Painéis stub -->
     <div id="cad-panel-fornecedores" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
-    <div id="cad-panel-funcionarios" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     <div id="cad-panel-terceiros"    style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
   </div>
 
@@ -4088,9 +4087,6 @@ const _CAD_DEFS = {
       {id:'cpf', lbl:'CPF', tipo:'text'}, {id:'telefone', lbl:'Telefone', tipo:'text'},
       {id:'email', lbl:'E-mail', tipo:'text', full:true},
       {id:'funcao_id', lbl:'Função', tipo:'select_funcoes'}, {id:'cargo', lbl:'Cargo (título)', tipo:'text'},
-      {id:'remuneracao_tipo', lbl:'Remuneração', tipo:'select', ops:[['fixa','Fixa'],['fixa_variavel','Fixa + variável']]},
-      {id:'remuneracao_fixa', lbl:'Remuneração fixa (R$)', tipo:'number'},
-      {id:'remuneracao_var', lbl:'Parte variável (R$)', tipo:'number'},
       {id:'status', lbl:'Status', tipo:'select', ops:[['ativo','Ativo'],['inativo','Inativo']]},
       ..._CAMPOS_ENDERECO, ..._CAMPOS_BANCO,
     ], acesso:true },
@@ -9966,8 +9962,22 @@ function finTab(t){
 // ── Folha de Pagamento (Modulos_Orizon_v10 §2.1): motor — parte fixa (cadastro) + variável (vendas) ──
 let _folhaComp = null;   // competência ativa (AAAA-MM)
 function _folhaCompDefault(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
-async function folhaCarregar(){
+let _folhaAba = 'folha';
+async function folhaCarregar(){   // entry do módulo Folha: sub-abas Folha do mês | Funcionários
   const box = document.getElementById('folha-box'); if(!box) return;
+  box.innerHTML =
+    '<div class="home-tabs" style="display:flex;gap:6px;margin-bottom:14px">'
+    +'<button class="home-tab'+(_folhaAba==='folha'?' active':'')+'" onclick="folhaAba(\'folha\')">Folha do mês</button>'
+    +'<button class="home-tab'+(_folhaAba==='func'?' active':'')+'" onclick="folhaAba(\'func\')">Funcionários</button>'
+    +'</div>'
+    +'<div id="folha-mes-box" style="display:'+(_folhaAba==='folha'?'block':'none')+'"></div>'
+    +'<div id="cad-panel-funcionarios" style="display:'+(_folhaAba==='func'?'block':'none')+'"></div>';
+  if(_folhaAba==='func') cadEntCarregar('funcionarios');
+  else folhaMesCarregar();
+}
+function folhaAba(a){ _folhaAba=a; folhaCarregar(); }
+async function folhaMesCarregar(){
+  const box = document.getElementById('folha-mes-box'); if(!box) return;
   if(!_folhaComp) _folhaComp = _folhaCompDefault();
   box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
   const d = await (await fetch('/api/folha?competencia='+encodeURIComponent(_folhaComp),{credentials:'same-origin'})).json().catch(()=>({}));
@@ -9987,7 +9997,7 @@ async function folhaPagar(id){
   showToast('Folha paga.', false); folhaCarregar();
 }
 function folhaRender(folha){
-  const box = document.getElementById('folha-box'); if(!box) return;
+  const box = document.getElementById('folha-mes-box'); if(!box) return;
   folha = folha || {itens:[]};
   const linhas = (folha.itens||[]).map(it => {
     const acao = it.status==='paga'
