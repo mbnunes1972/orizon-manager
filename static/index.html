@@ -1871,6 +1871,50 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="orz-panel-gestores" style="display:none"></div>
   </div>
 
+  <!-- Modal: Cadastro/Edição de Loja (Painel Orizon) -->
+  <style>.ml-f{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)}.ml-f input,.ml-f select{padding:5px 8px;box-sizing:border-box}</style>
+  <div id="modal-loja" style="display:none;position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:24px;max-width:580px;width:94%;max-height:90vh;overflow:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div id="ml-titulo" style="font-family:var(--font-display);font-weight:900;font-size:16px">Cadastro de Loja</div>
+        <span onclick="orizonFecharModalLoja()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
+      </div>
+      <input type="hidden" id="ml-id">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px">
+        <label class="ml-f"><span>Nome*</span><input id="ml-nome"></label>
+        <label class="ml-f"><span>Código (3 letras)*</span><input id="ml-codigo" maxlength="3"></label>
+        <label class="ml-f"><span>CNPJ</span><input id="ml-cnpj"></label>
+        <label class="ml-f"><span>Telefone</span><input id="ml-telefone"></label>
+        <label class="ml-f"><span>E-mail</span><input id="ml-email"></label>
+        <label class="ml-f"><span>Responsável</span><input id="ml-responsavel"></label>
+        <label class="ml-f"><span>CEP</span><input id="ml-cep"></label>
+        <label class="ml-f"><span>Logradouro</span><input id="ml-logradouro"></label>
+        <label class="ml-f"><span>Número</span><input id="ml-numero"></label>
+        <label class="ml-f"><span>Bairro</span><input id="ml-bairro"></label>
+        <label class="ml-f"><span>Cidade</span><input id="ml-cidade"></label>
+        <label class="ml-f"><span>UF</span><input id="ml-estado" maxlength="2"></label>
+        <label class="ml-f" style="grid-column:1 / -1"><span>Rede (grupo)</span><select id="ml-rede"></select></label>
+      </div>
+      <div id="ml-diretor-sec" style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:6px">1º usuário (Diretor)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px">
+          <label class="ml-f"><span>Nome</span><input id="ml-dir-nome"></label>
+          <label class="ml-f"><span>E-mail (login)</span><input id="ml-dir-login"></label>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Senha provisória (dígitos do CNPJ ou "orizon123"); o diretor troca no 1º acesso.</div>
+      </div>
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+        <div style="font-weight:700;font-size:13px;margin-bottom:6px">Módulos de uso</div>
+        <div id="ml-modulos" style="display:flex;flex-wrap:wrap;gap:6px 16px"></div>
+      </div>
+      <div id="ml-erro" style="color:var(--muted);font-size:12px;min-height:16px;margin:10px 0"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-ghost btn-sm" onclick="orizonFecharModalLoja()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="orizonSalvarLoja()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: editar data prevista de conclusão (Cronograma do Ciclo, v11) — reautenticação Gerente+ -->
   <div id="modal-crono" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:26px;max-width:400px;width:92%;animation:mIn .18s ease">
@@ -9238,6 +9282,65 @@ function orizonTab(qual){
   if (qual==='gestores') orizonGestoresCarregar();
 }
 
+async function orizonAbrirModalLoja(loja){
+  loja = loja || {};
+  const ed = !!loja.id;
+  document.getElementById('ml-titulo').textContent = ed ? 'Editar Loja' : 'Cadastro de Loja';
+  document.getElementById('ml-id').value = loja.id || '';
+  const setv = (id,v)=>{ const e=document.getElementById(id); if(e) e.value = v||''; };
+  setv('ml-nome',loja.nome); setv('ml-codigo',loja.codigo); setv('ml-cnpj',loja.cnpj);
+  setv('ml-telefone',loja.telefone); setv('ml-email',loja.email); setv('ml-responsavel',loja.responsavel);
+  setv('ml-cep',loja.cep); setv('ml-logradouro',loja.logradouro); setv('ml-numero',loja.numero);
+  setv('ml-bairro',loja.bairro); setv('ml-cidade',loja.cidade); setv('ml-estado',loja.estado);
+  setv('ml-dir-nome',''); setv('ml-dir-login',''); document.getElementById('ml-erro').textContent='';
+  document.getElementById('ml-codigo').disabled = ed;                 // código não muda na edição
+  document.getElementById('ml-diretor-sec').style.display = ed ? 'none' : '';
+  const dr = await fetch('/api/admin/redes',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({redes:[]}));
+  const rsel = document.getElementById('ml-rede');
+  rsel.innerHTML = `<option value="">— Avulsa —</option>`+(dr.redes||[]).map(r=>`<option value="${r.id}" ${String(r.id)===String(loja.rede_id)?'selected':''}>${esc(r.nome)}</option>`).join('');
+  const mbox = document.getElementById('ml-modulos');
+  mbox.innerHTML = '<span style="color:var(--muted);font-size:12px">Carregando…</span>';
+  let doms = [];
+  if (ed){
+    const dm = await fetch(`/api/admin/lojas/${loja.id}/modulos`,{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({dominios:[]}));
+    doms = (dm.dominios||[]).map(m=>({id:m.id, rotulo:m.rotulo, ativo:m.ativo}));
+  } else {
+    const dp = await fetch('/api/admin/perfis',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({}));
+    doms = ((((dp.modulos_opcoes)||{}).dominios)||[]).map(m=>({id:m.id, rotulo:m.rotulo, ativo:true}));
+  }
+  mbox.innerHTML = doms.map(m=>`<label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" data-mlmod="${esc(m.id)}" ${m.ativo?'checked':''}> ${esc(m.rotulo)}</label>`).join('') || '<span style="color:var(--muted)">Sem módulos.</span>';
+  document.getElementById('modal-loja').style.display='flex';
+}
+function orizonFecharModalLoja(){ const m=document.getElementById('modal-loja'); if(m) m.style.display='none'; }
+async function orizonSalvarLoja(){
+  const g = id => (document.getElementById(id).value||'').trim();
+  const erro = document.getElementById('ml-erro');
+  const id = g('ml-id');
+  const mods = Array.from(document.querySelectorAll('#ml-modulos input[data-mlmod]:checked')).map(c=>c.getAttribute('data-mlmod'));
+  const rede = document.getElementById('ml-rede').value;
+  const base = { nome:g('ml-nome'), cnpj:g('ml-cnpj'), telefone:g('ml-telefone'), email:g('ml-email'),
+    responsavel:g('ml-responsavel'), cep:g('ml-cep'), logradouro:g('ml-logradouro'), numero:g('ml-numero'),
+    bairro:g('ml-bairro'), cidade:g('ml-cidade'), estado:g('ml-estado'),
+    rede_id: rede ? parseInt(rede,10) : null, modulos: mods };
+  let r;
+  if (id){
+    r = await fetch(`/api/admin/lojas/${id}`, {method:'PATCH', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(base)});
+  } else {
+    if(!g('ml-nome') || !g('ml-codigo')){ erro.textContent='Informe nome e código.'; return; }
+    const payload = Object.assign({}, base, {codigo:g('ml-codigo')});
+    const dl = g('ml-dir-login');
+    if (dl) payload.diretor = { nome:g('ml-dir-nome'), login: dl };
+    r = await fetch('/api/admin/lojas', {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  }
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ erro.textContent = d.erro || 'Erro ao salvar.'; return; }
+  orizonFecharModalLoja();
+  showToast(id?'Loja atualizada.':'Loja criada.', false);
+  orizonLojasCarregar();
+}
+
 async function orizonRedesCarregar(){
   const box = document.getElementById('orz-panel-redes'); if(!box) return;
   box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
@@ -9248,9 +9351,10 @@ async function orizonRedesCarregar(){
         <strong style="color:var(--accent)"><i class="ti ti-building"></i>Redes</strong>
         <button class="btn btn-ghost btn-sm" onclick="orizonRedeNova()" style="font-size:11px">+ Nova rede</button>
       </div>
-      <table class="cli-table"><thead><tr><th>Nome</th><th>CNPJ</th></tr></thead><tbody>
-      ${(d.redes||[]).map(r=>`<tr><td>${esc(r.nome)}</td><td style="color:var(--muted)">${esc(r.cnpj||'—')}</td></tr>`).join('')
-        || '<tr><td colspan="2" style="color:var(--muted)">Nenhuma rede.</td></tr>'}
+      <table class="cli-table"><thead><tr><th>Nome</th><th>CNPJ</th><th></th></tr></thead><tbody>
+      ${(d.redes||[]).map(r=>`<tr><td>${esc(r.nome)}</td><td style="color:var(--muted)">${esc(r.cnpj||'—')}</td>
+        <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick='orizonAbrirModalLoja({rede_id:${r.id}})'>+ Loja nesta rede</button></td></tr>`).join('')
+        || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma rede.</td></tr>'}
       </tbody></table>
     </div>`;
 }
@@ -9270,29 +9374,19 @@ async function orizonLojasCarregar(){
   else if (_orzLojaFiltro)               lojas = lojas.filter(l=>String(l.rede_id)===_orzLojaFiltro);
   const filtroOpts = `<option value="">Todas</option><option value="avulsas" ${_orzLojaFiltro==='avulsas'?'selected':''}>Avulsas</option>`+
     redes.map(r=>`<option value="${r.id}" ${String(r.id)===_orzLojaFiltro?'selected':''}>${esc(r.nome)}</option>`).join('');
-  const redeSelOpts = `<option value="">— Avulsa —</option>`+
-    redes.map(r=>`<option value="${r.id}">${esc(r.nome)}</option>`).join('');
   box.innerHTML = `
     <div class="card" style="padding:14px 16px">
       <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
         <strong style="color:var(--accent)"><i class="ti ti-building-store"></i>Lojas</strong>
         <span style="color:var(--muted);font-size:12px">Grupo:</span>
         <select onchange="_orzLojaFiltro=this.value; orizonLojasCarregar()" style="padding:4px 8px">${filtroOpts}</select>
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('orz-nova-loja').style.display=''" style="font-size:11px">+ Nova loja</button>
+        <button class="btn btn-ghost btn-sm" onclick="orizonAbrirModalLoja(null)" style="font-size:11px">+ Nova loja</button>
       </div>
-      <div id="orz-nova-loja" style="display:none;margin-bottom:10px;padding:10px;border:1px solid var(--border);border-radius:8px">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <input id="orz-nl-nome" placeholder="Nome da loja" style="padding:4px 8px">
-          <input id="orz-nl-codigo" placeholder="Código (3 letras)" style="padding:4px 8px;width:130px">
-          <select id="orz-nl-rede" style="padding:4px 8px">${redeSelOpts}</select>
-          <button class="btn btn-primary btn-sm" onclick="orizonLojaCriar()" style="font-size:11px">Criar</button>
-          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('orz-nova-loja').style.display='none'" style="font-size:11px">Cancelar</button>
-        </div>
-      </div>
-      <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th>Grupo (rede)</th></tr></thead><tbody>
+      <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th>Grupo (rede)</th><th></th></tr></thead><tbody>
       ${lojas.map(l=>`<tr><td>${esc(l.nome)}</td><td style="color:var(--muted)">${esc(l.codigo||'—')}</td>
-        <td style="color:var(--muted)">${esc(l.rede_id ? (redeNome[l.rede_id]||'—') : 'Avulsa')}</td></tr>`).join('')
-        || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma loja neste filtro.</td></tr>'}
+        <td style="color:var(--muted)">${esc(l.rede_id ? (redeNome[l.rede_id]||'—') : 'Avulsa')}</td>
+        <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick='orizonAbrirModalLoja(${_attrJson(l)})'>Editar</button></td></tr>`).join('')
+        || '<tr><td colspan="4" style="color:var(--muted)">Nenhuma loja neste filtro.</td></tr>'}
       </tbody></table>
     </div>`;
 }
@@ -9326,20 +9420,6 @@ async function orizonRedeNova(){
   const d = await r.json();
   if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Redes'}); return; }
   showToast('Rede criada.', false); orizonRedesCarregar();
-}
-
-async function orizonLojaCriar(){
-  const nome   = (document.getElementById('orz-nl-nome').value || '').trim();
-  const codigo = (document.getElementById('orz-nl-codigo').value || '').trim();
-  const redeId = document.getElementById('orz-nl-rede').value;
-  if(!nome || !codigo){ await avisoPopup('Informe nome e código.', {titulo:'Lojas'}); return; }
-  const body = { nome, codigo };
-  if (redeId) body.rede_id = parseInt(redeId, 10);
-  const r = await fetch('/api/admin/lojas', {method:'POST', credentials:'same-origin',
-    headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-  const d = await r.json();
-  if(!d.ok){ await avisoPopup(d.erro||'Erro', {titulo:'Lojas'}); return; }
-  showToast('Loja criada.', false); orizonLojasCarregar();
 }
 
 async function adminRenderLoja(box){

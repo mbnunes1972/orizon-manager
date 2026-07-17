@@ -8658,6 +8658,7 @@ def _loja_dict(l) -> dict:
         "codigo":      l.codigo      or "",
         "telefone":    l.telefone    or "",
         "email":       l.email       or "",
+        "responsavel": l.responsavel or "",
         "cep":         l.cep         or "",
         "logradouro":  l.logradouro  or "",
         "numero":      l.numero      or "",
