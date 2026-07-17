@@ -2567,6 +2567,7 @@ async function carregarUsuarioAutenticado(){
     const d = await r.json();
     if(!d.ok){ window.location.href = '/login'; return; }
     _usuarioAtual = d.usuario;
+    if (_usuarioAtual.precisa_trocar_senha){ _forcarTrocaSenha(); return; }   // 1º login: bloqueia até trocar
     aplicarTema(_usuarioAtual.tema || 'claro');
     const _lojas = _usuarioAtual.lojas || [];
     const _salva = parseInt(localStorage.getItem('loja_ativa') || '', 10);
@@ -2590,6 +2591,43 @@ async function carregarUsuarioAutenticado(){
     _carregarDadosExtrasUsuario();
     _aterrissarPorPapel();
   } catch(e){ console.warn('[AUTH] Erro ao carregar usuário:', e); }
+}
+
+// Troca obrigatória de senha no 1º login (senha provisória) — modal bloqueante.
+function _forcarTrocaSenha(){
+  let ov = document.getElementById('modal-troca-senha');
+  if (!ov){
+    ov = document.createElement('div');
+    ov.id = 'modal-troca-senha';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+    ov.innerHTML = `
+      <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:26px;max-width:400px;width:92%">
+        <div style="font-family:var(--font-display);font-weight:900;font-size:16px;margin-bottom:6px">Defina sua senha</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Você está com uma senha provisória. Defina uma nova senha para continuar.</div>
+        <label style="font-size:12px;color:var(--muted)">Nova senha</label>
+        <input type="password" id="ts-nova" style="width:100%;box-sizing:border-box;margin-bottom:10px;padding:6px 10px">
+        <label style="font-size:12px;color:var(--muted)">Confirme a nova senha</label>
+        <input type="password" id="ts-conf" onkeydown="if(event.key==='Enter')_trocaSenhaSalvar()" style="width:100%;box-sizing:border-box;padding:6px 10px">
+        <div id="ts-erro" style="font-size:12px;color:var(--muted);min-height:16px;margin:8px 0"></div>
+        <button class="btn btn-primary btn-sm" onclick="_trocaSenhaSalvar()" style="width:100%;justify-content:center">Salvar e continuar</button>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+  const n = document.getElementById('ts-nova'); if(n) n.focus();
+}
+async function _trocaSenhaSalvar(){
+  const nova = document.getElementById('ts-nova').value || '';
+  const conf = document.getElementById('ts-conf').value || '';
+  const erro = document.getElementById('ts-erro');
+  if (nova.length < 6){ erro.textContent = 'A senha deve ter ao menos 6 caracteres.'; return; }
+  if (nova !== conf){ erro.textContent = 'As senhas não conferem.'; return; }
+  const r = await fetch('/api/auth/trocar-senha', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({nova_senha: nova})});
+  const d = await r.json().catch(()=>({}));
+  if (!d.ok){ erro.textContent = d.erro || 'Erro ao trocar a senha.'; return; }
+  const ov = document.getElementById('modal-troca-senha'); if(ov) ov.style.display = 'none';
+  carregarUsuarioAutenticado();   // recarrega já sem a flag
 }
 
 // Esconde itens de menu conforme os módulos ativos da loja do usuário.
