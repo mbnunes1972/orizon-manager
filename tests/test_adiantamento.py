@@ -58,6 +58,42 @@ def test_upsert_oficial_ignora_terceirizado(seed, app_db):
     db.close()
 
 
+def test_gerar_folha_cria_oficial_e_liquido(seed, app_db):
+    import mod_folha, mod_provisoes
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
+    fn = app_db.Funcao(loja_id=loja, nome="Reg", salario_fixo=2000.0,
+                       regime_contratacao="registrado", status="ativo"); db.add(fn); db.flush()
+    f = app_db.Funcionario(loja_id=loja, nome="R", funcao_id=fn.id, status="ativo"); db.add(f); db.commit()
+    cfg = mod_provisoes.config_financeira_default()
+    cfg["folha"]["adiantamento_oficial_ativo"] = True
+    mod_folha.gerar_folha(db, loja, "2026-07", cfg); db.commit()
+    reg = db.query(app_db.FolhaPagamento).filter_by(funcionario_id=f.id, competencia="2026-07").first()
+    d = mod_folha.serialize(db, reg)
+    assert d["total"] == 2000.0
+    assert d["abatimentos"] == 800.0
+    assert d["liquido_pagar"] == 1200.0
+    assert d["saldo_debito"] == 800.0
+    assert any(a["tipo"] == "oficial" and a["valor"] == 800.0 for a in d["adiantamentos"])
+    db.close()
+
+
+def test_pagar_quita_adiantamentos_da_competencia(seed, app_db):
+    import mod_folha
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
+    f = app_db.Funcionario(loja_id=loja, nome="P", status="ativo", pix="p@x"); db.add(f); db.flush()
+    ad = app_db.AdiantamentoFuncionario(loja_id=loja, funcionario_id=f.id, tipo="adiantamento",
+         competencia="2026-07", valor=300.0, abater=1, competencia_abate="2026-07", quitado=0)
+    reg = app_db.FolhaPagamento(loja_id=loja, funcionario_id=f.id, competencia="2026-07",
+         parte_fixa=1000.0, total=1000.0, status="aberta")
+    db.add(ad); db.add(reg); db.flush()
+    mod_folha.pagar(db, "loja", 99, reg)
+    assert reg.status == "paga"
+    db.refresh(ad); assert ad.quitado == 1
+    db.close()
+
+
 def test_quitar_da_competencia(seed, app_db):
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id

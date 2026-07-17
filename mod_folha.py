@@ -10,7 +10,9 @@ from datetime import datetime
 
 import mod_contabil
 import mod_provisoes
-from database import Funcionario, Funcao, Projeto, Orcamento, FolhaPagamento, ComissaoFolha
+import mod_adiantamento
+from database import (Funcionario, Funcao, Projeto, Orcamento, FolhaPagamento, ComissaoFolha,
+                      AdiantamentoFuncionario)
 
 _STATUS_VENDA = ("fechado", "convertido")   # projeto considerado "venda fechada"
 
@@ -147,6 +149,10 @@ def gerar_folha(db, loja_id, competencia, cfg):
         if reg.status == "paga":
             out.append(reg); continue
         _upsert_item_venda(db, loja_id, f, competencia, cfg)
+        folha_cfg = (cfg or {}).get("folha", {}) or {}
+        if folha_cfg.get("adiantamento_oficial_ativo"):   # oficial: 40% do fixo (carteira), auto
+            mod_adiantamento.upsert_oficial(db, loja_id, f, competencia,
+                                            folha_cfg.get("adiantamento_oficial_pct") or 0.0)
         c = calcular_folha(db, loja_id, f, competencia, cfg)   # fixa + benefícios (variável tratada via itens)
         variavel = _total_itens_comissao(db, loja_id, f.id, competencia)
         reg.parte_fixa = c["parte_fixa"]; reg.vendas_liq = c["vendas_liq"]; reg.faixa_pct = c["faixa_pct"]
@@ -171,6 +177,7 @@ def pagar(db, owner_tipo, owner_id, reg):
         mod_contabil.registrar_evento(db, owner_tipo, owner_id, "folha_variavel", reg.parte_variavel, ref=ref + ":var")
     if (reg.beneficios or 0) > 0:
         mod_contabil.registrar_evento(db, owner_tipo, owner_id, "folha_beneficios", reg.beneficios, ref=ref + ":ben")
+    mod_adiantamento.quitar_da_competencia(db, reg.funcionario_id, reg.competencia)   # baixa os adiantamentos abatidos
     reg.status = "paga"; reg.ref_lancamento = ref; reg.pago_em = datetime.utcnow()
     return True, None
 
@@ -194,11 +201,22 @@ def serialize(db, reg):
     comissoes = [{"id": i.id, "origem": i.origem, "papel": i.papel, "projeto": i.projeto_nome,
                   "etapa": i.etapa_codigo, "base": i.base, "base_ajustada": i.base_ajustada,
                   "pct": i.pct, "valor": i.valor, "status": i.status} for i in itens_com]
+    ads = (db.query(AdiantamentoFuncionario)
+           .filter_by(funcionario_id=reg.funcionario_id)
+           .order_by(AdiantamentoFuncionario.id.asc()).all())
+    adiantamentos = [{"id": a.id, "tipo": a.tipo, "competencia": a.competencia, "valor": a.valor,
+                      "abater": bool(a.abater), "competencia_abate": a.competencia_abate,
+                      "quitado": bool(a.quitado), "observacao": a.observacao} for a in ads]
+    abat = mod_adiantamento.abatimentos_competencia(db, reg.funcionario_id, reg.competencia)
+    saldo = mod_adiantamento.saldo_debito(db, reg.funcionario_id)
+    liquido = round((reg.total or 0.0) - abat, 2)
     return {"id": reg.id, "funcionario_id": reg.funcionario_id, "funcionario": (f.nome if f else ""),
             "competencia": reg.competencia, "parte_fixa": reg.parte_fixa, "vendas_liq": reg.vendas_liq,
             "base_comissao": reg.base_comissao, "faixa_pct": reg.faixa_pct,
             "parte_variavel": reg.parte_variavel, "beneficios": reg.beneficios, "total": reg.total,
-            "comissoes": comissoes, "status": reg.status, "pagamento": _pagamento_str(f)}
+            "comissoes": comissoes, "adiantamentos": adiantamentos, "abatimentos": abat,
+            "liquido_pagar": liquido, "saldo_debito": saldo,
+            "status": reg.status, "pagamento": _pagamento_str(f)}
 
 
 def listar(db, loja_id, competencia):
@@ -210,4 +228,5 @@ def listar(db, loja_id, competencia):
             "total_fixa": round(sum(x["parte_fixa"] or 0 for x in itens), 2),
             "total_variavel": round(sum(x["parte_variavel"] or 0 for x in itens), 2),
             "total_beneficios": round(sum(x["beneficios"] or 0 for x in itens), 2),
+            "total_liquido": round(sum(x["liquido_pagar"] or 0 for x in itens), 2),
             "total_geral": round(sum(x["total"] or 0 for x in itens), 2)}
