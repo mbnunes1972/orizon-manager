@@ -244,6 +244,7 @@ class Funcao(Base):
     beneficios_json     = Column(Text,    nullable=True)   # {"at":{"on","valor"},"va":..,"ps":..}
     comissao_json       = Column(Text,    nullable=True)   # {"por_meta","base","pct"|"faixas"} (não-consultor)
     usa_comissao_vendas = Column(Integer, default=0)       # 1 = comissão vem do comissao_vendas da loja (Consultor)
+    comissao_fixa       = Column(Float,   nullable=True)   # comissão FIXA mensal isenta de encargos (férias/13º/INSS) — planejamento
     criado_em = Column(DateTime,    default=datetime.utcnow)
 
 
@@ -282,6 +283,7 @@ class FolhaPagamento(Base):
     parte_variavel = Column(Float,       nullable=True, default=0.0)
     base_comissao  = Column(Float,       nullable=True, default=0.0)   # base editável da comissão (recalcula variável)
     beneficios     = Column(Float,       nullable=True, default=0.0)   # Σ AT/VA/PS ativos da Função
+    comissao_fixa  = Column(Float,       nullable=True, default=0.0)   # comissão fixa da Função (isenta de encargos)
     total          = Column(Float,       nullable=True, default=0.0)
     status         = Column(String(10),  nullable=False, default="aberta")   # aberta | paga
     ref_lancamento = Column(String(60),  nullable=True)           # ref idempotente do lançamento contábil
@@ -1405,9 +1407,10 @@ def _migrar_colunas():
                                    ("salario_fixo", "REAL"),
                                    ("beneficios_json", "TEXT"),
                                    ("comissao_json", "TEXT"),
-                                   ("usa_comissao_vendas", "INTEGER")])
+                                   ("usa_comissao_vendas", "INTEGER"),
+                                   ("comissao_fixa", "REAL")])
         # Folha Fase 3: base da comissão editável + soma de benefícios no registro da folha
-        _add_cols("folha_pagamento", [("base_comissao", "REAL"), ("beneficios", "REAL")])
+        _add_cols("folha_pagamento", [("base_comissao", "REAL"), ("beneficios", "REAL"), ("comissao_fixa", "REAL")])
         # Cronograma do Ciclo (Modulos_Orizon_v11): data prevista de conclusão por etapa
         # + Responsável por função (Modulos_Orizon_v12): função exigida + funcionário escolhido
         _add_cols("ciclo_etapas", [("data_prevista_conclusao","DATETIME"),
@@ -1746,6 +1749,8 @@ def _migrar_colunas_pg():
         "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS beneficios_json TEXT",
         "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS comissao_json TEXT",
         "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS usa_comissao_vendas INTEGER DEFAULT 0",
+        "ALTER TABLE funcoes ADD COLUMN IF NOT EXISTS comissao_fixa DOUBLE PRECISION",
+        "ALTER TABLE folha_pagamento ADD COLUMN IF NOT EXISTS comissao_fixa DOUBLE PRECISION",
         "ALTER TABLE folha_pagamento ADD COLUMN IF NOT EXISTS base_comissao DOUBLE PRECISION",
         "ALTER TABLE folha_pagamento ADD COLUMN IF NOT EXISTS beneficios DOUBLE PRECISION",
     ]

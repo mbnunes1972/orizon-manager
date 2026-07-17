@@ -205,6 +205,7 @@ def funcao_serialize(f, db=None):
             "regime_trabalho": getattr(f, "regime_trabalho", None),
             "regime_contratacao": getattr(f, "regime_contratacao", None),
             "salario_fixo": getattr(f, "salario_fixo", None),
+            "comissao_fixa": getattr(f, "comissao_fixa", None),
             "usa_comissao_vendas": bool(getattr(f, "usa_comissao_vendas", 0)),
             "comissao": {"por_meta": bool(com.get("por_meta")),
                          "base": com.get("base") if com.get("base") in ("liquido", "fabrica") else "liquido",
@@ -232,6 +233,8 @@ def funcao_aplicar(db, f, req, loja_id):
         v = _s(req.get("regime_contratacao")); f.regime_contratacao = v if v in _REG_CONTR else None
     if "salario_fixo" in req:
         f.salario_fixo = _f(req.get("salario_fixo"))
+    if "comissao_fixa" in req:
+        f.comissao_fixa = _f(req.get("comissao_fixa"))
     if "comissao" in req:
         cm = req.get("comissao") or {}
         base = cm.get("base"); base = base if base in ("liquido", "fabrica") else "liquido"

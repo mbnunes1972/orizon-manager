@@ -72,6 +72,7 @@ def calcular_folha(db, loja_id, funcionario, competencia, cfg, base_override=Non
     `base_override` (se não None) força a base da comissão — usado ao editar a base na Folha."""
     funcao = db.get(Funcao, funcionario.funcao_id) if funcionario.funcao_id else None
     fixa = float(funcao.salario_fixo or 0.0) if funcao else 0.0
+    comissao_fixa = float(getattr(funcao, "comissao_fixa", 0.0) or 0.0) if funcao else 0.0
     beneficios = _beneficios_total(funcao)
     vendas_liq = 0.0
     base = 0.0
@@ -90,7 +91,8 @@ def calcular_folha(db, loja_id, funcionario, competencia, cfg, base_override=Non
     variavel = round(base * pct / 100.0, 2)
     return {"parte_fixa": round(fixa, 2), "vendas_liq": round(vendas_liq, 2),
             "base_comissao": round(base, 2), "faixa_pct": pct, "parte_variavel": variavel,
-            "beneficios": beneficios, "total": round(fixa + variavel + beneficios, 2)}
+            "beneficios": beneficios, "comissao_fixa": round(comissao_fixa, 2),
+            "total": round(fixa + variavel + beneficios + comissao_fixa, 2)}
 
 
 def editar_base(db, loja_id, reg, base, cfg):
@@ -102,7 +104,7 @@ def editar_base(db, loja_id, reg, base, cfg):
     c = calcular_folha(db, loja_id, f, reg.competencia, cfg, base_override=base)
     reg.parte_fixa = c["parte_fixa"]; reg.base_comissao = c["base_comissao"]
     reg.faixa_pct = c["faixa_pct"]; reg.parte_variavel = c["parte_variavel"]
-    reg.beneficios = c["beneficios"]; reg.total = c["total"]
+    reg.beneficios = c["beneficios"]; reg.comissao_fixa = c["comissao_fixa"]; reg.total = c["total"]
     db.flush()
     return True, None
 
@@ -157,8 +159,9 @@ def gerar_folha(db, loja_id, competencia, cfg):
         variavel = _total_itens_comissao(db, loja_id, f.id, competencia)
         reg.parte_fixa = c["parte_fixa"]; reg.vendas_liq = c["vendas_liq"]; reg.faixa_pct = c["faixa_pct"]
         reg.base_comissao = c["base_comissao"]; reg.parte_variavel = variavel
-        reg.beneficios = c["beneficios"]
-        reg.total = round((c["parte_fixa"] or 0.0) + variavel + (c["beneficios"] or 0.0), 2)
+        reg.beneficios = c["beneficios"]; reg.comissao_fixa = c["comissao_fixa"]
+        reg.total = round((c["parte_fixa"] or 0.0) + variavel + (c["beneficios"] or 0.0)
+                          + (c["comissao_fixa"] or 0.0), 2)
         reg.status = "aberta"
         db.flush()
         out.append(reg)
@@ -213,7 +216,8 @@ def serialize(db, reg):
     return {"id": reg.id, "funcionario_id": reg.funcionario_id, "funcionario": (f.nome if f else ""),
             "competencia": reg.competencia, "parte_fixa": reg.parte_fixa, "vendas_liq": reg.vendas_liq,
             "base_comissao": reg.base_comissao, "faixa_pct": reg.faixa_pct,
-            "parte_variavel": reg.parte_variavel, "beneficios": reg.beneficios, "total": reg.total,
+            "parte_variavel": reg.parte_variavel, "beneficios": reg.beneficios,
+            "comissao_fixa": reg.comissao_fixa, "total": reg.total,
             "comissoes": comissoes, "adiantamentos": adiantamentos, "abatimentos": abat,
             "liquido_pagar": liquido, "saldo_debito": saldo,
             "status": reg.status, "pagamento": _pagamento_str(f)}
