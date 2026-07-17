@@ -1845,7 +1845,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="cfg-emp-seletor"></div>
     <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin:12px 0 16px;flex-wrap:wrap">
       <button class="home-tab ativo" id="cfg-tab-provisoes"  onclick="cfgTab('provisoes')">Provisões</button>
-      <button class="home-tab"       id="cfg-tab-comissao"   onclick="cfgTab('comissao')">Comissão de Vendas</button>
+      <button class="home-tab"       id="cfg-tab-comissao"   onclick="cfgTab('comissao')">Remunerações</button>
       <button class="home-tab"       id="cfg-tab-cronograma" onclick="cfgTab('cronograma')">Cronograma</button>
       <button class="home-tab"       id="cfg-tab-funcoes"    onclick="cfgTab('funcoes')">Funções</button>
       <button class="home-tab"       id="cfg-tab-documentos" onclick="cfgTab('documentos')">Documentos</button>
@@ -3076,12 +3076,97 @@ async function cfgFuncaoToggle(id, novo){
   if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
   _funcoesCache = null; cfgFuncoesRender();
 }
-function cfgComissaoRender(){
+let _cfgRemFuncoes = [];
+let _rmFaixas = [];
+async function cfgComissaoRender(){   // Config › Remunerações
   const box = document.getElementById('cfg-panel-comissao'); if(!box) return;
-  const lid = (_usuarioAtual && _usuarioAtual.loja_id);
-  box.innerHTML = '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:640px">'
-    +'Comissão de vendas por metas: faixas de % por faixa de venda mensal + limitador conforme o desconto concedido.</div>'
-    +'<button class="btn btn-primary btn-sm" onclick="abrirModalComissao('+(lid||'null')+')">Configurar comissão de vendas</button>';
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  const d = await (await fetch('/api/funcoes',{credentials:'same-origin'})).json().catch(()=>({}));
+  _cfgRemFuncoes = (d && d.ok && d.itens) ? d.itens : [];
+  const resumo = f => {
+    const p = [];
+    if (f.salario_fixo) p.push('fixo '+_fBRL(f.salario_fixo));
+    if (f.usa_comissao_vendas) p.push('comissão de vendas');
+    else if (f.comissao && (f.comissao.pct || (f.comissao.faixas||[]).length)) p.push('comissão');
+    const b = ['at','va','ps'].filter(k => f.beneficios && f.beneficios[k] && f.beneficios[k].on);
+    if (b.length) p.push('benef.: '+b.map(x=>x.toUpperCase()).join('/'));
+    return p.join(' · ') || '—';
+  };
+  const linhas = _cfgRemFuncoes.map(f =>
+    '<tr class="proj-row"><td style="padding:9px 12px;color:var(--text);font-weight:500">'+esc(f.nome)+'</td>'
+    +'<td style="padding:9px 12px;color:var(--muted);font-size:11px">'+esc(resumo(f))+'</td>'
+    +'<td style="text-align:right;padding:9px 12px"><button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cfgRemuneracaoEditar('+f.id+')">Remuneração</button></td></tr>').join('')
+    || '<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma função. Cadastre em Config › Funções.</td></tr>';
+  box.innerHTML =
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:680px">Remuneração por função: salário fixo, comissão (por meta ou % simples) e benefícios. O Consultor de Vendas usa a comissão de vendas por metas (que também vale na negociação).</div>'
+    +'<table class="proj-table" style="max-width:680px"><thead><tr><th>Função</th><th>Resumo</th><th style="width:130px"></th></tr></thead><tbody>'+linhas+'</tbody></table>';
+}
+function cfgRemuneracaoEditar(id){
+  const f = _cfgRemFuncoes.find(x=>x.id===id) || {};
+  const lid = _lojaAtiva || (_usuarioAtual && _usuarioAtual.loja_id);
+  const lf = 'display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)';
+  const com = f.comissao || {por_meta:false, base:'liquido', pct:0, faixas:[]};
+  const ben = f.beneficios || {at:{on:false,valor:0}, va:{on:false,valor:0}, ps:{on:false,valor:0}};
+  _rmFaixas = (com.faixas||[]).map(x=>({venda_ate:x.venda_ate, pct:x.pct}));
+  const benRow = (k,l) => `<label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" id="rm-b-${k}-on" ${ben[k].on?'checked':''}> ${l}</label><input id="rm-b-${k}-val" type="number" step="0.01" value="${ben[k].valor||0}" style="width:110px;padding:4px 8px" placeholder="R$">`;
+  let comHtml;
+  if (f.usa_comissao_vendas){
+    comHtml = `<div style="font-size:12px;color:var(--muted);margin:6px 0">Comissão de vendas por metas (também usada na negociação).</div>`
+      +`<button class="btn btn-ghost btn-sm" type="button" onclick="abrirModalComissao(${lid||'null'})">Configurar comissão de vendas</button>`;
+  } else {
+    comHtml = `<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin:6px 0"><input type="checkbox" id="rm-pormeta" ${com.por_meta?'checked':''} onchange="_rmToggleMeta()"> Comissão por meta?</label>`
+      +`<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">`
+      +`<label style="${lf}"><span>Base</span><select id="rm-base" style="padding:5px 8px"><option value="liquido" ${com.base==='liquido'?'selected':''}>Líquido de Vendas</option><option value="fabrica" ${com.base==='fabrica'?'selected':''}>Custo Fábrica</option></select></label>`
+      +`<label id="rm-pct-wrap" style="${lf};display:${com.por_meta?'none':'flex'}"><span>% comissão</span><input id="rm-pct" type="number" step="0.01" value="${com.pct||0}" style="width:100px;padding:5px 8px"></label></div>`
+      +`<div id="rm-faixas-wrap" style="display:${com.por_meta?'block':'none'};margin-top:8px"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Faixas (venda até R$ → %; última com "até" vazio = acima)</div><div id="rm-faixas"></div><button class="btn btn-ghost btn-sm" type="button" style="font-size:11px;margin-top:6px" onclick="_rmAddFaixa()">+ faixa</button></div>`;
+  }
+  const ex=document.getElementById('modal-remun'); if(ex) ex.remove();
+  const ov=document.createElement('div'); ov.id='modal-remun';
+  ov.style.cssText='position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
+  ov.innerHTML = `<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:24px;max-width:480px;width:94%;max-height:90vh;overflow:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div style="font-family:var(--font-display);font-weight:900;font-size:16px">Remuneração — ${esc(f.nome||'')}</div>
+      <span onclick="document.getElementById('modal-remun').remove()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
+    </div>
+    <input type="hidden" id="rm-id" value="${f.id}">
+    <label style="${lf};margin-bottom:10px"><span>Salário Fixo (R$)</span><input id="rm-fixo" type="number" step="0.01" value="${f.salario_fixo||0}" style="padding:5px 8px"></label>
+    <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px"><div style="font-weight:700;font-size:13px;margin-bottom:2px">Comissão</div>${comHtml}</div>
+    <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:10px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">Benefícios</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center">${benRow('at','Auxílio Transporte (AT)')}${benRow('va','Vale Alimentação (VA)')}${benRow('ps','Plano de Saúde (PS)')}</div></div>
+    <div id="rm-erro" style="color:var(--muted);font-size:12px;min-height:16px;margin:10px 0"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-remun').remove()">Cancelar</button><button class="btn btn-primary btn-sm" onclick="cfgRemuneracaoSalvar()">Salvar</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  if(!f.usa_comissao_vendas) _rmRenderFaixas();
+}
+function _rmToggleMeta(){
+  const on=document.getElementById('rm-pormeta').checked;
+  const pw=document.getElementById('rm-pct-wrap'); if(pw) pw.style.display=on?'none':'flex';
+  const fw=document.getElementById('rm-faixas-wrap'); if(fw) fw.style.display=on?'block':'none';
+}
+function _rmRenderFaixas(){
+  const box=document.getElementById('rm-faixas'); if(!box) return;
+  box.innerHTML=_rmFaixas.map((fx,i)=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+    <input type="number" step="0.01" value="${fx.venda_ate!=null?fx.venda_ate:''}" placeholder="até R$ (vazio=acima)" onchange="_rmFaixas[${i}].venda_ate=this.value===''?null:parseFloat(this.value)" style="width:170px;padding:4px 8px">
+    <input type="number" step="0.01" value="${fx.pct!=null?fx.pct:''}" placeholder="%" onchange="_rmFaixas[${i}].pct=parseFloat(this.value)||0" style="width:80px;padding:4px 8px">
+    <button class="btn btn-ghost btn-sm" type="button" style="font-size:10px" onclick="_rmDelFaixa(${i})">&times;</button></div>`).join('');
+}
+function _rmAddFaixa(){ _rmFaixas.push({venda_ate:null, pct:0}); _rmRenderFaixas(); }
+function _rmDelFaixa(i){ _rmFaixas.splice(i,1); _rmRenderFaixas(); }
+async function cfgRemuneracaoSalvar(){
+  const id=document.getElementById('rm-id').value;
+  const erro=document.getElementById('rm-erro');
+  const body={ salario_fixo: parseFloat(document.getElementById('rm-fixo').value)||0, beneficios:{} };
+  ['at','va','ps'].forEach(k=>{ body.beneficios[k]={on:document.getElementById('rm-b-'+k+'-on').checked, valor:parseFloat(document.getElementById('rm-b-'+k+'-val').value)||0}; });
+  if(document.getElementById('rm-pormeta')){   // não-Consultor: comissão editável aqui
+    const pm=document.getElementById('rm-pormeta').checked;
+    body.comissao={ por_meta:pm, base:document.getElementById('rm-base').value };
+    if(pm) body.comissao.faixas=_rmFaixas; else body.comissao.pct=parseFloat(document.getElementById('rm-pct').value)||0;
+  }
+  const d=await (await fetch('/api/funcoes/'+id,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json().catch(()=>({}));
+  if(!d.ok){ erro.textContent=d.erro||'Erro ao salvar.'; return; }
+  document.getElementById('modal-remun').remove();
+  showToast('Remuneração salva.', false); cfgComissaoRender();
 }
 // ── Config › Documentos (Task 9): painel de modelos da loja + wizard de importação ────────────
 // GET /api/documentos/modelos devolve TODAS as versões (ativa e histórico) da loja; GET
