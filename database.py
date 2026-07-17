@@ -1095,11 +1095,27 @@ def init_db():
     else:
         _migrar_colunas_pg()  # Postgres: ADD COLUMN das colunas novas (create_all não altera existentes)
         _seed_loja_padrao()   # equivalente portável da tenancy_v1_2026 (loja seed + backfill)
+    _backfill_funcao_flags()  # liga usa_comissao_vendas na função Consultor de Vendas (idempotente)
     try:
         from auth import perfis
         perfis.recarregar()   # invalida o cache do registro de perfis (perfil_acesso pode ter mudado)
     except Exception:
         pass
+
+
+def _backfill_funcao_flags():
+    """Garante que a função 'Consultor de Vendas' tenha usa_comissao_vendas=1 (motor da Folha e
+    identificação do consultor). Idempotente; funções antigas nascidas antes do flag são corrigidas."""
+    db = Session()
+    try:
+        for fn in db.query(Funcao).filter(Funcao.nome.ilike("consultor de vendas")).all():
+            if not fn.usa_comissao_vendas:
+                fn.usa_comissao_vendas = 1
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
 
 
 def _migrar_pre_schema():

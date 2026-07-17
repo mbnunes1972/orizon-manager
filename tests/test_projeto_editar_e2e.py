@@ -19,16 +19,23 @@ def _cliente_id(app_db, nome):
 
 
 def test_consultores_endpoint_gerente_vs_consultor(http_client_factory, seed, app_db, projetos_dir):
-    # `_usuarios_atribuiveis_da_loja` (main.py) filtra por igualdade literal de slug em
-    # perfis.slugs_loja() (master/gerencial/operador). O fixture `cons_l1` (conftest) já usa
-    # o slug de BASE 'operador' (Task 3: nivel volta a ser a base, já que a regra de escopo
-    # próprio é dirigida por perfis.base()), então basta usá-lo direto.
+    # `_usuarios_atribuiveis_da_loja` (main.py) agora filtra por FUNÇÃO (Consultor de Vendas /
+    # Gerente de Vendas), não por perfil de acesso. Damos ao cons_l1 a função Consultor de Vendas;
+    # o Diretor (dir_l1) pode ATRIBUIR (pode_atribuir), mas não aparece como consultor de vendas.
+    db = app_db.get_session()
+    cons = db.query(app_db.Usuario).filter_by(login="cons_l1").first()
+    fc = app_db.Funcao(loja_id=cons.loja_id, nome="Consultor de Vendas", status="ativo")
+    db.add(fc); db.flush()
+    cons.funcao_id = fc.id
+    db.commit(); db.close()
+
     c = http_client_factory(); c.login("dir_l1", "senha123")
     st, d = c.get("/api/projetos/consultores")
     assert st == 200 and d["ok"] is True
     assert d["pode_atribuir"] is True
     nomes = {x["nome"] for x in d["consultores"]}
-    assert "Consultor L1" in nomes and "Diretor L1" in nomes
+    assert "Consultor L1" in nomes           # tem função Consultor de Vendas
+    assert "Diretor L1" not in nomes         # diretor não é consultor de vendas (regra por função)
     # consultor (escopo próprio) não pode atribuir
     c2 = http_client_factory(); c2.login("cons_l1", "senha123")
     _, d2 = c2.get("/api/projetos/consultores")

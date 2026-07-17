@@ -108,7 +108,9 @@ def func_sync_acesso(db, f, req):
                 u.ativo = 0                      # desativa (nunca apaga — preserva histórico/sessões)
         return True, None
     email = _s(ac.get("email")) or _s(f.email)
-    perfil = _s(ac.get("perfil")) or "operador"
+    funcao = db.get(Funcao, f.funcao_id) if f.funcao_id else None
+    # perfil: o informado, senão o perfil_padrão da FUNÇÃO (Mapa de Funções), senão 'operador'
+    perfil = _s(ac.get("perfil")) or (_s(getattr(funcao, "perfil_padrao", None))) or "operador"
     if not email:
         return False, "Informe o e-mail de acesso do funcionário."
     if perfil not in perfis.slugs_loja():
@@ -123,11 +125,13 @@ def func_sync_acesso(db, f, req):
         if u:
             u.login = email; u.email = email; u.nivel = perfil; u.ativo = 1
             u.nome = f.nome; u.cpf = f.cpf; u.loja_id = f.loja_id
+            u.funcao_id = f.funcao_id                 # conta herda a FUNÇÃO do funcionário
             return True, None
-    # cria conta nova ligada — senha inicial = dígitos do CPF (ou 'orizon123' se sem CPF)
+    # cria conta nova ligada — login = e-mail, senha provisória = dígitos do CPF (troca no 1º acesso)
     u = Usuario(nome=f.nome, login=email, email=email, cpf=f.cpf, nivel=perfil,
-                loja_id=f.loja_id, ativo=1, funcionario_id=f.id)
+                loja_id=f.loja_id, ativo=1, funcionario_id=f.id, funcao_id=f.funcao_id)
     u.set_senha(_digitos(f.cpf) or "orizon123")
+    u.senha_provisoria = 1
     db.add(u); db.flush()
     f.usuario_id = u.id
     return True, None

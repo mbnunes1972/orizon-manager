@@ -140,8 +140,21 @@ def _enriquecer_projetos_com_pool(projetos):
         db.close()
 
 # Consultor responsável do projeto (criado_por_id) — atribuição por gerente+ ------------------
-# Quem pode ser "consultor responsável" (Perfil-4): perfis de loja com acesso operacional.
-_NIVEIS_ATRIBUIVEIS = tuple(s for s in perfis.slugs_loja() if perfis.pode(s, "acesso_operacional"))
+# Quem pode ser "consultor responsável" de um projeto: pela FUNÇÃO (não pelo perfil de acesso).
+# Consultor de Vendas + Gerente de Vendas (que pode assumir/reatribuir projetos). Comparação por nome
+# normalizado (catálogo FUNCOES_PADRAO).
+_FUNCOES_CONSULTOR = ("consultor de vendas", "gerente de vendas")
+
+def _funcao_nome_do_usuario(db, u):
+    """Nome (lower) da FUNÇÃO do usuário: via funcao_id direto ou via Funcionário vinculado."""
+    fid = getattr(u, "funcao_id", None)
+    if not fid and getattr(u, "funcionario_id", None):
+        fnc = db.get(Funcionario, u.funcionario_id)
+        fid = fnc.funcao_id if fnc else None
+    if not fid:
+        return None
+    fn = db.get(Funcao, fid)
+    return (fn.nome or "").strip().lower() if fn else None
 
 def _usuario_pertence_a_loja(db, u, loja_id):
     """True se o usuário `u` está ligado à loja (loja_id direto ou vínculo UsuarioLoja)."""
@@ -162,7 +175,7 @@ def _usuarios_atribuiveis_da_loja(db, loja_id):
     if vinc_ids:
         conds.append(Usuario.id.in_(vinc_ids))
     us = (db.query(Usuario).filter(Usuario.ativo == 1).filter(or_(*conds)).all())
-    us = [u for u in us if u.nivel in _NIVEIS_ATRIBUIVEIS]
+    us = [u for u in us if _funcao_nome_do_usuario(db, u) in _FUNCOES_CONSULTOR]
     return sorted(us, key=lambda u: (u.nome or "").lower())
 
 # Cadastro (Modulos_Orizon_v9): entidade -> (Model, serialize, aplicar) para dispatch genérico
