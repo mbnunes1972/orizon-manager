@@ -9121,26 +9121,52 @@ async function empresasCarregar(){
   catch(e){ _empresas = []; }
   return _empresas;
 }
-async function empresaSeletorHTML(){
+async function empresaSeletorHTML(ctx){
   const emps = await empresasCarregar();
   const cur = _empresaAtivaId();
-  const wrap = 'display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:13px';
   if (emps.length <= 1){
     const nome = (emps[0] && emps[0].nome) || 'Minha empresa';
-    return `<div class="emp-seletor" style="${wrap}"><span style="color:var(--muted)">Empresa:</span> <strong>${esc(nome)}</strong></div>`;
+    return `<div class="emp-seletor" style="margin-bottom:12px;font-size:13px"><span style="color:var(--muted)">Empresa:</span> <strong>${esc(nome)}</strong></div>`;
   }
-  const grupos = {};
-  emps.forEach(e => { const g = e.rede_nome || 'Sem grupo'; (grupos[g] = grupos[g] || []).push(e); });
-  const opts = Object.keys(grupos).sort().map(g =>
-    `<optgroup label="${esc(g)}">`+grupos[g].map(e =>
-      `<option value="${e.loja_id}" ${e.loja_id==cur?'selected':''}>${esc(e.nome)}</option>`).join('')+`</optgroup>`).join('');
-  return `<div class="emp-seletor" style="${wrap}"><span style="color:var(--muted)">Empresa:</span>
-    <select onchange="empresaTrocar(this.value)" style="padding:4px 8px"><option value="">— escolher —</option>${opts}</select></div>`;
+  const atual = emps.find(e => e.loja_id == cur);
+  const curNome = atual ? atual.nome : '';
+  return `<div class="emp-seletor" style="position:relative;max-width:340px;margin-bottom:12px;font-size:13px">
+    <input id="emp-inp-${ctx}" type="text" autocomplete="off" placeholder="Empresa — buscar por nome ou CNPJ…"
+      value="${esc(curNome)}" oninput="empBusca('${ctx}')" onfocus="empBusca('${ctx}')"
+      style="width:100%;padding:6px 10px;box-sizing:border-box">
+    <div id="emp-drop-${ctx}" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:50;max-height:280px;overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.25);margin-top:2px"></div>
+  </div>`;
 }
 async function _empSeletorPreencher(containerId){
   const el = document.getElementById(containerId); if(!el) return;
-  el.innerHTML = await empresaSeletorHTML();
+  const ctx = containerId.indexOf('cfg') !== -1 ? 'cfg' : 'admin';
+  el.innerHTML = await empresaSeletorHTML(ctx);
 }
+function _empDigitos(s){ return (s||'').replace(/\D/g,''); }
+function empBusca(ctx){
+  const inp = document.getElementById('emp-inp-'+ctx), drop = document.getElementById('emp-drop-'+ctx);
+  if(!inp || !drop) return;
+  const q = (inp.value||'').trim().toLowerCase(), qd = _empDigitos(inp.value);
+  const cur = _empresaAtivaId();
+  const match = (_empresas||[]).filter(e =>
+    (!q && !qd) || (q && (e.nome||'').toLowerCase().indexOf(q) !== -1) ||
+    (qd && _empDigitos(e.cnpj).indexOf(qd) !== -1));
+  const grupos = {};
+  match.forEach(e => { const g = e.rede_nome || 'Sem grupo'; (grupos[g] = grupos[g] || []).push(e); });
+  const html = Object.keys(grupos).sort().map(g =>
+    `<div style="padding:4px 10px;color:var(--muted);font-size:11px;font-weight:700">${esc(g)}</div>`+
+    grupos[g].map(e => `<div onmousedown="empEscolher(${e.loja_id},'${ctx}')" style="padding:6px 10px;cursor:pointer;${e.loja_id==cur?'background:var(--surface-2);':''}">${esc(e.nome)} <span style="color:var(--muted);font-size:11px">${esc(e.cnpj||'')}</span></div>`).join('')).join('')
+    || `<div style="padding:8px 10px;color:var(--muted)">Nenhuma empresa encontrada.</div>`;
+  drop.innerHTML = html; drop.style.display = '';
+}
+function empEscolher(id, ctx){
+  const drop = document.getElementById('emp-drop-'+ctx); if(drop) drop.style.display='none';
+  empresaTrocar(id);
+}
+document.addEventListener('click', function(ev){
+  if (ev.target && ev.target.closest && ev.target.closest('.emp-seletor')) return;
+  ['admin','cfg'].forEach(ctx => { const d = document.getElementById('emp-drop-'+ctx); if(d) d.style.display='none'; });
+});
 function empresaTrocar(id){
   _lojaAtiva = id ? parseInt(id,10) : null;
   if (_lojaAtiva) localStorage.setItem('loja_ativa', String(_lojaAtiva));
