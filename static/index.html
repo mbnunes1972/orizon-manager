@@ -3102,6 +3102,7 @@ async function cfgComissaoRender(){   // Config › Remunerações
   const resumo = f => {
     const p = [];
     if (f.salario_fixo) p.push('fixo '+_fBRL(f.salario_fixo));
+    if (f.comissao_fixa) p.push('com. fixa '+_fBRL(f.comissao_fixa));
     if (f.usa_comissao_vendas) p.push('comissão de vendas');
     else if (f.comissao && (f.comissao.pct || (f.comissao.faixas||[]).length)) p.push('comissão');
     const b = ['at','va','ps'].filter(k => f.beneficios && f.beneficios[k] && f.beneficios[k].on);
@@ -3158,6 +3159,7 @@ function cfgRemuneracaoEditar(id){
     </div>
     <input type="hidden" id="rm-id" value="${f.id}">
     <label style="${lf};margin-bottom:10px"><span>Salário Fixo (R$)</span><input id="rm-fixo" type="number" step="0.01" value="${f.salario_fixo||0}" style="padding:5px 8px"></label>
+    <label style="${lf};margin-bottom:10px"><span>Comissão fixa (R$) — parcela mensal isenta de encargos</span><input id="rm-comfixa" type="number" step="0.01" value="${f.comissao_fixa||0}" style="padding:5px 8px"></label>
     <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px"><div style="font-weight:700;font-size:13px;margin-bottom:2px">Comissão</div>${comHtml}</div>
     <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:10px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">Benefícios</div>
       <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center">${benRow('at','Auxílio Transporte (AT)')}${benRow('va','Vale Alimentação (VA)')}${benRow('ps','Plano de Saúde (PS)')}</div></div>
@@ -3194,7 +3196,8 @@ function _rmDelFaixa(i){ _rmFaixas.splice(i,1); _rmRenderFaixas(); }
 async function cfgRemuneracaoSalvar(){
   const id=document.getElementById('rm-id').value;
   const erro=document.getElementById('rm-erro');
-  const body={ salario_fixo: parseFloat(document.getElementById('rm-fixo').value)||0, beneficios:{} };
+  const body={ salario_fixo: parseFloat(document.getElementById('rm-fixo').value)||0,
+    comissao_fixa: parseFloat(document.getElementById('rm-comfixa').value)||0, beneficios:{} };
   ['at','va','ps'].forEach(k=>{ body.beneficios[k]={on:document.getElementById('rm-b-'+k+'-on').checked, valor:parseFloat(document.getElementById('rm-b-'+k+'-val').value)||0}; });
   if(document.getElementById('rm-pormeta')){   // não-Consultor: comissão editável aqui
     const pm=document.getElementById('rm-pormeta').checked;
@@ -10071,7 +10074,8 @@ function folhaRender(folha){
       +(it.status==='paga'?'':'<button class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:3px" onclick="adiantamentoAdd('+it.funcionario_id+',\''+esc(it.competencia||'')+'\')">+ adiant.</button>');
     return '<tr class="proj-row">'
       +'<td style="padding:8px 10px;color:var(--text);font-weight:500">'+esc(it.funcionario||'—')+'</td>'
-      +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(it.parte_fixa||0)+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(it.parte_fixa||0)
+        +(it.comissao_fixa?'<div style="font-size:10px;color:var(--muted)">+ com. fixa '+_fBRL(it.comissao_fixa)+'</div>':'')+'</td>'
       +'<td style="padding:8px 10px;min-width:280px">'+comCel+'</td>'
       +'<td style="padding:8px 10px;text-align:right;color:var(--muted)">'+(it.faixa_pct?(Number(it.faixa_pct).toFixed(2)+'%'):'—')+'</td>'
       +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(it.parte_variavel||0)+'</td>'
