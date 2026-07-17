@@ -34,6 +34,8 @@ a IA** — apenas garante que os dados existam, corretos, monitoráveis e visív
 
 1. **Datas na assinatura — SEMPRE (ambos os casos):** **medição esperada** e **expectativa de entrega** são
    obrigatórias para finalizar a assinatura. Moram no `Projeto` (`projetos_meta`); são previsões editáveis.
+   **Venda programada** é um checkbox importante: quando `true`, acrescenta uma **informação ao contrato**
+   (marcador condicional, §5).
 2. **Semântica do `prazo_dias`:** **duração própria da etapa** em **dias corridos** (não acumulado desde
    D0). `cronogramas()` já acumula corretamente; `gerar_cronograma_projeto` e o `default` estão errados e
    serão corrigidos.
@@ -122,8 +124,16 @@ Colunas novas (migração idempotente via `_add_cols`, como `data_entrega`/`data
   - `PRAZO_CONTRATUAL` — "N dias úteis a partir da assinatura" (+ a data-limite calculada).
   - `DATA_PREVISTA_ENTREGA` — a expectativa de entrega (observação do acordo).
   - `PREVISAO_MEDICAO` — a medição esperada (quando pertinente ao texto).
+  - `VENDA_PROGRAMADA` — informação condicional: quando `venda_programada` é `true`, rende o texto/observação
+    da venda programada (obra do cliente controla a medição); quando `false`, rende vazio.
   - Escopo `documento`. O corpo do template pode referenciá-los como cláusula/observação; `_html_corpo`
     continua **escapando** o valor (defesa já existente).
+- **Check de coerência padrão × prazo contratual (AVISO, não bloqueio):** na aba **Config → Cronograma**, ao
+  editar/salvar o Cronograma Padrão, o sistema compara o **total do padrão** com o **prazo contratual**. Como
+  o padrão é em dias corridos e o prazo em dias úteis, compara **datas resultantes** a partir de um D0 de
+  referência: `D0 + Σ durações (corridos)` (entrega pelo padrão) × `D0 + prazo_contratual_dias_uteis` (úteis).
+  Se o padrão ultrapassa o prazo contratual, exibe **aviso** ("o Cronograma Padrão soma X dias corridos e não
+  cabe no prazo contratual de N dias úteis") — orienta a calibrar, **sem** impedir o salvamento.
 
 ### 6. Monitoramento de atraso (GERAL) na lista de projetos
 
@@ -169,7 +179,8 @@ Colunas novas (migração idempotente via `_add_cols`, como `data_entrega`/`data
 
 - **`mod_cronograma`:** folga (fórmula única medição→entrega, dias corridos), `gerar_cronograma_projeto`
   acumulando durações, `somar_dias_uteis` (pula fim de semana; N dias úteis), normalização
-  `cronograma_formato` (legado acumulado → durações; idempotente).
+  `cronograma_formato` (legado acumulado → durações; idempotente), check de coerência padrão × prazo
+  contratual (aviso quando o total corrido excede a data-limite em dias úteis; sem aviso quando cabe).
 - **HTTP:**
   - Round-trip: `POST /data-entrega` → `GET .../contrato` devolve as datas (regressão do bug).
   - `folga < 0` sem senha → não grava; com senha gerencial → grava + `LogAcaoGerencial`.
@@ -177,7 +188,8 @@ Colunas novas (migração idempotente via `_add_cols`, como `data_entrega`/`data
     cronograma + data-limite contratual.
   - Lista de projetos: `atrasado` verdadeiro quando qualquer etapa aberta tem previsão vencida.
 - **Contrato/marcadores:** anti-drift `CATALOGO` × `_montar_mapping` cobre os novos marcadores;
-  `PRAZO_CONTRATUAL`/`DATA_PREVISTA_ENTREGA` renderizam no PDF de teste.
+  `PRAZO_CONTRATUAL`/`DATA_PREVISTA_ENTREGA` renderizam no PDF de teste; `VENDA_PROGRAMADA` rende o texto
+  quando `true` e vazio quando `false`.
 
 ## Fora de escopo (frentes próprias, depois)
 
