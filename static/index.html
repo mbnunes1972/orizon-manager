@@ -9291,6 +9291,12 @@ function empEscolher(id, ctx){
   const drop = document.getElementById('emp-drop-'+ctx); if(drop) drop.style.display='none';
   empresaTrocar(id);
 }
+// Painel Orizon › Lojas: "Administrar" fixa a loja como ativa e abre o Painel Admin escopado nela.
+function orizonAdministrarLoja(id){
+  _lojaAtiva = id ? parseInt(id,10) : null;
+  if (_lojaAtiva) localStorage.setItem('loja_ativa', String(_lojaAtiva));
+  goPage(7);   // Admin (4 abas da empresa: Dados da empresa / Usuários / Perfis de Usuário / Módulos)
+}
 document.addEventListener('click', function(ev){
   if (ev.target && ev.target.closest && ev.target.closest('.emp-seletor')) return;
   ['admin','cfg'].forEach(ctx => { const d = document.getElementById('emp-drop-'+ctx); if(d) d.style.display='none'; });
@@ -9431,7 +9437,7 @@ async function orizonLojasCarregar(){
       <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th>Grupo (rede)</th><th></th></tr></thead><tbody>
       ${lojas.map(l=>`<tr><td>${esc(l.nome)}</td><td style="color:var(--muted)">${esc(l.codigo||'—')}</td>
         <td style="color:var(--muted)">${esc(l.rede_id ? (redeNome[l.rede_id]||'—') : 'Avulsa')}</td>
-        <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick='orizonAbrirModalLoja(${_attrJson(l)})'>Editar</button></td></tr>`).join('')
+        <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px" onclick='orizonAdministrarLoja(${l.id})'>Administrar</button> <button class="btn btn-ghost btn-sm" style="font-size:10px" onclick='orizonAbrirModalLoja(${_attrJson(l)})'>Editar</button></td></tr>`).join('')
         || '<tr><td colspan="4" style="color:var(--muted)">Nenhuma loja neste filtro.</td></tr>'}
       </tbody></table>
     </div>`;
