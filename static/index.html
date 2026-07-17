@@ -9670,7 +9670,7 @@ function sbNavRender(){
   if(!box) return;
   const grupos = (_usuarioAtual && _usuarioAtual.hub) || null;
   if(!grupos){ box.innerHTML = ''; return; }      // sem info do hub -> nada (compat)
-  const mods = grupos.flatMap(g => g.modulos || []);   // lista PLANA, sem cabeçalho de faixa
+  const mods = grupos.flatMap(g => g.modulos || []).filter(m => m.id !== 'folha');   // Folha vive como SEÇÃO do Financeiro, não módulo próprio (evita aba vazia)
   box.innerHTML = mods.map(m => {
     if(m.bloqueado){
       return '<div class="nav-item sb-mod" style="opacity:.55" title="Sem acesso — clique para liberar com senha"'
