@@ -3142,13 +3142,23 @@ function _rmToggleMeta(){
   const on=document.getElementById('rm-pormeta').checked;
   const pw=document.getElementById('rm-pct-wrap'); if(pw) pw.style.display=on?'none':'flex';
   const fw=document.getElementById('rm-faixas-wrap'); if(fw) fw.style.display=on?'block':'none';
+  if(on && _rmFaixas.length===0) _rmFaixas.push({venda_ate:null, pct:0});   // já mostra o 1º degrau
+  _rmRenderFaixas();
 }
 function _rmRenderFaixas(){
   const box=document.getElementById('rm-faixas'); if(!box) return;
-  box.innerHTML=_rmFaixas.map((fx,i)=>`<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
-    <input type="number" step="0.01" value="${fx.venda_ate!=null?fx.venda_ate:''}" placeholder="até R$ (vazio=acima)" onchange="_rmFaixas[${i}].venda_ate=this.value===''?null:parseFloat(this.value)" style="width:170px;padding:4px 8px">
-    <input type="number" step="0.01" value="${fx.pct!=null?fx.pct:''}" placeholder="%" onchange="_rmFaixas[${i}].pct=parseFloat(this.value)||0" style="width:80px;padding:4px 8px">
-    <button class="btn btn-ghost btn-sm" type="button" style="font-size:10px" onclick="_rmDelFaixa(${i})">&times;</button></div>`).join('');
+  let prev=0;
+  box.innerHTML=_rmFaixas.map((fx,i)=>{
+    const deLbl='De R$ '+Number(prev||0).toLocaleString('pt-BR');
+    const html=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:5px;font-size:12px;flex-wrap:wrap">
+      <span style="color:var(--muted);min-width:118px">${deLbl}</span><span style="color:var(--muted)">até R$</span>
+      <input type="number" step="0.01" value="${fx.venda_ate!=null?fx.venda_ate:''}" placeholder="(vazio = acima)" onchange="_rmFaixas[${i}].venda_ate=this.value===''?null:parseFloat(this.value); _rmRenderFaixas()" style="width:130px;padding:4px 8px">
+      <span style="color:var(--muted)">→</span>
+      <input type="number" step="0.01" value="${fx.pct!=null?fx.pct:''}" placeholder="%" onchange="_rmFaixas[${i}].pct=parseFloat(this.value)||0" style="width:70px;padding:4px 8px"><span style="color:var(--muted)">%</span>
+      <button class="btn btn-ghost btn-sm" type="button" style="font-size:10px" onclick="_rmDelFaixa(${i})">&times;</button></div>`;
+    prev=fx.venda_ate!=null?fx.venda_ate:prev;
+    return html;
+  }).join('') || '<div style="color:var(--muted);font-size:11px">Clique em "+ faixa" para adicionar um degrau.</div>';
 }
 function _rmAddFaixa(){ _rmFaixas.push({venda_ate:null, pct:0}); _rmRenderFaixas(); }
 function _rmDelFaixa(i){ _rmFaixas.splice(i,1); _rmRenderFaixas(); }
