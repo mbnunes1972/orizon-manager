@@ -1466,6 +1466,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not mod_tenancy.pode_ver_loja(ator, {"id": lo.id, "rede_id": lo.rede_id}):
                         continue
                     empresas.append({"loja_id": lo.id, "nome": lo.nome,
+                                     "cnpj": lo.cnpj or "",
                                      "rede_id": lo.rede_id,
                                      "rede_nome": redes.get(lo.rede_id, "") if lo.rede_id else ""})
                 self.send_json({"ok": True, "empresas": empresas})

@@ -42,3 +42,10 @@ def test_sem_login_401(http_client_factory, seed):
     c = http_client_factory()
     st, out = c.get("/api/admin/empresas")
     assert st == 401
+
+
+def test_empresas_incluem_cnpj(http_client_factory, seed):
+    c = http_client_factory(); c.login("super", "senha123")
+    st, out = c.get("/api/admin/empresas")
+    assert st == 200 and out["ok"]
+    assert all("cnpj" in e for e in out["empresas"])
