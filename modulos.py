@@ -38,7 +38,7 @@ MODULOS = {
                     "tabelas": ["clientes", "parceiros", "funcionarios", "fornecedores", "terceiros", "funcoes"],
                     "rotas": ["/api/clientes", "/api/parceiros", "/api/funcionarios",
                               "/api/fornecedores", "/api/terceiros", "/api/funcoes"]},
-    "comercial":   {"camada": "dominio", "depende_de": ["cadastro"], "rotulo": "Comercial (Vendas)", "faixa": "vendas",
+    "comercial":   {"camada": "dominio", "depende_de": ["cadastro"], "rotulo": "Comercial", "faixa": "vendas",
                     "arquivos": ["mod_orcamento_params.py", "mod_margens.py", "mod_negociacao.py",
                                  "mod_contrato.py", "mod_marcadores.py",
                                  "mod_documentos_import.py", "mod_documentos.py", "mod_arvore.py",
@@ -56,7 +56,7 @@ MODULOS = {
                                 "documento_modelos"],
                     "rotas": ["/api/orcamentos", "/api/contratos", "/api/medicoes", "/api/comercial",
                               "/api/documentos"]},
-    "fiscal":      {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Fiscal (NF-e/NFS-e)", "faixa": "expedicao",
+    "fiscal":      {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Fiscal", "faixa": "expedicao",
                     # PACOTE (piloto da reorganização, 2026-07-15) — mesmo padrão do mod_fin:
                     # entra pelo nome do diretório. O ratchet de arquitetura EXPANDE o dir
                     # nos .py de dentro (tests/test_arquitetura_modulos._arquivos_do_modulo),

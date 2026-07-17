@@ -51,7 +51,7 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:100vh;display:flex;overflow:hidden}
-.sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto}
+.sidebar{width:250px;min-width:250px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto}
 /* v1.5: a sidebar é ESCURA nos dois temas (design system §7). Reescopa os tokens theme-following
    para os --sidebar-* DENTRO da .sidebar → todo filho (classes e styles inline: nav, creds, rodapé)
    resolve para a paleta escura da sidebar em ambos os temas, sem tocar cada propriedade. */
@@ -1277,7 +1277,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <button class="home-tab active" data-cadtab="clientes"     onclick="cadTab('clientes')">Clientes</button>
       <button class="home-tab"        data-cadtab="fornecedores" onclick="cadTab('fornecedores')">Fornecedores</button>
       <button class="home-tab"        data-cadtab="parceiros"    onclick="cadTab('parceiros')">Parceiros</button>
-      <button class="home-tab"        data-cadtab="funcionarios" onclick="cadTab('funcionarios')">Funcionários</button>
       <button class="home-tab"        data-cadtab="terceiros"    onclick="cadTab('terceiros')">Terceiros</button>
     </div>
 
@@ -3844,7 +3843,7 @@ async function assistCriar(){
 function cadTab(qual){
   document.querySelectorAll('#page-10 .home-tab').forEach(b =>
     b.classList.toggle('active', b.getAttribute('data-cadtab') === qual));
-  ['clientes','parceiros','fornecedores','funcionarios','terceiros'].forEach(k => {
+  ['clientes','parceiros','fornecedores','terceiros'].forEach(k => {
     const p = document.getElementById('cad-panel-'+k);
     if(p) p.style.display = (k === qual) ? 'block' : 'none';
   });
@@ -9348,7 +9347,7 @@ const _FIN_SECOES = [
   {id:'recon',   lbl:'Reconciliação',   ic:'refresh',         load:()=>reconInit()},
   {id:'reconprov', lbl:'Reconc. Provisões', ic:'checklist',   load:()=>finReconProvCarregar()},   // FASE D
   {id:'contaspagar', lbl:'Contas a Pagar', ic:'file-invoice', load:()=>finContasPagarCarregar()}, // FASE D
-  {id:'folha',   lbl:'Folha de Pagamento', ic:'wallet',       load:()=>folhaCarregar()},   // Modulos_Orizon_v10 §2.1
+  {id:'folha',   lbl:'Folha de Pagamento', ic:'cash-banknote', load:()=>folhaCarregar()},   // Modulos_Orizon_v10 §2.1
   // "Repasse Fábrica" saiu do Financeiro (Modulos_Orizon_v4/§6.2): migra p/ o módulo Assistências
   // (filtro Loja/Fábrica/Paga nativo). O painel/endpoint segue existindo, só não é mais aba do submenu.
 ];
@@ -9368,7 +9367,6 @@ const _SB_MODULOS = {
                  {id:'clientes',     lbl:'Clientes',     ic:'user',           go:()=>cadIr('clientes')},
                  {id:'parceiros',    lbl:'Parceiros',    ic:'users-group',    go:()=>cadIr('parceiros')},
                  {id:'fornecedores', lbl:'Fornecedores', ic:'building-store', go:()=>cadIr('fornecedores')},
-                 {id:'funcionarios', lbl:'Funcionários', ic:'id-badge',       go:()=>cadIr('funcionarios')},
                  {id:'terceiros',    lbl:'Terceiros',    ic:'user-cog',       go:()=>cadIr('terceiros')},
               ]},
   comercial:  {ic:'chart-histogram', go:()=>comercialDashAbrir()},  // Comercial = DASHBOARD (conversão/carteira/volume); a lista+ciclo é o atalho "Projetos"
