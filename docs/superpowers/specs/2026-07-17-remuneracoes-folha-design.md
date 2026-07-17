@@ -23,6 +23,9 @@ A **Folha de Pagamento** tem motor/endpoints/tela prontos (`mod_folha`, `/api/fo
 ### `Funcionario` (reuso; sem novas colunas)
 - Já tem `nome, cpf, telefone, email, funcao_id, cep/endereço, banco/agencia/conta/pix, status`. **A remuneração NÃO é mais editada no Funcionário** (vem da Função). Os campos `remuneracao_fixa/tipo/var` ficam **ignorados** pela Folha (legado; não removidos para não quebrar migração).
 
+### `FolhaPagamento` (nova coluna — migração SQLite + Postgres)
+- `base_comissao` (Float, nullable) — **base de cálculo da comissão da linha, EDITÁVEL**; inicia com a referência calculada (líquido ou fábrica). `parte_variavel = base_comissao × pct`. (Reaproveita a semântica do `vendas_liq` atual, mas explicitamente editável e agnóstica à base.)
+
 ### Como a Folha identifica a função "Consultor de Vendas"
 Por um marcador estável, não pelo texto do nome. Opção: um campo `Funcao.eh_consultor_vendas` (Bool) marcado no seed/edição, OU casar `perfil`/uma flag. **Decisão:** usar o **catálogo** — a função-semente "Consultor de Vendas" recebe a comissão via `comissao_vendas` da loja; identificamos por um flag `Funcao.usa_comissao_vendas` (Bool, default False; True na semente do Consultor). Assim o vínculo é dado, não string.
 
@@ -45,15 +48,20 @@ Por um marcador estável, não pelo texto do nome. Opção: um campo `Funcao.eh_
 ## Motor da Folha (rework de `mod_folha.calcular_folha`)
 Por Funcionário ATIVO, resolvendo pela **Função** (`funcionario.funcao_id`):
 - **parte_fixa** = `funcao.salario_fixo` (0 se sem função/valor).
-- **parte_variavel** = se `funcao.usa_comissao_vendas`: `resolver_comissao_venda(cfg_loja, vendas_liquido_consultor(...), 0)` (motor atual, inalterado). Senão 0 nesta rodada (comissão das outras funções é config; cálculo = extensão).
+- **base_comissao (EDITÁVEL na Folha):** o motor **calcula uma referência** conforme a base da função — "líquido" = Σ valor líquido das vendas atribuídas à pessoa no período; "fábrica" = Σ custo de fábrica (CFO) — mas o valor gravado na linha (`FolhaPagamento.base_comissao`) é **editável pelo admin** (inicia com a referência). Motivo: a **atribuição de quem executou cada projeto** é o ponto difícil (nota abaixo); a base editável deixa a Folha correta já hoje.
+- **parte_variavel** = `base_comissao × pct`. `pct` vem da comissão da função — Consultor: `resolver_comissao_venda` sobre a base; outras: `comissao_json` (fixa % ou faixas). **Nesta rodada** a base é calculada automaticamente só para o **Consultor** (`criado_por_id`); para as demais funções o admin **lança a base manualmente** no campo editável. Ao **editar a base**, re-resolve `pct` (se por meta) e recalcula variável + total.
 - **beneficios** = soma dos valores dos benefícios ativos da função (`beneficios_json`); serializados discriminados (AT/VA/PS) para a tela e o contra-cheque futuro.
 - **total** = fixa + variável + benefícios.
+- **Editar a base:** `PATCH /api/folha/<id>` grava `base_comissao`, re-resolve `pct` e recalcula variável+total. Folha **paga** não é editável.
+
+### Atribuição — o desafio de "quem executa cada projeto"
+A base da comissão depende de atribuir vendas/projetos às pessoas. Hoje: **Consultor** = `projetos_meta.criado_por_id`. Para os **outros papéis comissionados** (PE, Medição, Montagem, Assistência), a atribuição vem do **Mapa de Atribuições** (`atribuicoes_ambiente`, papel × ambiente/projeto) — mas somar essa base por pessoa/papel na Folha é **extensão** (não nesta rodada). Enquanto isso, o **campo base editável** permite lançar a base correta manualmente para qualquer função.
 - **pagar:** `folha_fixa`→5.3.06, `folha_variavel`→5.3.01 (já existem). **Benefícios:** novo evento `folha_beneficios` → conta a definir (**default proposto:** `5.3.06` "Salários de Vendas" agregado, OU criar `5.3.07 Benefícios` — **decisão do contador**; o spec deixa como parâmetro, implementação usa uma conta única configurável).
 
 ## Faseamento (um spec, plano em 3 fases)
 - **Fase 1 — Remunerações (config):** colunas na Função (fixa/benefícios/comissao_json/usa_comissao_vendas) + migração SQLite/PG; `funcao_aplicar`/`serialize`; painel Config › Remunerações (lista + modal por função, com fixa/comissão/benefícios). Backend TDD.
 - **Fase 2 — Funcionários no módulo Folha:** aba Funcionários (form sem salário) reusando `/api/funcionarios`. Frontend + verificação.
-- **Fase 3 — Motor calcula:** `calcular_folha` resolve pela Função (fixa + Consultor variável + benefícios); `pagar` lança benefícios; tela discrimina fixa/variável/benefícios/total. Backend TDD (sensível — motor contábil).
+- **Fase 3 — Motor calcula:** `calcular_folha` resolve pela Função (fixa + Consultor variável + benefícios); **base de comissão editável por linha** (`FolhaPagamento.base_comissao` + `PATCH /api/folha/<id>` que re-resolve pct e recalcula); `pagar` lança benefícios; a tela discrimina fixa / base (editável) / variável / benefícios / total. Backend TDD (sensível — motor contábil).
 
 ## Fora de escopo / pendências
 - **[Contador]** contas contábeis dos benefícios e tratamento no contra-cheque (descontos do empregado × custo do empregador, encargos). Fase 3 usa uma conta única, a refinar.
