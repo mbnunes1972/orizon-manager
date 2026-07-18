@@ -13701,14 +13701,20 @@ async function salvarDataEntrega(autorizacao){
         body: JSON.stringify(payload) }).then(r=>r.json());
     if(!j.ok){ setRes(esc(j.erro||'Erro'), 'var(--err)'); return; }
     const fm = (j.folga_min!=null) ? (j.folga_min+'d') : '—';
-    if(j.cabe){ setRes('&#x2713; Cabe (folga do trecho medição&rarr;entrega: '+fm+').', 'var(--ok)'); return; }
-    let msg = '&#x26A0; Não cabe (folga '+fm+'). ';
-    if(_podeAutorizarFront && _podeAutorizarFront()){
-      msg += '<button class="btn-ciclo" style="font-size:var(--fs-xs);border-color:var(--cancel);color:var(--cancel)" onclick="autorizarDataEntrega()">Registrar com autorização</button>';
-    } else {
-      msg += 'Requer autorização de Gerente/Diretor.';
+    if(j.requer_autorizacao){
+      // folga negativa e ainda SEM autorização → oferece override (Gerente+)
+      let msg = '&#x26A0; Não cabe (folga '+fm+'). ';
+      if(_podeAutorizarFront && _podeAutorizarFront()){
+        msg += '<button class="btn-ciclo" style="font-size:var(--fs-xs);border-color:var(--cancel);color:var(--cancel)" onclick="autorizarDataEntrega()">Registrar com autorização</button>';
+      } else {
+        msg += 'Requer autorização de Gerente/Diretor.';
+      }
+      setRes(msg, 'var(--err)');
+      return;
     }
-    setRes(msg, 'var(--err)');
+    // persistido: cabe, ou gravado sob autorização gerencial
+    if(j.cabe){ setRes('&#x2713; Cabe (folga do trecho medição&rarr;entrega: '+fm+').', 'var(--ok)'); }
+    else { setRes('&#x2713; Registrado com autorização (não cabe — folga '+fm+').', 'var(--warn)'); }
   } catch(e){ setRes('Erro de rede.', 'var(--err)'); }
 }
 
@@ -13716,9 +13722,6 @@ function autorizarDataEntrega(){
   const login = prompt('Login do autorizador (Gerente/Diretor):'); if(!login) return;
   const senha = prompt('Senha:'); if(!senha) return;
   salvarDataEntrega({ login: login.trim(), senha: senha.trim() });
-}
-function cronogramaProprioEmBreve(){
-  avisoPopup('Cronograma próprio: edição dos prazos por etapa, aprovada com senha de Diretor. Em implementação (Passo 3).', {titulo:'Cronograma próprio'});
 }
 
 function renderContratoUI(contrato) {
