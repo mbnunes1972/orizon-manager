@@ -100,3 +100,21 @@ def test_folga_medicao_entrega_fallback_sem_10():
         {"codigo": "16", "prazo_dias": 5}]}
     med = datetime(2026, 8, 1); ent = datetime(2026, 10, 1)    # 61 dias
     assert mcr.folga_medicao_entrega(cfg, med, ent) == 61 - 25
+
+
+def test_folga_medicao_entrega_entrega_ausente_usa_ultima():
+    # sem "16" → âncora de entrega cai na ÚLTIMA etapa; após "10": 11(10)+20(7)=17
+    cfg = {"cronograma_formato": 2, "cronograma_padrao": [
+        {"codigo": "10", "prazo_dias": 5}, {"codigo": "11", "prazo_dias": 10},
+        {"codigo": "20", "prazo_dias": 7}]}
+    from datetime import datetime as _dt
+    assert mcr.folga_medicao_entrega(cfg, _dt(2026, 8, 1), _dt(2026, 9, 1)) == 31 - 17
+
+
+def test_folga_medicao_entrega_sem_medicao_nem_9_usa_primeira():
+    # sem "10" e sem "9" → âncora de medição cai na PRIMEIRA etapa (idx 0); após ela: 12(8)+16(4)=12
+    cfg = {"cronograma_formato": 2, "cronograma_padrao": [
+        {"codigo": "11", "prazo_dias": 3}, {"codigo": "12", "prazo_dias": 8},
+        {"codigo": "16", "prazo_dias": 4}]}
+    from datetime import datetime as _dt
+    assert mcr.folga_medicao_entrega(cfg, _dt(2026, 8, 1), _dt(2026, 9, 1)) == 31 - 12

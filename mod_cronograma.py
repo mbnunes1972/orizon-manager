@@ -131,21 +131,25 @@ def cabe_no_cronograma(resultado):
     return all(e["folga_dias"] >= 0 for e in (resultado or []))
 
 
-def folga_medicao_entrega(cfg, previsao_medicao, data_entrega, cod_medicao="10", cod_entrega="16"):
+def folga_medicao_entrega(cfg, previsao_medicao, data_entrega, codigo_medicao="10", codigo_entrega="16"):
     """Folga do trecho MEDIÇÃO→ENTREGA em dias corridos: (data_entrega − previsao_medicao) menos a soma
     das DURAÇÕES das etapas APÓS a medição até a entrega (inclusive). Só as etapas sob controle da loja
     (PE, produção, entrega) contam; as anteriores à medição dependem da obra do cliente. Negativa = não
-    cabe. Âncora da medição: prefere `cod_medicao` ("10"); se ausente, "9"; se nenhum, a 1ª etapa.
-    `cod_entrega` default "16" (Entrega no cliente); se ausente, a última etapa."""
+    cabe. Âncora da medição: prefere `codigo_medicao` ("10"); se ausente, "9"; se nenhum, a 1ª etapa.
+    `codigo_entrega` default "16" (Entrega no cliente); se ausente, a última etapa. PRECONDIÇÃO: espera
+    `cronograma_padrao` em ORDEM (medição antes da entrega), como a UI já ordena as etapas 8→20 (medição
+    = 10, entrega = 16); se a medição vier em/depois da entrega (idx_medição >= idx_entrega), o range
+    fica vazio → soma=0 → a folga sai SUPERESTIMADA silenciosamente. É violação de precondição da config,
+    não um caso de uso a tratar aqui."""
     etapas = cronograma_padrao(cfg)
     cods = [e["codigo"] for e in etapas]
-    if cod_medicao in cods:
-        idx_med = cods.index(cod_medicao)
+    if codigo_medicao in cods:
+        idx_med = cods.index(codigo_medicao)
     elif "9" in cods:
         idx_med = cods.index("9")
     else:
         idx_med = 0
-    idx_ent = cods.index(cod_entrega) if cod_entrega in cods else len(etapas) - 1
+    idx_ent = cods.index(codigo_entrega) if codigo_entrega in cods else len(etapas) - 1
     soma = sum(int(etapas[i]["prazo_dias"]) for i in range(idx_med + 1, idx_ent + 1))
     return (data_entrega - previsao_medicao).days - soma
 
