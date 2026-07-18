@@ -1339,7 +1339,21 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
-## ⏸️ ESTADO ATUAL (2026-07-16) — retomar aqui
+## ⏸️ ESTADO ATUAL (2026-07-17) — retomar aqui
+
+> **Frente A+B (cronograma/data de entrega) — Fatia 1 na branch `feat/fatia1-cronograma-data-entrega`, suíte
+> 1270 verde, NÃO mergeada.** Corrigidos: o bug da data de entrega que "sumia" do card (vinha do `Projeto`,
+> mas não era serializada no GET contrato), a semântica do Cronograma Padrão (`prazo_dias`=duração, não
+> acumulado; default reescrito + `cronograma_formato`), a acumulação em `gerar_cronograma_projeto` (que
+> destravou um bug latente: data persistida ≠ preview da tela), e a normalização de config legada na leitura.
+> Spec completa da frente (4 fatias) em `docs/superpowers/specs/ciclo/2026-07-17-ancora-entrega-folga-venda-programada-design.md`;
+> plano da Fatia 1 em `docs/superpowers/plans/2026-07-17-fatia1-correcoes-cronograma-data-entrega.md`. Ver
+> `## Sessão 82` abaixo. **PENDENTE:** verificação manual no navegador (o card reexibir a data após validar/
+> sair/voltar) + merge/push; depois Fatias 2–4.
+>
+> **(Anterior, 2026-07-16 — mantido abaixo por referência.)**
+
+## ⏸️ ESTADO ATUAL (2026-07-16)
 
 > **Tudo na `main`, suíte 1184 verde, pushado.** Sessões 78 (modelos de documento) e 79 (faxina +
 > pacotes) fechadas. Ver essas seções para as decisões.
@@ -2225,6 +2239,42 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 82 — Fatia 1 da frente A+B: correções de cronograma + persistência da data de entrega (branch `feat/fatia1-cronograma-data-entrega`)
+Brainstorm → spec → plano → execução subagent-driven (implementer + revisão de spec + revisão de qualidade por task).
+Origem: teste manual do usuário no card do Contrato — a data de entrega "sumia" depois de validar/assinar, e a
+folga do cronograma era incompreensível. A frente A+B foi desenhada inteira (spec
+`docs/superpowers/specs/ciclo/2026-07-17-ancora-entrega-folga-venda-programada-design.md`, 4 fatias); esta sessão
+implementou só a **Fatia 1** (correções que destravam o uso). Suíte **1270 verde** na branch. **NÃO mergeada** —
+pendente verificação manual no navegador + merge/push.
+
+**1. Semântica do Cronograma Padrão fixada: `prazo_dias` = DURAÇÃO da etapa (dias corridos), não offset acumulado
+desde D0.** O default de `mod_provisoes.config_financeira_default()` foi reescrito em durações realistas (soma ~72
+dias corridos ≈ 50 dias úteis, o prazo contratual-alvo) e ganhou o marcador `cronograma_formato: 2`.
+
+**2. `mod_provisoes.normalizar_cronograma_formato(cfg)` (nova, pura):** converte config LEGADA (acumulado, sem o
+marcador) → durações por diferença consecutiva, idempotente (`cronograma_formato` ausente/1 = converte; ≥2 = mantém).
+Robusta: parsing defensivo via `_f()` e ignora itens não-dict (config malformada não quebra o read). Aplicada na
+**leitura** da config (`_cfg_financeira_loja` e o GET config-financeira) **ANTES** do merge com o default — senão o
+merge herdaria `formato:2` do default e nunca converteria o legado.
+
+**3. `mod_cronograma.gerar_cronograma_projeto` passou a ACUMULAR** (`data_prevista = D0 + Σ durações até a etapa`).
+Isto conserta um **bug latente pré-existente**: como o default já era duração e a função usava offset direto, a
+`data_prevista_conclusao` persistida estava dessincronizada do preview da própria tela de Config (`cronoTplRecalc`,
+que já acumulava). Teste de regressão e2e prova que, p/ loja legada, normalizar+acumular reproduz os offsets originais.
+
+**4. Bug da data que "sumia" (raiz encontrada):** o card lê `contrato.data_entrega`, mas a serialização do
+`GET /api/projetos/<nome>/contrato` **nunca** devolvia esse campo — a data É gravada em `Projeto.data_entrega`, só
+não voltava. Corrigido: o payload passa a incluir `data_entrega` do projeto (reusando o lookup `_projeto_da_loja`).
+Nenhuma mudança de JS (o card já lia o campo).
+
+**[DECIDIDO na spec]** entrega esperada = previsão editável no `Projeto`; folga ≥ 0 bloqueia com override gerencial
+(Fatia 2); prazo contratual ~50 dias úteis desde a assinatura, único em dias úteis (Fatia 3); medição esperada +
+expectativa de entrega obrigatórias na assinatura; venda programada = classificação + marcador no contrato; sinal de
+atraso GERAL. **[PENDENTE]** Fatias 2–4 (colunas `previsao_medicao`/`venda_programada`, folga medição→entrega +
+bloqueio, prazo contratual + marcadores, sinal de atraso). Verificação manual no navegador + merge desta Fatia 1.
+**[ARQUIVOS]** `mod_provisoes.py`, `mod_cronograma.py`, `main.py`, `tests/test_cronograma.py`, `tests/test_data_entrega.py`,
+`tests/test_provisoes.py`, spec+plano em `docs/superpowers/{specs/ciclo,plans}/2026-07-17-*`.
 
 ## Sessão 81 — Reforma de navegação (Painel Orizon + Admin plano + seletor) + 9 tópicos (Grupos A e C)
 Sequência de frentes de UI/admin, todas mergeadas na `main` por FF a partir de worktrees isoladas.
