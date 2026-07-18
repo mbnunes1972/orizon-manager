@@ -10064,7 +10064,7 @@ function folhaRender(folha){
             +'<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="folhaPagar('+it.id+')">Pagar</button></div>'
           : '<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="folhaAprovar('+it.id+')">Aprovar</button>');
     const comItens = it.comissoes||[];
-    // Só a BASE editável da comissão. O % vai na coluna "%" e o resultado na "Parte variável".
+    // Só a BASE editável da comissão. O resultado (base × %) vai na coluna "Comissões".
     const _baseInp = (val, fn) => '<input type="number" step="0.01" value="'+val+'" class="inp" style="width:120px;text-align:right;font-family:var(--font-mono);font-size:13px;padding:2px 6px;box-sizing:border-box;margin:0" onchange="'+fn+'">';
     const comCel = comItens.length
       ? comItens.map(cm => {
@@ -10100,14 +10100,14 @@ function folhaRender(folha){
       +'<td style="padding:8px 10px;text-align:right"><div class="fcell">'+acao+'</div></td></tr>';
   }).join('') || '<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma folha para esta competência. Clique em “Gerar folha”.</td></tr>';
   box.innerHTML =
-     '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;max-width:760px">Motor de cálculo: a remuneração vem da <strong style="color:var(--text)">Função</strong> do funcionário (Config → Remunerações) — <strong style="color:var(--text)">salário fixo</strong>, <strong style="color:var(--text)">benefícios</strong> (AT/VA/PS) e comissão. A <strong style="color:var(--text)">parte variável</strong> é a soma dos itens de <strong style="color:var(--text)">Comissões</strong>: a do Consultor (vendas líquidas × %) e as de cada <strong style="color:var(--text)">papel</strong> (PE/Medição/Montagem/Assistência), preparadas automaticamente ao concluir cada etapa do ciclo (base = valor dos ambientes atribuídos × % da função). Cada base é <strong style="color:var(--text)">editável</strong>. O pagamento lança a despesa nas contas 5.3 e usa os dados bancários/PIX cadastrados.</div>'
+     '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;max-width:760px">Motor de cálculo: a remuneração vem da <strong style="color:var(--text)">Função</strong> do funcionário (Config → Remunerações) — <strong style="color:var(--text)">salário fixo</strong>, <strong style="color:var(--text)">benefícios</strong> (AT/VA/PS) e comissões. As <strong style="color:var(--text)">Comissões</strong> são a soma dos itens: a do Consultor (vendas líquidas × %) e as de cada <strong style="color:var(--text)">papel</strong> (PE/Medição/Montagem/Assistência), preparadas automaticamente ao concluir cada etapa do ciclo. A coluna <strong style="color:var(--text)">Base</strong> (valor dos ambientes atribuídos, ou vendas líquidas) é <strong style="color:var(--text)">editável</strong>; a <strong style="color:var(--text)">Comissão</strong> = Base × % da função (passe o mouse sobre o valor para ver base × %). O pagamento lança a despesa nas contas 5.3 e usa os dados bancários/PIX cadastrados.</div>'
     +'<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">'
     +'<label style="font-size:var(--fs-sm);color:var(--muted)">Competência</label>'
     +'<input type="month" value="'+esc(folha.competencia||_folhaComp)+'" onchange="folhaMudarComp(this.value)" class="inp" style="width:auto">'
     +'<button class="btn btn-primary btn-sm" onclick="folhaGerar()">Gerar folha</button></div>'
     +'<table class="proj-table folha-tbl"><thead><tr>'
-    +'<th>Funcionário</th><th class="num">Parte fixa</th><th class="num">Comissões</th>'
-    +'<th class="num">Parte variável</th><th class="num">Benefícios</th>'
+    +'<th>Funcionário</th><th class="num">Parte fixa</th><th class="num">Base</th>'
+    +'<th class="num">Comissões</th><th class="num">Benefícios</th>'
     +'<th class="num">Total</th><th class="num">Líquido a pagar</th><th>Pagamento</th><th style="width:80px"></th></tr></thead><tbody>'+linhas+'</tbody>'
     +'<tfoot><tr style="border-top:2px solid var(--border-strong);font-weight:700;vertical-align:middle">'
     +'<td style="padding:9px 10px">Totais</td>'
