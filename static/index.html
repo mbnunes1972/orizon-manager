@@ -3024,8 +3024,6 @@ async function cfgFuncaoNova(){
 }
 async function cfgFuncaoEditar(id){
   const f = _cfgFuncoesItens.find(x=>x.id===id) || {};
-  const dp = await fetch('/api/admin/perfis',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({perfis:[]}));
-  const perfis = dp.perfis || [];
   const lf = 'display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--muted)';
   const optSel = (val,opts) => '<option value="">—</option>'+opts.map(([v,l])=>`<option value="${v}" ${val===v?'selected':''}>${esc(l)}</option>`).join('');
   const ex = document.getElementById('modal-funcao'); if(ex) ex.remove();
@@ -3042,7 +3040,6 @@ async function cfgFuncaoEditar(id){
       <label style="${lf};margin-bottom:8px"><span>Nome</span><input id="fn-nome" value="${esc(f.nome||'')}" style="padding:5px 8px"></label>
       <label style="${lf};margin-bottom:10px"><span>Descrição (o que a função faz)</span><textarea id="fn-descricao" rows="2" style="padding:5px 8px;resize:vertical">${esc(f.descricao||'')}</textarea></label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px">
-        <label style="${lf}"><span>Perfil de usuário</span><select id="fn-perfil" style="padding:5px 8px"><option value="">— nenhum —</option>${perfis.map(p=>`<option value="${p.slug}" ${(f.perfil_padrao||'')===p.slug?'selected':''}>${esc(p.nome)}</option>`).join('')}</select></label>
         <label style="${lf}"><span>Padrão de remuneração</span><select id="fn-remun" style="padding:5px 8px">${optSel(f.remuneracao_padrao,[['fixa','Fixa'],['variavel','Variável'],['fixa_variavel','Fixa + Variável']])}</select></label>
         <label style="${lf}"><span>Regime de trabalho</span><select id="fn-regtrab" style="padding:5px 8px">${optSel(f.regime_trabalho,[['presencial','Presencial'],['remoto','Remoto'],['misto','Misto']])}</select></label>
         <label style="${lf}"><span>Regime de contratação</span><select id="fn-regcontr" style="padding:5px 8px">${optSel(f.regime_contratacao,[['registrado','Registrado'],['terceirizacao','Terceirização']])}</select></label>
@@ -3061,7 +3058,6 @@ async function cfgFuncaoSalvar(){
   const nome = (document.getElementById('fn-nome').value||'').trim();
   if(!nome){ erro.textContent='Informe o nome.'; return; }
   const body = { nome, descricao: document.getElementById('fn-descricao').value,
-    perfil_padrao: document.getElementById('fn-perfil').value,
     remuneracao_padrao: document.getElementById('fn-remun').value,
     regime_trabalho: document.getElementById('fn-regtrab').value,
     regime_contratacao: document.getElementById('fn-regcontr').value };
