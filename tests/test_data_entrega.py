@@ -26,3 +26,14 @@ def test_data_entrega_invalida_400(http_client_factory, seed):
     c = http_client_factory(); c.login("dir_l1", "senha123")
     st, _ = c.post("/api/projetos/%s/data-entrega" % seed["projeto_l1"], {})
     assert st == 400
+
+
+def test_data_entrega_persiste_e_volta_no_contrato(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    proj = seed["projeto_l1"]
+    st, d = c.post("/api/projetos/%s/data-entrega" % proj, {"data_entrega": "2028-01-01"})
+    assert st == 200 and d["ok"], (st, d)
+    # o GET do contrato deve devolver a data gravada (hoje não devolve → o card relê vazio)
+    st2, d2 = c.get("/api/projetos/%s/contrato" % proj)
+    assert st2 == 200 and d2["contrato"] is not None, (st2, d2)
+    assert (d2["contrato"].get("data_entrega") or "").startswith("2028-01-01"), d2["contrato"]
