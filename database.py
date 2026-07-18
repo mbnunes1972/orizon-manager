@@ -1421,7 +1421,7 @@ def _migrar_colunas():
         _add_cols("parcela_projeto", [("prazo_conclusao","DATETIME")])   # Fase A: prazo da fase
         _add_cols("projetos_meta", [("data_entrega","DATETIME"), ("data_inicio","DATETIME")])   # âncoras do cronograma
         _add_cols("projetos_meta", [("equipe_json","TEXT")])   # Equipe do Projeto (seleções dos papéis seletores)
-        _add_cols("projetos_meta", [("previsao_medicao","DATETIME"), ("venda_programada","INTEGER")])   # Fatia 2: marco de medição + classificação
+        _add_cols("projetos_meta", [("previsao_medicao","DATETIME"), ("venda_programada","INTEGER DEFAULT 0")])   # Fatia 2: marco de medição + classificação
 
         conn.commit()
     except Exception:
