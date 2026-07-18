@@ -34,16 +34,18 @@ def config_financeira_default():
         },
         # Folha (Fase 5): adiantamento oficial (40% do salário fixo em carteira, opcional por loja).
         "folha": {"adiantamento_oficial_ativo": False, "adiantamento_oficial_pct": 40.0},
-        # Cronograma de Projeto Padrão (Modulos_Orizon_v11): prazo em dias a partir de D0 (assinatura
-        # do contrato) por etapa do ciclo. Na assinatura, cada etapa ganha data_prevista = D0 + prazo.
+        # Cronograma de Projeto Padrão: prazo_dias = DURAÇÃO da etapa (dias corridos). Na assinatura,
+        # data_prevista = D0 + Σ durações até a etapa. cronograma_formato=2 marca o formato "durações"
+        # (1/ausente = legado acumulado, convertido na leitura por normalizar_cronograma_formato).
+        "cronograma_formato": 2,
         "cronograma_padrao": [
-            {"codigo": "8",  "prazo_dias": 2},   {"codigo": "9",  "prazo_dias": 5},
-            {"codigo": "10", "prazo_dias": 10},  {"codigo": "11", "prazo_dias": 20},
-            {"codigo": "12", "prazo_dias": 25},  {"codigo": "13", "prazo_dias": 45},
-            {"codigo": "14", "prazo_dias": 50},  {"codigo": "15", "prazo_dias": 52},
-            {"codigo": "16", "prazo_dias": 55},  {"codigo": "17", "prazo_dias": 60},
-            {"codigo": "18", "prazo_dias": 63},  {"codigo": "19", "prazo_dias": 68},
-            {"codigo": "20", "prazo_dias": 70},
+            {"codigo": "8",  "prazo_dias": 2},   {"codigo": "9",  "prazo_dias": 3},
+            {"codigo": "10", "prazo_dias": 5},   {"codigo": "11", "prazo_dias": 10},
+            {"codigo": "12", "prazo_dias": 3},   {"codigo": "13", "prazo_dias": 25},
+            {"codigo": "14", "prazo_dias": 5},   {"codigo": "15", "prazo_dias": 2},
+            {"codigo": "16", "prazo_dias": 5},   {"codigo": "17", "prazo_dias": 5},
+            {"codigo": "18", "prazo_dias": 3},   {"codigo": "19", "prazo_dias": 2},
+            {"codigo": "20", "prazo_dias": 2},
         ],
     }
 

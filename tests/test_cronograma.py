@@ -98,6 +98,16 @@ def test_config_default_inclui_cronograma():
     assert any(f["codigo"] == "8" for f in cfg["cronograma_padrao"])
 
 
+def test_default_cronograma_em_duracoes_e_formato_2():
+    cfg = mod_provisoes.config_financeira_default()
+    assert cfg.get("cronograma_formato") == 2                      # nasce em durações
+    fases = cfg["cronograma_padrao"]
+    # durações (não acumulado): nenhuma etapa isolada dura mais que o ciclo inteiro
+    total = sum(int(f["prazo_dias"]) for f in fases)
+    assert total <= 90                                             # ~50 dias úteis ≈ ~72 corridos
+    assert all(int(f["prazo_dias"]) <= 30 for f in fases)          # nenhuma etapa vira o acumulado antigo (55,70…)
+
+
 def test_cronograma_padrao_normaliza_e_ignora_invalido():
     fases = mod_cronograma.cronograma_padrao(_cfg([
         {"codigo": "9", "prazo_dias": "5", "funcao_id": "7"},   # strings viram int

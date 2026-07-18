@@ -5,7 +5,7 @@ import mod_orcamento_params
 def test_default_tem_estrutura_completa():
     c = mod_provisoes.config_financeira_default()
     assert set(c.keys()) == {"defaults_negociacao", "provisoes", "provisoes_contabeis",
-                             "comissao_vendas", "cronograma_padrao",
+                             "comissao_vendas", "cronograma_padrao", "cronograma_formato",
                              "aprovacao_financeira",   # Fatia C: limites AF1/AF2
                              "folha"}                  # Fase 5: adiantamento oficial
     assert c["aprovacao_financeira"] == {"limite_af1_pct": 1.0, "limite_af2_pct": 2.0}
