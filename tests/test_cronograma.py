@@ -191,6 +191,14 @@ def test_normalizar_cronograma_formato_lista_vazia():
     assert out["cronograma_formato"] == 2
 
 
+def test_normalizar_cronograma_formato_item_nao_dict_ignora():
+    out = mod_provisoes.normalizar_cronograma_formato(
+        {"cronograma_padrao": [{"codigo": "8", "prazo_dias": 2}, "lixo", None]})
+    cods = [f["codigo"] for f in out["cronograma_padrao"]]
+    assert cods == ["8"]                     # itens não-dict ignorados, sem exceção
+    assert out["cronograma_formato"] == 2
+
+
 def test_cfg_loja_converte_cronograma_legado_na_leitura(http_client_factory, seed, app_db):
     # grava no config da loja o formato-legado acumulado (sem cronograma_formato)
     db = app_db.get_session()

@@ -55,7 +55,8 @@ def normalizar_cronograma_formato(cfg):
     idempotente via a chave 'cronograma_formato' (ausente/0/1 = acumulado → converte; >=2 = durações →
     mantém). Não inventa cronograma_padrao se a chave não existe (o merge com o default é quem preenche).
     Parsing defensivo via _f() (config de loja pode vir malformada do banco): valor não-numérico não
-    lança exceção, vira 0. PRECONDIÇÃO: espera cronograma_padrao em ordem ACUMULADA CRESCENTE, como o
+    lança exceção, vira 0; item de cronograma_padrao que não seja dict (ex.: string por dado corrompido)
+    é ignorado, não quebra. PRECONDIÇÃO: espera cronograma_padrao em ordem ACUMULADA CRESCENTE, como o
     formato-legado sempre foi por construção (2, 5, 10, ..., 70); fora dessa ordem as durações resultantes
     são clampadas a 0 em vez de negativas, mas não fazem sentido semântico. Muta e retorna o próprio cfg."""
     cfg = cfg or {}
@@ -66,8 +67,10 @@ def normalizar_cronograma_formato(cfg):
     prev = 0
     novas = []
     for it in (cfg.get("cronograma_padrao") or []):
-        acc = int(_f((it or {}).get("prazo_dias")))
-        nova = dict(it or {})
+        if not isinstance(it, dict):
+            continue   # item malformado (não-dict) no config legado → ignora, não quebra
+        acc = int(_f(it.get("prazo_dias")))
+        nova = dict(it)
         nova["prazo_dias"] = max(0, acc - prev)
         prev = acc
         novas.append(nova)
