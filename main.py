@@ -2460,6 +2460,7 @@ class Handler(BaseHTTPRequestHandler):
                         "desatualizado":        _desatualizado,
                         "orcamento_id":         contrato.orcamento_id,
                         "data_entrega":         _meta.data_entrega.isoformat() if (_meta and _meta.data_entrega) else None,
+                        "previsao_medicao":     _meta.previsao_medicao.isoformat() if (_meta and _meta.previsao_medicao) else None,
                     }})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -4836,8 +4837,9 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         elif re.match(r"^/api/projetos/([^/]+)/data-entrega$", path):
-            # ── POST /api/projetos/<nome>/data-entrega — define a data de entrega esperada do cliente e
-            # valida contra o Cronograma Padrão (folga). Base do regressivo + do gate "cronograma próprio". ──
+            # ── POST /api/projetos/<nome>/data-entrega — persiste expectativa de entrega + previsão de
+            # medição + venda programada e valida a FOLGA do trecho medição→entrega. folga<0 só grava com
+            # reautenticação Gerente+ (auditada). Base do monitoramento e do gate da assinatura. ──
             from urllib.parse import unquote as _unq
             import mod_cronograma as _mcr, mod_tenancy as _mten
             m_de = re.match(r"^/api/projetos/([^/]+)/data-entrega$", path)
@@ -4847,8 +4849,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
             req = json.loads(body) if body else {}
             data_entrega = _parse_data(req.get("data_entrega"))
+            previsao_medicao = _parse_data(req.get("previsao_medicao"))
             if not data_entrega:
                 self.send_json({"ok": False, "erro": "Informe a data de entrega esperada (AAAA-MM-DD)."}, code=400); return
+            if not previsao_medicao:
+                self.send_json({"ok": False, "erro": "Informe a previsão de medição (AAAA-MM-DD)."}, code=400); return
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -4857,16 +4862,36 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": _err}, code=403); return
                 if _projeto_da_loja(db, nome_safe, loja_id) is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                cfg = _cfg_financeira_loja(db, loja_id)
+                folga = _mcr.folga_medicao_entrega(cfg, previsao_medicao, data_entrega)
+                cabe = folga >= 0
+                # Override gerencial: folga<0 só grava com reautenticação Gerente+ (auditada).
+                override_ok = False
+                if not cabe:
+                    login = (req.get("login") or "").strip()
+                    senha = (req.get("senha") or "").strip()
+                    if login and senha:
+                        autorizador = db.query(Usuario).filter_by(login=login, ativo=1).first()
+                        if autorizador and autorizador.check_senha(senha) and perfis.pode(autorizador.nivel, "autorizar"):
+                            override_ok = True
+                            db.add(LogAcaoGerencial(
+                                solicitante_id=usuario["id"], autorizador_id=autorizador.id,
+                                acao="data_entrega_sem_folga", projeto_nome=nome_safe,
+                                contexto=json.dumps({
+                                    "data_entrega": data_entrega.isoformat(),
+                                    "previsao_medicao": previsao_medicao.isoformat(),
+                                    "folga": folga})))
+                if not cabe and not override_ok:
+                    self.send_json({"ok": True, "cabe": False, "folga_min": folga, "requer_autorizacao": True})
+                    return
                 proj = db.get(Projeto, nome_safe)
                 proj.data_entrega = data_entrega
+                proj.previsao_medicao = previsao_medicao
+                proj.venda_programada = 1 if req.get("venda_programada") else 0
                 if not proj.data_inicio:
-                    proj.data_inicio = datetime.utcnow()   # default do início (âncora do progressivo)
-                cfg = _cfg_financeira_loja(db, loja_id)
-                view = _mcr.cronograma_do_projeto(cfg, proj.data_inicio, data_entrega)
-                cabe = _mcr.cabe_no_cronograma(view)
-                folga_min = min((e["folga_dias"] for e in view), default=None)
+                    proj.data_inicio = datetime.utcnow()   # âncora do progressivo
                 db.commit()
-                self.send_json({"ok": True, "cabe": cabe, "folga_min": folga_min})
+                self.send_json({"ok": True, "cabe": cabe, "folga_min": folga})
             finally:
                 db.close()
             return

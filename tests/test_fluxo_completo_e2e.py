@@ -254,9 +254,11 @@ def test_contrato_real_geracao_e_assinatura(app_db, seed, projetos_dir, contrato
     assert st == 200 and b["ok"], b
     assert b["status"] == "assinado_loja"
 
-    # (cronograma) a assinatura que COMPLETA o contrato exige a data de entrega esperada definida.
-    st, _ = c.post("/api/projetos/%s/data-entrega" % nome, {"data_entrega": "2028-01-01"})
-    assert st == 200
+    # (cronograma) a assinatura que COMPLETA o contrato exige a data de entrega esperada definida
+    # (Fatia 2: agora também exige a previsão de medição, folgada o bastante pra caber).
+    st, d = c.post("/api/projetos/%s/data-entrega" % nome,
+                   {"data_entrega": "2028-01-01", "previsao_medicao": "2027-06-01"})
+    assert st == 200 and d["ok"], (st, d)
 
     # 6) ASSINATURA — cliente → 'assinado'
     st, b = c.post("/api/projetos/%s/contrato/assinar" % nome,
