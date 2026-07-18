@@ -25,17 +25,21 @@ def test_base_ambientes_projeto_inteiro(seed, app_db):
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
     f = app_db.Funcionario(loja_id=loja, nome="Med", status="ativo"); db.add(f); db.flush()
-    # order_total (custo) 5000+1000=6000; budget (venda) 8000+2000=10000; líquido = 9000 (10% desc)
-    db.add(app_db.PoolAmbiente(projeto_id="PBase", nome="a", nome_exibicao="Cozinha",
-                               xml_path="x", ambientes_json="[]", order_total=5000.0, budget_total=8000.0))
-    db.add(app_db.PoolAmbiente(projeto_id="PBase", nome="b", nome_exibicao="Quarto",
-                               xml_path="y", ambientes_json="[]", order_total=1000.0, budget_total=2000.0))
-    db.add(app_db.Orcamento(projeto_id="PBase", nome="O", ordem=1, loja_id=loja, valor_liquido=9000.0))
+    # VBVA (venda) 8000+2000=10000; 10% desc_orc, sem custos → VAVO=Val_Liq=9000
+    p1 = app_db.PoolAmbiente(projeto_id="PBase", nome="a", nome_exibicao="Cozinha",
+                             xml_path="x", ambientes_json="[]", order_total=5000.0, budget_total=8000.0)
+    p2 = app_db.PoolAmbiente(projeto_id="PBase", nome="b", nome_exibicao="Quarto",
+                             xml_path="y", ambientes_json="[]", order_total=1000.0, budget_total=2000.0)
+    db.add(p1); db.add(p2); db.flush()
+    orc = app_db.Orcamento(projeto_id="PBase", nome="O", ordem=1, loja_id=loja, desconto_pct=10.0)
+    db.add(orc); db.flush()
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=orc.id, pool_ambiente_id=p1.id))
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=orc.id, pool_ambiente_id=p2.id))
     db.add(app_db.AtribuicaoAmbiente(loja_id=loja, projeto_nome="PBase", papel="medicao",
                                      funcionario_id=f.id, pool_ambiente_id=None))
     db.commit()
     base = mod_comissao.base_ambientes(db, "PBase", "medicao", f.id)
-    assert base == 9000.0     # projeto inteiro = Valor Líquido da venda (não o custo)
+    assert base == 9000.0     # projeto inteiro = Val_Liq da venda (não o custo)
     db.close()
 
 
@@ -48,12 +52,15 @@ def test_base_ambientes_por_ambiente(seed, app_db):
     p2 = app_db.PoolAmbiente(projeto_id="PBase2", nome="b", nome_exibicao="Quarto",
                              xml_path="y", ambientes_json="[]", order_total=1000.0, budget_total=2000.0)
     db.add(p1); db.add(p2); db.flush()
-    db.add(app_db.Orcamento(projeto_id="PBase2", nome="O", ordem=1, loja_id=loja, valor_liquido=9000.0))
+    orc = app_db.Orcamento(projeto_id="PBase2", nome="O", ordem=1, loja_id=loja, desconto_pct=10.0)
+    db.add(orc); db.flush()
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=orc.id, pool_ambiente_id=p1.id))
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=orc.id, pool_ambiente_id=p2.id))
     db.add(app_db.AtribuicaoAmbiente(loja_id=loja, projeto_nome="PBase2", papel="medicao",
                                      funcionario_id=f.id, pool_ambiente_id=p1.id))   # só a cozinha
     db.commit()
     base = mod_comissao.base_ambientes(db, "PBase2", "medicao", f.id)
-    assert base == 7200.0     # fatia líquida da Cozinha = 9000 × 8000/10000
+    assert base == 7200.0     # Val_Liq da Cozinha = VAVA 7200 (8000×0,9), sem custos adicionais
     db.close()
 
 
@@ -66,9 +73,12 @@ def test_preparar_comissao_etapa_cria_item(seed, app_db):
                        comissao_json=json.dumps(com), status="ativo")
     db.add(fn); db.flush()
     f = app_db.Funcionario(loja_id=loja, nome="Med", funcao_id=fn.id, status="ativo"); db.add(f); db.flush()
-    db.add(app_db.PoolAmbiente(projeto_id="PComis", nome="a", nome_exibicao="Cozinha",
-                               xml_path="x", ambientes_json="[]", order_total=999.0, budget_total=10000.0))
-    db.add(app_db.Orcamento(projeto_id="PComis", nome="O", ordem=1, loja_id=loja, valor_liquido=10000.0))
+    p = app_db.PoolAmbiente(projeto_id="PComis", nome="a", nome_exibicao="Cozinha",
+                            xml_path="x", ambientes_json="[]", order_total=999.0, budget_total=10000.0)
+    db.add(p); db.flush()
+    orc = app_db.Orcamento(projeto_id="PComis", nome="O", ordem=1, loja_id=loja)
+    db.add(orc); db.flush()
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=orc.id, pool_ambiente_id=p.id))
     db.add(app_db.AtribuicaoAmbiente(loja_id=loja, projeto_nome="PComis", papel="medicao",
                                      funcionario_id=f.id, pool_ambiente_id=None))
     et = app_db.CicloEtapa(projeto_nome="PComis", etapa_codigo="10", status="concluido",
@@ -99,9 +109,12 @@ def test_preparar_comissao_usa_mapa_sem_responsavel_etapa(seed, app_db):
                            {"venda_ate": 500000.0, "pct": 0.5}, {"venda_ate": None, "pct": 1.0}]}))
     db.add(fn); db.flush()
     f = app_db.Funcionario(loja_id=loja, nome="Med", funcao_id=fn.id, status="ativo"); db.add(f); db.flush()
-    db.add(app_db.PoolAmbiente(projeto_id="PMapa", nome="a", nome_exibicao="Cozinha",
-                               xml_path="x", ambientes_json="[]", order_total=40000.0, budget_total=81359.22))
-    db.add(app_db.Orcamento(projeto_id="PMapa", nome="O", ordem=1, loja_id=loja, valor_liquido=81359.22))
+    p = app_db.PoolAmbiente(projeto_id="PMapa", nome="a", nome_exibicao="Cozinha",
+                            xml_path="x", ambientes_json="[]", order_total=40000.0, budget_total=81359.22)
+    db.add(p); db.flush()
+    orc = app_db.Orcamento(projeto_id="PMapa", nome="O", ordem=1, loja_id=loja)
+    db.add(orc); db.flush()
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=orc.id, pool_ambiente_id=p.id))
     db.add(app_db.AtribuicaoAmbiente(loja_id=loja, projeto_nome="PMapa", papel="medicao",
                                      funcionario_id=f.id, pool_ambiente_id=None))
     et = app_db.CicloEtapa(projeto_nome="PMapa", etapa_codigo="10", status="concluido",
@@ -138,9 +151,12 @@ def test_set_etapa_status_dispara_comissao(seed, app_db):
     db.add(fn); db.flush()
     f = app_db.Funcionario(loja_id=loja, nome="Mnt", funcao_id=fn.id, status="ativo"); db.add(f); db.flush()
     db.add(app_db.Projeto(nome_safe="PHook", loja_id=loja, status="fechado"))
-    db.add(app_db.PoolAmbiente(projeto_id="PHook", nome="a", nome_exibicao="Sala",
-                               xml_path="x", ambientes_json="[]", order_total=2000.0, budget_total=5000.0))
-    db.add(app_db.Orcamento(projeto_id="PHook", nome="O", ordem=1, loja_id=loja, valor_liquido=5000.0))
+    p = app_db.PoolAmbiente(projeto_id="PHook", nome="a", nome_exibicao="Sala",
+                            xml_path="x", ambientes_json="[]", order_total=2000.0, budget_total=5000.0)
+    db.add(p); db.flush()
+    orc = app_db.Orcamento(projeto_id="PHook", nome="O", ordem=1, loja_id=loja)
+    db.add(orc); db.flush()
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=orc.id, pool_ambiente_id=p.id))
     db.add(app_db.AtribuicaoAmbiente(loja_id=loja, projeto_nome="PHook", papel="montagem",
                                      funcionario_id=f.id, pool_ambiente_id=None))
     db.add(app_db.CicloEtapa(projeto_nome="PHook", etapa_codigo="17", status="em_andamento",
@@ -259,8 +275,11 @@ def test_base_detalhe_lista_ambientes(seed, app_db):
     p2 = app_db.PoolAmbiente(projeto_id="PDet", nome="b", nome_exibicao="Banheiro", xml_path="y",
                              ambientes_json="[]", order_total=400.0, budget_total=953.4)
     db.add(p1); db.add(p2); db.flush()
-    # sem desconto (valor_liquido == Σ budget) → fatia líquida do ambiente = seu budget
-    db.add(app_db.Orcamento(projeto_id="PDet", nome="O", ordem=1, loja_id=loja, valor_liquido=47473.91))
+    # sem desconto e sem custos → Val_Liq do ambiente = seu VAVA = budget_total
+    orc = app_db.Orcamento(projeto_id="PDet", nome="O", ordem=1, loja_id=loja)
+    db.add(orc); db.flush()
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=orc.id, pool_ambiente_id=p1.id))
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=orc.id, pool_ambiente_id=p2.id))
     db.add(app_db.AtribuicaoAmbiente(loja_id=loja, projeto_nome="PDet", papel="medicao",
                                      funcionario_id=f.id, pool_ambiente_id=p1.id))   # só a Cozinha
     it = app_db.ComissaoFolha(loja_id=loja, funcionario_id=f.id, competencia="2026-07", origem="papel",

@@ -33,47 +33,90 @@ def _ambientes_da_base(db, projeto_nome, papel, funcionario_id):
     return db.query(PoolAmbiente).filter(PoolAmbiente.id.in_(ids)).all() if ids else []
 
 
-def _valor_liquido_projeto(db, projeto_nome):
-    """Valor Líquido da venda do projeto = maior valor_liquido (ou valor_total) entre seus orçamentos."""
+def _breakdown_projeto(db, projeto_nome):
+    """(breakdown do orçamento vencedor via mod_negociacao, [pool_ambiente_id por índice]).
+    Espelha main._negociacao_breakdown (lê só os insumos salvos) para obter o VAVA POR AMBIENTE,
+    VAVO e Val_Liq — respeitando o toggle 'incluir_custos'. (None, []) se não há orçamento."""
+    import mod_negociacao, mod_provisoes, mod_orcamento_params
+    from database import Loja, Projeto, OrcamentoAmbiente
     orcs = db.query(Orcamento).filter_by(projeto_id=projeto_nome).all()
     if not orcs:
-        return 0.0
-    return round(max((o.valor_liquido or o.valor_total or 0.0) for o in orcs), 2)
+        return None, []
+    orc = max(orcs, key=lambda o: (o.valor_liquido or o.valor_total or 0.0))
+    proj = db.query(Projeto).filter_by(nome_safe=projeto_nome).first()
+    loja = db.get(Loja, orc.loja_id) if getattr(orc, "loja_id", None) else None
+    cfg = {}
+    if loja and loja.config_financeira_json:
+        try:
+            cfg = json.loads(loja.config_financeira_json)
+        except Exception:
+            cfg = {}
+    if not cfg:
+        cfg = mod_provisoes.config_financeira_default()
+    params = (json.loads(proj.parametros_json) if (proj and proj.parametros_json)
+              else mod_orcamento_params.parametros_default_loja(cfg))
+    desc_orc = orc.desconto_pct or 0.0
+    ambs, ids = [], []
+    for lk in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all():
+        pa = db.get(PoolAmbiente, lk.pool_ambiente_id)
+        if pa:
+            ambs.append({"VBVA": pa.budget_total or 0.0, "CFA": pa.order_total or 0.0,
+                         "desc_amb_pct": float(lk.desconto_individual_pct or 0.0)})
+            ids.append(lk.pool_ambiente_id)
+    total_cliente = None
+    try:
+        fp = json.loads(orc.forma_pagamento) if orc.forma_pagamento else None
+        if isinstance(fp, dict) and fp.get("total_cliente"):
+            total_cliente = float(fp["total_cliente"])
+    except Exception:
+        total_cliente = None
+    pool_proj = db.query(PoolAmbiente).filter_by(projeto_id=projeto_nome).all()
+    n_total_proj = len(pool_proj) or None
+    vbvo_proj = sum((pa.budget_total or 0.0) for pa in pool_proj) or None
+    d0 = mod_negociacao.calcular_orcamento(ambs, params, desc_orc,
+                                           n_total_proj=n_total_proj, vbvo_proj=vbvo_proj)
+    cust_fin = 0.0 if total_cliente is None else max(0.0, total_cliente - d0["VAVO"])
+    d = mod_negociacao.calcular_orcamento(ambs, params, desc_orc, cust_fin=cust_fin,
+                                          n_total_proj=n_total_proj, vbvo_proj=vbvo_proj)
+    return d, ids
 
 
-def _liq_e_bruto(db, projeto_nome):
-    """(valor_liquido do projeto, Σ preço-de-venda bruto (budget_total) de TODOS os ambientes)."""
-    net = _valor_liquido_projeto(db, projeto_nome)
-    todos = db.query(PoolAmbiente).filter_by(projeto_id=projeto_nome).all()
-    bruto = round(sum(p.budget_total or 0.0 for p in todos), 2)
-    return net, bruto
+def _liquidos_por_ambiente(db, projeto_nome):
+    """{pool_ambiente_id: Val_Liq_Amb}, onde Val_Liq_Amb = VAVA − Cust_Ad × (VAVA/VAVO), isto é, o VAVA
+    do ambiente menos a fatia (proporcional ao VAVA) dos custos adicionais. Σ = Val_Liq do projeto."""
+    d, ids = _breakdown_projeto(db, projeto_nome)
+    if not d:
+        return {}
+    vavo = d.get("VAVO") or 0.0
+    val_liq = d.get("Val_Liq") or 0.0
+    fator = (val_liq / vavo) if vavo > 0 else 0.0     # (VAVO − Cust_Ad)/VAVO
+    out = {}
+    for i, a in enumerate(d.get("ambientes", [])):
+        aid = ids[i] if i < len(ids) else None
+        if aid is not None:
+            out[aid] = round(float(a.get("VAVA") or 0.0) * fator, 2)
+    return out
 
 
 def base_ambientes(db, projeto_nome, papel, funcionario_id):
-    """Base = Valor Líquido da venda do projeto RATEADO pela fatia de venda (budget_total) dos ambientes
-    atribuídos a (papel, funcionario). Projeto inteiro → base = Valor Líquido do projeto."""
+    """Base = Σ do Valor Líquido POR AMBIENTE (VAVA − fatia dos custos adicionais) dos ambientes
+    atribuídos a (papel, funcionario). Projeto inteiro → base = Val_Liq do projeto."""
     pools = _ambientes_da_base(db, projeto_nome, papel, funcionario_id)
     if not pools:
         return 0.0
-    net, bruto = _liq_e_bruto(db, projeto_nome)
-    if bruto <= 0:
-        return 0.0
-    atribuido = sum(p.budget_total or 0.0 for p in pools)
-    return round(net * atribuido / bruto, 2)
+    liq = _liquidos_por_ambiente(db, projeto_nome)
+    return round(sum(liq.get(p.id, 0.0) for p in pools), 2)
 
 
 def base_detalhe(db, item):
-    """Composição da base de um item de PAPEL: [{nome, valor}] = fatia LÍQUIDA de cada ambiente atribuído
-    (valor_liquido do projeto × preço-venda do ambiente ÷ preço-venda total)."""
+    """Composição da base de um item de PAPEL: [{nome, valor}] = Valor Líquido de cada ambiente atribuído."""
     if item.origem != "papel" or not item.projeto_nome or not item.papel:
         return []
     pools = _ambientes_da_base(db, item.projeto_nome, item.papel, item.funcionario_id)
     if not pools:
         return []
-    net, bruto = _liq_e_bruto(db, item.projeto_nome)
-    if bruto <= 0:
-        return [{"nome": p.nome_exibicao, "valor": 0.0} for p in pools]
-    return [{"nome": p.nome_exibicao, "valor": round(net * (p.budget_total or 0.0) / bruto, 2)} for p in pools]
+    liq = _liquidos_por_ambiente(db, item.projeto_nome)
+    return [{"nome": p.nome_exibicao, "valor": round(liq.get(p.id, 0.0), 2)} for p in pools]
 
 
 def _pct_funcao(funcao, base):
