@@ -85,6 +85,32 @@ def test_preparar_comissao_etapa_cria_item(seed, app_db):
     db.close()
 
 
+def test_preparar_comissao_usa_mapa_sem_responsavel_etapa(seed, app_db):
+    # Regressão: o executor vem do MAPA (atribuicoes_ambiente), mesmo sem responsavel_funcionario_id
+    # na etapa. A função (e o %) vem do próprio Funcionário. (bug: medição concluída não gerava comissão)
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
+    fn = app_db.Funcao(loja_id=loja, nome="Medidor", usa_comissao_vendas=0, status="ativo",
+                       comissao_json=json.dumps({"por_meta": True, "faixas": [
+                           {"venda_ate": 500000.0, "pct": 0.5}, {"venda_ate": None, "pct": 1.0}]}))
+    db.add(fn); db.flush()
+    f = app_db.Funcionario(loja_id=loja, nome="Med", funcao_id=fn.id, status="ativo"); db.add(f); db.flush()
+    db.add(app_db.PoolAmbiente(projeto_id="PMapa", nome="a", nome_exibicao="Cozinha",
+                               xml_path="x", ambientes_json="[]", order_total=81359.22))
+    db.add(app_db.AtribuicaoAmbiente(loja_id=loja, projeto_nome="PMapa", papel="medicao",
+                                     funcionario_id=f.id, pool_ambiente_id=None))
+    et = app_db.CicloEtapa(projeto_nome="PMapa", etapa_codigo="10", status="concluido",
+                           concluido_em=datetime(2026, 7, 18),
+                           funcao_responsavel_id=None, responsavel_funcionario_id=None)  # só o Mapa
+    db.add(et); db.commit()
+    item = mod_comissao.preparar_comissao_etapa(db, loja, et); db.commit()
+    assert item is not None
+    assert item.funcionario_id == f.id and item.papel == "medicao"
+    assert item.base == 81359.22 and item.pct == 0.5
+    assert item.valor == 406.8      # 81359.22 × 0.5%
+    db.close()
+
+
 def test_preparar_comissao_etapa_sem_comissao_nao_cria(seed, app_db):
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
