@@ -135,16 +135,36 @@ def test_gerar_cronograma_herda_funcao_responsavel(app_db):
     db.close()
 
 
-def test_gerar_cronograma_define_data_prevista(app_db):
+def test_gerar_cronograma_define_data_prevista_acumulado(app_db):
     db = app_db.get_session()
     d0 = datetime(2026, 7, 1, 12, 0, 0)
+    # prazo_dias = DURAÇÃO por etapa; data_prevista = D0 + Σ durações até a etapa (inclusive)
     cfg = _cfg([{"codigo": "9", "prazo_dias": 5}, {"codigo": "13", "prazo_dias": 45}])
     mod_cronograma.gerar_cronograma_projeto(db, "ProjX", cfg, d0); db.commit()
     e9 = db.query(app_db.CicloEtapa).filter_by(projeto_nome="ProjX", etapa_codigo="9").first()
     e13 = db.query(app_db.CicloEtapa).filter_by(projeto_nome="ProjX", etapa_codigo="13").first()
-    assert e9.data_prevista_conclusao == d0 + timedelta(days=5)
-    assert e13.data_prevista_conclusao == d0 + timedelta(days=45)
-    assert e9.concluido_em is None   # data_conclusao nasce vazia
+    assert e9.data_prevista_conclusao == d0 + timedelta(days=5)        # 1ª etapa: só a própria duração
+    assert e13.data_prevista_conclusao == d0 + timedelta(days=50)      # 5 + 45 acumulado
+    assert e9.concluido_em is None
+    db.close()
+
+
+def test_gerar_cronograma_de_config_legada_reproduz_offsets_originais(app_db):
+    # Regressão: config LEGADA (acumulado) normalizada → durações e então acumulada por
+    # gerar_cronograma_projeto deve reproduzir EXATAMENTE os offsets acumulados originais.
+    # Ou seja: normalizar + acumular = identidade sobre o dado legado (loja antiga não muda de data).
+    d0 = datetime(2026, 7, 1)
+    legado = {"cronograma_padrao": [
+        {"codigo": "9", "prazo_dias": 5}, {"codigo": "10", "prazo_dias": 10},
+        {"codigo": "16", "prazo_dias": 55}]}          # acumulado (dias desde D0), sem cronograma_formato
+    cfg = mod_provisoes.normalizar_cronograma_formato(legado)   # vira durações (5, 5, 45)
+    db = app_db.get_session()
+    mod_cronograma.gerar_cronograma_projeto(db, "ProjLeg", cfg, d0); db.commit()
+    by = {e.etapa_codigo: e.data_prevista_conclusao
+          for e in db.query(app_db.CicloEtapa).filter_by(projeto_nome="ProjLeg").all()}
+    assert by["9"]  == d0 + timedelta(days=5)     # offsets ACUMULADOS originais reproduzidos
+    assert by["10"] == d0 + timedelta(days=10)
+    assert by["16"] == d0 + timedelta(days=55)
     db.close()
 
 

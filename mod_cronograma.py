@@ -36,11 +36,13 @@ def cronograma_padrao(cfg):
 
 def gerar_cronograma_projeto(db, projeto_nome, cfg, d0):
     """Para cada fase do Cronograma Padrão, cria/atualiza a etapa do projeto com
-    data_prevista_conclusao = d0 + prazo_dias. Não toca data de conclusão. Idempotente.
-    Retorna a lista de CicloEtapa afetadas."""
+    data_prevista_conclusao = d0 + Σ(durações das etapas até esta, inclusive). prazo_dias é a DURAÇÃO
+    da etapa (dias corridos). Não toca data de conclusão. Idempotente. Retorna as CicloEtapa afetadas."""
     afetadas = []
+    acc = 0
     for fase in cronograma_padrao(cfg):
-        prevista = d0 + timedelta(days=fase["prazo_dias"])
+        acc += fase["prazo_dias"]
+        prevista = d0 + timedelta(days=acc)
         reg = (db.query(CicloEtapa)
                .filter_by(projeto_nome=projeto_nome, etapa_codigo=fase["codigo"]).first())
         if reg is None:
