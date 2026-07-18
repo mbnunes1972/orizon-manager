@@ -191,6 +191,24 @@ def test_normalizar_cronograma_formato_lista_vazia():
     assert out["cronograma_formato"] == 2
 
 
+def test_cfg_loja_converte_cronograma_legado_na_leitura(http_client_factory, seed, app_db):
+    # grava no config da loja o formato-legado acumulado (sem cronograma_formato)
+    db = app_db.get_session()
+    import json as _json
+    loja = db.query(app_db.Loja).filter_by(id=db.query(app_db.Usuario)
+              .filter_by(login="dir_l1").first().loja_id).first()
+    loja.config_financeira_json = _json.dumps({"cronograma_padrao": [
+        {"codigo": "10", "prazo_dias": 10}, {"codigo": "16", "prazo_dias": 55}]})
+    db.commit(); loja_id = loja.id; db.close()
+    # GET config-financeira deve devolver durações (10→10, 16→45), não o acumulado
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.get("/api/admin/lojas/%d/config-financeira" % loja_id)
+    assert st == 200
+    by = {f["codigo"]: f["prazo_dias"] for f in d["config"]["cronograma_padrao"]}
+    assert by["10"] == 10 and by["16"] == 45
+    assert d["config"]["cronograma_formato"] == 2
+
+
 def test_gerar_cronograma_idempotente_e_preserva_conclusao(app_db):
     db = app_db.get_session()
     d0 = datetime(2026, 7, 1)

@@ -1565,7 +1565,10 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Loja fora do escopo"}, code=403); return
                 # Merge com o default preenche chaves novas (ex.: cronograma_padrao, v11) em lojas
                 # cujo config foi salvo antes da chave existir — sem apagar valores já configurados.
-                _stored = json.loads(loja.config_financeira_json) if loja.config_financeira_json else {}
+                # Normaliza o STORED antes do merge: config legada (sem cronograma_formato) é
+                # convertida de acumulado para durações.
+                _stored = mod_provisoes.normalizar_cronograma_formato(
+                    json.loads(loja.config_financeira_json) if loja.config_financeira_json else {})
                 cfg = {**mod_provisoes.config_financeira_default(), **_stored}
                 self.send_json({"ok": True, "config": cfg})
             finally:
@@ -8521,9 +8524,10 @@ def _cfg_financeira_loja(db, loja_id):
     loja = db.get(Loja, loja_id) if loja_id else None
     if loja and loja.config_financeira_json:
         try:
-            # Merge com o default preenche chaves novas (ex.: cronograma_padrao, v11) em configs
-            # salvos antes da chave existir — o gatilho da assinatura usa esta função.
-            return {**mod_provisoes.config_financeira_default(), **json.loads(loja.config_financeira_json)}
+            # Normaliza o STORED antes do merge: config legada (sem cronograma_formato) é convertida de
+            # acumulado para durações. O merge preenche chaves novas sem apagar o já configurado.
+            _stored = mod_provisoes.normalizar_cronograma_formato(json.loads(loja.config_financeira_json))
+            return {**mod_provisoes.config_financeira_default(), **_stored}
         except Exception:
             pass
     return mod_provisoes.config_financeira_default()
