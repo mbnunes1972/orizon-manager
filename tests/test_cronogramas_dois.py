@@ -73,3 +73,30 @@ def test_cronograma_projeto_view(app_db):
     assert by["12"]["folga_dias"] is not None       # Limite − Planejada
     assert by["13"]["executado"] is None            # etapa sem CicloEtapa
     db.close()
+
+
+def test_folga_medicao_entrega_cabe():
+    cfg = {"cronograma_formato": 2, "cronograma_padrao": [
+        {"codigo": "9", "prazo_dias": 3}, {"codigo": "10", "prazo_dias": 5},
+        {"codigo": "11", "prazo_dias": 10}, {"codigo": "16", "prazo_dias": 5}]}
+    med = datetime(2026, 8, 1); ent = datetime(2026, 9, 1)     # 31 dias corridos
+    # etapas APÓS "10" até "16": 11(10) + 16(5) = 15 → folga = 31 − 15 = 16
+    assert mcr.folga_medicao_entrega(cfg, med, ent) == 16
+
+
+def test_folga_medicao_entrega_nao_cabe():
+    cfg = {"cronograma_formato": 2, "cronograma_padrao": [
+        {"codigo": "10", "prazo_dias": 5}, {"codigo": "11", "prazo_dias": 10},
+        {"codigo": "16", "prazo_dias": 5}]}
+    med = datetime(2026, 8, 1); ent = datetime(2026, 8, 10)    # 9 dias
+    # após "10": 11(10)+16(5)=15 → folga = 9 − 15 = −6
+    assert mcr.folga_medicao_entrega(cfg, med, ent) == -6
+
+
+def test_folga_medicao_entrega_fallback_sem_10():
+    # sem etapa "10" → âncora cai na "9"; após "9": 13(20)+16(5)=25
+    cfg = {"cronograma_formato": 2, "cronograma_padrao": [
+        {"codigo": "9", "prazo_dias": 4}, {"codigo": "13", "prazo_dias": 20},
+        {"codigo": "16", "prazo_dias": 5}]}
+    med = datetime(2026, 8, 1); ent = datetime(2026, 10, 1)    # 61 dias
+    assert mcr.folga_medicao_entrega(cfg, med, ent) == 61 - 25

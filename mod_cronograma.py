@@ -131,6 +131,25 @@ def cabe_no_cronograma(resultado):
     return all(e["folga_dias"] >= 0 for e in (resultado or []))
 
 
+def folga_medicao_entrega(cfg, previsao_medicao, data_entrega, cod_medicao="10", cod_entrega="16"):
+    """Folga do trecho MEDIÇÃO→ENTREGA em dias corridos: (data_entrega − previsao_medicao) menos a soma
+    das DURAÇÕES das etapas APÓS a medição até a entrega (inclusive). Só as etapas sob controle da loja
+    (PE, produção, entrega) contam; as anteriores à medição dependem da obra do cliente. Negativa = não
+    cabe. Âncora da medição: prefere `cod_medicao` ("10"); se ausente, "9"; se nenhum, a 1ª etapa.
+    `cod_entrega` default "16" (Entrega no cliente); se ausente, a última etapa."""
+    etapas = cronograma_padrao(cfg)
+    cods = [e["codigo"] for e in etapas]
+    if cod_medicao in cods:
+        idx_med = cods.index(cod_medicao)
+    elif "9" in cods:
+        idx_med = cods.index("9")
+    else:
+        idx_med = 0
+    idx_ent = cods.index(cod_entrega) if cod_entrega in cods else len(etapas) - 1
+    soma = sum(int(etapas[i]["prazo_dias"]) for i in range(idx_med + 1, idx_ent + 1))
+    return (data_entrega - previsao_medicao).days - soma
+
+
 def cronograma_projeto_view(db, projeto_nome, cfg, codigo_entrega="16"):
     """Dados das 3 datas do ciclo por etapa — **Planejada** (`CicloEtapa.data_prevista_conclusao`, do
     Cronograma Padrão gerado na assinatura), **Prazo Limite** (regressivo, âncora `Projeto.data_entrega`)
