@@ -148,6 +148,31 @@ def test_gerar_cronograma_define_data_prevista(app_db):
     db.close()
 
 
+def test_normalizar_cronograma_formato_converte_legado():
+    # config legada: acumulado (dias desde D0), sem marcador de formato
+    legado = {"cronograma_padrao": [
+        {"codigo": "8", "prazo_dias": 2}, {"codigo": "9", "prazo_dias": 5},
+        {"codigo": "10", "prazo_dias": 10}, {"codigo": "16", "prazo_dias": 55},
+    ]}
+    out = mod_provisoes.normalizar_cronograma_formato(legado)
+    by = {f["codigo"]: f["prazo_dias"] for f in out["cronograma_padrao"]}
+    assert by == {"8": 2, "9": 3, "10": 5, "16": 45}   # diferenças = durações
+    assert out["cronograma_formato"] == 2
+
+
+def test_normalizar_cronograma_formato_idempotente():
+    ja = {"cronograma_formato": 2, "cronograma_padrao": [{"codigo": "8", "prazo_dias": 2}]}
+    out = mod_provisoes.normalizar_cronograma_formato(ja)
+    assert out["cronograma_padrao"][0]["prazo_dias"] == 2   # não converte de novo
+    assert out["cronograma_formato"] == 2
+
+
+def test_normalizar_cronograma_formato_sem_cronograma_nao_inventa():
+    # config antiga sem a chave → não cria lista vazia (o merge com default é quem preenche)
+    out = mod_provisoes.normalizar_cronograma_formato({"provisoes": {}})
+    assert "cronograma_padrao" not in out
+
+
 def test_gerar_cronograma_idempotente_e_preserva_conclusao(app_db):
     db = app_db.get_session()
     d0 = datetime(2026, 7, 1)

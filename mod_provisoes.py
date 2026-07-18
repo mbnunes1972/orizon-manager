@@ -50,6 +50,29 @@ def config_financeira_default():
     }
 
 
+def normalizar_cronograma_formato(cfg):
+    """Converte o cronograma_padrao do formato-legado ACUMULADO (dias desde D0) para DURAÇÕES por etapa,
+    idempotente via a chave 'cronograma_formato' (ausente/1 = acumulado → converte; 2 = durações → mantém).
+    Não inventa cronograma_padrao se a chave não existe (o merge com o default é quem preenche). Muta e
+    retorna o próprio cfg."""
+    cfg = cfg or {}
+    if "cronograma_padrao" not in cfg:
+        return cfg
+    if int(cfg.get("cronograma_formato") or 1) >= 2:
+        return cfg
+    prev = 0
+    novas = []
+    for it in (cfg.get("cronograma_padrao") or []):
+        acc = int((it or {}).get("prazo_dias") or 0)
+        nova = dict(it or {})
+        nova["prazo_dias"] = max(0, acc - prev)
+        prev = acc
+        novas.append(nova)
+    cfg["cronograma_padrao"] = novas
+    cfg["cronograma_formato"] = 2
+    return cfg
+
+
 def validar_config_financeira(dados):
     erros = []
     d = dados or {}
