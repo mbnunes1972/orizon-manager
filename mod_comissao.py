@@ -4,7 +4,7 @@ Mapa (projeto inteiro se atribuição = NULL) × % da Função. Itens em comissa
 import json
 
 import mod_folha
-from database import (ComissaoFolha, Funcao, Funcionario, PoolAmbiente, AtribuicaoAmbiente)
+from database import (ComissaoFolha, Funcao, Funcionario, PoolAmbiente, AtribuicaoAmbiente, Orcamento)
 
 # Etapa operacional → papel do Mapa (só estas geram comissão de papel).
 PAPEL_POR_ETAPA = {
@@ -33,18 +33,47 @@ def _ambientes_da_base(db, projeto_nome, papel, funcionario_id):
     return db.query(PoolAmbiente).filter(PoolAmbiente.id.in_(ids)).all() if ids else []
 
 
+def _valor_liquido_projeto(db, projeto_nome):
+    """Valor Líquido da venda do projeto = maior valor_liquido (ou valor_total) entre seus orçamentos."""
+    orcs = db.query(Orcamento).filter_by(projeto_id=projeto_nome).all()
+    if not orcs:
+        return 0.0
+    return round(max((o.valor_liquido or o.valor_total or 0.0) for o in orcs), 2)
+
+
+def _liq_e_bruto(db, projeto_nome):
+    """(valor_liquido do projeto, Σ preço-de-venda bruto (budget_total) de TODOS os ambientes)."""
+    net = _valor_liquido_projeto(db, projeto_nome)
+    todos = db.query(PoolAmbiente).filter_by(projeto_id=projeto_nome).all()
+    bruto = round(sum(p.budget_total or 0.0 for p in todos), 2)
+    return net, bruto
+
+
 def base_ambientes(db, projeto_nome, papel, funcionario_id):
-    """Σ order_total dos ambientes atribuídos a (papel, funcionario) no Mapa."""
+    """Base = Valor Líquido da venda do projeto RATEADO pela fatia de venda (budget_total) dos ambientes
+    atribuídos a (papel, funcionario). Projeto inteiro → base = Valor Líquido do projeto."""
     pools = _ambientes_da_base(db, projeto_nome, papel, funcionario_id)
-    return round(sum(p.order_total or 0.0 for p in pools), 2)
+    if not pools:
+        return 0.0
+    net, bruto = _liq_e_bruto(db, projeto_nome)
+    if bruto <= 0:
+        return 0.0
+    atribuido = sum(p.budget_total or 0.0 for p in pools)
+    return round(net * atribuido / bruto, 2)
 
 
 def base_detalhe(db, item):
-    """Composição da base de um item de comissão de PAPEL: [{nome, valor}] dos ambientes atribuídos."""
+    """Composição da base de um item de PAPEL: [{nome, valor}] = fatia LÍQUIDA de cada ambiente atribuído
+    (valor_liquido do projeto × preço-venda do ambiente ÷ preço-venda total)."""
     if item.origem != "papel" or not item.projeto_nome or not item.papel:
         return []
     pools = _ambientes_da_base(db, item.projeto_nome, item.papel, item.funcionario_id)
-    return [{"nome": p.nome_exibicao, "valor": round(p.order_total or 0.0, 2)} for p in pools]
+    if not pools:
+        return []
+    net, bruto = _liq_e_bruto(db, item.projeto_nome)
+    if bruto <= 0:
+        return [{"nome": p.nome_exibicao, "valor": 0.0} for p in pools]
+    return [{"nome": p.nome_exibicao, "valor": round(net * (p.budget_total or 0.0) / bruto, 2)} for p in pools]
 
 
 def _pct_funcao(funcao, base):
