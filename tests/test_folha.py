@@ -53,6 +53,24 @@ def test_calcular_folha_consultor_fixa_mais_variavel(seed, app_db):
     db.close()
 
 
+def test_calcular_folha_funcao_com_base_liquido_nao_estoura(seed, app_db):
+    # Regressão: comissao_json.base guarda o TIPO ("liquido"/"fabrica"), não um número —
+    # float(com["base"]) estourava "could not convert string to float: 'liquido'" ao gerar folha.
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
+    fn = app_db.Funcao(loja_id=loja, nome="ComBaseLiquido", salario_fixo=1500.0, usa_comissao_vendas=0,
+                       comissao_json=json.dumps({"por_meta": False, "base": "liquido", "pct": 2.0}),
+                       status="ativo")
+    db.add(fn); db.flush()
+    f = app_db.Funcionario(loja_id=loja, nome="X", funcao_id=fn.id, status="ativo"); db.add(f); db.commit()
+    c = mod_folha.calcular_folha(db, loja, f, "2026-07", _cfg_pct(0.0))
+    assert c["parte_fixa"] == 1500.0
+    assert c["base_comissao"] == 0.0     # base numérica inicia 0 (editável), não o tipo
+    assert c["parte_variavel"] == 0.0
+    assert c["total"] == 1500.0
+    db.close()
+
+
 def test_calcular_folha_soma_beneficios_da_funcao(seed, app_db):
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id

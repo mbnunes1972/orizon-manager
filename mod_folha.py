@@ -86,7 +86,9 @@ def calcular_folha(db, loja_id, funcionario, competencia, cfg, base_override=Non
             com = json.loads(funcao.comissao_json)
         except (ValueError, TypeError):
             com = {}
-        base = float(com.get("base") or 0.0) if base_override is None else float(base_override)
+        # com["base"] é o TIPO da base ("liquido"/"fabrica"), não um número. A base numérica da
+        # comissão de função não-consultor é editável (inicia 0) ou definida por item (Fase 4).
+        base = 0.0 if base_override is None else float(base_override)
         pct = _resolver_pct_funcao(com, base)
     variavel = round(base * pct / 100.0, 2)
     return {"parte_fixa": round(fixa, 2), "vendas_liq": round(vendas_liq, 2),
