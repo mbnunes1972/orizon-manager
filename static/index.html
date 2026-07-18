@@ -13721,7 +13721,7 @@ async function salvarDataEntrega(){
     const fm = (j.folga_min!=null) ? (j.folga_min+'d') : '—';
     if(j.requer_autorizacao){
       // folga negativa e ainda SEM autorização → oferece override gerencial (modal com senha mascarada)
-      let msg = '&#x26A0; Não cabe (folga '+fm+'). ';
+      let msg = '&#x26A0; Não cabe (folga '+fm+') — não salvo. ';
       if(_podeAutorizarFront && _podeAutorizarFront()){
         msg += '<button class="btn-ciclo" style="font-size:var(--fs-xs);border-color:var(--cancel);color:var(--cancel)" onclick="abrirModalAutorizaEntrega()">Registrar com autorização</button>';
       } else {
@@ -13745,7 +13745,13 @@ function abrirModalAutorizaEntrega(){
   document.getElementById('modal-autoriza-entrega').style.display = 'flex';
   setTimeout(()=>document.getElementById('ae-senha').focus(), 60);
 }
-function fecharModalAutorizaEntrega(){ document.getElementById('modal-autoriza-entrega').style.display = 'none'; }
+function fecharModalAutorizaEntrega(){
+  document.getElementById('modal-autoriza-entrega').style.display = 'none';
+  // Autorização NÃO concluída → recarrega o card no estado realmente SALVO. Evita exibir uma data que
+  // não foi gravada (o que iludiria na hora de assinar); o que estava digitado e não passou é descartado.
+  showToast('Autorização não concluída — a data de entrega em vigor não foi alterada.', false);
+  carregarDadosContrato();
+}
 async function salvarModalAutorizaEntrega(){
   const st = document.getElementById('ae-erro');
   const login = document.getElementById('ae-login').value.trim();
@@ -13762,7 +13768,7 @@ async function salvarModalAutorizaEntrega(){
         body: JSON.stringify({ data_entrega:data, previsao_medicao:med, venda_programada:prog, login, senha }) }).then(r=>r.json());
   } catch(e){ st.textContent = 'Erro de rede.'; st.style.color = 'var(--err)'; return; }
   if(!j || !j.ok){ st.textContent = esc((j && j.erro) || 'Falha'); st.style.color = 'var(--err)'; return; }
-  fecharModalAutorizaEntrega();
+  document.getElementById('modal-autoriza-entrega').style.display = 'none';   // sucesso: esconde SEM reverter
   const res = document.getElementById('ct-entrega-result');
   const fm = (j.folga_min!=null) ? (j.folga_min+'d') : '—';
   if(res){ res.innerHTML = '&#x2713; Registrado com autorização (não cabe — folga '+fm+').'; res.style.color = 'var(--warn)'; }
