@@ -173,6 +173,24 @@ def test_normalizar_cronograma_formato_sem_cronograma_nao_inventa():
     assert "cronograma_padrao" not in out
 
 
+def test_normalizar_cronograma_formato_valor_invalido_nao_quebra():
+    # config real de loja pode vir malformada (None/"" no meio da lista) → não pode dar 500 no read
+    legado = {"cronograma_padrao": [
+        {"codigo": "8", "prazo_dias": 2}, {"codigo": "9", "prazo_dias": None},
+        {"codigo": "10", "prazo_dias": ""}, {"codigo": "11", "prazo_dias": 10},
+    ]}
+    out = mod_provisoes.normalizar_cronograma_formato(legado)
+    for f in out["cronograma_padrao"]:
+        assert isinstance(f["prazo_dias"], int) and f["prazo_dias"] >= 0
+    assert out["cronograma_formato"] == 2
+
+
+def test_normalizar_cronograma_formato_lista_vazia():
+    out = mod_provisoes.normalizar_cronograma_formato({"cronograma_padrao": []})
+    assert out["cronograma_padrao"] == []
+    assert out["cronograma_formato"] == 2
+
+
 def test_gerar_cronograma_idempotente_e_preserva_conclusao(app_db):
     db = app_db.get_session()
     d0 = datetime(2026, 7, 1)

@@ -52,18 +52,21 @@ def config_financeira_default():
 
 def normalizar_cronograma_formato(cfg):
     """Converte o cronograma_padrao do formato-legado ACUMULADO (dias desde D0) para DURAÇÕES por etapa,
-    idempotente via a chave 'cronograma_formato' (ausente/1 = acumulado → converte; 2 = durações → mantém).
-    Não inventa cronograma_padrao se a chave não existe (o merge com o default é quem preenche). Muta e
-    retorna o próprio cfg."""
+    idempotente via a chave 'cronograma_formato' (ausente/0/1 = acumulado → converte; >=2 = durações →
+    mantém). Não inventa cronograma_padrao se a chave não existe (o merge com o default é quem preenche).
+    Parsing defensivo via _f() (config de loja pode vir malformada do banco): valor não-numérico não
+    lança exceção, vira 0. PRECONDIÇÃO: espera cronograma_padrao em ordem ACUMULADA CRESCENTE, como o
+    formato-legado sempre foi por construção (2, 5, 10, ..., 70); fora dessa ordem as durações resultantes
+    são clampadas a 0 em vez de negativas, mas não fazem sentido semântico. Muta e retorna o próprio cfg."""
     cfg = cfg or {}
     if "cronograma_padrao" not in cfg:
         return cfg
-    if int(cfg.get("cronograma_formato") or 1) >= 2:
+    if int(_f(cfg.get("cronograma_formato"))) >= 2:
         return cfg
     prev = 0
     novas = []
     for it in (cfg.get("cronograma_padrao") or []):
-        acc = int((it or {}).get("prazo_dias") or 0)
+        acc = int(_f((it or {}).get("prazo_dias")))
         nova = dict(it or {})
         nova["prazo_dias"] = max(0, acc - prev)
         prev = acc
