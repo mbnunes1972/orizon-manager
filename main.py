@@ -2365,7 +2365,8 @@ class Handler(BaseHTTPRequestHandler):
                     if _err:
                         self.send_json({"ok": False, "erro": _err}, code=403)
                         return
-                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                    _meta = _projeto_da_loja(db, nome_safe, loja_id)
+                    if _meta is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
                     contrato = db.query(Contrato)\
@@ -2390,7 +2391,6 @@ class Handler(BaseHTTPRequestHandler):
                     _desatualizado = _mod_contrato.contrato_desatualizado(
                         contrato.pagamento_json,
                         _orc_src.forma_pagamento if _orc_src else None)
-                    _proj_meta = db.get(Projeto, nome_safe)
                     self.send_json({"ok": True, "contrato": {
                         "id":                   contrato.id,
                         "status":               contrato.status,
@@ -2402,7 +2402,7 @@ class Handler(BaseHTTPRequestHandler):
                         "assinaturas":          assinaturas,
                         "desatualizado":        _desatualizado,
                         "orcamento_id":         contrato.orcamento_id,
-                        "data_entrega":         _proj_meta.data_entrega.isoformat() if (_proj_meta and _proj_meta.data_entrega) else None,
+                        "data_entrega":         _meta.data_entrega.isoformat() if (_meta and _meta.data_entrega) else None,
                     }})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
