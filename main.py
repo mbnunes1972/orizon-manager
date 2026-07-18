@@ -2461,6 +2461,7 @@ class Handler(BaseHTTPRequestHandler):
                         "orcamento_id":         contrato.orcamento_id,
                         "data_entrega":         _meta.data_entrega.isoformat() if (_meta and _meta.data_entrega) else None,
                         "previsao_medicao":     _meta.previsao_medicao.isoformat() if (_meta and _meta.previsao_medicao) else None,
+                        "venda_programada":     bool(_meta.venda_programada) if _meta else False,
                     }})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)

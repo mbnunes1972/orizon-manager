@@ -95,3 +95,14 @@ def test_data_entrega_sem_folga_credenciais_invalidas_403(http_client_factory, s
                    {"data_entrega": "2026-08-05", "previsao_medicao": "2026-08-01",
                     "login": "dir_l1", "senha": "ERRADA"})
     assert st == 403 and "credenciais" in (d.get("erro", "").lower()), (st, d)
+
+
+def test_venda_programada_volta_no_contrato(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    proj = seed["projeto_l1"]
+    st, d = c.post("/api/projetos/%s/data-entrega" % proj,
+                   {"data_entrega": "2028-01-01", "previsao_medicao": "2027-06-01", "venda_programada": True})
+    assert st == 200 and d["ok"], (st, d)
+    st2, d2 = c.get("/api/projetos/%s/contrato" % proj)
+    assert st2 == 200 and d2["contrato"] is not None, (st2, d2)
+    assert d2["contrato"].get("venda_programada") is True, d2["contrato"]
