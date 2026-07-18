@@ -53,6 +53,50 @@ def test_calcular_folha_consultor_fixa_mais_variavel(seed, app_db):
     db.close()
 
 
+def test_aprovacao_gate_e_gerar_preserva_aprovada(seed, app_db):
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
+    fn = app_db.Funcao(loja_id=loja, nome="Fx", salario_fixo=1000.0, usa_comissao_vendas=0, status="ativo")
+    db.add(fn); db.flush()
+    f = app_db.Funcionario(loja_id=loja, nome="A", funcao_id=fn.id, status="ativo"); db.add(f); db.commit()
+    mod_folha.gerar_folha(db, loja, "2026-07", _cfg_pct(0.0)); db.commit()
+    reg = db.query(app_db.FolhaPagamento).filter_by(funcionario_id=f.id, competencia="2026-07").first()
+    assert reg.status == "aberta"
+    # pagar antes de aprovar é bloqueado
+    ok, err = mod_folha.pagar(db, "loja", 1, reg)
+    assert ok is False and "aprov" in (err or "").lower()
+    # aprovar libera o pagamento
+    ok2, _ = mod_folha.aprovar(db, reg); db.commit()
+    assert ok2 and reg.status == "aprovada"
+    # gerar de novo NÃO sobrescreve a aprovada
+    mod_folha.gerar_folha(db, loja, "2026-07", _cfg_pct(0.0)); db.commit()
+    db.refresh(reg); assert reg.status == "aprovada"
+    # reabrir volta para aberta
+    ok3, _ = mod_folha.reabrir(db, reg); db.commit()
+    assert ok3 and reg.status == "aberta"
+    db.close()
+
+
+def test_folha_endpoints_aprovar_e_pagar(http_client_factory, seed, app_db):
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l1").first().loja_id
+    fn = app_db.Funcao(loja_id=loja, nome="FxE", salario_fixo=1500.0, usa_comissao_vendas=0, status="ativo")
+    db.add(fn); db.flush()
+    db.add(app_db.Funcionario(loja_id=loja, nome="AprovE", funcao_id=fn.id, status="ativo"))
+    db.commit(); db.close()
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    c.post("/api/folha/gerar", {"competencia": "2026-07"})
+    st, d = c.get("/api/folha?competencia=2026-07")
+    reg = next(x for x in d["folha"]["itens"] if x["funcionario"] == "AprovE")
+    fid = reg["id"]
+    sp, dp = c.post("/api/folha/%d/pagar" % fid, {})   # antes de aprovar → erro
+    assert dp.get("ok") is False
+    sa, da = c.post("/api/folha/%d/aprovar" % fid, {})
+    assert sa == 200 and da["status"] == "aprovada"
+    sp2, dp2 = c.post("/api/folha/%d/pagar" % fid, {})
+    assert sp2 == 200 and dp2["ok"] is True
+
+
 def test_calcular_folha_funcao_com_base_liquido_nao_estoura(seed, app_db):
     # Regressão: comissao_json.base guarda o TIPO ("liquido"/"fabrica"), não um número —
     # float(com["base"]) estourava "could not convert string to float: 'liquido'" ao gerar folha.
@@ -136,7 +180,7 @@ def test_pagar_posta_nas_contas_5_3(app_db):
     db.add(f); db.flush()
     reg = app_db.FolhaPagamento(loja_id=loja.id, funcionario_id=f.id, competencia="2026-07",
                                 parte_fixa=2000.0, parte_variavel=300.0, beneficios=700.0,
-                                total=3000.0, status="aberta")
+                                total=3000.0, status="aprovada")
     db.add(reg); db.flush()
     mod_folha.pagar(db, "loja", 91, reg)
 

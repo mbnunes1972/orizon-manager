@@ -3223,6 +3223,33 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        # ── Folha: aprovar (aberta→aprovada) / reabrir (aprovada→aberta) ─────────────────
+        m = re.match(r'^/api/folha/(\d+)/(aprovar|reabrir)$', path)
+        if m:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                reg = db.query(FolhaPagamento).filter_by(id=int(m.group(1)), loja_id=loja_id).first()
+                if reg is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                ok, err = (mod_folha.aprovar(db, reg) if m.group(2) == "aprovar"
+                           else mod_folha.reabrir(db, reg))
+                if not ok:
+                    self.send_json({"ok": False, "erro": err}, code=409); return
+                db.commit()
+                self.send_json({"ok": True, "status": reg.status})
+            except Exception as e:
+                db.rollback(); self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
         m = re.match(r'^/api/folha/(\d+)/pagar$', path)
         if m:
             usuario = get_usuario_sessao(self)

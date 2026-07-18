@@ -86,7 +86,7 @@ def test_pagar_quita_adiantamentos_da_competencia(seed, app_db):
     ad = app_db.AdiantamentoFuncionario(loja_id=loja, funcionario_id=f.id, tipo="adiantamento",
          competencia="2026-07", valor=300.0, abater=1, competencia_abate="2026-07", quitado=0)
     reg = app_db.FolhaPagamento(loja_id=loja, funcionario_id=f.id, competencia="2026-07",
-         parte_fixa=1000.0, total=1000.0, status="aberta")
+         parte_fixa=1000.0, total=1000.0, status="aprovada")
     db.add(ad); db.add(reg); db.flush()
     mod_folha.pagar(db, "loja", 99, reg)
     assert reg.status == "paga"

@@ -98,10 +98,10 @@ def calcular_folha(db, loja_id, funcionario, competencia, cfg, base_override=Non
 
 
 def editar_base(db, loja_id, reg, base, cfg):
-    """Reedita a base da comissão de um registro de folha (status != 'paga') e recalcula
-    faixa_pct/parte_variavel/total. Parte fixa e benefícios vêm da Função. Retorna (ok, erro)."""
-    if reg.status == "paga":
-        return False, "folha já paga"
+    """Reedita a base da comissão de um registro de folha ABERTA e recalcula faixa_pct/parte_variavel/
+    total. Parte fixa e benefícios vêm da Função. Retorna (ok, erro)."""
+    if reg.status != "aberta":
+        return False, "folha " + (reg.status or "") + " — reabra para editar"
     f = db.get(Funcionario, reg.funcionario_id)
     c = calcular_folha(db, loja_id, f, reg.competencia, cfg, base_override=base)
     reg.parte_fixa = c["parte_fixa"]; reg.base_comissao = c["base_comissao"]
@@ -150,7 +150,7 @@ def gerar_folha(db, loja_id, competencia, cfg):
         if reg is None:
             reg = FolhaPagamento(loja_id=loja_id, funcionario_id=f.id, competencia=competencia)
             db.add(reg)
-        if reg.status == "paga":
+        if reg.status in ("paga", "aprovada"):   # não sobrescreve folha aprovada/paga (preserva ajustes)
             out.append(reg); continue
         _upsert_item_venda(db, loja_id, f, competencia, cfg)
         folha_cfg = (cfg or {}).get("folha", {}) or {}
@@ -170,11 +170,29 @@ def gerar_folha(db, loja_id, competencia, cfg):
     return out
 
 
+def aprovar(db, reg):
+    """Aprova a folha (aberta → aprovada) — trava edições e libera o pagamento. Retorna (ok, erro)."""
+    if reg.status == "paga":
+        return False, "folha já paga"
+    reg.status = "aprovada"; db.flush()
+    return True, None
+
+
+def reabrir(db, reg):
+    """Reabre a folha (aprovada → aberta) para novos ajustes. Retorna (ok, erro)."""
+    if reg.status == "paga":
+        return False, "folha já paga — não pode reabrir"
+    reg.status = "aberta"; db.flush()
+    return True, None
+
+
 def pagar(db, owner_tipo, owner_id, reg):
-    """Paga a folha: posta a despesa (fixa→5.3.06, variável→5.3.01) e marca 'paga'. Idempotente por ref.
-    Usa os Dados Bancários/PIX já cadastrados (nada redigitado). Retorna (ok, erro)."""
+    """Paga a folha APROVADA: posta a despesa (fixa→5.3.06, variável→5.3.01) e marca 'paga'. Idempotente
+    por ref. Usa os Dados Bancários/PIX já cadastrados (nada redigitado). Retorna (ok, erro)."""
     if reg.status == "paga":
         return True, None
+    if reg.status != "aprovada":
+        return False, "folha precisa ser aprovada antes do pagamento"
     ref = "folha:%d" % reg.id
     if (reg.parte_fixa or 0) > 0:
         mod_contabil.registrar_evento(db, owner_tipo, owner_id, "folha_fixa", reg.parte_fixa, ref=ref + ":fixa")

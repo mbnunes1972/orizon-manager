@@ -10034,13 +10034,27 @@ async function folhaPagar(id){
   if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
   showToast('Folha paga.', false); folhaCarregar();
 }
+async function folhaAprovar(id){
+  const d = await (await fetch('/api/folha/'+id+'/aprovar',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'})).json().catch(()=>({}));
+  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+  showToast('Folha aprovada.', false); folhaMesCarregar();
+}
+async function folhaReabrir(id){
+  const d = await (await fetch('/api/folha/'+id+'/reabrir',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:'{}'})).json().catch(()=>({}));
+  if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
+  showToast('Folha reaberta para ajustes.', false); folhaMesCarregar();
+}
 function folhaRender(folha){
   const box = document.getElementById('folha-mes-box'); if(!box) return;
   folha = folha || {itens:[]};
   const linhas = (folha.itens||[]).map(it => {
     const acao = it.status==='paga'
       ? '<span style="color:var(--st-fechado);font-size:11px;font-weight:600">Paga</span>'
-      : '<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="folhaPagar('+it.id+')">Pagar</button>';
+      : (it.status==='aprovada'
+          ? '<div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">'
+            +'<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="folhaReabrir('+it.id+')">Reabrir</button>'
+            +'<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="folhaPagar('+it.id+')">Pagar</button></div>'
+          : '<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="folhaAprovar('+it.id+')">Aprovar</button>');
     const comItens = it.comissoes||[];
     const comCel = comItens.length
       ? comItens.map(cm => {
