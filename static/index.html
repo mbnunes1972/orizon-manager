@@ -1944,6 +1944,26 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     </div>
   </div>
 
+  <!-- Modal: autorização gerencial para registrar data de entrega SEM folga (Fatia 2) -->
+  <div id="modal-autoriza-entrega" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:26px;max-width:400px;width:92%;animation:mIn .18s ease">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-family:var(--font-display);font-weight:900;font-size:15px">Registrar data sem folga</div>
+        <span onclick="fecharModalAutorizaEntrega()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px">A data informada não cabe no cronograma (folga negativa). Registrar mesmo assim exige reautenticação de Gerente/Diretor e fica na auditoria (quem, quando, folga).</div>
+      <label style="font-size:var(--fs-sm);color:var(--muted)">Login do autorizador</label>
+      <input type="text" id="ae-login" style="width:100%;box-sizing:border-box;margin-bottom:10px">
+      <label style="font-size:var(--fs-sm);color:var(--muted)">Confirme a senha</label>
+      <input type="password" id="ae-senha" onkeydown="if(event.key==='Enter')salvarModalAutorizaEntrega()" style="width:100%;box-sizing:border-box">
+      <div id="ae-erro" style="font-size:11px;min-height:16px;margin:8px 0"></div>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-sm" onclick="fecharModalAutorizaEntrega()" style="flex:1;justify-content:center">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="salvarModalAutorizaEntrega()" style="flex:1;justify-content:center">Autorizar e registrar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Mapa de Atribuições (Regras_Funcoes_Perfis_Atribuicoes §4) — só Gerência+/Supervisor -->
   <div id="modal-mapa" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:24px;max-width:820px;width:94%;max-height:90vh;overflow:auto;animation:mIn .18s ease">
@@ -13684,7 +13704,7 @@ async function carregarDadosContrato() {
 }
 
 // Passo 2 (cronograma): define/valida a data de entrega no card do Contrato → mostra a folga.
-async function salvarDataEntrega(autorizacao){
+async function salvarDataEntrega(){
   if(!projetoAtivo) return;
   const data  = (document.getElementById('ct-data-entrega')||{}).value || '';
   const med   = (document.getElementById('ct-previsao-medicao')||{}).value || '';
@@ -13693,19 +13713,17 @@ async function salvarDataEntrega(autorizacao){
   const setRes = (txt, cor) => { if(res){ res.innerHTML = txt; res.style.color = cor; } };
   if(!med){ setRes('Informe a previsão de medição.', 'var(--err)'); return; }
   if(!data){ setRes('Informe a expectativa de entrega.', 'var(--err)'); return; }
-  const payload = { data_entrega: data, previsao_medicao: med, venda_programada: prog };
-  if(autorizacao){ payload.login = autorizacao.login; payload.senha = autorizacao.senha; }
   try {
     const j = await fetch('/api/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/data-entrega',
       { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(payload) }).then(r=>r.json());
+        body: JSON.stringify({ data_entrega: data, previsao_medicao: med, venda_programada: prog }) }).then(r=>r.json());
     if(!j.ok){ setRes(esc(j.erro||'Erro'), 'var(--err)'); return; }
     const fm = (j.folga_min!=null) ? (j.folga_min+'d') : '—';
     if(j.requer_autorizacao){
-      // folga negativa e ainda SEM autorização → oferece override (Gerente+)
+      // folga negativa e ainda SEM autorização → oferece override gerencial (modal com senha mascarada)
       let msg = '&#x26A0; Não cabe (folga '+fm+'). ';
       if(_podeAutorizarFront && _podeAutorizarFront()){
-        msg += '<button class="btn-ciclo" style="font-size:var(--fs-xs);border-color:var(--cancel);color:var(--cancel)" onclick="autorizarDataEntrega()">Registrar com autorização</button>';
+        msg += '<button class="btn-ciclo" style="font-size:var(--fs-xs);border-color:var(--cancel);color:var(--cancel)" onclick="abrirModalAutorizaEntrega()">Registrar com autorização</button>';
       } else {
         msg += 'Requer autorização de Gerente/Diretor.';
       }
@@ -13718,10 +13736,36 @@ async function salvarDataEntrega(autorizacao){
   } catch(e){ setRes('Erro de rede.', 'var(--err)'); }
 }
 
-function autorizarDataEntrega(){
-  const login = prompt('Login do autorizador (Gerente/Diretor):'); if(!login) return;
-  const senha = prompt('Senha:'); if(!senha) return;
-  salvarDataEntrega({ login: login.trim(), senha: senha.trim() });
+// Override gerencial da folga negativa — modal com senha mascarada (mesmo padrão do modal-crono),
+// no lugar do prompt() nativo. Reusa os campos do card + reautentica Gerente+ (o backend valida e audita).
+function abrirModalAutorizaEntrega(){
+  document.getElementById('ae-login').value = (_usuarioAtual && _usuarioAtual.login) || '';
+  document.getElementById('ae-senha').value = '';
+  document.getElementById('ae-erro').textContent = '';
+  document.getElementById('modal-autoriza-entrega').style.display = 'flex';
+  setTimeout(()=>document.getElementById('ae-senha').focus(), 60);
+}
+function fecharModalAutorizaEntrega(){ document.getElementById('modal-autoriza-entrega').style.display = 'none'; }
+async function salvarModalAutorizaEntrega(){
+  const st = document.getElementById('ae-erro');
+  const login = document.getElementById('ae-login').value.trim();
+  const senha = document.getElementById('ae-senha').value;
+  if(!senha){ st.textContent = 'Confirme a senha para autorizar.'; st.style.color = 'var(--err)'; return; }
+  const data = (document.getElementById('ct-data-entrega')||{}).value || '';
+  const med  = (document.getElementById('ct-previsao-medicao')||{}).value || '';
+  const prog = !!(document.getElementById('ct-venda-programada')||{}).checked;
+  st.textContent = 'Autorizando…'; st.style.color = 'var(--muted)';
+  let j;
+  try {
+    j = await fetch('/api/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/data-entrega',
+      { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ data_entrega:data, previsao_medicao:med, venda_programada:prog, login, senha }) }).then(r=>r.json());
+  } catch(e){ st.textContent = 'Erro de rede.'; st.style.color = 'var(--err)'; return; }
+  if(!j || !j.ok){ st.textContent = esc((j && j.erro) || 'Falha'); st.style.color = 'var(--err)'; return; }
+  fecharModalAutorizaEntrega();
+  const res = document.getElementById('ct-entrega-result');
+  const fm = (j.folga_min!=null) ? (j.folga_min+'d') : '—';
+  if(res){ res.innerHTML = '&#x2713; Registrado com autorização (não cabe — folga '+fm+').'; res.style.color = 'var(--warn)'; }
 }
 
 function renderContratoUI(contrato) {
