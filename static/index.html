@@ -14368,7 +14368,18 @@ async function coletarSignatarioOverride() {
   });
 }
 
-function abrirModalAssinatura(parte) {
+async function abrirModalAssinatura(parte) {
+  // Gate (Fatia 2): não abre a assinatura sem as datas do acordo definidas (previsão de medição +
+  // expectativa de entrega). O backend também bloqueia a POST; aqui evita abrir a tela à toa.
+  try {
+    const cj = await fetch('/api/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/contrato',
+                           { credentials:'same-origin' }).then(r=>r.json());
+    const ct = (cj && cj.contrato) || {};
+    if(!ct.data_entrega || !ct.previsao_medicao){
+      showToast('Defina a previsão de medição e a expectativa de entrega (card "Datas do acordo") antes de assinar.', true);
+      return;
+    }
+  } catch(e){ /* se a checagem falhar, o backend ainda bloqueia a assinatura */ }
   const overlay = document.createElement('div');
   overlay.id = 'modal-assinatura-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center';

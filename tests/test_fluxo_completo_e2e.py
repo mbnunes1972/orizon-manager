@@ -248,17 +248,17 @@ def test_contrato_real_geracao_e_assinatura(app_db, seed, projetos_dir, contrato
     st, _ = c.get("/api/projetos/%s/contrato/pdf" % nome)
     assert st == 200
 
+    # (cronograma/Fatia 2) as datas do acordo (previsão de medição + expectativa de entrega) precisam
+    # estar definidas ANTES de qualquer assinatura — a trava vale desde a 1ª. Folgadas o bastante pra caber.
+    st, d = c.post("/api/projetos/%s/data-entrega" % nome,
+                   {"data_entrega": "2028-01-01", "previsao_medicao": "2027-06-01"})
+    assert st == 200 and d["ok"], (st, d)
+
     # 5) ASSINATURA — loja
     st, b = c.post("/api/projetos/%s/contrato/assinar" % nome,
                    {"parte": "loja", "nome": "Gerente Loja 1", "cpf": "111.111.111-11"})
     assert st == 200 and b["ok"], b
     assert b["status"] == "assinado_loja"
-
-    # (cronograma) a assinatura que COMPLETA o contrato exige a data de entrega esperada definida
-    # (Fatia 2: agora também exige a previsão de medição, folgada o bastante pra caber).
-    st, d = c.post("/api/projetos/%s/data-entrega" % nome,
-                   {"data_entrega": "2028-01-01", "previsao_medicao": "2027-06-01"})
-    assert st == 200 and d["ok"], (st, d)
 
     # 6) ASSINATURA — cliente → 'assinado'
     st, b = c.post("/api/projetos/%s/contrato/assinar" % nome,

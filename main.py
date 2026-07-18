@@ -6335,26 +6335,22 @@ class Handler(BaseHTTPRequestHandler):
                     if ja_assinou:
                         self.send_json({"ok": False, "erro": f"Parte '{parte}' já assinou"}, code=400)
                         return
-                    # Guard (cronograma): a assinatura que COMPLETA o contrato (loja+cliente) exige a data
-                    # de entrega esperada do cliente já definida (âncora do cronograma regressivo).
-                    _completaria = {"loja", "cliente"}.issubset(
-                        {a.parte for a in contrato.assinaturas} | {parte})
-                    if _completaria:
-                        _pm = db.get(Projeto, nome_safe)
-                        if _pm is None or _pm.data_entrega is None or _pm.previsao_medicao is None:
-                            self.send_json({"ok": False,
-                                "erro": "Defina a data de entrega esperada E a previsão de medição antes de finalizar a assinatura."}, code=400)
-                            return
-                        # Reforço (Fatia 2): a data SALVA ainda precisa CABER na folga, OU ter sido autorizada
-                        # (folga_autorizada). Pega o caso de a config do cronograma mudar depois de salvar.
-                        import mod_cronograma as _mcr_sig
-                        _folga_sig = _mcr_sig.folga_medicao_entrega(
-                            _cfg_financeira_loja(db, loja_id), _pm.previsao_medicao, _pm.data_entrega)
-                        if _folga_sig < 0 and not _pm.folga_autorizada:
-                            self.send_json({"ok": False,
-                                "erro": "A data de entrega não cabe no cronograma (folga negativa) e não foi autorizada. "
-                                        "Ajuste a data ou registre com autorização gerencial antes de assinar."}, code=400)
-                            return
+                    # Gate (Fatia 2): QUALQUER assinatura — já a 1ª — exige as datas do acordo definidas e a
+                    # data de entrega cabendo na folga (ou autorizada sob gerência). Antes só travava a
+                    # assinatura que COMPLETAVA o contrato (loja+cliente); agora bloqueia desde a primeira.
+                    _pm = db.get(Projeto, nome_safe)
+                    if _pm is None or _pm.data_entrega is None or _pm.previsao_medicao is None:
+                        self.send_json({"ok": False,
+                            "erro": "Defina a data de entrega esperada E a previsão de medição antes de assinar."}, code=400)
+                        return
+                    import mod_cronograma as _mcr_sig
+                    _folga_sig = _mcr_sig.folga_medicao_entrega(
+                        _cfg_financeira_loja(db, loja_id), _pm.previsao_medicao, _pm.data_entrega)
+                    if _folga_sig < 0 and not _pm.folga_autorizada:
+                        self.send_json({"ok": False,
+                            "erro": "A data de entrega não cabe no cronograma (folga negativa) e não foi autorizada. "
+                                    "Ajuste a data ou registre com autorização gerencial antes de assinar."}, code=400)
+                        return
                     timestamp = datetime.utcnow().isoformat()
                     ip        = self.client_address[0] if self.client_address else ""
                     hash_sig  = calcular_hash_assinatura(nome, cpf, contrato.id, timestamp)

@@ -107,3 +107,18 @@ def test_assinatura_permite_folga_negativa_autorizada(app_db, seed, http_client_
     st, d = c.post("/api/projetos/%s/contrato/assinar" % nome,
                    {"parte": "cliente", "nome": "Cliente", "cpf": "11111111111"})
     assert st == 200 and d.get("ok"), (st, d)
+
+
+def test_assinatura_primeira_exige_datas(app_db, seed, http_client_factory):
+    """A trava vale desde a PRIMEIRA assinatura (loja), não só na que completa o contrato."""
+    from database import Projeto, Contrato, ContratoAssinatura
+    nome = seed["projeto_l1"]; cid = seed["contrato_l1_id"]
+    db = app_db.get_session()
+    p = db.get(Projeto, nome); p.data_entrega = None; p.previsao_medicao = None
+    ct = db.get(Contrato, cid); ct.status = "para_assinatura"
+    db.query(ContratoAssinatura).filter_by(contrato_id=cid).delete()   # sem assinaturas ainda
+    db.commit(); db.close()
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/projetos/%s/contrato/assinar" % nome,
+                   {"parte": "loja", "nome": "Loja", "cpf": "00000000000"})
+    assert st == 400 and "entrega" in (d.get("erro", "").lower()), (st, d)
