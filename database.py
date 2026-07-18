@@ -1756,6 +1756,17 @@ def _migrar_colunas_pg():
         "ALTER TABLE folha_pagamento ADD COLUMN IF NOT EXISTS comissao_fixa DOUBLE PRECISION",
         "ALTER TABLE folha_pagamento ADD COLUMN IF NOT EXISTS base_comissao DOUBLE PRECISION",
         "ALTER TABLE folha_pagamento ADD COLUMN IF NOT EXISTS beneficios DOUBLE PRECISION",
+        # projetos_meta: âncoras do cronograma (v11) + equipe + Fatia 2 (medição / venda programada).
+        # Um Postgres criado antes destas colunas não as ganha por create_all() — precisa deste ADD.
+        "ALTER TABLE projetos_meta ADD COLUMN IF NOT EXISTS data_entrega TIMESTAMP",
+        "ALTER TABLE projetos_meta ADD COLUMN IF NOT EXISTS data_inicio TIMESTAMP",
+        "ALTER TABLE projetos_meta ADD COLUMN IF NOT EXISTS equipe_json TEXT",
+        "ALTER TABLE projetos_meta ADD COLUMN IF NOT EXISTS previsao_medicao TIMESTAMP",
+        "ALTER TABLE projetos_meta ADD COLUMN IF NOT EXISTS venda_programada INTEGER DEFAULT 0",
+        # ciclo_etapas: data prevista + responsável por função (v11/v12).
+        "ALTER TABLE ciclo_etapas ADD COLUMN IF NOT EXISTS data_prevista_conclusao TIMESTAMP",
+        "ALTER TABLE ciclo_etapas ADD COLUMN IF NOT EXISTS funcao_responsavel_id INTEGER",
+        "ALTER TABLE ciclo_etapas ADD COLUMN IF NOT EXISTS responsavel_funcionario_id INTEGER",
     ]
     with ENGINE.begin() as conn:
         for s in stmts:
