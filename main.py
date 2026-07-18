@@ -6340,9 +6340,9 @@ class Handler(BaseHTTPRequestHandler):
                         {a.parte for a in contrato.assinaturas} | {parte})
                     if _completaria:
                         _pm = db.get(Projeto, nome_safe)
-                        if _pm is None or _pm.data_entrega is None:
+                        if _pm is None or _pm.data_entrega is None or _pm.previsao_medicao is None:
                             self.send_json({"ok": False,
-                                "erro": "Defina a data de entrega esperada do cliente antes de finalizar a assinatura."}, code=400)
+                                "erro": "Defina a data de entrega esperada E a previsão de medição antes de finalizar a assinatura."}, code=400)
                             return
                     timestamp = datetime.utcnow().isoformat()
                     ip        = self.client_address[0] if self.client_address else ""

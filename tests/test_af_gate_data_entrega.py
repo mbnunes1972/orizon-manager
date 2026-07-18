@@ -58,3 +58,19 @@ def test_af_fecha_com_data_e_contrato_assinado(app_db, seed, http_client_factory
     st, d = _patch_af(c, nome)
     assert st == 200 and d["ok"], (st, d)
     assert d["status"] == "concluido"
+
+
+def test_assinatura_exige_previsao_medicao(app_db, seed, http_client_factory):
+    from database import Projeto, Contrato, ContratoAssinatura
+    nome = seed["projeto_l1"]; cid = seed["contrato_l1_id"]
+    db = app_db.get_session()
+    db.get(Projeto, nome).data_entrega = datetime(2028, 1, 1)
+    db.get(Projeto, nome).previsao_medicao = None                 # falta a medição
+    ct = db.get(Contrato, cid); ct.status = "assinado_loja"
+    db.add(ContratoAssinatura(contrato_id=cid, parte="loja", nome="L", cpf="00000000000",
+                              assinado_em=datetime.utcnow(), hash_sha256="x" * 64))
+    db.commit(); db.close()
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/projetos/%s/contrato/assinar" % nome,
+                   {"parte": "cliente", "nome": "Cliente", "cpf": "11111111111"})
+    assert st == 400 and "medição" in (d.get("erro", "").lower()), (st, d)
