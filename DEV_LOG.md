@@ -1339,7 +1339,21 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
-## ⏸️ ESTADO ATUAL (2026-07-17) — retomar aqui
+## ⏸️ ESTADO ATUAL (2026-07-18) — retomar aqui
+
+> **Frente A+B — Fatia 2 na branch `feat/fatia2-datas-assinatura`, suíte 1285 verde, NÃO mergeada.** Datas do
+> acordo (previsão de medição + expectativa de entrega) agora obrigatórias na assinatura; folga do trecho
+> medição→entrega (`mod_cronograma.folga_medicao_entrega`); bloqueio de folga<0 com override gerencial auditado;
+> trava da 2ª assinatura pelas duas datas; UI de entrada no card (medição + entrega + checkbox venda programada +
+> fluxo de override). `Projeto` ganhou `previsao_medicao`/`venda_programada`. Ver `## Sessão 84`. Plano:
+> `docs/superpowers/plans/2026-07-18-fatia2-datas-assinatura-enforcement.md`. **PENDENTE:** verificação manual no
+> navegador + merge/push + re-ingerir MCP; depois Fatia 3 (prazo contratual em dias úteis + marcadores no contrato)
+> e Fatia 4 (sinal de atraso geral + UI final). Nota de polish: `autorizarDataEntrega` usa `prompt()` (trocar por
+> modal com senha mascarada).
+>
+> **(Anterior, 2026-07-17 — Fatia 1, já mergeada na `main`; mantido abaixo por referência.)**
+
+## ⏸️ ESTADO ATUAL (2026-07-17)
 
 > **Frente A+B (cronograma/data de entrega) — Fatia 1 na branch `feat/fatia1-cronograma-data-entrega`, suíte
 > 1270 verde, NÃO mergeada.** Corrigidos: o bug da data de entrega que "sumia" do card (vinha do `Projeto`,
@@ -2239,6 +2253,41 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 84 — Fatia 2 da frente A+B: datas da assinatura, folga medição→entrega e enforcement (branch `feat/fatia2-datas-assinatura`)
+Execução subagent-driven (implementer + revisão de spec + revisão de qualidade por task; 7 tasks). Segue a spec
+`docs/superpowers/specs/ciclo/2026-07-17-ancora-entrega-folga-venda-programada-design.md` (Fatia 2 de 4). Suíte
+**1285 verde** na branch. **NÃO mergeada** — pendente verificação manual no navegador + merge/push.
+
+**1. Duas datas do acordo, obrigatórias na assinatura.** `Projeto` ganhou `previsao_medicao` (DateTime) e
+`venda_programada` (Integer 0/1, migração com `DEFAULT 0` p/ backfill de linhas legadas). O `POST /data-entrega`
+passa a exigir **expectativa de entrega E previsão de medição** (400 se faltar), persiste as duas + a classificação
+venda programada, e a **2ª assinatura** (loja+cliente) exige ambas as datas (guard estendido).
+
+**2. Folga do trecho MEDIÇÃO→ENTREGA.** `mod_cronograma.folga_medicao_entrega(cfg, previsao_medicao, data_entrega)`
+= `(entrega − medição) − Σ durações das etapas após a medição até a "16"`. Só o trecho sob controle da loja (PE,
+produção, entrega) conta — as etapas até a medição dependem da obra do cliente. Âncora da medição: "10", senão "9",
+senão a 1ª etapa; precondição documentada (config em ordem). Substitui, neste fluxo, a folga início→entrega antiga.
+
+**3. Bloqueio real + override gerencial auditado.** `folga < 0` → **não grava**, retorna `requer_autorizacao`.
+Com reautenticação Gerente+ (`login`/`senha` + `perfis.pode(nivel,"autorizar")`) grava assim mesmo e audita em
+`LogAcaoGerencial(acao="data_entrega_sem_folga")`. Endpoint com `try/except` (rollback + 500), 403 explícito em
+credencial inválida/nível insuficiente, e `venda_programada` preservado em update parcial (só grava se enviado).
+
+**4. UI mínima de entrada (deployabilidade).** Card do Contrato ganhou os campos **previsão de medição** +
+**expectativa de entrega** + checkbox **venda programada**; `salvarDataEntrega` posta os três e, em folga<0, oferece
+"Registrar com autorização" (Gerente+ via `_podeAutorizarFront`), que reposta com `login`/`senha`. Feedback de
+sucesso do override corrigido (branch em `requer_autorizacao`, não em `cabe`). GET contrato serializa os 3 campos.
+
+**[DECIDIDO]** semântica: `cabe:false` é correto mesmo após override gravar (override = "gravar apesar de não
+caber"); o front distingue "gravado" por AUSÊNCIA de `requer_autorizacao`. UI de entrada trazida da Fatia 4 para cá
+porque a exigência das datas na assinatura travaria produção sem campo para inseri-las. **[PENDENTE]** verificação
+manual no navegador (validar folgado/apertado, override, reexibição, trava da assinatura) + merge; `autorizarDataEntrega`
+usa `prompt()` (MVP) — trocar pelo modal com senha mascarada (padrão `modal-crono`) numa passada de polish; Fatia 3
+(prazo contratual em dias úteis + marcadores no contrato) e Fatia 4 (sinal de atraso geral + UI final).
+**[ARQUIVOS]** `database.py`, `mod_cronograma.py`, `main.py`, `static/index.html`, `tests/test_cronograma.py`,
+`tests/test_cronogramas_dois.py`, `tests/test_data_entrega.py`, `tests/test_af_gate_data_entrega.py`,
+`tests/test_fluxo_completo_e2e.py`, plano em `docs/superpowers/plans/2026-07-18-fatia2-datas-assinatura-enforcement.md`.
 
 ## Sessão 83 — Folha de Pagamento & Remunerações: motor pela Função, comissão por papel (Mapa), adiantamentos, comissão fixa, aprovação e base LÍQUIDA por ambiente
 
