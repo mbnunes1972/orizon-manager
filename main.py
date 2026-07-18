@@ -1120,6 +1120,8 @@ class Handler(BaseHTTPRequestHandler):
                                 "ambientes": mod_comissao.base_detalhe(db, it)})
                 self.send_json({"ok": True, "itens": out,
                                 "total_base": round(sum(x["base"] for x in out), 2)})
+            except Exception as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
             finally:
                 db.close()
             return
