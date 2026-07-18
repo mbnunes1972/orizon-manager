@@ -4889,6 +4889,7 @@ class Handler(BaseHTTPRequestHandler):
                 proj = db.get(Projeto, nome_safe)
                 proj.data_entrega = data_entrega
                 proj.previsao_medicao = previsao_medicao
+                proj.folga_autorizada = 0 if cabe else 1   # 1 = gravada sob autorização gerencial (folga negativa)
                 if "venda_programada" in req:
                     proj.venda_programada = 1 if req.get("venda_programada") else 0
                 if not proj.data_inicio:
@@ -6343,6 +6344,16 @@ class Handler(BaseHTTPRequestHandler):
                         if _pm is None or _pm.data_entrega is None or _pm.previsao_medicao is None:
                             self.send_json({"ok": False,
                                 "erro": "Defina a data de entrega esperada E a previsão de medição antes de finalizar a assinatura."}, code=400)
+                            return
+                        # Reforço (Fatia 2): a data SALVA ainda precisa CABER na folga, OU ter sido autorizada
+                        # (folga_autorizada). Pega o caso de a config do cronograma mudar depois de salvar.
+                        import mod_cronograma as _mcr_sig
+                        _folga_sig = _mcr_sig.folga_medicao_entrega(
+                            _cfg_financeira_loja(db, loja_id), _pm.previsao_medicao, _pm.data_entrega)
+                        if _folga_sig < 0 and not _pm.folga_autorizada:
+                            self.send_json({"ok": False,
+                                "erro": "A data de entrega não cabe no cronograma (folga negativa) e não foi autorizada. "
+                                        "Ajuste a data ou registre com autorização gerencial antes de assinar."}, code=400)
                             return
                     timestamp = datetime.utcnow().isoformat()
                     ip        = self.client_address[0] if self.client_address else ""

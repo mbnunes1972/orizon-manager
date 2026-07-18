@@ -74,3 +74,36 @@ def test_assinatura_exige_previsao_medicao(app_db, seed, http_client_factory):
     st, d = c.post("/api/projetos/%s/contrato/assinar" % nome,
                    {"parte": "cliente", "nome": "Cliente", "cpf": "11111111111"})
     assert st == 400 and "medição" in (d.get("erro", "").lower()), (st, d)
+
+
+def _prep_assinatura_folga(app_db, seed, *, folga_autorizada):
+    """Contrato com 1ª assinatura (loja) + datas com FOLGA NEGATIVA (entrega logo após a medição).
+    folga_autorizada controla se a data foi registrada sob autorização gerencial."""
+    from database import Projeto, Contrato, ContratoAssinatura
+    nome = seed["projeto_l1"]; cid = seed["contrato_l1_id"]
+    db = app_db.get_session()
+    p = db.get(Projeto, nome)
+    p.previsao_medicao = datetime(2028, 1, 1)
+    p.data_entrega     = datetime(2028, 1, 10)   # 9 dias < ~50 do padrão → folga negativa
+    p.folga_autorizada = folga_autorizada
+    ct = db.get(Contrato, cid); ct.status = "assinado_loja"
+    db.add(ContratoAssinatura(contrato_id=cid, parte="loja", nome="L", cpf="00000000000",
+                              assinado_em=datetime.utcnow(), hash_sha256="x" * 64))
+    db.commit(); db.close()
+    return nome
+
+
+def test_assinatura_bloqueia_folga_negativa_nao_autorizada(app_db, seed, http_client_factory):
+    nome = _prep_assinatura_folga(app_db, seed, folga_autorizada=0)
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/projetos/%s/contrato/assinar" % nome,
+                   {"parte": "cliente", "nome": "Cliente", "cpf": "11111111111"})
+    assert st == 400 and "folga" in (d.get("erro", "").lower()), (st, d)
+
+
+def test_assinatura_permite_folga_negativa_autorizada(app_db, seed, http_client_factory):
+    nome = _prep_assinatura_folga(app_db, seed, folga_autorizada=1)
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/projetos/%s/contrato/assinar" % nome,
+                   {"parte": "cliente", "nome": "Cliente", "cpf": "11111111111"})
+    assert st == 200 and d.get("ok"), (st, d)

@@ -106,3 +106,18 @@ def test_venda_programada_volta_no_contrato(http_client_factory, seed):
     st2, d2 = c.get("/api/projetos/%s/contrato" % proj)
     assert st2 == 200 and d2["contrato"] is not None, (st2, d2)
     assert d2["contrato"].get("venda_programada") is True, d2["contrato"]
+
+
+def test_folga_autorizada_flag(http_client_factory, seed, app_db):
+    """O save marca folga_autorizada: 0 quando cabe, 1 quando gravado sob override gerencial."""
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    proj = seed["projeto_l1"]
+    st, d = c.post("/api/projetos/%s/data-entrega" % proj,
+                   {"data_entrega": "2028-01-01", "previsao_medicao": "2027-06-01"})   # cabe
+    assert st == 200 and d["cabe"] is True, (st, d)
+    db = app_db.get_session(); assert db.get(Projeto, proj).folga_autorizada == 0; db.close()
+    st2, d2 = c.post("/api/projetos/%s/data-entrega" % proj,
+                     {"data_entrega": "2026-08-05", "previsao_medicao": "2026-08-01",
+                      "login": "dir_l1", "senha": "senha123"})   # não cabe + override
+    assert st2 == 200 and d2["cabe"] is False, (st2, d2)
+    db = app_db.get_session(); assert db.get(Projeto, proj).folga_autorizada == 1; db.close()
