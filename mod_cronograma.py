@@ -2,7 +2,8 @@
 
 Na assinatura do contrato (D0 = ambas as partes assinaram — mesmo gatilho que constitui as
 Provisões, Financeiro §6.4), constitui a data prevista de conclusão de cada etapa a partir do
-Cronograma de Projeto Padrão (Config): data_prevista_conclusao = D0 + prazo_dias.
+Cronograma de Projeto Padrão (Config): data_prevista_conclusao = D0 + Σ(durações até a etapa,
+inclusive). prazo_dias é a DURAÇÃO da etapa (dias corridos), não um offset absoluto desde D0.
 
 data_conclusao (= CicloEtapa.concluido_em) nasce vazia — preenche quando a etapa é de fato
 concluída. Idempotente por (projeto, etapa): reexecutar recomputa a data prevista a partir de D0.
