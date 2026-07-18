@@ -10064,15 +10064,12 @@ function folhaRender(folha){
             +'<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="folhaPagar('+it.id+')">Pagar</button></div>'
           : '<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="folhaAprovar('+it.id+')">Aprovar</button>');
     const comItens = it.comissoes||[];
-    // Só a BASE editável da comissão. O resultado (base × %) vai na coluna "Comissões".
     const _baseInp = (val, fn) => '<input type="number" step="0.01" value="'+val+'" class="inp" style="width:120px;text-align:right;font-family:var(--font-mono);font-size:13px;padding:2px 6px;box-sizing:border-box;margin:0" onchange="'+fn+'">';
-    const _qBase = id => '<span onclick="comissaoVerBase('+id+')" title="Ver composição da base (clique)" style="cursor:pointer;color:var(--accent);font-size:9px;font-weight:700;margin-left:4px;border:1px solid var(--accent);border-radius:50%;width:13px;height:13px;min-width:13px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto">?</span>';
+    // "?" pequena (clique) → discrimina a composição da base de TODA a linha (por projeto/ambiente).
+    const _qBase = fid => '<span onclick="comissaoVerBase('+fid+')" title="Ver composição da base (clique)" style="cursor:pointer;color:var(--accent);font-size:9px;font-weight:700;margin-left:5px;border:1px solid var(--accent);border-radius:50%;width:13px;height:13px;min-width:13px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto">?</span>';
+    const baseTotal = comItens.reduce((s,cm)=> s+((cm.base_ajustada!=null?cm.base_ajustada:cm.base)||0), 0);
     const comCel = comItens.length
-      ? comItens.map(cm => {
-          const b = (cm.base_ajustada!=null?cm.base_ajustada:cm.base)||0;
-          const inp = it.status==='paga' ? _fBRL(b) : _baseInp(b, "comissaoSalvarBase("+cm.id+",this.value)");
-          return '<div class="fcell">'+inp+(cm.origem==='papel'?_qBase(cm.id):'')+'</div>';
-        }).join('')
+      ? '<div class="fcell"><span style="font-family:var(--font-mono)">'+_fBRL(baseTotal)+'</span>'+_qBase(it.id)+'</div>'   // BASE somada + "?"
       : '<div class="fcell">'+(it.status==='paga' ? '<span style="color:var(--muted)">—</span>' : _baseInp(it.base_comissao||0, "folhaSalvarBase("+it.id+",this.value)"))+'</div>';
     const ads = it.adiantamentos||[];
     const adsList = ads.map(a =>
@@ -10133,22 +10130,27 @@ async function comissaoSalvarBase(id, valor){
   if(r.ok && !d.erro){ folhaGerar(); }   // regenera a folha p/ resomar a parte variável (Σ itens)
   else { showToast((d&&d.erro)||'Erro ao salvar comissão.', true); }
 }
-async function comissaoVerBase(id){
-  const d = await (await fetch('/api/comissao/'+id+'/base',{credentials:'same-origin'})).json().catch(()=>({}));
+async function comissaoVerBase(folhaId){
+  const d = await (await fetch('/api/folha/'+folhaId+'/comissoes-base',{credentials:'same-origin'})).json().catch(()=>({}));
   if(!d.ok){ showToast((d&&d.erro)||'Erro ao carregar base.', true); return; }
-  const linhas = (d.itens||[]).map(x=>
-     '<div style="display:flex;justify-content:space-between;gap:14px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px">'
-    +'<span>'+esc(x.nome||'—')+'</span><span style="font-family:var(--font-mono)">'+_fBRL(x.valor||0)+'</span></div>').join('')
-    || '<div style="color:var(--muted);font-size:12px;padding:6px 0">Sem ambientes atribuídos a este papel no Mapa de Atribuições.</div>';
+  const blocos = (d.itens||[]).map(x=>{
+    const amb = (x.ambientes||[]).map(a=>
+       '<div style="display:flex;justify-content:space-between;gap:14px;padding:2px 0 2px 14px;font-size:11px;color:var(--muted)">'
+      +'<span>'+esc(a.nome||'—')+'</span><span style="font-family:var(--font-mono)">'+_fBRL(a.valor||0)+'</span></div>').join('');
+    return '<div style="padding:6px 0;border-bottom:1px solid var(--border)">'
+      +'<div style="display:flex;justify-content:space-between;gap:14px;font-size:12px;font-weight:600">'
+      +'<span>'+esc(x.papel||'')+(x.projeto?' · '+esc(x.projeto):'')+'</span>'
+      +'<span style="font-family:var(--font-mono)">'+_fBRL(x.base||0)+'</span></div>'+amb+'</div>';
+  }).join('') || '<div style="color:var(--muted);font-size:12px;padding:6px 0">Sem itens de comissão nesta competência.</div>';
   const ex=document.getElementById('modal-base-com'); if(ex) ex.remove();
   const ov=document.createElement('div'); ov.id='modal-base-com';
   ov.style.cssText='position:fixed;inset:0;z-index:660;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(3px)';
-  ov.innerHTML='<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:22px;max-width:420px;width:92%;max-height:85vh;overflow:auto">'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-family:var(--font-display);font-weight:900;font-size:15px">Composição da base</div>'
+  ov.innerHTML='<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:22px;max-width:440px;width:92%;max-height:85vh;overflow:auto">'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-family:var(--font-display);font-weight:900;font-size:15px">Composição da base de comissão</div>'
     +'<span onclick="document.getElementById(\'modal-base-com\').remove()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span></div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-bottom:10px">'+esc(d.papel||'')+(d.projeto?' · '+esc(d.projeto):'')+' — fatia líquida da venda por ambiente atribuído</div>'
-    +linhas
-    +'<div style="display:flex;justify-content:space-between;gap:14px;padding:8px 0 0;font-weight:800;font-size:13px"><span>Base total</span><span style="font-family:var(--font-mono)">'+_fBRL(d.total||0)+'</span></div></div>';
+    +'<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Por projeto/papel; abaixo de cada um, a fatia líquida da venda por ambiente atribuído.</div>'
+    +blocos
+    +'<div style="display:flex;justify-content:space-between;gap:14px;padding:8px 0 0;font-weight:800;font-size:13px"><span>Base total</span><span style="font-family:var(--font-mono)">'+_fBRL(d.total_base||0)+'</span></div></div>';
   document.body.appendChild(ov);
 }
 

@@ -1092,6 +1092,38 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        # ── Folha: discriminação da BASE de comissão de uma linha (todos os itens + ambientes) ──
+        m = re.match(r'^/api/folha/(\d+)/comissoes-base$', path)
+        if m:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            import mod_comissao
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                reg = db.query(FolhaPagamento).filter_by(id=int(m.group(1)), loja_id=loja_id).first()
+                if reg is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                itens = (db.query(ComissaoFolha)
+                         .filter_by(funcionario_id=reg.funcionario_id, competencia=reg.competencia)
+                         .filter(ComissaoFolha.status != "cancelado")
+                         .order_by(ComissaoFolha.id.asc()).all())
+                out = []
+                for it in itens:
+                    base = it.base_ajustada if it.base_ajustada is not None else it.base
+                    out.append({"projeto": it.projeto_nome, "papel": it.papel or it.origem, "origem": it.origem,
+                                "base": round(base or 0.0, 2), "valor": it.valor,
+                                "ambientes": mod_comissao.base_detalhe(db, it)})
+                self.send_json({"ok": True, "itens": out,
+                                "total_base": round(sum(x["base"] for x in out), 2)})
+            finally:
+                db.close()
+            return
+
         # ── Cadastro (Modulos_Orizon_v9/v10): listas Funcionários/Fornecedores/Terceiros/Funções ──
         m = re.match(r'^/api/(funcionarios|fornecedores|terceiros|funcoes)$', path)
         if m:
