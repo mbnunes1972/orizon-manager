@@ -10149,7 +10149,7 @@ async function comissaoVerBase(folhaId){
   ov.innerHTML='<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:22px;max-width:440px;width:92%;max-height:85vh;overflow:auto">'
     +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-family:var(--font-display);font-weight:900;font-size:15px">Composição da base de comissão</div>'
     +'<span onclick="document.getElementById(\'modal-base-com\').remove()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span></div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Por projeto/papel; abaixo de cada um, a fatia líquida da venda por ambiente atribuído.</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Por item de comissão; abaixo de cada um, os valores líquidos que compõem a base (contratos, para venda; ambientes, para os papéis).</div>'
     +blocos
     +'<div style="display:flex;justify-content:space-between;gap:14px;padding:8px 0 0;font-weight:800;font-size:13px"><span>Base total</span><span style="font-family:var(--font-mono)">'+_fBRL(d.total_base||0)+'</span></div></div>';
   document.body.appendChild(ov);

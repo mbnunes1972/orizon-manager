@@ -37,6 +37,27 @@ def vendas_liquido_consultor(db, loja_id, usuario_id, competencia):
     return round(total, 2)
 
 
+def vendas_liquido_detalhe(db, loja_id, usuario_id, competencia):
+    """Vendas fechadas do consultor no mês, discriminadas por PROJETO/contrato: [{nome, valor}]
+    (maior valor_liquido de cada projeto). Composição da base da comissão de venda."""
+    if not usuario_id:
+        return []
+    projs = (db.query(Projeto)
+             .filter(Projeto.loja_id == loja_id,
+                     Projeto.criado_por_id == usuario_id,
+                     Projeto.status.in_(_STATUS_VENDA)).all())
+    out = []
+    for p in projs:
+        sa = p.status_at
+        if sa is None or sa.strftime("%Y-%m") != competencia:
+            continue
+        orcs = db.query(Orcamento).filter_by(projeto_id=p.nome_safe).all()
+        if orcs:
+            out.append({"nome": p.nome_safe,
+                        "valor": round(max((o.valor_liquido or o.valor_total or 0.0) for o in orcs), 2)})
+    return out
+
+
 def _resolver_pct_funcao(com, base):
     """% da comissão de uma função NÃO-consultor, dado o `com` (comissao_json) e a base.
     por_meta=True → resolve pela lista de faixas (venda_ate crescente; None = topo/última).

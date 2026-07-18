@@ -109,7 +109,14 @@ def base_ambientes(db, projeto_nome, papel, funcionario_id):
 
 
 def base_detalhe(db, item):
-    """Composição da base de um item de PAPEL: [{nome, valor}] = Valor Líquido de cada ambiente atribuído."""
+    """Composição da base de um item de comissão:
+    - venda (Consultor): por PROJETO/contrato (valor líquido de cada venda do mês);
+    - papel: por ambiente atribuído (Valor Líquido de cada ambiente)."""
+    if item.origem == "venda":
+        f = db.get(Funcionario, item.funcionario_id)
+        if not f or not f.usuario_id:
+            return []
+        return mod_folha.vendas_liquido_detalhe(db, item.loja_id, f.usuario_id, item.competencia)
     if item.origem != "papel" or not item.projeto_nome or not item.papel:
         return []
     pools = _ambientes_da_base(db, item.projeto_nome, item.papel, item.funcionario_id)

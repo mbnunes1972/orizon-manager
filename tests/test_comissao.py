@@ -296,6 +296,25 @@ def test_base_detalhe_lista_ambientes(seed, app_db):
     db.close()
 
 
+def test_base_detalhe_venda_por_projeto(seed, app_db):
+    db = app_db.get_session()
+    u = db.query(app_db.Usuario).filter_by(login="cons_l1").first()
+    loja = u.loja_id
+    f = app_db.Funcionario(loja_id=loja, nome="Vend", usuario_id=u.id, status="ativo"); db.add(f); db.flush()
+    db.add(app_db.Projeto(nome_safe="V1", loja_id=loja, criado_por_id=u.id, status="fechado",
+                          status_at=datetime(2026, 7, 5)))
+    db.add(app_db.Orcamento(projeto_id="V1", nome="O", ordem=1, loja_id=loja, valor_liquido=100000.0))
+    db.add(app_db.Projeto(nome_safe="V2", loja_id=loja, criado_por_id=u.id, status="fechado",
+                          status_at=datetime(2026, 7, 20)))
+    db.add(app_db.Orcamento(projeto_id="V2", nome="O", ordem=1, loja_id=loja, valor_liquido=50000.0))
+    it = app_db.ComissaoFolha(loja_id=loja, funcionario_id=f.id, competencia="2026-07", origem="venda",
+         papel="venda", base=150000.0, pct=3.0, valor=4500.0, status="previsto", ref_etapa="venda:%d:2026-07" % f.id)
+    db.add(it); db.commit()
+    det = {x["nome"]: x["valor"] for x in mod_comissao.base_detalhe(db, it)}
+    assert det.get("V1") == 100000.0 and det.get("V2") == 50000.0     # discriminado por contrato
+    db.close()
+
+
 def test_cancelar_comissao_etapa(seed, app_db):
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
