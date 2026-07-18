@@ -244,6 +244,31 @@ def test_serialize_folha_inclui_comissoes(seed, app_db):
     db.close()
 
 
+def test_base_detalhe_lista_ambientes(seed, app_db):
+    db = app_db.get_session()
+    loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
+    f = app_db.Funcionario(loja_id=loja, nome="Med", status="ativo"); db.add(f); db.flush()
+    p1 = app_db.PoolAmbiente(projeto_id="PDet", nome="a", nome_exibicao="Cozinha", xml_path="x",
+                             ambientes_json="[]", order_total=46520.51)
+    p2 = app_db.PoolAmbiente(projeto_id="PDet", nome="b", nome_exibicao="Banheiro", xml_path="y",
+                             ambientes_json="[]", order_total=953.4)
+    db.add(p1); db.add(p2); db.flush()
+    db.add(app_db.AtribuicaoAmbiente(loja_id=loja, projeto_nome="PDet", papel="medicao",
+                                     funcionario_id=f.id, pool_ambiente_id=p1.id))   # só a Cozinha
+    it = app_db.ComissaoFolha(loja_id=loja, funcionario_id=f.id, competencia="2026-07", origem="papel",
+         papel="medicao", projeto_nome="PDet", etapa_codigo="10", base=46520.51, pct=0.5, valor=232.6,
+         status="previsto", ref_etapa="PDet:10:%d" % f.id)
+    db.add(it); db.commit()
+    det = mod_comissao.base_detalhe(db, it)
+    assert len(det) == 1 and det[0]["nome"] == "Cozinha" and det[0]["valor"] == 46520.51
+    # item de venda não tem detalhe de ambientes
+    itv = app_db.ComissaoFolha(loja_id=loja, funcionario_id=f.id, competencia="2026-07", origem="venda",
+         papel="venda", base=1000.0, pct=3.0, valor=30.0, status="previsto", ref_etapa="venda:%d:2026-07" % f.id)
+    db.add(itv); db.commit()
+    assert mod_comissao.base_detalhe(db, itv) == []
+    db.close()
+
+
 def test_cancelar_comissao_etapa(seed, app_db):
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id

@@ -20,19 +20,31 @@ def papel_da_etapa(codigo):
     return PAPEL_POR_ETAPA.get(str(codigo))
 
 
-def base_ambientes(db, projeto_nome, papel, funcionario_id):
-    """Σ order_total dos ambientes atribuídos a (papel, funcionario) no Mapa. Atribuição projeto-inteiro
-    (pool_ambiente_id NULL) → Σ de TODOS os ambientes do projeto."""
+def _ambientes_da_base(db, projeto_nome, papel, funcionario_id):
+    """Ambientes (PoolAmbiente) que compõem a base de (papel, funcionario) no Mapa. Atribuição
+    projeto-inteiro (pool_ambiente_id NULL) → TODOS os ambientes do projeto."""
     atrs = (db.query(AtribuicaoAmbiente)
             .filter_by(projeto_nome=projeto_nome, papel=papel, funcionario_id=funcionario_id).all())
     if not atrs:
-        return 0.0
+        return []
     if any(a.pool_ambiente_id is None for a in atrs):     # projeto inteiro
-        pools = db.query(PoolAmbiente).filter_by(projeto_id=projeto_nome).all()
-        return round(sum(p.order_total or 0.0 for p in pools), 2)
-    ids = {a.pool_ambiente_id for a in atrs}
-    pools = db.query(PoolAmbiente).filter(PoolAmbiente.id.in_(ids)).all()
+        return db.query(PoolAmbiente).filter_by(projeto_id=projeto_nome).all()
+    ids = {a.pool_ambiente_id for a in atrs if a.pool_ambiente_id}
+    return db.query(PoolAmbiente).filter(PoolAmbiente.id.in_(ids)).all() if ids else []
+
+
+def base_ambientes(db, projeto_nome, papel, funcionario_id):
+    """Σ order_total dos ambientes atribuídos a (papel, funcionario) no Mapa."""
+    pools = _ambientes_da_base(db, projeto_nome, papel, funcionario_id)
     return round(sum(p.order_total or 0.0 for p in pools), 2)
+
+
+def base_detalhe(db, item):
+    """Composição da base de um item de comissão de PAPEL: [{nome, valor}] dos ambientes atribuídos."""
+    if item.origem != "papel" or not item.projeto_nome or not item.papel:
+        return []
+    pools = _ambientes_da_base(db, item.projeto_nome, item.papel, item.funcionario_id)
+    return [{"nome": p.nome_exibicao, "valor": round(p.order_total or 0.0, 2)} for p in pools]
 
 
 def _pct_funcao(funcao, base):

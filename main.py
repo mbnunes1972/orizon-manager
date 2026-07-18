@@ -1069,6 +1069,29 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
+        # ── Comissão: composição da BASE (ambientes atribuídos) de um item de papel ──────
+        m = re.match(r'^/api/comissao/(\d+)/base$', path)
+        if m:
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            import mod_comissao
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                it = db.query(ComissaoFolha).filter_by(id=int(m.group(1)), loja_id=loja_id).first()
+                if it is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                itens = mod_comissao.base_detalhe(db, it)
+                self.send_json({"ok": True, "itens": itens, "projeto": it.projeto_nome, "papel": it.papel,
+                                "total": round(sum(x["valor"] for x in itens), 2)})
+            finally:
+                db.close()
+            return
+
         # ── Cadastro (Modulos_Orizon_v9/v10): listas Funcionários/Fornecedores/Terceiros/Funções ──
         m = re.match(r'^/api/(funcionarios|fornecedores|terceiros|funcoes)$', path)
         if m:
