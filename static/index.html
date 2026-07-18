@@ -219,6 +219,11 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .proj-table th{text-align:left;padding:7px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);border-bottom:1px solid var(--border);font-weight:600}
 .proj-table td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
 .proj-table tr.proj-row:hover td{background:var(--accent-tint);cursor:pointer}
+/* Folha: linhas têm células multi-linha (comissões/adiantamentos) — alinha tudo ao TOPO para os
+   números de coluna única baterem com o conteúdo. Colunas monetárias: número à direita, sem quebra. */
+.folha-tbl td,.folha-tbl th{vertical-align:top}
+.folha-tbl td.num,.folha-tbl th.num{text-align:right;font-family:var(--font-mono);white-space:nowrap}
+.folha-tbl th.num{font-family:inherit}
 .proj-table tr.proj-row td.cell-status{cursor:default}
 .proj-status-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
 .proj-status-badge.quente{background:var(--err-soft);color:var(--st-quente)}
@@ -10056,20 +10061,24 @@ function folhaRender(folha){
             +'<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="folhaPagar('+it.id+')">Pagar</button></div>'
           : '<button class="btn btn-primary btn-sm" style="font-size:11px" onclick="folhaAprovar('+it.id+')">Aprovar</button>');
     const comItens = it.comissoes||[];
+    // Grid de colunas fixas dentro da célula (rótulo | base | % | valor) → sub-colunas alinhadas entre linhas.
+    const _comRow = (label, baseH, pctH, valorH) =>
+       '<div style="display:grid;grid-template-columns:minmax(56px,1fr) 98px 46px 82px;gap:6px;align-items:center;font-size:11px;padding:1px 0">'
+      +'<span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+label+'</span>'
+      +'<span style="text-align:right">'+baseH+'</span>'
+      +'<span style="color:var(--muted);text-align:right;white-space:nowrap">'+pctH+'</span>'
+      +'<span style="font-family:var(--font-mono);font-weight:600;text-align:right">'+valorH+'</span></div>';
+    const _baseInp = (val, fn) => '<input type="number" step="0.01" value="'+val+'" class="inp" style="width:94px;text-align:right;font-family:var(--font-mono);padding:2px 5px;box-sizing:border-box" onchange="'+fn+'">';
     const comCel = comItens.length
       ? comItens.map(cm => {
           const b = (cm.base_ajustada!=null?cm.base_ajustada:cm.base)||0;
-          const baseIn = it.status==='paga'
-            ? _fBRL(b)
-            : '<input type="number" step="0.01" value="'+b+'" class="inp" style="width:100px;text-align:right;font-family:var(--font-mono);padding:2px 5px" onchange="comissaoSalvarBase('+cm.id+',this.value)">';
-          return '<div style="display:flex;gap:6px;align-items:center;font-size:11px;padding:1px 0">'
-            +'<span style="color:var(--muted);margin-right:auto">'+esc(cm.papel||cm.origem)+(cm.projeto?' · '+esc(cm.projeto):'')+'</span>'
-            +baseIn+'<span style="color:var(--muted)">× '+(cm.pct?Number(cm.pct).toFixed(2)+'%':'—')+'</span>'
-            +'<span style="font-family:var(--font-mono);font-weight:600;min-width:68px;text-align:right">'+_fBRL(cm.valor||0)+'</span></div>';
+          const baseH = it.status==='paga' ? _fBRL(b) : _baseInp(b, "comissaoSalvarBase("+cm.id+",this.value)");
+          return _comRow(esc(cm.papel||cm.origem)+(cm.projeto?' · '+esc(cm.projeto):''),
+            baseH, (cm.pct?'× '+Number(cm.pct).toFixed(2)+'%':''), _fBRL(cm.valor||0));
         }).join('')
       : (it.status==='paga'
-          ? _fBRL(it.base_comissao||0)
-          : '<input type="number" step="0.01" value="'+(it.base_comissao||0)+'" class="inp" style="width:120px;text-align:right;font-family:var(--font-mono);padding:3px 6px" onchange="folhaSalvarBase('+it.id+',this.value)">');
+          ? '<span style="color:var(--muted);font-size:11px">—</span>'
+          : _comRow('<span style="color:var(--muted)">base</span>', _baseInp(it.base_comissao||0, "folhaSalvarBase("+it.id+",this.value)"), '', ''));
     const ads = it.adiantamentos||[];
     const adsList = ads.map(a =>
        '<div style="display:flex;gap:5px;align-items:center;font-size:10.5px;padding:1px 0">'
@@ -10084,13 +10093,13 @@ function folhaRender(folha){
       +(it.status==='paga'?'':'<button class="btn btn-ghost btn-sm" style="font-size:10px;margin-top:3px" onclick="adiantamentoAdd('+it.funcionario_id+',\''+esc(it.competencia||'')+'\')">+ adiant.</button>');
     return '<tr class="proj-row">'
       +'<td style="padding:8px 10px;color:var(--text);font-weight:500">'+esc(it.funcionario||'—')+'</td>'
-      +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(it.parte_fixa||0)
+      +'<td class="num" style="padding:8px 10px">'+_fBRL(it.parte_fixa||0)
         +(it.comissao_fixa?'<div style="font-size:10px;color:var(--muted)">+ com. fixa '+_fBRL(it.comissao_fixa)+'</div>':'')+'</td>'
-      +'<td style="padding:8px 10px;min-width:280px">'+comCel+'</td>'
-      +'<td style="padding:8px 10px;text-align:right;color:var(--muted)">'+(it.faixa_pct?(Number(it.faixa_pct).toFixed(2)+'%'):'—')+'</td>'
-      +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(it.parte_variavel||0)+'</td>'
-      +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);color:var(--muted)">'+_fBRL(it.beneficios||0)+'</td>'
-      +'<td style="padding:8px 10px;text-align:right;font-family:var(--font-mono);font-weight:700">'+_fBRL(it.total||0)+'</td>'
+      +'<td style="padding:8px 10px;min-width:300px">'+comCel+'</td>'
+      +'<td style="padding:8px 10px;text-align:right;color:var(--muted);white-space:nowrap">'+(it.faixa_pct?(Number(it.faixa_pct).toFixed(2)+'%'):'—')+'</td>'
+      +'<td class="num" style="padding:8px 10px">'+_fBRL(it.parte_variavel||0)+'</td>'
+      +'<td class="num" style="padding:8px 10px;color:var(--muted)">'+_fBRL(it.beneficios||0)+'</td>'
+      +'<td class="num" style="padding:8px 10px;font-weight:700">'+_fBRL(it.total||0)+'</td>'
       +'<td style="padding:8px 10px;text-align:right;min-width:160px">'+adiantCel+'</td>'
       +'<td style="padding:8px 10px;font-size:11px;color:var(--muted)">'+esc(it.pagamento||'—')+'</td>'
       +'<td style="padding:8px 10px;text-align:right">'+acao+'</td></tr>';
@@ -10101,17 +10110,17 @@ function folhaRender(folha){
     +'<label style="font-size:var(--fs-sm);color:var(--muted)">Competência</label>'
     +'<input type="month" value="'+esc(folha.competencia||_folhaComp)+'" onchange="folhaMudarComp(this.value)" class="inp" style="width:auto">'
     +'<button class="btn btn-primary btn-sm" onclick="folhaGerar()">Gerar folha</button></div>'
-    +'<table class="proj-table"><thead><tr>'
-    +'<th>Funcionário</th><th style="text-align:right">Parte fixa</th><th>Comissões</th>'
-    +'<th style="text-align:right">Faixa</th><th style="text-align:right">Parte variável</th><th style="text-align:right">Benefícios</th>'
-    +'<th style="text-align:right">Total</th><th style="text-align:right">Líquido a pagar</th><th>Pagamento</th><th style="width:80px"></th></tr></thead><tbody>'+linhas+'</tbody>'
-    +'<tfoot><tr style="border-top:2px solid var(--border-strong);font-weight:700">'
+    +'<table class="proj-table folha-tbl"><thead><tr>'
+    +'<th>Funcionário</th><th class="num">Parte fixa</th><th>Comissões</th>'
+    +'<th class="num">Faixa</th><th class="num">Parte variável</th><th class="num">Benefícios</th>'
+    +'<th class="num">Total</th><th class="num">Líquido a pagar</th><th>Pagamento</th><th style="width:80px"></th></tr></thead><tbody>'+linhas+'</tbody>'
+    +'<tfoot><tr style="border-top:2px solid var(--border-strong);font-weight:700;vertical-align:middle">'
     +'<td style="padding:9px 10px">Totais</td>'
-    +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(folha.total_fixa||0)+'</td><td></td><td></td>'
-    +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(folha.total_variavel||0)+'</td>'
-    +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(folha.total_beneficios||0)+'</td>'
-    +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono)">'+_fBRL(folha.total_geral||0)+'</td>'
-    +'<td style="padding:9px 10px;text-align:right;font-family:var(--font-mono);color:var(--accent)">'+_fBRL(folha.total_liquido||0)+'</td>'
+    +'<td class="num" style="padding:9px 10px">'+_fBRL(folha.total_fixa||0)+'</td><td></td><td></td>'
+    +'<td class="num" style="padding:9px 10px">'+_fBRL(folha.total_variavel||0)+'</td>'
+    +'<td class="num" style="padding:9px 10px">'+_fBRL(folha.total_beneficios||0)+'</td>'
+    +'<td class="num" style="padding:9px 10px">'+_fBRL(folha.total_geral||0)+'</td>'
+    +'<td class="num" style="padding:9px 10px;color:var(--accent)">'+_fBRL(folha.total_liquido||0)+'</td>'
     +'<td colspan="2"></td></tr></tfoot></table>';
 }
 
