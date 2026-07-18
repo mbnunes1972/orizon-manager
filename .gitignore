@@ -68,3 +68,5 @@ wt-*/
 /test_*.db
 /test_*.db-journal
 *.tmp
+# backups pg_dump (ex.: backup_orizon_pg_*.dump)
+*.dump
