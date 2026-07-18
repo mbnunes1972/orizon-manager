@@ -4865,33 +4865,38 @@ class Handler(BaseHTTPRequestHandler):
                 cfg = _cfg_financeira_loja(db, loja_id)
                 folga = _mcr.folga_medicao_entrega(cfg, previsao_medicao, data_entrega)
                 cabe = folga >= 0
-                # Override gerencial: folga<0 só grava com reautenticação Gerente+ (auditada).
                 override_ok = False
                 if not cabe:
                     login = (req.get("login") or "").strip()
                     senha = (req.get("senha") or "").strip()
-                    if login and senha:
+                    if login or senha:   # tentou autorizar → credenciais devem ser válidas
                         autorizador = db.query(Usuario).filter_by(login=login, ativo=1).first()
-                        if autorizador and autorizador.check_senha(senha) and perfis.pode(autorizador.nivel, "autorizar"):
-                            override_ok = True
-                            db.add(LogAcaoGerencial(
-                                solicitante_id=usuario["id"], autorizador_id=autorizador.id,
-                                acao="data_entrega_sem_folga", projeto_nome=nome_safe,
-                                contexto=json.dumps({
-                                    "data_entrega": data_entrega.isoformat(),
-                                    "previsao_medicao": previsao_medicao.isoformat(),
-                                    "folga": folga})))
-                if not cabe and not override_ok:
-                    self.send_json({"ok": True, "cabe": False, "folga_min": folga, "requer_autorizacao": True})
-                    return
+                        if not autorizador or not autorizador.check_senha(senha):
+                            self.send_json({"ok": False, "erro": "Credenciais inválidas"}, code=403); return
+                        if not perfis.pode(autorizador.nivel, "autorizar"):
+                            self.send_json({"ok": False, "erro": "Necessário nível Gerente ou Diretor"}, code=403); return
+                        override_ok = True
+                        db.add(LogAcaoGerencial(
+                            solicitante_id=usuario["id"], autorizador_id=autorizador.id,
+                            acao="data_entrega_sem_folga", projeto_nome=nome_safe,
+                            contexto=json.dumps({
+                                "data_entrega": data_entrega.isoformat(),
+                                "previsao_medicao": previsao_medicao.isoformat(),
+                                "folga": folga})))
+                    if not override_ok:
+                        self.send_json({"ok": True, "cabe": False, "folga_min": folga, "requer_autorizacao": True}); return
                 proj = db.get(Projeto, nome_safe)
                 proj.data_entrega = data_entrega
                 proj.previsao_medicao = previsao_medicao
-                proj.venda_programada = 1 if req.get("venda_programada") else 0
+                if "venda_programada" in req:
+                    proj.venda_programada = 1 if req.get("venda_programada") else 0
                 if not proj.data_inicio:
                     proj.data_inicio = datetime.utcnow()   # âncora do progressivo
                 db.commit()
                 self.send_json({"ok": True, "cabe": cabe, "folga_min": folga})
+            except Exception as _e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(_e)}, code=500)
             finally:
                 db.close()
             return

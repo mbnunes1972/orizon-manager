@@ -73,3 +73,25 @@ def test_data_entrega_persiste_e_volta_no_contrato(http_client_factory, seed):
     assert st2 == 200 and d2["contrato"] is not None, (st2, d2)
     assert (d2["contrato"].get("data_entrega") or "").startswith("2028-01-01")
     assert (d2["contrato"].get("previsao_medicao") or "").startswith("2027-06-01")
+
+
+def test_venda_programada_persiste_e_preserva(http_client_factory, seed, app_db):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    proj = seed["projeto_l1"]
+    st, d = c.post("/api/projetos/%s/data-entrega" % proj,
+                   {"data_entrega": "2028-01-01", "previsao_medicao": "2027-06-01", "venda_programada": True})
+    assert st == 200 and d["ok"] and d["cabe"], (st, d)
+    db = app_db.get_session(); assert db.get(Projeto, proj).venda_programada == 1; db.close()
+    # atualiza só as datas, sem reenviar venda_programada → PRESERVA
+    st2, d2 = c.post("/api/projetos/%s/data-entrega" % proj,
+                     {"data_entrega": "2028-02-01", "previsao_medicao": "2027-07-01"})
+    assert st2 == 200 and d2["ok"], (st2, d2)
+    db = app_db.get_session(); assert db.get(Projeto, proj).venda_programada == 1; db.close()
+
+
+def test_data_entrega_sem_folga_credenciais_invalidas_403(http_client_factory, seed):
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/projetos/%s/data-entrega" % seed["projeto_l1"],
+                   {"data_entrega": "2026-08-05", "previsao_medicao": "2026-08-01",
+                    "login": "dir_l1", "senha": "ERRADA"})
+    assert st == 403 and "credenciais" in (d.get("erro", "").lower()), (st, d)
