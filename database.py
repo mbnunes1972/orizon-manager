@@ -519,6 +519,8 @@ class Projeto(Base):
     data_entrega   = Column(DateTime,   nullable=True)   # âncora do cronograma REGRESSIVO (entrega ao cliente, def. na assinatura)
     data_inicio    = Column(DateTime,   nullable=True)   # âncora do cronograma PROGRESSIVO (início; def. assinatura + carência)
     equipe_json    = Column(Text,       nullable=True)   # Equipe do Projeto: seleções dos papéis SELETORES (medidor/finalizador/montagem[N])
+    previsao_medicao = Column(DateTime, nullable=True)   # marco de medição (venda programada / obra do cliente)
+    venda_programada = Column(Integer,  default=0)        # 1 = obra do cliente controla a medição (classificação + marcador no contrato, Fatia 3)
 
 
 class Briefing(Base):
@@ -1419,6 +1421,7 @@ def _migrar_colunas():
         _add_cols("parcela_projeto", [("prazo_conclusao","DATETIME")])   # Fase A: prazo da fase
         _add_cols("projetos_meta", [("data_entrega","DATETIME"), ("data_inicio","DATETIME")])   # âncoras do cronograma
         _add_cols("projetos_meta", [("equipe_json","TEXT")])   # Equipe do Projeto (seleções dos papéis seletores)
+        _add_cols("projetos_meta", [("previsao_medicao","DATETIME"), ("venda_programada","INTEGER")])   # Fatia 2: marco de medição + classificação
 
         conn.commit()
     except Exception:

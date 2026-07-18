@@ -252,3 +252,14 @@ def test_gerar_cronograma_idempotente_e_preserva_conclusao(app_db):
     assert regs[0].data_prevista_conclusao == d0 + timedelta(days=6)   # recomputado do novo D0
     assert regs[0].concluido_em == datetime(2026, 7, 3)                # conclusão preservada
     db.close()
+
+
+def test_projeto_tem_previsao_medicao_e_venda_programada(app_db):
+    from datetime import datetime
+    db = app_db.get_session()
+    p = app_db.Projeto(nome_safe="ProjVP", previsao_medicao=datetime(2026, 8, 1), venda_programada=1)
+    db.add(p); db.commit()
+    got = db.get(app_db.Projeto, "ProjVP")
+    assert got.previsao_medicao == datetime(2026, 8, 1)
+    assert got.venda_programada == 1
+    db.close()
