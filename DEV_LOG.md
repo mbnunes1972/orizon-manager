@@ -1339,7 +1339,20 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
-## ⏸️ ESTADO ATUAL (2026-07-18) — retomar aqui
+## ⏸️ ESTADO ATUAL (2026-07-19) — retomar aqui
+
+> **Frente A+B — Fatias 2 e 3 + retirada do SQLite na branch `feat/fatia2-datas-assinatura`, suíte 1295 verde
+> (SQLite) e 1293+2skip (Postgres), NÃO mergeada.** Fatia 3: prazo contratual em dias úteis (`somar_dias_uteis`,
+> parâmetro `prazo_contratual_dias_uteis`), aviso de coerência na Config → Cronograma, e 4 marcadores no contrato
+> (`DATA_PREVISTA_ENTREGA`/`PREVISAO_MEDICAO`/`PRAZO_CONTRATUAL`/`VENDA_PROGRAMADA`). **SQLite APOSENTADO no runtime**
+> (o app exige Postgres via `DATABASE_URL`; use `./run.sh`) — resolveu o incidente de "projetos sumindo" (fallback
+> silencioso pro SQLite defasado). Refinamentos da Fatia 2: modal do design no override, `folga_autorizada` +
+> recheck na assinatura, bloqueio desde a 1ª assinatura. Ver `## Sessão 85`. **PENDENTE:** verificação manual da
+> Fatia 3 no navegador + **merge da branch** (grande: Fatia 2 + Fatia 3 + infra); depois Fatia 4 (sinal de atraso).
+>
+> **(Anterior, 2026-07-18 — mantido abaixo por referência.)**
+
+## ⏸️ ESTADO ATUAL (2026-07-18)
 
 > **Frente A+B — Fatia 2 na branch `feat/fatia2-datas-assinatura`, suíte 1285 verde, NÃO mergeada.** Datas do
 > acordo (previsão de medição + expectativa de entrega) agora obrigatórias na assinatura; folga do trecho
@@ -2253,6 +2266,40 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 85 — Fatia 3 (prazo contratual + marcadores) + retirada do SQLite + refinamentos da Fatia 2 (branch `feat/fatia2-datas-assinatura`)
+Continuação da frente A+B com testes manuais do usuário. Execução subagent-driven. Suíte **1295 verde (SQLite) e
+1293+2skip (Postgres)**. Branch **não mergeada** — acumula Fatia 2 + Fatia 3 + infra Postgres/SQLite.
+
+**1. INCIDENTE Postgres↔SQLite (resolvido; dado NÃO perdido).** Ao testar a Fatia 2, "os projetos sumiram". Raiz:
+o app escolhe o banco por `DATABASE_URL` — **setada = Postgres**, **ausente = SQLite** (`orizon.db`). O servidor
+subiu sem `DATABASE_URL` → caiu no **SQLite antigo** (snapshot de ~16/07, com projetos Marcelo), mascarando o
+**Postgres real** (com os projetos Teste de 17-18/07). Correção: subir no Postgres (dados intactos). **SQLite
+APOSENTADO no runtime:** `main.py` agora RECUSA subir no SQLite sem `DATABASE_URL` (guard, escape `ORIZON_ALLOW_SQLITE=1`);
+novo `run.sh` + `.env` (git-ignored) sobem sempre no Postgres. O pytest segue em SQLite via conftest (não passa por
+`main()`). **Bug real da Fatia 2 achado:** `_migrar_colunas_pg` não tinha as colunas de `projetos_meta`/`ciclo_etapas`
+(só a migração SQLite tinha) → app quebrava no Postgres; corrigido (paridade). **[ARQUIVOS]** `main.py`, `database.py`,
+`run.sh`, `.env`(local), `.gitignore`, `.gitattributes`.
+
+**2. Refinamentos da Fatia 2 (testes manuais).** (a) Override da folga usa **modal do design** (senha mascarada,
+padrão `modal-crono`), não `prompt()`. (b) `Projeto.folga_autorizada` (flag): save marca 0 se cabe / 1 se gravado sob
+override; a **assinatura RECALCULA a folga** e bloqueia se `folga<0 e não autorizada` (pega config mudada pós-save).
+(c) A trava de datas/folga vale **desde a 1ª assinatura** (antes só a que completava); o frontend não abre a tela de
+assinatura sem as datas. (d) Card volta ao estado SALVO quando a autorização é cancelada/recusada (não ilude).
+
+**3. Fatia 3 — prazo contratual (dias úteis) + marcadores no contrato.** Parâmetro `prazo_contratual_dias_uteis`
+(default 50) na config da loja. `mod_cronograma.somar_dias_uteis` (seg–sex; único prazo em dias úteis). Aviso de
+coerência (não bloqueia) na aba Config → Cronograma quando o padrão (dias corridos) não cabe no prazo contratual
+(`padrao_cabe_no_prazo_contratual` + flag `padrao_cabe_prazo` no GET config-financeira). **4 marcadores** no contrato
+(`DATA_PREVISTA_ENTREGA`, `PREVISAO_MEDICAO`, `PRAZO_CONTRATUAL` = cláusula "N dias úteis a partir da assinatura",
+`VENDA_PROGRAMADA`) em `CATALOGO` + `_montar_mapping` (teste anti-drift), alimentados pelo `Projeto` via
+`_extras_marcadores_contrato` (`variaveis.update` nos 2 chamadores reais da geração — sem mexer em assinaturas).
+
+**[DECIDIDO]** `PRAZO_CONTRATUAL` = cláusula em texto (a assinatura ainda não ocorreu na geração). **[PENDENTE]**
+verificação manual no navegador da Fatia 3 (marcadores no PDF exigem o modelo referenciá-los); merge da branch;
+Fatia 4 (sinal de atraso geral). **[ARQUIVOS Fatia 3]** `mod_provisoes.py`, `mod_cronograma.py`, `mod_marcadores.py`,
+`mod_contrato.py`, `main.py`, `static/index.html`, `tests/test_provisoes.py`, `tests/test_cronogramas_dois.py`,
+`tests/test_marcadores.py`, plano em `docs/superpowers/plans/2026-07-18-fatia3-prazo-contratual-marcadores.md`.
 
 ## Sessão 84 — Fatia 2 da frente A+B: datas da assinatura, folga medição→entrega e enforcement (branch `feat/fatia2-datas-assinatura`)
 Execução subagent-driven (implementer + revisão de spec + revisão de qualidade por task; 7 tasks). Segue a spec
