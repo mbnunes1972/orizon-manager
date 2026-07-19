@@ -2465,6 +2465,7 @@ class Handler(BaseHTTPRequestHandler):
                         "data_entrega":         _meta.data_entrega.isoformat() if (_meta and _meta.data_entrega) else None,
                         "previsao_medicao":     _meta.previsao_medicao.isoformat() if (_meta and _meta.previsao_medicao) else None,
                         "venda_programada":     bool(_meta.venda_programada) if _meta else False,
+                        "data_limite_contratual": _meta.data_limite_contratual.isoformat() if (_meta and _meta.data_limite_contratual) else None,
                     }})
                 except Exception as e:
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -6398,8 +6399,15 @@ class Handler(BaseHTTPRequestHandler):
                         try:
                             import mod_cronograma
                             _cfg_crono = _cfg_financeira_loja(db, loja_id)
-                            mod_cronograma.gerar_cronograma_projeto(
-                                db, nome_safe, _cfg_crono, datetime.utcnow())
+                            _d0 = datetime.utcnow()
+                            mod_cronograma.gerar_cronograma_projeto(db, nome_safe, _cfg_crono, _d0)
+                            # Data-limite do Contrato (Fatia 3): D0 + prazo contratual em DIAS ÚTEIS. Só existe
+                            # após a assinatura (na geração do contrato ainda não há D0) — registrada aqui para
+                            # a Agenda monitorar o esgotamento do prazo conforme as etapas avançam/atrasam.
+                            _prazo_du = int(_cfg_crono.get("prazo_contratual_dias_uteis") or 50)
+                            _pm_lim = db.get(Projeto, nome_safe)
+                            if _pm_lim is not None:
+                                _pm_lim.data_limite_contratual = mod_cronograma.somar_dias_uteis(_d0, _prazo_du)
                             db.commit()
                         except Exception as _ec:
                             db.rollback()

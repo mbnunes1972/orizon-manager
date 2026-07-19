@@ -522,6 +522,7 @@ class Projeto(Base):
     previsao_medicao = Column(DateTime, nullable=True)   # marco de medição (venda programada / obra do cliente)
     venda_programada = Column(Integer,  default=0)        # 1 = obra do cliente controla a medição (classificação + marcador no contrato, Fatia 3)
     folga_autorizada = Column(Integer,  default=0)        # 1 = data de entrega gravada apesar de folga NEGATIVA, sob autorização gerencial (Fatia 2)
+    data_limite_contratual = Column(DateTime, nullable=True)  # D0 (assinatura) + prazo contratual em DIAS ÚTEIS — registrada na assinatura (Fatia 3)
 
 
 class Briefing(Base):
@@ -1423,7 +1424,8 @@ def _migrar_colunas():
         _add_cols("projetos_meta", [("data_entrega","DATETIME"), ("data_inicio","DATETIME")])   # âncoras do cronograma
         _add_cols("projetos_meta", [("equipe_json","TEXT")])   # Equipe do Projeto (seleções dos papéis seletores)
         _add_cols("projetos_meta", [("previsao_medicao","DATETIME"), ("venda_programada","INTEGER DEFAULT 0"),
-                                    ("folga_autorizada","INTEGER DEFAULT 0")])   # Fatia 2: medição + classificação + folga autorizada
+                                    ("folga_autorizada","INTEGER DEFAULT 0"),
+                                    ("data_limite_contratual","DATETIME")])   # Fatia 2/3: medição + classificação + folga autorizada + data-limite
 
         conn.commit()
     except Exception:
@@ -1766,6 +1768,7 @@ def _migrar_colunas_pg():
         "ALTER TABLE projetos_meta ADD COLUMN IF NOT EXISTS previsao_medicao TIMESTAMP",
         "ALTER TABLE projetos_meta ADD COLUMN IF NOT EXISTS venda_programada INTEGER DEFAULT 0",
         "ALTER TABLE projetos_meta ADD COLUMN IF NOT EXISTS folga_autorizada INTEGER DEFAULT 0",
+        "ALTER TABLE projetos_meta ADD COLUMN IF NOT EXISTS data_limite_contratual TIMESTAMP",
         # ciclo_etapas: data prevista + responsável por função (v11/v12).
         "ALTER TABLE ciclo_etapas ADD COLUMN IF NOT EXISTS data_prevista_conclusao TIMESTAMP",
         "ALTER TABLE ciclo_etapas ADD COLUMN IF NOT EXISTS funcao_responsavel_id INTEGER",

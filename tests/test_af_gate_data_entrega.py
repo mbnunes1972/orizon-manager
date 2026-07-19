@@ -86,7 +86,9 @@ def _prep_assinatura_folga(app_db, seed, *, folga_autorizada):
     p.previsao_medicao = datetime(2028, 1, 1)
     p.data_entrega     = datetime(2028, 1, 10)   # 9 dias < ~50 do padrão → folga negativa
     p.folga_autorizada = folga_autorizada
+    p.data_limite_contratual = None
     ct = db.get(Contrato, cid); ct.status = "assinado_loja"
+    db.query(ContratoAssinatura).filter_by(contrato_id=cid).delete()   # isolamento: limpa assinaturas de testes anteriores
     db.add(ContratoAssinatura(contrato_id=cid, parte="loja", nome="L", cpf="00000000000",
                               assinado_em=datetime.utcnow(), hash_sha256="x" * 64))
     db.commit(); db.close()
@@ -107,6 +109,21 @@ def test_assinatura_permite_folga_negativa_autorizada(app_db, seed, http_client_
     st, d = c.post("/api/projetos/%s/contrato/assinar" % nome,
                    {"parte": "cliente", "nome": "Cliente", "cpf": "11111111111"})
     assert st == 200 and d.get("ok"), (st, d)
+
+
+def test_assinatura_registra_data_limite_contratual(app_db, seed, http_client_factory):
+    """Ao completar a assinatura (D0), o sistema registra a Data-limite do Contrato = D0 + prazo em dias úteis."""
+    from database import Projeto
+    nome = _prep_assinatura_folga(app_db, seed, folga_autorizada=1)   # datas válidas + loja já assinada
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.post("/api/projetos/%s/contrato/assinar" % nome,
+                   {"parte": "cliente", "nome": "Cliente", "cpf": "11111111111"})
+    assert st == 200 and d.get("ok"), (st, d)
+    db = app_db.get_session()
+    p = db.get(Projeto, nome)
+    assert p.data_limite_contratual is not None, "data-limite deve ser registrada na assinatura"
+    assert p.data_limite_contratual.weekday() < 5, "data-limite cai em dia útil (seg-sex)"
+    db.close()
 
 
 def test_assinatura_primeira_exige_datas(app_db, seed, http_client_factory):
