@@ -2984,6 +2984,8 @@ async function cfgCronogramaRender(){
     +'<div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:14px;flex-wrap:wrap">'
     +'<div><label class="field-label" id="crono-d0-lbl">Data de assinatura (D0)</label>'
     +'<input type="date" id="crono-d0" value="'+_hojeISO()+'" onchange="cronoTplRecalc()" style="width:170px"></div>'
+    +'<div><label class="field-label">Prazo contratual (dias úteis)</label>'
+    +'<input type="number" min="1" step="1" id="crono-prazo-contratual" value="'+prazoContratual+'" title="Deve refletir o prazo escrito no contrato — o marcador [PRAZO_CONTRATUAL] renderiza este valor" style="width:150px"></div>'
     +'<label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);padding-bottom:8px;cursor:pointer"><input type="checkbox" id="crono-compra" onchange="cronoTplCompraLabel();cronoTplRecalc()"> compra programada (D0 = solicitação do cliente)</label>'
     +'</div>'
     +'<table class="proj-table" style="max-width:840px"><thead><tr><th>Etapa</th><th>Fase</th><th style="width:52px">Início</th><th style="text-align:right;width:120px">Prazo</th><th style="width:120px">Data prevista</th><th style="width:190px">Função responsável</th></tr></thead><tbody>'+linhas+'</tbody></table>'
@@ -3022,6 +3024,9 @@ async function cfgCronogramaSalvar(lid){
     funcao_id: parseInt((document.getElementById('crono-funcao-'+f.codigo)||{}).value, 10) || null,
   }));
   _cfgFin.cronograma_padrao = fases;
+  // Prazo contratual (dias úteis): fonte única que alimenta o marcador [PRAZO_CONTRATUAL] do contrato E a Data-limite.
+  _cfgFin.prazo_contratual_dias_uteis = parseInt((document.getElementById('crono-prazo-contratual')||{}).value, 10)
+                                        || _cfgFin.prazo_contratual_dias_uteis || 50;
   const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {method:'PUT', credentials:'same-origin',
     headers:{'Content-Type':'application/json'}, body: JSON.stringify(_cfgFin)});
   const d = await r.json().catch(()=>({}));
