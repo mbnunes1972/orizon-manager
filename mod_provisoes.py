@@ -38,6 +38,8 @@ def config_financeira_default():
         # data_prevista = D0 + Σ durações até a etapa. cronograma_formato=2 marca o formato "durações"
         # (1/ausente = legado acumulado, convertido na leitura por normalizar_cronograma_formato).
         "cronograma_formato": 2,
+        # Prazo contratual (Fatia 3): promessa formal em DIAS ÚTEIS a partir da assinatura.
+        "prazo_contratual_dias_uteis": 50,
         "cronograma_padrao": [
             {"codigo": "8",  "prazo_dias": 2},   {"codigo": "9",  "prazo_dias": 3},
             {"codigo": "10", "prazo_dias": 5},   {"codigo": "11", "prazo_dias": 10},
@@ -115,6 +117,9 @@ def validar_config_financeira(dados):
             erros.append("Limite de desconto fora de 0–100%.")
         if _f(lim.get("desconto_acima_de")) > 100:
             erros.append("Limite de desconto fora de 0–100%.")
+    pc = d.get("prazo_contratual_dias_uteis")
+    if pc is not None and _f(pc) <= 0:
+        erros.append("Prazo contratual (dias úteis) deve ser maior que zero.")
     return erros
 
 
