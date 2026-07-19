@@ -166,6 +166,15 @@ def somar_dias_uteis(data, n):
     return d
 
 
+def padrao_cabe_no_prazo_contratual(cfg, d0):
+    """True se a ENTREGA pelo Cronograma Padrão (d0 + Σ durações CORRIDAS) cabe na data-limite contratual
+    (d0 + prazo_contratual_dias_uteis, em dias ÚTEIS). Aviso de coerência, não bloqueio."""
+    total = sum(f["prazo_dias"] for f in cronograma_padrao(cfg))
+    entrega_padrao = d0 + timedelta(days=total)
+    limite = somar_dias_uteis(d0, int((cfg or {}).get("prazo_contratual_dias_uteis") or 50))
+    return entrega_padrao <= limite
+
+
 def cronograma_projeto_view(db, projeto_nome, cfg, codigo_entrega="16"):
     """Dados das 3 datas do ciclo por etapa — **Planejada** (`CicloEtapa.data_prevista_conclusao`, do
     Cronograma Padrão gerado na assinatura), **Prazo Limite** (regressivo, âncora `Projeto.data_entrega`)

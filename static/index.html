@@ -2960,8 +2960,13 @@ async function cfgCronogramaRender(){
   await cadFuncoesGarantir();   // catálogo de funções (Tabela de Funções) p/ o dropdown
   const r = await fetch('/api/admin/lojas/'+lid+'/config-financeira', {credentials:'same-origin'});
   if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Sem acesso.</em>'; return; }
-  _cfgFin = (await r.json().catch(()=>({}))).config || {};
+  const _d = await r.json().catch(()=>({}));
+  _cfgFin = _d.config || {};
   const fases = _cfgFin.cronograma_padrao || [];
+  const prazoContratual = parseInt(_cfgFin.prazo_contratual_dias_uteis, 10) || 50;
+  const avisoPrazo = (_d.padrao_cabe_prazo === false)
+    ? '<div style="font-size:12px;color:var(--warn);margin-bottom:12px;max-width:780px">⚠️ O Cronograma Padrão (dias corridos) não cabe no prazo contratual de '+prazoContratual+' dias úteis. Ajuste os prazos ou o prazo contratual.</div>'
+    : '';
   const nome = c => { const e = ETAPAS_CICLO.find(x=>x.codigo===c); return e ? e.nome : ('Etapa '+c); };
   const funcOps = sel => '<option value="">— sem função —</option>' + (_funcoesCache||[]).map(fn =>
       '<option value="'+fn.id+'"'+(String(sel)===String(fn.id)?' selected':'')+'>'+esc(fn.nome)+'</option>').join('');
@@ -2975,6 +2980,7 @@ async function cfgCronogramaRender(){
   ).join('') || '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted);font-size:12px">Nenhuma fase configurada.</td></tr>';
   box.innerHTML =
      '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:780px">Por fase: o <strong style="color:var(--text)">prazo</strong> (dias a partir de <strong style="color:var(--text)">D0</strong>) e a <strong style="color:var(--text)">função responsável</strong> (Tabela de Funções — o cargo que executa a fase). A coluna <strong style="color:var(--text)">Início</strong> mostra o dia acumulado (D0, D+prazo…); a <strong style="color:var(--text)">Data prevista</strong> é calculada a partir da data de referência abaixo (simulação — não é salva; só o prazo e a função são).</div>'
+    +avisoPrazo
     +'<div style="display:flex;align-items:flex-end;gap:16px;margin-bottom:14px;flex-wrap:wrap">'
     +'<div><label class="field-label" id="crono-d0-lbl">Data de assinatura (D0)</label>'
     +'<input type="date" id="crono-d0" value="'+_hojeISO()+'" onchange="cronoTplRecalc()" style="width:170px"></div>'

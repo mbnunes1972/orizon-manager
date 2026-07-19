@@ -1627,7 +1627,10 @@ class Handler(BaseHTTPRequestHandler):
                 _stored = mod_provisoes.normalizar_cronograma_formato(
                     json.loads(loja.config_financeira_json) if loja.config_financeira_json else {})
                 cfg = {**mod_provisoes.config_financeira_default(), **_stored}
-                self.send_json({"ok": True, "config": cfg})
+                import mod_cronograma as _mcr_cfg
+                from datetime import datetime as _dt_cfg
+                _cabe = _mcr_cfg.padrao_cabe_no_prazo_contratual(cfg, _dt_cfg(2026, 1, 5))  # 2026-01-05 = segunda
+                self.send_json({"ok": True, "config": cfg, "padrao_cabe_prazo": _cabe})
             finally:
                 db.close()
 

@@ -132,3 +132,13 @@ def test_somar_dias_uteis_pula_fim_de_semana():
 def test_somar_dias_uteis_sexta_mais_um_vai_segunda():
     # 2026-07-03 é sexta: +1 útil = segunda 2026-07-06 (pula sáb 07-04 e dom 07-05)
     assert mcr.somar_dias_uteis(datetime(2026, 7, 3), 1) == datetime(2026, 7, 6)
+
+
+def test_padrao_cabe_no_prazo_contratual():
+    d0 = datetime(2026, 1, 5)   # segunda (referência estável)
+    cfg = {"cronograma_formato": 2, "cronograma_padrao": [
+        {"codigo": "8", "prazo_dias": 2}, {"codigo": "16", "prazo_dias": 5}],
+        "prazo_contratual_dias_uteis": 50}
+    assert mcr.padrao_cabe_no_prazo_contratual(cfg, d0) is True     # 7 corridos cabe em 50 úteis
+    cfg2 = dict(cfg); cfg2["prazo_contratual_dias_uteis"] = 2
+    assert mcr.padrao_cabe_no_prazo_contratual(cfg2, d0) is False   # 7 corridos NÃO cabe em 2 úteis
