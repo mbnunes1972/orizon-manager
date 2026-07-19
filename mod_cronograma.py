@@ -154,6 +154,18 @@ def folga_medicao_entrega(cfg, previsao_medicao, data_entrega, codigo_medicao="1
     return (data_entrega - previsao_medicao).days - soma
 
 
+def somar_dias_uteis(data, n):
+    """Avança `n` dias ÚTEIS (seg–sex; sem feriados) a partir de `data`. n=0 → a própria data.
+    Único prazo do sistema em dias úteis (o prazo contratual, Fatia 3); o resto usa dias corridos."""
+    d = data
+    passos = 0
+    while passos < n:
+        d = d + timedelta(days=1)
+        if d.weekday() < 5:   # 0=seg .. 4=sex (pula 5=sáb, 6=dom)
+            passos += 1
+    return d
+
+
 def cronograma_projeto_view(db, projeto_nome, cfg, codigo_entrega="16"):
     """Dados das 3 datas do ciclo por etapa — **Planejada** (`CicloEtapa.data_prevista_conclusao`, do
     Cronograma Padrão gerado na assinatura), **Prazo Limite** (regressivo, âncora `Projeto.data_entrega`)

@@ -118,3 +118,17 @@ def test_folga_medicao_entrega_sem_medicao_nem_9_usa_primeira():
         {"codigo": "16", "prazo_dias": 4}]}
     from datetime import datetime as _dt
     assert mcr.folga_medicao_entrega(cfg, _dt(2026, 8, 1), _dt(2026, 9, 1)) == 31 - 12
+
+
+def test_somar_dias_uteis_zero_no_mesmo_dia():
+    assert mcr.somar_dias_uteis(datetime(2026, 7, 1), 0) == datetime(2026, 7, 1)
+
+
+def test_somar_dias_uteis_pula_fim_de_semana():
+    # 2026-07-01 é quarta: +3 úteis (qui 07-02, sex 07-03, seg 07-06, pulando sáb/dom) = 2026-07-06
+    assert mcr.somar_dias_uteis(datetime(2026, 7, 1), 3) == datetime(2026, 7, 6)
+
+
+def test_somar_dias_uteis_sexta_mais_um_vai_segunda():
+    # 2026-07-03 é sexta: +1 útil = segunda 2026-07-06 (pula sáb 07-04 e dom 07-05)
+    assert mcr.somar_dias_uteis(datetime(2026, 7, 3), 1) == datetime(2026, 7, 6)
