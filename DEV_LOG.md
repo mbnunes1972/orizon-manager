@@ -2294,6 +2294,11 @@ coerência (não bloqueia) na aba Config → Cronograma quando o padrão (dias c
 (`DATA_PREVISTA_ENTREGA`, `PREVISAO_MEDICAO`, `PRAZO_CONTRATUAL` = cláusula "N dias úteis a partir da assinatura",
 `VENDA_PROGRAMADA`) em `CATALOGO` + `_montar_mapping` (teste anti-drift), alimentados pelo `Projeto` via
 `_extras_marcadores_contrato` (`variaveis.update` nos 2 chamadores reais da geração — sem mexer em assinaturas).
+**Data-limite do Contrato:** na assinatura (D0) grava `Projeto.data_limite_contratual = D0 + prazo em dias úteis`
+(`somar_dias_uteis`; coluna migrada SQLite+PG, serializada no GET contrato) — completa as 3 datas do acordo (Medição,
+Entrega, Data-limite) para a **Agenda** monitorar o esgotamento do prazo. O prazo (`prazo_contratual_dias_uteis`)
+ganhou **campo editável na aba Config → Cronograma**: é a **fonte única** que alimenta o marcador `[PRAZO_CONTRATUAL]`
+(texto do contrato) E a Data-limite — não divergem quando o modelo usa o marcador.
 
 **[DECIDIDO]** `PRAZO_CONTRATUAL` = cláusula em texto (a assinatura ainda não ocorreu na geração). **[PENDENTE]**
 verificação manual no navegador da Fatia 3 (marcadores no PDF exigem o modelo referenciá-los); merge da branch;

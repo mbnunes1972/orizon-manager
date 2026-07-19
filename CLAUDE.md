@@ -20,10 +20,18 @@ o `comercial` (15 arquivos) — os 4 módulos da importação de contrato (`mod_
 não a raiz — suba um nível (`dirname(dirname(__file__))`). Um `__file__` errado devolve 404/`""` em
 SILÊNCIO (foi o que sumiu a página de entrada). `test_caminhos_de_pacote.py` é o ratchet disso.
 
+**Motor 5.0 (decisão 2026-07-16, preparação em andamento, execução adiada):** reestruturação maior e
+posterior a esta — `app/core/` + `app/modules/*` (12 domínios) + `app/integrations/` + `app/shared/`,
+"mesma cara, motor novo". Só começa a execução real depois que esta v1 (empacotamento incremental acima)
+estabilizar em produção; até lá, frente paralela **só de documentação/inventário**, sem mexer em código.
+Spec: `docs/superpowers/specs/_geral/2026-07-16-motor-5-reestruturacao-app-design.md`.
+
 ## Ambiente e execução
 - Use **`python3`** (nunca `python`). WSL/Ubuntu.
-- Servidor local: `python3 main.py` → `http://localhost:8765` (bind `127.0.0.1`; em produção
-  `ORIZON_HOST=0.0.0.0`). A mensagem `gio: ... Operation not supported` no start é inofensiva.
+- Servidor local: **`./run.sh`** → `http://localhost:8765` (lê `DATABASE_URL` do `.env`, sobe no
+  **PostgreSQL**). O **SQLite foi APOSENTADO no runtime** (Sessão 85): `python3 main.py` pelado, sem
+  `DATABASE_URL`, RECUSA subir (guard; escape só com `ORIZON_ALLOW_SQLITE=1`) — evita cair no `orizon.db`
+  defasado. Em produção `ORIZON_HOST=0.0.0.0`. A mensagem `gio: ... Operation not supported` é inofensiva.
 - **`static/index.html` é lido do disco a cada request** → mudança de frontend = só **Ctrl+F5**, sem
   restart. Mudança em **Python** (`main.py`/módulos) **exige restart** do servidor.
 
