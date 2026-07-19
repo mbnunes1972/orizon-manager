@@ -6523,6 +6523,7 @@ class Handler(BaseHTTPRequestHandler):
                         "consultor_nome":  usuario.get("nome", ""),
                         "_ambientes":      _ambientes_valor_para_contrato(orcamento_id, db),
                     })
+                    variaveis.update(_extras_marcadores_contrato(db, nome_safe, loja_id))
                     contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
                                  .order_by(Contrato.id.desc()).first()
                     if not contrato:
@@ -8109,6 +8110,7 @@ class Handler(BaseHTTPRequestHandler):
                         "consultor_nome":  usuario.get("nome", ""),
                         "_ambientes":      _ambientes_valor_para_contrato(contrato.orcamento_id, db),
                     })
+                    variaveis.update(_extras_marcadores_contrato(db, nome_safe, contrato.loja_id or loja_id))
                     # Fixa a versão do modelo que gerou este contrato: regerar
                     # depois reproduz estas cláusulas mesmo que a loja troque o
                     # modelo. Contrato legado (já gerado, sem versão) fica no
@@ -8631,6 +8633,25 @@ def _cfg_financeira_loja(db, loja_id):
         except Exception:
             pass
     return mod_provisoes.config_financeira_default()
+
+
+def _extras_marcadores_contrato(db, nome_safe, loja_id):
+    """Valores dos marcadores DATA_PREVISTA_ENTREGA/PREVISAO_MEDICAO/PRAZO_CONTRATUAL/
+    VENDA_PROGRAMADA (Fatia 3), lidos do Projeto (projetos_meta) e da config financeira
+    da loja. Mescla em ctx antes de gerar_pdf_contrato(); ausência de projeto/datas
+    resulta em campos em branco (marcador some do PDF, não quebra a geração)."""
+    projeto = db.get(Projeto, nome_safe)
+    data_entrega    = projeto.data_entrega    if projeto else None
+    previsao_med    = projeto.previsao_medicao if projeto else None
+    venda_prog      = bool(projeto.venda_programada) if projeto else False
+    prazo_dias = _cfg_financeira_loja(db, loja_id).get("prazo_contratual_dias_uteis", 50)
+    return {
+        "data_prevista_entrega": data_entrega.strftime("%d/%m/%Y") if data_entrega else "",
+        "previsao_medicao":      previsao_med.strftime("%d/%m/%Y") if previsao_med else "",
+        "prazo_contratual":      "%d dias úteis a partir da assinatura" % prazo_dias,
+        "venda_programada_txt":  ("Trata-se de VENDA PROGRAMADA: a medição depende da "
+                                   "liberação da obra pelo cliente.") if venda_prog else "",
+    }
 
 
 def _params_iniciais_projeto(db, projeto_nome, loja_id):

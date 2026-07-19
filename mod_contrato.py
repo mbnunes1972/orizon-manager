@@ -555,6 +555,10 @@ def _montar_mapping(ctx, pag):
         "CPF_CLIENTE":       ctx.get("cliente_cpf", "") or "",
         "CPF_TESTEMUNHA_1":  t1c,
         "CPF_TESTEMUNHA_2":  t2c,
+        "DATA_PREVISTA_ENTREGA": ctx.get("data_prevista_entrega", "") or "",
+        "PREVISAO_MEDICAO":      ctx.get("previsao_medicao", "") or "",
+        "PRAZO_CONTRATUAL":      ctx.get("prazo_contratual", "") or "",
+        "VENDA_PROGRAMADA":      ctx.get("venda_programada_txt", "") or "",
     }
 
 

@@ -12,6 +12,10 @@ CATALOGO = {
     "DATA_CONTRATO":      {"rotulo": "Data do contrato",        "escopo": "documento"},
     "TEXTO_COMPLEMENTAR": {"rotulo": "Adendo (texto livre)",    "escopo": "documento"},
     "REDE_IDENTIFICADOR": {"rotulo": "Identificador da rede",   "escopo": "documento"},
+    "DATA_PREVISTA_ENTREGA": {"rotulo": "Data prevista de entrega (expectativa)", "escopo": "documento"},
+    "PREVISAO_MEDICAO":      {"rotulo": "Previsão de medição",                    "escopo": "documento"},
+    "PRAZO_CONTRATUAL":      {"rotulo": "Prazo contratual (dias úteis)",          "escopo": "documento"},
+    "VENDA_PROGRAMADA":      {"rotulo": "Venda programada (observação)",          "escopo": "documento"},
 
     # ── cliente ──────────────────────────────────────────────────────────────
     "NOME_CLIENTE":     {"rotulo": "Nome do cliente",           "escopo": "cliente"},

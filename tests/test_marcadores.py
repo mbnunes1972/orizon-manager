@@ -33,6 +33,18 @@ def test_todo_verbete_tem_rotulo_e_escopo():
             f"{chave} com escopo inválido: {v.get('escopo')}"
 
 
+def test_novos_marcadores_saem_no_mapping():
+    ctx = {"loja": {"nome": "L", "cnpj": "1", "cidade": "C"},
+           "data_prevista_entrega": "01/01/2028", "previsao_medicao": "01/06/2027",
+           "prazo_contratual": "50 dias úteis a partir da assinatura",
+           "venda_programada_txt": "Trata-se de VENDA PROGRAMADA."}
+    m = mod_contrato._montar_mapping(ctx, {})
+    assert m["DATA_PREVISTA_ENTREGA"] == "01/01/2028"
+    assert m["PREVISAO_MEDICAO"] == "01/06/2027"
+    assert m["PRAZO_CONTRATUAL"].endswith("a partir da assinatura")
+    assert "VENDA PROGRAMADA" in m["VENDA_PROGRAMADA"]
+
+
 def test_marcadores_de_endereco_da_loja_existem():
     """Sem estes, o preâmbulo do contrato não tem como ser parametrizado."""
     for c in ("LOJA_LOGRADOURO", "LOJA_NUMERO", "LOJA_BAIRRO",
