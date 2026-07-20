@@ -1339,7 +1339,28 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
-## ⏸️ ESTADO ATUAL (2026-07-19) — retomar aqui
+## ⏸️ ESTADO ATUAL (2026-07-20) — retomar aqui
+
+> **Tudo na `main`, pushado.** A branch `feat/fatia2-datas-assinatura` (Fatias 2+3 + retirada do SQLite,
+> Sessões 84–85) foi **mergeada na `main` e apagada** — o estado de 19/07 abaixo ("NÃO mergeada") ficou
+> histórico. Depois do merge entraram ainda: spec do **Motor 5.0** (`docs/superpowers/specs/_geral/
+> 2026-07-16-motor-5-reestruturacao-app-design.md`, execução adiada até a v1 estabilizar) e a migração do
+> VPS dev/pré-homolog `167.88.33.121` para **Postgres 16** (runbook A/B via `/root/orizon-A.env`/`-B.env`).
+>
+> **Deploy 2026-07-20:** instância **A** (integração, `:8765`) atualizada para o topo do `main`
+> (`b367b96`); instância **B** (pré-homolog, `:8766`) promovida para a tag **`v2026.07.20-homolog`**
+> (mesmo commit). Ambas no ar (HTTP 302 interno e externo). Acesso ao VPS agora por **chave SSH**
+> (ed25519 desta máquina autorizada no root). Script de deploy A+B aprimorado (mata só o processo da
+> instância certa via cwd, poll até 302) — candidato a entrar no repo em `scripts/`.
+>
+> **PENDENTE:** re-ingerir o grafo MCP (bloqueado no momento: Docker Desktop do Windows não estava
+> rodando); verificação manual da Fatia 3 no navegador (marcadores no PDF exigem modelo referenciá-los);
+> **Fatia 4** (sinal de atraso geral + UI final) — próxima frente, spec em
+> `docs/superpowers/specs/ciclo/2026-07-17-ancora-entrega-folga-venda-programada-design.md`.
+>
+> **(Anterior, 2026-07-19 — mantido abaixo por referência.)**
+
+## ⏸️ ESTADO ATUAL (2026-07-19)
 
 > **Frente A+B — Fatias 2 e 3 + retirada do SQLite na branch `feat/fatia2-datas-assinatura`, suíte 1295 verde
 > (SQLite) e 1293+2skip (Postgres), NÃO mergeada.** Fatia 3: prazo contratual em dias úteis (`somar_dias_uteis`,
