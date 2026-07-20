@@ -237,6 +237,8 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 .proj-status-badge.concluido{background:var(--accent-tint);color:var(--accent)}
 .proj-status-badge.perdido{background:var(--surface-2);color:var(--st-perdido)}
 .proj-status-badge.sem{background:transparent;color:var(--muted)}
+/* Selo de atraso GERAL (Fatia 4 §6): qualquer etapa aberta vencida ilumina o projeto na lista */
+.proj-atraso-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.3px;white-space:nowrap;background:var(--err-soft);color:var(--err)}
 .proj-status-dd{position:absolute;top:100%;left:0;z-index:300;background:var(--card);border:1px solid var(--border2);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);min-width:140px;overflow:hidden;display:none}
 .proj-status-dd.open{display:block}
 .proj-status-dd-item{padding:8px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px}
@@ -3890,7 +3892,7 @@ async function expedicaoKanbanCarregar(){
   _expMeta = d.meta || null;
   const cols = d.colunas.map(c=>{
     const cards = c.cards.map(p=>{
-      const badge = p.atrasado ? '<span class="proj-status-badge" style="background:var(--err-soft);color:var(--err)">Atrasado</span>' : '';
+      const badge = p.atrasado ? '<span class="proj-atraso-badge">Atrasado</span>' : '';
       return '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer" onclick="expDetAbrir('+p.id+')">'
         +'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px">'
         +'<div style="font-weight:500;font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(p.projeto_nome)+'</div>'+badge+'</div>'
@@ -4449,6 +4451,7 @@ function renderProjResultados(lista){
         <th style="width:130px">Consultor</th>
         <th style="width:110px;text-align:center">Especificador</th>
         <th style="width:140px;text-align:right">Último Orçamento</th>
+        <th style="width:120px">Entrega</th>
         <th style="width:150px"></th>
       </tr></thead>
       <tbody>${lista.map(p=>`
@@ -4471,6 +4474,9 @@ function renderProjResultados(lista){
               ? `<span title="${esc(p.parceiro_nome)}" style="color:var(--ok);cursor:help">Sim</span>`
               : `<span style="color:var(--muted)">Não</span>`}</td>
           <td style="text-align:right;font-family:var(--font-mono);font-size:12px">${fmt(p.ultimo_orcamento_valor)}</td>
+          <td style="white-space:nowrap">${fmtData(p.data_entrega)}${p.atrasado
+              ? ' <span class="proj-atraso-badge" title="Alguma etapa aberta está com a previsão vencida">Atrasado</span>'
+              : ''}</td>
           <td style="text-align:right;white-space:nowrap">
             <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();projEditarAbrir('${esc(p.nome_safe||'')}')"
                     style="font-size:11px;padding:3px 9px;margin-right:4px">Editar</button>

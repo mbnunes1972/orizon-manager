@@ -1353,10 +1353,15 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > (ed25519 desta máquina autorizada no root). Script de deploy A+B aprimorado (mata só o processo da
 > instância certa via cwd, poll até 302) — candidato a entrar no repo em `scripts/`.
 >
+> **Fatia 4 FECHADA no mesmo dia (Sessão 86): frente A+B CONCLUÍDA** — sinal de atraso geral na lista
+> de projetos (spec §6), mergeada na `main`. QA da Vera pegou bug grave pré-merge (`status="fechado"`
+> tratado como terminal — mataria a feature; corrigido + regressão).
+>
 > **PENDENTE:** re-ingerir o grafo MCP (bloqueado no momento: Docker Desktop do Windows não estava
-> rodando); verificação manual da Fatia 3 no navegador (marcadores no PDF exigem modelo referenciá-los);
-> **Fatia 4** (sinal de atraso geral + UI final) — próxima frente, spec em
-> `docs/superpowers/specs/ciclo/2026-07-17-ancora-entrega-folga-venda-programada-design.md`.
+> rodando); verificação manual no navegador — Fatia 3 (marcadores no PDF exigem modelo referenciá-los)
+> e Fatia 4 (coluna Entrega + selo Atrasado, temas claro/escuro); promover a Fatia 4 à instância B
+> (nova tag) quando homologada. Próximas frentes candidatas: Agenda Global (consome a base de atraso
+> do §6), empacotar `comercial`, baseline Alembic.
 >
 > **(Anterior, 2026-07-19 — mantido abaixo por referência.)**
 
@@ -2287,6 +2292,37 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 86 — Fatia 4 (sinal de atraso GERAL na lista) FECHA a frente A+B + deploy A/B + chave SSH
+Suíte **1314 verde (SQLite) e 1312+2skip (Postgres `orizon_test`)**. Branch `feat/fatia4-sinal-atraso`
+mergeada na `main`. **Frente A+B (spec 2026-07-17) CONCLUÍDA** — o §7 (UI do card) já tinha sido
+antecipado nas Fatias 2–3; esta fatia entrega o §6.
+
+**1. Sinal de atraso geral (spec §6).** `mod_cronograma.projeto_em_atraso(etapas, data_entrega, hoje)`
+(pura): atrasado se qualquer etapa aberta (`concluido_em` nulo) tem previsão vencida, OU entrega vencida
+com a "16" aberta (**ausente conta como aberta**). `_enriquecer_projetos_com_atraso` em `main.py` anota
+`atrasado` + `data_entrega` nos itens de `/projetos` e `/projetos/buscar` (2 queries em lote por request;
+reusa o `p['status']` do enriquecimento anterior — ordem documentada). Lista de projetos ganhou coluna
+**Entrega** com selo **Atrasado** (`.proj-atraso-badge`, tokens `--err`/`--err-soft`); o Kanban de
+Expedição passou a reusar a mesma classe (era estilo inline).
+
+**2. QA da Vera pegou bug GRAVE antes do merge:** a 1ª versão excluía `status="fechado"` do sinal como
+se fosse terminal — mas "fechado" é o estado de **EXECUÇÃO** (atribuído na 2ª assinatura, vale pelas
+etapas 8–20, só vira "concluido" na Etapa 21): o selo nunca acenderia pra população-alvo. Corrigido:
+terminais são `perdido/concluido/cancelado`; "fechado" acende. Teste de regressão dedicado
+(`test_lista_projeto_fechado_em_execucao_ACENDE`). Lição: cobrir o status que o ciclo REALMENTE usa.
+
+**3. Deploy/infra (início da sessão).** Instância **A** (`:8765`) no topo do `main`; **B** (pré-homolog,
+`:8766`) promovida à tag **`v2026.07.20-homolog`** — ambas 302 interno/externo. Acesso ao VPS
+`167.88.33.121` agora por **chave SSH** (ed25519 desta máquina no root — deploys sem senha). Script
+`deploy_ab.sh` (scratchpad): mata só o processo da instância certa (via cwd em `/proc`), poll até 302 —
+melhor que o `pkill -f main.py` do runbook, que derrubaria as duas.
+
+**[PENDENTE]** verificação manual no navegador (coluna/selo na lista, tema claro/escuro — Vera não teve
+navegador); re-ingerir grafo MCP (Docker Desktop parado no Windows); promover Fatia 4 à B quando
+homologada. **[ARQUIVOS]** `mod_cronograma.py`, `main.py`, `static/index.html`,
+`tests/test_cronogramas_dois.py`, `tests/test_lista_projetos_atraso.py` (novo), spec (status concluída),
+plano `docs/superpowers/plans/2026-07-20-fatia4-sinal-atraso.md`.
 
 ## Sessão 85 — Fatia 3 (prazo contratual + marcadores) + retirada do SQLite + refinamentos da Fatia 2 (branch `feat/fatia2-datas-assinatura`)
 Continuação da frente A+B com testes manuais do usuário. Execução subagent-driven. Suíte **1295 verde (SQLite) e
