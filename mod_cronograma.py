@@ -175,6 +175,23 @@ def padrao_cabe_no_prazo_contratual(cfg, d0):
     return entrega_padrao <= limite
 
 
+def projeto_em_atraso(etapas, data_entrega, hoje, codigo_entrega="16"):
+    """Sinal de atraso GERAL (Fatia 4, spec §6) — puro. `etapas`: [(codigo, data_prevista_conclusao,
+    concluido_em)]; aberta = concluido_em nulo. Atrasado se QUALQUER etapa aberta tem previsão vencida
+    (data_prevista_conclusao < hoje), OU se hoje > data_entrega com a etapa de entrega aberta — a "16"
+    AUSENTE conta como aberta (não existir a etapa significa que a entrega não foi concluída)."""
+    entrega_concluida = False
+    for cod, prevista, concluida in etapas or []:
+        if concluida is None:
+            if prevista is not None and prevista < hoje:
+                return True
+        elif str(cod) == codigo_entrega:
+            entrega_concluida = True
+    if data_entrega is not None and hoje > data_entrega and not entrega_concluida:
+        return True
+    return False
+
+
 def cronograma_projeto_view(db, projeto_nome, cfg, codigo_entrega="16"):
     """Dados das 3 datas do ciclo por etapa — **Planejada** (`CicloEtapa.data_prevista_conclusao`, do
     Cronograma Padrão gerado na assinatura), **Prazo Limite** (regressivo, âncora `Projeto.data_entrega`)

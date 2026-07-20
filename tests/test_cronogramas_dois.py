@@ -142,3 +142,60 @@ def test_padrao_cabe_no_prazo_contratual():
     assert mcr.padrao_cabe_no_prazo_contratual(cfg, d0) is True     # 7 corridos cabe em 50 úteis
     cfg2 = dict(cfg); cfg2["prazo_contratual_dias_uteis"] = 2
     assert mcr.padrao_cabe_no_prazo_contratual(cfg2, d0) is False   # 7 corridos NÃO cabe em 2 úteis
+
+
+# ── Fatia 4 — sinal de atraso GERAL (spec §6): função pura projeto_em_atraso ─────────────────────
+# etapas = [(codigo, data_prevista_conclusao, concluido_em)]; aberta = concluido_em nulo.
+
+_HOJE = datetime(2026, 7, 20)
+
+
+def test_atraso_etapa_aberta_vencida():
+    etapas = [("9", datetime(2026, 7, 10), None)]
+    assert mcr.projeto_em_atraso(etapas, None, _HOJE) is True
+
+
+def test_atraso_falso_quando_tudo_concluido():
+    etapas = [("9", datetime(2026, 7, 10), datetime(2026, 7, 9)),
+              ("16", datetime(2026, 7, 15), datetime(2026, 7, 14))]
+    assert mcr.projeto_em_atraso(etapas, None, _HOJE) is False
+
+
+def test_atraso_falso_etapa_vencida_mas_concluida_depois():
+    # concluiu (mesmo com atraso à época) → não ilumina mais
+    etapas = [("9", datetime(2026, 7, 10), datetime(2026, 7, 18))]
+    assert mcr.projeto_em_atraso(etapas, None, _HOJE) is False
+
+
+def test_atraso_falso_sem_etapas_sem_data_entrega():
+    assert mcr.projeto_em_atraso([], None, _HOJE) is False
+
+
+def test_atraso_falso_previsao_futura():
+    etapas = [("9", datetime(2026, 7, 25), None)]
+    assert mcr.projeto_em_atraso(etapas, None, _HOJE) is False
+
+
+def test_atraso_ignora_etapa_aberta_sem_previsao():
+    etapas = [("9", None, None)]
+    assert mcr.projeto_em_atraso(etapas, None, _HOJE) is False
+
+
+def test_atraso_entrega_vencida_com_16_aberta():
+    etapas = [("16", datetime(2026, 8, 1), None)]   # previsão da etapa ainda no futuro
+    assert mcr.projeto_em_atraso(etapas, datetime(2026, 7, 15), _HOJE) is True
+
+
+def test_atraso_falso_entrega_vencida_mas_16_concluida():
+    etapas = [("16", datetime(2026, 7, 10), datetime(2026, 7, 12))]
+    assert mcr.projeto_em_atraso(etapas, datetime(2026, 7, 15), _HOJE) is False
+
+
+def test_atraso_entrega_vencida_sem_etapa_16_conta_como_aberta():
+    # cronograma sem a "16" (ou inexistente): entrega não concluída → atrasado
+    assert mcr.projeto_em_atraso([], datetime(2026, 7, 15), _HOJE) is True
+
+
+def test_atraso_falso_entrega_futura_16_aberta():
+    etapas = [("16", datetime(2026, 8, 1), None)]
+    assert mcr.projeto_em_atraso(etapas, datetime(2026, 8, 1), _HOJE) is False

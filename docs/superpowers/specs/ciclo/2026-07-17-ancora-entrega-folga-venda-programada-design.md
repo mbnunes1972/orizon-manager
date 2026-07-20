@@ -1,7 +1,7 @@
 # Prazo Contratual, Datas da Assinatura, Folga com Bloqueio e Monitoramento de Atraso — Design
 
-**Data:** 2026-07-17 · **Status:** aprovado no brainstorm (pronto para plano) · **Frente:** A+B (C —
-execução por ambiente — fica para spec própria depois).
+**Data:** 2026-07-17 · **Status:** ✅ CONCLUÍDA (Fatias 1–4 implementadas; Fatia 4 em 2026-07-20,
+Sessão 86) · **Frente:** A+B (C — execução por ambiente — fica para spec própria depois).
 
 Consolida o teste manual do card do Contrato + o refinamento do brainstorm: a data de entrega **não
 persistia** na tela, a **folga** exibida era incompreensível, faltavam **medição esperada** e **expectativa

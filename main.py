@@ -122,6 +122,38 @@ def _enriquecer_projetos_com_parceiro(projetos):
     finally:
         db.close()
 
+def _enriquecer_projetos_com_atraso(projetos):
+    """Sinal de atraso GERAL (Fatia 4, spec §6): anota `atrasado` + `data_entrega` em cada item.
+    Atrasado = qualquer CicloEtapa aberta com previsão vencida, ou entrega vencida com a "16" aberta
+    (mod_cronograma.projeto_em_atraso). Status terminal (perdido/concluido/cancelado) nunca acende;
+    "fechado" NÃO é terminal — é o estado de EXECUÇÃO (2ª assinatura → etapa 21), a população-alvo
+    do sinal. Chamar DEPOIS de _enriquecer_projetos_com_status (reusa o p['status'] já anotado)."""
+    import mod_cronograma as _mcr
+    nomes = [p['nome_safe'] for p in projetos if p.get('nome_safe')]
+    if not nomes:
+        return
+    db = get_session()
+    try:
+        hoje = datetime.utcnow()
+        entregas = dict(db.query(Projeto.nome_safe, Projeto.data_entrega)
+                        .filter(Projeto.nome_safe.in_(nomes)).all())
+        etapas_map = {}
+        for e in db.query(CicloEtapa).filter(CicloEtapa.projeto_nome.in_(nomes)).all():
+            etapas_map.setdefault(e.projeto_nome, []).append(
+                (e.etapa_codigo, e.data_prevista_conclusao, e.concluido_em))
+        for p in projetos:
+            ns = p.get('nome_safe')
+            if not ns:
+                continue
+            de = entregas.get(ns)
+            p['data_entrega'] = de.isoformat() if de else None
+            if ns not in entregas or (p.get('status') or "") in ("perdido", "concluido", "cancelado"):
+                p['atrasado'] = False
+                continue
+            p['atrasado'] = _mcr.projeto_em_atraso(etapas_map.get(ns, []), de, hoje)
+    finally:
+        db.close()
+
 def _enriquecer_projetos_com_pool(projetos):
     """Para projetos EP-07, sobrescreve n_ambientes/n_selecionados com contagens do pool."""
     nomes = [p['nome_safe'] for p in projetos if p.get('nome_safe')]
@@ -1224,6 +1256,7 @@ class Handler(BaseHTTPRequestHandler):
                 _enriquecer_projetos_com_pool(projetos)
                 _enriquecer_projetos_com_status(projetos)
                 _enriquecer_projetos_com_parceiro(projetos)
+                _enriquecer_projetos_com_atraso(projetos)
                 self.send_json({"ok": True, "projetos": projetos})
             except Exception as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -1270,6 +1303,7 @@ class Handler(BaseHTTPRequestHandler):
                 _enriquecer_projetos_com_pool(locais)
                 _enriquecer_projetos_com_status(locais)
                 _enriquecer_projetos_com_parceiro(locais)
+                _enriquecer_projetos_com_atraso(locais)
                 omie_res = _buscar_projetos_omie(q)
                 nomes_locais = {p['nome_projeto'].lower() for p in locais}
                 omie_unicos = [p for p in omie_res if p['nome_projeto'].lower() not in nomes_locais]
