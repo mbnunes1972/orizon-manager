@@ -110,8 +110,10 @@ implementação.
   legados (fluxo antigo) **não migram**. Detalhes: spec
   `docs/superpowers/specs/financeiro/2026-07-12-fase-d2-provisao-completa-conciliacao-final-design.md`.
 - **Banco de dados:** migração **SQLite → PostgreSQL** decidida e **em produção** (VPS dedicada,
-  `orizonsolution.com.br`) desde 2026-07-15. Local (WSL) e produção já rodam Postgres; `DATABASE_URL` (env
-  var) seleciona o dialeto — ausente = SQLite (dev-VPS antiga, `167.88.33.121`, ainda não migrada). Suíte
+  `orizonsolution.com.br`) desde 2026-07-15. **SQLite APOSENTADO** (o app se recusa a subir sem
+  `DATABASE_URL`; escape `ORIZON_ALLOW_SQLITE=1`). Local (WSL), produção **e o dev/pré-homolog
+  `167.88.33.121`** (migrado 2026-07-19: Postgres 16, dbs `orizon`/`orizon_homolog`, envs
+  `/root/orizon-A.env`+`/root/orizon-B.env`) já rodam Postgres; `DATABASE_URL` seleciona o dialeto. Suíte
   pytest tem validação opt-in contra Postgres real via `TEST_DATABASE_URL` (`tests/conftest.py`) — achou e
   corrigiu divergências reais de dialeto (FK enforcement real, `DROP SCHEMA CASCADE` por FK circular,
   `Lancamento.origem` estourando `VARCHAR(30)`, vários testes com FK fabricada que só SQLite deixa passar).

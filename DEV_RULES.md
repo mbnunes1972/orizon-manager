@@ -95,12 +95,13 @@ for s in $(screen -ls | grep -oE '[0-9]+\.orizon-manager'); do screen -S "$s" -X
 screen -wipe
 git fetch origin && git reset --hard origin/main
 # Dependências (Ubuntu 24.04 / PEP 668 — usar apt, não pip):
-apt install -y python3-docx python3-openpyxl python3-requests python3-sqlalchemy
+apt install -y python3-docx python3-openpyxl python3-requests python3-sqlalchemy python3-psycopg2
 ufw allow 8765/tcp 2>/dev/null
-# Banco descartável no servidor (recria limpo + usuários). OMITIR se for preservar dados.
-rm -f orizon.db && python3 seed.py
-# Sobe em screen, bind externo, com log:
-screen -S orizon-manager -dm bash -c 'cd /root/orizon-manager && ORIZON_HOST=0.0.0.0 python3 main.py > app.log 2>&1'
+# Banco: POSTGRES (SQLite APOSENTADO — o app se recusa a subir sem DATABASE_URL). A DATABASE_URL fica
+# em /root/orizon-A.env (fora do git; user orizon / db orizon). Só na 1ª vez cria schema + usuários:
+#   . /root/orizon-A.env && python3 seed.py
+# Sobe em screen (a env traz ORIZON_HOST=0.0.0.0 + DATABASE_URL do Postgres):
+screen -S orizon-manager -dm bash -c 'cd /root/orizon-manager && . /root/orizon-A.env && python3 main.py > app.log 2>&1'
 sleep 3; ss -ltnp | grep 8765; tail -8 app.log
 curl -s -o /dev/null -w "HTTP: %{http_code}\n" http://127.0.0.1:8765   # esperado: 302
 ```
@@ -123,13 +124,10 @@ ufw allow 8766/tcp 2>/dev/null
 # 2026-07-16: as migracoes sqlite3 miram o arquivo certo, sem tocar o orizon.db da instancia A).
 # FICA FORA da arvore do clone git (nao dentro de /root/orizon-homolog): senao um `git clean -fd`
 # ali apagaria o banco da B, e `git status` mostraria o .db+journal/wal como ruido nao rastreado.
-mkdir -p /root/orizon-homolog-data
-export ORIZON_HOMOLOG_DB="sqlite:////root/orizon-homolog-data/orizon_homolog.db"
-DATABASE_URL="$ORIZON_HOMOLOG_DB" python3 seed.py        # cria schema + usuarios no banco da B
-# Sobe em screen proprio, porta 8766, banco proprio:
-screen -S orizon-homolog -dm bash -c 'cd /root/orizon-homolog && \
-  ORIZON_HOST=0.0.0.0 ORIZON_PORT=8766 DATABASE_URL="sqlite:////root/orizon-homolog-data/orizon_homolog.db" \
-  python3 main.py > app.log 2>&1'
+# Banco PRÓPRIO da B em POSTGRES (db orizon_homolog, mesmo servidor Postgres da A). DATABASE_URL em
+# /root/orizon-B.env (fora do git). Só na 1ª vez cria schema + usuários:  . /root/orizon-B.env && python3 seed.py
+# Sobe em screen proprio (a env traz ORIZON_HOST=0.0.0.0 + ORIZON_PORT=8766 + DATABASE_URL orizon_homolog):
+screen -S orizon-homolog -dm bash -c 'cd /root/orizon-homolog && . /root/orizon-B.env && python3 main.py > app.log 2>&1'
 # Espera por CONDICAO (nao `sleep 3` cego): o 1o boot importa muita coisa e pode passar de 3s —
 # um curl cedo demais devolve 000 (falso alarme de "nao subiu"). Faz poll ate a porta responder.
 for i in $(seq 1 30); do
@@ -144,10 +142,11 @@ echo "HTTP: $code (esperado 302)"   # se ficar em 000 apos 30s, veja o traceback
 <NOVA_TAG>`, mate o screen `orizon-homolog` e suba de novo (NUNCA `git reset --hard origin/main` aqui —
 a B é build tagueado, não o `main`). **Parar a B sem afetar a A:** `screen -S orizon-homolog -X quit`
 (o `pkill -f main.py` do runbook da A mataria as DUAS — na B use o nome do screen).
-> **Paridade com produção (alvo):** a spec pede **Postgres** na pré-homologação (motor contábil). O
-> arquivo SQLite separado acima é a **ponte** (isola já, sem instalar Postgres no servidor antigo).
-> Para a paridade plena, trocar a `DATABASE_URL` por um Postgres dedicado (`orizon_homolog`), instalando
-> Postgres no servidor antigo — mesma linha do Passo 1 do servidor de produção.
+> **Paridade com produção:** ✅ **feito em 2026-07-19** — Postgres 16 instalado no `167.88.33.121`
+> (`apt install postgresql postgresql-contrib python3-psycopg2`), user `orizon`, dbs `orizon` (A) e
+> `orizon_homolog` (B), Postgres escutando só em localhost. As duas instâncias rodam em Postgres via
+> `/root/orizon-A.env` e `/root/orizon-B.env` (senha fora do git). SQLite **aposentado** (os `.db`
+> antigos ficaram como backup). Para migrar DADOS de um SQLite legado, seria um passo à parte (dump/load).
 
 #### Runbook de migração de nome — UMA vez (`omie_v3` → `orizon-manager`)
 > Rodar **uma única vez** ao migrar o nome. O servidor ainda tem os nomes antigos; depois disto,
