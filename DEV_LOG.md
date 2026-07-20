@@ -1357,11 +1357,15 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > de projetos (spec §6), mergeada na `main`. QA da Vera pegou bug grave pré-merge (`status="fechado"`
 > tratado como terminal — mataria a feature; corrigido + regressão).
 >
-> **PENDENTE:** re-ingerir o grafo MCP (bloqueado no momento: Docker Desktop do Windows não estava
-> rodando); verificação manual no navegador — Fatia 3 (marcadores no PDF exigem modelo referenciá-los)
-> e Fatia 4 (coluna Entrega + selo Atrasado, temas claro/escuro); promover a Fatia 4 à instância B
-> (nova tag) quando homologada. Próximas frentes candidatas: Agenda Global (consome a base de atraso
-> do §6), empacotar `comercial`, baseline Alembic.
+> **Fatia 4 promovida à B no mesmo dia:** tag **`v2026.07.20.1-homolog`** na instância B (`:8766`);
+> A no `main` (`01f2acd`). Script de deploy versionado em `scripts/deploy_ab.sh` (uso no VPS:
+> `bash deploy_ab.sh <TAG>`).
+>
+> **PENDENTE (retomar por aqui):** 1) re-ingerir o grafo MCP (`POST :8767/ingest/all`) — estava
+> bloqueado com o Docker Desktop do Windows parado; usuário ia reiniciar o Windows pra liberar.
+> 2) Verificação manual no navegador — Fatia 3 (marcadores no PDF exigem modelo referenciá-los)
+> e Fatia 4 (coluna Entrega + selo Atrasado, temas claro/escuro). Próximas frentes candidatas:
+> Agenda Global (consome a base de atraso do §6), empacotar `comercial`, baseline Alembic.
 >
 > **(Anterior, 2026-07-19 — mantido abaixo por referência.)**
 
