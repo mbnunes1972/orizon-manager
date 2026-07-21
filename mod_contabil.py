@@ -27,6 +27,9 @@ PLANO_PADRAO = [
     ("1.1.06.19", "Custo Financeiro a Apropriar"),   # FASE B: ramo FINANCEIRA (Aymoré/Cartão) — despesa financeira diferida
     ("1.1.06.20", "Custo Especial a Apropriar"),   # Custo Especial (5º custo adicional — não rateado nos ambientes)
     ("1.1.07", "Recebíveis de Parcelamentos"),   # FASE B: ramo LOJA (financiamento direto) — carrega SÓ os juros (VAVO fica no 1.1.02)
+    # Ajustes Excepcionais de Fábrica (spec 2026-07-21): saldos de acordos no razão
+    ("1.1.08", "Créditos com a Fábrica"),
+    ("1.1.09", "Conta Corrente com Lojas do Grupo (a receber)"),
     ("1.2", "Não Circulante"),
     ("1.2.1", "Imobilizado"),
     ("1.2.1.01", "Itens de Informática"), ("1.2.1.02", "Veículos"),
@@ -58,11 +61,15 @@ PLANO_PADRAO = [
     ("2.1.05", "Financiamento Total Flex a Pagar"),
     ("2.1.06", "Receita a Realizar"),   # FASE D2: recebe o Val_Cont cheio no contrato (era "Adiantamento de Clientes")
     ("2.1.07", "Receita Financeira a Apropriar"),   # FASE B: ramo LOJA — juros diferidos, realizados por parcela
+    # Ajustes Excepcionais de Fábrica (spec 2026-07-21)
+    ("2.1.08", "Acordos com a Fábrica a Amortizar"),
+    ("2.1.09", "Conta Corrente com Lojas do Grupo (a pagar)"),
     ("2.2", "Não Circulante"),
     ("2.2.01", "Financiamentos de Longo Prazo (principal)"),
     ("3", "PATRIMÔNIO LÍQUIDO"),
     ("3.1", "Capital Social"), ("3.2", "Reservas"),
     ("3.3", "Lucros/Prejuízos Acumulados"), ("3.4", "Distribuição de Lucros"),
+    ("3.5", "Ajustes de Exercícios Anteriores"),   # CPC 23: implantação de saldos de eventos passados (nunca DRE corrente)
     ("4", "RECEITAS"),
     ("4.1", "Vendas de Produtos"),
     ("4.1.01", "Receitas com Vendas"), ("4.1.02", "Receita com Vendas de Assistência"),
@@ -474,6 +481,25 @@ EVENTOS = {
     # NF-e via matching pleno (reconhecimento_despesa_custo_fabrica: 5.1.01 × baixa do ativo 1.1.06.06).
     # Baixa do passivo com a fábrica ao pagar: passivo × ativo, não toca o resultado.
     "pagamento_fabrica":            ("2.1.04.06", "1.1.01", "Pagamento à fábrica (baixa da Provisão de Custo de Fábrica)"),
+    # ── Ajustes Excepcionais de Fábrica (spec 2026-07-21) ─────────────────────────────────────
+    # Implantação de saldos: eventos PASSADOS entram pelo PL (CPC 23), nunca pela DRE corrente.
+    "implantacao_credito_fabrica":  ("1.1.08", "3.5",       "Implantação de crédito com a fábrica (ajuste de exercícios anteriores)"),
+    "implantacao_divida_fabrica":   ("3.5", "2.1.08",       "Implantação de dívida com a fábrica (ajuste de exercícios anteriores)"),
+    # Aplicações na venda (consumir_saldo — o custo econômico NÃO muda; ajustes de CUSTO usam
+    # ajustar_provisao_delta). Desconto: paga-se menos à fábrica; crédito (ou conta corrente
+    # intercompany, SÓ no razão da compradora) baixa. Acréscimo: o a-pagar sobe casando com a
+    # NF-e; a dívida antiga baixa. DRE intocada nos três.
+    "desconto_excepcional_fabrica":      ("2.1.04.06", "1.1.08", "Desconto excepcional — consumo de crédito com a fábrica"),
+    "desconto_excepcional_intercompany": ("2.1.04.06", "2.1.09", "Desconto excepcional — crédito de loja irmã (conta corrente a pagar)"),
+    "acrescimo_excepcional_fabrica":     ("2.1.08", "2.1.04.06", "Acréscimo excepcional — amortização de dívida com a fábrica"),
+    # Acerto periódico consolidado: SÓ no razão da credora (venda de uma loja nunca lança na outra)
+    "acerto_acordo_intercompany":   ("1.1.09", "1.1.08",    "Acerto do acordo — consumo das lojas do grupo (consolidado por período)"),
+    # Liquidação financeira da conta corrente: cada loja lança a SUA ponta
+    "liquidacao_conta_corrente_devedora": ("2.1.09", "1.1.01", "Liquidação da conta corrente com lojas do grupo (pagamento)"),
+    "liquidacao_conta_corrente_credora":  ("1.1.01", "1.1.09", "Liquidação da conta corrente com lojas do grupo (recebimento)"),
+    # Encerramento com resíduo: baixa espelho da implantação (× 3.5)
+    "baixa_credito_fabrica":        ("3.5", "1.1.08",       "Baixa de resíduo de crédito com a fábrica (encerramento do acordo)"),
+    "baixa_divida_fabrica":         ("2.1.08", "3.5",       "Baixa de resíduo de dívida com a fábrica (encerramento do acordo)"),
     # FASE D: pagamento da obrigação com fornecedor (baixa de Fornecedores a Pagar) — passivo × ativo
     "pagamento_fornecedor":         ("2.1.01", "1.1.01",   "Pagamento a fornecedor (baixa de Fornecedores a Pagar)"),
     # Folha de Pagamento (v10 §2.1): despesa nas contas 5.3 existentes × Caixa (sem conta nova)
@@ -773,7 +799,7 @@ def apropriar_juros_loja(db, owner_tipo, owner_id, projeto_id, valor, ref_base, 
 
 
 def conferencia_pedido(db, owner_tipo, owner_id, projeto_id, custo_fabrica_novo, valor_outros_forn,
-                       ref_base, data=None):
+                       ref_base, data=None, excluir_ajustes=0.0):
     """#13 — Conferência e Implantação do Pedido (etapa 12): DOIS lançamentos auditáveis, ambos
     ativo × provisão, NUNCA DRE:
       (a) ajusta o **Custo de Fábrica** do saldo ATUAL da provisão (2.1.04.06) para `custo_fabrica_novo`
@@ -784,7 +810,12 @@ def conferencia_pedido(db, owner_tipo, owner_id, projeto_id, custo_fabrica_novo,
     {custo_fabrica_delta?, outros_fornecedores?}."""
     out = {}
     _a, prov_cod, _h = EVENTOS[_PROV_FECHAMENTO["custo_fabrica"]]   # 2.1.04.06
-    atual = round(_mov(db, owner_tipo, owner_id, prov_cod, "credor", None, None, projeto_id=projeto_id), 2)
+    # `excluir_ajustes` (spec Ajustes Excepcionais 2026-07-21): efeito LÍQUIDO dos ajustes
+    # excepcionais já aplicados neste projeto (acréscimos − descontos). Sem excluí-lo, re-rodar a
+    # conferência miraria `custo_novo` sobre a provisão JÁ ajustada e reverteria os ajustes
+    # (o delta zero da 1ª conferência não grava ref — não há marca de idempotência).
+    atual = round(_mov(db, owner_tipo, owner_id, prov_cod, "credor", None, None, projeto_id=projeto_id)
+                  - float(excluir_ajustes or 0), 2)
     novo = round(float(custo_fabrica_novo or 0), 2)
     lan_a = ajustar_provisao_delta(db, owner_tipo, owner_id, projeto_id, "custo_fabrica",
                                    atual, novo, ref=ref_base + ":pe", data=data)

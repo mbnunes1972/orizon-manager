@@ -1391,11 +1391,17 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 >
 > **PENDENTE (retomar por aqui):** Verificação manual no navegador — marcadores no PDF (S85),
 > coluna Entrega + selo Atrasado (S86), Custo Especial (S87), Total Flex + remover ambiente (S88),
-> comparação de venda/coluna Complemento na 11c e CFO na AF2 (S91), fluxo completo da 11e (S92–93:
+> comparação de venda/coluna Complemento na 11c e CFO na AF2 (S91), fluxo completo da 11e (S92–94:
 > importar modelos de **Termo Aditivo** e **Aprovação de PE** em Config → Documentos; carregar XML
-> de complemento por ambiente; modal comparativo; negociar a diferença com desconto por ambiente;
-> gerar/assinar Aprovação do PE e Termo Aditivo; concluir a 11e), temas claro/escuro. Frentes
-> candidatas seguintes: Agenda Global, empacotar `comercial`, baseline Alembic.
+> de complemento por ambiente; modal comparativo; negociar a diferença com desconto por ambiente —
+> pagamento nasce à vista/entrada 0; gerar/assinar Aprovação do PE e Termo Aditivo; concluir a 11e),
+> temas claro/escuro.
+>
+> **Frente ABERTA (S95): Ajustes Excepcionais de Fábrica** — fatia backend contábil PRONTA (spec
+> `financeiro/2026-07-21-descontos-acrescimos-excepcionais-fabrica-design.md`); **próxima fatia:
+> frontend** (painel Admin "Acordos com a Fábrica" — lista/extrato/ações — + bloco de preview e
+> aplicação na tela da etapa 12). Frentes candidatas seguintes: Agenda Global, empacotar
+> `comercial`, baseline Alembic.
 >
 > **(Anterior, 2026-07-19 — mantido abaixo por referência.)**
 
@@ -2326,6 +2332,34 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 95 — Ajustes Excepcionais de Fábrica: fatia backend contábil (TDD)
+**Frente da spec `financeiro/2026-07-21-descontos-acrescimos-excepcionais-fabrica-design.md`** (A2;
+motor de negociação INTOCADO). **Entregue:** `mod_ajustes_fabrica.py` puro (ordem fixa desconto sobre
+o conferido → acréscimo sobre o pós-descontos; caps ao DISPONÍVEL compartilhados por acordo;
+esgotamento; vigência/pontual; round por aplicação); 5 contas (`1.1.08`/`2.1.08` saldos, `1.1.09`/
+`2.1.09` conta corrente intercompany, `3.5` PL p/ implantação CPC 23) + 10 eventos; 3 tabelas
+(`acordo_fabrica`/`ajuste_fabrica`/`ajuste_fabrica_aplicacao` — trilha e ponte entre razões);
+endpoints Admin (criar acordo c/ implantação ×3.5, criar ajuste c/ validações, acertar consolidado
+por data-corte idempotente, liquidar capado, encerrar c/ baixa de resíduo, GET lista c/ os 3 saldos)
++ GET preview e aplicação na CONFERÊNCIA (etapa 12, idempotente por `ajx:<proj>:<ajuste>`); devolução
+reverte aplicações proporcionalmente (acertada → pendente NEGATIVA, absorvida no próximo acerto).
+**Intercompany desacoplado decidido por OWNER** (lojas da mesma rede compartilham razão → consumo
+direto; owners distintos → 2.1.09 só na compradora + acerto só na credora). **Bug real achado pelo
+TDD e corrigido na fonte:** re-rodar a conferência REVERTIA os ajustes (delta zero da 1ª não grava
+ref) — `conferencia_pedido` ganhou `excluir_ajustes` (efeito líquido das aplicações) e mira o alvo
+certo em qualquer re-run. **E2E com os exemplos da spec ao centavo:** Loja 3 (100k → CMV 95k / a
+pagar 104,5k / dívida −9,5k → matching → pagamento → conciliação SEM sobra/falta) e triangular
+Inspirium/Verano (lojas avulsas de teste; invariantes Σ2.1.09 == aplicações; acerto idempotente;
+liquidação bilateral zera). **QA Vera (2 achados bloqueantes, ambos corrigidos + regressão):**
+🔴 devolução com ajuste `custo` re-adicionava o valor que o `devolver_venda` genérico já revertera
+(resíduo fantasma no par) — reversão de aplicações agora filtra `tratamento=consumir_saldo`;
+🟠 reconferência com PE diferente congelava os ajustes no valor antigo e o payload divergia do
+razão — aplicação passou a lançar o DELTA (rebase, refs `:rN`), com o cap devolvendo o consumo do
+próprio projeto antes de capar; 🟡 soma de descontos `custo` recorrentes >100% barrada na criação
++ piso na base dos acréscimos; 🟡 conta corrente não segregada por acordo registrada como
+limitação conhecida no spec. Suíte **1357/1355+2**. Frontend (painel Admin + bloco da etapa 12)
+fica para a próxima fatia.
 
 ## Sessão 94 — fix pós-teste do usuário: pagamento do CONTRATADO vazava para o complemento
 **Sintomas (teste manual):** a negociação do complemento puxava o valor TOTAL do contrato (apesar

@@ -1039,6 +1039,69 @@ class AprovacaoPEAssinatura(Base):
     aprovacao = relationship("AprovacaoPE", back_populates="assinaturas")
 
 
+class AcordoFabrica(Base):
+    """Acordo com a fábrica (spec 2026-07-21): crédito (fábrica deve à titular) ou dívida (titular
+    deve à fábrica), com saldo CONTROLADO NO RAZÃO da loja titular (1.1.08 / 2.1.08). O cadastro
+    dispara a implantação pelo PL (× 3.5, CPC 23). Consumido pelos ajustes vinculados até esgotar."""
+    __tablename__ = "acordo_fabrica"
+
+    id               = Column(Integer,  primary_key=True, autoincrement=True)
+    descricao        = Column(Text,     nullable=False)
+    tipo             = Column(String(10), nullable=False)   # credito | divida
+    loja_titular_id  = Column(Integer,  ForeignKey("lojas.id"), nullable=False)
+    conta_saldo      = Column(String(10), nullable=False)   # 1.1.08 | 2.1.08
+    valor_implantado = Column(Float,    nullable=False, default=0.0)
+    status           = Column(String(12), nullable=False, default="ativo")   # ativo|esgotado|encerrado
+    criado_por_id    = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    criado_em        = Column(DateTime, default=datetime.utcnow)
+
+    ajustes = relationship("AjusteFabrica", back_populates="acordo")
+
+
+class AjusteFabrica(Base):
+    """Regra de consumo por loja (spec 2026-07-21): % de desconto/acréscimo aplicado na
+    Conferência do Pedido sobre o valor de fábrica. `tratamento='custo'` (sem acordo) muda o
+    custo econômico via ajustar_provisao_delta; `'consumir_saldo'` amortiza o acordo vinculado.
+    `loja_id ≠ loja_titular` do acordo ⇒ fluxo intercompany (conta corrente + acerto)."""
+    __tablename__ = "ajuste_fabrica"
+
+    id            = Column(Integer,  primary_key=True, autoincrement=True)
+    acordo_id     = Column(Integer,  ForeignKey("acordo_fabrica.id"), nullable=True)
+    loja_id       = Column(Integer,  ForeignKey("lojas.id"), nullable=False)   # quem consome
+    descricao     = Column(Text,     nullable=True)
+    tipo          = Column(String(10), nullable=False)    # desconto | acrescimo
+    natureza      = Column(String(10), nullable=False, default="recorrente")   # recorrente|pontual
+    pct           = Column(Float,    nullable=False)
+    base          = Column(String(16), nullable=False, default="pos_descontos")  # |valor_conferido
+    tratamento    = Column(String(14), nullable=False)    # custo | consumir_saldo
+    vigencia_de   = Column(DateTime, nullable=True)
+    vigencia_ate  = Column(DateTime, nullable=True)
+    projetos_json = Column(Text,     nullable=True)       # pontual: lista de nome_safe vinculados
+    ativo         = Column(Integer,  nullable=False, default=1)
+    criado_por_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    criado_em     = Column(DateTime, default=datetime.utcnow)
+
+    acordo = relationship("AcordoFabrica", back_populates="ajustes")
+
+
+class AjusteFabricaAplicacao(Base):
+    """Aplicação de um ajuste numa venda (trilha de auditoria + ponte entre razões no
+    intercompany). `pendente_acerto` até o acerto consolidado da credora; aplicações NEGATIVAS
+    registram reversões (devolução) de aplicações já acertadas — só a credora lança na credora."""
+    __tablename__ = "ajuste_fabrica_aplicacao"
+
+    id             = Column(Integer,  primary_key=True, autoincrement=True)
+    ajuste_id      = Column(Integer,  ForeignKey("ajuste_fabrica.id"), nullable=False)
+    projeto_nome   = Column(Text,     nullable=False, index=True)
+    base_calculo   = Column(Float,    nullable=True)
+    pct_snapshot   = Column(Float,    nullable=True)
+    valor          = Column(Float,    nullable=False)
+    status         = Column(String(16), nullable=False, default="n/a")   # pendente_acerto|acertada|n/a
+    lancamento_ref = Column(Text,     nullable=True)
+    acerto_ref     = Column(Text,     nullable=True)
+    criado_em      = Column(DateTime, default=datetime.utcnow)
+
+
 class CicloDocumento(Base):
     """Documento carregado numa subfase do ciclo. Append-only: nunca sobrescreve."""
     __tablename__ = "ciclo_documentos"
