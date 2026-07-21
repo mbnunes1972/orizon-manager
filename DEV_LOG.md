@@ -2334,6 +2334,20 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 102 — DRE/Balanço: período selecionável + TODAS as contas com lançamento
+**Relato do usuário:** a DRE analítica não mostrava todas as contas com lançamento; pediu seletor de
+datas início/fim (e idem no Balanço), com contas sem movimento fora. **Bug REAL encontrado na
+investigação:** `_mov`/`_detalhe_grupo` filtravam `tipo="analitica"` — mas o `seed_plano` CONVERTE um
+pai em sintética quando ele ganha filho no backfill; lançamentos diretos anteriores à conversão
+SUMIAM da DRE/Balanço (do total E do analítico). Fix: toda conta com lançamento no período entra
+(sem dupla contagem — totais são por lançamento direto); movimento que zera no líquido aparece com
+0,00 (teve lançamentos); sem movimento, fora. **Frontend:** DRE ganhou "Período: [de] a [até]" (+
+Limpar) — o backend já aceitava `?ini&fim`, o fetch é que nunca enviava; sublinhas zeradas sem
+detalhe somem. **Balanço:** seletor "Posição em" (`?data`, corte) + nota explicando por que balanço
+não tem data-início (saldo patrimonial é acumulado; recorte quebraria Ativo = Passivo + PL).
+4 testes novos (`test_dre_balanco_periodo.py`), incluindo o cenário do pai-convertido e o corte do
+balanço. Suíte **1369/1367+2**.
+
 ## Sessão 101 — cadastro completo de Credor/Devedor (modal) + reorganização do painel
 **Pedidos do usuário (em teste):** (1) cadastro completo da contraparte — **CNPJ, telefone/e-mail
 do contato financeiro e endereço** — num MODAL (com ViaCEP preenchendo logradouro/bairro/cidade/UF;

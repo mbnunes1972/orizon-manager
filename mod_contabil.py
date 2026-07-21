@@ -1408,9 +1408,12 @@ def _totais_conta(db, ot, oid, conta_id, ini, fim, projeto_id=None):
 
 
 def _mov(db, ot, oid, prefixo, sentido, ini, fim, projeto_id=None):
-    """Movimento das analíticas sob `prefixo`, no sentido pedido ('credor' = C−D p/ receitas;
-    'devedor' = D−C p/ deduções/despesas). `projeto_id` filtra a dimensão gerencial."""
-    contas = [c for c in db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid, tipo="analitica").all()
+    """Movimento das contas sob `prefixo`, no sentido pedido ('credor' = C−D p/ receitas;
+    'devedor' = D−C p/ deduções/despesas). `projeto_id` filtra a dimensão gerencial.
+    Considera TODAS as contas (não só analíticas): o seed_plano converte um pai em sintética
+    quando ele ganha filho no backfill — lançamentos diretos anteriores à conversão sumiam da
+    DRE/Balanço (fix 2026-07-22). Sem dupla contagem: _totais_conta é por lançamento direto."""
+    contas = [c for c in db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid).all()
               if c.codigo == prefixo or c.codigo.startswith(prefixo + ".")]
     deb = cred = 0.0
     for c in contas:
@@ -1425,15 +1428,19 @@ def _detalhe_grupo(db, ot, oid, prefixos, sentido, ini, fim):
     Alimenta o modo Analítico da DRE (v5 §3.1) — Resumido usa só os totais de nível 2."""
     if isinstance(prefixos, str):
         prefixos = [prefixos]
-    contas = db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid, tipo="analitica").all()
+    # TODAS as contas com LANÇAMENTO no período aparecem (fix 2026-07-22): inclui sintéticas com
+    # lançamento direto (pai convertido pelo backfill) e contas cujo líquido zera mas tiveram
+    # movimento. Sem movimento → fora (pedido do usuário).
+    contas = db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid).all()
     linhas = []
     for c in sorted(contas, key=lambda x: x.codigo):
         if not any(c.codigo == p or c.codigo.startswith(p + ".") for p in prefixos):
             continue
         d, cr = _totais_conta(db, ot, oid, c.id, ini, fim)
+        if d == 0 and cr == 0:
+            continue
         val = round(cr - d if sentido == "credor" else d - cr, 2)
-        if val:
-            linhas.append({"codigo": c.codigo, "nome": c.nome, "valor": val})
+        linhas.append({"codigo": c.codigo, "nome": c.nome, "valor": val})
     return linhas
 
 

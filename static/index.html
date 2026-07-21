@@ -10684,11 +10684,16 @@ async function repasseRegistrar(){
 }
 
 let _balModo = 'resumido';   // 'resumido' | 'analitico'
+let _balData = '';   // posição em (data de corte — 2026-07-22)
 function balSetModo(m){ _balModo = m; balancoCarregar(); }
+function balPeriodo(){
+  _balData = document.getElementById('bal-data')?.value || '';
+  balancoCarregar();
+}
 async function balancoCarregar(){
   const box = document.getElementById('bal-box');
   if(!box) return;
-  const r = await fetch('/api/financeiro/balanco', {credentials:'same-origin'});
+  const r = await fetch('/api/financeiro/balanco'+(_balData?'?data='+_balData:''), {credentials:'same-origin'});
   if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Módulo financeiro inativo ou sem acesso.</em>'; return; }
   const b = (await r.json().catch(()=>({}))).balanco;
   if(!b){ box.innerHTML='<em style="color:var(--muted)">Falha ao carregar o balanço.</em>'; return; }
@@ -10717,9 +10722,14 @@ async function balancoCarregar(){
   const confere = b.confere
     ? '<div style="font-size:10px;color:var(--accent);margin-top:10px">✓ Ativo = Passivo + PL (fecha por partida dobrada)</div>'
     : '<div style="font-size:10px;color:var(--warn);margin-top:10px"><i class="ti ti-alert-triangle"></i> Ativo ≠ Passivo + PL — verificar lançamentos</div>';
-  box.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:10px">'+btn('resumido','Resumido')+btn('analitico','Analítico')+'</div>'
-    + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Posição patrimonial acumulada'
-    +(b.data_corte?(' até '+esc(b.data_corte.slice(0,10))):' (data atual)')+'.</div>'
+  box.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:6px">'+btn('resumido','Resumido')+btn('analitico','Analítico')+'</div>'
+    + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:12px;color:var(--muted)">'
+    + 'Posição em: <input type="date" id="bal-data" value="'+_balData+'" onchange="balPeriodo()" style="padding:4px 6px;font-size:12px">'
+    + (_balData ? ' <button class="btn btn-ghost btn-sm" onclick="_balData=\'\';balancoCarregar()">Hoje</button>' : '')
+    + '</div>'
+    + '<div style="font-size:11px;color:var(--muted);margin-bottom:10px">Posição patrimonial ACUMULADA desde o início'
+    +(b.data_corte?(' até '+esc(b.data_corte.slice(0,10))):' (data atual)')
+    +'. Balanço não tem "data início": o saldo patrimonial é acumulado — um recorte quebraria Ativo = Passivo + PL.</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">'
     + '<div>'+ativoCol+'</div><div>'+passivoCol+'</div></div>'
     + confere;
@@ -10816,16 +10826,27 @@ async function projDreCarregar(){
 
 function _fBRL(v){ return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 let _dreModo = 'resumido';   // 'resumido' | 'analitico' (v5 §3.1)
+let _dreIni = '', _dreFim = '';   // período do relatório (2026-07-22)
 function dreSetModo(m){ _dreModo = m; dreCarregar(); }
+function drePeriodo(){
+  _dreIni = document.getElementById('dre-ini')?.value || '';
+  _dreFim = document.getElementById('dre-fim')?.value || '';
+  dreCarregar();
+}
 async function dreCarregar(){
   const box = document.getElementById('dre-box');
   if(!box) return;
-  const r = await fetch('/api/financeiro/dre', {credentials:'same-origin'});
+  const q = [];
+  if(_dreIni) q.push('ini='+_dreIni);
+  if(_dreFim) q.push('fim='+_dreFim);
+  const r = await fetch('/api/financeiro/dre'+(q.length?'?'+q.join('&'):''), {credentials:'same-origin'});
   if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Módulo financeiro inativo ou sem acesso.</em>'; return; }
   const d = (await r.json().catch(()=>({}))).dre;
   if(!d){ box.innerHTML='<em style="color:var(--muted)">Falha ao carregar a DRE.</em>'; return; }
   const det = d.detalhe || {};
   const linha=(lbl,val,opts)=>{ opts=opts||{};
+    // linha subordinada sem movimento no período não aparece (pedido 2026-07-22)
+    if(opts.sub && !val && !((det[opts.chave]||[]).length)) return '';
     const cor = opts.total ? 'var(--accent)' : (val<0?'var(--st-quente)':'var(--text)');
     let html = '<div style="display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--border);'
       +(opts.total?'font-weight:700;border-top:1px solid var(--border-strong)':'')+(opts.sub?'padding-left:26px;color:var(--muted)':'')+'">'
@@ -10838,8 +10859,14 @@ async function dreCarregar(){
     }
     return html; };
   const btn=(m,lbl)=>'<button class="btn '+(_dreModo===m?'btn-primary':'btn-ghost')+' btn-sm" onclick="dreSetModo(\''+m+'\')">'+lbl+'</button>';
+  const perHtml = '<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;font-size:12px;color:var(--muted)">'
+    + 'Período: <input type="date" id="dre-ini" value="'+_dreIni+'" onchange="drePeriodo()" style="padding:4px 6px;font-size:12px">'
+    + ' a <input type="date" id="dre-fim" value="'+_dreFim+'" onchange="drePeriodo()" style="padding:4px 6px;font-size:12px">'
+    + (_dreIni||_dreFim ? ' <button class="btn btn-ghost btn-sm" onclick="_dreIni=\'\';_dreFim=\'\';dreCarregar()">Limpar</button>' : '')
+    + '</div>';
   box.innerHTML = '<div style="max-width:560px">'
-    + '<div style="display:flex;gap:6px;margin-bottom:10px">'+btn('resumido','Resumido')+btn('analitico','Analítico')+'</div>'
+    + '<div style="display:flex;gap:6px;margin-bottom:6px">'+btn('resumido','Resumido')+btn('analitico','Analítico')+'</div>'
+    + perHtml
     + linha('Receita Bruta (produto + serviço)', d.receita_bruta, {chave:'receita_bruta'})
     + linha('(−) Deduções', -d.deducoes, {sub:true, chave:'deducoes'})
     + linha('= Receita Líquida', d.receita_liquida, {total:true})
