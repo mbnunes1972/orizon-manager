@@ -9797,15 +9797,18 @@ async function acordosFabricaCarregar(){
   }
   catch(e){ box.innerHTML = '<em style="color:var(--err);font-size:12px">Erro ao carregar.</em>'; return; }
   const _cps = (jc && jc.ok && jc.contrapartes) || [];
+  _afContrapartes = _cps;
   if(!j.ok){ box.innerHTML = `<em style="color:var(--muted);font-size:12px">${esc(j.erro||'Acesso negado.')}</em>`; return; }
   _afAcordos = j.acordos || [];
   const fmt = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
   const lojaNome = id => { const e = (_empresas||[]).find(x => x.loja_id === id); return e ? e.nome : ('Loja #'+id); };
   const lojaSel = id => `<select id="${id}" style="padding:4px 6px;font-size:12px">`
     + (_empresas||[]).map(e => `<option value="${e.loja_id}">${esc(e.nome)}</option>`).join('') + '</select>';
-  const ctpRotulo = a => a.contraparte_tipo === 'banco' ? ('banco' + (a.contraparte_nome ? ' · '+esc(a.contraparte_nome) : ''))
-    : a.contraparte_tipo === 'empresa' ? ('empresa' + (a.contraparte_nome ? ' · '+esc(a.contraparte_nome) : ''))
-    : 'fábrica';
+  const _tipoRot = t => t === 'banco' ? 'banco' : t === 'empresa' ? 'empresa' : 'fábrica';
+  // SEMPRE nomeia a contraparte (com duas fábricas cadastradas, "fábrica" sozinho não diz nada)
+  const ctpRotulo = a => a.contraparte_nome
+    ? `<strong>${esc(a.contraparte_nome)}</strong> <span style="color:var(--muted)">(${_tipoRot(a.contraparte_tipo)})</span>`
+    : _tipoRot(a.contraparte_tipo);
   const stBadge = s => s==='ativo' ? '<span style="color:var(--ok)">ativo</span>'
     : s==='esgotado' ? '<span style="color:var(--warn)">esgotado</span>'
     : '<span style="color:var(--muted)">encerrado</span>';
@@ -9837,7 +9840,8 @@ async function acordosFabricaCarregar(){
     <div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:10px;padding:12px 14px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:center">
         <div><strong>${esc(a.descricao)}</strong>
-          <span style="color:var(--muted);font-size:12px"> · ${a.tipo === 'credito' ? 'crédito' : 'dívida'} · ${ctpRotulo(a)} · titular ${esc(lojaNome(a.loja_titular_id))} · ${a.conta_saldo}</span></div>
+          <span style="font-size:12px"> — ${a.tipo === 'credito' ? 'crédito com' : 'dívida com'} ${ctpRotulo(a)}</span>
+          <div style="color:var(--muted);font-size:11px;margin-top:2px">titular: ${esc(lojaNome(a.loja_titular_id))} · conta ${a.conta_saldo}</div></div>
         <div style="font-size:12px">${stBadge(a.status)}
           <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="afExtrato(${a.id})">Extrato</button></div>
       </div>
@@ -9859,43 +9863,48 @@ async function acordosFabricaCarregar(){
         onchange="afToggleAjuste(${x.id}, this.checked)"><span class="sw-slider"></span></label>
     </div>`).join('') || '<div style="font-size:12px;color:var(--muted)">Nenhum.</div>';
 
-  box.innerHTML = `
-    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;max-width:760px">
-      Créditos e dívidas da loja — com a <strong>fábrica</strong>, com <strong>empresas</strong>
-      (do grupo ou não; cada loja registra só o seu lado) e com <strong>bancos</strong>
-      (empréstimos). Os lançamentos contábeis (partidas dobradas) são automáticos; os %
-      vinculados aplicam na <strong>Conferência do Pedido</strong> (etapa 12).
-    </div>
-    <div style="margin-bottom:12px">
-      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Credores e Devedores cadastrados</div>
-      <div style="font-size:12px;margin-bottom:6px;display:flex;gap:10px;flex-wrap:wrap">${_cps.length ? _cps.map(c =>
-        `<span style="display:inline-flex;align-items:center;gap:4px">${esc(c.nome)}
-          <span style="color:var(--muted)">(${c.tipo === 'fabrica' ? 'fábrica' : c.tipo})</span>
-          <a style="cursor:pointer;color:var(--muted)" title="Editar" onclick="afEditarContraparte(${c.id},'${esc(c.nome).replace(/'/g,"\\'")}','${c.tipo}')"><i class="ti ti-pencil"></i></a>
-          <a style="cursor:pointer;color:var(--muted)" title="Apagar" onclick="afApagarContraparte(${c.id},'${esc(c.nome).replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></a>
-        </span>`).join('') : '<span style="color:var(--muted)">Nenhum cadastrado.</span>'}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <input type="text" id="af-cp-nome" placeholder="Nome (ex.: Banco Itaú, Verano)" style="min-width:180px;padding:5px 8px;font-size:12px">
-        <select id="af-cp-tipo" style="padding:4px 6px;font-size:12px">
-          <option value="fabrica">Fábrica</option><option value="empresa">Empresa</option><option value="banco">Banco</option></select>
-        <button class="btn btn-ghost btn-sm" onclick="afNovaContraparte()">Cadastrar</button>
-      </div>
-    </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
-      <input type="text" id="af-novo-desc" placeholder="Descrição do acordo" style="flex:1;min-width:170px;padding:5px 8px;font-size:12px">
-      <select id="af-novo-cp" style="padding:4px 6px;font-size:12px" onchange="afNovoCpChange()">
-        ${_cps.map(c => `<option value="${c.id}" data-tipo="${c.tipo}">${esc(c.nome)}</option>`).join('') || '<option value="">— cadastre uma contraparte —</option>'}
-      </select>
-      <select id="af-novo-tipo" style="padding:4px 6px;font-size:12px">
-        <option value="credito">crédito (nos devem)</option><option value="divida">dívida (devemos)</option></select>
-      ${lojaSel('af-novo-loja')}
-      <input type="text" id="af-novo-valor" inputmode="numeric" placeholder="Valor R$" oninput="mascaraMoedaInput(this)" style="width:120px;padding:5px 8px;font-size:12px;font-family:var(--font-mono)">
-      <label id="af-novo-capt-wrap" style="display:none;font-size:11px;color:var(--muted);align-items:center;gap:4px"><input type="checkbox" id="af-novo-capt"> dinheiro entra agora (empréstimo novo)</label>
-      <button class="btn btn-primary btn-sm" onclick="afNovoAcordo()">Implantar acordo</button>
-    </div>
+  const secao = (titulo, corpo, sub='') => `
+    <div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 16px;margin-bottom:14px">
+      <div style="font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:${sub?'2px':'10px'}">${titulo}</div>
+      ${sub ? `<div style="font-size:11px;color:var(--muted);margin-bottom:10px">${sub}</div>` : ''}
+      ${corpo}
+    </div>`;
+  const campo = (lbl, inner, largura='') => `
+    <label style="display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted);${largura}">
+      ${lbl}${inner}</label>`;
+
+  const secContrapartes = secao('1 · Credores e Devedores',
+    `<div style="font-size:12px;margin-bottom:8px;display:flex;gap:12px;flex-wrap:wrap">${_cps.length ? _cps.map(c =>
+      `<span style="display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:4px 10px">
+        <strong>${esc(c.nome)}</strong>
+        <span style="color:var(--muted)">(${_tipoRot(c.tipo)})</span>
+        <a style="cursor:pointer;color:var(--muted)" title="Editar" onclick="afCpAbrirModal(${c.id})"><i class="ti ti-pencil"></i></a>
+        <a style="cursor:pointer;color:var(--muted)" title="Apagar" onclick="afApagarContraparte(${c.id},'${esc(c.nome).replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></a>
+      </span>`).join('') : '<span style="color:var(--muted)">Nenhum cadastrado.</span>'}</div>
+    <button class="btn btn-ghost btn-sm" onclick="afCpAbrirModal(null)">+ Cadastrar credor/devedor</button>`,
+    'Cadastro das entidades (fábrica, empresas, bancos) contra as quais os acordos são lançados.');
+
+  const secNovoAcordo = secao('2 · Novo acordo',
+    `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      ${campo('Descrição', `<input type="text" id="af-novo-desc" placeholder="ex.: Empréstimo capital de giro" style="padding:6px 9px;font-size:12px;min-width:200px">`, 'flex:1;min-width:200px')}
+      ${campo('Com quem (contraparte)', `<select id="af-novo-cp" style="padding:6px 8px;font-size:12px" onchange="afNovoCpChange()">
+        ${_cps.map(c => `<option value="${c.id}" data-tipo="${c.tipo}">${esc(c.nome)} (${_tipoRot(c.tipo)})</option>`).join('') || '<option value="">— cadastre acima —</option>'}
+      </select>`)}
+      ${campo('Natureza', `<select id="af-novo-tipo" style="padding:6px 8px;font-size:12px">
+        <option value="credito">crédito (nos devem)</option><option value="divida">dívida (devemos)</option></select>`)}
+      ${campo('Loja titular', lojaSel('af-novo-loja'))}
+      ${campo('Valor', `<input type="text" id="af-novo-valor" inputmode="numeric" placeholder="R$" oninput="mascaraMoedaInput(this)" style="width:120px;padding:6px 9px;font-size:12px;font-family:var(--font-mono)">`)}
+      <label id="af-novo-capt-wrap" style="display:none;font-size:11px;color:var(--muted);align-items:center;gap:4px;padding-bottom:6px"><input type="checkbox" id="af-novo-capt"> dinheiro entra agora (empréstimo novo)</label>
+      <button class="btn btn-primary btn-sm" style="height:30px" onclick="afNovoAcordo()">Implantar acordo</button>
+    </div>`,
+    'Saldo pré-existente entra pelo PL (CPC 23); empréstimo novo com "dinheiro entra agora" lança no caixa.');
+
+  box.innerHTML = secContrapartes + secNovoAcordo + `
+    <div style="font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:10px">3 · Acordos vigentes</div>
     ${_afAcordos.map(cardAcordo).join('') || '<em style="color:var(--muted);font-size:12px">Nenhum acordo cadastrado.</em>'}
-    <div style="margin-top:16px">
-      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Descontos/Acréscimos da fábrica (% sobre o Custo de Fábrica na conferência; vigência = data da VENDA)</div>
+    <div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 16px;margin-top:14px">
+      <div style="font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:2px">4 · Descontos/Acréscimos da fábrica</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">% sobre o Custo de Fábrica, aplicado na Conferência do Pedido; vigência avaliada pela data da VENDA. O lado financeiro (crédito/dívida) é lançado manualmente nos acordos acima.</div>
       ${avulsos}
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
         ${lojaSel('af-av-loja')}
@@ -9920,12 +9929,52 @@ function afNovoCpChange(){
   if(capt) capt.style.display = tipo === 'banco' ? 'flex' : 'none';
 }
 
-async function afEditarContraparte(id, nomeAtual, tipoAtual){
-  const nome = prompt('Nome da contraparte:', nomeAtual);
-  if(nome === null) return;
-  const j = await _afPost(`/api/admin/contrapartes-financeiras/${id}`,
-                          {nome: nome.trim(), tipo: tipoAtual}, 'Contraparte atualizada.');
-  if(j) acordosFabricaCarregar();
+let _afContrapartes = [];
+let _afCpEditId = null;
+const _AF_CP_CAMPOS = ['nome','tipo','cnpj','telefone','email','cep','logradouro','numero',
+                       'complemento','bairro','cidade','uf'];
+
+function afCpAbrirModal(id){
+  _afCpEditId = id;
+  const cp = id ? (_afContrapartes||[]).find(c => c.id === id) : null;
+  document.getElementById('af-cp-titulo').textContent = cp ? ('Editar — ' + cp.nome) : 'Novo Credor/Devedor';
+  _AF_CP_CAMPOS.forEach(c => {
+    const el = document.getElementById('af-cpm-'+c);
+    if(el) el.value = (cp && cp[c]) || (c === 'tipo' ? 'fabrica' : '');
+  });
+  document.getElementById('modal-af-cp').style.display = 'flex';
+  setTimeout(()=>{ document.getElementById('af-cpm-nome')?.focus(); }, 50);
+}
+
+let _afCpCepTimer = null;
+function afCpCepBuscar(el){
+  const v = el.value.replace(/\D/g,'').slice(0,8);
+  el.value = v.length>5 ? v.slice(0,5)+'-'+v.slice(5) : v;
+  clearTimeout(_afCpCepTimer);
+  if(v.length===8) _afCpCepTimer = setTimeout(async()=>{
+    try{
+      const d = await (await fetch('https://viacep.com.br/ws/'+v+'/json/')).json();
+      if(d.erro) return;
+      const setF=(id,val)=>{ const e=document.getElementById('af-cpm-'+id); if(e && !e.value) e.value=val||''; };
+      setF('logradouro', d.logradouro); setF('bairro', d.bairro);
+      setF('cidade', d.localidade); setF('uf', d.uf);
+    }catch(e){}
+  }, 400);
+}
+
+async function afCpSalvar(){
+  const payload = {};
+  _AF_CP_CAMPOS.forEach(c => {
+    payload[c] = (document.getElementById('af-cpm-'+c)?.value || '').trim();
+  });
+  if(!payload.nome){ await avisoPopup('Informe o nome.', {titulo:'Credor/Devedor'}); return; }
+  const url = _afCpEditId ? `/api/admin/contrapartes-financeiras/${_afCpEditId}`
+                          : '/api/admin/contrapartes-financeiras';
+  const j = await _afPost(url, payload, _afCpEditId ? 'Contraparte atualizada.' : 'Contraparte cadastrada.');
+  if(j){
+    document.getElementById('modal-af-cp').style.display = 'none';
+    acordosFabricaCarregar();
+  }
 }
 
 async function afApagarContraparte(id, nome){
@@ -9933,14 +9982,6 @@ async function afApagarContraparte(id, nome){
                            {titulo:'Acordos Financeiros'})) return;
   const j = await _afPost(`/api/admin/contrapartes-financeiras/${id}`, {apagar: true},
                           'Contraparte apagada.');
-  if(j) acordosFabricaCarregar();
-}
-
-async function afNovaContraparte(){
-  const j = await _afPost('/api/admin/contrapartes-financeiras', {
-    nome: (document.getElementById('af-cp-nome')?.value||'').trim(),
-    tipo: document.getElementById('af-cp-tipo')?.value,
-  }, 'Contraparte cadastrada.');
   if(j) acordosFabricaCarregar();
 }
 
@@ -15610,6 +15651,54 @@ function bfFechar() {
 </div>
 
 <!-- Modal: Total Flex — Aviso parcela negativa -->
+<!-- Acordos Financeiros: modal de cadastro completo de Credor/Devedor (2026-07-22) -->
+<div id="modal-af-cp"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:600;
+            align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;
+              padding:26px 24px;max-width:560px;width:94%;max-height:88vh;overflow-y:auto;
+              animation:mIn .2s ease;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3 id="af-cp-titulo" style="margin:0;font-size:15px;color:var(--text)">Credor/Devedor</h3>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-af-cp').style.display='none'">✕</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px">
+      <label style="grid-column:1/-1">Nome / Razão social *
+        <input id="af-cpm-nome" style="width:100%;padding:7px 9px"></label>
+      <label>Tipo *
+        <select id="af-cpm-tipo" style="width:100%;padding:7px 9px">
+          <option value="fabrica">Fábrica</option><option value="empresa">Empresa</option>
+          <option value="banco">Banco</option></select></label>
+      <label>CNPJ
+        <input id="af-cpm-cnpj" placeholder="00.000.000/0000-00" style="width:100%;padding:7px 9px"></label>
+      <div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:8px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Contato financeiro</div>
+      <label>Telefone
+        <input id="af-cpm-telefone" style="width:100%;padding:7px 9px"></label>
+      <label>E-mail
+        <input id="af-cpm-email" type="email" style="width:100%;padding:7px 9px"></label>
+      <div style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:8px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em">Endereço</div>
+      <label>CEP
+        <input id="af-cpm-cep" oninput="afCpCepBuscar(this)" style="width:100%;padding:7px 9px"></label>
+      <label>Logradouro
+        <input id="af-cpm-logradouro" style="width:100%;padding:7px 9px"></label>
+      <label>Número
+        <input id="af-cpm-numero" style="width:100%;padding:7px 9px"></label>
+      <label>Complemento
+        <input id="af-cpm-complemento" style="width:100%;padding:7px 9px"></label>
+      <label>Bairro
+        <input id="af-cpm-bairro" style="width:100%;padding:7px 9px"></label>
+      <div style="display:flex;gap:8px">
+        <label style="flex:1">Cidade<input id="af-cpm-cidade" style="width:100%;padding:7px 9px"></label>
+        <label style="width:64px">UF<input id="af-cpm-uf" maxlength="2" style="width:100%;padding:7px 9px;text-transform:uppercase"></label>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-af-cp').style.display='none'">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="afCpSalvar()">Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Correção Fatia 3 PE: modal comparativo do Complemento (contratado × complemento × diferença) -->
 <div id="modal-pe-compl"
      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:600;

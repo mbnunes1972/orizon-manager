@@ -1723,8 +1723,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
             db = get_session()
             try:
-                cps = [{"id": c.id, "nome": c.nome, "tipo": c.tipo}
-                       for c in db.query(ContraparteFinanceira)
+                cps = [_contraparte_dict(c) for c in db.query(ContraparteFinanceira)
                        .order_by(ContraparteFinanceira.nome.asc()).all()]
                 self.send_json({"ok": True, "contrapartes": cps})
             finally:
@@ -3414,9 +3413,18 @@ class Handler(BaseHTTPRequestHandler):
                     return lj if (lj and mod_tenancy.pode_ver_loja(
                         ator, {"id": lj.id, "rede_id": lj.rede_id})) else None
 
+                _CP_CAMPOS = ("cnpj", "telefone", "email", "cep", "logradouro", "numero",
+                              "complemento", "bairro", "cidade", "uf")
+
+                def _cp_aplicar_campos(cp_obj):
+                    for _c in _CP_CAMPOS:
+                        if _c in req:
+                            setattr(cp_obj, _c, (str(req.get(_c) or "").strip() or None))
+
                 if path == "/api/admin/contrapartes-financeiras":
                     # Revisão 2026-07-22: cadastro de Credor/Devedor — o papel vem do TIPO de
-                    # cada acordo lançado contra a contraparte.
+                    # cada acordo lançado contra a contraparte. Cadastro completo: CNPJ,
+                    # contato financeiro (telefone/e-mail) e endereço.
                     nome_cp = (req.get("nome") or "").strip()
                     tipo_cp = (req.get("tipo") or "").strip()
                     if not nome_cp or tipo_cp not in ("fabrica", "empresa", "banco"):
@@ -3429,9 +3437,9 @@ class Handler(BaseHTTPRequestHandler):
                                         "este nome."}, code=400); return
                     cp = ContraparteFinanceira(nome=nome_cp, tipo=tipo_cp,
                                                criado_por_id=usuario.get("id"))
+                    _cp_aplicar_campos(cp)
                     db.add(cp); db.commit()
-                    self.send_json({"ok": True, "contraparte": {"id": cp.id, "nome": cp.nome,
-                                    "tipo": cp.tipo}})
+                    self.send_json({"ok": True, "contraparte": _contraparte_dict(cp)})
                     return
 
                 m_cp = re.match(r'^/api/admin/contrapartes-financeiras/(\d+)$', path)
@@ -3463,13 +3471,13 @@ class Handler(BaseHTTPRequestHandler):
                                         "nome."}, code=400); return
                     cp.nome = nome_cp
                     cp.tipo = tipo_cp
+                    _cp_aplicar_campos(cp)
                     # espelha o nome denormalizado nos acordos vinculados
                     for ac_upd in db.query(AcordoFabrica).filter_by(contraparte_id=cp.id).all():
                         ac_upd.contraparte_nome = nome_cp
                         ac_upd.contraparte_tipo = tipo_cp
                     db.commit()
-                    self.send_json({"ok": True, "contraparte": {"id": cp.id, "nome": cp.nome,
-                                    "tipo": cp.tipo}})
+                    self.send_json({"ok": True, "contraparte": _contraparte_dict(cp)})
                     return
 
                 if path == "/api/admin/acordos-fabrica":
@@ -9885,6 +9893,14 @@ def _complemento_diferencas(db, nome_safe):
 # ── Ajustes Excepcionais de Fábrica (spec 2026-07-21) — composition root ─────────────────────
 # O razão só BOOKA (mod_contabil); o cálculo é do mod_ajustes_fabrica (puro). O saldo POR ACORDO
 # vem da trilha de aplicações (a conta do razão consolida acordos da mesma natureza da loja).
+
+def _contraparte_dict(c):
+    return {"id": c.id, "nome": c.nome, "tipo": c.tipo,
+            "cnpj": c.cnpj or "", "telefone": c.telefone or "", "email": c.email or "",
+            "cep": c.cep or "", "logradouro": c.logradouro or "", "numero": c.numero or "",
+            "complemento": c.complemento or "", "bairro": c.bairro or "",
+            "cidade": c.cidade or "", "uf": c.uf or ""}
+
 
 def _acordo_saldos(db, acordo):
     """Saldo do acordo (revisão Acordos Financeiros, 2026-07-21) = implantado + aplicações COM

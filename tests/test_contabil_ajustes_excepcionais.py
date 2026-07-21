@@ -492,3 +492,26 @@ def test_contraparte_editar_e_apagar(http_client_factory, seed, app_db):
     cp2 = body["contraparte"]["id"]
     st, body = su.post(f"/api/admin/contrapartes-financeiras/{cp2}", {"apagar": True})
     assert st == 200 and body["apagada"] is True
+
+
+def test_contraparte_cadastro_completo(http_client_factory, seed, app_db):
+    # cadastro completo (2026-07-22): CNPJ, contato financeiro e endereço — round-trip
+    su = _login(http_client_factory, "super")
+    st, body = su.post("/api/admin/contrapartes-financeiras",
+                       {"nome": "Fábrica Completa", "tipo": "fabrica",
+                        "cnpj": "12.345.678/0001-90", "telefone": "(47) 99999-0000",
+                        "email": "financeiro@fabrica.com", "cep": "89201-000",
+                        "logradouro": "Rua das Indústrias", "numero": "1000",
+                        "bairro": "Distrito", "cidade": "Joinville", "uf": "SC"})
+    assert st == 200, body
+    cp = body["contraparte"]
+    assert cp["cnpj"] == "12.345.678/0001-90" and cp["email"] == "financeiro@fabrica.com"
+    # GET devolve completo; PUT parcial preserva o resto
+    st, body = su.get("/api/admin/contrapartes-financeiras")
+    reg = [c for c in body["contrapartes"] if c["id"] == cp["id"]][0]
+    assert reg["cidade"] == "Joinville" and reg["telefone"] == "(47) 99999-0000"
+    st, body = su.post(f"/api/admin/contrapartes-financeiras/{cp['id']}",
+                       {"nome": "Fábrica Completa", "tipo": "fabrica",
+                        "telefone": "(47) 98888-1111"})
+    assert st == 200 and body["contraparte"]["telefone"] == "(47) 98888-1111"
+    assert body["contraparte"]["cnpj"] == "12.345.678/0001-90"   # não enviado → preservado

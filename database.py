@@ -1048,6 +1048,17 @@ class ContraparteFinanceira(Base):
     id            = Column(Integer,  primary_key=True, autoincrement=True)
     nome          = Column(Text,     nullable=False)
     tipo          = Column(String(10), nullable=False)   # fabrica | empresa | banco
+    # cadastro completo (pedido 2026-07-22): CNPJ, contato financeiro e endereço
+    cnpj          = Column(String(18), nullable=True)
+    telefone      = Column(String(20), nullable=True)
+    email         = Column(Text,     nullable=True)
+    cep           = Column(String(9),  nullable=True)
+    logradouro    = Column(Text,     nullable=True)
+    numero        = Column(String(20), nullable=True)
+    complemento   = Column(Text,     nullable=True)
+    bairro        = Column(Text,     nullable=True)
+    cidade        = Column(Text,     nullable=True)
+    uf            = Column(String(2),  nullable=True)
     criado_por_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     criado_em     = Column(DateTime, default=datetime.utcnow)
 
@@ -1518,6 +1529,18 @@ def _migrar_colunas():
                 cur.execute("ALTER TABLE acordo_fabrica ADD COLUMN contraparte_nome TEXT")
             if "contraparte_id" not in af_cols:
                 cur.execute("ALTER TABLE acordo_fabrica ADD COLUMN contraparte_id INTEGER")
+
+        # ── contraparte_financeira: cadastro completo (2026-07-22) ──
+        cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='contraparte_financeira'")
+        if cur.fetchone() is not None:
+            cur.execute("PRAGMA table_info(contraparte_financeira)")
+            cpf_cols = {row[1] for row in cur.fetchall()}
+            for col, tipo_c in [("cnpj", "VARCHAR(18)"), ("telefone", "VARCHAR(20)"),
+                                ("email", "TEXT"), ("cep", "VARCHAR(9)"), ("logradouro", "TEXT"),
+                                ("numero", "VARCHAR(20)"), ("complemento", "TEXT"),
+                                ("bairro", "TEXT"), ("cidade", "TEXT"), ("uf", "VARCHAR(2)")]:
+                if col not in cpf_cols:
+                    cur.execute(f"ALTER TABLE contraparte_financeira ADD COLUMN {col} {tipo_c}")
 
         # ── orcamento_ambientes ───────────────────────────────────────────────
         cur.execute("PRAGMA table_info(orcamento_ambientes)")
@@ -1991,6 +2014,17 @@ def _migrar_colunas_pg():
         "ALTER TABLE acordo_fabrica ADD COLUMN IF NOT EXISTS contraparte_tipo VARCHAR(10) DEFAULT 'fabrica'",
         "ALTER TABLE acordo_fabrica ADD COLUMN IF NOT EXISTS contraparte_nome TEXT",
         "ALTER TABLE acordo_fabrica ADD COLUMN IF NOT EXISTS contraparte_id INTEGER",
+        # cadastro completo da contraparte (2026-07-22)
+        "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS cnpj VARCHAR(18)",
+        "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS telefone VARCHAR(20)",
+        "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS email TEXT",
+        "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS cep VARCHAR(9)",
+        "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS logradouro TEXT",
+        "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS numero VARCHAR(20)",
+        "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS complemento TEXT",
+        "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS bairro TEXT",
+        "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS cidade TEXT",
+        "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS uf VARCHAR(2)",
     ]
     with ENGINE.begin() as conn:
         for s in stmts:
