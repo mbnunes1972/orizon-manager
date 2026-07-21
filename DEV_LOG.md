@@ -2324,6 +2324,14 @@ pedindo credencial de executor e contando revisão Rev1/Rev2…) e, no sucesso, 
 `btnCarregar` só some na 11c (11a/11b/11e intactas). Sem permissão `executar_pe`, resta o botão
 "Comparar valores" read-only (o PE já carregado continua visível). Frontend-only (sem restart; Ctrl+F5).
 Suíte 1330 passed.
+**Correção no mesmo dia (feedback do usuário):** o seletor de arquivo do conjunto era desnecessário — a
+tabela de comparação JÁ carrega o PE **por ambiente** (coluna "Carregar" → `pePeUpload` → `/pe/upload`,
+grava `ArquivoPE`). O botão "Carregar e Comparar Valores" virou só abrir a comparação (sem file picker;
+`peUploadEComparar` removido). Consequência no backend: o gate da 11c (`guarda_conclusao`) exigia o
+**documento único** da subfase (`CicloDocumento` tipo `pe_projeto_executivo`), que ficou sem UI de upload
+— agora aceita **PE por ambiente completo** (`pe_ambientes=(total_pool, com_pe)`; barra com contagem
+"N/M carregados"; pool vazio barra; doc único legado segue valendo — retrocompat). TDD em
+`tests/test_ciclo.py`. Mudança de Python → restart (local + orizon-a). Suíte **1331 passed**.
 
 ## Sessão 89 — "Custo Especial não entra no total": era servidor com Python DEFASADO (não era bug)
 **Sintoma reportado:** campo aparece no modal, mas o total do projeto não inclui o valor. **Causa:** o

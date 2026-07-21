@@ -12823,19 +12823,13 @@ function _renderCardPE(codigo, dados, bloqueada) {
 
   // Fatia 1 (desmembramento): na Revisão de PE (11c), comparação de CFO venda×PE + reconciliação
   // estimada (read-only, "estimativa gerencial"). spec 2026-07-13 §6/#9.
-  // 2026-07-21: "Carregar Projeto Executivo" fundido em "Carregar e Comparar Valores" — o upload do PE
-  // (que alimenta a comparação e conta as revisões) e a comparação viram um passo só. Sem permissão de
-  // executar_pe, resta a comparação read-only (o dado já carregado continua visível).
-  const btnCarregarComparar = podeExec
-    ? `<label class="btn-ciclo" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">
-        <i class="ti ti-arrows-diff"></i> Carregar e Comparar Valores
-        <input type="file" id="${inputId}" style="display:none" onchange="peUploadEComparar('${codigo}', this)">
-       </label>`
-    : `<button class="btn-ciclo" onclick="peComparacaoRender()"><i class="ti ti-arrows-diff"></i> Comparar valores</button>`;
+  // 2026-07-21: sem botão de upload da subfase — o carregamento do PE é POR AMBIENTE, dentro da
+  // própria tabela de comparação (coluna "Carregar" → pePeUpload). O gate de conclusão da 11c
+  // aceita PE por ambiente completo (mod_ciclo.guarda_conclusao, doc único legado segue valendo).
   const peCmpBlock = (codigo === '11c') ? `
     <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        ${btnCarregarComparar}
+        <button class="btn-ciclo" onclick="peComparacaoRender()"><i class="ti ti-arrows-diff"></i> Carregar e Comparar Valores</button>
         <button class="btn-ciclo" onclick="peDesmembrarRender()"><i class="ti ti-layout-columns"></i> Desmembrar em fases</button>
       </div>
       <div id="pe-cmp-container" style="margin-top:12px"></div>
@@ -13126,13 +13120,6 @@ async function peUpload(codigo, inputFile) {
     await carregarCiclo();
     return true;
   } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'PE — Upload'}); return false; }
-}
-
-// 11c — "Carregar e Comparar Valores": upload do PE e comparação num passo só. A comparação
-// vem DEPOIS do peUpload porque ele re-renderiza o ciclo (recria o pe-cmp-container).
-async function peUploadEComparar(codigo, inputFile) {
-  const ok = await peUpload(codigo, inputFile);
-  if (ok) peComparacaoRender();
 }
 
 // ── Etapa 12 — Implantação do pedido ───────────────────────────────────────

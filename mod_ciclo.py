@@ -71,13 +71,25 @@ def tipo_doc_de(codigo):
     return sf["tipo_doc"] if sf else None
 
 
-def guarda_conclusao(codigo, tipos_presentes, status_por_codigo):
+def guarda_conclusao(codigo, tipos_presentes, status_por_codigo, pe_ambientes=None):
     """(ok, erro). tipos_presentes: set de tipos de documento já carregados na subfase.
-    status_por_codigo: {codigo: status} — usado no 11e para exigir 11a-11d concluídas."""
+    status_por_codigo: {codigo: status} — usado no 11e para exigir 11a-11d concluídas.
+    pe_ambientes: (total_pool, com_pe) — só a 11c usa (2026-07-21): o documento único da
+    subfase saiu da UI e o carregamento é POR AMBIENTE na tabela de comparação; a 11c
+    conclui quando todo ambiente do pool tem PE carregado. Documento único presente segue
+    valendo (projetos legados). None → regra antiga do documento (chamador não informa)."""
     sf = SUBFASES_PE.get(codigo)
     if not sf:
         return (False, "Subfase de PE desconhecida.")
-    if sf["tipo_doc"] not in tipos_presentes:
+    doc_ok = sf["tipo_doc"] in tipos_presentes
+    if codigo == "11c" and pe_ambientes is not None and not doc_ok:
+        total, com_pe = pe_ambientes
+        if total <= 0:
+            return (False, "Projeto sem ambientes no pool — carregue o PE dos ambientes antes de concluir.")
+        if com_pe < total:
+            return (False, "Carregue o PE de todos os ambientes na comparação antes de "
+                           f"'{sf['botao']}' ({com_pe}/{total} carregados).")
+    elif not doc_ok:
         return (False, f"Carregue o documento ({sf['doc_label']}) antes de '{sf['botao']}'.")
     if codigo == PE_SUBFASE_FINAL:
         faltando = [c for c in PE_SUBFASES_OBRIGATORIAS

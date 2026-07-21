@@ -6983,7 +6983,14 @@ class Handler(BaseHTTPRequestHandler):
                     tipos_presentes = {d.tipo for d in docs}
                     todas = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe).all()
                     status_por = {e.etapa_codigo: e.status for e in todas}
-                    ok, erro = mod_ciclo.guarda_conclusao(codigo, tipos_presentes, status_por)
+                    pe_amb = None
+                    if codigo == "11c":   # PE por ambiente (tabela de comparação) substitui o doc único
+                        total = db.query(PoolAmbiente).filter_by(projeto_id=nome_safe).count()
+                        com_pe = (db.query(ArquivoPE.pool_ambiente_id)
+                                    .filter_by(projeto_nome=nome_safe).distinct().count())
+                        pe_amb = (total, com_pe)
+                    ok, erro = mod_ciclo.guarda_conclusao(codigo, tipos_presentes, status_por,
+                                                          pe_ambientes=pe_amb)
                     if not ok:
                         self.send_json({"ok": False, "erro": erro}, code=400); return
                     _set_etapa_status(db, nome_safe, codigo, "concluido", u.id)

@@ -259,3 +259,22 @@ def test_modelos_ciclo_documento_e_revisao(tmp_path, monkeypatch):
     assert s.query(database.CicloDocumento).count() == 1
     assert s.query(database.CicloRevisao).first().etapa_codigo == "11b"
     s.close()
+
+
+def test_guarda_conclusao_11c_pe_por_ambiente():
+    # 2026-07-21: o documento único da 11c foi substituído na UI pelo PE POR AMBIENTE
+    # (tabela de comparação). Todos os ambientes com PE → conclui sem o documento antigo.
+    ok, erro = mc.guarda_conclusao("11c", set(), {}, pe_ambientes=(3, 3))
+    assert ok is True and erro == ""
+    # faltando ambiente → barra, com contagem
+    ok, erro = mc.guarda_conclusao("11c", set(), {}, pe_ambientes=(3, 1))
+    assert ok is False and "1/3" in erro
+    # retrocompat: documento único da subfase (projeto legado) ainda satisfaz
+    ok, erro = mc.guarda_conclusao("11c", {"pe_projeto_executivo"}, {}, pe_ambientes=(3, 0))
+    assert ok is True
+    # pool vazio → barra (nada a revisar não é conclusão)
+    ok, erro = mc.guarda_conclusao("11c", set(), {}, pe_ambientes=(0, 0))
+    assert ok is False
+    # chamador antigo (sem pe_ambientes) → regra antiga do documento
+    ok, erro = mc.guarda_conclusao("11c", set(), {})
+    assert ok is False and "Carregue" in erro
