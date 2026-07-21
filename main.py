@@ -1679,6 +1679,44 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif re.match(r'^/api/admin/acordos-fabrica/(\d+)/extrato$', path):
+            # Extrato do acordo (spec: implantação, aplicações por loja/projeto, acertos)
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+            m_ex = re.match(r'^/api/admin/acordos-fabrica/(\d+)/extrato$', path)
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                ac = db.get(AcordoFabrica, int(m_ex.group(1)))
+                lj = db.get(Loja, ac.loja_titular_id) if ac else None
+                if ac is None or lj is None or not mod_tenancy.pode_ver_loja(
+                        ator, {"id": lj.id, "rede_id": lj.rede_id}):
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                loja_nome = {l.id: l.nome for l in db.query(Loja).all()}
+                rows = (db.query(AjusteFabricaAplicacao, AjusteFabrica)
+                          .join(AjusteFabrica, AjusteFabricaAplicacao.ajuste_id == AjusteFabrica.id)
+                          .filter(AjusteFabrica.acordo_id == ac.id)
+                          .order_by(AjusteFabricaAplicacao.id.asc()).all())
+                aplicacoes, acertos = [], {}
+                for ap, aj in rows:
+                    aplicacoes.append({
+                        "id": ap.id, "loja": loja_nome.get(aj.loja_id, "?"),
+                        "projeto": ap.projeto_nome, "tipo": aj.tipo, "pct": ap.pct_snapshot,
+                        "valor": ap.valor, "status": ap.status,
+                        "em": ap.criado_em.strftime("%Y-%m-%d %H:%M") if ap.criado_em else ""})
+                    if ap.acerto_ref:
+                        g = acertos.setdefault(ap.acerto_ref, {"ref": ap.acerto_ref, "total": 0.0, "n": 0})
+                        g["total"] = round(g["total"] + ap.valor, 2)
+                        g["n"] += 1
+                self.send_json({"ok": True,
+                                "implantacao": {"valor": ac.valor_implantado,
+                                                "em": ac.criado_em.strftime("%Y-%m-%d") if ac.criado_em else ""},
+                                "aplicacoes": aplicacoes,
+                                "acertos": sorted(acertos.values(), key=lambda g: g["ref"])})
+            finally:
+                db.close()
+
         elif path == "/api/admin/acordos-fabrica":
             # Ajustes Excepcionais de Fábrica: lista de acordos visíveis com os TRÊS saldos
             # (contábil, pendente de acerto, disponível) + ajustes aninhados + avulsos (custo).

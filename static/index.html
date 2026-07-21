@@ -9751,6 +9751,7 @@ async function adminRenderLoja(box){
       <button class="home-tab" id="loja-tab-usuarios" onclick="adminLojaTab('usuarios')">Usuários</button>
       <button class="home-tab" id="loja-tab-perfis" onclick="adminLojaTab('perfis')">Perfis de Usuário</button>
       <button class="home-tab" id="loja-tab-modulos" onclick="adminLojaTab('modulos')">Módulos</button>
+      <button class="home-tab" id="loja-tab-acordos" onclick="adminLojaTab('acordos')">Acordos c/ Fábrica</button>
     </div>
     <div id="loja-panel-dados"></div>
     <div id="loja-panel-usuarios" style="display:none">
@@ -9758,14 +9759,15 @@ async function adminRenderLoja(box){
       <div id="admin-usuarios-lista" style="margin-top:10px"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     </div>
     <div id="loja-panel-perfis" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
-    <div id="loja-panel-modulos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>`;
+    <div id="loja-panel-modulos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+    <div id="loja-panel-acordos" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>`;
   adminLojaCarregarDados(lid);
   adminUsuariosCarregar();   // popula #admin-usuarios-lista (função já existente)
   _empSeletorPreencher('admin-emp-seletor');
 }
 
 function adminLojaTab(qual){
-  ['dados','usuarios','perfis','modulos'].forEach(q => {
+  ['dados','usuarios','perfis','modulos','acordos'].forEach(q => {
     const tab   = document.getElementById('loja-tab-'+q);
     const panel = document.getElementById('loja-panel-'+q);
     if (tab)   tab.classList.toggle('ativo', q===qual);
@@ -9773,6 +9775,203 @@ function adminLojaTab(qual){
   });
   if (qual==='modulos') adminModulosCarregar();
   if (qual==='perfis')  adminPerfisCarregar();
+  if (qual==='acordos') acordosFabricaCarregar();
+}
+
+// ── Painel "Acordos com a Fábrica" (spec Ajustes Excepcionais, 2026-07-21) ────────────────────
+// Acordos são negociação de Diretoria e CRUZAM lojas — a lista mostra todos os visíveis ao
+// ator, independente da empresa selecionada. Três saldos por acordo: contábil (razão da
+// titular), pendente de acerto (intercompany) e DISPONÍVEL (cap de novas aplicações).
+let _afAcordos = [];
+async function acordosFabricaCarregar(){
+  const box = document.getElementById('loja-panel-acordos');
+  if(!box) return;
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  await empresasCarregar();   // cache [{loja_id,nome,...}] p/ os selects de loja
+  let j;
+  try{ j = await fetch('/api/admin/acordos-fabrica',{credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ box.innerHTML = '<em style="color:var(--err);font-size:12px">Erro ao carregar.</em>'; return; }
+  if(!j.ok){ box.innerHTML = `<em style="color:var(--muted);font-size:12px">${esc(j.erro||'Acesso negado.')}</em>`; return; }
+  _afAcordos = j.acordos || [];
+  const fmt = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const lojaNome = id => { const e = (_empresas||[]).find(x => x.loja_id === id); return e ? e.nome : ('Loja #'+id); };
+  const lojaSel = (id, extra='') => `<select id="${id}" style="padding:4px 6px;font-size:12px" ${extra}>`
+    + (_empresas||[]).map(e => `<option value="${e.loja_id}">${esc(e.nome)}</option>`).join('') + '</select>';
+
+  const stBadge = s => s==='ativo' ? '<span style="color:var(--ok)">ativo</span>'
+    : s==='esgotado' ? '<span style="color:var(--warn)">esgotado</span>'
+    : '<span style="color:var(--muted)">encerrado</span>';
+
+  const cardAcordo = a => {
+    const aj = (a.ajustes||[]).map(x => `
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;line-height:2">
+        <span>${esc(lojaNome(x.loja_id))} — ${x.tipo === 'desconto' ? '−' : '+'}${x.pct}%
+          <span style="color:var(--muted)">(${x.tratamento === 'custo' ? 'custo' : 'consome saldo'}${x.natureza==='pontual' ? ' · pontual' : ''})</span></span>
+        <label class="sw" style="transform:scale(.8)"><input type="checkbox" ${x.ativo?'checked':''}
+          onchange="afToggleAjuste(${x.id}, this.checked)"><span class="sw-slider"></span></label>
+      </div>`).join('') || '<div style="font-size:12px;color:var(--muted)">Nenhum ajuste vinculado.</div>';
+    const acoes = a.status !== 'encerrado' ? `
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <input type="date" id="af-corte-${a.id}" style="padding:3px 6px;font-size:12px">
+        <button class="btn btn-ghost btn-sm" onclick="afAcertar(${a.id})">Acertar</button>
+        ${lojaSel('af-liq-loja-'+a.id)}
+        <select id="af-liq-papel-${a.id}" style="padding:4px 6px;font-size:12px">
+          <option value="devedora">devedora paga</option><option value="credora">credora recebe</option></select>
+        <input type="text" id="af-liq-valor-${a.id}" inputmode="numeric" placeholder="R$" oninput="mascaraMoedaInput(this)" style="width:110px;padding:3px 6px;font-size:12px;font-family:var(--font-mono)">
+        <button class="btn btn-ghost btn-sm" onclick="afLiquidar(${a.id})">Liquidar</button>
+        <button class="btn btn-ghost btn-sm" onclick="afEncerrar(${a.id})">Encerrar</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+        <span style="font-size:11px;color:var(--muted)">+ Ajuste:</span>
+        ${lojaSel('af-aj-loja-'+a.id)}
+        <select id="af-aj-tipo-${a.id}" style="padding:4px 6px;font-size:12px">
+          <option value="desconto">desconto</option><option value="acrescimo">acréscimo</option></select>
+        <input type="number" id="af-aj-pct-${a.id}" min="0.01" max="100" step="0.1" placeholder="%" style="width:70px;padding:3px 6px;font-size:12px">
+        <button class="btn btn-ghost btn-sm" onclick="afNovoAjuste(${a.id})">Criar</button>
+      </div>` : '';
+    return `
+    <div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><strong>${esc(a.descricao)}</strong>
+          <span style="color:var(--muted);font-size:12px"> · ${a.tipo === 'credito' ? 'crédito' : 'dívida'} · titular ${esc(lojaNome(a.loja_titular_id))} · ${a.conta_saldo}</span></div>
+        <div style="font-size:12px">${stBadge(a.status)}
+          <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="afExtrato(${a.id})">Extrato</button></div>
+      </div>
+      <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:6px;font-size:12px">
+        <span style="color:var(--muted)">Implantado <span style="font-family:var(--font-mono);color:var(--text)">${fmt(a.valor_implantado)}</span></span>
+        <span style="color:var(--muted)">Contábil <span style="font-family:var(--font-mono);color:var(--text)">${fmt(a.saldos.contabil)}</span></span>
+        <span style="color:var(--muted)">Pendente de acerto <span style="font-family:var(--font-mono);color:var(--warn)">${fmt(a.saldos.pendente_acerto)}</span></span>
+        <span style="color:var(--muted)">Disponível <span style="font-family:var(--font-mono);color:var(--ok);font-weight:700">${fmt(a.saldos.disponivel)}</span></span>
+      </div>
+      <div id="af-extrato-${a.id}" style="display:none;margin-top:8px"></div>
+      <div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:6px">${aj}${acoes}</div>
+    </div>`;
+  };
+
+  const avulsos = (j.ajustes_avulsos||[]).map(x => `
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;line-height:2">
+      <span>${esc(lojaNome(x.loja_id))} — ${x.tipo === 'desconto' ? '−' : '+'}${x.pct}% <span style="color:var(--muted)">(custo${x.natureza==='pontual' ? ' · pontual' : ''})</span></span>
+      <label class="sw" style="transform:scale(.8)"><input type="checkbox" ${x.ativo?'checked':''}
+        onchange="afToggleAjuste(${x.id}, this.checked)"><span class="sw-slider"></span></label>
+    </div>`).join('') || '<div style="font-size:12px;color:var(--muted)">Nenhum.</div>';
+
+  box.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;max-width:720px">
+      Condições excepcionais negociadas com a fábrica (spec 2026-07-21). Aplicadas na
+      <strong>Conferência do Pedido</strong> (etapa 12) sobre o valor de fábrica — a negociação/markup
+      não muda. Saldos controlados no razão; implantação pelo PL (3.5).
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      <input type="text" id="af-novo-desc" placeholder="Descrição do acordo" style="flex:1;min-width:180px;padding:5px 8px;font-size:12px">
+      <select id="af-novo-tipo" style="padding:4px 6px;font-size:12px">
+        <option value="credito">crédito (fábrica deve)</option><option value="divida">dívida (loja deve)</option></select>
+      ${lojaSel('af-novo-loja')}
+      <input type="text" id="af-novo-valor" inputmode="numeric" placeholder="Valor R$" oninput="mascaraMoedaInput(this)" style="width:120px;padding:5px 8px;font-size:12px;font-family:var(--font-mono)">
+      <button class="btn btn-primary btn-sm" onclick="afNovoAcordo()">Implantar acordo</button>
+    </div>
+    ${_afAcordos.map(cardAcordo).join('') || '<em style="color:var(--muted);font-size:12px">Nenhum acordo cadastrado.</em>'}
+    <div style="margin-top:16px">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Ajustes de custo (sem acordo — ex.: cashback)</div>
+      ${avulsos}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+        ${lojaSel('af-av-loja')}
+        <select id="af-av-tipo" style="padding:4px 6px;font-size:12px">
+          <option value="desconto">desconto</option><option value="acrescimo">acréscimo</option></select>
+        <input type="number" id="af-av-pct" min="0.01" max="100" step="0.1" placeholder="%" style="width:70px;padding:3px 6px;font-size:12px">
+        <button class="btn btn-ghost btn-sm" onclick="afNovoAjuste(null)">Criar</button>
+      </div>
+    </div>`;
+}
+
+async function _afPost(url, payload, okMsg){
+  try{
+    const j = await fetch(url, {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload||{})}).then(r=>r.json());
+    if(!j.ok){ await avisoPopup(j.erro||'Erro', {titulo:'Acordos com a Fábrica'}); return null; }
+    if(okMsg) showToast(okMsg);
+    return j;
+  }catch(e){ await avisoPopup('Erro de rede.', {titulo:'Acordos com a Fábrica'}); return null; }
+}
+
+async function afNovoAcordo(){
+  const j = await _afPost('/api/admin/acordos-fabrica', {
+    descricao: (document.getElementById('af-novo-desc')?.value||'').trim(),
+    tipo: document.getElementById('af-novo-tipo')?.value,
+    loja_titular_id: parseInt(document.getElementById('af-novo-loja')?.value)||0,
+    valor: _moedaNum('af-novo-valor'),
+  }, 'Acordo implantado (lançamento pelo PL).');
+  if(j) acordosFabricaCarregar();
+}
+
+async function afNovoAjuste(acordoId){
+  const suf = acordoId ? ('-'+acordoId) : '';
+  const loja = parseInt(document.getElementById(acordoId ? 'af-aj-loja'+suf : 'af-av-loja')?.value)||0;
+  const tipo = document.getElementById(acordoId ? 'af-aj-tipo'+suf : 'af-av-tipo')?.value;
+  const pct = parseFloat(document.getElementById(acordoId ? 'af-aj-pct'+suf : 'af-av-pct')?.value)||0;
+  const j = await _afPost('/api/admin/ajustes-fabrica', {
+    acordo_id: acordoId || undefined, loja_id: loja, tipo, pct,
+    tratamento: acordoId ? 'consumir_saldo' : 'custo',
+  }, 'Ajuste criado.');
+  if(j) acordosFabricaCarregar();
+}
+
+async function afToggleAjuste(id, ativo){
+  const j = await _afPost(`/api/admin/ajustes-fabrica/${id}/ativo`, {ativo}, ativo ? 'Ajuste ativado.' : 'Ajuste desativado.');
+  if(!j) acordosFabricaCarregar();   // reverte o switch se falhou
+}
+
+async function afAcertar(id){
+  const corte = document.getElementById('af-corte-'+id)?.value || '';
+  const j = await _afPost(`/api/admin/acordos-fabrica/${id}/acertar`,
+                          corte ? {data_corte: corte} : {}, null);
+  if(j){ showToast('Acerto consolidado: R$ ' + Number(j.acertado||0).toLocaleString('pt-BR',{minimumFractionDigits:2}) + ' (' + j.aplicacoes + ' aplicações).'); acordosFabricaCarregar(); }
+}
+
+async function afLiquidar(id){
+  const j = await _afPost(`/api/admin/acordos-fabrica/${id}/liquidar`, {
+    loja_id: parseInt(document.getElementById('af-liq-loja-'+id)?.value)||0,
+    papel: document.getElementById('af-liq-papel-'+id)?.value,
+    valor: _moedaNum('af-liq-valor-'+id),
+  }, null);
+  if(j){ showToast('Liquidado R$ ' + Number(j.liquidado||0).toLocaleString('pt-BR',{minimumFractionDigits:2}) + '.'); acordosFabricaCarregar(); }
+}
+
+async function afEncerrar(id){
+  if(!await confirmarPopup('Encerrar este acordo?', {titulo:'Acordos com a Fábrica'})) return;
+  let j = await fetch(`/api/admin/acordos-fabrica/${id}/encerrar`, {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body:'{}'}).then(r=>r.json()).catch(()=>null);
+  if(j && !j.ok && /resid/i.test(j.erro||'')){
+    if(!await confirmarPopup(j.erro + ' Baixar o resíduo contra o PL (3.5) e encerrar?', {titulo:'Acordos com a Fábrica'})) return;
+    j = await _afPost(`/api/admin/acordos-fabrica/${id}/encerrar`, {baixar_residuo: true}, null);
+  } else if(j && !j.ok){ await avisoPopup(j.erro||'Erro', {titulo:'Acordos com a Fábrica'}); return; }
+  else if(!j){ await avisoPopup('Erro de rede.', {titulo:'Acordos com a Fábrica'}); return; }
+  if(j && j.ok){ showToast('Acordo encerrado.'); acordosFabricaCarregar(); }
+}
+
+async function afExtrato(id){
+  const box = document.getElementById('af-extrato-'+id);
+  if(!box) return;
+  if(box.style.display !== 'none'){ box.style.display = 'none'; return; }
+  box.style.display = '';
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
+  let j;
+  try{ j = await fetch(`/api/admin/acordos-fabrica/${id}/extrato`,{credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ box.innerHTML = '<em style="color:var(--err);font-size:12px">Erro.</em>'; return; }
+  if(!j.ok){ box.innerHTML = `<em style="color:var(--muted);font-size:12px">${esc(j.erro||'Erro')}</em>`; return; }
+  const fmt = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const rows = (j.aplicacoes||[]).map(a => `
+    <tr><td>${esc(a.em)}</td><td>${esc(a.loja)}</td><td>${esc(a.projeto)}</td>
+      <td>${a.tipo === 'desconto' ? '−' : '+'}${a.pct != null ? a.pct + '%' : ''}</td>
+      <td class="num" style="font-family:var(--font-mono)">${fmt(a.valor)}</td>
+      <td style="color:var(--muted)">${esc(a.status)}</td></tr>`).join('');
+  const acertos = (j.acertos||[]).map(g =>
+    `<div style="font-size:11px;color:var(--muted)">Acerto ${esc(g.ref)} — ${g.n} aplicações, <span style="font-family:var(--font-mono)">${fmt(g.total)}</span></div>`).join('');
+  box.innerHTML = `
+    <div style="font-size:11px;color:var(--muted)">Implantação (líquida de baixas de encerramento): <span style="font-family:var(--font-mono)">${fmt(j.implantacao.valor)}</span> em ${esc(j.implantacao.em)}</div>
+    <div class="table-wrap"><table class="tbl" style="font-size:12px"><thead><tr>
+      <th>Data</th><th>Loja</th><th>Projeto</th><th>%</th><th style="text-align:right">Valor</th><th>Status</th>
+    </tr></thead><tbody>${rows || '<tr><td colspan="6" style="color:var(--muted)">Sem aplicações.</td></tr>'}</tbody></table></div>
+    ${acertos}`;
 }
 
 async function adminLojaProjetosCarregar(){
@@ -13534,17 +13733,58 @@ function _renderCardImplantacao(dados, bloqueada) {
          <div style="margin-top:14px;border-top:1px dashed var(--border);padding-top:12px">
            <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:6px">Conferência contábil (#13): ajusta o Custo de Fábrica pelo valor do PE e migra parte p/ Outros Fornecedores. Dois lançamentos auditáveis (ativo × provisão, não tocam a DRE).</div>
            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-             <input type="text" id="conf-custo" inputmode="numeric" placeholder="Custo fábrica (PE) R$" oninput="mascaraMoedaInput(this)" style="width:150px;height:var(--control-h-sm);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-body)">
+             <input type="text" id="conf-custo" inputmode="numeric" placeholder="Custo fábrica (PE) R$" oninput="mascaraMoedaInput(this);confAjustesPreviewAgendar()" style="width:150px;height:var(--control-h-sm);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-body)">
              <input type="text" id="conf-outros" inputmode="numeric" placeholder="Migrar p/ Outros R$" oninput="mascaraMoedaInput(this)" style="width:150px;height:var(--control-h-sm);padding:0 var(--sp-3);background:var(--surface);border:1px solid var(--field-border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--font-mono);font-size:var(--fs-body)">
              <button class="btn-ciclo" onclick="conferenciaRegistrar()"><i class="ti ti-checkup-list"></i> Confirmar conferência</button>
            </div>
+           <div id="conf-ajustes-prev" style="margin-top:8px"></div>
          </div>`}`;
+}
+
+// ── Ajustes Excepcionais de Fábrica — preview na conferência (etapa 12) ───────────────────────
+let _confPrevTimer = null;
+function _moedaNum(id){
+  const el = document.getElementById(id);
+  return el ? (parseFloat((el.value||'').replace(/[^\d,]/g,'').replace(',','.'))||0) : 0;
+}
+function confAjustesPreviewAgendar(){
+  clearTimeout(_confPrevTimer);
+  _confPrevTimer = setTimeout(confAjustesPreview, 400);
+}
+async function confAjustesPreview(){
+  const box = document.getElementById('conf-ajustes-prev');
+  if(!box || !projetoAtivo) return;
+  const valor = _moedaNum('conf-custo');
+  if(!(valor > 0)){ box.innerHTML = ''; return; }
+  let j;
+  try { j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/conferencia/ajustes-preview?valor=${valor}`,
+                        {credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ box.innerHTML = ''; return; }
+  if(!j.ok || !j.preview){ box.innerHTML = ''; return; }
+  box.innerHTML = _confAjustesHtml(j.preview, 'Ajustes excepcionais previstos');
+}
+function _confAjustesHtml(p, titulo){
+  const fmt = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const aps = p.aplicacoes || [];
+  if(!aps.length) return '';
+  const linhas = aps.map(a =>
+    `<div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);line-height:1.9">
+       <span style="color:var(--muted)">${a.tipo === 'desconto' ? '−' : '+'} ${a.pct}% ${a.tratamento === 'custo' ? '(custo)' : '(acordo)'}${a.capado ? ' <span style="color:var(--warn)">· capado ao saldo</span>' : ''}</span>
+       <span style="font-family:var(--font-mono)">${a.tipo === 'desconto' ? '−' : '+'} ${fmt(a.valor)}</span>
+     </div>`).join('');
+  return `<div style="border:1px dashed var(--border);border-radius:var(--radius-sm);padding:8px 10px">
+    <div style="font-size:9px;letter-spacing:1.2px;color:var(--muted);text-transform:uppercase;margin-bottom:4px">${titulo}</div>
+    ${linhas}
+    <div style="display:flex;justify-content:space-between;font-size:var(--fs-xs);border-top:1px solid var(--border);margin-top:4px;padding-top:4px">
+      <span>CMV final ${fmt(p.custo_fabrica_final)}</span>
+      <span style="font-weight:700">A pagar à fábrica <span style="font-family:var(--font-mono)">${fmt(p.a_pagar_final)}</span></span>
+    </div></div>`;
 }
 
 async function conferenciaRegistrar(){
   if(!projetoAtivo) return;
-  const _num = id => { const el=document.getElementById(id); return el ? (parseFloat((el.value||'').replace(/\./g,'').replace(',','.'))||0) : 0; };
-  const custo = _num('conf-custo'), outros = _num('conf-outros');
+  // parse tolerante à máscara ("R$ 100.000,00") — o parse antigo dava NaN com o prefixo R$
+  const custo = _moedaNum('conf-custo'), outros = _moedaNum('conf-outros');
   if(!(custo > 0) && !(outros > 0)){ await avisoPopup('Informe o custo de fábrica do PE e/ou o valor a migrar.', {titulo:'Conferência'}); return; }
   const cred = await pedirCredenciaisGerente({
     titulo: 'Conferência e Implantação do Pedido',
@@ -13554,7 +13794,18 @@ async function conferenciaRegistrar(){
     const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/conferencia`,
       { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ custo_fabrica_novo: custo, valor_outros_forn: outros, login: cred.login, senha: cred.senha }) }).then(r=>r.json());
-    if(j.ok){ showToast('Conferência registrada.'); }
+    if(j.ok){
+      showToast('Conferência registrada.');
+      const box = document.getElementById('conf-ajustes-prev');
+      if (box && j.ajustes){
+        // pós-POST mostra o que foi LANÇADO NESTA AÇÃO (delta_lancado) — numa reconferência o
+        // total recalculado ≠ movimento do razão (QA Vera 🟠: rótulo "APLICADOS" induzia a erro)
+        const lanc = (j.ajustes.aplicadas || []).map(a => ({...a, valor: a.delta_lancado}));
+        box.innerHTML = lanc.length
+          ? _confAjustesHtml({...j.ajustes, aplicacoes: lanc}, 'Ajustes lançados NESTA conferência')
+          : _confAjustesHtml(j.ajustes, 'Ajustes excepcionais — estado atual (nada novo lançado)');
+      }
+    }
     else { await avisoPopup(j.erro||'Erro', {titulo:'Conferência'}); }
   } catch(e){ await avisoPopup('Erro de rede.', {titulo:'Conferência'}); }
 }
