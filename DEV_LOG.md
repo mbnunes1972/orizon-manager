@@ -1367,9 +1367,17 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > antes eram screens manuais que não sobreviviam a reboot — era por isso que o pré-homolog "caía");
 > `deploy_ab.sh` atualizado para systemctl (`da0957b`), auto-restart testado matando o processo.
 >
+> **Sessão 87 (ainda 2026-07-20):** frente **Custo Especial** (custo adicional não rateado nos ambientes,
+> toggle no modal de parâmetros + provisão própria 1.1.06.20 × 2.1.04.20 / despesa 5.3.17) implementada
+> ponta a ponta — motor, params, provisões/AF, contábil (FASE D2 + matching + conciliação data-driven) e
+> frontend; QA da Vera com 1 achado corrigido (orçamento vazio). Nome mudou de "Custo Fixo" → "Custo
+> Especial" antes do commit (colisão com o conceito contábil). Ver `## Sessão 87` e o spec
+> `financeiro/2026-07-20-custo-especial-nao-rateado-design.md`.
+>
 > **PENDENTE (retomar por aqui):** Verificação manual no navegador — Fatia 3 (marcadores no PDF exigem
-> modelo referenciá-los) e Fatia 4 (coluna Entrega + selo Atrasado, temas claro/escuro). Próximas frentes
-> candidatas: Agenda Global (consome a base de atraso do §6), empacotar `comercial`, baseline Alembic.
+> modelo referenciá-los), Fatia 4 (coluna Entrega + selo Atrasado, temas claro/escuro) e agora o modal de
+> parâmetros com o Custo Especial (Sessão 87). Próximas frentes candidatas: Agenda Global (consome a base de
+> atraso do §6), empacotar `comercial`, baseline Alembic.
 >
 > **(Anterior, 2026-07-19 — mantido abaixo por referência.)**
 
@@ -2300,6 +2308,29 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 87 — Custo Especial: custo adicional NÃO rateado nos ambientes (toggle + provisão própria)
+**Demanda do usuário:** custo de valor fixo por projeto que não se distribui nos ambientes (3 ambientes
+80k+50k+20k + custo 1.000 → 151.000; removendo 2 ambientes → 51.000, fica integral), configurável no modal
+de parâmetros como as rubricas irmãs (arquiteto/fidelidade/viagem/brinde), com provisão própria.
+**Nome:** a 1ª proposta era "Custo Fixo"; a pedido do usuário avaliei a colisão com o conceito contábil
+consagrado (custo de estrutura, invariante ao volume — o oposto deste, que é custo direto da venda) e o
+usuário bateu o martelo em **"Custo Especial"** — renomeado ponta a ponta ANTES do 1º commit (chaves,
+sigla, contas, rótulos; sem migração, nada existia em banco).
+**Motor:** chaves `custo_especial`/`custo_especial_ativo` + sigla `Cust_Esp` — linha do ORÇAMENTO, fora do
+loop de ambientes (é o que o torna não-rateado; ignora `n_total_proj`/`vbvo_proj`). Repassado: `VBNO/VAVO
++= ce` fora do fator de desconto (blindado; `Val_Liq`/`Desc_Tot` intactos); absorvido: só `cust_ad += ce`.
+Comissões arq/fid não incidem. Consequência assumida: Σ `Val_Liq` por ambiente ≠ total quando ativo — a
+diferença é a própria linha. **Contábil (5º da família Cust_Ad):** contas novas `1.1.06.20 × 2.1.04.20` +
+despesa `5.3.17`; eventos de constituição no contrato (FASE D2, sem tocar DRE) e matching na NF-e; AF,
+conciliação final, devolução e reconciliação pegam a rubrica por serem data-driven; `seed_plano` backfilla
+owners existentes. **Frontend:** bloco no modal (após Brinde), linha "− Custo Especial" no apoio, payloads
+dos 2 caminhos de save + snapshot/restore, rubrica na tabela da AF; de propósito FORA dos gross-ups por
+ambiente. **QA (Vera):** validou motor (simulações independentes), ciclo contábil e tokens de design; 1
+achado baixo — orçamento SEM ambientes gerava `Val_Cont` do custo sem venda — corrigido no motor (zera sem
+ambientes) com regressão. **Testes:** +13 (motor com o exemplo literal da demanda, params, provisões, ciclo
+contábil completo, sets de chaves dos E2E). Suíte **1322 passed** (SQLite) e **1320+2 skipped** (Postgres).
+Spec: `docs/superpowers/specs/financeiro/2026-07-20-custo-especial-nao-rateado-design.md`.
 
 ## Sessão 86 — Fatia 4 (sinal de atraso GERAL na lista) FECHA a frente A+B + deploy A/B + chave SSH
 Suíte **1314 verde (SQLite) e 1312+2skip (Postgres `orizon_test`)**. Branch `feat/fatia4-sinal-atraso`

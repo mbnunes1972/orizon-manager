@@ -21,16 +21,20 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
     tog_fid  = bool(p.get("fidelidade_ativa", False))
     tog_cvia = bool(p.get("fora_da_sede", False))
     tog_bri  = bool(p.get("brinde_ativo", False))
+    tog_cesp = bool(p.get("custo_especial_ativo", False))
     pct_arq  = _f(p.get("comissao_arq_pct")) / 100.0
     pct_fid  = _f(p.get("fidelidade_pct")) / 100.0
     cust_via = _f(p.get("custo_viagem"))
     bri      = _f(p.get("brinde"))
+    cust_esp = _f(p.get("custo_especial")) if tog_cesp else 0.0
     pct_trib = _f(p.get("carga_trib")) / 100.0
     d_orc    = _f(desc_orc_pct) / 100.0
 
     ambs = [{"VBVA": _f(a.get("VBVA")), "CFA": _f(a.get("CFA")),
              "d_amb": _f(a.get("desc_amb_pct")) / 100.0} for a in (ambientes or [])]
     num_amb = len(ambs)
+    if not num_amb:
+        cust_esp = 0.0   # sem ambientes não há venda — custo especial só existe sobre uma venda (QA Vera)
     VBVO = sum(a["VBVA"] for a in ambs)
     CFO  = sum(a["CFA"] for a in ambs)
 
@@ -74,7 +78,15 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
                          "Cust_Via": round(num_via, 2), "Bri": round(num_bri, 2),
                          "Val_Liq": round(liq_amb, 2)})
 
-    cust_ad = com_arq + pro_fid + (total_via if tog_cvia else 0.0) + (total_bri if tog_bri else 0.0)
+    # Custo Especial: linha do ORÇAMENTO, não rateada nos ambientes (sai ambiente, ele fica integral —
+    # ≠ viagem/brinde, que se distribuem pelo pool do projeto). Repassado (tog_cadi), soma direto em
+    # VBNO/VAVO fora do fator de desconto (blindado: o cliente paga o valor cheio); absorvido, só
+    # abate o líquido via cust_ad. Comissões arq/fid não o alcançam (ficam no loop por ambiente).
+    if tog_cadi and cust_esp:
+        VBNO += cust_esp
+        VAVO += cust_esp
+    cust_ad = (com_arq + pro_fid + (total_via if tog_cvia else 0.0)
+               + (total_bri if tog_bri else 0.0) + cust_esp)
     val_liq = VAVO - cust_ad
     desc_tot = ((VBVO - val_liq) / VBVO) if VBVO > 0 else 0.0
     markup = (val_liq / CFO) if CFO > 0 else 0.0
@@ -87,6 +99,7 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
         "Com_Arq": round(com_arq, 2), "Pro_Fid": round(pro_fid, 2),
         "Cust_Via": round(total_via if tog_cvia else 0.0, 2),
         "Bri": round(total_bri if tog_bri else 0.0, 2),
+        "Cust_Esp": round(cust_esp, 2),
         "Cust_Ad": round(cust_ad, 2),
         "Val_Liq": round(val_liq, 2), "Desc_Tot": round(desc_tot, 4), "Markup": round(markup, 3),
         "Cust_Fin": round(_f(cust_fin), 2), "Val_Cont": round(val_cont, 2), "Prov_Imp": round(prov_imp, 2),

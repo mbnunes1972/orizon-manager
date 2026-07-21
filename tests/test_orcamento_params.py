@@ -57,12 +57,12 @@ def test_sanear_descontos_rejeita_nan():
         sanear_descontos({"1": math.nan}, ids_validos={1})
 
 
-def test_parametros_default_tem_10_chaves_estruturais():
+def test_parametros_default_tem_12_chaves_estruturais():
     from mod_orcamento_params import PARAMETROS_DEFAULT
     assert set(PARAMETROS_DEFAULT) == {
         "incluir_custos", "comissao_arq_pct", "comissao_arq_ativa",
         "fidelidade_pct", "fidelidade_ativa", "fora_da_sede", "custo_viagem",
-        "brinde", "brinde_ativo", "carga_trib"}
+        "brinde", "brinde_ativo", "custo_especial", "custo_especial_ativo", "carga_trib"}
     assert "desconto_pct" not in PARAMETROS_DEFAULT
     assert PARAMETROS_DEFAULT["carga_trib"] == 8.0
 
@@ -92,3 +92,11 @@ def test_merge_parametros_coage_e_preserva():
     assert out["fora_da_sede"] is True
     assert out["comissao_arq_pct"] == 10.0      # preservado
     assert "desconto_pct" not in out            # estruturais não incluem desconto
+
+
+def test_merge_custo_especial_coage_tipos():
+    from mod_orcamento_params import merge_parametros, merge_margens, PARAMETROS_DEFAULT
+    out = merge_parametros(dict(PARAMETROS_DEFAULT), {"custo_especial": "1000", "custo_especial_ativo": "true"})
+    assert out["custo_especial"] == 1000.0 and out["custo_especial_ativo"] is True
+    out2 = merge_margens({}, {"custo_especial": 250, "custo_especial_ativo": 1})
+    assert out2["custo_especial"] == 250.0 and out2["custo_especial_ativo"] is True

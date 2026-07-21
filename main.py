@@ -491,6 +491,7 @@ def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
                 "pro_fid":             d.get("Pro_Fid"),
                 "cust_via":            d.get("Cust_Via"),
                 "brinde":              d.get("Bri"),
+                "cust_esp":           d.get("Cust_Esp"),
             }
             ot, oid = mod_contabil.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
             # FASE D2: registra a venda CHEIA (Val_Cont) em Receita a Realizar (1.1.02 × 2.1.06) — não toca a DRE
@@ -1940,13 +1941,14 @@ class Handler(BaseHTTPRequestHandler):
                     # (FASE 2). Snapshot novo (12 chaves) → comparação íntegra, inclui o drift das 2.
                     desatualizado = bool(venda and any(
                         venda["itens"].get(k) != atual["itens"].get(k) for k in venda["itens"]))
-                    # custos adicionais (arq/fidelidade/viagem/brinde): já descontados do
+                    # custos adicionais (arq/fidelidade/viagem/brinde/custo especial): já descontados do
                     # Val. Líquido pelo motor — exibidos à parte, não somam no Cust_Var.
                     custos_adicionais = {
                         "com_arq":  float(d.get("Com_Arq")  or 0),
                         "pro_fid":  float(d.get("Pro_Fid")  or 0),
                         "cust_via": float(d.get("Cust_Via") or 0),
                         "brinde":   float(d.get("Bri")      or 0),
+                        "cust_esp": float(d.get("Cust_Esp") or 0),
                         "total":    float(d.get("Cust_Ad")  or 0),
                         "cust_fin": float(d.get("Cust_Fin") or 0),   # custo financeiro (informativo)
                     }

@@ -13,6 +13,8 @@ MARGENS_DEFAULT = {
     "fora_da_sede":         False,
     "brinde":               0.0,
     "brinde_ativo":         False,
+    "custo_especial":       0.0,
+    "custo_especial_ativo": False,
     "comissao_arq_pct":     0.0,
     "comissao_arq_ativa":   False,
     "fidelidade_pct":       0.0,
@@ -21,9 +23,9 @@ MARGENS_DEFAULT = {
     "carga_trib":           8.0,
 }
 
-_FLOAT_KEYS = ("desconto_pct", "custo_viagem", "brinde",
+_FLOAT_KEYS = ("desconto_pct", "custo_viagem", "brinde", "custo_especial",
                "comissao_arq_pct", "fidelidade_pct", "carga_trib")
-_BOOL_KEYS  = ("fora_da_sede", "brinde_ativo", "comissao_arq_ativa",
+_BOOL_KEYS  = ("fora_da_sede", "brinde_ativo", "custo_especial_ativo", "comissao_arq_ativa",
                "fidelidade_ativa", "incluir_custos")
 
 
@@ -56,12 +58,15 @@ PARAMETROS_DEFAULT = {
     "custo_viagem":       0.0,
     "brinde":             0.0,
     "brinde_ativo":       False,
+    "custo_especial":       0.0,
+    "custo_especial_ativo": False,
     "carga_trib":         8.0,
 }
 
-_PARAM_FLOAT_KEYS = ("comissao_arq_pct", "fidelidade_pct", "custo_viagem", "brinde", "carga_trib")
+_PARAM_FLOAT_KEYS = ("comissao_arq_pct", "fidelidade_pct", "custo_viagem", "brinde",
+                     "custo_especial", "carga_trib")
 _PARAM_BOOL_KEYS  = ("incluir_custos", "comissao_arq_ativa", "fidelidade_ativa",
-                     "fora_da_sede", "brinde_ativo")
+                     "fora_da_sede", "brinde_ativo", "custo_especial_ativo")
 
 
 def merge_parametros(atual: dict, req: dict) -> dict:

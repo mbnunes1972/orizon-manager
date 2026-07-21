@@ -25,6 +25,7 @@ PLANO_PADRAO = [
     ("1.1.06.15", "Comissão de Arquiteto a Apropriar"), ("1.1.06.16", "Programa de Fidelidade a Apropriar"),
     ("1.1.06.17", "Custo de Viagem a Apropriar"), ("1.1.06.18", "Brinde a Apropriar"),
     ("1.1.06.19", "Custo Financeiro a Apropriar"),   # FASE B: ramo FINANCEIRA (Aymoré/Cartão) — despesa financeira diferida
+    ("1.1.06.20", "Custo Especial a Apropriar"),   # Custo Especial (5º custo adicional — não rateado nos ambientes)
     ("1.1.07", "Recebíveis de Parcelamentos"),   # FASE B: ramo LOJA (financiamento direto) — carrega SÓ os juros (VAVO fica no 1.1.02)
     ("1.2", "Não Circulante"),
     ("1.2.1", "Imobilizado"),
@@ -53,6 +54,7 @@ PLANO_PADRAO = [
     ("2.1.04.15", "Provisão de Comissão de Arquiteto"), ("2.1.04.16", "Provisão de Programa de Fidelidade"),
     ("2.1.04.17", "Provisão de Custo de Viagem"), ("2.1.04.18", "Provisão de Brinde"),
     ("2.1.04.19", "Provisão de Custo Financeiro"),   # FASE B: ramo FINANCEIRA — provisão da despesa financeira
+    ("2.1.04.20", "Provisão de Custo Especial"),   # Custo Especial (5º custo adicional — não rateado nos ambientes)
     ("2.1.05", "Financiamento Total Flex a Pagar"),
     ("2.1.06", "Receita a Realizar"),   # FASE D2: recebe o Val_Cont cheio no contrato (era "Adiantamento de Clientes")
     ("2.1.07", "Receita Financeira a Apropriar"),   # FASE B: ramo LOJA — juros diferidos, realizados por parcela
@@ -90,6 +92,7 @@ PLANO_PADRAO = [
     ("5.3.11", "Uniformes"), ("5.3.12", "Brindes"), ("5.3.13", "Suprimento a Cliente"),
     ("5.3.14", "Viagens de Especificador"), ("5.3.15", "Comissão de Arquiteto"),   # FASE A: despesa da comissão de arquiteto (NF-e)
     ("5.3.16", "Benefícios a Funcionários (AT/VA/PS)"),   # Folha Fase 3: benefícios (conta provisória, a validar c/ contabilidade)
+    ("5.3.17", "Custo Especial de Projeto"),   # despesa do Custo Especial (5º custo adicional, reconhecida na NF-e)
     ("5.4", "Despesas Administrativas"),
     ("5.4.01", "Aluguel"), ("5.4.02", "Energia Elétrica"), ("5.4.03", "Água"),
     ("5.4.04", "Telefonia Fixa/Móvel e Internet"), ("5.4.05", "Contabilidade"),
@@ -406,6 +409,7 @@ EVENTOS = {
     "fechamento_venda_pro_fid":  ("1.1.06.16", "2.1.04.16", "Constituição — Provisão de Programa de Fidelidade (ativo diferido)"),
     "fechamento_venda_cust_via": ("1.1.06.17", "2.1.04.17", "Constituição — Provisão de Custo de Viagem (ativo diferido)"),
     "fechamento_venda_brinde":   ("1.1.06.18", "2.1.04.18", "Constituição — Provisão de Brinde (ativo diferido)"),
+    "fechamento_venda_cust_esp": ("1.1.06.20", "2.1.04.20", "Constituição — Provisão de Custo Especial (ativo diferido)"),
     # FASE B (resultado financeiro) — ramo FINANCEIRA: despesa financeira diferida (constituída no contrato)
     "fechamento_venda_custo_financeiro":     ("1.1.06.19", "2.1.04.19", "Constituição — Provisão de Custo Financeiro (ativo diferido)"),
     "reconhecimento_despesa_custo_financeiro": ("5.5.04", "1.1.06.19", "Reconhecimento da despesa financeira (baixa do ativo diferido)"),
@@ -433,6 +437,7 @@ EVENTOS = {
     "reconhecimento_despesa_pro_fid":  ("5.3.04", "1.1.06.16", "Reconhecimento de despesa na NF-e — Programa de Fidelidade"),
     "reconhecimento_despesa_cust_via": ("5.3.14", "1.1.06.17", "Reconhecimento de despesa na NF-e — Custo de Viagem"),
     "reconhecimento_despesa_brinde":   ("5.3.12", "1.1.06.18", "Reconhecimento de despesa na NF-e — Brinde"),
+    "reconhecimento_despesa_cust_esp": ("5.3.17", "1.1.06.20", "Reconhecimento de despesa na NF-e — Custo Especial"),
     # Impostos = PROVISÃO (Tipo D). CONTRATO: passivo nasce SEM tocar a DRE — ativo diferido (1.1.05) ×
     # Provisão de Impostos (2.1.04.13). EMISSÃO (proporcional Merc/Serv): a dedução entra na DRE
     # (4.3.01 × baixa do ativo 1.1.05) e a obrigação fiscal real crystalliza (2.1.04.13 × 2.1.03).
@@ -568,6 +573,7 @@ _PROV_FECHAMENTO = {
     "pro_fid":             "fechamento_venda_pro_fid",
     "cust_via":            "fechamento_venda_cust_via",
     "brinde":              "fechamento_venda_brinde",
+    "cust_esp":           "fechamento_venda_cust_esp",
     # FASE B — ramo FINANCEIRA (custo financeiro é rubrica provisionada; NÃO entra no matching
     # operacional da NF-e — tem reconhecimento próprio, como impostos)
     "custo_financeiro":    "fechamento_venda_custo_financeiro",
@@ -814,6 +820,7 @@ _MATCHING_NFE = {
     "pro_fid":             "reconhecimento_despesa_pro_fid",
     "cust_via":            "reconhecimento_despesa_cust_via",
     "brinde":              "reconhecimento_despesa_brinde",
+    "cust_esp":           "reconhecimento_despesa_cust_esp",
 }
 
 

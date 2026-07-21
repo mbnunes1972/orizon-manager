@@ -135,3 +135,73 @@ def test_fallback_sem_contexto_inalterado():
     d = mn.calcular_orcamento(ambs, p, 0)    # sem contexto
     assert abs(d["Bri"] - 700.0) < 0.01      # cheio
     assert abs(d["Cust_Via"] - 700.0) < 0.01 # cheio
+
+
+# ── Custo Especial (linha do ORÇAMENTO, não rateada nos ambientes) ─────────────────────────────────
+# Diferente de viagem (proporcional) e brinde (igual/amb), o Custo Especial NÃO se distribui:
+# sai ambiente, ele fica integral. Por isso Σ Val_Liq dos ambientes ≠ Val_Liq do orçamento
+# quando ativo — a diferença é exatamente a linha Cust_Esp.
+
+def test_custo_especial_repassado_soma_no_total_sem_ratear():
+    # exemplo da demanda: cozinha 80k + sala 50k + banheiro 20k + custo especial 1.000 → 151.000
+    ambs = [{"VBVA": 80000, "CFA": 30000, "desc_amb_pct": 0},
+            {"VBVA": 50000, "CFA": 20000, "desc_amb_pct": 0},
+            {"VBVA": 20000, "CFA": 8000,  "desc_amb_pct": 0}]
+    p = {"incluir_custos": True, "custo_especial": 1000.0, "custo_especial_ativo": True}
+    d = mn.calcular_orcamento(ambs, p, 0)
+    _ap(d["Cust_Esp"], 1000.0)
+    _ap(d["VAVO"], 151000.0); _ap(d["Val_Cont"], 151000.0)
+    # ambientes intocados (não rateia): preços por ambiente não mudam
+    assert [a["VAVA"] for a in d["ambientes"]] == [80000.0, 50000.0, 20000.0]
+
+def test_custo_especial_sobrevive_remocao_de_ambientes():
+    # retirada da cozinha e do banheiro → total 51.000 (o custo especial fica INTEGRAL, mesmo com
+    # contexto de projeto que ratearia viagem/brinde)
+    ambs = [{"VBVA": 50000, "CFA": 20000, "desc_amb_pct": 0}]
+    p = {"incluir_custos": True, "custo_especial": 1000.0, "custo_especial_ativo": True}
+    d = mn.calcular_orcamento(ambs, p, 0, n_total_proj=3, vbvo_proj=150000.0)
+    _ap(d["Cust_Esp"], 1000.0)      # NÃO proporcional (≠ viagem/brinde)
+    _ap(d["Val_Cont"], 51000.0)
+
+def test_custo_especial_blindado_do_desconto():
+    # repassado, o cliente paga o custo especial INTEGRAL mesmo com desconto; proteção total mantida
+    ambs = [{"VBVA": 1000.0, "CFA": 400.0, "desc_amb_pct": 0}]
+    p = {"incluir_custos": True, "custo_especial": 100.0, "custo_especial_ativo": True}
+    d = mn.calcular_orcamento(ambs, p, 20.0)
+    _ap(d["VAVO"], 900.0)            # 1000×0,80 + 100
+    _ap(d["Val_Liq"], 800.0)         # líquido igual ao cenário sem custo nenhum
+    _ap(d["Desc_Tot"] * 100, 20.00)  # desconto total não contamina
+
+def test_custo_especial_absorvido():
+    ambs = [{"VBVA": 1000.0, "CFA": 400.0, "desc_amb_pct": 0}]
+    p = {"incluir_custos": False, "custo_especial": 100.0, "custo_especial_ativo": True}
+    d = mn.calcular_orcamento(ambs, p, 0)
+    _ap(d["VAVO"], 1000.0)           # preço ao cliente inalterado
+    _ap(d["Cust_Esp"], 100.0)
+    _ap(d["Val_Liq"], 900.0)         # loja absorve
+
+def test_custo_especial_toggle_off_zera():
+    p = {"incluir_custos": True, "custo_especial": 100.0, "custo_especial_ativo": False}
+    d = mn.calcular_orcamento([{"VBVA": 1000, "CFA": 400, "desc_amb_pct": 0}], p, 0)
+    assert d["Cust_Esp"] == 0.0
+    _ap(d["VAVO"], 1000.0)
+
+def test_comissoes_nao_incidem_sobre_custo_especial():
+    # arq/fid não ganham sobre o custo especial (fica fora do waterfall dos ambientes)
+    ambs = [{"VBVA": 10000, "CFA": 4000, "desc_amb_pct": 0}]
+    p = {"incluir_custos": True, "comissao_arq_ativa": True, "comissao_arq_pct": 10.0,
+         "fidelidade_ativa": True, "fidelidade_pct": 5.0,
+         "custo_especial": 1000.0, "custo_especial_ativo": True}
+    d  = mn.calcular_orcamento(ambs, p, 0)
+    d0 = mn.calcular_orcamento(ambs, {**p, "custo_especial_ativo": False}, 0)
+    _ap(d["Com_Arq"], d0["Com_Arq"]); _ap(d["Pro_Fid"], d0["Pro_Fid"])
+    # cadeia fecha no nível do orçamento: VAVO − Com_Arq − Pro_Fid − Cust_Esp == Val_Liq
+    _ap(d["VAVO"] - d["Com_Arq"] - d["Pro_Fid"] - d["Cust_Esp"], d["Val_Liq"], tol=0.05)
+
+def test_custo_especial_orcamento_vazio_zera():
+    # achado da Vera: sem ambientes não há venda — o custo especial não pode gerar Val_Cont>0
+    # (repassado) nem líquido negativo (absorvido), como viagem/brinde já zeram.
+    for inc in (True, False):
+        d = mn.calcular_orcamento([], {"incluir_custos": inc,
+                                       "custo_especial": 1000.0, "custo_especial_ativo": True}, 0)
+        assert d["Cust_Esp"] == 0.0 and d["Val_Cont"] == 0.0 and d["Val_Liq"] == 0.0

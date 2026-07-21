@@ -157,8 +157,10 @@ _RUBRICAS = {
 
 # F0 (bug ①): custos adicionais — base Cust_Ad (já descontados do Val_Liq pelo motor). Viram LINHA no
 # painel da AF e são provisionados/ajustáveis no razão, mas NÃO entram no Cust_Var (senão DOBRAM o custo).
+# cust_esp (5º): linha do orçamento, não rateada nos ambientes — mesma família contábil.
 _RUBRICAS_CUST_AD = {
     "com_arq": "Com_Arq", "pro_fid": "Pro_Fid", "cust_via": "Cust_Via", "brinde": "Bri",
+    "cust_esp": "Cust_Esp",
 }
 # Custo financeiro — base Val_Cont; LEITURA no painel (ajuste pelo box do ramo, não digitável).
 _RUBRICA_CUST_FIN = {"custo_financeiro": "Cust_Fin"}

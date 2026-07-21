@@ -136,7 +136,7 @@ def test_itens_provisao_mapeia_rubricas():
     assert set(itens.keys()) == {"frete_fab","com_adm","com_venda","com_med",
         "com_proj_exec","frete_loc","assist","ins_loc","prov_imp","out_forn","prov_mont","prov_gar",
         # F0: + custos adicionais + custo financeiro (viram linha; chave ausente no d antigo → 0)
-        "com_arq","pro_fid","cust_via","brinde","custo_financeiro"}
+        "com_arq","pro_fid","cust_via","brinde","cust_esp","custo_financeiro"}
     assert itens["frete_fab"] == 100.0 and itens["out_forn"] == 300.0 and itens["frete_loc"] == 50.0
     assert itens["com_arq"] == 0.0 and itens["custo_financeiro"] == 0.0   # d antigo sem as chaves → 0
     assert itens["prov_mont"] == 0.0 and itens["prov_gar"] == 0.0   # chave ausente no d antigo → 0
@@ -149,11 +149,13 @@ def test_custos_adicionais_e_cust_fin_aparecem_sem_dobrar_no_cust_var():
     d = {"Frete_Fab_Orc": 100.0, "Com_Adm_Orc": 0.0, "Com_Venda_Orc": 0.0, "Com_Med_Orc": 0.0,
          "Com_Proj_Exec_Orc": 0.0, "Frete_Loc_Orc": 0.0, "Assist_Orc": 0.0, "Ins_Loc_Orc": 0.0,
          "Prov_Imp": 0.0, "Out_Forn": 0.0, "Prov_Mont": 0.0, "Prov_Gar": 0.0,
-         "Com_Arq": 500.0, "Pro_Fid": 300.0, "Cust_Via": 200.0, "Bri": 100.0, "Cust_Fin": 700.0}
+         "Com_Arq": 500.0, "Pro_Fid": 300.0, "Cust_Via": 200.0, "Bri": 100.0,
+         "Cust_Esp": 400.0, "Cust_Fin": 700.0}
     itens = mod_provisoes.itens_provisao(d)
     # (a) aparecem como rubricas
     assert itens["com_arq"] == 500.0 and itens["pro_fid"] == 300.0
     assert itens["cust_via"] == 200.0 and itens["brinde"] == 100.0
+    assert itens["cust_esp"] == 400.0
     assert itens["custo_financeiro"] == 700.0
     # (b) NÃO entram no Cust_Var: CFO 1000 + frete_fab 100 = 1100 (sem os 1800 de adicionais/fin)
     cv, _ = mod_provisoes.cust_var_marg_cont(cfo=1000.0, val_liq=5000.0, itens=itens)

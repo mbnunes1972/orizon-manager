@@ -2241,6 +2241,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <input type="number" class="toggle-input" id="mp-brinde" min="0" step="10" value="0" disabled style="opacity:.35" oninput="agendarParametros()">
       <span class="toggle-unit" style="font-size:9px">R$</span>
     </div>
+    <!-- Custo Especial: valor por projeto que NÃO se distribui nos ambientes (sai ambiente, ele fica) -->
+    <div class="toggle-row">
+      <span class="toggle-label" style="flex:1">Custo Especial</span>
+      <label class="sw" style="margin-right:8px"><input type="checkbox" id="mp-cesp-ativo" onchange="mpToggleCustoEspecial();agendarParametros()"><span class="sw-slider"></span></label>
+      <input type="number" class="toggle-input" id="mp-cesp" min="0" step="10" value="0" disabled style="opacity:.35" oninput="agendarParametros()">
+      <span class="toggle-unit" style="font-size:9px">R$</span>
+    </div>
     <div class="toggle-row">
       <span class="toggle-label" style="flex:1">Carga Tributaria</span>
       <input type="number" class="toggle-input" id="mp-carga-trib" min="0" max="100" step="0.5" value="8.00"
@@ -2284,7 +2291,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Comissão arquiteto</span><span id="mp-a-arq" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
         <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Programa de fidelidade</span><span id="mp-a-fid" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
         <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Custo de viagem</span><span id="mp-a-viagem" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
-        <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px"><span style="color:var(--muted)">− Brinde</span><span id="mp-a-brinde" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">− Brinde</span><span id="mp-a-brinde" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
+        <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px"><span style="color:var(--muted)">− Custo Especial</span><span id="mp-a-cesp" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
         <div style="display:flex;justify-content:space-between"><span style="font-weight:700">Valor líquido final</span><span id="mp-a-liq" style="font-family:var(--font-mono);font-weight:700;color:var(--ok)">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Desconto Total</span><span id="mp-a-margem" style="font-family:var(--font-mono);color:var(--warn);font-weight:700">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Custo Variável</span><span id="mp-a-cust-var" style="font-family:var(--font-mono)">—</span></div>
@@ -7147,6 +7155,8 @@ function lerMargensNegociacao(){
     custo_financeiro_pct: _acrescimoFin,
     brinde:               parseFloat(m.brinde) || 0,
     brinde_ativo:         !!m.brinde_ativo,
+    custo_especial:           parseFloat(m.custo_especial) || 0,
+    custo_especial_ativo:     !!m.custo_especial_ativo,
     incluir_custos:       incluirCustos,
   };
 }
@@ -7754,6 +7764,10 @@ function mpToggleViagem(){
   inp.style.opacity = cb.checked ? '1' : '0.35';
   mpRecalcularEstruturalModal();
 }
+function mpToggleCustoEspecial(){
+  const cb=document.getElementById('mp-cesp-ativo'), inp=document.getElementById('mp-cesp');
+  inp.disabled=!cb.checked; inp.style.opacity=cb.checked?'1':'0.35';
+}
 
 // Recalcula estrutural em _negBaseValues com base no estado atual dos toggles do modal
 function mpRecalcularEstruturalModal(){
@@ -7810,6 +7824,8 @@ async function salvarParametrosAuto(){
     custo_viagem:       parseFloat(id('mp-viagem').value)||0,
     brinde_ativo:       id('mp-brinde-ativo').checked,
     brinde:             parseFloat(id('mp-brinde').value)||0,
+    custo_especial_ativo:   id('mp-cesp-ativo').checked,
+    custo_especial:         parseFloat(id('mp-cesp').value)||0,
     incluir_custos:     inc,
     carga_trib:         parseFloat(id('mp-carga-trib').value)||0,
   };
@@ -7932,13 +7948,16 @@ function mpAtualizarApoio(){
     // margem/impostos. NÃO recalcular aqui (senão o legado sobrescreve o preview no apoio).
     if(!orcAmbs.length){ id('mp-apoio').style.display='none'; return; }
     id('mp-apoio').style.display='block';
-    // viagem/brinde: ecos dos inputs (o motor os inclui em Cust_Ad); desconto %: eco do input
+    // viagem/brinde/custo especial: ecos dos inputs (o motor os inclui em Cust_Ad); desconto %: eco do input
     const viagAtiva = id('mp-fora-sede').checked;
     const viagVal   = viagAtiva ? (parseFloat(id('mp-viagem').value)||0) : 0;
     const brdAtivo  = id('mp-brinde-ativo').checked;
     const brdVal    = brdAtivo  ? (parseFloat(id('mp-brinde').value)||0) : 0;
+    const cespAtivo  = id('mp-cesp-ativo').checked;
+    const cespVal    = cespAtivo  ? (parseFloat(id('mp-cesp').value)||0) : 0;
     id('mp-a-viagem').textContent   = viagAtiva ? '− R$ '+fmt(viagVal) : 'R$ 0,00';
     id('mp-a-brinde').textContent   = brdAtivo  ? '− R$ '+fmt(brdVal)  : 'R$ 0,00';
+    id('mp-a-cesp').textContent    = cespAtivo  ? '− R$ '+fmt(cespVal)  : 'R$ 0,00';
     id('mp-a-desc-pct').textContent = (parseFloat(id('mp-desconto').value)||0).toLocaleString('pt-BR');
     agendarPreview();   // motor preenche os demais campos do apoio (e os totais da tela)
     return;
@@ -7980,6 +7999,8 @@ function mpAtualizarApoio(){
   const viagem_val  = viagemAtiva ? (parseFloat(id('mp-viagem').value)||0) : 0;
   const brinde_ativo= id('mp-brinde-ativo').checked;
   const brinde_val  = brinde_ativo ? (parseFloat(id('mp-brinde').value)||0) : 0;
+  const cesp_ativo = id('mp-cesp-ativo').checked;
+  const cesp_val   = cesp_ativo ? (parseFloat(id('mp-cesp').value)||0) : 0;
   const n_ambs      = ambsNeg.length || 1;
 
   let saldo = avista;
@@ -7987,6 +8008,8 @@ function mpAtualizarApoio(){
   saldo = rnd(saldo - v_viagem);
   const v_brinde = rnd(brinde_val);
   saldo = rnd(saldo - v_brinde);
+  const v_cesp = rnd(cesp_val);        // custo especial: fora da base de arq/fid, como viagem/brinde
+  saldo = rnd(saldo - v_cesp);
   const s_apos_viagem_brinde = saldo;
   const v_arq = rnd(s_apos_viagem_brinde * arq_pct / 100);
   saldo = rnd(saldo - v_arq);
@@ -8009,6 +8032,7 @@ function mpAtualizarApoio(){
   id('mp-a-fid').textContent       = fid_ativa ? '− R$ '+fmt(v_fid) : 'R$ 0,00';
   id('mp-a-viagem').textContent    = viagemAtiva ? '− R$ '+fmt(v_viagem) : 'R$ 0,00';
   id('mp-a-brinde').textContent    = brinde_ativo ? '− R$ '+fmt(v_brinde) : 'R$ 0,00';
+  id('mp-a-cesp').textContent     = cesp_ativo ? '− R$ '+fmt(v_cesp) : 'R$ 0,00';
   id('mp-a-liq').textContent       = 'R$ '+fmt(liquido);
   id('mp-a-margem').textContent    = margem.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
   // ── modo sombra: HOJE × NOVO (Task 7 — validação visual) ──
@@ -8095,7 +8119,7 @@ function aplicarBreakdownResposta(d) {
 }
 
 // Sobrepõe TODOS os displays do modal/tela com os valores do MOTOR (fonte única).
-// Cadeia consistente: VBNO − desconto = VAVO; VAVO − Com_Arq − Pro_Fid − viagem − brinde = Val_Liq.
+// Cadeia consistente: VBNO − desconto = VAVO; VAVO − Com_Arq − Pro_Fid − viagem − brinde − custo especial = Val_Liq.
 function _aplicarPreviewNaTela(s) {
   if (!s) return;
   const id = x => document.getElementById(x);
@@ -8109,9 +8133,10 @@ function _aplicarPreviewNaTela(s) {
   setR('mp-a-avista', vavo);
   setR('mp-a-arq', arq, arq > 0 ? '− ' : '');
   setR('mp-a-fid', fid, fid > 0 ? '− ' : '');
-  const via = Number(s.Cust_Via) || 0, bri = Number(s.Bri) || 0;
+  const via = Number(s.Cust_Via) || 0, bri = Number(s.Bri) || 0, cesp = Number(s.Cust_Esp) || 0;
   setR('mp-a-viagem', via, via > 0 ? '− ' : '');     // viagem total do motor (Cust_Via)
   setR('mp-a-brinde', bri, bri > 0 ? '− ' : '');     // brinde total do motor (Bri)
+  setR('mp-a-cesp', cesp, cesp > 0 ? '− ' : '');      // custo especial do motor (não rateado)
   setR('mp-a-liq', s.Val_Liq);
   const margem = (Number(s.Desc_Tot) || 0) * 100;
   _margemAtual = margem;   // usado pelo limite de 35%
@@ -8178,12 +8203,14 @@ function abrirModalParams(){
   id('mp-viagem').value       = m.custo_viagem   || 0;
   id('mp-brinde-ativo').checked = !!m.brinde_ativo;
   id('mp-brinde').value       = m.brinde || 0;
+  id('mp-cesp-ativo').checked = !!m.custo_especial_ativo;
+  id('mp-cesp').value        = m.custo_especial || 0;
   id('mp-carga-trib').value   = m.carga_trib !== undefined ? m.carga_trib : 8.00;
   // preenche out_forn com o valor vindo do preview do motor (Out_Forn)
   const outFornEl = id('mp-out-forn');
   if (outFornEl) outFornEl.value = (_previewNeg && _previewNeg.Out_Forn != null) ? _previewNeg.Out_Forn : 0;
   mpSegPopular(m);   // segmentação Mercadoria × Serviço (override do projeto) — só ao Diretor
-  mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
+  mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde(); mpToggleCustoEspecial();
   // Carrega toggle incluir_custos — sincroniza _incluirCustos com o valor salvo
   _incluirCustos = !!m.incluir_custos;
   const incEl = document.getElementById('mp-incluir-custos');
@@ -8199,6 +8226,8 @@ function abrirModalParams(){
     custo_viagem:       m.custo_viagem || 0,
     brinde_ativo:       !!m.brinde_ativo,
     brinde:             m.brinde || 0,
+    custo_especial_ativo:   !!m.custo_especial_ativo,
+    custo_especial:         m.custo_especial || 0,
     incluir_custos:     !!m.incluir_custos,
     carga_trib:         m.carga_trib !== undefined ? m.carga_trib : 8.00,
   };
@@ -8306,11 +8335,13 @@ async function fecharModalParams(salvar){
     id('mp-viagem').value         = s.custo_viagem;
     id('mp-brinde-ativo').checked = s.brinde_ativo;
     id('mp-brinde').value         = s.brinde;
+    id('mp-cesp-ativo').checked  = !!s.custo_especial_ativo;
+    id('mp-cesp').value          = s.custo_especial || 0;
     id('mp-carga-trib').value     = s.carga_trib !== undefined ? s.carga_trib : 8.00;
     _incluirCustos = !!s.incluir_custos;  // restaura fonte de verdade com o snapshot
     const incEl2 = document.getElementById('mp-incluir-custos');
     if(incEl2) incEl2.checked = _incluirCustos;
-    mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde();
+    mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde(); mpToggleCustoEspecial();
     mpRecalcularEstruturalModal();
     negSyncSidebar(s.desconto_pct);
     _mpSnapshot = null;
@@ -8330,6 +8361,8 @@ async function fecharModalParams(salvar){
       custo_viagem:       parseFloat(id('mp-viagem').value)||0,
       brinde_ativo:       id('mp-brinde-ativo').checked,
       brinde:             parseFloat(id('mp-brinde').value)||0,
+      custo_especial_ativo:   id('mp-cesp-ativo').checked,
+      custo_especial:         parseFloat(id('mp-cesp').value)||0,
       incluir_custos:     novoIncluirCustos,
       carga_trib:         parseFloat(id('mp-carga-trib').value)||0,
     };
@@ -10390,7 +10423,7 @@ async function projDreCarregar(){
     +'<input id="pv-proj" type="text" placeholder="projeto (nome_safe)" style="'+_finInput+'"></div>'
     +'<button class="btn btn-ghost btn-sm" onclick="provVendaVer()">Ver provisões</button></div>'
     +'<div id="pv-out" style="margin-bottom:14px"></div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Margem de contribuição por projeto (não inclui rateio de custo fixo — isso é a Auditoria).</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Margem de contribuição por projeto (não inclui rateio de custo especial — isso é a Auditoria).</div>'
     + '<table style="width:100%;border-collapse:collapse">'+head+linhas+'</table>';
 }
 
@@ -12155,6 +12188,7 @@ const _PROV_RUBRICAS = [
   { key: 'pro_fid',        label: 'Programa Fidelidade' },
   { key: 'cust_via',       label: 'Custo de Viagem' },
   { key: 'brinde',         label: 'Brinde' },
+  { key: 'cust_esp',      label: 'Custo Especial' },
   { key: 'custo_financeiro', label: 'Custo Financeiro', readonly: true },
 ];
 
