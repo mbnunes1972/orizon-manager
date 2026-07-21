@@ -4773,13 +4773,19 @@ async function abrirProjeto(nome_safe){
 
 // ── EP-07: Orçamentos ─────────────────────────────────────────────────────────
 
-async function carregarOrcamentos(){
+async function carregarOrcamentos(selecionarId){
+  // selecionarId (Fatia 3 PE): ativa DIRETO o orçamento pedido (ex.: Negociar Complemento),
+  // pulando o default do contratado — sem isso a tela piscava com os totais do CONTRATO
+  // antes de trocar para o complemento (relato do usuário, 2026-07-21).
   if(!projetoAtivo) return;
   try{
     const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/orcamentos');
     const d = await r.json();
     if(!d.ok) return;
     _orcamentos = d.orcamentos || [];
+    if(selecionarId && _orcamentos.find(o => o.id === selecionarId)){
+      _orcamentoAtivoId = selecionarId;
+    }
     if(!_orcamentoAtivoId && _orcamentos.length > 0){
       // FASE D2 (Ajuste 1): se o projeto TEM contrato, trava SEMPRE no orçamento contratado (a decisão já
       // foi tomada nesse ponto), ignorando localStorage/updated_at. O seletor ▾ continua permitindo ver os
@@ -7396,7 +7402,7 @@ function renderTabelaNeg(ambientes = null){
                  style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;display:block;margin:0 auto"
                  onchange="if(!this.checked)_orcConfirmarRemover(${pa.id},'${esc(pa.nome_exibicao)}',this)">
         </td>
-        <td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600">${esc(pa.nome_exibicao)}${(typeof _orcamentoComplementoAtivo === 'function' && _orcamentoComplementoAtivo()) ? ' <span style="color:var(--warn);font-size:10px;letter-spacing:.04em">— Complemento</span>' : ''}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600">${(typeof _orcamentoComplementoAtivo === 'function' && _orcamentoComplementoAtivo()) ? 'Complemento ' : ''}${esc(pa.nome_exibicao)}</td>
         <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;width:80px">
           <input type="number" value="${disc_i}" min="0" max="100" step="0.5"
                  style="width:60px;text-align:right;padding:3px 6px;font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none"
@@ -13013,6 +13019,9 @@ async function peComplementoRender(){
   const {fmt, sig} = _peCmpHelpers();
   const linhas = (cmp.ok && cmp.linhas) || [];
   // ── Carregar Complemento de Projeto (por ambiente marcado; pode ser idêntico ao PE) ──
+  // Ao lado do XML aparece SÓ a DIFERENÇA (o que será cobrado), não o valor integral do
+  // ambiente novo (relato do usuário, 2026-07-21).
+  const corD = v => v>0.005?'var(--warn)':(v<-0.005?'var(--ok)':'var(--text-3)');
   let complHtml;
   if(!linhas.length){
     complHtml = '<span style="color:var(--muted);font-size:.82rem">Nenhum ambiente marcado para complemento na Revisão de PE.</span>';
@@ -13021,7 +13030,7 @@ async function peComplementoRender(){
       <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;line-height:2.1">
         <span>${esc(l.ambiente)}</span>
         <span style="font-family:var(--font-mono)">
-          ${l.compl_carregado ? fmt(l.vava_complemento)
+          ${l.compl_carregado ? `<span style="color:${corD(l.diferenca)}" title="Diferença sobre o contratado (${fmt(l.vava_contratado)})">Δ ${sig(l.diferenca)}</span>`
             : '<span style="color:var(--text-3);font-size:var(--fs-xs)">complemento não carregado</span>'}
           <label class="btn-ciclo" style="font-size:var(--fs-xs);padding:2px 8px;cursor:pointer;margin-left:8px"><i class="ti ti-upload"></i> XML
             <input type="file" accept=".xml" style="display:none" onchange="peComplUpload(${l.pool_ambiente_id}, this)"></label>
@@ -13160,8 +13169,8 @@ async function peComplementoNegociar(){
     if(!j.ok){ await avisoPopup(j.erro||'Erro',{titulo:'Negociar Complemento'}); return; }
     fecharCiclo();
     goPage(2);
-    await carregarOrcamentos();               // recarrega a lista (o default trava no contratado)
-    await ativarOrcamento(j.orcamento.id);    // ...e ativa o COMPLEMENTO explicitamente
+    _orcamentoAtivoId = null;                       // força re-seleção…
+    await carregarOrcamentos(j.orcamento.id);       // …DIRETO no complemento (sem flash do contratado)
     showToast('Complemento ativo — negocie as diferenças (desconto por ambiente).');
   } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Negociar Complemento'}); }
 }
