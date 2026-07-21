@@ -9788,9 +9788,15 @@ async function acordosFabricaCarregar(){
   if(!box) return;
   box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
   await empresasCarregar();
-  let j;
-  try{ j = await fetch('/api/admin/acordos-fabrica',{credentials:'same-origin'}).then(r=>r.json()); }
+  let j, jc;
+  try{
+    [j, jc] = await Promise.all([
+      fetch('/api/admin/acordos-fabrica',{credentials:'same-origin'}).then(r=>r.json()),
+      fetch('/api/admin/contrapartes-financeiras',{credentials:'same-origin'}).then(r=>r.json()),
+    ]);
+  }
   catch(e){ box.innerHTML = '<em style="color:var(--err);font-size:12px">Erro ao carregar.</em>'; return; }
+  const _cps = (jc && jc.ok && jc.contrapartes) || [];
   if(!j.ok){ box.innerHTML = `<em style="color:var(--muted);font-size:12px">${esc(j.erro||'Acesso negado.')}</em>`; return; }
   _afAcordos = j.acordos || [];
   const fmt = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -9805,36 +9811,24 @@ async function acordosFabricaCarregar(){
     : '<span style="color:var(--muted)">encerrado</span>';
 
   const cardAcordo = a => {
-    const aj = (a.ajustes||[]).map(x => `
-      <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;line-height:2">
-        <span>${esc(lojaNome(x.loja_id))} — ${x.tipo === 'desconto' ? '−' : '+'}${x.pct}%
-          <span style="color:var(--muted)">(${x.tratamento === 'custo' ? 'custo' : (a.tipo==='divida' && a.contraparte_tipo==='empresa' ? 'acumula dívida' : 'consome saldo')}${x.natureza==='pontual' ? ' · pontual' : ''}${x.vigencia_de || x.vigencia_ate ? ' · '+(x.vigencia_de||'…')+' a '+(x.vigencia_ate||'…') : ''})</span></span>
-        <label class="sw" style="transform:scale(.8)"><input type="checkbox" ${x.ativo?'checked':''}
-          onchange="afToggleAjuste(${x.id}, this.checked)"><span class="sw-slider"></span></label>
-      </div>`).join('') || '<div style="font-size:12px;color:var(--muted)">Nenhum ajuste vinculado.</div>';
     const outrosCreditos = _afAcordos.filter(o => o.id !== a.id && o.tipo === 'credito'
       && o.loja_titular_id === a.loja_titular_id && o.status !== 'encerrado');
     const acoes = a.status !== 'encerrado' ? `
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px">
-        <input type="text" id="af-mov-valor-${a.id}" inputmode="numeric" placeholder="R$" oninput="mascaraMoedaInput(this)" style="width:110px;padding:3px 6px;font-size:12px;font-family:var(--font-mono)">
+        <input type="text" id="af-mov-valor-${a.id}" inputmode="numeric" placeholder="${a.tipo==='divida' ? 'Nominal R$' : 'R$'}" oninput="mascaraMoedaInput(this)" style="width:110px;padding:3px 6px;font-size:12px;font-family:var(--font-mono)">
         ${a.tipo === 'divida'
-          ? `<button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'pagar')">Pagar</button>
-             <button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'atualizar')" title="Juros/encargos — aumenta a dívida (despesa 5.5.02)">Atualizar juros</button>`
+          ? `<input type="text" id="af-mov-juros-${a.id}" inputmode="numeric" placeholder="Juros R$" oninput="mascaraMoedaInput(this)" style="width:100px;padding:3px 6px;font-size:12px;font-family:var(--font-mono)" title="Despesa de juros paga junto (5.5.02 × Caixa)">
+             <button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'pagar')" title="Baixa o nominal do passivo; os juros vão direto a despesa">Pagar</button>
+             <button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'atualizar')" title="Encargos incorporados ao saldo devedor (despesa 5.5.02 × dívida)">Atualizar encargos</button>`
           : `<button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'receber')">Receber</button>`}
+        <button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'acrescer')" title="Aumenta o saldo SEM caixa (ex.: refletir acréscimo/desconto de conferência no balanço)">Acrescer</button>
+        <button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'abater')" title="Reduz o saldo SEM caixa (ex.: dívida amortizada via acréscimo em nota)">Abater</button>
         ${a.tipo === 'credito' && outrosCreditos.length ? `
           <select id="af-mov-dest-${a.id}" style="padding:4px 6px;font-size:12px">
             ${outrosCreditos.map(o => `<option value="${o.id}">→ ${esc(o.descricao)}</option>`).join('')}
           </select>
-          <button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'transferir')" title="Move saldo p/ outro acordo de crédito da mesma loja (ex.: crédito da fábrica → conta corrente de empresa devedora)">Transferir</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'transferir')" title="Move saldo p/ outro acordo de crédito da mesma loja">Transferir</button>` : ''}
         <button class="btn btn-ghost btn-sm" onclick="afEncerrar(${a.id})">Encerrar</button>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
-        <span style="font-size:11px;color:var(--muted)">+ Ajuste na conferência:</span>
-        ${lojaSel('af-aj-loja-'+a.id)}
-        <select id="af-aj-tipo-${a.id}" style="padding:4px 6px;font-size:12px">
-          <option value="desconto">desconto</option><option value="acrescimo">acréscimo</option></select>
-        <input type="number" id="af-aj-pct-${a.id}" min="0.01" max="100" step="0.1" placeholder="%" style="width:70px;padding:3px 6px;font-size:12px">
-        <button class="btn btn-ghost btn-sm" onclick="afNovoAjuste(${a.id})">Criar</button>
       </div>` : '';
     return `
     <div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:10px;padding:12px 14px;margin-bottom:10px">
@@ -9849,7 +9843,7 @@ async function acordosFabricaCarregar(){
         <span style="color:var(--muted)">Saldo <span style="font-family:var(--font-mono);color:${a.tipo === 'credito' ? 'var(--ok)' : 'var(--warn)'};font-weight:700">${fmt(a.saldos.contabil)}</span></span>
       </div>
       <div id="af-extrato-${a.id}" style="display:none;margin-top:8px"></div>
-      <div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:6px">${aj}${acoes}</div>
+      <div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:6px">${acoes}</div>
     </div>`;
   };
 
@@ -9867,11 +9861,21 @@ async function acordosFabricaCarregar(){
       (empréstimos). Os lançamentos contábeis (partidas dobradas) são automáticos; os %
       vinculados aplicam na <strong>Conferência do Pedido</strong> (etapa 12).
     </div>
+    <div style="margin-bottom:12px">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Credores e Devedores cadastrados</div>
+      <div style="font-size:12px;margin-bottom:6px">${_cps.length ? _cps.map(c => `${esc(c.nome)} <span style="color:var(--muted)">(${c.tipo === 'fabrica' ? 'fábrica' : c.tipo})</span>`).join(' · ') : '<span style="color:var(--muted)">Nenhum cadastrado.</span>'}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <input type="text" id="af-cp-nome" placeholder="Nome (ex.: Banco Itaú, Verano)" style="min-width:180px;padding:5px 8px;font-size:12px">
+        <select id="af-cp-tipo" style="padding:4px 6px;font-size:12px">
+          <option value="fabrica">Fábrica</option><option value="empresa">Empresa</option><option value="banco">Banco</option></select>
+        <button class="btn btn-ghost btn-sm" onclick="afNovaContraparte()">Cadastrar</button>
+      </div>
+    </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
       <input type="text" id="af-novo-desc" placeholder="Descrição do acordo" style="flex:1;min-width:170px;padding:5px 8px;font-size:12px">
-      <select id="af-novo-ctp" style="padding:4px 6px;font-size:12px" onchange="afNovoCtpChange()">
-        <option value="fabrica">Fábrica</option><option value="empresa">Empresa</option><option value="banco">Banco</option></select>
-      <input type="text" id="af-novo-nome" placeholder="Nome da contraparte" style="display:none;width:150px;padding:5px 8px;font-size:12px">
+      <select id="af-novo-cp" style="padding:4px 6px;font-size:12px" onchange="afNovoCpChange()">
+        ${_cps.map(c => `<option value="${c.id}" data-tipo="${c.tipo}">${esc(c.nome)}</option>`).join('') || '<option value="">— cadastre uma contraparte —</option>'}
+      </select>
       <select id="af-novo-tipo" style="padding:4px 6px;font-size:12px">
         <option value="credito">crédito (nos devem)</option><option value="divida">dívida (devemos)</option></select>
       ${lojaSel('af-novo-loja')}
@@ -9881,7 +9885,7 @@ async function acordosFabricaCarregar(){
     </div>
     ${_afAcordos.map(cardAcordo).join('') || '<em style="color:var(--muted);font-size:12px">Nenhum acordo cadastrado.</em>'}
     <div style="margin-top:16px">
-      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Descontos/acréscimos de custo (sem acordo — ex.: cashback, campanha por período)</div>
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Descontos/Acréscimos da fábrica (% sobre o Custo de Fábrica na conferência; vigência = data da VENDA)</div>
       ${avulsos}
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
         ${lojaSel('af-av-loja')}
@@ -9891,17 +9895,24 @@ async function acordosFabricaCarregar(){
         <span style="font-size:11px;color:var(--muted)">vigência:</span>
         <input type="date" id="af-av-de" style="padding:3px 6px;font-size:12px" title="Início da vigência (opcional)">
         <input type="date" id="af-av-ate" style="padding:3px 6px;font-size:12px" title="Fim da vigência (opcional)">
-        <button class="btn btn-ghost btn-sm" onclick="afNovoAjuste(null)">Criar</button>
+        <button class="btn btn-ghost btn-sm" onclick="afNovoAjuste()">Criar</button>
       </div>
     </div>`;
 }
 
-function afNovoCtpChange(){
-  const ctp = document.getElementById('af-novo-ctp')?.value;
-  const nome = document.getElementById('af-novo-nome');
+function afNovoCpChange(){
+  const sel = document.getElementById('af-novo-cp');
+  const tipo = sel?.selectedOptions?.[0]?.dataset?.tipo || 'fabrica';
   const capt = document.getElementById('af-novo-capt-wrap');
-  if(nome) nome.style.display = ctp === 'fabrica' ? 'none' : '';
-  if(capt) capt.style.display = ctp === 'banco' ? 'flex' : 'none';
+  if(capt) capt.style.display = tipo === 'banco' ? 'flex' : 'none';
+}
+
+async function afNovaContraparte(){
+  const j = await _afPost('/api/admin/contrapartes-financeiras', {
+    nome: (document.getElementById('af-cp-nome')?.value||'').trim(),
+    tipo: document.getElementById('af-cp-tipo')?.value,
+  }, 'Contraparte cadastrada.');
+  if(j) acordosFabricaCarregar();
 }
 
 async function _afPost(url, payload, okMsg){
@@ -9915,11 +9926,11 @@ async function _afPost(url, payload, okMsg){
 }
 
 async function afNovoAcordo(){
-  const ctp = document.getElementById('af-novo-ctp')?.value;
+  const cpId = parseInt(document.getElementById('af-novo-cp')?.value)||0;
+  if(!cpId){ await avisoPopup('Cadastre e selecione uma contraparte (credor/devedor).', {titulo:'Acordos Financeiros'}); return; }
   const j = await _afPost('/api/admin/acordos-fabrica', {
     descricao: (document.getElementById('af-novo-desc')?.value||'').trim(),
-    contraparte_tipo: ctp,
-    contraparte_nome: (document.getElementById('af-novo-nome')?.value||'').trim(),
+    contraparte_id: cpId,
     tipo: document.getElementById('af-novo-tipo')?.value,
     loja_titular_id: parseInt(document.getElementById('af-novo-loja')?.value)||0,
     valor: _moedaNum('af-novo-valor'),
@@ -9928,20 +9939,16 @@ async function afNovoAcordo(){
   if(j) acordosFabricaCarregar();
 }
 
-async function afNovoAjuste(acordoId){
-  const suf = acordoId ? ('-'+acordoId) : '';
-  const loja = parseInt(document.getElementById(acordoId ? 'af-aj-loja'+suf : 'af-av-loja')?.value)||0;
-  const tipo = document.getElementById(acordoId ? 'af-aj-tipo'+suf : 'af-av-tipo')?.value;
-  const pct = parseFloat(document.getElementById(acordoId ? 'af-aj-pct'+suf : 'af-av-pct')?.value)||0;
-  const payload = {
-    acordo_id: acordoId || undefined, loja_id: loja, tipo, pct,
-    tratamento: acordoId ? 'consumir_saldo' : 'custo',
-  };
-  if(!acordoId){
-    payload.vigencia_de = document.getElementById('af-av-de')?.value || '';
-    payload.vigencia_ate = document.getElementById('af-av-ate')?.value || '';
-  }
-  const j = await _afPost('/api/admin/ajustes-fabrica', payload, 'Ajuste criado.');
+async function afNovoAjuste(){
+  // revisão 2026-07-22: todo desconto/acréscimo é de CUSTO (mexe na provisão da conferência,
+  // vigência pela data da venda); o lado financeiro é manual nos acordos.
+  const j = await _afPost('/api/admin/ajustes-fabrica', {
+    loja_id: parseInt(document.getElementById('af-av-loja')?.value)||0,
+    tipo: document.getElementById('af-av-tipo')?.value,
+    pct: parseFloat(document.getElementById('af-av-pct')?.value)||0,
+    vigencia_de: document.getElementById('af-av-de')?.value || '',
+    vigencia_ate: document.getElementById('af-av-ate')?.value || '',
+  }, 'Ajuste criado.');
   if(j) acordosFabricaCarregar();
 }
 
@@ -9956,6 +9963,7 @@ async function afMovimento(id, acao){
   _afMovEmVoo = true;
   const payload = {acao, valor: _moedaNum('af-mov-valor-'+id),
                    nonce: Date.now() + '-' + Math.random().toString(36).slice(2, 8)};
+  if(acao === 'pagar') payload.juros = _moedaNum('af-mov-juros-'+id);
   if(acao === 'transferir'){
     payload.destino_acordo_id = parseInt(document.getElementById('af-mov-dest-'+id)?.value)||0;
   }
@@ -9995,7 +10003,9 @@ async function afExtrato(id){
     <tr><td>${esc(a.em)}</td><td>${esc(a.loja)}</td><td>${esc(a.projeto)}</td>
       <td>${a.tipo === 'desconto' ? '−' : '+'}${a.pct != null ? a.pct + '%' : ''}</td>
       <td class="num" style="font-family:var(--font-mono)">${fmt(a.valor)}</td></tr>`).join('');
-  const rotMov = {pagamento:'Pagamento', recebimento:'Recebimento', atualizacao:'Atualização (juros)',
+  const rotMov = {pagamento:'Pagamento (nominal)', recebimento:'Recebimento', atualizacao:'Atualização de encargos',
+                  juros_pagos:'Juros pagos (despesa)', acrescimo_manual:'Acréscimo manual (sem caixa)',
+                  abatimento_manual:'Abatimento manual (sem caixa)',
                   transferencia_in:'Transferência recebida', transferencia_out:'Transferência enviada',
                   baixa_encerramento:'Baixa de encerramento'};
   const movs = (j.movimentos||[]).map(m =>

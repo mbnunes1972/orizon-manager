@@ -70,7 +70,7 @@ MODULOS = {
                     "arquivos": ["mod_provisoes.py", "mod_contabil.py", "mod_ajustes_fabrica.py"],
                     "tabelas": ["provisao_registro", "conta", "lancamento", "periodo_contabil",
                                 "acordo_fabrica", "ajuste_fabrica", "ajuste_fabrica_aplicacao",
-                                "acordo_movimento"],
+                                "acordo_movimento", "contraparte_financeira"],
                     "rotas": ["/api/provisoes", "/api/financeiro/contas", "/api/financeiro/lancamentos",
                               "/api/financeiro/eventos", "/api/financeiro/dre", "/api/financeiro/projetos-dre",
                               "/api/financeiro/reconciliar", "/api/financeiro/periodos", "/api/financeiro/balanco",

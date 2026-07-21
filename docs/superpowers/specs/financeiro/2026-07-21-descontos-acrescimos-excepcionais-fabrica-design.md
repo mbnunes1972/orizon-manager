@@ -243,6 +243,26 @@ foi **eliminado**. Modelo novo, mais simples e mais geral:
 - **Desconto por período** sem crédito/dívida: ajuste `tratamento=custo` com `vigencia_de/ate`
   (o motor já respeitava vigência; agora o painel expõe os campos nos ajustes avulsos).
 
+## 2ª revisão (2026-07-22, feedback de teste): Credores/Devedores, juros e desacoplamento total
+- **Cadastro de Credores/Devedores** (`contraparte_financeira`): o acordo é lançado contra uma
+  contraparte CADASTRADA (seletor). O papel vem do tipo do acordo: crédito nosso ⇒ contraparte
+  devedora; dívida nossa ⇒ contraparte credora.
+- **Pagamento com NOMINAL + JUROS separados**: nominal baixa o passivo (`dívida × 1.1.01`); juros
+  vão direto a despesa (`5.5.02 × 1.1.01`, evento `pagamento_juros_acordo`) — bancos sempre têm.
+  "Atualizar encargos" (incorpora ao saldo) continua disponível.
+- **Desacoplamento TOTAL**: descontos/acréscimos são SEMPRE de custo (% que ajusta a provisão de
+  Custo de Fábrica na conferência — mudam a condição comercial); `consumir_saldo` foi
+  DESCONTINUADO (400 na criação). Se um desconto/acréscimo se referir a um crédito/dívida, o
+  lado financeiro é lançado MANUALMENTE no acordo (acrescer/abater sem caixa, × 3.5) — reflete
+  no balanço sem acoplar os painéis. Consequência assumida: o CMV passa a ser o custo REAL da
+  nota (ex.: Loja 3 → CMV 104.500), não mais o custo "econômico" — validar com contador.
+- **Vigência pela DATA DA VENDA**: o desconto por período aplica se o pedido foi VENDIDO dentro
+  da janela (data do contrato), mesmo que a conferência ocorra depois.
+- **PL × credores (pergunta do Diretor, respondida)**: o passivo JÁ vive em contas de credores
+  (2.1.08/2.1.09/2.1.10); o `3.5` (PL) é apenas a contrapartida da implantação de saldos
+  PRÉ-EXISTENTES (CPC 23 — fatos passados não passam pela DRE corrente). Empréstimo NOVO entra
+  pelo caixa (captação), sem tocar o PL.
+
 ## Limitações conhecidas (registradas no QA de 2026-07-21)
 - **Conta corrente por contraparte** *(RESOLVIDA pela revisão Acordos Financeiros)*: o saldo por
   acordo agora é 100% derivado da trilha própria (implantado + aplicações + movimentos), não do

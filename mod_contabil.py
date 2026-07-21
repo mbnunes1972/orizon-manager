@@ -515,6 +515,8 @@ EVENTOS = {
     "atualizacao_divida_fabrica":   ("5.5.02", "2.1.08",    "Atualização (juros/encargos) da dívida com a fábrica"),
     "atualizacao_divida_empresa":   ("5.5.02", "2.1.09",    "Atualização (juros/encargos) da dívida com empresa"),
     "atualizacao_emprestimo":       ("5.5.02", "2.1.10",    "Atualização (juros/encargos) do empréstimo bancário"),
+    # Revisão 2026-07-22: juros pagos DIRETO no ato do pagamento (nominal + juros separados)
+    "pagamento_juros_acordo":       ("5.5.02", "1.1.01",    "Pagamento de juros/encargos de acordo financeiro"),
     # FASE D: pagamento da obrigação com fornecedor (baixa de Fornecedores a Pagar) — passivo × ativo
     "pagamento_fornecedor":         ("2.1.01", "1.1.01",   "Pagamento a fornecedor (baixa de Fornecedores a Pagar)"),
     # Folha de Pagamento (v10 §2.1): despesa nas contas 5.3 existentes × Caixa (sem conta nova)

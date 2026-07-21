@@ -21,7 +21,8 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        AdiantamentoFuncionario,
                        AtribuicaoAmbiente, ArquivoPE, ParcelaProjeto, ParcelaAmbiente,
                        Aditivo, AditivoAssinatura, AprovacaoPE, AprovacaoPEAssinatura,
-                       AcordoFabrica, AjusteFabrica, AjusteFabricaAplicacao, AcordoMovimento)
+                       AcordoFabrica, AjusteFabrica, AjusteFabricaAplicacao, AcordoMovimento,
+                       ContraparteFinanceira)
 import mod_expedicao
 import mod_assistencias
 import mod_cadastro
@@ -1716,6 +1717,19 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif path == "/api/admin/contrapartes-financeiras":
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+            db = get_session()
+            try:
+                cps = [{"id": c.id, "nome": c.nome, "tipo": c.tipo}
+                       for c in db.query(ContraparteFinanceira)
+                       .order_by(ContraparteFinanceira.nome.asc()).all()]
+                self.send_json({"ok": True, "contrapartes": cps})
+            finally:
+                db.close()
+
         elif path == "/api/admin/acordos-fabrica":
             # Ajustes Excepcionais de Fábrica: lista de acordos visíveis com os TRÊS saldos
             # (contábil, pendente de acerto, disponível) + ajustes aninhados + avulsos (custo).
@@ -3383,7 +3397,8 @@ class Handler(BaseHTTPRequestHandler):
 
         # ── Ajustes Excepcionais de Fábrica — painel Admin (spec 2026-07-21) ──────────────────
         # Gate: mesma capacidade do config-financeira (editar_dados_loja) + escopo de loja(s).
-        if path == "/api/admin/acordos-fabrica" or re.match(r'^/api/admin/(acordos|ajustes)-fabrica/', path):
+        if path in ("/api/admin/acordos-fabrica", "/api/admin/contrapartes-financeiras") \
+                or re.match(r'^/api/admin/(acordos|ajustes)-fabrica/', path):
             import mod_contabil as _mcaf
             usuario = get_usuario_sessao(self)
             if not usuario or not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
@@ -3398,6 +3413,21 @@ class Handler(BaseHTTPRequestHandler):
                     return lj if (lj and mod_tenancy.pode_ver_loja(
                         ator, {"id": lj.id, "rede_id": lj.rede_id})) else None
 
+                if path == "/api/admin/contrapartes-financeiras":
+                    # Revisão 2026-07-22: cadastro de Credor/Devedor — o papel vem do TIPO de
+                    # cada acordo lançado contra a contraparte.
+                    nome_cp = (req.get("nome") or "").strip()
+                    tipo_cp = (req.get("tipo") or "").strip()
+                    if not nome_cp or tipo_cp not in ("fabrica", "empresa", "banco"):
+                        self.send_json({"ok": False, "erro": "Informe nome e tipo "
+                                        "(fabrica|empresa|banco)."}, code=400); return
+                    cp = ContraparteFinanceira(nome=nome_cp, tipo=tipo_cp,
+                                               criado_por_id=usuario.get("id"))
+                    db.add(cp); db.commit()
+                    self.send_json({"ok": True, "contraparte": {"id": cp.id, "nome": cp.nome,
+                                    "tipo": cp.tipo}})
+                    return
+
                 if path == "/api/admin/acordos-fabrica":
                     # Acordos Financeiros (revisão 2026-07-21): cria o ACORDO com contraparte
                     # generalizada (fábrica|empresa|banco) e dispara a implantação no owner
@@ -3405,7 +3435,12 @@ class Handler(BaseHTTPRequestHandler):
                     # novo: o dinheiro entra no caixa). Conta corrente com empresa pode nascer
                     # zerada (acumula com o uso).
                     tipo = (req.get("tipo") or "").strip()
-                    ctp = (req.get("contraparte_tipo") or "fabrica").strip()
+                    cp = db.get(ContraparteFinanceira, int(req.get("contraparte_id") or 0))
+                    if cp is not None:      # revisão 2026-07-22: seletor do cadastro
+                        ctp = cp.tipo
+                        req["contraparte_nome"] = cp.nome
+                    else:
+                        ctp = (req.get("contraparte_tipo") or "fabrica").strip()
                     if tipo not in ("credito", "divida") or ctp not in ("fabrica", "empresa", "banco"):
                         self.send_json({"ok": False, "erro": "tipo deve ser credito|divida; "
                                         "contraparte fabrica|empresa|banco"}, code=400); return
@@ -3428,6 +3463,7 @@ class Handler(BaseHTTPRequestHandler):
                                         "com empresa pode nascer zerada)."}, code=400); return
                     ac = AcordoFabrica(descricao=(req.get("descricao") or "").strip() or tipo,
                                        tipo=tipo, contraparte_tipo=ctp,
+                                       contraparte_id=cp.id if cp else None,
                                        contraparte_nome=(req.get("contraparte_nome") or "").strip() or None,
                                        loja_titular_id=loja.id, conta_saldo=conta,
                                        valor_implantado=valor, criado_por_id=usuario.get("id"))
@@ -3481,7 +3517,9 @@ class Handler(BaseHTTPRequestHandler):
                         valor = round(float(req.get("valor") or 0), 2)
                     except (TypeError, ValueError):
                         valor = 0.0
-                    if valor <= 0:
+                    # "pagar" aceita valor 0 quando há juros (parcela só-juros — QA Vera);
+                    # as demais ações exigem valor > 0
+                    if valor <= 0 and acao != "pagar":
                         self.send_json({"ok": False, "erro": "Informe o valor (> 0)."}, code=400); return
                     ot_t, own_t = mod_contabil_owner(db, ac.loja_titular_id)
                     ctp = (ac.contraparte_tipo or "fabrica")
@@ -3499,18 +3537,31 @@ class Handler(BaseHTTPRequestHandler):
                     saldo = _acordo_saldos(db, ac)["contabil"]
 
                     if acao == "pagar":
+                        # Revisão 2026-07-22: pagamento com NOMINAL (baixa o passivo) + JUROS
+                        # (despesa 5.5.02 × caixa, direto no ato) — campos separados.
                         if ac.tipo != "divida":
                             self.send_json({"ok": False, "erro": "Pagar é para acordos de DÍVIDA."},
                                            code=400); return
+                        try:
+                            juros = round(float(req.get("juros") or 0), 2)
+                        except (TypeError, ValueError):
+                            juros = 0.0
                         v = round(min(valor, max(saldo, 0.0)), 2)
-                        if v <= 0:
+                        if v <= 0 and juros <= 0:
                             self.send_json({"ok": False, "erro": "Sem saldo a pagar."}, code=400); return
-                        ev = {"fabrica": "pagamento_divida_fabrica_caixa",
-                              "empresa": "liquidacao_conta_corrente_devedora",
-                              "banco": "pagamento_emprestimo"}[ctp]
-                        _mcaf.registrar_evento(db, ot_t, own_t, ev, v, ref=ref)
-                        db.add(AcordoMovimento(acordo_id=ac.id, tipo="pagamento", valor=v,
-                                               lancamento_ref=ref, criado_por_id=usuario.get("id")))
+                        if v > 0:
+                            ev = {"fabrica": "pagamento_divida_fabrica_caixa",
+                                  "empresa": "liquidacao_conta_corrente_devedora",
+                                  "banco": "pagamento_emprestimo"}[ctp]
+                            _mcaf.registrar_evento(db, ot_t, own_t, ev, v, ref=ref)
+                            db.add(AcordoMovimento(acordo_id=ac.id, tipo="pagamento", valor=v,
+                                                   lancamento_ref=ref, criado_por_id=usuario.get("id")))
+                        if juros > 0:
+                            _mcaf.registrar_evento(db, ot_t, own_t, "pagamento_juros_acordo", juros,
+                                                   ref=ref + ":juros")
+                            db.add(AcordoMovimento(acordo_id=ac.id, tipo="juros_pagos", valor=juros,
+                                                   lancamento_ref=ref + ":juros",
+                                                   criado_por_id=usuario.get("id")))
                     elif acao == "receber":
                         if ac.tipo != "credito":
                             self.send_json({"ok": False, "erro": "Receber é para acordos de CRÉDITO."},
@@ -3559,9 +3610,36 @@ class Handler(BaseHTTPRequestHandler):
                                                lancamento_ref=ref, criado_por_id=usuario.get("id")))
                         db.add(AcordoMovimento(acordo_id=dest.id, tipo="transferencia_in", valor=v,
                                                lancamento_ref=ref, criado_por_id=usuario.get("id")))
+                    elif acao in ("acrescer", "abater"):
+                        # movimentos SEM caixa (revisão 2026-07-22): espelham a implantação (× 3.5).
+                        # Uso: refletir no balanço o lado financeiro de descontos/acréscimos da
+                        # conferência (o % mexe só no Custo Fábrica; o financeiro é manual aqui).
+                        if acao == "abater":
+                            v = round(min(valor, max(saldo, 0.0)), 2)
+                            if v <= 0:
+                                self.send_json({"ok": False, "erro": "Sem saldo a abater."}, code=400); return
+                        else:
+                            v = valor
+                        _mcaf.seed_plano(db, ot_t, own_t)
+                        c_ac = _mcaf._conta_por_codigo(db, ot_t, own_t, ac.conta_saldo)
+                        c_pl = _mcaf._conta_por_codigo(db, ot_t, own_t, "3.5")
+                        aumenta = (acao == "acrescer")
+                        if ac.tipo == "divida":
+                            cd, cc = ((c_pl, c_ac) if aumenta else (c_ac, c_pl))
+                        else:
+                            cd, cc = ((c_ac, c_pl) if aumenta else (c_pl, c_ac))
+                        _mcaf.lancar(db, ot_t, own_t, cd.id, cc.id, v, origem="acordo_financeiro",
+                                     historico=("Acréscimo manual de saldo do acordo (sem caixa)"
+                                                if aumenta else
+                                                "Abatimento manual de saldo do acordo (sem caixa)"),
+                                     ref=ref)
+                        db.add(AcordoMovimento(acordo_id=ac.id,
+                                               tipo="acrescimo_manual" if aumenta else "abatimento_manual",
+                                               valor=v, lancamento_ref=ref,
+                                               criado_por_id=usuario.get("id")))
                     else:
                         self.send_json({"ok": False, "erro": "acao deve ser pagar|receber|"
-                                        "atualizar|transferir"}, code=400); return
+                                        "atualizar|transferir|acrescer|abater"}, code=400); return
                     # recalcula o status SEMPRE (QA Vera: juros/transferência recebida devolvem
                     # saldo a um acordo esgotado — ele REATIVA; zerou → esgota)
                     for _ac_st in ({ac} | ({dest} if dest is not None else set())):
@@ -3635,46 +3713,27 @@ class Handler(BaseHTTPRequestHandler):
                 if loja is None:
                     self.send_json({"ok": False, "erro": "Loja fora do escopo"}, code=403); return
                 tipo = (req.get("tipo") or "").strip()
-                trat = (req.get("tratamento") or "").strip()
+                # Revisão 2026-07-22: descontos/acréscimos são SEMPRE de custo (mexem na provisão
+                # de Custo de Fábrica na conferência, com vigência avaliada pela DATA DA VENDA).
+                # O lado financeiro de créditos/dívidas é MANUAL, no painel de acordos —
+                # consumir_saldo foi descontinuado.
+                if (req.get("tratamento") or "custo") == "consumir_saldo" or req.get("acordo_id"):
+                    self.send_json({"ok": False, "erro": "Descontos/acréscimos não se vinculam "
+                                    "mais a acordos — o %% ajusta o Custo de Fábrica; o lado "
+                                    "financeiro é lançado manualmente no acordo (acrescer/abater)."},
+                                   code=400); return
+                trat = "custo"
                 natureza = (req.get("natureza") or "recorrente").strip()
                 base = (req.get("base") or "pos_descontos").strip()
                 try:
                     pct = round(float(req.get("pct")), 4)
                 except (TypeError, ValueError):
                     pct = 0.0
-                if tipo not in ("desconto", "acrescimo") or trat not in ("custo", "consumir_saldo") \
-                        or natureza not in ("recorrente", "pontual") \
+                if tipo not in ("desconto", "acrescimo") or natureza not in ("recorrente", "pontual") \
                         or base not in ("pos_descontos", "valor_conferido") or not (0 < pct <= 100):
-                    self.send_json({"ok": False, "erro": "Dados inválidos (tipo/tratamento/"
-                                    "natureza/base/pct)."}, code=400); return
-                acordo = None
-                if trat == "consumir_saldo":
-                    acordo = db.get(AcordoFabrica, int(req.get("acordo_id") or 0))
-                    if acordo is None or acordo.status == "encerrado":
-                        self.send_json({"ok": False, "erro": "consumir_saldo exige um acordo "
-                                        "ativo."}, code=400); return
-                    if _ve_loja2(acordo.loja_titular_id) is None:
-                        self.send_json({"ok": False, "erro": "Acordo fora do escopo (é preciso "
-                                        "visão da loja titular E da consumidora)."}, code=403); return
-                    _ctp_aj = (acordo.contraparte_tipo or "fabrica")
-                    # revisão 2026-07-21: desconto consome CRÉDITO ou acumula DÍVIDA com EMPRESA
-                    # credora (ex.: Inspirium desconta financiada pela Verano); acréscimo amortiza
-                    # DÍVIDA com a fábrica, da própria loja titular.
-                    if tipo == "desconto" and not (acordo.tipo == "credito"
-                                                   or (acordo.tipo == "divida" and _ctp_aj == "empresa")):
-                        self.send_json({"ok": False, "erro": "Desconto consome acordo de CRÉDITO "
-                                        "ou acumula DÍVIDA com empresa credora."}, code=400); return
-                    if tipo == "desconto" and acordo.tipo == "divida" and _ctp_aj == "empresa" \
-                            and acordo.loja_titular_id != loja.id:
-                        self.send_json({"ok": False, "erro": "A dívida com a empresa credora deve "
-                                        "ser da própria loja consumidora."}, code=400); return
-                    if tipo == "acrescimo" and (acordo.tipo != "divida" or _ctp_aj != "fabrica"
-                                                or acordo.loja_titular_id != loja.id):
-                        self.send_json({"ok": False, "erro": "Acréscimo amortiza DÍVIDA com a "
-                                        "FÁBRICA, da própria loja titular."}, code=400); return
-                elif req.get("acordo_id"):
-                    self.send_json({"ok": False, "erro": "tratamento=custo não usa acordo."},
+                    self.send_json({"ok": False, "erro": "Dados inválidos (tipo/natureza/base/pct)."},
                                    code=400); return
+                acordo = None
                 projetos = req.get("projetos")
                 if natureza == "pontual" and not projetos:
                     self.send_json({"ok": False, "erro": "Ajuste pontual exige a lista de "
@@ -9788,11 +9847,14 @@ def _acordo_saldos(db, acordo):
         else:
             saldo -= ap.valor          # consumo de crédito / amortização de dívida
     movs = db.query(AcordoMovimento).filter_by(acordo_id=acordo.id).all()
+    _IN = ("atualizacao", "transferencia_in", "acrescimo_manual")
+    _OUT = ("pagamento", "recebimento", "transferencia_out", "baixa_encerramento", "abatimento_manual")
     for m in movs:
-        if m.tipo in ("atualizacao", "transferencia_in"):
+        if m.tipo in _IN:
             saldo += m.valor
-        else:                          # pagamento|recebimento|transferencia_out|baixa_encerramento
+        elif m.tipo in _OUT:
             saldo -= m.valor
+        # demais (ex.: juros_pagos) são neutros — despesa direta, não mexem no principal
     saldo = round(saldo, 2)
     return {"contabil": saldo, "acumulado": round(acumulado, 2),
             "disponivel": max(saldo, 0.0)}
@@ -9828,44 +9890,23 @@ def _aplicar_ajustes_conferencia(db, ot, own_id, loja_id, nome_safe, valor_confe
     Idempotente por ref `ajx:<projeto>:<ajuste_id>`. Retorna o cálculo + aplicados."""
     import mod_contabil
     rows = {r.id: r for r in db.query(AjusteFabrica)
-            .filter_by(loja_id=loja_id, ativo=1).all()}
-    acordos = {}
-    for r in rows.values():
-        if r.acordo_id and r.acordo_id not in acordos:
-            ac = db.get(AcordoFabrica, r.acordo_id)
-            if ac is not None and ac.status == "ativo":
-                acordos[r.acordo_id] = ac
-    ajustes = []
-    for r in rows.values():
-        if r.acordo_id and r.acordo_id not in acordos:
-            continue   # acordo esgotado/encerrado → ajuste não aplica
-        ajustes.append(dict(_ajuste_fabrica_dict(r)))
-    disponiveis = {}
-    for aid, ac in acordos.items():
-        # dívida com EMPRESA financiando desconto ACUMULA (sem cap — revisão 2026-07-21)
-        eh_conta_corrente = (ac.tipo == "divida"
-                             and (getattr(ac, "contraparte_tipo", "") or "") == "empresa")
-        disponiveis[aid] = 1e12 if eh_conta_corrente else _acordo_saldos(db, ac)["disponivel"]
-    # rebase (reconferência): o cap limita o TOTAL recalculado, então o disponível deve somar de
-    # volta o que ESTE projeto já consumiu do acordo — senão o recálculo seria capado pelo saldo
-    # já líquido do próprio consumo e o delta "devolveria" indevidamente
-    for r in (db.query(AjusteFabricaAplicacao)
-                .join(AjusteFabrica, AjusteFabricaAplicacao.ajuste_id == AjusteFabrica.id)
-                .filter(AjusteFabricaAplicacao.projeto_nome == nome_safe,
-                        AjusteFabrica.tratamento == "consumir_saldo",
-                        AjusteFabrica.acordo_id.isnot(None)).all()):
-        aid = db.get(AjusteFabrica, r.ajuste_id).acordo_id
-        if aid in disponiveis:
-            disponiveis[aid] = round(disponiveis[aid] + r.valor, 2)
+            .filter_by(loja_id=loja_id, ativo=1, tratamento="custo").all()}
+    ajustes = [dict(_ajuste_fabrica_dict(r)) for r in rows.values()]
+    # Revisão 2026-07-22: a vigência é avaliada pela DATA DA VENDA ("caso o pedido seja vendido
+    # dentro do prazo de vigência") — o desconto muda a condição comercial DAQUELE período,
+    # mesmo que a conferência aconteça depois. Sem contrato, cai em hoje.
+    ct_v = (db.query(Contrato).filter_by(projeto_nome=nome_safe)
+              .order_by(Contrato.id.desc()).first())
+    data_venda = (ct_v.gerado_em.date().isoformat()
+                  if (ct_v is not None and ct_v.gerado_em) else None)
     calc = mod_ajustes_fabrica.calcular_aplicacoes(valor_conferido, ajustes,
-                                                   disponiveis=disponiveis, projeto=nome_safe)
+                                                   hoje=data_venda, projeto=nome_safe)
     if not aplicar:            # preview (GET): só o cálculo, nenhum lançamento
         calc["aplicadas"] = []
         return calc
     aplicadas = []
     for ap in calc["aplicacoes"]:
         aj = rows[ap["id"]]
-        ac = acordos.get(aj.acordo_id)
         # RECONFERÊNCIA (QA Vera, 🟠): lança o DELTA entre o recalculado (PE atual) e o LÍQUIDO
         # já aplicado — o razão acompanha o PE novo e a resposta reflete o que foi lançado.
         ja_rows = (db.query(AjusteFabricaAplicacao)
@@ -9877,46 +9918,18 @@ def _aplicar_ajustes_conferencia(db, ot, own_id, loja_id, nome_safe, valor_confe
         ref = "ajx:%s:%s" % (nome_safe, ap["id"])
         if ja_rows:
             ref = "%s:r%d" % (ref, len(ja_rows))       # rebase N da mesma venda
-        status = "n/a"
-        if ap["tratamento"] == "custo":
-            # muda o custo econômico: ativo diferido × provisão (nunca DRE) — ajustar_provisao_delta
-            # desconto reduz a provisão; acréscimo aumenta (sinal do delta acompanha)
-            mudanca = -delta if ap["tipo"] == "desconto" else delta
-            atual = round(mod_contabil._mov(db, ot, own_id, "2.1.04.06", "credor", None, None,
-                                            projeto_id=nome_safe), 2)
-            mod_contabil.ajustar_provisao_delta(db, ot, own_id, nome_safe, "custo_fabrica",
-                                                atual, round(atual + mudanca, 2), ref=ref)
-        else:
-            # revisão Acordos Financeiros (2026-07-21): evento por (tipo do acordo, contraparte)
-            ctp = (getattr(ac, "contraparte_tipo", None) or "fabrica") if ac else "fabrica"
-            if ap["tipo"] == "acrescimo":
-                evento = "acrescimo_excepcional_fabrica"           # amortiza dívida c/ a fábrica
-            elif ac is not None and ac.tipo == "divida":           # desconto financiado por EMPRESA
-                evento = "desconto_excepcional_intercompany"       # credora: dívida acumula (sem cap)
-            elif ctp == "empresa":
-                evento = "desconto_excepcional_credito_empresa"    # consome crédito c/ empresa
-            else:
-                evento = "desconto_excepcional_fabrica"            # consome crédito c/ a fábrica
-            if delta > 0:
-                mod_contabil.registrar_evento(db, ot, own_id, evento, delta,
-                                              projeto_id=nome_safe, ref=ref)
-            else:   # PE menor: devolve a diferença ao acordo (lançamento inverso do evento)
-                mod_contabil.seed_plano(db, ot, own_id)
-                cod_d, cod_c, _h = mod_contabil.EVENTOS[evento]
-                cd = mod_contabil._conta_por_codigo(db, ot, own_id, cod_c)
-                cc = mod_contabil._conta_por_codigo(db, ot, own_id, cod_d)
-                mod_contabil.lancar(db, ot, own_id, cd.id, cc.id, -delta,
-                                    projeto_id=nome_safe, origem=evento,
-                                    historico="Reconferência — estorno parcial de ajuste "
-                                              "excepcional de fábrica", ref=ref)
+        # revisão 2026-07-22: todo ajuste é de CUSTO — delta na provisão de fábrica
+        # (ativo diferido × provisão, nunca DRE); desconto reduz, acréscimo aumenta
+        mudanca = -delta if ap["tipo"] == "desconto" else delta
+        atual = round(mod_contabil._mov(db, ot, own_id, "2.1.04.06", "credor", None, None,
+                                        projeto_id=nome_safe), 2)
+        mod_contabil.ajustar_provisao_delta(db, ot, own_id, nome_safe, "custo_fabrica",
+                                            atual, round(atual + mudanca, 2), ref=ref)
+
         db.add(AjusteFabricaAplicacao(ajuste_id=ap["id"], projeto_nome=nome_safe,
                                       base_calculo=ap["base_calculo"], pct_snapshot=ap["pct"],
-                                      valor=delta, status=status, lancamento_ref=ref))
-        aplicadas.append({**ap, "delta_lancado": delta, "status": status})
-    for aid in calc["acordos_esgotados"]:
-        ac = db.get(AcordoFabrica, aid)
-        if ac is not None and ac.status == "ativo":
-            ac.status = "esgotado"
+                                      valor=delta, status="n/a", lancamento_ref=ref))
+        aplicadas.append({**ap, "delta_lancado": delta, "status": "n/a"})
     calc["aplicadas"] = aplicadas
     return calc
 

@@ -10,11 +10,10 @@ só financeiro, decisão 2026-07-21). Ordem FIXA (reproduz o exemplo 100.000 →
   1. DESCONTOS sobre o valor conferido;
   2. ACRÉSCIMOS sobre o pós-descontos (ou sobre o conferido, se `base='valor_conferido'`).
 
-Dois tratamentos por ajuste (semânticas contábeis distintas — quem lança é o composition root):
-  - `custo`:          muda o custo econômico (CMV futuro) — ativo diferido × provisão;
-  - `consumir_saldo`: custo íntegro; realiza/amortiza o saldo de um ACORDO no razão. Capado ao
-                      DISPONÍVEL do acordo (contábil − pendentes de acerto); consumo parcial
-                      marca `capado`; disponível zerado ⇒ acordo `esgotado`.
+Tratamento (revisão 2026-07-22): todo ajuste NOVO é `custo` (delta na provisão de fábrica na
+conferência; vigência avaliada pela data da VENDA). `consumir_saldo` foi DESCONTINUADO — o motor
+mantém o suporte (caps/disponíveis) só para retrocompatibilidade de leitura de dados legados; o
+lado financeiro de créditos/dívidas é lançado manualmente no painel de Acordos Financeiros.
 
 Arredondamento por aplicação (`round(…, 2)`); o encadeamento usa valores já arredondados.
 """

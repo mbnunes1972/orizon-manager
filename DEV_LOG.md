@@ -2334,6 +2334,24 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 99 — 2ª revisão dos Acordos Financeiros: Credores/Devedores, juros e desacoplamento
+**Feedback de teste do usuário:** (1) **cadastro de Credor/Devedor** (`contraparte_financeira`) com
+seletor na criação do acordo; (2) **pagamento de empréstimo com NOMINAL + JUROS separados** (nominal
+baixa o passivo; juros direto a despesa `5.5.02 × caixa`, evento novo, nonce cobre os dois); (3)
+**desacoplamento total**: descontos/acréscimos são SEMPRE de custo (% na provisão da conferência,
+`consumir_saldo` DESCONTINUADO → 400) e o lado financeiro de crédito/dívida é lançado MANUALMENTE
+no acordo (**acrescer/abater sem caixa**, × 3.5); (4) **vigência avaliada pela DATA DA VENDA**
+(contrato.gerado_em) — desconto de período aplica se o pedido foi vendido na janela, mesmo
+conferido depois; (5) sem campo % nos acordos. Pergunta do Diretor sobre PL respondida no spec
+(passivo já vive em contas de credores; 3.5 é só implantação de saldos pré-existentes, CPC 23;
+empréstimo novo entra pelo caixa). Consequência assumida e documentada: CMV = custo real da nota
+(Loja 3 → 104.500). Testes reescritos (Loja 3 c/ abater manual; triangular 100% manual c/ cadastro;
+pagamento nominal+juros; reconferência só-custo). **QA Vera (2ª rodada, sem bloqueantes):** 1
+médio corrigido — o guard genérico do /movimento barrava parcela SÓ de juros (nominal 0, caso de
+carência bancária) antes do check interno correto; + regressão. Vestígio `if True:` e docstrings do
+consumir_saldo limpos; nome de contraparte sem unique registrado como aceitável. Suíte
+**1361/1359+2**.
+
 ## Sessão 98 — REFORMA "Acordos Financeiros" (feedback de teste: acerto/data-corte eliminado)
 **O usuário reprovou o acerto consolidado por data-corte ("bem confuso") e generalizou o conceito:**
 créditos/dívidas com a FÁBRICA, com EMPRESAS (cada loja registra só o seu lado — Verano cadastra a

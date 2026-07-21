@@ -1039,6 +1039,19 @@ class AprovacaoPEAssinatura(Base):
     aprovacao = relationship("AprovacaoPE", back_populates="assinaturas")
 
 
+class ContraparteFinanceira(Base):
+    """Cadastro de Credores/Devedores (revisão 2026-07-22): entidade contra a qual acordos são
+    lançados — fábrica, empresa (do grupo ou não) ou banco. O papel (credor|devedor) é dado pelo
+    TIPO de cada acordo (crédito nosso ⇒ contraparte devedora; dívida nossa ⇒ contraparte credora)."""
+    __tablename__ = "contraparte_financeira"
+
+    id            = Column(Integer,  primary_key=True, autoincrement=True)
+    nome          = Column(Text,     nullable=False)
+    tipo          = Column(String(10), nullable=False)   # fabrica | empresa | banco
+    criado_por_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    criado_em     = Column(DateTime, default=datetime.utcnow)
+
+
 class AcordoFabrica(Base):
     """Acordo com a fábrica (spec 2026-07-21): crédito (fábrica deve à titular) ou dívida (titular
     deve à fábrica), com saldo CONTROLADO NO RAZÃO da loja titular (1.1.08 / 2.1.08). O cadastro
@@ -1053,6 +1066,7 @@ class AcordoFabrica(Base):
     # ou BANCO (empréstimos). O nome é livre (ex.: "Verano", "Banco Itaú").
     contraparte_tipo = Column(String(10), nullable=False, default="fabrica")  # fabrica|empresa|banco
     contraparte_nome = Column(Text,     nullable=True)
+    contraparte_id   = Column(Integer,  ForeignKey("contraparte_financeira.id"), nullable=True)
     loja_titular_id  = Column(Integer,  ForeignKey("lojas.id"), nullable=False)
     conta_saldo      = Column(String(10), nullable=False)   # 1.1.08|2.1.08|1.1.09|2.1.09|2.1.10
     valor_implantado = Column(Float,    nullable=False, default=0.0)
@@ -1078,7 +1092,7 @@ class AjusteFabrica(Base):
     natureza      = Column(String(10), nullable=False, default="recorrente")   # recorrente|pontual
     pct           = Column(Float,    nullable=False)
     base          = Column(String(16), nullable=False, default="pos_descontos")  # |valor_conferido
-    tratamento    = Column(String(14), nullable=False)    # custo | consumir_saldo
+    tratamento    = Column(String(14), nullable=False)    # custo (consumir_saldo: legado, recusado na criação desde 2026-07-22)
     vigencia_de   = Column(DateTime, nullable=True)
     vigencia_ate  = Column(DateTime, nullable=True)
     projetos_json = Column(Text,     nullable=True)       # pontual: lista de nome_safe vinculados
@@ -1502,6 +1516,8 @@ def _migrar_colunas():
                 cur.execute("ALTER TABLE acordo_fabrica ADD COLUMN contraparte_tipo VARCHAR(10) DEFAULT 'fabrica'")
             if "contraparte_nome" not in af_cols:
                 cur.execute("ALTER TABLE acordo_fabrica ADD COLUMN contraparte_nome TEXT")
+            if "contraparte_id" not in af_cols:
+                cur.execute("ALTER TABLE acordo_fabrica ADD COLUMN contraparte_id INTEGER")
 
         # ── orcamento_ambientes ───────────────────────────────────────────────
         cur.execute("PRAGMA table_info(orcamento_ambientes)")
@@ -1974,6 +1990,7 @@ def _migrar_colunas_pg():
         # Acordos Financeiros (revisão 2026-07-21): contraparte generalizada.
         "ALTER TABLE acordo_fabrica ADD COLUMN IF NOT EXISTS contraparte_tipo VARCHAR(10) DEFAULT 'fabrica'",
         "ALTER TABLE acordo_fabrica ADD COLUMN IF NOT EXISTS contraparte_nome TEXT",
+        "ALTER TABLE acordo_fabrica ADD COLUMN IF NOT EXISTS contraparte_id INTEGER",
     ]
     with ENGINE.begin() as conn:
         for s in stmts:
