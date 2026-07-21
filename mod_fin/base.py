@@ -43,3 +43,40 @@ def linha_entrada(data: datetime, valor: float) -> dict:
 def linha_parcela(num: int, data: datetime, valor: float) -> dict:
     tipo = "primeira" if num == 1 else "parcela"
     return {"num": num, "tipo": tipo, "data": data.strftime("%d/%m/%Y"), "valor": round(valor, 2)}
+
+
+def validar_plano_pagamento(plano):
+    """Valida o plano de pagamento a persistir (dict do forma_pagamento JSON do orçamento).
+    Nenhuma parcela nem a entrada pode ser negativa — um plano Total Flex recalculado sobre
+    um total defasado (ex.: ambiente removido do orçamento) fecha a última parcela negativa,
+    e isso nunca deve chegar ao banco. Retorna mensagem de erro, ou None se o plano é válido
+    (None/sem lista de parcelas = formatos legados, aceitos)."""
+    if not isinstance(plano, dict):
+        return None
+
+    def _num(v):
+        try:
+            return float(v or 0)
+        except (TypeError, ValueError):
+            return None   # não-numérico → inválido (erro 400, não 500)
+
+    ent = plano.get("entrada_valor")
+    if ent is not None:
+        ev = _num(ent)
+        if ev is None:
+            return "Plano de pagamento inválido: entrada não numérica."
+        if ev < 0:
+            return "Plano de pagamento inválido: entrada negativa."
+    for p in (plano.get("parcelas") or []):
+        v = (p or {}).get("valor")
+        if v is None:
+            continue
+        pv = _num(v)
+        if pv is None:
+            return ("Plano de pagamento inválido: parcela %s com valor não numérico."
+                    % ((p or {}).get("num") or "?"))
+        if pv < 0:
+            return ("Plano de pagamento inválido: parcela %s com valor negativo — "
+                    "refaça o parcelamento para o total atual do orçamento."
+                    % (p.get("num") or "?"))
+    return None

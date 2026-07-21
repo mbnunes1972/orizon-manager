@@ -129,3 +129,4 @@ from .venda_programada import calcular as calcular_venda_programada
 from .total_flex       import calcular as calcular_total_flex
 from .total_flex       import inicializar as tf_inicializar
 from .total_flex       import recalcular  as tf_recalcular
+from .base             import validar_plano_pagamento

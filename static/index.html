@@ -5679,8 +5679,9 @@ function _capturarNegociacao(){
     campos,
   };
   if (codigo === 'total_flex') {
-    snap.tf_datas   = Array.isArray(_tfDatas)   ? _tfDatas.slice()   : [];
-    snap.tf_valores = Array.isArray(_tfValores) ? _tfValores.slice() : [];
+    snap.tf_datas      = Array.isArray(_tfDatas)   ? _tfDatas.slice()   : [];
+    snap.tf_valores    = Array.isArray(_tfValores) ? _tfValores.slice() : [];
+    snap.tf_avista_ref = _tfAvistaRef;   // total p/ o qual os valores valem (detecta orçamento mudado ao restaurar)
   }
   if (codigo === 'venda_programada') snap.vp_datas = Array.isArray(_vpDatas) ? _vpDatas.slice() : [];
   return snap;
@@ -5726,6 +5727,9 @@ async function _restaurarNegociacao(snap){
     _tfGen++;  // invalida qualquer atualizarTF() em voo (ex: o de tfMostrarPainel) para evitar race condition
     _tfDatas   = snap.tf_datas.slice();
     _tfValores = Array.isArray(snap.tf_valores) ? snap.tf_valores.slice() : [];
+    // total de referência salvo com o plano: se o orçamento mudou desde então (ex.: ambiente
+    // removido com o painel fechado), o atualizarTF detecta e reinicializa em vez de fechar negativo.
+    _tfAvistaRef = (snap.tf_avista_ref != null) ? snap.tf_avista_ref : null;
     if (typeof atualizarTF === 'function') atualizarTF();
   }
   if (snap.codigo === 'venda_programada' && Array.isArray(snap.vp_datas)) {
@@ -6762,6 +6766,7 @@ let _tfDatas         = [];   // datas de todas as parcelas (ISO strings)
 let _tfUltimoEditIdx = null; // índice da última parcela editada pelo usuário
 let _tfRevertendo    = false;
 let _tfGen           = 0;    // geração: incrementado antes de cada fetch; stale callbacks são descartados
+let _tfAvistaRef     = null; // valor à vista para o qual _tfValores foram montados (detecta orçamento mudado)
 
 function _parseValorBR(str) {
   return parseFloat(String(str||'').trim().replace(/\./g,'').replace(',','.')) || 0;
@@ -6793,6 +6798,10 @@ function tfFecharAviso() {
   document.getElementById('modal-tf-aviso').style.display = 'none';
   if (_tfUltimoEditIdx != null) {
     _tfValores[_tfUltimoEditIdx] = 0;
+  } else {
+    // negativa SEM edição de parcela (ex.: plano salvo para um total que mudou) —
+    // não há o que reverter pontualmente: descarta o plano e reinicializa
+    _tfValores = []; _tfDatas = [];
   }
   _tfRevertendo = false;
   atualizarTF();
@@ -6932,6 +6941,16 @@ async function atualizarTF() {
     return;
   }
 
+  // Total do orçamento CAIU sob o plano (ex.: ambiente removido, desconto maior)? Os valores
+  // digitados eram relativos ao total antigo — mantê-los estoura o saldo e a última parcela
+  // (que fecha o saldo) sai negativa. Descarta e reinicializa o plano. AUMENTO de total não
+  // reseta (a última parcela absorve, digitação preservada — comportamento de sempre), e
+  // mudança de ENTRADA não passa por aqui (muda o financiado, não o à-vista).
+  if (_tfValores.length && _tfAvistaRef != null && valorAvista < _tfAvistaRef - 0.01) {
+    _tfValores = []; _tfDatas = []; _tfUltimoEditIdx = null;
+    showToast('Total do orçamento diminuiu — parcelas do Total Flex reiniciadas.');
+  }
+
   let d;
   try {
     const semEdicoes = _tfDatas.length < n || _tfValores.length < n - 1;
@@ -6980,13 +6999,17 @@ async function atualizarTF() {
   } catch(e) { console.error('[TF]', e); return; }
   if (!d.parcelas) { console.warn('[TF]', d.erro || d.erros); return; }
 
-  // Bloqueia se última parcela ficaria negativa
-  if (d.ultima_negativa && !_tfRevertendo) {
-    _tfRevertendo = true;
-    document.getElementById('modal-tf-aviso').style.display = 'flex';
+  // Bloqueia se última parcela ficaria negativa — NUNCA renderiza nem salva um plano
+  // negativo (antes, um 2º disparo com o modal aberto atravessava o guard e salvava).
+  if (d.ultima_negativa) {
+    if (!_tfRevertendo) {
+      _tfRevertendo = true;
+      document.getElementById('modal-tf-aviso').style.display = 'flex';
+    }
     return;
   }
   _tfRevertendo = false;
+  _tfAvistaRef  = valorAvista;   // plano válido montado para ESTE total
 
   const res    = d.resumo;
   const parc   = d.parcelas;

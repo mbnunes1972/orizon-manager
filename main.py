@@ -7923,7 +7923,20 @@ class Handler(BaseHTTPRequestHandler):
                         return
                     # backend autoritativo: NÃO aceita valor_total/valor_liquido do frontend
                     if "forma_pagamento" in req:
-                        orc.forma_pagamento = req["forma_pagamento"] or None
+                        _fp_novo = req["forma_pagamento"] or None
+                        # cinto de segurança: plano com parcela/entrada negativa nunca persiste
+                        # (ex.: Total Flex digitado p/ um total que mudou — ambiente removido)
+                        if _fp_novo:
+                            try:
+                                _fp_d = json.loads(_fp_novo)
+                            except Exception:
+                                _fp_d = None   # legado texto curto — aceito
+                            from mod_fin import validar_plano_pagamento as _vpp
+                            _err_fp = _vpp(_fp_d)
+                            if _err_fp:
+                                self.send_json({"ok": False, "erro": _err_fp}, code=400)
+                                return
+                        orc.forma_pagamento = _fp_novo
                     if "negociacao_json" in req:
                         orc.negociacao_json = req["negociacao_json"] or None
                     orc.updated_at = datetime.utcnow()

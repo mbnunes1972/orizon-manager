@@ -1374,10 +1374,15 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > Especial" antes do commit (colisão com o conceito contábil). Ver `## Sessão 87` e o spec
 > `financeiro/2026-07-20-custo-especial-nao-rateado-design.md`.
 >
+> **Sessão 88 (2026-07-21):** fix do Total Flex — última parcela negativa ao remover ambiente (plano
+> digitado p/ total antigo + guard furado que salvava o plano negativo). Reinit automático quando o
+> total muda (`_tfAvistaRef`) + validação backend (`mod_fin.validar_plano_pagamento`). Ver `## Sessão 88`.
+>
 > **PENDENTE (retomar por aqui):** Verificação manual no navegador — Fatia 3 (marcadores no PDF exigem
-> modelo referenciá-los), Fatia 4 (coluna Entrega + selo Atrasado, temas claro/escuro) e agora o modal de
-> parâmetros com o Custo Especial (Sessão 87). Próximas frentes candidatas: Agenda Global (consome a base de
-> atraso do §6), empacotar `comercial`, baseline Alembic.
+> modelo referenciá-los), Fatia 4 (coluna Entrega + selo Atrasado, temas claro/escuro), modal de
+> parâmetros com o Custo Especial (Sessão 87) e o fluxo Total Flex + remover ambiente (Sessão 88).
+> Próximas frentes candidatas: Agenda Global (consome a base de atraso do §6), empacotar `comercial`,
+> baseline Alembic.
 >
 > **(Anterior, 2026-07-19 — mantido abaixo por referência.)**
 
@@ -2308,6 +2313,28 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 88 — fix: Total Flex fechava a última parcela NEGATIVA ao remover ambiente
+**Bug (reportado em produção de teste):** com um plano Total Flex montado (parcelas 1..n-1 digitadas, a
+última fecha o saldo), remover um ambiente do orçamento derrubava o total — mas `atualizarTF()`
+reaproveitava os valores digitados relativos ao total ANTIGO (memória `_tfValores`/snapshot restaurado do
+`forma_pagamento`), o saldo estourava e a última parcela saía negativa. **Duas falhas:** (1) semântica —
+valor digitado é relativo ao total para o qual foi negociado, e nada invalidava o plano quando o total
+mudava por fora do painel; (2) guard furado — o modal `ultima_negativa` bloqueava só a 1ª passada
+(`_tfRevertendo`); o 2º disparo (a tela dispara vários no reload) atravessava, renderizava e SALVAVA o
+plano negativo; e `tfFecharAviso` sem `_tfUltimoEditIdx` (caso sem edição) não revertia nada → loop.
+**Fix (frontend):** novo `_tfAvistaRef` — o à-vista para o qual os valores foram montados (persiste no
+snapshot como `tf_avista_ref`); se o à-vista atual CAIU >R$0,01, descarta e REINICIALIZA o plano (toast
+avisa). AUMENTO de total NÃO reseta (última absorve, digitação preservada — QA da Vera, 2ª rodada) e
+mudar a ENTRADA não passa pelo gate (muda o financiado, não o à-vista). Guard endurecido:
+`ultima_negativa` nunca renderiza/salva; `tfFecharAviso` sem edição descarta o plano inteiro. Planos
+negativos JÁ salvos se auto-curam ao reabrir (modal → OK → reinit).
+**Fix (backend, cinto de segurança):** `mod_fin.validar_plano_pagamento` (puro, 6 testes) — o PATCH do
+orçamento rejeita com 400 forma_pagamento com parcela/entrada negativa OU não-numérica (endurecido
+pós-QA: antes não-numérico viraria 500 cru); legado texto-curto segue aceito. QA da Vera: bug reproduzido
+no módulo puro (recalc de 150k→50k com digitação antiga → última −70.563,60), endpoint validado via HTTP
+real (400/200/legado), ponto único de escrita de `forma_pagamento` confirmado, formatos das 5 modalidades
+compatíveis com o validador. Suíte **1329 passed** (SQLite) / **1327+2 skipped** (Postgres).
 
 ## Sessão 87 — Custo Especial: custo adicional NÃO rateado nos ambientes (toggle + provisão própria)
 **Demanda do usuário:** custo de valor fixo por projeto que não se distribui nos ambientes (3 ambientes
