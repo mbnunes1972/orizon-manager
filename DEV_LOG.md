@@ -2327,6 +2327,19 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 94 — fix pós-teste do usuário: pagamento do CONTRATADO vazava para o complemento
+**Sintomas (teste manual):** a negociação do complemento puxava o valor TOTAL do contrato (apesar
+das linhas mostrarem as diferenças), e a modalidade/entrada vinham do contrato. **Causa única:** ao
+ativar orçamento SEM negociação salva, `carregarMargensSalvas` capturava o estado da TELA (ainda o
+pagamento do contratado) e o restaurava; o auto-save persistia, e o motor lia o `total_cliente` do
+contrato no plano salvo → `cust_fin = total − diferença` → Val_Cont do complemento = total do
+contrato. **Fix:** (a) `_pagamentoDoOrc` rastreia o dono do estado do painel — na troca para
+orçamento sem negociação salva, `_resetPagamentoPadrao()` (À VISTA, entrada R$ 0,00; re-triggers do
+MESMO orçamento preservam a tela como antes); (b) cada "Negociar Complemento" zera
+`forma_pagamento`/`negociacao_json` do complemento (padrão à vista por decisão do usuário +
+descontamina vazamentos já salvos — projetos de teste se curam sozinhos); (c) regressão E2E
+simulando a contaminação. Suíte **1340 passed**.
+
 ## Sessão 93 — Correção da Fatia 3: complemento POR DIFERENÇA + Aprovação do PE assinável
 **Feedback do usuário sobre a S92:** a negociação do complemento deve ser SÓ sobre a diferença; a
 memória do projeto guarda 3 XMLs por ambiente (contrato/pool, Executivo/`xml_pe`, **Complemento/**

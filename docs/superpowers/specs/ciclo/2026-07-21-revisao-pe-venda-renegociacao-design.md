@@ -101,6 +101,11 @@ upload só p/ ambientes marcados, exige .xml, subdir `pe/<id>/compl/`, "pode at�
   O `p = Cust_Ad/VAVO` segue exibido read-only no Apoio ("Custos adicionais / À vista") e no
   modal comparativo, como informação; e é o fallback do fator se o ambiente contratado tiver
   bruto zero.
+- **Pagamento do complemento (fix pós-teste, S94):** parte SEMPRE do padrão **à vista com
+  entrada R$ 0,00** — cada "Negociar Complemento" zera o plano salvo, e a tela reseta o painel de
+  pagamento ao ativar orçamento sem negociação salva (`_pagamentoDoOrc`/`_resetPagamentoPadrao`).
+  Antes, o pagamento do CONTRATADO vazava pela tela + auto-save e o `total_cliente` do contrato
+  inflava o `cust_fin` do complemento (Val_Cont virava o total do contrato).
 - **Orçamento de complemento = as diferenças:** breakdown com params NEUTROS e desconto global
   FORÇADO a zero (o fator já carrega os custos adicionais; aplicar params de novo dobraria) —
   única alavanca é o **desconto por ambiente**, sobre a diferença. Nasce à vista. Nome exibido
