@@ -21,7 +21,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        AdiantamentoFuncionario,
                        AtribuicaoAmbiente, ArquivoPE, ParcelaProjeto, ParcelaAmbiente,
                        Aditivo, AditivoAssinatura, AprovacaoPE, AprovacaoPEAssinatura,
-                       AcordoFabrica, AjusteFabrica, AjusteFabricaAplicacao)
+                       AcordoFabrica, AjusteFabrica, AjusteFabricaAplicacao, AcordoMovimento)
 import mod_expedicao
 import mod_assistencias
 import mod_cadastro
@@ -1698,22 +1698,21 @@ class Handler(BaseHTTPRequestHandler):
                           .join(AjusteFabrica, AjusteFabricaAplicacao.ajuste_id == AjusteFabrica.id)
                           .filter(AjusteFabrica.acordo_id == ac.id)
                           .order_by(AjusteFabricaAplicacao.id.asc()).all())
-                aplicacoes, acertos = [], {}
+                aplicacoes = []
                 for ap, aj in rows:
                     aplicacoes.append({
                         "id": ap.id, "loja": loja_nome.get(aj.loja_id, "?"),
                         "projeto": ap.projeto_nome, "tipo": aj.tipo, "pct": ap.pct_snapshot,
-                        "valor": ap.valor, "status": ap.status,
+                        "valor": ap.valor,
                         "em": ap.criado_em.strftime("%Y-%m-%d %H:%M") if ap.criado_em else ""})
-                    if ap.acerto_ref:
-                        g = acertos.setdefault(ap.acerto_ref, {"ref": ap.acerto_ref, "total": 0.0, "n": 0})
-                        g["total"] = round(g["total"] + ap.valor, 2)
-                        g["n"] += 1
+                movimentos = [{"tipo": m.tipo, "valor": m.valor,
+                               "em": m.criado_em.strftime("%Y-%m-%d %H:%M") if m.criado_em else ""}
+                              for m in db.query(AcordoMovimento).filter_by(acordo_id=ac.id)
+                              .order_by(AcordoMovimento.id.asc()).all()]
                 self.send_json({"ok": True,
                                 "implantacao": {"valor": ac.valor_implantado,
                                                 "em": ac.criado_em.strftime("%Y-%m-%d") if ac.criado_em else ""},
-                                "aplicacoes": aplicacoes,
-                                "acertos": sorted(acertos.values(), key=lambda g: g["ref"])})
+                                "aplicacoes": aplicacoes, "movimentos": movimentos})
             finally:
                 db.close()
 
@@ -1735,6 +1734,8 @@ class Handler(BaseHTTPRequestHandler):
                     if ac.loja_titular_id not in visiveis:
                         continue
                     acordos.append({"id": ac.id, "descricao": ac.descricao, "tipo": ac.tipo,
+                                    "contraparte_tipo": ac.contraparte_tipo or "fabrica",
+                                    "contraparte_nome": ac.contraparte_nome or "",
                                     "loja_titular_id": ac.loja_titular_id,
                                     "conta_saldo": ac.conta_saldo, "status": ac.status,
                                     "valor_implantado": ac.valor_implantado,
@@ -3398,31 +3399,55 @@ class Handler(BaseHTTPRequestHandler):
                         ator, {"id": lj.id, "rede_id": lj.rede_id})) else None
 
                 if path == "/api/admin/acordos-fabrica":
-                    # cria o ACORDO e dispara a implantação pelo PL (× 3.5) no owner titular
+                    # Acordos Financeiros (revisão 2026-07-21): cria o ACORDO com contraparte
+                    # generalizada (fábrica|empresa|banco) e dispara a implantação no owner
+                    # titular — pelo PL (×3.5, saldo pré-existente) ou por CAPTAÇÃO (empréstimo
+                    # novo: o dinheiro entra no caixa). Conta corrente com empresa pode nascer
+                    # zerada (acumula com o uso).
                     tipo = (req.get("tipo") or "").strip()
-                    if tipo not in ("credito", "divida"):
-                        self.send_json({"ok": False, "erro": "tipo deve ser credito|divida"}, code=400); return
+                    ctp = (req.get("contraparte_tipo") or "fabrica").strip()
+                    if tipo not in ("credito", "divida") or ctp not in ("fabrica", "empresa", "banco"):
+                        self.send_json({"ok": False, "erro": "tipo deve ser credito|divida; "
+                                        "contraparte fabrica|empresa|banco"}, code=400); return
+                    _CONTAS_ACORDO = {("fabrica", "credito"): "1.1.08", ("fabrica", "divida"): "2.1.08",
+                                      ("empresa", "credito"): "1.1.09", ("empresa", "divida"): "2.1.09",
+                                      ("banco", "divida"): "2.1.10"}
+                    conta = _CONTAS_ACORDO.get((ctp, tipo))
+                    if conta is None:
+                        self.send_json({"ok": False, "erro": "Combinação inválida (banco só como "
+                                        "dívida/empréstimo)."}, code=400); return
                     loja = _ve_loja(req.get("loja_titular_id"))
                     if loja is None:
                         self.send_json({"ok": False, "erro": "Loja titular fora do escopo"}, code=403); return
                     try:
-                        valor = round(float(req.get("valor")), 2)
+                        valor = round(float(req.get("valor") or 0), 2)
                     except (TypeError, ValueError):
                         valor = 0.0
-                    if valor <= 0:
-                        self.send_json({"ok": False, "erro": "Informe o valor implantado (> 0)."}, code=400); return
+                    if valor < 0 or (valor <= 0 and ctp != "empresa"):
+                        self.send_json({"ok": False, "erro": "Informe o valor (> 0; conta corrente "
+                                        "com empresa pode nascer zerada)."}, code=400); return
                     ac = AcordoFabrica(descricao=(req.get("descricao") or "").strip() or tipo,
-                                       tipo=tipo, loja_titular_id=loja.id,
-                                       conta_saldo="1.1.08" if tipo == "credito" else "2.1.08",
+                                       tipo=tipo, contraparte_tipo=ctp,
+                                       contraparte_nome=(req.get("contraparte_nome") or "").strip() or None,
+                                       loja_titular_id=loja.id, conta_saldo=conta,
                                        valor_implantado=valor, criado_por_id=usuario.get("id"))
                     db.add(ac); db.flush()
-                    ot_t, own_t = mod_contabil_owner(db, loja.id)
-                    ev = ("implantacao_credito_fabrica" if tipo == "credito"
-                          else "implantacao_divida_fabrica")
-                    _mcaf.registrar_evento(db, ot_t, own_t, ev, valor, ref="impl:acordo:%d" % ac.id)
+                    if valor > 0:
+                        ot_t, own_t = mod_contabil_owner(db, loja.id)
+                        if ctp == "banco" and req.get("captacao"):
+                            ev = "captacao_emprestimo"          # dinheiro entra AGORA no caixa
+                        else:
+                            ev = {("fabrica", "credito"): "implantacao_credito_fabrica",
+                                  ("fabrica", "divida"): "implantacao_divida_fabrica",
+                                  ("empresa", "credito"): "implantacao_credito_empresa",
+                                  ("empresa", "divida"): "implantacao_divida_empresa",
+                                  ("banco", "divida"): "implantacao_divida_banco"}[(ctp, tipo)]
+                        _mcaf.registrar_evento(db, ot_t, own_t, ev, valor, ref="impl:acordo:%d" % ac.id)
                     db.commit()
                     self.send_json({"ok": True, "acordo": {"id": ac.id, "descricao": ac.descricao,
-                                    "tipo": ac.tipo, "loja_titular_id": ac.loja_titular_id,
+                                    "tipo": ac.tipo, "contraparte_tipo": ac.contraparte_tipo,
+                                    "contraparte_nome": ac.contraparte_nome or "",
+                                    "loja_titular_id": ac.loja_titular_id,
                                     "conta_saldo": ac.conta_saldo, "status": ac.status,
                                     "valor_implantado": ac.valor_implantado,
                                     "saldos": _acordo_saldos(db, ac)}})
@@ -3438,77 +3463,115 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": True, "ajuste": _ajuste_fabrica_dict(aj)})
                     return
 
-                m_ace = re.match(r'^/api/admin/acordos-fabrica/(\d+)/acertar$', path)
-                if m_ace:
-                    # acerto periódico consolidado — SÓ no razão da CREDORA (titular); absorve
-                    # inclusive aplicações negativas (reversões de devolução pós-acerto)
-                    ac = db.get(AcordoFabrica, int(m_ace.group(1)))
+                m_mov = re.match(r'^/api/admin/acordos-fabrica/(\d+)/movimento$', path)
+                if m_mov:
+                    # Acordos Financeiros (revisão 2026-07-21): movimento manual no acordo —
+                    # pagar (dívida), receber (crédito), atualizar (juros/encargos, só dívida:
+                    # DR 5.5.02 — despesa corrente legítima) e transferir (crédito→crédito da
+                    # MESMA loja; ex.: Verano move crédito da fábrica p/ a conta corrente da
+                    # Inspirium). Tudo no razão da titular, capado ao saldo quando reduz.
+                    ac = db.get(AcordoFabrica, int(m_mov.group(1)))
                     if ac is None or _ve_loja(ac.loja_titular_id) is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
-                    corte = (req.get("data_corte") or datetime.utcnow().date().isoformat())[:10]
-                    fim = datetime.fromisoformat(corte + "T23:59:59")
-                    pend = (db.query(AjusteFabricaAplicacao)
-                              .join(AjusteFabrica, AjusteFabricaAplicacao.ajuste_id == AjusteFabrica.id)
-                              .filter(AjusteFabrica.acordo_id == ac.id,
-                                      AjusteFabricaAplicacao.status == "pendente_acerto",
-                                      AjusteFabricaAplicacao.criado_em <= fim).all())
-                    total = round(sum(r.valor for r in pend), 2)
-                    if not pend or abs(total) < 0.005:
-                        self.send_json({"ok": False, "erro": "Nada pendente de acerto até a "
-                                        "data-corte."}, code=400); return
-                    ot_t, own_t = mod_contabil_owner(db, ac.loja_titular_id)
-                    ref = "acerto:%d:%s" % (ac.id, corte)
-                    if _mcaf.lancamento_por_ref(db, ot_t, own_t, ref) is not None:
-                        self.send_json({"ok": False, "erro": "Acerto desta data-corte já "
-                                        "lançado."}, code=400); return
-                    if total > 0:
-                        _mcaf.registrar_evento(db, ot_t, own_t, "acerto_acordo_intercompany",
-                                               total, ref=ref)
-                    else:   # net negativo (reversões superaram consumos): lançamento inverso
-                        _mcaf.seed_plano(db, ot_t, own_t)
-                        cd = _mcaf._conta_por_codigo(db, ot_t, own_t, "1.1.08")
-                        cc = _mcaf._conta_por_codigo(db, ot_t, own_t, "1.1.09")
-                        _mcaf.lancar(db, ot_t, own_t, cd.id, cc.id, -total,
-                                     origem="acerto_acordo_intercompany",
-                                     historico="Acerto do acordo — estorno líquido do período", ref=ref)
-                    for r in pend:
-                        r.status = "acertada"
-                        r.acerto_ref = ref
-                    db.commit()
-                    self.send_json({"ok": True, "acertado": total, "aplicacoes": len(pend),
-                                    "saldos": _acordo_saldos(db, ac)})
-                    return
-
-                m_liq = re.match(r'^/api/admin/acordos-fabrica/(\d+)/liquidar$', path)
-                if m_liq:
-                    # liquidação financeira da conta corrente: CADA loja lança a SUA ponta
-                    ac = db.get(AcordoFabrica, int(m_liq.group(1)))
-                    if ac is None:
-                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
-                    papel = (req.get("papel") or "").strip()
-                    loja = _ve_loja(req.get("loja_id"))
-                    if papel not in ("devedora", "credora") or loja is None:
-                        self.send_json({"ok": False, "erro": "Informe loja_id e papel "
-                                        "(devedora|credora)."}, code=400); return
+                    if ac.status == "encerrado":
+                        self.send_json({"ok": False, "erro": "Acordo encerrado."}, code=400); return
+                    acao = (req.get("acao") or "").strip()
+                    dest = None   # preenchido no branch "transferir"
                     try:
-                        valor = round(float(req.get("valor")), 2)
+                        valor = round(float(req.get("valor") or 0), 2)
                     except (TypeError, ValueError):
                         valor = 0.0
-                    ot_l, own_l = mod_contabil_owner(db, loja.id)
-                    conta, sentido = ("2.1.09", "credor") if papel == "devedora" else ("1.1.09", "devedor")
-                    saldo = round(_mcaf._mov(db, ot_l, own_l, conta, sentido, None, None), 2)
-                    v = round(min(valor, max(saldo, 0.0)), 2)
-                    if v <= 0:
-                        self.send_json({"ok": False, "erro": "Sem saldo de conta corrente a "
-                                        "liquidar."}, code=400); return
-                    seq = 1 + db.query(AjusteFabricaAplicacao).filter(
-                        AjusteFabricaAplicacao.lancamento_ref.like("liq:%d:%%" % ac.id)).count()
-                    ref = "liq:%d:%d:%d" % (ac.id, loja.id, seq)
-                    ev = ("liquidacao_conta_corrente_devedora" if papel == "devedora"
-                          else "liquidacao_conta_corrente_credora")
-                    _mcaf.registrar_evento(db, ot_l, own_l, ev, v, ref=ref)
+                    if valor <= 0:
+                        self.send_json({"ok": False, "erro": "Informe o valor (> 0)."}, code=400); return
+                    ot_t, own_t = mod_contabil_owner(db, ac.loja_titular_id)
+                    ctp = (ac.contraparte_tipo or "fabrica")
+                    # idempotência (QA Vera): nonce do cliente compõe o ref — duplo clique/retry
+                    # de rede não lança duas vezes (crítico p/ "atualizar", que não tem cap)
+                    nonce = str(req.get("nonce") or "")[:40]
+                    if nonce:
+                        ref = "mov:%d:%s" % (ac.id, nonce)
+                    else:
+                        seq = 1 + db.query(AcordoMovimento).filter_by(acordo_id=ac.id).count()
+                        ref = "mov:%d:%d" % (ac.id, seq)
+                    if _mcaf.lancamento_por_ref(db, ot_t, own_t, ref) is not None:
+                        self.send_json({"ok": False, "erro": "Movimento já registrado "
+                                        "(repetição detectada)."}, code=400); return
+                    saldo = _acordo_saldos(db, ac)["contabil"]
+
+                    if acao == "pagar":
+                        if ac.tipo != "divida":
+                            self.send_json({"ok": False, "erro": "Pagar é para acordos de DÍVIDA."},
+                                           code=400); return
+                        v = round(min(valor, max(saldo, 0.0)), 2)
+                        if v <= 0:
+                            self.send_json({"ok": False, "erro": "Sem saldo a pagar."}, code=400); return
+                        ev = {"fabrica": "pagamento_divida_fabrica_caixa",
+                              "empresa": "liquidacao_conta_corrente_devedora",
+                              "banco": "pagamento_emprestimo"}[ctp]
+                        _mcaf.registrar_evento(db, ot_t, own_t, ev, v, ref=ref)
+                        db.add(AcordoMovimento(acordo_id=ac.id, tipo="pagamento", valor=v,
+                                               lancamento_ref=ref, criado_por_id=usuario.get("id")))
+                    elif acao == "receber":
+                        if ac.tipo != "credito":
+                            self.send_json({"ok": False, "erro": "Receber é para acordos de CRÉDITO."},
+                                           code=400); return
+                        v = round(min(valor, max(saldo, 0.0)), 2)
+                        if v <= 0:
+                            self.send_json({"ok": False, "erro": "Sem saldo a receber."}, code=400); return
+                        ev = {"fabrica": "recebimento_credito_fabrica",
+                              "empresa": "liquidacao_conta_corrente_credora"}.get(ctp)
+                        if ev is None:
+                            self.send_json({"ok": False, "erro": "Combinação inválida."}, code=400); return
+                        _mcaf.registrar_evento(db, ot_t, own_t, ev, v, ref=ref)
+                        db.add(AcordoMovimento(acordo_id=ac.id, tipo="recebimento", valor=v,
+                                               lancamento_ref=ref, criado_por_id=usuario.get("id")))
+                    elif acao == "atualizar":
+                        if ac.tipo != "divida":
+                            self.send_json({"ok": False, "erro": "Atualização (juros) é para "
+                                            "acordos de DÍVIDA."}, code=400); return
+                        ev = {"fabrica": "atualizacao_divida_fabrica",
+                              "empresa": "atualizacao_divida_empresa",
+                              "banco": "atualizacao_emprestimo"}[ctp]
+                        v = valor
+                        _mcaf.registrar_evento(db, ot_t, own_t, ev, v, ref=ref)
+                        db.add(AcordoMovimento(acordo_id=ac.id, tipo="atualizacao", valor=v,
+                                               lancamento_ref=ref, criado_por_id=usuario.get("id")))
+                    elif acao == "transferir":
+                        dest = db.get(AcordoFabrica, int(req.get("destino_acordo_id") or 0))
+                        if (ac.tipo != "credito" or dest is None or dest.tipo != "credito"
+                                or dest.loja_titular_id != ac.loja_titular_id or dest.id == ac.id
+                                or dest.status == "encerrado"):
+                            self.send_json({"ok": False, "erro": "Transferência exige DOIS acordos "
+                                            "de crédito da mesma loja."}, code=400); return
+                        v = round(min(valor, max(saldo, 0.0)), 2)
+                        if v <= 0:
+                            self.send_json({"ok": False, "erro": "Sem saldo a transferir."}, code=400); return
+                        _mcaf.seed_plano(db, ot_t, own_t)
+                        cd = _mcaf._conta_por_codigo(db, ot_t, own_t, dest.conta_saldo)
+                        cc = _mcaf._conta_por_codigo(db, ot_t, own_t, ac.conta_saldo)
+                        if cd.id == cc.id:   # mesma conta do razão (dois acordos de empresa): só a trilha
+                            pass
+                        else:
+                            _mcaf.lancar(db, ot_t, own_t, cd.id, cc.id, v, origem="acordo_financeiro",
+                                         historico="Transferência de saldo entre acordos financeiros",
+                                         ref=ref)
+                        db.add(AcordoMovimento(acordo_id=ac.id, tipo="transferencia_out", valor=v,
+                                               lancamento_ref=ref, criado_por_id=usuario.get("id")))
+                        db.add(AcordoMovimento(acordo_id=dest.id, tipo="transferencia_in", valor=v,
+                                               lancamento_ref=ref, criado_por_id=usuario.get("id")))
+                    else:
+                        self.send_json({"ok": False, "erro": "acao deve ser pagar|receber|"
+                                        "atualizar|transferir"}, code=400); return
+                    # recalcula o status SEMPRE (QA Vera: juros/transferência recebida devolvem
+                    # saldo a um acordo esgotado — ele REATIVA; zerou → esgota)
+                    for _ac_st in ({ac} | ({dest} if dest is not None else set())):
+                        s2 = _acordo_saldos(db, _ac_st)
+                        if s2["contabil"] <= 0.005 and _ac_st.status == "ativo":
+                            _ac_st.status = "esgotado"
+                        elif s2["contabil"] > 0.005 and _ac_st.status == "esgotado":
+                            _ac_st.status = "ativo"
                     db.commit()
-                    self.send_json({"ok": True, "liquidado": v})
+                    self.send_json({"ok": True, "valor": v, "saldos": _acordo_saldos(db, ac)})
                     return
 
                 m_enc = re.match(r'^/api/admin/acordos-fabrica/(\d+)/encerrar$', path)
@@ -3517,23 +3580,32 @@ class Handler(BaseHTTPRequestHandler):
                     if ac is None or _ve_loja(ac.loja_titular_id) is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     s = _acordo_saldos(db, ac)
-                    if abs(s["pendente_acerto"]) > 0.005:
-                        self.send_json({"ok": False, "erro": "Acerte as aplicações pendentes "
-                                        "antes de encerrar."}, code=400); return
                     if s["contabil"] > 0.005:
                         if not req.get("baixar_residuo"):
                             self.send_json({"ok": False, "erro": "Saldo residual de R$ %.2f — "
                                             "confirme baixar_residuo para encerrar (baixa × 3.5)."
                                             % s["contabil"]}, code=400); return
                         ot_t, own_t = mod_contabil_owner(db, ac.loja_titular_id)
-                        ev = ("baixa_credito_fabrica" if ac.tipo == "credito"
-                              else "baixa_divida_fabrica")
-                        _mcaf.registrar_evento(db, ot_t, own_t, ev, s["contabil"],
-                                               ref="baixa:acordo:%d" % ac.id)
-                        # a baixa zera o contábil derivado: registra como aplicação de sistema
-                        # (sem ajuste) não é possível — ajusta o implantado (trilha no razão)
-                        ac.valor_implantado = round(float(ac.valor_implantado or 0)
-                                                    - s["contabil"], 2)
+                        ctp_enc = (ac.contraparte_tipo or "fabrica")
+                        if ctp_enc == "fabrica":
+                            ev = ("baixa_credito_fabrica" if ac.tipo == "credito"
+                                  else "baixa_divida_fabrica")
+                            _mcaf.registrar_evento(db, ot_t, own_t, ev, s["contabil"],
+                                                   ref="baixa:acordo:%d" % ac.id)
+                        else:   # empresa/banco: baixa espelho da implantação (conta × 3.5)
+                            _mcaf.seed_plano(db, ot_t, own_t)
+                            c_ac = _mcaf._conta_por_codigo(db, ot_t, own_t, ac.conta_saldo)
+                            c_pl = _mcaf._conta_por_codigo(db, ot_t, own_t, "3.5")
+                            cd, cc = ((c_pl, c_ac) if ac.tipo == "credito" else (c_ac, c_pl))
+                            _mcaf.lancar(db, ot_t, own_t, cd.id, cc.id, s["contabil"],
+                                         origem="acordo_financeiro",
+                                         historico="Baixa de resíduo no encerramento do acordo",
+                                         ref="baixa:acordo:%d" % ac.id)
+                        db.add(AcordoMovimento(acordo_id=ac.id, tipo="baixa_encerramento",
+                                               valor=s["contabil"],
+                                               lancamento_ref="baixa:acordo:%d" % ac.id,
+                                               criado_por_id=usuario.get("id")))
+
                     ac.status = "encerrado"
                     db.commit()
                     self.send_json({"ok": True, "status": ac.status})
@@ -3584,13 +3656,22 @@ class Handler(BaseHTTPRequestHandler):
                     if _ve_loja2(acordo.loja_titular_id) is None:
                         self.send_json({"ok": False, "erro": "Acordo fora do escopo (é preciso "
                                         "visão da loja titular E da consumidora)."}, code=403); return
-                    if tipo == "desconto" and acordo.tipo != "credito":
-                        self.send_json({"ok": False, "erro": "Desconto consome acordo de "
-                                        "CRÉDITO."}, code=400); return
-                    if tipo == "acrescimo" and (acordo.tipo != "divida"
+                    _ctp_aj = (acordo.contraparte_tipo or "fabrica")
+                    # revisão 2026-07-21: desconto consome CRÉDITO ou acumula DÍVIDA com EMPRESA
+                    # credora (ex.: Inspirium desconta financiada pela Verano); acréscimo amortiza
+                    # DÍVIDA com a fábrica, da própria loja titular.
+                    if tipo == "desconto" and not (acordo.tipo == "credito"
+                                                   or (acordo.tipo == "divida" and _ctp_aj == "empresa")):
+                        self.send_json({"ok": False, "erro": "Desconto consome acordo de CRÉDITO "
+                                        "ou acumula DÍVIDA com empresa credora."}, code=400); return
+                    if tipo == "desconto" and acordo.tipo == "divida" and _ctp_aj == "empresa" \
+                            and acordo.loja_titular_id != loja.id:
+                        self.send_json({"ok": False, "erro": "A dívida com a empresa credora deve "
+                                        "ser da própria loja consumidora."}, code=400); return
+                    if tipo == "acrescimo" and (acordo.tipo != "divida" or _ctp_aj != "fabrica"
                                                 or acordo.loja_titular_id != loja.id):
-                        self.send_json({"ok": False, "erro": "Acréscimo amortiza DÍVIDA da "
-                                        "própria loja titular."}, code=400); return
+                        self.send_json({"ok": False, "erro": "Acréscimo amortiza DÍVIDA com a "
+                                        "FÁBRICA, da própria loja titular."}, code=400); return
                 elif req.get("acordo_id"):
                     self.send_json({"ok": False, "erro": "tratamento=custo não usa acordo."},
                                    code=400); return
@@ -3608,10 +3689,20 @@ class Handler(BaseHTTPRequestHandler):
                     if soma > 100.0:
                         self.send_json({"ok": False, "erro": "Descontos recorrentes ativos da "
                                         "loja somariam %.2f%% (> 100%%)." % soma}, code=400); return
+                def _dt_vig(campo):
+                    v = (req.get(campo) or "").strip()
+                    if not v:
+                        return None
+                    try:
+                        return datetime.fromisoformat(v[:10] + "T00:00:00")
+                    except ValueError:
+                        return None
                 aj = AjusteFabrica(acordo_id=acordo.id if acordo else None, loja_id=loja.id,
                                    descricao=(req.get("descricao") or "").strip() or None,
                                    tipo=tipo, natureza=natureza, pct=pct, base=base,
                                    tratamento=trat,
+                                   vigencia_de=_dt_vig("vigencia_de"),
+                                   vigencia_ate=_dt_vig("vigencia_ate"),
                                    projetos_json=json.dumps(projetos) if projetos else None,
                                    criado_por_id=usuario.get("id"))
                 db.add(aj); db.commit()
@@ -9680,18 +9771,31 @@ def _complemento_diferencas(db, nome_safe):
 # vem da trilha de aplicações (a conta do razão consolida acordos da mesma natureza da loja).
 
 def _acordo_saldos(db, acordo):
-    """Os três números do acordo (spec): contábil (implantado − diretas − acertadas — o que o
-    razão da titular reflete), pendente de acerto (intercompany ainda não consolidado) e
-    DISPONÍVEL (cap de novas aplicações = contábil − pendente)."""
-    rows = (db.query(AjusteFabricaAplicacao)
+    """Saldo do acordo (revisão Acordos Financeiros, 2026-07-21) = implantado + aplicações COM
+    SINAL + movimentos manuais. Sinal das aplicações por (tipo do acordo, tipo do ajuste):
+    crédito consumido por desconto → reduz; dívida-fábrica amortizada por acréscimo → reduz;
+    dívida-EMPRESA financiando desconto → ACUMULA (a dívida com a credora cresce, sem cap).
+    Sem acerto/pendências: cada loja registra só o seu lado. disponivel == saldo (cap)."""
+    rows = (db.query(AjusteFabricaAplicacao, AjusteFabrica)
               .join(AjusteFabrica, AjusteFabricaAplicacao.ajuste_id == AjusteFabrica.id)
               .filter(AjusteFabrica.acordo_id == acordo.id).all())
-    diretas = sum(r.valor for r in rows if r.status == "n/a")
-    acertadas = sum(r.valor for r in rows if r.status == "acertada")
-    pendentes = sum(r.valor for r in rows if r.status == "pendente_acerto")
-    contabil = round(float(acordo.valor_implantado or 0) - diretas - acertadas, 2)
-    return {"contabil": contabil, "pendente_acerto": round(pendentes, 2),
-            "disponivel": mod_ajustes_fabrica.disponivel_acordo(contabil, pendentes)}
+    saldo = float(acordo.valor_implantado or 0)
+    acumulado = 0.0
+    for ap, aj in rows:
+        if acordo.tipo == "divida" and aj.tipo == "desconto":
+            saldo += ap.valor          # desconto financiado pela credora: dívida cresce
+            acumulado += ap.valor
+        else:
+            saldo -= ap.valor          # consumo de crédito / amortização de dívida
+    movs = db.query(AcordoMovimento).filter_by(acordo_id=acordo.id).all()
+    for m in movs:
+        if m.tipo in ("atualizacao", "transferencia_in"):
+            saldo += m.valor
+        else:                          # pagamento|recebimento|transferencia_out|baixa_encerramento
+            saldo -= m.valor
+    saldo = round(saldo, 2)
+    return {"contabil": saldo, "acumulado": round(acumulado, 2),
+            "disponivel": max(saldo, 0.0)}
 
 
 def _ajuste_fabrica_dict(a):
@@ -9736,7 +9840,12 @@ def _aplicar_ajustes_conferencia(db, ot, own_id, loja_id, nome_safe, valor_confe
         if r.acordo_id and r.acordo_id not in acordos:
             continue   # acordo esgotado/encerrado → ajuste não aplica
         ajustes.append(dict(_ajuste_fabrica_dict(r)))
-    disponiveis = {aid: _acordo_saldos(db, ac)["disponivel"] for aid, ac in acordos.items()}
+    disponiveis = {}
+    for aid, ac in acordos.items():
+        # dívida com EMPRESA financiando desconto ACUMULA (sem cap — revisão 2026-07-21)
+        eh_conta_corrente = (ac.tipo == "divida"
+                             and (getattr(ac, "contraparte_tipo", "") or "") == "empresa")
+        disponiveis[aid] = 1e12 if eh_conta_corrente else _acordo_saldos(db, ac)["disponivel"]
     # rebase (reconferência): o cap limita o TOTAL recalculado, então o disponível deve somar de
     # volta o que ESTE projeto já consumiu do acordo — senão o recálculo seria capado pelo saldo
     # já líquido do próprio consumo e o delta "devolveria" indevidamente
@@ -9778,15 +9887,16 @@ def _aplicar_ajustes_conferencia(db, ot, own_id, loja_id, nome_safe, valor_confe
             mod_contabil.ajustar_provisao_delta(db, ot, own_id, nome_safe, "custo_fabrica",
                                                 atual, round(atual + mudanca, 2), ref=ref)
         else:
+            # revisão Acordos Financeiros (2026-07-21): evento por (tipo do acordo, contraparte)
+            ctp = (getattr(ac, "contraparte_tipo", None) or "fabrica") if ac else "fabrica"
             if ap["tipo"] == "acrescimo":
-                evento = "acrescimo_excepcional_fabrica"
+                evento = "acrescimo_excepcional_fabrica"           # amortiza dívida c/ a fábrica
+            elif ac is not None and ac.tipo == "divida":           # desconto financiado por EMPRESA
+                evento = "desconto_excepcional_intercompany"       # credora: dívida acumula (sem cap)
+            elif ctp == "empresa":
+                evento = "desconto_excepcional_credito_empresa"    # consome crédito c/ empresa
             else:
-                ot_tit, own_tit = mod_contabil_owner(db, ac.loja_titular_id) if ac else (ot, own_id)
-                if (ot_tit, own_tit) == (ot, own_id):
-                    evento = "desconto_excepcional_fabrica"        # mesmo razão: consumo direto
-                else:
-                    evento = "desconto_excepcional_intercompany"   # SÓ no razão da compradora
-                    status = "pendente_acerto"
+                evento = "desconto_excepcional_fabrica"            # consome crédito c/ a fábrica
             if delta > 0:
                 mod_contabil.registrar_evento(db, ot, own_id, evento, delta,
                                               projeto_id=nome_safe, ref=ref)
@@ -9812,10 +9922,10 @@ def _aplicar_ajustes_conferencia(db, ot, own_id, loja_id, nome_safe, valor_confe
 
 
 def _reverter_aplicacoes_fabrica(db, ot, own_id, nome_safe, fracao, ref_base):
-    """Devolução (spec, risco 'Devolução de venda'): reverte as aplicações do projeto na fração
-    devolvida — devolve saldo ao acordo. Ledger inverso SÓ na compradora; aplicação NEGATIVA:
-    'n/a'→'n/a' (razão direto), 'pendente_acerto'→negativa pendente, 'acertada'→negativa
-    PENDENTE (só a credora lança na credora; o acerto seguinte absorve). Idempotente por ref."""
+    """Devolução (spec, risco 'Devolução de venda'): reverte as aplicações consumir_saldo do
+    projeto na fração devolvida — devolve saldo ao acordo (ledger inverso na própria loja;
+    aplicação NEGATIVA na trilha). Revisão Acordos Financeiros 2026-07-21: status é sempre
+    'n/a' (o fluxo de acerto foi eliminado). Idempotente por ref."""
     import mod_contabil
     out = []
     rows = (db.query(AjusteFabricaAplicacao)
@@ -9841,10 +9951,9 @@ def _reverter_aplicacoes_fabrica(db, ot, own_id, nome_safe, fracao, ref_base):
                             rev, projeto_id=nome_safe, origem="devolucao",
                             historico="Devolução — reversão de ajuste excepcional de fábrica",
                             ref=ref)
-        novo_status = "pendente_acerto" if row.status in ("pendente_acerto", "acertada") else "n/a"
         db.add(AjusteFabricaAplicacao(ajuste_id=row.ajuste_id, projeto_nome=nome_safe,
                                       base_calculo=None, pct_snapshot=row.pct_snapshot,
-                                      valor=-rev, status=novo_status, lancamento_ref=ref))
+                                      valor=-rev, status="n/a", lancamento_ref=ref))
         # acordo volta a ter saldo → reativa se estava esgotado
         aj = db.get(AjusteFabrica, row.ajuste_id)
         ac = db.get(AcordoFabrica, aj.acordo_id) if (aj and aj.acordo_id) else None

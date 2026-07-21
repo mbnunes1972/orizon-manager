@@ -219,12 +219,37 @@ própria) — não reabre a conferência.
 - **Pagamento:** `pagamento_fabrica` baixa `2.1.04.06` pelo total (104.500) — conferir telas de
   contas a pagar que assumem "a pagar = CFO".
 
+## Revisão "Acordos Financeiros" (2026-07-21, feedback de TESTE do usuário — SUPERA o acerto)
+O mecanismo de acerto consolidado por data-corte reprovou no teste de usabilidade ("bem confuso") e
+foi **eliminado**. Modelo novo, mais simples e mais geral:
+
+- **Contraparte generalizada** no acordo: `fabrica` | `empresa` (nome livre; do grupo ou não) |
+  `banco`. Aba renomeada **"Acordos Financeiros"** (internamente as rotas/tabelas mantêm os nomes
+  `acordos-fabrica`/`acordo_fabrica` — mesmo precedente do "parcela→Fase").
+- **Cada loja registra só o SEU lado** (nenhuma escrita cross-owner, nenhum acerto automático):
+  a Verano cadastra a Inspirium como DEVEDORA (acordo crédito-empresa, `1.1.09`, nasce zerado e
+  recebe por **transferência manual** do crédito-fábrica); a Inspirium cadastra a Verano como
+  CREDORA (acordo dívida-empresa, `2.1.09`, nasce zerado e **ACUMULA sem cap** a cada desconto
+  consumido na conferência). Liquidação: cada lado registra o seu movimento (pagar/receber).
+- **Bancos/empréstimos**: acordo dívida-banco (`2.1.10` nova). Criação com `captacao=true` lança
+  `1.1.01 × 2.1.10` (o dinheiro entra agora); saldo pré-existente → PL (`3.5 × 2.1.10`).
+  **Atualização de juros** (`5.5.02 × dívida` — despesa corrente LEGÍTIMA, única exceção
+  deliberada ao "sem DRE") e **pagamento** (`dívida × 1.1.01`) pelo painel.
+- **Movimentos manuais por acordo** (`acordo_movimento`, endpoint `/movimento`): pagar | receber |
+  atualizar | transferir (crédito→crédito da MESMA loja, capado à origem). Substituem os antigos
+  `/acertar` e `/liquidar`.
+- **Saldo por acordo** = implantado + aplicações COM SINAL (dívida-empresa+desconto acumula; os
+  demais consomem) + movimentos. `pendente_acerto` deixou de existir.
+- **Desconto por período** sem crédito/dívida: ajuste `tratamento=custo` com `vigencia_de/ate`
+  (o motor já respeitava vigência; agora o painel expõe os campos nos ajustes avulsos).
+
 ## Limitações conhecidas (registradas no QA de 2026-07-21)
-- **Conta corrente intercompany não segregada por acordo/contraparte**: `1.1.09`/`2.1.09` são
-  únicas por loja — com DUAS relações intercompany simultâneas, a liquidação pelo endpoint de um
-  acordo pode abater saldo "do outro" (o cap usa o saldo agregado da conta). Suficiente para o
-  arranjo atual (um triângulo); antes de escalar para múltiplos acordos simultâneos, criar
-  sub-razão por contraparte.
+- **Conta corrente por contraparte** *(RESOLVIDA pela revisão Acordos Financeiros)*: o saldo por
+  acordo agora é 100% derivado da trilha própria (implantado + aplicações + movimentos), não do
+  saldo agregado da conta do razão — múltiplos acordos na mesma conta não se contaminam. As
+  contas `1.1.09`/`2.1.09` seguem agregadas no razão (balanço), o que é aceitável.
+- **Dados legados do acerto**: verificado em 2026-07-21 (local + VPS A/B) que NENHUMA aplicação
+  `pendente_acerto` existia antes da revisão — a mudança de leitura do saldo não órfã nada.
 - **Reconferência com PE diferente** rebaseia os ajustes por DELTA (razão acompanha o PE novo;
   refs `ajx:<proj>:<ajuste>[:rN]`); o cap do recálculo devolve ao disponível o consumo do próprio
   projeto antes de capar.

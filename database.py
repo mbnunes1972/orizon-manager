@@ -1048,8 +1048,13 @@ class AcordoFabrica(Base):
     id               = Column(Integer,  primary_key=True, autoincrement=True)
     descricao        = Column(Text,     nullable=False)
     tipo             = Column(String(10), nullable=False)   # credito | divida
+    # Revisão "Acordos Financeiros" (2026-07-21, feedback de teste): contraparte generalizada —
+    # fábrica, EMPRESA (do grupo ou não; cada loja registra só o SEU lado, sem acerto automático)
+    # ou BANCO (empréstimos). O nome é livre (ex.: "Verano", "Banco Itaú").
+    contraparte_tipo = Column(String(10), nullable=False, default="fabrica")  # fabrica|empresa|banco
+    contraparte_nome = Column(Text,     nullable=True)
     loja_titular_id  = Column(Integer,  ForeignKey("lojas.id"), nullable=False)
-    conta_saldo      = Column(String(10), nullable=False)   # 1.1.08 | 2.1.08
+    conta_saldo      = Column(String(10), nullable=False)   # 1.1.08|2.1.08|1.1.09|2.1.09|2.1.10
     valor_implantado = Column(Float,    nullable=False, default=0.0)
     status           = Column(String(12), nullable=False, default="ativo")   # ativo|esgotado|encerrado
     criado_por_id    = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
@@ -1084,10 +1089,26 @@ class AjusteFabrica(Base):
     acordo = relationship("AcordoFabrica", back_populates="ajustes")
 
 
+class AcordoMovimento(Base):
+    """Movimento MANUAL de um acordo financeiro (revisão 2026-07-21): pagamento, recebimento,
+    atualização (juros), transferência entre acordos da MESMA loja, captação (empréstimo novo) e
+    baixa de encerramento. `valor` sempre positivo; o efeito no saldo vem do `tipo`."""
+    __tablename__ = "acordo_movimento"
+
+    id            = Column(Integer,  primary_key=True, autoincrement=True)
+    acordo_id     = Column(Integer,  ForeignKey("acordo_fabrica.id"), nullable=False, index=True)
+    tipo          = Column(String(20), nullable=False)
+    # pagamento|recebimento|atualizacao|transferencia_in|transferencia_out|baixa_encerramento
+    valor         = Column(Float,    nullable=False)
+    lancamento_ref = Column(Text,    nullable=True)
+    criado_por_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    criado_em     = Column(DateTime, default=datetime.utcnow)
+
+
 class AjusteFabricaAplicacao(Base):
-    """Aplicação de um ajuste numa venda (trilha de auditoria + ponte entre razões no
-    intercompany). `pendente_acerto` até o acerto consolidado da credora; aplicações NEGATIVAS
-    registram reversões (devolução) de aplicações já acertadas — só a credora lança na credora."""
+    """Aplicação de um ajuste numa venda (trilha de auditoria — fonte do saldo por acordo).
+    Revisão 2026-07-21: `status` é sempre 'n/a' (o fluxo de acerto foi eliminado; a coluna e
+    `acerto_ref` ficam vestigiais). Aplicações NEGATIVAS registram reversões (devolução)."""
     __tablename__ = "ajuste_fabrica_aplicacao"
 
     id             = Column(Integer,  primary_key=True, autoincrement=True)
@@ -1471,6 +1492,16 @@ def _migrar_colunas():
             ape_cols = {row[1] for row in cur.fetchall()}
             if "valor_venda" not in ape_cols:
                 cur.execute("ALTER TABLE arquivo_pe ADD COLUMN valor_venda REAL")
+
+        # ── acordo_fabrica: contraparte generalizada (Acordos Financeiros, 2026-07-21) ──
+        cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='acordo_fabrica'")
+        if cur.fetchone() is not None:
+            cur.execute("PRAGMA table_info(acordo_fabrica)")
+            af_cols = {row[1] for row in cur.fetchall()}
+            if "contraparte_tipo" not in af_cols:
+                cur.execute("ALTER TABLE acordo_fabrica ADD COLUMN contraparte_tipo VARCHAR(10) DEFAULT 'fabrica'")
+            if "contraparte_nome" not in af_cols:
+                cur.execute("ALTER TABLE acordo_fabrica ADD COLUMN contraparte_nome TEXT")
 
         # ── orcamento_ambientes ───────────────────────────────────────────────
         cur.execute("PRAGMA table_info(orcamento_ambientes)")
@@ -1940,6 +1971,9 @@ def _migrar_colunas_pg():
         "ALTER TABLE pool_ambientes ADD COLUMN IF NOT EXISTS renegociar_pe INTEGER DEFAULT 0",
         # Fatia 3 PE: orçamento de ajuste pós-assinatura.
         "ALTER TABLE orcamentos ADD COLUMN IF NOT EXISTS complemento_pe INTEGER DEFAULT 0",
+        # Acordos Financeiros (revisão 2026-07-21): contraparte generalizada.
+        "ALTER TABLE acordo_fabrica ADD COLUMN IF NOT EXISTS contraparte_tipo VARCHAR(10) DEFAULT 'fabrica'",
+        "ALTER TABLE acordo_fabrica ADD COLUMN IF NOT EXISTS contraparte_nome TEXT",
     ]
     with ENGINE.begin() as conn:
         for s in stmts:

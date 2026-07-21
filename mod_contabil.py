@@ -29,7 +29,7 @@ PLANO_PADRAO = [
     ("1.1.07", "Recebíveis de Parcelamentos"),   # FASE B: ramo LOJA (financiamento direto) — carrega SÓ os juros (VAVO fica no 1.1.02)
     # Ajustes Excepcionais de Fábrica (spec 2026-07-21): saldos de acordos no razão
     ("1.1.08", "Créditos com a Fábrica"),
-    ("1.1.09", "Conta Corrente com Lojas do Grupo (a receber)"),
+    ("1.1.09", "Créditos com Empresas (conta corrente)"),
     ("1.2", "Não Circulante"),
     ("1.2.1", "Imobilizado"),
     ("1.2.1.01", "Itens de Informática"), ("1.2.1.02", "Veículos"),
@@ -63,7 +63,8 @@ PLANO_PADRAO = [
     ("2.1.07", "Receita Financeira a Apropriar"),   # FASE B: ramo LOJA — juros diferidos, realizados por parcela
     # Ajustes Excepcionais de Fábrica (spec 2026-07-21)
     ("2.1.08", "Acordos com a Fábrica a Amortizar"),
-    ("2.1.09", "Conta Corrente com Lojas do Grupo (a pagar)"),
+    ("2.1.09", "Débitos com Empresas (conta corrente)"),
+    ("2.1.10", "Empréstimos Bancários"),   # Acordos Financeiros (2026-07-21): contraparte banco
     ("2.2", "Não Circulante"),
     ("2.2.01", "Financiamentos de Longo Prazo (principal)"),
     ("3", "PATRIMÔNIO LÍQUIDO"),
@@ -493,6 +494,8 @@ EVENTOS = {
     "desconto_excepcional_intercompany": ("2.1.04.06", "2.1.09", "Desconto excepcional — crédito de loja irmã (conta corrente a pagar)"),
     "acrescimo_excepcional_fabrica":     ("2.1.08", "2.1.04.06", "Acréscimo excepcional — amortização de dívida com a fábrica"),
     # Acerto periódico consolidado: SÓ no razão da credora (venda de uma loja nunca lança na outra)
+    # VESTIGIAL (revisão 2026-07-21): o fluxo de acerto foi eliminado; o par 1.1.09×1.1.08 vive
+    # na TRANSFERÊNCIA manual entre acordos (endpoint /movimento). Mantido por histórico de refs.
     "acerto_acordo_intercompany":   ("1.1.09", "1.1.08",    "Acerto do acordo — consumo das lojas do grupo (consolidado por período)"),
     # Liquidação financeira da conta corrente: cada loja lança a SUA ponta
     "liquidacao_conta_corrente_devedora": ("2.1.09", "1.1.01", "Liquidação da conta corrente com lojas do grupo (pagamento)"),
@@ -500,6 +503,18 @@ EVENTOS = {
     # Encerramento com resíduo: baixa espelho da implantação (× 3.5)
     "baixa_credito_fabrica":        ("3.5", "1.1.08",       "Baixa de resíduo de crédito com a fábrica (encerramento do acordo)"),
     "baixa_divida_fabrica":         ("2.1.08", "3.5",       "Baixa de resíduo de dívida com a fábrica (encerramento do acordo)"),
+    # ── Acordos Financeiros (revisão 2026-07-21): contrapartes empresa/banco + movimentos ────
+    "implantacao_credito_empresa":  ("1.1.09", "3.5",       "Implantação de crédito com empresa (ajuste de exercícios anteriores)"),
+    "implantacao_divida_empresa":   ("3.5", "2.1.09",       "Implantação de dívida com empresa (ajuste de exercícios anteriores)"),
+    "implantacao_divida_banco":     ("3.5", "2.1.10",       "Implantação de saldo de empréstimo bancário pré-existente"),
+    "captacao_emprestimo":          ("1.1.01", "2.1.10",    "Captação de empréstimo bancário (dinheiro entra no caixa)"),
+    "desconto_excepcional_credito_empresa": ("2.1.04.06", "1.1.09", "Desconto excepcional — consumo de crédito com empresa"),
+    "recebimento_credito_fabrica":  ("1.1.01", "1.1.08",    "Recebimento de crédito com a fábrica (em dinheiro)"),
+    "pagamento_divida_fabrica_caixa": ("2.1.08", "1.1.01",  "Pagamento de dívida com a fábrica (em dinheiro)"),
+    "pagamento_emprestimo":         ("2.1.10", "1.1.01",    "Pagamento de empréstimo bancário"),
+    "atualizacao_divida_fabrica":   ("5.5.02", "2.1.08",    "Atualização (juros/encargos) da dívida com a fábrica"),
+    "atualizacao_divida_empresa":   ("5.5.02", "2.1.09",    "Atualização (juros/encargos) da dívida com empresa"),
+    "atualizacao_emprestimo":       ("5.5.02", "2.1.10",    "Atualização (juros/encargos) do empréstimo bancário"),
     # FASE D: pagamento da obrigação com fornecedor (baixa de Fornecedores a Pagar) — passivo × ativo
     "pagamento_fornecedor":         ("2.1.01", "1.1.01",   "Pagamento a fornecedor (baixa de Fornecedores a Pagar)"),
     # Folha de Pagamento (v10 §2.1): despesa nas contas 5.3 existentes × Caixa (sem conta nova)

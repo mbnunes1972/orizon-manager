@@ -28,7 +28,7 @@ def _f(v):
         return 0.0
 
 
-def disponivel_acordo(saldo_contabil, pendentes_acerto):
+def disponivel_acordo(saldo_contabil, pendentes_acerto):   # VESTIGIAL (revisão 2026-07-21: sem acerto)
     """Saldo DISPONÍVEL do acordo = saldo contábil (razão da titular) − Σ aplicações
     `pendente_acerto` (a tabela de aplicações é a ponte entre razões no intercompany).
     Nunca negativo."""

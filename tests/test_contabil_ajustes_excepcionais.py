@@ -135,39 +135,51 @@ def _loja_avulsa(app_db, nome, codigo, login):
     return lid
 
 
-def test_triangular_inspirium_verano_desacoplado(http_client_factory, seed, app_db):
-    # spec §Acordo triangular: crédito da VERANO consumido pela INSPIRIUM — a venda lança SÓ
-    # na compradora (2.1.09); a credora só reconhece no ACERTO consolidado (1.1.09 × 1.1.08).
+def test_triangular_inspirium_verano_manual(http_client_factory, seed, app_db):
+    # Revisão "Acordos Financeiros" (2026-07-21): SEM acerto automático/data-corte — cada loja
+    # registra só o seu lado. Verano: crédito c/ a Fábrica (10.000) + conta corrente CREDORA da
+    # Inspirium (nasce zerada; recebe por TRANSFERÊNCIA manual do crédito da fábrica). Inspirium:
+    # dívida c/ a EMPRESA Verano (nasce zerada; ACUMULA sem cap a cada desconto consumido).
     insp = _loja_avulsa(app_db, "Inspirium", "INS", "dir_insp")
     ver = _loja_avulsa(app_db, "Verano", "VER", "dir_ver")
     su = _login(http_client_factory, "super")
 
     st, body = su.post("/api/admin/acordos-fabrica",
-                       {"descricao": "Crédito fábrica (dívida com o grupo)", "tipo": "credito",
-                        "loja_titular_id": ver, "valor": 10000.0})
+                       {"descricao": "Crédito Verano c/ Fábrica", "tipo": "credito",
+                        "contraparte_tipo": "fabrica", "loja_titular_id": ver, "valor": 10000.0})
     assert st == 200, body
-    acordo_id = body["acordo"]["id"]
-    # UM acordo, DOIS ajustes: 3% Inspirium (intercompany) e 5% Verano (direto)
+    ac_ver_fab = body["acordo"]["id"]
+    st, body = su.post("/api/admin/acordos-fabrica",
+                       {"descricao": "CC Inspirium (devedora)", "tipo": "credito",
+                        "contraparte_tipo": "empresa", "contraparte_nome": "Inspirium",
+                        "loja_titular_id": ver, "valor": 0})
+    assert st == 200, body                      # conta corrente pode nascer zerada
+    ac_ver_insp = body["acordo"]["id"]
+    st, body = su.post("/api/admin/acordos-fabrica",
+                       {"descricao": "CC Verano (credora)", "tipo": "divida",
+                        "contraparte_tipo": "empresa", "contraparte_nome": "Verano",
+                        "loja_titular_id": insp, "valor": 0})
+    assert st == 200, body
+    ac_insp_ver = body["acordo"]["id"]
+
+    # ajustes: 3% Inspirium ACUMULA a dívida com a Verano (sem cap); 5% Verano consome o próprio crédito
     st, body = su.post("/api/admin/ajustes-fabrica",
                        {"loja_id": insp, "tipo": "desconto", "pct": 3.0,
-                        "tratamento": "consumir_saldo", "acordo_id": acordo_id})
+                        "tratamento": "consumir_saldo", "acordo_id": ac_insp_ver})
     assert st == 200, body
     st, body = su.post("/api/admin/ajustes-fabrica",
                        {"loja_id": ver, "tipo": "desconto", "pct": 5.0,
-                        "tratamento": "consumir_saldo", "acordo_id": acordo_id})
+                        "tratamento": "consumir_saldo", "acordo_id": ac_ver_fab})
     assert st == 200, body
 
-    # projetos conferíveis nas duas lojas (provisão de fábrica 100k, direto no razão)
     db = app_db.get_session()
     for lid, pnome in ((insp, "Proj_INS"), (ver, "Proj_VER")):
         db.add(app_db.Projeto(nome_safe=pnome, loja_id=lid, status="quente"))
-        ot_l, own_l = mc.resolver_owner(db, {"loja_id": lid, "rede_id": None})
-        mc.constituir_provisoes_fechamento(db, ot_l, own_l, pnome,
+        mc.constituir_provisoes_fechamento(db, "loja", lid, pnome,
                                            {"custo_fabrica": 100000.0}, ref_base="pf:" + pnome)
     db.commit(); db.close()
 
-    # Inspirium confere: paga 97.000; CMV segue 100.000; deve 3.000 à Verano (2.1.09);
-    # NADA lança no razão da Verano
+    # Inspirium confere: paga 97.000 à fábrica; CMV íntegro; dívida com a Verano ACUMULA 3.000
     ci = _login(http_client_factory, "dir_insp")
     st, body = ci.post("/api/projetos/Proj_INS/conferencia",
                        {"custo_fabrica_novo": 100000.0, "valor_outros_forn": 0,
@@ -176,11 +188,15 @@ def test_triangular_inspirium_verano_desacoplado(http_client_factory, seed, app_
     db = app_db.get_session()
     assert _s(db, "loja", insp, "2.1.04.06") == 97000.0
     assert _s(db, "loja", insp, "1.1.06.06") == 100000.0   # CMV íntegro
-    assert _s(db, "loja", insp, "2.1.09") == 3000.0        # conta corrente a pagar
-    assert _s(db, "loja", ver, "1.1.08") == 10000.0        # Verano intocada até o acerto
+    assert _s(db, "loja", insp, "2.1.09") == 3000.0        # dívida com a Verano (só o razão dela)
+    assert _s(db, "loja", ver, "1.1.08") == 10000.0        # Verano intocada
     db.close()
+    su2 = _login(http_client_factory, "super")
+    st, body = su2.get("/api/admin/acordos-fabrica")
+    por_id = {a["id"]: a for a in body["acordos"]}
+    assert por_id[ac_insp_ver]["saldos"]["contabil"] == 3000.0    # acumulou (sem cap)
 
-    # Verano confere: consumo DIRETO do próprio crédito (sem conta corrente)
+    # Verano confere: consumo direto do próprio crédito (capado)
     cv = _login(http_client_factory, "dir_ver")
     st, body = cv.post("/api/projetos/Proj_VER/conferencia",
                        {"custo_fabrica_novo": 100000.0, "valor_outros_forn": 0,
@@ -188,38 +204,92 @@ def test_triangular_inspirium_verano_desacoplado(http_client_factory, seed, app_
     assert st == 200 and body["ok"], body
     db = app_db.get_session()
     assert _s(db, "loja", ver, "2.1.04.06") == 95000.0
-    assert _s(db, "loja", ver, "1.1.08") == 5000.0         # 10.000 − 5.000 direto
-    assert _s(db, "loja", ver, "2.1.09") == 0.0
+    assert _s(db, "loja", ver, "1.1.08") == 5000.0
     db.close()
 
-    # saldos do acordo no painel: contábil 5.000 · pendente 3.000 · disponível 2.000
-    st, body = su.get("/api/admin/acordos-fabrica")
-    ac = [a for a in body["acordos"] if a["id"] == acordo_id][0]
-    assert ac["saldos"] == {"contabil": 5000.0, "pendente_acerto": 3000.0, "disponivel": 2000.0}
-
-    # ACERTO consolidado — SÓ no razão da Verano; invariantes da spec
-    st, body = su.post(f"/api/admin/acordos-fabrica/{acordo_id}/acertar", {})
-    assert st == 200 and body["acertado"] == 3000.0, body
+    # Verano TRANSFERE 3.000 do crédito-fábrica p/ a conta corrente da Inspirium (registro manual)
+    st, body = su2.post(f"/api/admin/acordos-fabrica/{ac_ver_fab}/movimento",
+                        {"acao": "transferir", "valor": 3000.0,
+                         "destino_acordo_id": ac_ver_insp})
+    assert st == 200 and body["ok"], body
     db = app_db.get_session()
     assert _s(db, "loja", ver, "1.1.09") == 3000.0         # a receber da Inspirium
-    assert _s(db, "loja", ver, "1.1.08") == 2000.0         # crédito reflete o consumo do grupo
-    assert _s(db, "loja", insp, "2.1.09") == 3000.0        # invariante: Σ a pagar == aplicações
+    assert _s(db, "loja", ver, "1.1.08") == 2000.0
     db.close()
-    # acerto repetido na mesma data-corte → recusado (idempotente)
-    st, body = su.post(f"/api/admin/acordos-fabrica/{acordo_id}/acertar", {})
-    assert st == 400
 
-    # liquidação financeira: cada loja lança a SUA ponta; conta corrente zera dos dois lados
-    st, body = su.post(f"/api/admin/acordos-fabrica/{acordo_id}/liquidar",
-                       {"loja_id": insp, "papel": "devedora", "valor": 3000.0})
-    assert st == 200 and body["liquidado"] == 3000.0
-    st, body = su.post(f"/api/admin/acordos-fabrica/{acordo_id}/liquidar",
-                       {"loja_id": ver, "papel": "credora", "valor": 3000.0})
-    assert st == 200 and body["liquidado"] == 3000.0
+    # liquidação em dinheiro: Inspirium PAGA (o seu lado); Verano RECEBE (o dela)
+    st, body = su2.post(f"/api/admin/acordos-fabrica/{ac_insp_ver}/movimento",
+                        {"acao": "pagar", "valor": 3000.0})
+    assert st == 200 and body["valor"] == 3000.0
+    st, body = su2.post(f"/api/admin/acordos-fabrica/{ac_ver_insp}/movimento",
+                        {"acao": "receber", "valor": 3000.0})
+    assert st == 200 and body["valor"] == 3000.0
     db = app_db.get_session()
     assert _s(db, "loja", insp, "2.1.09") == 0.0
     assert _s(db, "loja", ver, "1.1.09") == 0.0
     db.close()
+
+
+def test_emprestimo_bancario_ciclo(http_client_factory, seed, app_db):
+    # Revisão 2026-07-21: empréstimo como acordo financeiro — captação (dinheiro entra no
+    # caixa), atualização de juros (5.5.02, despesa corrente LEGÍTIMA) e pagamento.
+    lid = _loja_avulsa(app_db, "Loja Banco", "BNC", "dir_bnc")
+    su = _login(http_client_factory, "super")
+    st, body = su.post("/api/admin/acordos-fabrica",
+                       {"descricao": "Empréstimo capital de giro", "tipo": "divida",
+                        "contraparte_tipo": "banco", "contraparte_nome": "Banco Itaú",
+                        "loja_titular_id": lid, "valor": 100000.0, "captacao": True})
+    assert st == 200, body
+    ac_id = body["acordo"]["id"]
+    db = app_db.get_session()
+    assert _s(db, "loja", lid, "1.1.01") == 100000.0       # dinheiro entrou no caixa
+    assert _s(db, "loja", lid, "2.1.10") == 100000.0
+    assert _s(db, "loja", lid, "3.5") == 0.0               # captação NÃO passa pelo PL
+    db.close()
+
+    st, body = su.post(f"/api/admin/acordos-fabrica/{ac_id}/movimento",
+                       {"acao": "atualizar", "valor": 2000.0})
+    assert st == 200 and body["saldos"]["contabil"] == 102000.0
+    st, body = su.post(f"/api/admin/acordos-fabrica/{ac_id}/movimento",
+                       {"acao": "pagar", "valor": 50000.0})
+    assert st == 200 and body["saldos"]["contabil"] == 52000.0
+    db = app_db.get_session()
+    assert _s(db, "loja", lid, "2.1.10") == 52000.0
+    assert _s(db, "loja", lid, "5.5.02") == 2000.0         # juros na DRE (correto p/ empréstimo)
+    assert _s(db, "loja", lid, "1.1.01") == 50000.0        # 100k − 50k pagos
+    # pagar acima do saldo é capado
+    st, body = su.post(f"/api/admin/acordos-fabrica/{ac_id}/movimento",
+                       {"acao": "pagar", "valor": 99999.0})
+    assert st == 200 and body["valor"] == 52000.0
+    assert body["saldos"]["contabil"] == 0.0
+    db.close()
+
+
+def test_desconto_por_periodo_vigencia(http_client_factory, seed, app_db):
+    # Revisão 2026-07-21: desconto específico POR PERÍODO, sem crédito/dívida (tratamento=custo
+    # com vigência) — fora da janela não aplica.
+    lid = _loja_avulsa(app_db, "Loja Per", "PER", "dir_per")
+    su = _login(http_client_factory, "super")
+    st, body = su.post("/api/admin/ajustes-fabrica",
+                       {"loja_id": lid, "tipo": "desconto", "pct": 4.0, "tratamento": "custo",
+                        "descricao": "campanha", "vigencia_de": "2020-01-01",
+                        "vigencia_ate": "2020-12-31"})
+    assert st == 200, body           # janela no passado → não vigente hoje
+    st, body = su.post("/api/admin/ajustes-fabrica",
+                       {"loja_id": lid, "tipo": "desconto", "pct": 2.0, "tratamento": "custo",
+                        "descricao": "vigente", "vigencia_de": "2020-01-01"})
+    assert st == 200, body           # aberta até hoje → vigente
+    db = app_db.get_session()
+    db.add(app_db.Projeto(nome_safe="Proj_PER", loja_id=lid, status="quente"))
+    mc.constituir_provisoes_fechamento(db, "loja", lid, "Proj_PER",
+                                       {"custo_fabrica": 100000.0}, ref_base="pf:Proj_PER")
+    db.commit(); db.close()
+    cp = _login(http_client_factory, "dir_per")
+    st, body = cp.get("/api/projetos/Proj_PER/conferencia/ajustes-preview?valor=100000")
+    assert st == 200, body
+    aps = body["preview"]["aplicacoes"]
+    assert len(aps) == 1 and aps[0]["pct"] == 2.0          # só o vigente aplica
+    assert body["preview"]["a_pagar_final"] == 98000.0
 
 
 def test_cap_esgota_acordo_e_devolucao_repoe_saldo(http_client_factory, seed, app_db):
@@ -348,3 +418,34 @@ def test_soma_de_descontos_custo_acima_de_100_rejeitada(http_client_factory, see
     st, body = su.post("/api/admin/ajustes-fabrica",
                        {"loja_id": lid, "tipo": "desconto", "pct": 50.0, "tratamento": "custo"})
     assert st == 400 and "100" in (body.get("erro") or "")
+
+
+def test_movimento_reativa_esgotado_e_nonce_idempotente(http_client_factory, seed, app_db):
+    # QA Vera: (1) juros/transferência devolvem saldo a acordo esgotado → REATIVA;
+    # (2) nonce torna o movimento idempotente (duplo clique não lança juros 2×).
+    lid = _loja_avulsa(app_db, "Loja Reat", "REA", "dir_rea")
+    su = _login(http_client_factory, "super")
+    st, body = su.post("/api/admin/acordos-fabrica",
+                       {"descricao": "empréstimo", "tipo": "divida", "contraparte_tipo": "banco",
+                        "loja_titular_id": lid, "valor": 1000.0, "captacao": True})
+    ac_id = body["acordo"]["id"]
+    st, body = su.post(f"/api/admin/acordos-fabrica/{ac_id}/movimento",
+                       {"acao": "pagar", "valor": 1000.0})
+    assert st == 200 and body["saldos"]["contabil"] == 0.0
+    db = app_db.get_session()
+    assert db.get(app_db.AcordoFabrica, ac_id).status == "esgotado"
+    db.close()
+    # juros devolvem saldo → acordo REATIVA
+    st, body = su.post(f"/api/admin/acordos-fabrica/{ac_id}/movimento",
+                       {"acao": "atualizar", "valor": 500.0, "nonce": "n1"})
+    assert st == 200 and body["saldos"]["contabil"] == 500.0
+    db = app_db.get_session()
+    assert db.get(app_db.AcordoFabrica, ac_id).status == "ativo"
+    db.close()
+    # nonce repetido → recusado (sem duplicar os juros)
+    st, body = su.post(f"/api/admin/acordos-fabrica/{ac_id}/movimento",
+                       {"acao": "atualizar", "valor": 500.0, "nonce": "n1"})
+    assert st == 400 and "repeti" in (body.get("erro") or "").lower()
+    db = app_db.get_session()
+    assert _s(db, "loja", lid, "2.1.10") == 500.0          # só 1× lançado
+    db.close()
