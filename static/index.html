@@ -12803,7 +12803,9 @@ function _renderCardPE(codigo, dados, bloqueada) {
   const inputId = `pe-file-${codigo}`;
   const inputRevisId = `pe-revis-file-${codigo}`;
 
-  const btnCarregar = podeExec
+  // Na 11c o upload vive DENTRO de "Carregar e Comparar Valores" (peCmpBlock) — sem botão próprio.
+  const btnCarregar = (codigo === '11c') ? ''
+    : podeExec
     ? `<label class="btn-ciclo" style="margin-left:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px">
         &#x2191; ${esc(cfg.carregar)}
         <input type="file" id="${inputId}" style="display:none" onchange="peUpload('${codigo}', this)">
@@ -12821,10 +12823,19 @@ function _renderCardPE(codigo, dados, bloqueada) {
 
   // Fatia 1 (desmembramento): na Revisão de PE (11c), comparação de CFO venda×PE + reconciliação
   // estimada (read-only, "estimativa gerencial"). spec 2026-07-13 §6/#9.
+  // 2026-07-21: "Carregar Projeto Executivo" fundido em "Carregar e Comparar Valores" — o upload do PE
+  // (que alimenta a comparação e conta as revisões) e a comparação viram um passo só. Sem permissão de
+  // executar_pe, resta a comparação read-only (o dado já carregado continua visível).
+  const btnCarregarComparar = podeExec
+    ? `<label class="btn-ciclo" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px">
+        <i class="ti ti-arrows-diff"></i> Carregar e Comparar Valores
+        <input type="file" id="${inputId}" style="display:none" onchange="peUploadEComparar('${codigo}', this)">
+       </label>`
+    : `<button class="btn-ciclo" onclick="peComparacaoRender()"><i class="ti ti-arrows-diff"></i> Comparar valores</button>`;
   const peCmpBlock = (codigo === '11c') ? `
     <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn-ciclo" onclick="peComparacaoRender()"><i class="ti ti-arrows-diff"></i> Comparar valores dos ambientes (PE)</button>
+        ${btnCarregarComparar}
         <button class="btn-ciclo" onclick="peDesmembrarRender()"><i class="ti ti-layout-columns"></i> Desmembrar em fases</button>
       </div>
       <div id="pe-cmp-container" style="margin-top:12px"></div>
@@ -13092,14 +13103,14 @@ async function ramoFinanceiroTrocar(ramo){
 }
 
 async function peUpload(codigo, inputFile) {
-  if (!projetoAtivo) return;
+  if (!projetoAtivo) return false;
   const f = inputFile.files[0];
-  if (!f) { await avisoPopup('Selecione um arquivo.', {titulo:'PE — Upload'}); return; }
+  if (!f) { await avisoPopup('Selecione um arquivo.', {titulo:'PE — Upload'}); return false; }
   const cred = await pedirCredenciaisGerente({
     titulo: 'Carregar documento PE',
     mensagem: 'Login e senha de quem executa o PE (Projetista Executivo, Gerente, Diretor…).'
   });
-  if (!cred) return;
+  if (!cred) return false;
   const fd = new FormData();
   fd.append('arquivo', f);
   fd.append('login', cred.login);
@@ -13109,11 +13120,19 @@ async function peUpload(codigo, inputFile) {
       `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${codigo}/documento`,
       { method: 'POST', credentials: 'same-origin', body: fd });
     const j = await r.json();
-    if (!j.ok) { await avisoPopup(j.erro || 'Falha ao carregar.', {titulo:'PE — Upload'}); return; }
+    if (!j.ok) { await avisoPopup(j.erro || 'Falha ao carregar.', {titulo:'PE — Upload'}); return false; }
     showToast('Documento carregado com sucesso!', false);
     await peCarregar(projetoAtivo.nome_safe);
     await carregarCiclo();
-  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'PE — Upload'}); }
+    return true;
+  } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'PE — Upload'}); return false; }
+}
+
+// 11c — "Carregar e Comparar Valores": upload do PE e comparação num passo só. A comparação
+// vem DEPOIS do peUpload porque ele re-renderiza o ciclo (recria o pe-cmp-container).
+async function peUploadEComparar(codigo, inputFile) {
+  const ok = await peUpload(codigo, inputFile);
+  if (ok) peComparacaoRender();
 }
 
 // ── Etapa 12 — Implantação do pedido ───────────────────────────────────────

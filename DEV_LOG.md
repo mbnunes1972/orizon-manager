@@ -2314,6 +2314,17 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 90 — Ciclo/Revisão de PE: "Carregar PE" fundido em "Carregar e Comparar Valores"
+**Demanda:** dos 3 botões da Revisão de PE (Carregar Projeto Executivo · Comparar Valores · Desmembrar),
+eliminar o "Carregar" e renomear o de comparação para **"Carregar e Comparar Valores"**. Implementado como
+FUSÃO (não só rename): o botão novo abre o seletor de arquivo, faz o upload do PE (`peUpload` — segue
+pedindo credencial de executor e contando revisão Rev1/Rev2…) e, no sucesso, renderiza a comparação
+(`peUploadEComparar`; a comparação vem depois porque o upload re-renderiza o ciclo e recria o container).
+`peUpload` agora retorna bool (upload cancelado/falho não dispara comparação). O botão genérico
+`btnCarregar` só some na 11c (11a/11b/11e intactas). Sem permissão `executar_pe`, resta o botão
+"Comparar valores" read-only (o PE já carregado continua visível). Frontend-only (sem restart; Ctrl+F5).
+Suíte 1330 passed.
+
 ## Sessão 89 — "Custo Especial não entra no total": era servidor com Python DEFASADO (não era bug)
 **Sintoma reportado:** campo aparece no modal, mas o total do projeto não inclui o valor. **Causa:** o
 servidor local rodava desde ANTES da Sessão 87 — `static/index.html` é lido do disco a cada request
