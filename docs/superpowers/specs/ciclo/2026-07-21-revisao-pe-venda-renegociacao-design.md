@@ -56,14 +56,31 @@ id da 11c). Cores: custo maior = vermelho.
 - **Backfill lazy:** o GET re-parseia XML salvo sem `valor_venda` e persiste (commit no GET); parse
   que falha é silencioso e re-tentado a cada GET (sem cache negativo) — aceito por simplicidade.
 
-## Fatia 3 — 11e "Negociar Ajuste" + Termo Aditivo (PRÓXIMA — não implementada)
-- Card 11e lista os ambientes `renegociar_pe=1` e o botão **Negociar Ajuste**.
-- **Orçamento de ajuste**: novo `Orcamento` (flag própria, ex.: `is_ajuste`/`ajuste_de_id`) contendo
-  SÓ os ambientes marcados, com VBVA inicial = `arquivo_pe.valor_venda` (base = PE). Tela de
-  negociação normal (motor/preview/parâmetros do projeto). **Atenção:** a trava `_contrato_assinado`
-  bloqueia hoje QUALQUER orçamento de projeto assinado — a Fatia 3 precisa de isenção deliberada e
-  gated (etapa 11e ativa + permissão) só para o orçamento de ajuste.
-- **Termo Aditivo**: tipo novo em `documento_modelos` (modelo versionado por loja, imutável, como o
-  contrato), marcadores próprios (ambientes renegociados, valor original × novo, diferença), PDF via
-  WeasyPrint (`mod_contrato` pattern), assinatura loja + cliente. SEM lançamentos contábeis.
-- Congelar `modelo_versao_id` no aditivo gerado (mesmo padrão do contrato).
+## Fatia 3 — 11e "Negociar Complemento" + Termo Aditivo (IMPLEMENTADA 2026-07-21)
+**Conceito (correção do usuário durante a implementação):** não é "renegociação" — o PE aumentou
+valores e o que se contrata é o **COMPLEMENTO** (o adicional dos ambientes marcados). **A trava do
+contrato NÃO é retirada**: o orçamento contratado e o contrato original permanecem imutáveis
+(testado: editar o contratado segue 403); o que fica negociável é um orçamento NOVO e separado que
+representa só o valor adicional.
+
+- **Orçamento de complemento**: `Orcamento.complemento_pe=1` (col nova, migrada), nome "Complemento
+  PE", badge COMPLEMENTO no dropdown. Get-or-create em POST `/pe/complemento/orcamento` — vínculos
+  sincronizados com as marcas `renegociar_pe` da 11c a cada chamada. `_negociacao_breakdown` usa
+  VBVA/CFA do `arquivo_pe` como base (valores do PE — decisão 2); ambiente sem PE mantém o pool.
+  Isenção da trava assinado/bloqueado APENAS nos endpoints de negociação (margens, descontos por
+  ambiente, valor/forma de pagamento) e APENAS para `complemento_pe` — parâmetros do projeto seguem
+  travados (são compartilhados com o contratado). O complemento nunca vira default
+  (`carregarOrcamentos` trava no `contratado_id`); a tela de negociação destrava só com ele ativo e
+  retrava ao voltar.
+- **Termo Aditivo**: tabelas próprias `aditivos`/`aditivos_assinaturas` — de propósito FORA de
+  `contratos` (uma linha lá viraria "o último contrato" e derrubaria `_contrato_assinado`). Tipo
+  novo `termo_aditivo` em `documento_modelos` (card em Config → Documentos; modelo obrigatório para
+  gerar; versão CONGELADA na 1ª geração). Marcadores novos (CATALOGO+mapping, anti-drift ok):
+  `NUM_ADITIVO`, `NUM_CONTRATO_ORIGINAL`, `AMBIENTES_COMPLEMENTO`, `VALOR_ORIGINAL_COMPLEMENTO`,
+  `VALOR_NOVO_COMPLEMENTO`, `VALOR_COMPLEMENTO`. Diferença calculada POR AMBIENTE (Σ VAVA ajuste −
+  Σ VAVA original dos mesmos ambientes — linhas do orçamento como Custo Especial ficam FORA, já
+  cobradas no contrato original). Nº `TA<data><seq>`; PDF WeasyPrint com o mesmo confinamento de
+  assets do contrato; assinatura interna loja+cliente (hash+IP, espelho do contrato); regerar após
+  assinado é recusado. SEM lançamentos contábeis (decisão 1 — acerto na liquidação/NF-e).
+- E2E: `tests/test_complemento_pe_e2e.py` (ciclo completo, incluindo PDF real e a prova de que o
+  contratado segue travado).

@@ -3293,6 +3293,7 @@ async function cfgDocumentosRender(){
     +'<div style="display:grid;grid-template-columns:repeat(auto-fill,240px);gap:12px">'
     + _docCardHtml('contrato', 'Contrato', 'ti-file-text', 'HTML + Markdown → PDF (WeasyPrint)')
     + _docCardHtml('proposta', 'Proposta comercial', 'ti-file-invoice', 'modelo .docx')
+    + _docCardHtml('termo_aditivo', 'Termo Aditivo', 'ti-file-diff', 'complemento de contrato (Fatia 3 PE)')
     + '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 16px;opacity:.7">'
       +'<i class="ti ti-files" style="font-size:20px;color:var(--muted)"></i>'
       +'<div style="font-weight:600;font-size:13px;color:var(--text);margin-top:6px">Demais documentos</div>'
@@ -3330,7 +3331,8 @@ function _docCardHtml(tipo, titulo, icone, desc){
 function abrirModalDocModelo(tipo){
   if(!_docPodeGerir) return;
   _docmCtx = {tipo, corpo_md:null, origem_nome:null, staging:null, origem_sha256:null, analise:null};
-  document.getElementById('docm-titulo').textContent = tipo==='contrato' ? 'Contrato' : 'Proposta comercial';
+  document.getElementById('docm-titulo').textContent =
+    tipo==='contrato' ? 'Contrato' : tipo==='termo_aditivo' ? 'Termo Aditivo' : 'Proposta comercial';
   document.getElementById('docm-arquivo').value = '';
   document.getElementById('docm-importar-btn').disabled = true;
   const status = document.getElementById('docm-importar-status');
@@ -4819,7 +4821,9 @@ function renderOrcamentosBar(){
   // Detecta nomes duplicados para exibir id como disambiguação
   const nCount = {};
   _orcamentos.forEach(o => { nCount[o.nome] = (nCount[o.nome]||0)+1; });
-  const rot = o => nCount[o.nome] > 1 ? `${esc(o.nome)} (${o.id})` : esc(o.nome);
+  // Fatia 3 PE: badge no orçamento de COMPLEMENTO (contratação do adicional do PE)
+  const rot = o => (nCount[o.nome] > 1 ? `${esc(o.nome)} (${o.id})` : esc(o.nome))
+    + (o.complemento_pe ? ' <span style="font-size:9px;letter-spacing:.05em;color:var(--warn)">COMPLEMENTO</span>' : '');
   const ativo = _orcamentos.find(o => o.id === _orcamentoAtivoId) || _orcamentos[0];
   // "Orçamento ativo" = Seletor de Status (Diagramacao_v7 §1.5): badge + chevron que abre o menu
   // para trocar qual orçamento está ativo — mesmo componente do badge "Fechado", não é botão de ação.
@@ -4937,6 +4941,13 @@ async function ativarOrcamento(id){
   _orcSombra = (_orcAtivo && _orcAtivo.sombra) || null;
   renderOrcamentosBar();
   await _aplicarFiltroOrcamento(id);
+  // Fatia 3 PE: o orçamento de COMPLEMENTO segue negociável mesmo com contrato assinado
+  // (o contratado permanece travado — a trava reaplica ao voltar para ele). Mesma decisão
+  // do atualizarBotoesAprovacao, via o helper único _orcamentoComplementoAtivo.
+  if (typeof _contratoAssinado !== 'undefined' && _contratoAssinado
+      && typeof aplicarBloqueioNegociacao === 'function') {
+    aplicarBloqueioNegociacao(!_orcamentoComplementoAtivo());
+  }
 }
 
 function abrirModalNovoOrc(){
@@ -11645,6 +11656,14 @@ function aplicarBloqueioNegociacao(travar) {
   }
 }
 
+// Fatia 3 PE: fonte ÚNICA da decisão de lock da negociação pós-assinatura — o orçamento de
+// COMPLEMENTO ativo fica editável; qualquer outro trava. Usada por atualizarBotoesAprovacao
+// E ativarOrcamento (QA Vera: os dois divergiam e o "Salvar" re-travava o complemento).
+function _orcamentoComplementoAtivo(){
+  const o = (_orcamentos || []).find(x => x.id === _orcamentoAtivoId);
+  return !!(o && o.complemento_pe);
+}
+
 function atualizarBotoesAprovacao() {
   const assinado = (typeof _contratoAssinado !== 'undefined') && _contratoAssinado;
   ['btn-pool','btn-novo-ambiente','btn-novo-orc'].forEach(id => {
@@ -11657,7 +11676,7 @@ function atualizarBotoesAprovacao() {
   const _bp = document.getElementById('btn-params');
   if (_bp) _bp.style.display = '';
   if (assinado) {
-    aplicarBloqueioNegociacao(true);
+    aplicarBloqueioNegociacao(!_orcamentoComplementoAtivo());
     const actionRow = document.querySelector('#page-02 .action-row');
     if (actionRow) {
       const bs = actionRow.querySelector('.btn-ok');    if (bs) bs.style.display = 'none';
@@ -11801,6 +11820,10 @@ function toggleCicloCard(codigo) {
   if (body) body.classList.toggle('aberto');
   if (codigo === '7' && body && body.classList.contains('aberto')) {
     carregarDadosContrato();
+  }
+  // Fatia 3 PE: abrir a 11e carrega os ambientes marcados p/ complemento + estado do aditivo
+  if (codigo === '11e' && body && body.classList.contains('aberto')) {
+    peComplementoRender();
   }
 }
 
@@ -12836,13 +12859,21 @@ function _renderCardPE(codigo, dados, bloqueada) {
       <div id="pe-cmp-container" style="margin-top:12px"></div>
       <div id="pe-desm-container" style="margin-top:12px"></div>
     </div>` : '';
+  // Fatia 3 PE: na Aprovação do PE pelo Cliente (11e), ambientes marcados p/ complemento +
+  // Negociar Complemento (orçamento de complemento, base PE) + Termo Aditivo (gerar/assinar/baixar).
+  // Conteúdo carregado ao ABRIR o card (toggleEtapa → peComplementoRender).
+  const peComplementoBlock = (codigo === '11e') ? `
+    <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Renegociação de ambientes</div>
+      <div id="pe-complemento-container"><span style="color:var(--muted);font-size:.82rem">Carregando…</span></div>
+    </div>` : '';
   return `${docsHtml}${revisHtml}
     <div style="font-size:.82rem;margin-bottom:10px">${statusLabel}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       ${btnCarregar}
       ${btnFechar}
       ${btnRevisao}
-    </div>${peCmpBlock}`;
+    </div>${peCmpBlock}${peComplementoBlock}`;
 }
 
 // ── Comparação de PE — helpers compartilhados (11c venda × 11d CFO) ────────────────────────────
@@ -12867,7 +12898,7 @@ async function _peComparacaoFetch(cont){
 // ── Revisão de PE (11c) — comparação de VENDA À VISTA pelo motor (Fatia venda 2026-07-21) ──────
 // O VBVA do XML de PE percorre o MESMO motor de negociação (parâmetros/descontos salvos, motor
 // inalterado) → VAVA por ambiente. Venda maior = verde. A comparação de CUSTO (CFO) mudou de
-// casa: vive na AF2 (peComparacaoCfoRender). Coluna Renegociar alimenta o Negociar Ajuste (11e).
+// casa: vive na AF2 (peComparacaoCfoRender). Coluna Complemento alimenta o Negociar Complemento (11e).
 async function peComparacaoRender(){
   if(!projetoAtivo) return;
   const cont = document.getElementById('pe-cmp-container');
@@ -12913,9 +12944,103 @@ async function peComparacaoRender(){
   const table = `<div class="table-wrap"><table class="tbl"><thead><tr>`
     + `<th>Ambiente</th><th style="text-align:right">À vista (contrato)</th>`
     + `<th style="text-align:right">À vista (PE)</th><th style="text-align:right">Δ venda</th>`
-    + `<th style="text-align:right">Δ %</th><th style="text-align:center">Renegociar</th>`
+    + `<th style="text-align:right">Δ %</th><th style="text-align:center">Complemento</th>`
     + `<th style="text-align:right">Carregar</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   cont.innerHTML = header + table;
+}
+
+// ── Fatia 3 PE — 11e: complemento dos marcados + Termo Aditivo ────────────────────────────────
+async function peComplementoRender(){
+  const cont = document.getElementById('pe-complemento-container');
+  if(!cont || !projetoAtivo) return;
+  cont.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Carregando…</span>';
+  let cmp, ad;
+  try {
+    [cmp, ad] = await Promise.all([
+      fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/comparacao`, {credentials:'same-origin'}).then(r=>r.json()),
+      fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo`, {credentials:'same-origin'}).then(r=>r.json()),
+    ]);
+  } catch(e){ cont.innerHTML = '<span style="color:var(--err)">Erro ao carregar.</span>'; return; }
+  const {fmt} = _peCmpHelpers();
+  const marcados = (cmp.ok && cmp.comparacao_venda || []).filter(l => l.renegociar);
+  if(!marcados.length){
+    cont.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Nenhum ambiente marcado para complemento na Revisão de PE.</span>';
+    return;
+  }
+  const lista = marcados.map(l =>
+    `<div style="display:flex;justify-content:space-between;font-size:.82rem;line-height:1.9">
+       <span>${esc(l.ambiente)}</span>
+       <span style="font-family:var(--font-mono)">${fmt(l.vava_original)} → ${l.pe_carregado ? fmt(l.vava_pe) : '—'}</span>
+     </div>`).join('');
+  const a = ad.ok ? ad.aditivo : null;
+  let adHtml = '';
+  if (!a) {
+    adHtml = `<button class="btn-ciclo" onclick="peAditivoGerar()"><i class="ti ti-file-plus"></i> Gerar Termo Aditivo</button>`;
+  } else {
+    const partes = new Set((a.assinaturas||[]).map(s => s.parte));
+    const assinado = a.status === 'assinado';
+    const sig = p => partes.has(p)
+      ? `<span style="color:var(--ok)">✓ ${p}</span>`
+      : `<button class="btn-ciclo" style="font-size:var(--fs-xs);padding:2px 8px" onclick="peAditivoAssinar('${p}')">Assinar (${p})</button>`;
+    adHtml = `
+      <div style="font-size:.82rem;margin-bottom:6px">Termo Aditivo <strong>${esc(a.num_aditivo)}</strong>
+        — ${assinado ? '<span style="color:var(--ok)">assinado</span>' : esc(a.status)}
+        ${a.dados ? ` · diferença <span style="font-family:var(--font-mono)">${fmt(a.dados.diferenca)}</span>` : ''}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        ${a.tem_pdf ? `<a class="btn-ciclo" style="text-decoration:none" target="_blank" rel="noopener" href="/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo/pdf?v=${Date.now()}"><i class="ti ti-download"></i> Baixar PDF</a>` : ''}
+        ${!assinado ? `<button class="btn-ciclo" onclick="peAditivoGerar()"><i class="ti ti-refresh"></i> Regerar</button>` : ''}
+        ${!assinado ? sig('loja') : `<span style="color:var(--ok);font-size:.82rem">✓ loja</span>`}
+        ${!assinado ? sig('cliente') : `<span style="color:var(--ok);font-size:.82rem">✓ cliente</span>`}
+      </div>
+      ${!assinado ? `<div style="display:flex;gap:8px;margin-top:8px">
+        <input id="pe-ad-nome" placeholder="Nome do signatário" style="flex:1;padding:5px 8px">
+        <input id="pe-ad-cpf" placeholder="CPF" style="width:140px;padding:5px 8px">
+      </div>` : ''}`;
+  }
+  cont.innerHTML = `${lista}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;margin-bottom:10px">
+      <button class="btn-ciclo" onclick="peComplementoNegociar()"><i class="ti ti-arrows-exchange"></i> Negociar Complemento</button>
+    </div>${adHtml}`;
+}
+
+async function peComplementoNegociar(){
+  if(!projetoAtivo) return;
+  try {
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/complemento/orcamento`,
+      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:'{}'}).then(r=>r.json());
+    if(!j.ok){ await avisoPopup(j.erro||'Erro',{titulo:'Negociar Complemento'}); return; }
+    fecharCiclo();
+    goPage(2);
+    await carregarOrcamentos();               // recarrega a lista (o default trava no contratado)
+    await ativarOrcamento(j.orcamento.id);    // ...e ativa o AJUSTE explicitamente
+    showToast('Orçamento de complemento ativo — negocie os valores dos ambientes marcados.');
+  } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Negociar Complemento'}); }
+}
+
+async function peAditivoGerar(){
+  if(!projetoAtivo) return;
+  try {
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo`,
+      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:'{}'}).then(r=>r.json());
+    if(!j.ok){ await avisoPopup(j.erro||'Erro',{titulo:'Termo Aditivo'}); return; }
+    showToast('Termo aditivo gerado.');
+    peComplementoRender();
+  } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Termo Aditivo'}); }
+}
+
+async function peAditivoAssinar(parte){
+  if(!projetoAtivo) return;
+  const nome = (document.getElementById('pe-ad-nome')?.value || '').trim();
+  const cpf  = (document.getElementById('pe-ad-cpf')?.value || '').trim();
+  if(!nome || !cpf){ await avisoPopup('Preencha nome e CPF do signatário.',{titulo:'Assinar aditivo'}); return; }
+  try {
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo/assinar`,
+      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({parte, nome, cpf})}).then(r=>r.json());
+    if(!j.ok){ await avisoPopup(j.erro||'Erro',{titulo:'Assinar aditivo'}); return; }
+    showToast('Assinatura registrada (' + parte + ').');
+    peComplementoRender();
+  } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Assinar aditivo'}); }
 }
 
 async function peRenegociarToggle(poolAmbienteId, cb){
@@ -12924,8 +13049,8 @@ async function peRenegociarToggle(poolAmbienteId, cb){
     const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/renegociar`,
       {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
        body: JSON.stringify({pool_ambiente_id: poolAmbienteId, renegociar: cb.checked})}).then(r=>r.json());
-    if(!j.ok){ cb.checked = !cb.checked; await avisoPopup(j.erro||'Erro',{titulo:'Renegociar'}); }
-  } catch(e){ cb.checked = !cb.checked; await avisoPopup('Erro de rede.',{titulo:'Renegociar'}); }
+    if(!j.ok){ cb.checked = !cb.checked; await avisoPopup(j.erro||'Erro',{titulo:'Complemento'}); }
+  } catch(e){ cb.checked = !cb.checked; await avisoPopup('Erro de rede.',{titulo:'Complemento'}); }
 }
 
 // ── AF2 (11d) — comparação de CUSTO DE FÁBRICA (CFO), read-only (mudou de casa: era da 11c) ────

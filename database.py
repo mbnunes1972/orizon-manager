@@ -635,6 +635,10 @@ class Orcamento(Base):
     # Fatia B (resultado financeiro): ramo do custo financeiro confirmado na AF (box).
     ramo_financeiro     = Column(String,  nullable=True)   # loja|loja_antecipacao|financeira (NULL = auto pela forma de pagamento)
     ramo_financeiro_seq = Column(Integer, default=0)       # contador p/ ref idempotente de troca de ramo
+    # Fatia 3 da Revisão de PE (2026-07-21): orçamento de AJUSTE pós-assinatura — só os ambientes
+    # marcados "Renegociar" na 11c, base de valores = PE (arquivo_pe). Isento das travas de contrato
+    # assinado nos endpoints de negociação (margens/descontos/valor); NUNCA vira o contratado.
+    complemento_pe           = Column(Integer, default=0)
     created_by      = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     created_at      = Column(DateTime, default=datetime.utcnow)
     updated_at      = Column(DateTime, nullable=True)
@@ -950,6 +954,48 @@ class ContratoAssinatura(Base):
     hash_sha256  = Column(Text,     nullable=False)
 
     contrato = relationship("Contrato", back_populates="assinaturas")
+
+
+class Aditivo(Base):
+    """Termo Aditivo do contrato (Fatia 3 da Revisão de PE, 2026-07-21): documenta a DIFERENÇA dos
+    ambientes renegociados (orçamento de ajuste × contrato original), com modelo versionado por loja
+    (documento_modelos tipo 'termo_aditivo') e assinatura loja+cliente. TABELA PRÓPRIA de propósito:
+    uma linha em `contratos` viraria "o último contrato" e quebraria a trava `_contrato_assinado`.
+    Sem efeito contábil (decisão do usuário: gerencial; acerto na liquidação/NF-e)."""
+    __tablename__ = "aditivos"
+
+    id                 = Column(Integer,  primary_key=True, autoincrement=True)
+    num_aditivo        = Column(Text,     nullable=True)    # TA<AAAAMMDD><SEQ> (gerado 1x)
+    projeto_nome       = Column(Text,     nullable=False, index=True)
+    contrato_id        = Column(Integer,  ForeignKey("contratos.id"), nullable=False)
+    orcamento_complemento_id = Column(Integer, ForeignKey("orcamentos.id"), nullable=False)
+    pdf_path           = Column(Text,     nullable=True)
+    dados_json         = Column(Text,     nullable=True)    # snapshot da diferença (ambientes, valores)
+    status             = Column(Text,     nullable=False, default="rascunho")
+    # status: rascunho | para_assinatura | assinado_loja | assinado_cliente | assinado
+    gerado_em          = Column(DateTime, nullable=True)
+    gerado_por_id      = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    loja_id            = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
+    modelo_versao_id   = Column(Integer,  ForeignKey("documento_modelos.id"), nullable=True)
+
+    assinaturas = relationship("AditivoAssinatura", back_populates="aditivo",
+                               cascade="all, delete-orphan")
+
+
+class AditivoAssinatura(Base):
+    """Assinatura interna do Termo Aditivo — espelho de ContratoAssinatura."""
+    __tablename__ = "aditivos_assinaturas"
+
+    id          = Column(Integer,  primary_key=True, autoincrement=True)
+    aditivo_id  = Column(Integer,  ForeignKey("aditivos.id"), nullable=False)
+    parte       = Column(Text,     nullable=False)   # loja | cliente
+    nome        = Column(Text,     nullable=False)
+    cpf         = Column(Text,     nullable=False)
+    assinado_em = Column(DateTime, nullable=False, default=datetime.utcnow)
+    ip_origem   = Column(Text,     nullable=True)
+    hash_sha256 = Column(Text,     nullable=False)
+
+    aditivo = relationship("Aditivo", back_populates="assinaturas")
 
 
 class CicloDocumento(Base):
@@ -1272,6 +1318,7 @@ def _migrar_colunas():
             ("num_proposta",    "TEXT"),
             ("ramo_financeiro",     "TEXT"),            # Fatia B: ramo do custo financeiro (box da AF)
             ("ramo_financeiro_seq", "INTEGER DEFAULT 0"),
+            ("complemento_pe",           "INTEGER DEFAULT 0"),   # Fatia 3 PE: orçamento de ajuste
         ]:
             if col not in orc_cols:
                 cur.execute(f"ALTER TABLE orcamentos ADD COLUMN {col} {tipo}")
@@ -1787,6 +1834,8 @@ def _migrar_colunas_pg():
         # Fatia venda da Revisão de PE (2026-07-21): venda do PE + flag Renegociar por ambiente.
         "ALTER TABLE arquivo_pe ADD COLUMN IF NOT EXISTS valor_venda DOUBLE PRECISION",
         "ALTER TABLE pool_ambientes ADD COLUMN IF NOT EXISTS renegociar_pe INTEGER DEFAULT 0",
+        # Fatia 3 PE: orçamento de ajuste pós-assinatura.
+        "ALTER TABLE orcamentos ADD COLUMN IF NOT EXISTS complemento_pe INTEGER DEFAULT 0",
     ]
     with ENGINE.begin() as conn:
         for s in stmts:

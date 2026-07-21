@@ -52,6 +52,7 @@ MODULOS = {
                                  "mod_equipe.py"],           # Equipe do Projeto (roster papel→responsável)
                     "tabelas": ["projetos_meta", "briefings", "pool_ambientes", "orcamentos",
                                 "orcamento_ambientes", "contratos", "contratos_assinaturas",
+                                "aditivos", "aditivos_assinaturas",   # Termo Aditivo (Fatia 3 PE)
                                 "arquivo_pe", "parcela_projeto", "parcela_ambiente", "medicoes",
                                 "documento_modelos"],
                     "rotas": ["/api/orcamentos", "/api/contratos", "/api/medicoes", "/api/comercial",

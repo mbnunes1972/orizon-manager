@@ -82,6 +82,16 @@ CATALOGO = {
     "NUM_PARCELAS":   {"rotulo": "Nº de parcelas",     "escopo": "pagamento"},
     "TIPO":           {"rotulo": "Tipo da parcela",    "escopo": "pagamento"},
     "TOTAL_CONTRATO": {"rotulo": "Valor total",        "escopo": "pagamento"},
+
+    # ── Termo Aditivo (Fatia 3 da Revisão de PE, 2026-07-21) — COMPLEMENTO contratado ─────────
+    # O PE aumentou valores → contrata-se o ADICIONAL dos ambientes marcados (o contrato original
+    # permanece intocado; o aditivo documenta só a diferença).
+    "NUM_ADITIVO":                {"rotulo": "Nº do termo aditivo",                          "escopo": "documento"},
+    "NUM_CONTRATO_ORIGINAL":      {"rotulo": "Nº do contrato original",                      "escopo": "documento"},
+    "AMBIENTES_COMPLEMENTO":      {"rotulo": "Ambientes do complemento (original → novo)",   "escopo": "documento"},
+    "VALOR_ORIGINAL_COMPLEMENTO": {"rotulo": "Soma original dos ambientes do complemento",   "escopo": "documento"},
+    "VALOR_NOVO_COMPLEMENTO":     {"rotulo": "Soma nova dos ambientes do complemento",       "escopo": "documento"},
+    "VALOR_COMPLEMENTO":          {"rotulo": "Valor do complemento (novo − original)",       "escopo": "documento"},
 }
 
 

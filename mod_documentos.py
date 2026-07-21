@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 
 from database import DocumentoModelo
 
-TIPOS = ("contrato", "proposta")
+TIPOS = ("contrato", "proposta", "termo_aditivo")
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 DOCS_LOJA_DIR = os.path.join(_THIS_DIR, "documentos_loja")

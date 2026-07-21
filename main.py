@@ -19,7 +19,8 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        PerfilEmissao, CicloLogistico, CicloLogisticoTransicao, AssistenciaCaso,
                        Funcionario, Fornecedor, Terceiro, Funcao, FolhaPagamento, ComissaoFolha,
                        AdiantamentoFuncionario,
-                       AtribuicaoAmbiente, ArquivoPE, ParcelaProjeto, ParcelaAmbiente)
+                       AtribuicaoAmbiente, ArquivoPE, ParcelaProjeto, ParcelaAmbiente,
+                       Aditivo, AditivoAssinatura)
 import mod_expedicao
 import mod_assistencias
 import mod_cadastro
@@ -2437,6 +2438,60 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            m = _re.match(r'^/api/projetos/([^/]+)/aditivo$', path)
+            if m:
+                # Fatia 3 PE: estado do Termo Aditivo (status, assinaturas, dados da diferença)
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    a = (db.query(Aditivo).filter_by(projeto_nome=nome_safe)
+                           .order_by(Aditivo.id.desc()).first())
+                    self.send_json({"ok": True, "aditivo": _aditivo_dict(a) if a else None})
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/aditivo/pdf$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    a = (db.query(Aditivo).filter_by(projeto_nome=nome_safe)
+                           .order_by(Aditivo.id.desc()).first())
+                    if a is None or not a.pdf_path or not os.path.exists(a.pdf_path):
+                        self.send_json({"ok": False, "erro": "PDF do aditivo não encontrado."},
+                                       code=404); return
+                    with open(a.pdf_path, "rb") as fh:
+                        data = fh.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/pdf")
+                    self.send_header("Content-Length", len(data))
+                    self.send_header("Content-Disposition",
+                                     'inline; filename="aditivo_%d.pdf"' % a.id)
+                    self.end_headers()
+                    self.wfile.write(data)
+                finally:
+                    db.close()
+                return
+
             m = _re.match(r'^/api/projetos/([^/]+)/contrato/pdf$', path)
             if m:
                 nome_safe = unquote(m.group(1))
@@ -3193,7 +3248,7 @@ class Handler(BaseHTTPRequestHandler):
         m_pereneg = re.match(r'^/api/projetos/([^/]+)/pe/renegociar$', path)
         if m_pereneg:
             # Fatia venda (2026-07-21): marca/desmarca "Renegociar" num ambiente da Revisão de PE.
-            # Os marcados aparecem na Aprovação do PE pelo Cliente (11e) para o Negociar Ajuste.
+            # Os marcados aparecem na Aprovação do PE pelo Cliente (11e) para o Negociar Complemento.
             nome = unquote(m_pereneg.group(1))
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -3218,6 +3273,223 @@ class Handler(BaseHTTPRequestHandler):
                 db.commit()
                 self.send_json({"ok": True, "pool_ambiente_id": pa_id,
                                 "renegociar": bool(pa.renegociar_pe)})
+            finally:
+                db.close()
+            return
+
+        m_peaj = re.match(r'^/api/projetos/([^/]+)/pe/complemento/orcamento$', path)
+        if m_peaj:
+            # Fatia 3 PE: get-or-create do ORÇAMENTO DE COMPLEMENTO (11e "Negociar Complemento") — contém só
+            # os ambientes marcados Renegociar na 11c; base de valores = PE (breakdown complemento_pe).
+            # Deliberadamente permitido com contrato assinado (é a razão de existir); nunca vira o
+            # contratado (carregarOrcamentos sempre trava o default no contratado_id).
+            nome = unquote(m_peaj.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                marcados = [pa.id for pa in db.query(PoolAmbiente)
+                            .filter_by(projeto_id=nome).order_by(PoolAmbiente.id.asc()).all()
+                            if pa.renegociar_pe]
+                if not marcados:
+                    self.send_json({"ok": False, "erro": "Nenhum ambiente marcado para complemento "
+                                    "na Revisão de PE."}, code=400); return
+                orc = (db.query(Orcamento).filter_by(projeto_id=nome, complemento_pe=1)
+                         .order_by(Orcamento.id.desc()).first())
+                if orc is None:
+                    maior = max([o.ordem or 0 for o in
+                                 db.query(Orcamento).filter_by(projeto_id=nome).all()] or [0])
+                    orc = Orcamento(projeto_id=nome, nome="Complemento PE", ordem=maior + 1,
+                                    desconto_pct=0.0, complemento_pe=1, loja_id=loja_id,
+                                    created_by=usuario.get("id"))
+                    db.add(orc); db.flush()
+                # sincroniza os vínculos com as marcas atuais (marcar/desmarcar na 11c reflete aqui)
+                atuais = {oa.pool_ambiente_id: oa for oa in
+                          db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all()}
+                for i, pid in enumerate(marcados):
+                    if pid not in atuais:
+                        db.add(OrcamentoAmbiente(orcamento_id=orc.id, pool_ambiente_id=pid, ordem=i + 1))
+                for pid, oa in atuais.items():
+                    if pid not in set(marcados):
+                        db.delete(oa)
+                db.flush()
+                try:
+                    _recalcular_orcamento(orc, db)
+                except Exception as _e:
+                    print("[AJUSTE-PE] recálculo falhou:", _e)
+                orc.updated_at = datetime.utcnow()
+                db.commit()
+                self.send_json({"ok": True, "orcamento": _orcamento_dict(orc)})
+            finally:
+                db.close()
+            return
+
+        m_adger = re.match(r'^/api/projetos/([^/]+)/aditivo$', path)
+        if m_adger:
+            # Fatia 3 PE: gera/regenera o TERMO ADITIVO — documenta a DIFERENÇA dos ambientes
+            # do complemento (orçamento de complemento × contrato original). SEM efeito contábil (decisão
+            # do usuário: gerencial; acerto na liquidação/NF-e). Modelo da loja tipo 'termo_aditivo'
+            # (obrigatório), versão CONGELADA na 1ª geração (padrão do contrato).
+            nome = unquote(m_adger.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                contrato = (db.query(Contrato).filter_by(projeto_nome=nome)
+                              .order_by(Contrato.id.desc()).first())
+                if contrato is None or not _contrato_assinado(nome, db):
+                    self.send_json({"ok": False, "erro": "O termo aditivo exige contrato assinado."},
+                                   code=400); return
+                orc_aj = (db.query(Orcamento).filter_by(projeto_id=nome, complemento_pe=1)
+                            .order_by(Orcamento.id.desc()).first())
+                if orc_aj is None:
+                    self.send_json({"ok": False, "erro": "Negocie o complemento antes de gerar o termo "
+                                    "aditivo (11e → Negociar Complemento)."}, code=400); return
+                aditivo = (db.query(Aditivo).filter_by(projeto_nome=nome)
+                             .order_by(Aditivo.id.desc()).first())
+                if aditivo is not None and aditivo.status == "assinado":
+                    self.send_json({"ok": False, "erro": "Termo aditivo já assinado — não pode ser "
+                                    "regerado."}, code=403); return
+                import mod_documentos as _mdoc
+                if aditivo is None:
+                    aditivo = Aditivo(projeto_nome=nome, contrato_id=contrato.id,
+                                      orcamento_complemento_id=orc_aj.id, loja_id=loja_id)
+                    db.add(aditivo); db.flush()
+                if aditivo.modelo_versao_id is None:      # congela o modelo na 1ª geração
+                    mv = _mdoc.ativo_de(db, loja_id, "termo_aditivo")
+                    if mv is None:
+                        self.send_json({"ok": False, "erro": "Nenhum modelo de Termo Aditivo ativo "
+                                        "— importe um em Config → Documentos."}, code=400); return
+                    aditivo.modelo_versao_id = mv.id
+                corpo_md = _mdoc.corpo_da_versao(db, aditivo.modelo_versao_id) or ""
+                # diferença POR AMBIENTE (à vista, VAVA): ajuste × contrato original. Somas por
+                # ambiente de propósito (linhas do orçamento, ex.: Custo Especial, ficam fora —
+                # já cobradas no contrato original; o aditivo é só a diferença dos ambientes).
+                d_orig = _negociacao_breakdown(db.get(Orcamento, contrato.orcamento_id), db)
+                d_aj = _negociacao_breakdown(orc_aj, db)
+                vava_orig = {a.get("id"): a.get("VAVA", 0.0) for a in d_orig.get("ambientes", [])}
+                pa_nome = {pa.id: (pa.nome_exibicao or pa.nome) for pa in
+                           db.query(PoolAmbiente).filter_by(projeto_id=nome).all()}
+                from mod_contrato import _formatar_valor as _fv
+                linhas_amb, tot_orig, tot_novo = [], 0.0, 0.0
+                for a in d_aj.get("ambientes", []):
+                    vo = round(float(vava_orig.get(a.get("id"), 0.0)), 2)
+                    vn = round(float(a.get("VAVA", 0.0)), 2)
+                    tot_orig += vo; tot_novo += vn
+                    linhas_amb.append({"pool_ambiente_id": a.get("id"),
+                                       "ambiente": pa_nome.get(a.get("id"), "?"),
+                                       "vava_original": vo, "vava_novo": vn,
+                                       "diferenca": round(vn - vo, 2)})
+                tot_orig, tot_novo = round(tot_orig, 2), round(tot_novo, 2)
+                dif = round(tot_novo - tot_orig, 2)
+                dados = {"ambientes": linhas_amb, "valor_original": tot_orig,
+                         "valor_novo": tot_novo, "diferenca": dif,
+                         "num_contrato_original": contrato.num_contrato or ""}
+                if not aditivo.num_aditivo:
+                    from mod_contrato import gerar_num_contrato as _gnc
+                    _existing = [x.num_aditivo for x in db.query(Aditivo)
+                                 .filter(Aditivo.num_aditivo.isnot(None)).all()]
+                    aditivo.num_aditivo = _gnc(_existing, "", prefixo="TA")
+                _proj, cliente_dict, _od = _montar_dados_projeto_para_contrato(
+                    nome, contrato.orcamento_id, db)
+                loja_dict = _loja_dict_para_contrato(db, loja_id)
+                usuario_ctx = {"nome": usuario.get("nome", ""),
+                               "telefone": _get_usuario_telefone(usuario["id"], db),
+                               "email": usuario.get("email", "") or ""}
+                from mod_contrato import construir_contexto as _cc, gerar_pdf_aditivo as _gpa
+                from mod_contrato import CONTRATOS_DIR as _CDIR
+                ctx = _cc(cliente_dict, usuario_ctx, "", loja_dict)
+                ctx["num_contrato"] = aditivo.num_aditivo
+                ctx["_corpo_md_aditivo"] = corpo_md
+                ctx["_aditivo"] = {
+                    "num_aditivo": aditivo.num_aditivo,
+                    "num_contrato_original": contrato.num_contrato or "",
+                    "ambientes_txt": "\n".join(
+                        "%s: %s → %s (Δ %s)" % (l["ambiente"], _fv(l["vava_original"]),
+                                                _fv(l["vava_novo"]), _fv(l["diferenca"]))
+                        for l in linhas_amb),
+                    "valor_original": _fv(tot_orig),
+                    "valor_novo": _fv(tot_novo),
+                    "diferenca": _fv(dif),
+                }
+                pdf_path = _gpa(ctx, os.path.join(_CDIR, "aditivo_%d.pdf" % aditivo.id))
+                aditivo.pdf_path = pdf_path
+                aditivo.dados_json = json.dumps(dados, ensure_ascii=False)
+                aditivo.orcamento_complemento_id = orc_aj.id
+                aditivo.gerado_em = datetime.utcnow()
+                aditivo.gerado_por_id = usuario.get("id")
+                aditivo.status = "para_assinatura"
+                db.commit()
+                self.send_json({"ok": True, "aditivo": _aditivo_dict(aditivo)})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        m_adass = re.match(r'^/api/projetos/([^/]+)/aditivo/assinar$', path)
+        if m_adass:
+            # Fatia 3 PE: assinatura interna do termo aditivo (loja + cliente), espelho do contrato.
+            nome = unquote(m_adass.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                req = json.loads(body or b'{}')
+                parte = (req.get("parte") or "").strip()
+                nome_ass = (req.get("nome") or "").strip()
+                cpf = (req.get("cpf") or "").strip()
+                if parte not in ("loja", "cliente"):
+                    self.send_json({"ok": False, "erro": "parte deve ser 'loja' ou 'cliente'"},
+                                   code=400); return
+                if not nome_ass or not cpf:
+                    self.send_json({"ok": False, "erro": "Informe nome e CPF."}, code=400); return
+                aditivo = (db.query(Aditivo).filter_by(projeto_nome=nome)
+                             .order_by(Aditivo.id.desc()).first())
+                if aditivo is None or not aditivo.pdf_path:
+                    self.send_json({"ok": False, "erro": "Gere o termo aditivo antes de assinar."},
+                                   code=400); return
+                if aditivo.status == "assinado":
+                    self.send_json({"ok": False, "erro": "Termo aditivo já assinado."}, code=400); return
+                if any(a.parte == parte for a in aditivo.assinaturas):
+                    self.send_json({"ok": False, "erro": "Esta parte já assinou."}, code=400); return
+                # ALIAS obrigatório: import não-aliased tornaria calcular_hash_assinatura local
+                # ao do_POST inteiro e quebraria o handler de assinatura do CONTRATO acima
+                from mod_contrato import calcular_hash_assinatura as _cha
+                ts = datetime.utcnow().isoformat()
+                # append na RELAÇÃO (não db.add solto): a coleção já carregada precisa enxergar
+                # a assinatura nova para o cálculo de "ambas as partes" logo abaixo
+                aditivo.assinaturas.append(AditivoAssinatura(
+                    parte=parte, nome=nome_ass, cpf=cpf, ip_origem=self.client_address[0],
+                    hash_sha256=_cha(nome_ass, cpf, aditivo.id, ts)))
+                db.flush()
+                partes = {a.parte for a in aditivo.assinaturas}
+                aditivo.status = ("assinado" if {"loja", "cliente"}.issubset(partes)
+                                  else "assinado_" + parte)
+                db.commit()
+                self.send_json({"ok": True, "status": aditivo.status})
             finally:
                 db.close()
             return
@@ -4582,16 +4854,19 @@ class Handler(BaseHTTPRequestHandler):
                 if orc is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
-                if _projeto_esta_bloqueado(orc.projeto_id):
-                    self.send_json({"ok": False,
-                                    "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
-                                   code=400)
-                    return
-                if orc and _contrato_assinado(orc.projeto_id, db):
-                    self.send_json({"ok": False,
-                                    "erro": "Contrato assinado — alterações não permitidas."},
-                                   code=403)
-                    return
+                # Orçamento de AJUSTE (Fatia 3 PE) é isento das travas de aprovação/assinatura —
+                # contratar o complemento pós-contrato é a razão de ele existir (11e Negociar Complemento).
+                if not getattr(orc, "complemento_pe", 0):
+                    if _projeto_esta_bloqueado(orc.projeto_id):
+                        self.send_json({"ok": False,
+                                        "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
+                                       code=400)
+                        return
+                    if _contrato_assinado(orc.projeto_id, db):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato assinado — alterações não permitidas."},
+                                       code=403)
+                        return
                 if "desconto_pct" in req:
                     orc.desconto_pct = float(req["desconto_pct"])
                 db.commit()
@@ -7822,16 +8097,19 @@ class Handler(BaseHTTPRequestHandler):
                 if orc is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
-                if _projeto_esta_bloqueado(orc.projeto_id):
-                    self.send_json({"ok": False,
-                                    "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
-                                   code=400)
-                    return
-                if orc and _contrato_assinado(orc.projeto_id, db):
-                    self.send_json({"ok": False,
-                                    "erro": "Contrato assinado — alterações não permitidas."},
-                                   code=403)
-                    return
+                # Orçamento de AJUSTE (Fatia 3 PE) é isento das travas de aprovação/assinatura —
+                # contratar o complemento pós-contrato é a razão de ele existir (11e Negociar Complemento).
+                if not getattr(orc, "complemento_pe", 0):
+                    if _projeto_esta_bloqueado(orc.projeto_id):
+                        self.send_json({"ok": False,
+                                        "erro": "Projeto bloqueado — alteracoes nao permitidas apos aprovacao."},
+                                       code=400)
+                        return
+                    if _contrato_assinado(orc.projeto_id, db):
+                        self.send_json({"ok": False,
+                                        "erro": "Contrato assinado — alterações não permitidas."},
+                                       code=403)
+                        return
                 links = db.query(OrcamentoAmbiente).filter_by(orcamento_id=oid).all()
                 ids_validos = {lk.pool_ambiente_id for lk in links}
                 limpos = sanear_descontos(pares, ids_validos)
@@ -8009,7 +8287,8 @@ class Handler(BaseHTTPRequestHandler):
                     if orc is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
-                    if orc and _contrato_assinado(orc.projeto_id, db):
+                    if orc and not getattr(orc, "complemento_pe", 0) and _contrato_assinado(orc.projeto_id, db):
+                        # ajuste (Fatia 3 PE) segue editável pós-assinatura
                         self.send_json({"ok": False,
                                         "erro": "Contrato assinado — alterações não permitidas."},
                                        code=403)
@@ -8733,6 +9012,23 @@ def _pool_ambiente_dict(pa) -> dict:
     }
 
 
+def _aditivo_dict(a) -> dict:
+    """Serialização do Termo Aditivo (Fatia 3 PE) para o frontend."""
+    try:
+        dados = json.loads(a.dados_json) if a.dados_json else None
+    except Exception:
+        dados = None
+    return {
+        "id": a.id, "num_aditivo": a.num_aditivo or "", "status": a.status,
+        "tem_pdf": bool(a.pdf_path and os.path.exists(a.pdf_path)),
+        "gerado_em": a.gerado_em.strftime("%Y-%m-%d %H:%M") if a.gerado_em else "",
+        "dados": dados,
+        "assinaturas": [{"parte": s.parte, "nome": s.nome,
+                         "assinado_em": s.assinado_em.strftime("%Y-%m-%d %H:%M") if s.assinado_em else ""}
+                        for s in a.assinaturas],
+    }
+
+
 def _orcamento_dict(o) -> dict:
     return {
         "id":              o.id,
@@ -8745,6 +9041,7 @@ def _orcamento_dict(o) -> dict:
         "valor_liquido":   o.valor_liquido   or 0.0,
         "created_at":      o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else "",
         "updated_at":      o.updated_at.strftime("%Y-%m-%d %H:%M") if o.updated_at else "",
+        "complemento_pe":       bool(getattr(o, "complemento_pe", 0)),   # Fatia 3 PE: orçamento de ajuste
         "ambientes":       [],  # preenchido por rotas específicas
         # ── modo sombra: derivados do motor de negociação (Task 7) ──
         "sombra": _sombra_dict(o),
@@ -8847,12 +9144,26 @@ def _negociacao_breakdown(orc, db, vbva_override=None):
     params = (json.loads(proj.parametros_json) if (proj and proj.parametros_json)
               else mod_orcamento_params.parametros_default_loja(cfg))
     desc_orc = orc.desconto_pct or 0.0
+    # Orçamento de AJUSTE (Fatia 3 PE): base de valores = PE (decisão do usuário) — VBVA/CFA vêm
+    # do arquivo_pe quando presentes; ambiente sem PE mantém os valores do pool.
+    pe_base = {}
+    if getattr(orc, "complemento_pe", 0):
+        pe_base = {a.pool_ambiente_id: a for a in
+                   db.query(ArquivoPE).filter_by(projeto_nome=orc.projeto_id, formato="xml_pe").all()}
     ambs, ids = [], []
     for lk in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all():
         pa = db.get(PoolAmbiente, lk.pool_ambiente_id)
         if pa:
-            vbva = (vbva_override or {}).get(lk.pool_ambiente_id, pa.budget_total or 0.0)
-            ambs.append({"VBVA": vbva, "CFA": pa.order_total or 0.0,
+            vbva = pa.budget_total or 0.0
+            cfa = pa.order_total or 0.0
+            pe = pe_base.get(lk.pool_ambiente_id)
+            if pe is not None:
+                if pe.valor_venda is not None:
+                    vbva = pe.valor_venda
+                if pe.valor_atualizado is not None:
+                    cfa = pe.valor_atualizado
+            vbva = (vbva_override or {}).get(lk.pool_ambiente_id, vbva)
+            ambs.append({"VBVA": vbva, "CFA": cfa,
                          "desc_amb_pct": float(lk.desconto_individual_pct or 0.0)})
             ids.append(lk.pool_ambiente_id)
     total_cliente = None

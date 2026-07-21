@@ -559,6 +559,14 @@ def _montar_mapping(ctx, pag):
         "PREVISAO_MEDICAO":      ctx.get("previsao_medicao", "") or "",
         "PRAZO_CONTRATUAL":      ctx.get("prazo_contratual", "") or "",
         "VENDA_PROGRAMADA":      ctx.get("venda_programada_txt", "") or "",
+        # Termo Aditivo (Fatia 3 PE): preenchidos via ctx["_aditivo"] pelo endpoint de geração;
+        # no contrato/proposta saem vazios (padrão dos extras).
+        "NUM_ADITIVO":            (ctx.get("_aditivo") or {}).get("num_aditivo", "") or "",
+        "NUM_CONTRATO_ORIGINAL":  (ctx.get("_aditivo") or {}).get("num_contrato_original", "") or "",
+        "AMBIENTES_COMPLEMENTO": (ctx.get("_aditivo") or {}).get("ambientes_txt", "") or "",
+        "VALOR_ORIGINAL_COMPLEMENTO":  (ctx.get("_aditivo") or {}).get("valor_original", "") or "",
+        "VALOR_NOVO_COMPLEMENTO":      (ctx.get("_aditivo") or {}).get("valor_novo", "") or "",
+        "VALOR_COMPLEMENTO":       (ctx.get("_aditivo") or {}).get("diferenca", "") or "",
     }
 
 
@@ -874,6 +882,36 @@ def gerar_pdf_proposta(ctx: dict, destino_pdf: str) -> str:
     if _dir:
         os.makedirs(_dir, exist_ok=True)
     HTML(string=montar_html_proposta(ctx), base_url=CONTRATO_TEMPLATE_DIR,
+         url_fetcher=_url_fetcher_local).write_pdf(destino_pdf)
+    return destino_pdf
+
+
+# ── Termo Aditivo (Fatia 3 da Revisão de PE, 2026-07-21) ──────────────────────
+
+def montar_html_aditivo(ctx):
+    """HTML do Termo Aditivo: SÓ o corpo do modelo 'termo_aditivo' da loja (sem capa), no shell
+    do contrato, com o mapping completo do CATALOGO — inclui os marcadores do aditivo, que o
+    endpoint de geração preenche via ctx['_aditivo'] (nº, contrato original, ambientes
+    renegociados original→novo, somas e diferença). O corpo vem em ctx['_corpo_md_aditivo']
+    (resolvido pelo chamador — versão CONGELADA no aditivo, mesmo padrão do contrato)."""
+    from html import escape
+    mapping = {k: escape(str(v)) for k, v in _montar_mapping(ctx, ctx.get("_pag", {})).items()}
+    shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"), encoding="utf-8").read()
+    corpo = _html_corpo(ctx.get("_corpo_md_aditivo") or "")
+    html_doc = shell.replace("<!--CAPA-->", "").replace("<!--CORPO-->", corpo)
+    html_doc = _substituir_marcadores_html(html_doc, mapping)
+    # TEXTO_COMPLEMENTAR não se aplica ao aditivo — remove o marcador se o modelo o trouxer
+    return html_doc.replace("[TEXTO_COMPLEMENTAR]", "")
+
+
+def gerar_pdf_aditivo(ctx: dict, destino_pdf: str) -> str:
+    """Renderiza o Termo Aditivo em PDF via WeasyPrint (mesmo confinamento de assets do
+    contrato: base_url + url_fetcher restritos ao contrato_template/). Retorna o caminho."""
+    from weasyprint import HTML
+    _dir = os.path.dirname(destino_pdf)
+    if _dir:
+        os.makedirs(_dir, exist_ok=True)
+    HTML(string=montar_html_aditivo(ctx), base_url=CONTRATO_TEMPLATE_DIR,
          url_fetcher=_url_fetcher_local).write_pdf(destino_pdf)
     return destino_pdf
 
