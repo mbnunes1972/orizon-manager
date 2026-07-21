@@ -1361,11 +1361,15 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > A no `main` (`01f2acd`). Script de deploy versionado em `scripts/deploy_ab.sh` (uso no VPS:
 > `bash deploy_ab.sh <TAG>`).
 >
-> **PENDENTE (retomar por aqui):** 1) re-ingerir o grafo MCP (`POST :8767/ingest/all`) — estava
-> bloqueado com o Docker Desktop do Windows parado; usuário ia reiniciar o Windows pra liberar.
-> 2) Verificação manual no navegador — Fatia 3 (marcadores no PDF exigem modelo referenciá-los)
-> e Fatia 4 (coluna Entrega + selo Atrasado, temas claro/escuro). Próximas frentes candidatas:
-> Agenda Global (consome a base de atraso do §6), empacotar `comercial`, baseline Alembic.
+> **Retomada (ainda 2026-07-20):** grafo MCP **re-ingerido** (código 2608 nós/2352 arestas — pendência 1
+> resolvida; `docker.exe compose up -d` em `../mcp-orizon` funciona de dentro do WSL com o Docker Desktop
+> aberto). As instâncias A/B do VPS viraram **serviços systemd** `orizon-a`/`orizon-b` (boot + auto-restart;
+> antes eram screens manuais que não sobreviviam a reboot — era por isso que o pré-homolog "caía");
+> `deploy_ab.sh` atualizado para systemctl (`da0957b`), auto-restart testado matando o processo.
+>
+> **PENDENTE (retomar por aqui):** Verificação manual no navegador — Fatia 3 (marcadores no PDF exigem
+> modelo referenciá-los) e Fatia 4 (coluna Entrega + selo Atrasado, temas claro/escuro). Próximas frentes
+> candidatas: Agenda Global (consome a base de atraso do §6), empacotar `comercial`, baseline Alembic.
 >
 > **(Anterior, 2026-07-19 — mantido abaixo por referência.)**
 
