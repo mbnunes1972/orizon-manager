@@ -80,8 +80,9 @@ PLANO_PADRAO = [
     ("4.3.01", "Simples Nacional s/ Vendas"), ("4.3.02", "Devolução de Vendas"),
     ("4.4", "Outras Receitas Não Operacionais"),
     ("4.4.01", "Receita de Aluguéis"),
-    ("4.4.02", "Reversão de Provisões"),   # FASE D: destino da SOBRA (provisionado > efetivado)
+    ("4.4.02", "Reversão de Provisões"),
     ("4.4.03", "Receita Financeira"),   # FASE B: ramo LOJA — juros do financiamento direto (competência por parcela)
+    ("4.4.04", "Ganhos com Acordos Financeiros"),   # opção B (2026-07-22): contrapartida-resultado de acrescer/abater
     ("5", "DESPESAS / CUSTOS"),
     ("5.1", "CMV"),
     ("5.1.01", "CMV Fábrica (Dal Mobile)"), ("5.1.02", "Frete Fábrica"),
@@ -114,6 +115,7 @@ PLANO_PADRAO = [
     ("5.5.01", "Tarifas Bancárias"), ("5.5.02", "Juros de Empréstimos"),
     ("5.5.03", "Custo de Antecipação de Recebíveis"),
     ("5.5.04", "Custo Financeiro sobre Vendas"),   # FASE B: deságio/taxa da financeira (Aymoré/Cartão)
+    ("5.5.05", "Perdas com Acordos Financeiros"),   # opção B (2026-07-22): contrapartida-resultado de acrescer/abater
     ("5.6", "Constituição de Provisões"),
     ("5.6.01", "Constituição — Provisão de Garantia"),
     ("5.6.02", "Constituição — Provisão de Montagem"),

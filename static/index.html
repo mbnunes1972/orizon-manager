@@ -9823,6 +9823,9 @@ async function acordosFabricaCarregar(){
           : `<button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'receber')">Receber</button>`}
         <button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'acrescer')" title="Aumenta o saldo SEM caixa (ex.: refletir acréscimo/desconto de conferência no balanço)">Acrescer</button>
         <button class="btn btn-ghost btn-sm" onclick="afMovimento(${a.id},'abater')" title="Reduz o saldo SEM caixa (ex.: dívida amortizada via acréscimo em nota)">Abater</button>
+        <select id="af-mov-cp-${a.id}" style="padding:4px 6px;font-size:11px" title="Contrapartida do Acrescer/Abater: fato do PERÍODO → resultado (4.4.03/5.5.05); saldo ANTIGO → PL (3.5, CPC 23)">
+          <option value="resultado">contrapartida: resultado (fato atual)</option>
+          <option value="pl">contrapartida: PL (saldo antigo)</option></select>
         ${a.tipo === 'credito' && outrosCreditos.length ? `
           <select id="af-mov-dest-${a.id}" style="padding:4px 6px;font-size:12px">
             ${outrosCreditos.map(o => `<option value="${o.id}">→ ${esc(o.descricao)}</option>`).join('')}
@@ -9843,7 +9846,9 @@ async function acordosFabricaCarregar(){
         <span style="color:var(--muted)">Saldo <span style="font-family:var(--font-mono);color:${a.tipo === 'credito' ? 'var(--ok)' : 'var(--warn)'};font-weight:700">${fmt(a.saldos.contabil)}</span></span>
       </div>
       <div id="af-extrato-${a.id}" style="display:none;margin-top:8px"></div>
-      <div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:6px">${acoes}</div>
+      <div style="margin-top:8px;border-top:1px dashed var(--border);padding-top:6px">${acoes}
+        ${a.tipo === 'divida' && a.status !== 'encerrado' ? `<div style="font-size:10px;color:var(--warn);margin-top:4px"><i class="ti ti-alert-triangle"></i> Juros: use OU "Atualizar encargos" (competência — incorpora ao saldo e depois paga tudo como nominal) OU o campo "Juros" do pagamento (caixa). Usar os dois para o MESMO juro lança a despesa em dobro.</div>` : ''}
+      </div>
     </div>`;
   };
 
@@ -9863,7 +9868,12 @@ async function acordosFabricaCarregar(){
     </div>
     <div style="margin-bottom:12px">
       <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">Credores e Devedores cadastrados</div>
-      <div style="font-size:12px;margin-bottom:6px">${_cps.length ? _cps.map(c => `${esc(c.nome)} <span style="color:var(--muted)">(${c.tipo === 'fabrica' ? 'fábrica' : c.tipo})</span>`).join(' · ') : '<span style="color:var(--muted)">Nenhum cadastrado.</span>'}</div>
+      <div style="font-size:12px;margin-bottom:6px;display:flex;gap:10px;flex-wrap:wrap">${_cps.length ? _cps.map(c =>
+        `<span style="display:inline-flex;align-items:center;gap:4px">${esc(c.nome)}
+          <span style="color:var(--muted)">(${c.tipo === 'fabrica' ? 'fábrica' : c.tipo})</span>
+          <a style="cursor:pointer;color:var(--muted)" title="Editar" onclick="afEditarContraparte(${c.id},'${esc(c.nome).replace(/'/g,"\\'")}','${c.tipo}')"><i class="ti ti-pencil"></i></a>
+          <a style="cursor:pointer;color:var(--muted)" title="Apagar" onclick="afApagarContraparte(${c.id},'${esc(c.nome).replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></a>
+        </span>`).join('') : '<span style="color:var(--muted)">Nenhum cadastrado.</span>'}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <input type="text" id="af-cp-nome" placeholder="Nome (ex.: Banco Itaú, Verano)" style="min-width:180px;padding:5px 8px;font-size:12px">
         <select id="af-cp-tipo" style="padding:4px 6px;font-size:12px">
@@ -9892,9 +9902,12 @@ async function acordosFabricaCarregar(){
         <select id="af-av-tipo" style="padding:4px 6px;font-size:12px">
           <option value="desconto">desconto</option><option value="acrescimo">acréscimo</option></select>
         <input type="number" id="af-av-pct" min="0.01" max="100" step="0.1" placeholder="%" style="width:70px;padding:3px 6px;font-size:12px">
-        <span style="font-size:11px;color:var(--muted)">vigência:</span>
-        <input type="date" id="af-av-de" style="padding:3px 6px;font-size:12px" title="Início da vigência (opcional)">
-        <input type="date" id="af-av-ate" style="padding:3px 6px;font-size:12px" title="Fim da vigência (opcional)">
+        <span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap">
+          <span style="font-size:11px;color:var(--muted)">vigência:</span>
+          <input type="date" id="af-av-de" style="padding:3px 6px;font-size:12px" title="Início da vigência (opcional)">
+          <span style="font-size:11px;color:var(--muted)">a</span>
+          <input type="date" id="af-av-ate" style="padding:3px 6px;font-size:12px" title="Fim da vigência (opcional)">
+        </span>
         <button class="btn btn-ghost btn-sm" onclick="afNovoAjuste()">Criar</button>
       </div>
     </div>`;
@@ -9905,6 +9918,22 @@ function afNovoCpChange(){
   const tipo = sel?.selectedOptions?.[0]?.dataset?.tipo || 'fabrica';
   const capt = document.getElementById('af-novo-capt-wrap');
   if(capt) capt.style.display = tipo === 'banco' ? 'flex' : 'none';
+}
+
+async function afEditarContraparte(id, nomeAtual, tipoAtual){
+  const nome = prompt('Nome da contraparte:', nomeAtual);
+  if(nome === null) return;
+  const j = await _afPost(`/api/admin/contrapartes-financeiras/${id}`,
+                          {nome: nome.trim(), tipo: tipoAtual}, 'Contraparte atualizada.');
+  if(j) acordosFabricaCarregar();
+}
+
+async function afApagarContraparte(id, nome){
+  if(!await confirmarPopup(`Apagar a contraparte "${nome}"? Só é possível sem acordos vinculados.`,
+                           {titulo:'Acordos Financeiros'})) return;
+  const j = await _afPost(`/api/admin/contrapartes-financeiras/${id}`, {apagar: true},
+                          'Contraparte apagada.');
+  if(j) acordosFabricaCarregar();
 }
 
 async function afNovaContraparte(){
@@ -9964,6 +9993,9 @@ async function afMovimento(id, acao){
   const payload = {acao, valor: _moedaNum('af-mov-valor-'+id),
                    nonce: Date.now() + '-' + Math.random().toString(36).slice(2, 8)};
   if(acao === 'pagar') payload.juros = _moedaNum('af-mov-juros-'+id);
+  if(acao === 'acrescer' || acao === 'abater'){
+    payload.contrapartida = document.getElementById('af-mov-cp-'+id)?.value || 'resultado';
+  }
   if(acao === 'transferir'){
     payload.destino_acordo_id = parseInt(document.getElementById('af-mov-dest-'+id)?.value)||0;
   }

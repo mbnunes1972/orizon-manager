@@ -3398,6 +3398,7 @@ class Handler(BaseHTTPRequestHandler):
         # ── Ajustes Excepcionais de Fábrica — painel Admin (spec 2026-07-21) ──────────────────
         # Gate: mesma capacidade do config-financeira (editar_dados_loja) + escopo de loja(s).
         if path in ("/api/admin/acordos-fabrica", "/api/admin/contrapartes-financeiras") \
+                or re.match(r'^/api/admin/contrapartes-financeiras/\d+$', path) \
                 or re.match(r'^/api/admin/(acordos|ajustes)-fabrica/', path):
             import mod_contabil as _mcaf
             usuario = get_usuario_sessao(self)
@@ -3421,9 +3422,52 @@ class Handler(BaseHTTPRequestHandler):
                     if not nome_cp or tipo_cp not in ("fabrica", "empresa", "banco"):
                         self.send_json({"ok": False, "erro": "Informe nome e tipo "
                                         "(fabrica|empresa|banco)."}, code=400); return
+                    ja_cp = (db.query(ContraparteFinanceira)
+                               .filter(ContraparteFinanceira.tipo == tipo_cp).all())
+                    if any((c.nome or "").strip().lower() == nome_cp.lower() for c in ja_cp):
+                        self.send_json({"ok": False, "erro": "Contraparte já cadastrada com "
+                                        "este nome."}, code=400); return
                     cp = ContraparteFinanceira(nome=nome_cp, tipo=tipo_cp,
                                                criado_por_id=usuario.get("id"))
                     db.add(cp); db.commit()
+                    self.send_json({"ok": True, "contraparte": {"id": cp.id, "nome": cp.nome,
+                                    "tipo": cp.tipo}})
+                    return
+
+                m_cp = re.match(r'^/api/admin/contrapartes-financeiras/(\d+)$', path)
+                if m_cp:
+                    # editar (nome/tipo) ou apagar contraparte (pedido do usuário, 2026-07-22).
+                    # Apagar só sem acordos vinculados — o histórico contábil não pode órfãr.
+                    cp = db.get(ContraparteFinanceira, int(m_cp.group(1)))
+                    if cp is None:
+                        self.send_json({"ok": False, "erro": "Não encontrada"}, code=404); return
+                    if req.get("apagar"):
+                        n_ac = db.query(AcordoFabrica).filter_by(contraparte_id=cp.id).count()
+                        if n_ac:
+                            self.send_json({"ok": False, "erro": "Contraparte tem %d acordo(s) "
+                                            "vinculado(s) — encerre/reatribua antes de apagar."
+                                            % n_ac}, code=400); return
+                        db.delete(cp); db.commit()
+                        self.send_json({"ok": True, "apagada": True})
+                        return
+                    nome_cp = (req.get("nome") or "").strip()
+                    tipo_cp = (req.get("tipo") or cp.tipo).strip()
+                    if not nome_cp or tipo_cp not in ("fabrica", "empresa", "banco"):
+                        self.send_json({"ok": False, "erro": "Informe nome e tipo válidos."},
+                                       code=400); return
+                    dup = (db.query(ContraparteFinanceira)
+                             .filter(ContraparteFinanceira.tipo == tipo_cp,
+                                     ContraparteFinanceira.id != cp.id).all())
+                    if any((c.nome or "").strip().lower() == nome_cp.lower() for c in dup):
+                        self.send_json({"ok": False, "erro": "Já existe contraparte com este "
+                                        "nome."}, code=400); return
+                    cp.nome = nome_cp
+                    cp.tipo = tipo_cp
+                    # espelha o nome denormalizado nos acordos vinculados
+                    for ac_upd in db.query(AcordoFabrica).filter_by(contraparte_id=cp.id).all():
+                        ac_upd.contraparte_nome = nome_cp
+                        ac_upd.contraparte_tipo = tipo_cp
+                    db.commit()
                     self.send_json({"ok": True, "contraparte": {"id": cp.id, "nome": cp.nome,
                                     "tipo": cp.tipo}})
                     return
@@ -3611,27 +3655,40 @@ class Handler(BaseHTTPRequestHandler):
                         db.add(AcordoMovimento(acordo_id=dest.id, tipo="transferencia_in", valor=v,
                                                lancamento_ref=ref, criado_por_id=usuario.get("id")))
                     elif acao in ("acrescer", "abater"):
-                        # movimentos SEM caixa (revisão 2026-07-22): espelham a implantação (× 3.5).
-                        # Uso: refletir no balanço o lado financeiro de descontos/acréscimos da
-                        # conferência (o % mexe só no Custo Fábrica; o financeiro é manual aqui).
+                        # movimentos SEM caixa. Opção B (2026-07-22, decisão do Diretor): a
+                        # CONTRAPARTIDA é escolhida no ato — "pl" (3.5, só p/ saldos de fatos
+                        # PASSADOS, CPC 23) ou "resultado" (evento do período corrente:
+                        # ganho 4.4.03 / perda 5.5.05 — não distorce a leitura da DRE×PL).
                         if acao == "abater":
                             v = round(min(valor, max(saldo, 0.0)), 2)
                             if v <= 0:
                                 self.send_json({"ok": False, "erro": "Sem saldo a abater."}, code=400); return
                         else:
                             v = valor
+                        contrapart = (req.get("contrapartida") or "pl").strip()
+                        if contrapart not in ("pl", "resultado"):
+                            self.send_json({"ok": False, "erro": "contrapartida deve ser "
+                                            "pl|resultado"}, code=400); return
                         _mcaf.seed_plano(db, ot_t, own_t)
                         c_ac = _mcaf._conta_por_codigo(db, ot_t, own_t, ac.conta_saldo)
-                        c_pl = _mcaf._conta_por_codigo(db, ot_t, own_t, "3.5")
                         aumenta = (acao == "acrescer")
-                        if ac.tipo == "divida":
-                            cd, cc = ((c_pl, c_ac) if aumenta else (c_ac, c_pl))
+                        # ganho patrimonial: abater dívida OU acrescer crédito; perda: o inverso
+                        ganho = (ac.tipo == "divida") != aumenta
+                        if contrapart == "pl":
+                            c_cp = _mcaf._conta_por_codigo(db, ot_t, own_t, "3.5")
                         else:
-                            cd, cc = ((c_ac, c_pl) if aumenta else (c_pl, c_ac))
+                            c_cp = _mcaf._conta_por_codigo(db, ot_t, own_t,
+                                                           "4.4.04" if ganho else "5.5.05")
+                        if ac.tipo == "divida":
+                            cd, cc = ((c_cp, c_ac) if aumenta else (c_ac, c_cp))
+                        else:
+                            cd, cc = ((c_ac, c_cp) if aumenta else (c_cp, c_ac))
                         _mcaf.lancar(db, ot_t, own_t, cd.id, cc.id, v, origem="acordo_financeiro",
-                                     historico=("Acréscimo manual de saldo do acordo (sem caixa)"
+                                     historico=("Acréscimo manual de saldo do acordo (sem caixa, "
                                                 if aumenta else
-                                                "Abatimento manual de saldo do acordo (sem caixa)"),
+                                                "Abatimento manual de saldo do acordo (sem caixa, ")
+                                               + ("contrapartida PL)" if contrapart == "pl"
+                                                  else "contrapartida resultado)"),
                                      ref=ref)
                         db.add(AcordoMovimento(acordo_id=ac.id,
                                                tipo="acrescimo_manual" if aumenta else "abatimento_manual",

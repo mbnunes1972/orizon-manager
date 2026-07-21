@@ -423,3 +423,72 @@ def test_pagamento_so_juros_sem_nominal(http_client_factory, seed, app_db):
     st, body = su.post(f"/api/admin/acordos-fabrica/{ac_id}/movimento",
                        {"acao": "pagar", "valor": 0, "juros": 0, "nonce": "sj2"})
     assert st == 400
+
+
+def test_acrescer_abater_contrapartida_resultado(http_client_factory, seed, app_db):
+    # Opção B (decisão do Diretor, 2026-07-22): evento do período corrente → resultado
+    # (ganho 4.4.03 / perda 5.5.05), não o PL. Loja 3: abater a dívida amortizada via
+    # nota com contrapartida=resultado credita GANHO — a DRE deixa de ficar distorcida.
+    lid = _loja_avulsa(app_db, "Loja CpR", "CPR", "dir_cpr")
+    su = _login(http_client_factory, "super")
+    st, body = su.post("/api/admin/acordos-fabrica",
+                       {"descricao": "dívida antiga", "tipo": "divida",
+                        "contraparte_tipo": "fabrica", "loja_titular_id": lid, "valor": 50000.0})
+    ac_id = body["acordo"]["id"]
+    # abater 9.500 como FATO ATUAL → ganho no resultado; PL intocado pelo abate
+    st, body = su.post(f"/api/admin/acordos-fabrica/{ac_id}/movimento",
+                       {"acao": "abater", "valor": 9500.0, "contrapartida": "resultado",
+                        "nonce": "cb1"})
+    assert st == 200 and body["saldos"]["contabil"] == 40500.0, body
+    db = app_db.get_session()
+    assert _s(db, "loja", lid, "4.4.04") == 9500.0         # ganho reconhecido na DRE
+    assert _s(db, "loja", lid, "3.5") == -50000.0          # PL só com a implantação (débito na dívida)
+    db.close()
+    # acrescer como fato atual → perda (5.5.05)
+    st, body = su.post(f"/api/admin/acordos-fabrica/{ac_id}/movimento",
+                       {"acao": "acrescer", "valor": 1000.0, "contrapartida": "resultado",
+                        "nonce": "cb2"})
+    assert st == 200 and body["saldos"]["contabil"] == 41500.0
+    db = app_db.get_session()
+    assert _s(db, "loja", lid, "5.5.05") == 1000.0
+    db.close()
+    # default sem o campo = PL (retrocompat)... não: default agora vem da UI; API default "pl"
+    st, body = su.post(f"/api/admin/acordos-fabrica/{ac_id}/movimento",
+                       {"acao": "abater", "valor": 500.0, "nonce": "cb3"})
+    assert st == 200
+    db = app_db.get_session()
+    assert _s(db, "loja", lid, "3.5") == -49500.0          # PL recebeu o abate default (+500 credor)
+    db.close()
+
+
+def test_contraparte_duplicada_rejeitada(http_client_factory, seed, app_db):
+    su = _login(http_client_factory, "super")
+    st, body = su.post("/api/admin/contrapartes-financeiras", {"nome": "Banco Dup", "tipo": "banco"})
+    assert st == 200, body
+    st, body = su.post("/api/admin/contrapartes-financeiras", {"nome": "banco dup", "tipo": "banco"})
+    assert st == 400 and "cadastrada" in (body.get("erro") or "")
+
+
+def test_contraparte_editar_e_apagar(http_client_factory, seed, app_db):
+    # pedido do usuário (2026-07-22): editar e apagar contrapartes cadastradas
+    su = _login(http_client_factory, "super")
+    st, body = su.post("/api/admin/contrapartes-financeiras", {"nome": "Banco Edit", "tipo": "banco"})
+    cp_id = body["contraparte"]["id"]
+    # editar espelha o nome nos acordos vinculados
+    st, body = su.post("/api/admin/acordos-fabrica",
+                       {"descricao": "emp ed", "tipo": "divida", "contraparte_id": cp_id,
+                        "loja_titular_id": seed["loja1_id"], "valor": 1000.0})
+    assert st == 200, body
+    st, body = su.post(f"/api/admin/contrapartes-financeiras/{cp_id}",
+                       {"nome": "Banco Editado", "tipo": "banco"})
+    assert st == 200 and body["contraparte"]["nome"] == "Banco Editado"
+    st, body = su.get("/api/admin/acordos-fabrica")
+    ac = [a for a in body["acordos"] if a["descricao"] == "emp ed"][0]
+    assert ac["contraparte_nome"] == "Banco Editado"
+    # apagar com acordo vinculado → recusa; sem vínculo → apaga
+    st, body = su.post(f"/api/admin/contrapartes-financeiras/{cp_id}", {"apagar": True})
+    assert st == 400 and "vinculado" in (body.get("erro") or "")
+    st, body = su.post("/api/admin/contrapartes-financeiras", {"nome": "Solta", "tipo": "empresa"})
+    cp2 = body["contraparte"]["id"]
+    st, body = su.post(f"/api/admin/contrapartes-financeiras/{cp2}", {"apagar": True})
+    assert st == 200 and body["apagada"] is True
