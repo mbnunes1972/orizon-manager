@@ -71,13 +71,18 @@ def tipo_doc_de(codigo):
     return sf["tipo_doc"] if sf else None
 
 
-def guarda_conclusao(codigo, tipos_presentes, status_por_codigo, pe_ambientes=None):
+def guarda_conclusao(codigo, tipos_presentes, status_por_codigo, pe_ambientes=None,
+                     aprovacao_pe=None):
     """(ok, erro). tipos_presentes: set de tipos de documento já carregados na subfase.
     status_por_codigo: {codigo: status} — usado no 11e para exigir 11a-11d concluídas.
     pe_ambientes: (total_pool, com_pe) — só a 11c usa (2026-07-21): o documento único da
     subfase saiu da UI e o carregamento é POR AMBIENTE na tabela de comparação; a 11c
     conclui quando todo ambiente do pool tem PE carregado. Documento único presente segue
-    valendo (projetos legados). None → regra antiga do documento (chamador não informa)."""
+    valendo (projetos legados). None → regra antiga do documento (chamador não informa).
+    aprovacao_pe: bool — só a 11e usa (correção Fatia 3, 2026-07-21): o upload de "PE
+    Assinado" foi substituído pela APROVAÇÃO DO PROJETO EXECUTIVO assinada no sistema
+    (documento próprio, mecanismo do contrato/aditivo). Doc legado segue valendo.
+    None → regra antiga do documento."""
     sf = SUBFASES_PE.get(codigo)
     if not sf:
         return (False, "Subfase de PE desconhecida.")
@@ -89,6 +94,10 @@ def guarda_conclusao(codigo, tipos_presentes, status_por_codigo, pe_ambientes=No
         if com_pe < total:
             return (False, "Carregue o PE de todos os ambientes na comparação antes de "
                            f"'{sf['botao']}' ({com_pe}/{total} carregados).")
+    elif codigo == PE_SUBFASE_FINAL and aprovacao_pe is not None and not doc_ok:
+        if not aprovacao_pe:
+            return (False, "Aprove o Projeto Executivo (assinatura da Aprovação) antes de "
+                           f"'{sf['botao']}'.")
     elif not doc_ok:
         return (False, f"Carregue o documento ({sf['doc_label']}) antes de '{sf['botao']}'.")
     if codigo == PE_SUBFASE_FINAL:

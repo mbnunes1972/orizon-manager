@@ -1383,17 +1383,19 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > para a AF2 ("Comparar Valores", read-only). Ver `## Sessão 91` e o spec
 > `ciclo/2026-07-21-revisao-pe-venda-renegociacao-design.md`.
 >
-> **Sessão 92 (2026-07-21):** Fatia 3 implementada — COMPLEMENTO contratual (11e "Negociar
-> Complemento", orçamento `complemento_pe` base PE, contratado segue travado) + Termo Aditivo
-> (tabelas próprias, modelo tipo `termo_aditivo`, assinatura loja+cliente, sem contabilidade).
-> Ver `## Sessão 92`.
+> **Sessões 92–93 (2026-07-21):** Fatia 3 implementada e CORRIGIDA por feedback — complemento POR
+> DIFERENÇA (3º XML `xml_compl` por ambiente marcado; fator exato 1/(1−p) dos custos adicionais;
+> descontos do contrato; desc global travado; XML idêntico ⇒ diferença zero), modal comparativo,
+> Termo Aditivo sobre a diferença negociada e **Aprovação do PE assinável** substituindo o upload
+> de PE Assinado (gate da 11e). Ver `## Sessão 93`.
 >
 > **PENDENTE (retomar por aqui):** Verificação manual no navegador — marcadores no PDF (S85),
 > coluna Entrega + selo Atrasado (S86), Custo Especial (S87), Total Flex + remover ambiente (S88),
-> comparação de venda/coluna Complemento na 11c e CFO na AF2 (S91), fluxo completo do Complemento +
-> Termo Aditivo na 11e (S92 — inclui importar um modelo de Termo Aditivo em Config → Documentos),
-> temas claro/escuro. Frentes candidatas seguintes: Agenda Global, empacotar `comercial`, baseline
-> Alembic.
+> comparação de venda/coluna Complemento na 11c e CFO na AF2 (S91), fluxo completo da 11e (S92–93:
+> importar modelos de **Termo Aditivo** e **Aprovação de PE** em Config → Documentos; carregar XML
+> de complemento por ambiente; modal comparativo; negociar a diferença com desconto por ambiente;
+> gerar/assinar Aprovação do PE e Termo Aditivo; concluir a 11e), temas claro/escuro. Frentes
+> candidatas seguintes: Agenda Global, empacotar `comercial`, baseline Alembic.
 >
 > **(Anterior, 2026-07-19 — mantido abaixo por referência.)**
 
@@ -2324,6 +2326,27 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 93 — Correção da Fatia 3: complemento POR DIFERENÇA + Aprovação do PE assinável
+**Feedback do usuário sobre a S92:** a negociação do complemento deve ser SÓ sobre a diferença; a
+memória do projeto guarda 3 XMLs por ambiente (contrato/pool, Executivo/`xml_pe`, **Complemento/**
+`xml_compl` — novo upload por ambiente marcado, "pode até ser idêntico ao PE"); e o botão "Carregar
+PE Assinado" da 11e não fazia sentido. **Fórmula exata:** `à_vista_compl_i = venda_XML_i ×
+(VAVA_contratado_i/VBVA_contratado_i)` — razão do PRÓPRIO ambiente (descontos + custos adicionais
+idênticos aos negociados); diferença = compl − contratado. **Propriedade testada em QUALQUER
+composição** (arq/fid/viagem/brinde/Custo Especial): XML idêntico ⇒ diferença ZERO. *(O fator único
+`1/(1−p)` da 1ª versão falhava com brinde e re-cobraria o Custo Especial — pego no QA; `p` segue
+como INFO no Apoio e fallback.)* Orçamento de complemento = as diferenças (params neutros,
+desc global FORÇADO 0 — alavanca única é o desconto por ambiente; nasce à vista; nome "X —
+Complemento"; diferença negativa permitida = crédito). Modal comparativo na 11e (contratado ×
+complemento × diferença, critérios por extenso) com o Negociar Complemento DENTRO. Aditivo documenta
+a diferença NEGOCIADA. **Aprovação do Projeto Executivo** (novo doc assinável, decisão do usuário):
+substitui o upload de PE Assinado — tabelas `aprovacoes_pe*`, modelo tipo `aprovacao_pe` (congelado),
+marcadores `NUM_APROVACAO_PE`/`AMBIENTES_APROVADOS`, nº AP+data+seq, PDF imprimível, assinatura
+loja+cliente, registra os ambientes aprovados (desmembramento); gate da 11e = aprovação ASSINADA
+(doc legado retrocompat). E2E reescrito (propriedade do zero, desc global sem efeito, desc por
+ambiente sobre a diferença, aditivo, aprovação, gate). Suíte **1339/1337+2**. Spec: seção "Correção
+da Fatia 3" do `ciclo/2026-07-21-revisao-pe-venda-renegociacao-design.md`.
 
 ## Sessão 92 — Fatia 3 da Revisão de PE: COMPLEMENTO contratual + Termo Aditivo
 **Conceito (corrigido pelo usuário em voo):** não é "renegociação" — o PE aumentou valores e

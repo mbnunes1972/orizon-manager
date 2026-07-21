@@ -84,3 +84,38 @@ representa só o valor adicional.
   assinado é recusado. SEM lançamentos contábeis (decisão 1 — acerto na liquidação/NF-e).
 - E2E: `tests/test_complemento_pe_e2e.py` (ciclo completo, incluindo PDF real e a prova de que o
   contratado segue travado).
+
+## Correção da Fatia 3 (mesmo dia — feedback do usuário): complemento POR DIFERENÇA
+A negociação do complemento é **somente sobre o valor da diferença**, e a memória do projeto guarda
+**3 XMLs por ambiente**: contrato (pool), Executivo (`xml_pe`) e **Complemento** (`xml_compl`, novo —
+upload só p/ ambientes marcados, exige .xml, subdir `pe/<id>/compl/`, "pode até ser idêntico ao PE").
+
+- **Fórmula (exata, não aproximação):**
+  `à_vista_compl_i = venda_XML_compl_i × (VAVA_contratado_i / VBVA_contratado_i)`;
+  `diferença_i = à_vista_compl_i − VAVA_contratado_i`. O fator é a razão do PRÓPRIO ambiente
+  contratado (à vista ÷ bruto): carrega descontos e custos adicionais EXATAMENTE como negociados
+  naquele ambiente. **Propriedade validada por teste em qualquer composição** (arq/fid/viagem/
+  brinde/Custo Especial — `test_propriedade_zero_com_composicao_completa`): XML idêntico ⇒
+  diferença ZERO. *(A 1ª formulação, fator único `1/(1−p)`, falhava com brinde — rateio igual, não
+  proporcional — e re-cobraria o Custo Especial, que não acompanha ambiente; achado do QA.)*
+  O `p = Cust_Ad/VAVO` segue exibido read-only no Apoio ("Custos adicionais / À vista") e no
+  modal comparativo, como informação; e é o fallback do fator se o ambiente contratado tiver
+  bruto zero.
+- **Orçamento de complemento = as diferenças:** breakdown com params NEUTROS e desconto global
+  FORÇADO a zero (o fator já carrega os custos adicionais; aplicar params de novo dobraria) —
+  única alavanca é o **desconto por ambiente**, sobre a diferença. Nasce à vista. Nome exibido
+  "Ambiente — Complemento". Diferença negativa É permitida (retirada de elementos gera crédito).
+  Helper único `_complemento_diferencas` alimenta o breakdown E o comparativo.
+- **Modal comparativo** (11e → "Negociar Complemento"): à vista contratado × complemento ×
+  diferença por ambiente + totais + o critério por extenso (desconto do contrato e % CA);
+  o botão Negociar Complemento fica DENTRO do modal.
+- **Aditivo:** documenta a diferença NEGOCIADA (o orçamento já é a diferença; o "original" vem do
+  comparativo). `VALOR_NOVO = original + complemento`.
+- **Aprovação do Projeto Executivo (novo documento assinável):** substitui o upload de "PE
+  Assinado" na 11e (que não fazia sentido — o PE sobe na 11c). Mecanismo do contrato/aditivo:
+  tabelas `aprovacoes_pe`/`aprovacoes_pe_assinaturas`, modelo por loja tipo `aprovacao_pe`
+  (obrigatório, versão congelada), marcadores `NUM_APROVACAO_PE`/`AMBIENTES_APROVADOS`, nº
+  `AP<data><seq>`, PDF imprimível, assinatura interna loja+cliente; **registra os ambientes
+  aprovados** (`dados_json` — relevante no desmembramento); integração de assinatura digital =
+  fase futura (mesmo placeholder do contrato). **Gate da 11e:** conclui com a Aprovação ASSINADA
+  (doc legado `pe_pe_assinado` segue valendo — retrocompat).

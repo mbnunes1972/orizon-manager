@@ -53,6 +53,7 @@ MODULOS = {
                     "tabelas": ["projetos_meta", "briefings", "pool_ambientes", "orcamentos",
                                 "orcamento_ambientes", "contratos", "contratos_assinaturas",
                                 "aditivos", "aditivos_assinaturas",   # Termo Aditivo (Fatia 3 PE)
+                                "aprovacoes_pe", "aprovacoes_pe_assinaturas",   # Aprovação do PE (Fatia 3)
                                 "arquivo_pe", "parcela_projeto", "parcela_ambiente", "medicoes",
                                 "documento_modelos"],
                     "rotas": ["/api/orcamentos", "/api/contratos", "/api/medicoes", "/api/comercial",

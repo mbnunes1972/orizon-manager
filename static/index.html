@@ -2295,6 +2295,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:6px"><span style="color:var(--muted)">− Custo Especial</span><span id="mp-a-cesp" style="font-family:var(--font-mono);color:var(--warn)">—</span></div>
         <div style="display:flex;justify-content:space-between"><span style="font-weight:700">Valor líquido final</span><span id="mp-a-liq" style="font-family:var(--font-mono);font-weight:700;color:var(--ok)">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Desconto Total</span><span id="mp-a-margem" style="font-family:var(--font-mono);color:var(--warn);font-weight:700">—</span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:2px"><span style="color:var(--text-3);font-size:var(--fs-xs)">Custos adicionais / À vista</span><span id="mp-a-pct-ca" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-2)">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Custo Variável</span><span id="mp-a-cust-var" style="font-family:var(--font-mono)">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Margem de Contribuição</span><span id="mp-a-marg-cont" style="font-family:var(--font-mono)">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:2px"><span style="color:var(--text-3);font-size:var(--fs-xs)">Margem da Venda</span><span id="mp-a-marg-venda" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-2)">—</span></div>
@@ -4943,10 +4944,10 @@ async function ativarOrcamento(id){
   await _aplicarFiltroOrcamento(id);
   // Fatia 3 PE: o orçamento de COMPLEMENTO segue negociável mesmo com contrato assinado
   // (o contratado permanece travado — a trava reaplica ao voltar para ele). Mesma decisão
-  // do atualizarBotoesAprovacao, via o helper único _orcamentoComplementoAtivo.
+  // do atualizarBotoesAprovacao, via o helper único _aplicarLockNegociacaoPosAssinatura.
   if (typeof _contratoAssinado !== 'undefined' && _contratoAssinado
       && typeof aplicarBloqueioNegociacao === 'function') {
-    aplicarBloqueioNegociacao(!_orcamentoComplementoAtivo());
+    _aplicarLockNegociacaoPosAssinatura();
   }
 }
 
@@ -7392,7 +7393,7 @@ function renderTabelaNeg(ambientes = null){
                  style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;display:block;margin:0 auto"
                  onchange="if(!this.checked)_orcConfirmarRemover(${pa.id},'${esc(pa.nome_exibicao)}',this)">
         </td>
-        <td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600">${esc(pa.nome_exibicao)}</td>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600">${esc(pa.nome_exibicao)}${(typeof _orcamentoComplementoAtivo === 'function' && _orcamentoComplementoAtivo()) ? ' <span style="color:var(--warn);font-size:10px;letter-spacing:.04em">— Complemento</span>' : ''}</td>
         <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;width:80px">
           <input type="number" value="${disc_i}" min="0" max="100" step="0.5"
                  style="width:60px;text-align:right;padding:3px 6px;font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none"
@@ -8172,6 +8173,11 @@ function _aplicarPreviewNaTela(s) {
   setR('mp-a-brinde', bri, bri > 0 ? '− ' : '');     // brinde total do motor (Bri)
   setR('mp-a-cesp', cesp, cesp > 0 ? '− ' : '');      // custo especial do motor (não rateado)
   setR('mp-a-liq', s.Val_Liq);
+  // Correção Fatia 3: % único dos custos adicionais sobre o à vista (p = Cust_Ad/VAVO) —
+  // informação read-only; é o mesmo p do fator 1/(1−p) usado no Complemento de Projeto.
+  const _pctCA = (Number(s.VAVO) > 0) ? (Number(s.Cust_Ad) || 0) / Number(s.VAVO) * 100 : 0;
+  if (id('mp-a-pct-ca')) id('mp-a-pct-ca').textContent =
+    _pctCA.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
   const margem = (Number(s.Desc_Tot) || 0) * 100;
   _margemAtual = margem;   // usado pelo limite de 35%
   if (id('mp-a-margem')) id('mp-a-margem').textContent =
@@ -11664,6 +11670,18 @@ function _orcamentoComplementoAtivo(){
   return !!(o && o.complemento_pe);
 }
 
+// Correção Fatia 3: aplica o lock pós-assinatura respeitando o complemento — e, no complemento,
+// re-trava SÓ o desconto global (o motor o força a zero; a alavanca é o desconto por ambiente).
+function _aplicarLockNegociacaoPosAssinatura(){
+  const compl = _orcamentoComplementoAtivo();
+  aplicarBloqueioNegociacao(!compl);
+  if (compl) {
+    const nd = document.getElementById('neg-desconto');
+    if (nd) { nd.readOnly = true;
+              nd.title = 'Complemento: desconto global travado (zero) — use o desconto por ambiente.'; }
+  }
+}
+
 function atualizarBotoesAprovacao() {
   const assinado = (typeof _contratoAssinado !== 'undefined') && _contratoAssinado;
   ['btn-pool','btn-novo-ambiente','btn-novo-orc'].forEach(id => {
@@ -11676,7 +11694,7 @@ function atualizarBotoesAprovacao() {
   const _bp = document.getElementById('btn-params');
   if (_bp) _bp.style.display = '';
   if (assinado) {
-    aplicarBloqueioNegociacao(!_orcamentoComplementoAtivo());
+    _aplicarLockNegociacaoPosAssinatura();
     const actionRow = document.querySelector('#page-02 .action-row');
     if (actionRow) {
       const bs = actionRow.querySelector('.btn-ok');    if (bs) bs.style.display = 'none';
@@ -12827,8 +12845,10 @@ function _renderCardPE(codigo, dados, bloqueada) {
   const inputId = `pe-file-${codigo}`;
   const inputRevisId = `pe-revis-file-${codigo}`;
 
-  // Na 11c o upload vive DENTRO de "Carregar e Comparar Valores" (peCmpBlock) — sem botão próprio.
-  const btnCarregar = (codigo === '11c') ? ''
+  // Na 11c o upload vive DENTRO de "Carregar e Comparar Valores" (peCmpBlock); na 11e o upload de
+  // "PE Assinado" foi SUBSTITUÍDO pela Aprovação do PE assinável + Carregar Complemento (correção
+  // Fatia 3) — nenhum dos dois tem botão de upload genérico da subfase.
+  const btnCarregar = (codigo === '11c' || codigo === '11e') ? ''
     : podeExec
     ? `<label class="btn-ciclo" style="margin-left:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px">
         &#x2191; ${esc(cfg.carregar)}
@@ -12949,29 +12969,72 @@ async function peComparacaoRender(){
   cont.innerHTML = header + table;
 }
 
-// ── Fatia 3 PE — 11e: complemento dos marcados + Termo Aditivo ────────────────────────────────
+// ── Correção Fatia 3 PE — 11e: Complemento de Projeto + Aprovação do PE + Termo Aditivo ───────
+// O complemento é a DIFERENÇA dos ambientes marcados: XML de complemento (3º arquivo do ambiente)
+// × descontos do contrato × fator de custos adicionais 1/(1−p) − à vista contratado.
 async function peComplementoRender(){
   const cont = document.getElementById('pe-complemento-container');
   if(!cont || !projetoAtivo) return;
   cont.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Carregando…</span>';
-  let cmp, ad;
+  let cmp, ad, ap;
   try {
-    [cmp, ad] = await Promise.all([
-      fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/comparacao`, {credentials:'same-origin'}).then(r=>r.json()),
-      fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo`, {credentials:'same-origin'}).then(r=>r.json()),
+    const enc = encodeURIComponent(projetoAtivo.nome_safe);
+    [cmp, ad, ap] = await Promise.all([
+      fetch(`/api/projetos/${enc}/pe/complemento/comparativo`, {credentials:'same-origin'}).then(r=>r.json()),
+      fetch(`/api/projetos/${enc}/aditivo`, {credentials:'same-origin'}).then(r=>r.json()),
+      fetch(`/api/projetos/${enc}/aprovacao-pe`, {credentials:'same-origin'}).then(r=>r.json()),
     ]);
   } catch(e){ cont.innerHTML = '<span style="color:var(--err)">Erro ao carregar.</span>'; return; }
-  const {fmt} = _peCmpHelpers();
-  const marcados = (cmp.ok && cmp.comparacao_venda || []).filter(l => l.renegociar);
-  if(!marcados.length){
-    cont.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Nenhum ambiente marcado para complemento na Revisão de PE.</span>';
-    return;
+  const {fmt, sig} = _peCmpHelpers();
+  const linhas = (cmp.ok && cmp.linhas) || [];
+  // ── Carregar Complemento de Projeto (por ambiente marcado; pode ser idêntico ao PE) ──
+  let complHtml;
+  if(!linhas.length){
+    complHtml = '<span style="color:var(--muted);font-size:.82rem">Nenhum ambiente marcado para complemento na Revisão de PE.</span>';
+  } else {
+    const rows = linhas.map(l => `
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:.82rem;line-height:2.1">
+        <span>${esc(l.ambiente)}</span>
+        <span style="font-family:var(--font-mono)">
+          ${l.compl_carregado ? fmt(l.vava_complemento)
+            : '<span style="color:var(--text-3);font-size:var(--fs-xs)">complemento não carregado</span>'}
+          <label class="btn-ciclo" style="font-size:var(--fs-xs);padding:2px 8px;cursor:pointer;margin-left:8px"><i class="ti ti-upload"></i> XML
+            <input type="file" accept=".xml" style="display:none" onchange="peComplUpload(${l.pool_ambiente_id}, this)"></label>
+        </span>
+      </div>`).join('');
+    complHtml = `
+      <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">Carregar Complemento de Projeto (XML por ambiente — pode ser idêntico ao PE)</div>
+      ${rows}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn-ciclo" onclick="abrirModalComplemento()"><i class="ti ti-arrows-exchange"></i> Negociar Complemento</button>
+      </div>`;
   }
-  const lista = marcados.map(l =>
-    `<div style="display:flex;justify-content:space-between;font-size:.82rem;line-height:1.9">
-       <span>${esc(l.ambiente)}</span>
-       <span style="font-family:var(--font-mono)">${fmt(l.vava_original)} → ${l.pe_carregado ? fmt(l.vava_pe) : '—'}</span>
-     </div>`).join('');
+  // ── Aprovação do Projeto Executivo (documento assinável — substitui o "PE Assinado") ──
+  const a2 = ap.ok ? ap.aprovacao : null;
+  let apHtml;
+  if (!a2) {
+    apHtml = `<button class="btn-ciclo" onclick="peAprovacaoGerar()"><i class="ti ti-file-check"></i> Aprovar Projeto Executivo</button>`;
+  } else {
+    const partes = new Set((a2.assinaturas||[]).map(s => s.parte));
+    const assinado = a2.status === 'assinado';
+    const sigBtn = p => partes.has(p)
+      ? `<span style="color:var(--ok)">✓ ${p}</span>`
+      : `<button class="btn-ciclo" style="font-size:var(--fs-xs);padding:2px 8px" onclick="peAprovacaoAssinar('${p}')">Assinar (${p})</button>`;
+    apHtml = `
+      <div style="font-size:.82rem;margin-bottom:6px">Aprovação do PE <strong>${esc(a2.num_aprovacao)}</strong>
+        — ${assinado ? '<span style="color:var(--ok)">assinada</span>' : esc(a2.status)}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        ${a2.tem_pdf ? `<a class="btn-ciclo" style="text-decoration:none" target="_blank" rel="noopener" href="/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aprovacao-pe/pdf?v=${Date.now()}"><i class="ti ti-printer"></i> Imprimir</a>` : ''}
+        ${!assinado ? `<button class="btn-ciclo" onclick="peAprovacaoGerar()"><i class="ti ti-refresh"></i> Regerar</button>` : ''}
+        ${!assinado ? sigBtn('loja') : '<span style="color:var(--ok);font-size:.82rem">✓ loja</span>'}
+        ${!assinado ? sigBtn('cliente') : '<span style="color:var(--ok);font-size:.82rem">✓ cliente</span>'}
+      </div>
+      ${!assinado ? `<div style="display:flex;gap:8px;margin-top:8px">
+        <input id="pe-ap-nome" placeholder="Nome do signatário" style="flex:1;padding:5px 8px">
+        <input id="pe-ap-cpf" placeholder="CPF" style="width:140px;padding:5px 8px">
+      </div>` : ''}`;
+  }
+  // ── Termo Aditivo (documenta a diferença negociada) ──
   const a = ad.ok ? ad.aditivo : null;
   let adHtml = '';
   if (!a) {
@@ -12979,28 +13042,89 @@ async function peComplementoRender(){
   } else {
     const partes = new Set((a.assinaturas||[]).map(s => s.parte));
     const assinado = a.status === 'assinado';
-    const sig = p => partes.has(p)
+    const sigBtn = p => partes.has(p)
       ? `<span style="color:var(--ok)">✓ ${p}</span>`
       : `<button class="btn-ciclo" style="font-size:var(--fs-xs);padding:2px 8px" onclick="peAditivoAssinar('${p}')">Assinar (${p})</button>`;
     adHtml = `
       <div style="font-size:.82rem;margin-bottom:6px">Termo Aditivo <strong>${esc(a.num_aditivo)}</strong>
         — ${assinado ? '<span style="color:var(--ok)">assinado</span>' : esc(a.status)}
-        ${a.dados ? ` · diferença <span style="font-family:var(--font-mono)">${fmt(a.dados.diferenca)}</span>` : ''}</div>
+        ${a.dados ? ` · complemento <span style="font-family:var(--font-mono)">${fmt(a.dados.diferenca)}</span>` : ''}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         ${a.tem_pdf ? `<a class="btn-ciclo" style="text-decoration:none" target="_blank" rel="noopener" href="/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo/pdf?v=${Date.now()}"><i class="ti ti-download"></i> Baixar PDF</a>` : ''}
         ${!assinado ? `<button class="btn-ciclo" onclick="peAditivoGerar()"><i class="ti ti-refresh"></i> Regerar</button>` : ''}
-        ${!assinado ? sig('loja') : `<span style="color:var(--ok);font-size:.82rem">✓ loja</span>`}
-        ${!assinado ? sig('cliente') : `<span style="color:var(--ok);font-size:.82rem">✓ cliente</span>`}
+        ${!assinado ? sigBtn('loja') : '<span style="color:var(--ok);font-size:.82rem">✓ loja</span>'}
+        ${!assinado ? sigBtn('cliente') : '<span style="color:var(--ok);font-size:.82rem">✓ cliente</span>'}
       </div>
       ${!assinado ? `<div style="display:flex;gap:8px;margin-top:8px">
         <input id="pe-ad-nome" placeholder="Nome do signatário" style="flex:1;padding:5px 8px">
         <input id="pe-ad-cpf" placeholder="CPF" style="width:140px;padding:5px 8px">
       </div>` : ''}`;
   }
-  cont.innerHTML = `${lista}
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;margin-bottom:10px">
-      <button class="btn-ciclo" onclick="peComplementoNegociar()"><i class="ti ti-arrows-exchange"></i> Negociar Complemento</button>
-    </div>${adHtml}`;
+  const bloco = (titulo, corpo) => `
+    <div style="margin-top:12px;border-top:1px dashed var(--border);padding-top:10px">
+      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">${titulo}</div>
+      ${corpo}
+    </div>`;
+  cont.innerHTML = complHtml
+    + bloco('Aprovação do Projeto Executivo', apHtml)
+    + (linhas.length ? bloco('Termo Aditivo', adHtml) : '');
+}
+
+async function peComplUpload(poolAmbienteId, inputFile){
+  if(!projetoAtivo) return;
+  const f = inputFile.files[0];
+  if(!f) return;
+  const fd = new FormData();
+  fd.append('arquivo', f);
+  fd.append('pool_ambiente_id', poolAmbienteId);
+  fd.append('finalidade', 'complemento');
+  try {
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/upload`,
+                          {method:'POST', credentials:'same-origin', body:fd}).then(r=>r.json());
+    if(j.ok){ showToast('Complemento carregado.'); peComplementoRender(); }
+    else { await avisoPopup(j.erro||'Erro',{titulo:'Carregar Complemento'}); }
+  } catch(e){ await avisoPopup('Erro ao enviar o arquivo.',{titulo:'Carregar Complemento'}); }
+}
+
+async function abrirModalComplemento(){
+  if(!projetoAtivo) return;
+  const modal = document.getElementById('modal-pe-compl');
+  const body = document.getElementById('pe-compl-modal-body');
+  if(!modal || !body) return;
+  modal.style.display = 'flex';
+  body.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Carregando…</span>';
+  let j;
+  try { j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/complemento/comparativo`,
+                        {credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ body.innerHTML = '<span style="color:var(--err)">Erro ao carregar.</span>'; return; }
+  if(!j.ok){ body.innerHTML = `<span style="color:var(--err)">${esc(j.erro||'Erro')}</span>`; return; }
+  const {fmt, sig, pctS} = _peCmpHelpers();
+  const corD = v => v>0.005?'var(--warn)':(v<-0.005?'var(--ok)':'var(--text-3)');
+  const r = j.resumo || {};
+  const rows = (j.linhas||[]).map(l => `
+    <tr><td>${esc(l.ambiente)}</td>
+      <td class="num">${fmt(l.vava_contratado)}</td>
+      <td class="num">${l.compl_carregado ? fmt(l.vava_complemento) : '<span style="color:var(--text-3);font-size:var(--fs-xs)">não carregado</span>'}</td>
+      <td class="num">${l.compl_carregado ? `<span style="color:${corD(l.diferenca)}">${sig(l.diferenca)}</span>` : '—'}</td></tr>`).join('');
+  body.innerHTML = `
+    <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:10px;line-height:1.7">
+      À vista do complemento = XML × (à vista ÷ bruto do MESMO ambiente no contrato) — descontos
+      (global ${pctS(r.desc_global_pct||0)}) e carga de custos adicionais
+      (${pctS(r.pct_custos_adicionais||0)} sobre o à vista) idênticos aos negociados no contrato.
+      XML idêntico ao contratado ⇒ diferença zero.
+    </div>
+    <div class="table-wrap"><table class="tbl"><thead><tr>
+      <th>Ambiente</th><th style="text-align:right">À vista (contrato)</th>
+      <th style="text-align:right">À vista (complemento)</th><th style="text-align:right">Diferença</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+      <span style="font-size:.85rem">Diferença total:
+        <strong style="font-family:var(--font-mono);color:${corD(r.total_diferenca||0)}">${sig(r.total_diferenca||0)}</strong>
+        <span style="color:var(--text-3);font-size:var(--fs-xs)"> (${r.carregados||0}/${r.marcados||0} carregados)</span></span>
+      <button class="btn-ciclo" style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);font-weight:700"
+              onclick="document.getElementById('modal-pe-compl').style.display='none';peComplementoNegociar()">
+        <i class="ti ti-arrows-exchange"></i> Negociar Complemento</button>
+    </div>`;
 }
 
 async function peComplementoNegociar(){
@@ -13012,9 +13136,35 @@ async function peComplementoNegociar(){
     fecharCiclo();
     goPage(2);
     await carregarOrcamentos();               // recarrega a lista (o default trava no contratado)
-    await ativarOrcamento(j.orcamento.id);    // ...e ativa o AJUSTE explicitamente
-    showToast('Orçamento de complemento ativo — negocie os valores dos ambientes marcados.');
+    await ativarOrcamento(j.orcamento.id);    // ...e ativa o COMPLEMENTO explicitamente
+    showToast('Complemento ativo — negocie as diferenças (desconto por ambiente).');
   } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Negociar Complemento'}); }
+}
+
+async function peAprovacaoGerar(){
+  if(!projetoAtivo) return;
+  try {
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aprovacao-pe`,
+      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:'{}'}).then(r=>r.json());
+    if(!j.ok){ await avisoPopup(j.erro||'Erro',{titulo:'Aprovar Projeto Executivo'}); return; }
+    showToast('Aprovação do PE gerada.');
+    peComplementoRender();
+  } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Aprovar Projeto Executivo'}); }
+}
+
+async function peAprovacaoAssinar(parte){
+  if(!projetoAtivo) return;
+  const nome = (document.getElementById('pe-ap-nome')?.value || '').trim();
+  const cpf  = (document.getElementById('pe-ap-cpf')?.value || '').trim();
+  if(!nome || !cpf){ await avisoPopup('Preencha nome e CPF do signatário.',{titulo:'Assinar aprovação'}); return; }
+  try {
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aprovacao-pe/assinar`,
+      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({parte, nome, cpf})}).then(r=>r.json());
+    if(!j.ok){ await avisoPopup(j.erro||'Erro',{titulo:'Assinar aprovação'}); return; }
+    showToast('Assinatura registrada (' + parte + ').');
+    peComplementoRender();
+  } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Assinar aprovação'}); }
 }
 
 async function peAditivoGerar(){
@@ -15099,6 +15249,21 @@ function bfFechar() {
 </div>
 
 <!-- Modal: Total Flex — Aviso parcela negativa -->
+<!-- Correção Fatia 3 PE: modal comparativo do Complemento (contratado × complemento × diferença) -->
+<div id="modal-pe-compl"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:600;
+            align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;
+              padding:26px 24px;max-width:680px;width:94%;max-height:86vh;overflow-y:auto;
+              animation:mIn .2s ease;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h3 style="margin:0;font-size:15px;color:var(--text)">Complemento de Projeto — comparativo</h3>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-pe-compl').style.display='none'">✕</button>
+    </div>
+    <div id="pe-compl-modal-body"><span style="color:var(--muted);font-size:.82rem">Carregando…</span></div>
+  </div>
+</div>
+
 <div id="modal-tf-aviso"
      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:600;
             align-items:center;justify-content:center;backdrop-filter:blur(4px)">

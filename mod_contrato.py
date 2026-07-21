@@ -567,6 +567,9 @@ def _montar_mapping(ctx, pag):
         "VALOR_ORIGINAL_COMPLEMENTO":  (ctx.get("_aditivo") or {}).get("valor_original", "") or "",
         "VALOR_NOVO_COMPLEMENTO":      (ctx.get("_aditivo") or {}).get("valor_novo", "") or "",
         "VALOR_COMPLEMENTO":       (ctx.get("_aditivo") or {}).get("diferenca", "") or "",
+        # Aprovação do PE (correção Fatia 3): preenchidos via ctx["_aprovacao_pe"]
+        "NUM_APROVACAO_PE":    (ctx.get("_aprovacao_pe") or {}).get("num_aprovacao", "") or "",
+        "AMBIENTES_APROVADOS": (ctx.get("_aprovacao_pe") or {}).get("ambientes_txt", "") or "",
     }
 
 
@@ -886,34 +889,50 @@ def gerar_pdf_proposta(ctx: dict, destino_pdf: str) -> str:
     return destino_pdf
 
 
-# ── Termo Aditivo (Fatia 3 da Revisão de PE, 2026-07-21) ──────────────────────
+# ── Documentos de corpo-só (Fatia 3 PE): Termo Aditivo e Aprovação do PE ──────
 
-def montar_html_aditivo(ctx):
-    """HTML do Termo Aditivo: SÓ o corpo do modelo 'termo_aditivo' da loja (sem capa), no shell
-    do contrato, com o mapping completo do CATALOGO — inclui os marcadores do aditivo, que o
-    endpoint de geração preenche via ctx['_aditivo'] (nº, contrato original, ambientes
-    renegociados original→novo, somas e diferença). O corpo vem em ctx['_corpo_md_aditivo']
-    (resolvido pelo chamador — versão CONGELADA no aditivo, mesmo padrão do contrato)."""
+def _montar_html_corpo_documento(ctx, corpo_md):
+    """HTML de um documento SEM capa: só o corpo do modelo da loja no shell do contrato, com o
+    mapping completo do CATALOGO (os marcadores específicos vêm de ctx['_aditivo'] /
+    ctx['_aprovacao_pe'], preenchidos pelo endpoint de geração). TEXTO_COMPLEMENTAR não se
+    aplica — removido se o modelo o trouxer."""
     from html import escape
     mapping = {k: escape(str(v)) for k, v in _montar_mapping(ctx, ctx.get("_pag", {})).items()}
     shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"), encoding="utf-8").read()
-    corpo = _html_corpo(ctx.get("_corpo_md_aditivo") or "")
+    corpo = _html_corpo(corpo_md or "")
     html_doc = shell.replace("<!--CAPA-->", "").replace("<!--CORPO-->", corpo)
     html_doc = _substituir_marcadores_html(html_doc, mapping)
-    # TEXTO_COMPLEMENTAR não se aplica ao aditivo — remove o marcador se o modelo o trouxer
     return html_doc.replace("[TEXTO_COMPLEMENTAR]", "")
 
 
-def gerar_pdf_aditivo(ctx: dict, destino_pdf: str) -> str:
-    """Renderiza o Termo Aditivo em PDF via WeasyPrint (mesmo confinamento de assets do
-    contrato: base_url + url_fetcher restritos ao contrato_template/). Retorna o caminho."""
+def _gerar_pdf_corpo_documento(html_doc: str, destino_pdf: str) -> str:
+    """PDF via WeasyPrint com o MESMO confinamento de assets do contrato."""
     from weasyprint import HTML
     _dir = os.path.dirname(destino_pdf)
     if _dir:
         os.makedirs(_dir, exist_ok=True)
-    HTML(string=montar_html_aditivo(ctx), base_url=CONTRATO_TEMPLATE_DIR,
+    HTML(string=html_doc, base_url=CONTRATO_TEMPLATE_DIR,
          url_fetcher=_url_fetcher_local).write_pdf(destino_pdf)
     return destino_pdf
+
+
+def montar_html_aditivo(ctx):
+    """Termo Aditivo: corpo do modelo 'termo_aditivo' (ctx['_corpo_md_aditivo'], versão CONGELADA)."""
+    return _montar_html_corpo_documento(ctx, ctx.get("_corpo_md_aditivo"))
+
+
+def gerar_pdf_aditivo(ctx: dict, destino_pdf: str) -> str:
+    return _gerar_pdf_corpo_documento(montar_html_aditivo(ctx), destino_pdf)
+
+
+def montar_html_aprovacao_pe(ctx):
+    """Aprovação do Projeto Executivo: corpo do modelo 'aprovacao_pe' (ctx['_corpo_md_aprovacao'],
+    versão CONGELADA na 1ª geração), com [AMBIENTES_APROVADOS]/[NUM_APROVACAO_PE]."""
+    return _montar_html_corpo_documento(ctx, ctx.get("_corpo_md_aprovacao"))
+
+
+def gerar_pdf_aprovacao_pe(ctx: dict, destino_pdf: str) -> str:
+    return _gerar_pdf_corpo_documento(montar_html_aprovacao_pe(ctx), destino_pdf)
 
 
 # ── LibreOffice ───────────────────────────────────────────────────────────────

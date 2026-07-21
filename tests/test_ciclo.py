@@ -278,3 +278,23 @@ def test_guarda_conclusao_11c_pe_por_ambiente():
     # chamador antigo (sem pe_ambientes) → regra antiga do documento
     ok, erro = mc.guarda_conclusao("11c", set(), {})
     assert ok is False and "Carregue" in erro
+
+
+def test_guarda_conclusao_11e_por_aprovacao_assinada():
+    # Correção Fatia 3 (2026-07-21): a 11e conclui com a APROVAÇÃO DO PE assinada (documento
+    # do sistema), não mais com upload de "PE Assinado". Doc legado segue valendo (retrocompat).
+    st_ok = {"11a": "concluido", "11b": "concluido", "11c": "concluido", "11d": "aprovado"}
+    ok, erro = mc.guarda_conclusao("11e", set(), st_ok, aprovacao_pe=True)
+    assert ok is True and erro == ""
+    ok, erro = mc.guarda_conclusao("11e", set(), st_ok, aprovacao_pe=False)
+    assert ok is False and "Aprova" in erro
+    # legado: doc pe_pe_assinado ainda satisfaz mesmo sem aprovação
+    ok, erro = mc.guarda_conclusao("11e", {"pe_pe_assinado"}, st_ok, aprovacao_pe=False)
+    assert ok is True
+    # pré-requisitos 11a-11d continuam valendo mesmo com aprovação assinada
+    st_falta = dict(st_ok, **{"11d": "pendente"})
+    ok, erro = mc.guarda_conclusao("11e", set(), st_falta, aprovacao_pe=True)
+    assert ok is False and "11d" in erro
+    # chamador antigo (sem aprovacao_pe) → regra antiga do documento
+    ok, erro = mc.guarda_conclusao("11e", set(), st_ok)
+    assert ok is False and "Carregue" in erro

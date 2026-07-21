@@ -20,7 +20,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        Funcionario, Fornecedor, Terceiro, Funcao, FolhaPagamento, ComissaoFolha,
                        AdiantamentoFuncionario,
                        AtribuicaoAmbiente, ArquivoPE, ParcelaProjeto, ParcelaAmbiente,
-                       Aditivo, AditivoAssinatura)
+                       Aditivo, AditivoAssinatura, AprovacaoPE, AprovacaoPEAssinatura)
 import mod_expedicao
 import mod_assistencias
 import mod_cadastro
@@ -2438,6 +2438,85 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            m = _re.match(r'^/api/projetos/([^/]+)/pe/complemento/comparativo$', path)
+            if m:
+                # Correção Fatia 3: comparativo do modal "Negociar Complemento" — à vista
+                # contratado × à vista do XML de complemento (descontos do contrato + fator de
+                # custos adicionais 1/(1−p)), por ambiente MARCADO, com totais e o p exibível.
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    linhas, resumo = _complemento_diferencas(db, nome_safe)
+                    if linhas is None:
+                        self.send_json({"ok": False, "erro": resumo}, code=400); return
+                    self.send_json({"ok": True, "linhas": linhas, "resumo": resumo})
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/aprovacao-pe$', path)
+            if m:
+                # Correção Fatia 3: estado da Aprovação do Projeto Executivo
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    a = (db.query(AprovacaoPE).filter_by(projeto_nome=nome_safe)
+                           .order_by(AprovacaoPE.id.desc()).first())
+                    self.send_json({"ok": True, "aprovacao": _aprovacao_pe_dict(a) if a else None})
+                finally:
+                    db.close()
+                return
+
+            m = _re.match(r'^/api/projetos/([^/]+)/aprovacao-pe/pdf$', path)
+            if m:
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    a = (db.query(AprovacaoPE).filter_by(projeto_nome=nome_safe)
+                           .order_by(AprovacaoPE.id.desc()).first())
+                    if a is None or not a.pdf_path or not os.path.exists(a.pdf_path):
+                        self.send_json({"ok": False, "erro": "PDF da aprovação não encontrado."},
+                                       code=404); return
+                    with open(a.pdf_path, "rb") as fh:
+                        data = fh.read()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/pdf")
+                    self.send_header("Content-Length", len(data))
+                    self.send_header("Content-Disposition",
+                                     'inline; filename="aprovacao_pe_%d.pdf"' % a.id)
+                    self.end_headers()
+                    self.wfile.write(data)
+                finally:
+                    db.close()
+                return
+
             m = _re.match(r'^/api/projetos/([^/]+)/aditivo$', path)
             if m:
                 # Fatia 3 PE: estado do Termo Aditivo (status, assinaturas, dados da diferença)
@@ -3214,8 +3293,23 @@ class Handler(BaseHTTPRequestHandler):
                 filename, conteudo = next(iter(arquivos.values()))
                 data = conteudo if isinstance(conteudo, (bytes, bytearray)) else str(conteudo).encode("utf-8")
                 is_xml  = str(filename).lower().endswith(".xml")
-                formato = "xml_pe" if is_xml else "promob_pe"
+                # Correção Fatia 3: finalidade=complemento grava o 3º XML do ambiente
+                # (contrato=pool, executivo=xml_pe, complemento=xml_compl) — só p/ ambientes
+                # MARCADOS na 11c, e obrigatoriamente .xml (a diferença precisa dos valores).
+                finalidade = (campos.get("finalidade") or "pe").strip().lower()
+                if finalidade == "complemento":
+                    if not is_xml:
+                        self.send_json({"ok": False, "erro": "Complemento de projeto exige "
+                                        "arquivo XML."}); return
+                    if not pa.renegociar_pe:
+                        self.send_json({"ok": False, "erro": "Ambiente não está marcado para "
+                                        "complemento na Revisão de PE."}, code=400); return
+                    formato = "xml_compl"
+                else:
+                    formato = "xml_pe" if is_xml else "promob_pe"
                 pe_dir = os.path.join(PROJETOS_DIR, nome, "pe", str(pool_ambiente_id))
+                if finalidade == "complemento":
+                    pe_dir = os.path.join(pe_dir, "compl")   # não colide com o arquivo do PE
                 os.makedirs(pe_dir, exist_ok=True)
                 dest = os.path.join(pe_dir, os.path.basename(str(filename)))
                 with open(dest, "wb") as f:
@@ -3376,26 +3470,29 @@ class Handler(BaseHTTPRequestHandler):
                                         "— importe um em Config → Documentos."}, code=400); return
                     aditivo.modelo_versao_id = mv.id
                 corpo_md = _mdoc.corpo_da_versao(db, aditivo.modelo_versao_id) or ""
-                # diferença POR AMBIENTE (à vista, VAVA): ajuste × contrato original. Somas por
-                # ambiente de propósito (linhas do orçamento, ex.: Custo Especial, ficam fora —
-                # já cobradas no contrato original; o aditivo é só a diferença dos ambientes).
-                d_orig = _negociacao_breakdown(db.get(Orcamento, contrato.orcamento_id), db)
+                # Correção Fatia 3: o orçamento de complemento JÁ é a diferença — o VAVA de cada
+                # ambiente dele é a DIFERENÇA NEGOCIADA (base XML complemento, fator de custos
+                # adicionais e descontos do contrato embutidos; desconto por ambiente aplicado
+                # sobre a diferença). O "original" vem do comparativo (_complemento_diferencas).
+                linhas_cmp, _res_cmp = _complemento_diferencas(db, nome)
+                base_orig = {l["pool_ambiente_id"]: l["vava_contratado"] for l in (linhas_cmp or [])}
                 d_aj = _negociacao_breakdown(orc_aj, db)
-                vava_orig = {a.get("id"): a.get("VAVA", 0.0) for a in d_orig.get("ambientes", [])}
                 pa_nome = {pa.id: (pa.nome_exibicao or pa.nome) for pa in
                            db.query(PoolAmbiente).filter_by(projeto_id=nome).all()}
                 from mod_contrato import _formatar_valor as _fv
-                linhas_amb, tot_orig, tot_novo = [], 0.0, 0.0
+                linhas_amb, tot_orig, tot_dif = [], 0.0, 0.0
                 for a in d_aj.get("ambientes", []):
-                    vo = round(float(vava_orig.get(a.get("id"), 0.0)), 2)
-                    vn = round(float(a.get("VAVA", 0.0)), 2)
-                    tot_orig += vo; tot_novo += vn
+                    vo = round(float(base_orig.get(a.get("id"), 0.0)), 2)
+                    dif_amb = round(float(a.get("VAVA", 0.0)), 2)   # diferença negociada
+                    tot_orig += vo; tot_dif += dif_amb
                     linhas_amb.append({"pool_ambiente_id": a.get("id"),
                                        "ambiente": pa_nome.get(a.get("id"), "?"),
-                                       "vava_original": vo, "vava_novo": vn,
-                                       "diferenca": round(vn - vo, 2)})
-                tot_orig, tot_novo = round(tot_orig, 2), round(tot_novo, 2)
-                dif = round(tot_novo - tot_orig, 2)
+                                       "vava_original": vo,
+                                       "vava_novo": round(vo + dif_amb, 2),
+                                       "diferenca": dif_amb})
+                tot_orig = round(tot_orig, 2)
+                dif = round(tot_dif, 2)
+                tot_novo = round(tot_orig + dif, 2)
                 dados = {"ambientes": linhas_amb, "valor_original": tot_orig,
                          "valor_novo": tot_novo, "diferenca": dif,
                          "num_contrato_original": contrato.num_contrato or ""}
@@ -3490,6 +3587,135 @@ class Handler(BaseHTTPRequestHandler):
                                   else "assinado_" + parte)
                 db.commit()
                 self.send_json({"ok": True, "status": aditivo.status})
+            finally:
+                db.close()
+            return
+
+        m_apger = re.match(r'^/api/projetos/([^/]+)/aprovacao-pe$', path)
+        if m_apger:
+            # Correção Fatia 3: gera/regenera a APROVAÇÃO DO PROJETO EXECUTIVO — documento do
+            # sistema (modelo por loja tipo 'aprovacao_pe', versão congelada na 1ª geração) que
+            # registra os AMBIENTES APROVADOS (importa no desmembramento) e substitui o upload de
+            # "PE Assinado". Imprimível; assinatura interna loja+cliente (integração de assinatura
+            # digital = fase futura, mesmo placeholder do contrato).
+            nome = unquote(m_apger.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                contrato = (db.query(Contrato).filter_by(projeto_nome=nome)
+                              .order_by(Contrato.id.desc()).first())
+                if contrato is None:
+                    self.send_json({"ok": False, "erro": "Projeto sem contrato."}, code=400); return
+                aprov = (db.query(AprovacaoPE).filter_by(projeto_nome=nome)
+                           .order_by(AprovacaoPE.id.desc()).first())
+                if aprov is not None and aprov.status == "assinado":
+                    self.send_json({"ok": False, "erro": "Aprovação do PE já assinada — não pode "
+                                    "ser regerada."}, code=403); return
+                import mod_documentos as _mdoc
+                if aprov is None:
+                    aprov = AprovacaoPE(projeto_nome=nome, contrato_id=contrato.id, loja_id=loja_id)
+                    db.add(aprov); db.flush()
+                if aprov.modelo_versao_id is None:      # congela o modelo na 1ª geração
+                    mv = _mdoc.ativo_de(db, loja_id, "aprovacao_pe")
+                    if mv is None:
+                        self.send_json({"ok": False, "erro": "Nenhum modelo de Aprovação de PE "
+                                        "ativo — importe um em Config → Documentos."}, code=400); return
+                    aprov.modelo_versao_id = mv.id
+                corpo_md = _mdoc.corpo_da_versao(db, aprov.modelo_versao_id) or ""
+                # ambientes aprovados = os do orçamento do CONTRATO (fase corrente do projeto)
+                pa_nome = {pa.id: (pa.nome_exibicao or pa.nome) for pa in
+                           db.query(PoolAmbiente).filter_by(projeto_id=nome).all()}
+                ambs_aprov = [{"pool_ambiente_id": oa.pool_ambiente_id,
+                               "ambiente": pa_nome.get(oa.pool_ambiente_id, "?")}
+                              for oa in db.query(OrcamentoAmbiente)
+                              .filter_by(orcamento_id=contrato.orcamento_id).all()]
+                if not aprov.num_aprovacao:
+                    from mod_contrato import gerar_num_contrato as _gnc2
+                    _existing = [x.num_aprovacao for x in db.query(AprovacaoPE)
+                                 .filter(AprovacaoPE.num_aprovacao.isnot(None)).all()]
+                    aprov.num_aprovacao = _gnc2(_existing, "", prefixo="AP")
+                _proj, cliente_dict, _od = _montar_dados_projeto_para_contrato(
+                    nome, contrato.orcamento_id, db)
+                loja_dict = _loja_dict_para_contrato(db, loja_id)
+                usuario_ctx = {"nome": usuario.get("nome", ""),
+                               "telefone": _get_usuario_telefone(usuario["id"], db),
+                               "email": usuario.get("email", "") or ""}
+                from mod_contrato import construir_contexto as _cc2, gerar_pdf_aprovacao_pe as _gpap
+                from mod_contrato import CONTRATOS_DIR as _CDIR2
+                ctx = _cc2(cliente_dict, usuario_ctx, "", loja_dict)
+                ctx["num_contrato"] = aprov.num_aprovacao
+                ctx["_corpo_md_aprovacao"] = corpo_md
+                ctx["_aprovacao_pe"] = {
+                    "num_aprovacao": aprov.num_aprovacao,
+                    "ambientes_txt": "\n".join(a["ambiente"] for a in ambs_aprov),
+                }
+                pdf_path = _gpap(ctx, os.path.join(_CDIR2, "aprovacao_pe_%d.pdf" % aprov.id))
+                aprov.pdf_path = pdf_path
+                aprov.dados_json = json.dumps({"ambientes": ambs_aprov}, ensure_ascii=False)
+                aprov.gerado_em = datetime.utcnow()
+                aprov.gerado_por_id = usuario.get("id")
+                aprov.status = "para_assinatura"
+                db.commit()
+                self.send_json({"ok": True, "aprovacao": _aprovacao_pe_dict(aprov)})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        m_apass = re.match(r'^/api/projetos/([^/]+)/aprovacao-pe/assinar$', path)
+        if m_apass:
+            # Correção Fatia 3: assinatura interna da Aprovação do PE (loja + cliente).
+            nome = unquote(m_apass.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                req = json.loads(body or b'{}')
+                parte = (req.get("parte") or "").strip()
+                nome_ass = (req.get("nome") or "").strip()
+                cpf = (req.get("cpf") or "").strip()
+                if parte not in ("loja", "cliente"):
+                    self.send_json({"ok": False, "erro": "parte deve ser 'loja' ou 'cliente'"},
+                                   code=400); return
+                if not nome_ass or not cpf:
+                    self.send_json({"ok": False, "erro": "Informe nome e CPF."}, code=400); return
+                aprov = (db.query(AprovacaoPE).filter_by(projeto_nome=nome)
+                           .order_by(AprovacaoPE.id.desc()).first())
+                if aprov is None or not aprov.pdf_path:
+                    self.send_json({"ok": False, "erro": "Gere a aprovação do PE antes de assinar."},
+                                   code=400); return
+                if aprov.status == "assinado":
+                    self.send_json({"ok": False, "erro": "Aprovação já assinada."}, code=400); return
+                if any(a.parte == parte for a in aprov.assinaturas):
+                    self.send_json({"ok": False, "erro": "Esta parte já assinou."}, code=400); return
+                from mod_contrato import calcular_hash_assinatura as _cha2
+                ts = datetime.utcnow().isoformat()
+                aprov.assinaturas.append(AprovacaoPEAssinatura(
+                    parte=parte, nome=nome_ass, cpf=cpf, ip_origem=self.client_address[0],
+                    hash_sha256=_cha2(nome_ass, cpf, aprov.id, ts)))
+                db.flush()
+                partes = {a.parte for a in aprov.assinaturas}
+                aprov.status = ("assinado" if {"loja", "cliente"}.issubset(partes)
+                                else "assinado_" + parte)
+                db.commit()
+                self.send_json({"ok": True, "status": aprov.status})
             finally:
                 db.close()
             return
@@ -7350,8 +7576,16 @@ class Handler(BaseHTTPRequestHandler):
                             com_pe = (db.query(ArquivoPE.pool_ambiente_id)
                                         .filter_by(projeto_nome=nome_safe).distinct().count())
                             pe_amb = (total, com_pe)
+                    aprov_ok = None
+                    if codigo == mod_ciclo.PE_SUBFASE_FINAL:
+                        # correção Fatia 3: a 11e conclui com a Aprovação do PE ASSINADA
+                        # (doc legado pe_pe_assinado segue valendo — retrocompat no guard)
+                        _ap = (db.query(AprovacaoPE).filter_by(projeto_nome=nome_safe)
+                                 .order_by(AprovacaoPE.id.desc()).first())
+                        aprov_ok = bool(_ap is not None and _ap.status == "assinado")
                     ok, erro = mod_ciclo.guarda_conclusao(codigo, tipos_presentes, status_por,
-                                                          pe_ambientes=pe_amb)
+                                                          pe_ambientes=pe_amb,
+                                                          aprovacao_pe=aprov_ok)
                     if not ok:
                         self.send_json({"ok": False, "erro": erro}, code=400); return
                     _set_etapa_status(db, nome_safe, codigo, "concluido", u.id)
@@ -9012,6 +9246,87 @@ def _pool_ambiente_dict(pa) -> dict:
     }
 
 
+def _complemento_diferencas(db, nome_safe):
+    """Correção da Fatia 3 (2026-07-21): diferenças por ambiente MARCADO para complemento —
+        à_vista_complemento_i = venda_XML_complemento_i × (VAVA_contratado_i / VBVA_contratado_i)
+        diferença_i           = à_vista_complemento_i − VAVA_contratado_i
+    O fator é a razão do PRÓPRIO ambiente contratado (à vista ÷ bruto): carrega os descontos do
+    contrato e a carga de custos adicionais EXATAMENTE como negociados naquele ambiente — objetivo
+    do usuário ("ajuste proporcional relativo aos custos adicionais" + "desconto aplicado de forma
+    idêntica"). Propriedade de validação (vale em QUALQUER composição — arq/fid/viagem/brinde;
+    o fator único 1/(1−p) falhava com brinde e Custo Especial): XML idêntico ⇒ diferença ZERO.
+    O Custo Especial fica naturalmente FORA (não está no VAVA por ambiente — coerente com a
+    definição dele: não acompanha ambiente). O percentual único p = Cust_Ad/VAVO segue no resumo
+    como INFORMAÇÃO (exibido no Apoio à negociação); fallback do fator se VBVA contratado = 0.
+    Retorna (linhas, resumo) ou (None, erro_str). linhas só dos ambientes marcados."""
+    ct = (db.query(Contrato).filter_by(projeto_nome=nome_safe)
+            .order_by(Contrato.id.desc()).first())
+    orc_ct = db.get(Orcamento, ct.orcamento_id) if ct else None
+    if orc_ct is None:
+        return None, "Projeto sem contrato para comparar."
+    d_ct = _negociacao_breakdown(orc_ct, db)
+    vava_ct = {a.get("id"): float(a.get("VAVA", 0.0)) for a in d_ct.get("ambientes", [])}
+    vavo_ct = float(d_ct.get("VAVO") or 0.0)
+    cad_ct = float(d_ct.get("Cust_Ad") or 0.0)
+    fator_ca = (vavo_ct / (vavo_ct - cad_ct)) if (vavo_ct - cad_ct) > 0 else 1.0
+    d_orc_ct = float(orc_ct.desconto_pct or 0.0) / 100.0
+    d_amb_ct = {oa.pool_ambiente_id: float(oa.desconto_individual_pct or 0.0) / 100.0
+                for oa in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc_ct.id).all()}
+    compls = {a.pool_ambiente_id: a for a in
+              db.query(ArquivoPE).filter_by(projeto_nome=nome_safe, formato="xml_compl").all()}
+    linhas = []
+    for pa in (db.query(PoolAmbiente).filter_by(projeto_id=nome_safe)
+                 .order_by(PoolAmbiente.id.asc()).all()):
+        if not pa.renegociar_pe:
+            continue
+        nome_amb = pa.nome_exibicao or pa.nome
+        vc = round(vava_ct.get(pa.id, 0.0), 2)
+        vbva_c = float(pa.budget_total or 0.0)
+        a = compls.get(pa.id)
+        carregado = a is not None and a.valor_venda is not None
+        va_compl = dif = cfo_dif = 0.0
+        if carregado:
+            if vbva_c > 0 and vc > 0:
+                va_compl = round(float(a.valor_venda) * (vc / vbva_c), 2)
+            else:   # fallback (ambiente contratado sem valor): fator único aproximado
+                va_compl = round(float(a.valor_venda) * (1 - d_orc_ct)
+                                 * (1 - d_amb_ct.get(pa.id, 0.0)) * fator_ca, 2)
+            dif = round(va_compl - vc, 2)
+            cfo_dif = round(float(a.valor_atualizado or 0.0) - float(pa.order_total or 0.0), 2)
+        linhas.append({"pool_ambiente_id": pa.id, "ambiente": nome_amb,
+                       "vava_contratado": vc, "vava_complemento": va_compl,
+                       "diferenca": dif, "cfo_diferenca": cfo_dif,
+                       "compl_carregado": carregado})
+    carregadas = [l for l in linhas if l["compl_carregado"]]
+    resumo = {
+        "pct_custos_adicionais": round((cad_ct / vavo_ct * 100.0) if vavo_ct else 0.0, 4),
+        "fator_ca": round(fator_ca, 6),
+        "desc_global_pct": float(orc_ct.desconto_pct or 0.0),
+        "total_contratado": round(sum(l["vava_contratado"] for l in carregadas), 2),
+        "total_complemento": round(sum(l["vava_complemento"] for l in carregadas), 2),
+        "total_diferenca": round(sum(l["diferenca"] for l in carregadas), 2),
+        "marcados": len(linhas), "carregados": len(carregadas),
+    }
+    return linhas, resumo
+
+
+def _aprovacao_pe_dict(a) -> dict:
+    """Serialização da Aprovação do PE (correção Fatia 3) para o frontend."""
+    try:
+        dados = json.loads(a.dados_json) if a.dados_json else None
+    except Exception:
+        dados = None
+    return {
+        "id": a.id, "num_aprovacao": a.num_aprovacao or "", "status": a.status,
+        "tem_pdf": bool(a.pdf_path and os.path.exists(a.pdf_path)),
+        "gerado_em": a.gerado_em.strftime("%Y-%m-%d %H:%M") if a.gerado_em else "",
+        "dados": dados,
+        "assinaturas": [{"parte": s.parte, "nome": s.nome,
+                         "assinado_em": s.assinado_em.strftime("%Y-%m-%d %H:%M") if s.assinado_em else ""}
+                        for s in a.assinaturas],
+    }
+
+
 def _aditivo_dict(a) -> dict:
     """Serialização do Termo Aditivo (Fatia 3 PE) para o frontend."""
     try:
@@ -9144,24 +9459,30 @@ def _negociacao_breakdown(orc, db, vbva_override=None):
     params = (json.loads(proj.parametros_json) if (proj and proj.parametros_json)
               else mod_orcamento_params.parametros_default_loja(cfg))
     desc_orc = orc.desconto_pct or 0.0
-    # Orçamento de AJUSTE (Fatia 3 PE): base de valores = PE (decisão do usuário) — VBVA/CFA vêm
-    # do arquivo_pe quando presentes; ambiente sem PE mantém os valores do pool.
-    pe_base = {}
+    # Orçamento de COMPLEMENTO (correção Fatia 3, 2026-07-21): cada ambiente entra pela
+    # DIFERENÇA (à vista do XML complemento com os descontos do CONTRATO e o fator de custos
+    # adicionais − à vista contratado — ver _complemento_diferencas). Params NEUTROS e desconto
+    # global ZERO (o fator já carrega os custos adicionais; a única alavanca aqui é o desconto
+    # por ambiente, sobre a diferença). Negociação nasce à vista.
+    compl_diff, compl_cfa = {}, {}
     if getattr(orc, "complemento_pe", 0):
-        pe_base = {a.pool_ambiente_id: a for a in
-                   db.query(ArquivoPE).filter_by(projeto_nome=orc.projeto_id, formato="xml_pe").all()}
+        linhas_c, _res = _complemento_diferencas(db, orc.projeto_id)
+        for l in (linhas_c or []):
+            if l["compl_carregado"]:
+                compl_diff[l["pool_ambiente_id"]] = l["diferenca"]
+                compl_cfa[l["pool_ambiente_id"]] = l["cfo_diferenca"]
+        params = {}
+        desc_orc = 0.0
     ambs, ids = [], []
     for lk in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all():
         pa = db.get(PoolAmbiente, lk.pool_ambiente_id)
         if pa:
-            vbva = pa.budget_total or 0.0
-            cfa = pa.order_total or 0.0
-            pe = pe_base.get(lk.pool_ambiente_id)
-            if pe is not None:
-                if pe.valor_venda is not None:
-                    vbva = pe.valor_venda
-                if pe.valor_atualizado is not None:
-                    cfa = pe.valor_atualizado
+            if getattr(orc, "complemento_pe", 0):
+                vbva = compl_diff.get(lk.pool_ambiente_id, 0.0)
+                cfa = compl_cfa.get(lk.pool_ambiente_id, 0.0)
+            else:
+                vbva = pa.budget_total or 0.0
+                cfa = pa.order_total or 0.0
             vbva = (vbva_override or {}).get(lk.pool_ambiente_id, vbva)
             ambs.append({"VBVA": vbva, "CFA": cfa,
                          "desc_amb_pct": float(lk.desconto_individual_pct or 0.0)})

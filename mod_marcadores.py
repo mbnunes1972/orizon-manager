@@ -92,6 +92,10 @@ CATALOGO = {
     "VALOR_ORIGINAL_COMPLEMENTO": {"rotulo": "Soma original dos ambientes do complemento",   "escopo": "documento"},
     "VALOR_NOVO_COMPLEMENTO":     {"rotulo": "Soma nova dos ambientes do complemento",       "escopo": "documento"},
     "VALOR_COMPLEMENTO":          {"rotulo": "Valor do complemento (novo − original)",       "escopo": "documento"},
+
+    # ── Aprovação do Projeto Executivo (correção Fatia 3, 2026-07-21) ────────────────────────
+    "NUM_APROVACAO_PE":     {"rotulo": "Nº da aprovação do Projeto Executivo",       "escopo": "documento"},
+    "AMBIENTES_APROVADOS":  {"rotulo": "Ambientes aprovados no Projeto Executivo",   "escopo": "documento"},
 }
 
 

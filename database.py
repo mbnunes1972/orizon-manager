@@ -998,6 +998,47 @@ class AditivoAssinatura(Base):
     aditivo = relationship("Aditivo", back_populates="assinaturas")
 
 
+class AprovacaoPE(Base):
+    """Aprovação do Projeto Executivo (correção da Fatia 3, 2026-07-21): substitui o upload de
+    "PE Assinado" na 11e — documento GERADO pelo sistema (modelo por loja tipo 'aprovacao_pe'),
+    registrando os AMBIENTES APROVADOS (dados_json — importa quando há desmembramento), imprimível
+    e assinável internamente (loja+cliente, mecanismo do contrato/aditivo; integração de assinatura
+    digital fica como fase futura, mesmo placeholder do contrato)."""
+    __tablename__ = "aprovacoes_pe"
+
+    id               = Column(Integer,  primary_key=True, autoincrement=True)
+    num_aprovacao    = Column(Text,     nullable=True)    # AP<AAAAMMDD><SEQ> (gerado 1x)
+    projeto_nome     = Column(Text,     nullable=False, index=True)
+    contrato_id      = Column(Integer,  ForeignKey("contratos.id"), nullable=False)
+    pdf_path         = Column(Text,     nullable=True)
+    dados_json       = Column(Text,     nullable=True)    # {"ambientes": [{id, nome}]} aprovados
+    status           = Column(Text,     nullable=False, default="rascunho")
+    # status: rascunho | para_assinatura | assinado_loja | assinado_cliente | assinado
+    gerado_em        = Column(DateTime, nullable=True)
+    gerado_por_id    = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+    loja_id          = Column(Integer,  ForeignKey("lojas.id"), nullable=True)
+    modelo_versao_id = Column(Integer,  ForeignKey("documento_modelos.id"), nullable=True)
+
+    assinaturas = relationship("AprovacaoPEAssinatura", back_populates="aprovacao",
+                               cascade="all, delete-orphan")
+
+
+class AprovacaoPEAssinatura(Base):
+    """Assinatura interna da Aprovação do PE — espelho de ContratoAssinatura."""
+    __tablename__ = "aprovacoes_pe_assinaturas"
+
+    id           = Column(Integer,  primary_key=True, autoincrement=True)
+    aprovacao_id = Column(Integer,  ForeignKey("aprovacoes_pe.id"), nullable=False)
+    parte        = Column(Text,     nullable=False)   # loja | cliente
+    nome         = Column(Text,     nullable=False)
+    cpf          = Column(Text,     nullable=False)
+    assinado_em  = Column(DateTime, nullable=False, default=datetime.utcnow)
+    ip_origem    = Column(Text,     nullable=True)
+    hash_sha256  = Column(Text,     nullable=False)
+
+    aprovacao = relationship("AprovacaoPE", back_populates="assinaturas")
+
+
 class CicloDocumento(Base):
     """Documento carregado numa subfase do ciclo. Append-only: nunca sobrescreve."""
     __tablename__ = "ciclo_documentos"
