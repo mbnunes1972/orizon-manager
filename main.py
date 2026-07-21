@@ -3413,6 +3413,13 @@ class Handler(BaseHTTPRequestHandler):
                 for pid, oa in atuais.items():
                     if pid not in set(marcados):
                         db.delete(oa)
+                # Correção (teste do usuário): a negociação do complemento PARTE do padrão À VISTA
+                # com entrada R$ 0,00 — cada "Negociar Complemento" zera o plano de pagamento salvo.
+                # Também descontamina o vazamento antigo (o painel do contratado era capturado pela
+                # tela e persistido aqui via auto-save, puxando o total_cliente do CONTRATO para o
+                # cust_fin do complemento → Val_Cont virava o total do contrato).
+                orc.forma_pagamento = None
+                orc.negociacao_json = None
                 db.flush()
                 try:
                     _recalcular_orcamento(orc, db)

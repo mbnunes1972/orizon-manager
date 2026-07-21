@@ -103,6 +103,22 @@ def test_complemento_por_diferenca_ponta_a_ponta(http_client_factory, seed, app_
     st, body = c.post(f"/api/orcamentos/{oid}/margens", {"desconto_pct": 5})
     assert st == 403, body
 
+    # 4b) contaminação (bug do teste do usuário): o pagamento do CONTRATADO vazava para o
+    # complemento via tela+auto-save — total_cliente do contrato inflava o cust_fin e o
+    # Val_Cont virava o total do contrato. Um novo "Negociar Complemento" DESCONTAMINA:
+    # plano zerado (padrão à vista, entrada 0) e valor_total = diferença.
+    db = app_db.get_session()
+    oc = db.get(app_db.Orcamento, aj_id)
+    oc.forma_pagamento = json.dumps({"tipo": "tf", "total_cliente": 200000.0,
+                                     "entrada_valor": 10000.0})
+    db.commit(); db.close()
+    st, body = c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
+    assert st == 200 and body["ok"], body
+    assert abs(body["orcamento"]["valor_total"] - 4000.0) < 0.05, body["orcamento"]["valor_total"]
+    db = app_db.get_session()
+    assert db.get(app_db.Orcamento, aj_id).forma_pagamento is None
+    db.close()
+
     # 5) aditivo documenta a diferença NEGOCIADA
     import mod_documentos
     db = app_db.get_session()

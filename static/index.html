@@ -5665,6 +5665,9 @@ let _codigoPagAtivo  = 'a_vista';  // código da modalidade selecionada (ex: 'ca
 let _formaEntrada = 'pix';
 let _formaParcela = 'boleto';
 let _negociacaoPendente = null;  // snapshot da negociação a restaurar após carregarModalidades
+let _pagamentoDoOrc     = null;  // dono do estado atual do painel de pagamento (evita VAZAR a
+                                 // modalidade/entrada de um orçamento para outro na troca — bug
+                                 // pego no teste do complemento: o pagamento do contratado vazava)
 
 // Snapshot da negociação — campos de input por modalidade (ids reais do DOM)
 const _NEG_CAMPOS_POR_MODALIDADE = {
@@ -7701,6 +7704,21 @@ async function salvarDescontoAutomatico(){
 // (discriminação por ambiente removida na faxina — ver DEV_LOG Sessão 30; futuro: refazer pelo motor)
 
 // Sincroniza campo de desconto ao entrar na Pagina 02 e carrega modalidades
+// Estado PADRÃO do pagamento (à vista, entrada R$ 0,00) — usado ao ativar um orçamento sem
+// negociação salva (ex.: Complemento PE recém-criado), para nada vazar do orçamento anterior.
+async function _resetPagamentoPadrao(){
+  _codigoPagAtivo = 'a_vista';
+  _tfValores = []; _tfDatas = []; _tfAvistaRef = null; _tfUltimoEditIdx = null;
+  _vpDatas = [];
+  _negEntradaValor = 0; _negTaxaRetencaoPct = 0;
+  const sel = document.getElementById('neg-pagamento');
+  if (sel) sel.value = 'a_vista';
+  ['tf-entrada','vp-entrada','ay-entrada','cc-entrada','av-entrada-valor'].forEach(i => {
+    const el = document.getElementById(i); if (el) el.value = 0;
+  });
+  if (typeof onPagamentoChange === 'function') await onPagamentoChange();
+}
+
 async function carregarMargensSalvas(){
   if(!projetoAtivo) return;
   // Ao carregar projeto, o desconto salvo passa a ser o limite autorizado
@@ -7719,12 +7737,19 @@ async function carregarMargensSalvas(){
   // Re-trigger (navegação p/ pág. 2, add-ambiente, save-params): há orçamento ativo mas NENHUMA
   // restauração pendente. carregarModalidades→onPagamentoChange(default) ZERA o parcelamento. Para
   // não perder o pagamento da tela (e o auto-save salvar vazio), captura a negociação ATUAL e a
-  // re-restaura. Na carga fresca (_aplicarFiltroOrcamento) _negociacaoPendente já vem do banco.
-  if (_orcamentoAtivoId && !_negociacaoPendente && _codigoPagAtivo) {
+  // re-restaura — mas SÓ se a tela ainda pertence ao MESMO orçamento (_pagamentoDoOrc): na troca
+  // de orçamento sem negociação salva, capturar aqui VAZAVA o pagamento do orçamento anterior
+  // (modalidade/entrada/total do CONTRATADO apareciam no complemento — teste do usuário).
+  const _mesmoOrc = (_pagamentoDoOrc === _orcamentoAtivoId);
+  if (_orcamentoAtivoId && !_negociacaoPendente && _codigoPagAtivo && _mesmoOrc) {
     try { _negociacaoPendente = _capturarNegociacao(); } catch(e){}
   }
   await carregarModalidades();  // popula dropdowns e dispara calculo
   if (_negociacaoPendente) { await _restaurarNegociacao(_negociacaoPendente); _negociacaoPendente = null; }
+  else if (_orcamentoAtivoId && !_mesmoOrc) {
+    await _resetPagamentoPadrao();   // orçamento novo sem negociação salva → à vista, entrada R$ 0,00
+  }
+  _pagamentoDoOrc = _orcamentoAtivoId;
   await carregarPerfil();
   // EP-07: _orcAmbientesAtivos já foi setado por ativarOrcamento (em carregarOrcamentos)
   // executarCalculo usará _orcAmbientesAtivos automaticamente — sem hook necessário aqui
