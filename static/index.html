@@ -12110,12 +12110,13 @@ function _renderCardGenerico(etapa, dados, bloqueada) {
 
 function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
   const concluido = dados.status === 'concluido';
-  // Fatia 1 (spec §5/§6): espelho READ-ONLY da comparação de PE + reconciliação estimada
-  // na Aprovação Financeira (11d) — só referência gerencial, não lança nada. Reusa peComparacaoRender.
+  // Comparação de CUSTO DE FÁBRICA (CFO venda × PE) — mudou de casa (2026-07-21): saiu da 11c
+  // (que agora compara VENDA) e vive aqui na AF2, read-only, sem coluna Carregar (os PEs já
+  // subiram na Revisão de PE). Container próprio p/ não colidir com o da 11c.
   const peEspelho = (codigo === '11d') ? `
     <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-      <button class="btn-ciclo" onclick="peComparacaoRender()"><i class="ti ti-arrows-diff"></i> Comparar valores dos ambientes (PE) — referência</button>
-      <div id="pe-cmp-container" style="margin-top:12px"></div>
+      <button class="btn-ciclo" onclick="peComparacaoCfoRender()"><i class="ti ti-arrows-diff"></i> Comparar Valores</button>
+      <div id="pe-cmp-container-af" style="margin-top:12px"></div>
     </div>` : '';
   // Fatia B (box): ramo do custo financeiro (loja próprio × antecipação bancária × financeira). Só na AF.
   const ramoBox = (codigo === '8' || codigo === '11d') ? `
@@ -12844,49 +12845,117 @@ function _renderCardPE(codigo, dados, bloqueada) {
     </div>${peCmpBlock}`;
 }
 
-// ── Fatia 1 — comparação de CFO (venda × PE) + reconciliação estimada (read-only) ──────────────
+// ── Comparação de PE — helpers compartilhados (11c venda × 11d CFO) ────────────────────────────
+function _peCmpHelpers(){
+  const fmt = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const sig = v => (v>0?'+':'') + fmt(v);
+  const pctS = v => `${v>0?'+':''}${Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}%`;
+  const kpi = (lbl,val,extra='') => `<div style="flex:1;min-width:150px">`
+    + `<div style="font-size:var(--fs-xs);color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">${lbl}</div>`
+    + `<div style="font-family:var(--font-mono);font-size:var(--fs-h3);font-weight:700;${extra}">${val}</div></div>`;
+  return {fmt, sig, pctS, kpi};
+}
+async function _peComparacaoFetch(cont){
+  let j;
+  try { j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/comparacao`,
+                        {credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ cont.innerHTML = '<span style="color:var(--err)">Erro ao carregar.</span>'; return null; }
+  if(!j.ok){ cont.innerHTML = `<span style="color:var(--err)">${esc(j.erro||'Erro')}</span>`; return null; }
+  return j;
+}
+
+// ── Revisão de PE (11c) — comparação de VENDA À VISTA pelo motor (Fatia venda 2026-07-21) ──────
+// O VBVA do XML de PE percorre o MESMO motor de negociação (parâmetros/descontos salvos, motor
+// inalterado) → VAVA por ambiente. Venda maior = verde. A comparação de CUSTO (CFO) mudou de
+// casa: vive na AF2 (peComparacaoCfoRender). Coluna Renegociar alimenta o Negociar Ajuste (11e).
 async function peComparacaoRender(){
   if(!projetoAtivo) return;
   const cont = document.getElementById('pe-cmp-container');
   if(!cont) return;
   cont.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Carregando…</span>';
-  let j;
-  try { j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/comparacao`,
-                        {credentials:'same-origin'}).then(r=>r.json()); }
-  catch(e){ cont.innerHTML = '<span style="color:var(--err)">Erro ao carregar.</span>'; return; }
-  if(!j.ok){ cont.innerHTML = `<span style="color:var(--err)">${esc(j.erro||'Erro')}</span>`; return; }
-  const fmt = v => 'R$ ' + Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const sig = v => (v>0?'+':'') + fmt(v);
-  const fmtN = v => Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
-  // --- Comparação de CFO SIMPLIFICADA (Conferência): só valor do projeto, Δ de custo de fábrica por
-  // ambiente com diferença %, e a média final. As provisões NÃO aparecem aqui (vivem no painel de
-  // Provisões / colunas Rev). Removido o bloco de reconciliação estimada (confuso nesta etapa). ---
-  const re = j.reconciliacao_estimada;                       // usado só p/ o Valor do projeto (Val_Cont)
+  const j = await _peComparacaoFetch(cont);
+  if(!j) return;
+  const {fmt, sig, pctS, kpi} = _peCmpHelpers();
+  const corV = v => v>0.005?'var(--ok)':(v<-0.005?'var(--err)':'var(--text-3)');   // venda: subir é bom
+  const lv = j.comparacao_venda || [];
+  if(!lv.length){
+    cont.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Sem orçamento de contrato para comparar.</span>';
+    return;
+  }
+  const vt = j.venda_totais || {};
+  const carregados = lv.filter(l => l.pe_carregado);
+  const deltaTot = carregados.reduce((s,l)=>s+(l.diferenca||0),0);
+  const vOrigTot = carregados.reduce((s,l)=>s+(l.vava_original||0),0);
+  const pctFinal = vOrigTot ? (deltaTot/vOrigTot*100) : 0;
+  const rows = lv.map(l => {
+    const pct = l.vava_original ? (l.diferenca/l.vava_original*100) : 0;
+    const pe  = l.pe_carregado ? fmt(l.vava_pe)
+              : `<span style="color:var(--text-3);font-size:var(--fs-xs)">PE não carregado</span>`;
+    const dif = l.pe_carregado ? `<span style="color:${corV(l.diferenca)}">${sig(l.diferenca)}</span>` : '—';
+    const pTd = l.pe_carregado ? `<span style="color:${corV(l.diferenca)}">${pctS(pct)}</span>` : '—';
+    const chk = `<input type="checkbox" ${l.renegociar?'checked':''} onchange="peRenegociarToggle(${l.pool_ambiente_id}, this)">`;
+    const up  = `<label class="btn-ciclo" style="font-size:var(--fs-xs);padding:2px 8px;cursor:pointer"><i class="ti ti-upload"></i> PE`
+              + `<input type="file" accept=".xml" style="display:none" onchange="pePeUpload(${l.pool_ambiente_id}, this)"></label>`;
+    return `<tr><td>${esc(l.ambiente)}</td>`
+         + `<td class="num">${fmt(l.vava_original)}</td>`
+         + `<td class="num">${pe}</td>`
+         + `<td class="num">${dif}</td>`
+         + `<td class="num">${pTd}</td>`
+         + `<td style="text-align:center">${chk}</td>`
+         + `<td style="text-align:right">${up}</td></tr>`;
+  }).join('');
+  const header = `<div style="display:flex;gap:var(--sp-5);flex-wrap:wrap;margin-bottom:var(--sp-4)">`
+    + kpi('À vista (contrato)', fmt(vt.vavo_original))
+    + kpi('À vista (PE)', fmt(vt.vavo_pe))
+    + kpi('Δ venda', sig(deltaTot), `color:${corV(deltaTot)}`)
+    + kpi('Δ % (carregados)', pctS(pctFinal), `color:${corV(deltaTot)}`)
+    + `</div>`;
+  const table = `<div class="table-wrap"><table class="tbl"><thead><tr>`
+    + `<th>Ambiente</th><th style="text-align:right">À vista (contrato)</th>`
+    + `<th style="text-align:right">À vista (PE)</th><th style="text-align:right">Δ venda</th>`
+    + `<th style="text-align:right">Δ %</th><th style="text-align:center">Renegociar</th>`
+    + `<th style="text-align:right">Carregar</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  cont.innerHTML = header + table;
+}
+
+async function peRenegociarToggle(poolAmbienteId, cb){
+  if(!projetoAtivo) return;
+  try {
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/renegociar`,
+      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({pool_ambiente_id: poolAmbienteId, renegociar: cb.checked})}).then(r=>r.json());
+    if(!j.ok){ cb.checked = !cb.checked; await avisoPopup(j.erro||'Erro',{titulo:'Renegociar'}); }
+  } catch(e){ cb.checked = !cb.checked; await avisoPopup('Erro de rede.',{titulo:'Renegociar'}); }
+}
+
+// ── AF2 (11d) — comparação de CUSTO DE FÁBRICA (CFO), read-only (mudou de casa: era da 11c) ────
+async function peComparacaoCfoRender(){
+  if(!projetoAtivo) return;
+  const cont = document.getElementById('pe-cmp-container-af');
+  if(!cont) return;
+  cont.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Carregando…</span>';
+  const j = await _peComparacaoFetch(cont);
+  if(!j) return;
+  const {fmt, sig, pctS, kpi} = _peCmpHelpers();
+  const cor = v => v>0.005?'var(--err)':(v<-0.005?'var(--ok)':'var(--text-3)');   // custo: subir é ruim
+  const re = j.reconciliacao_estimada;
   const carregados  = j.comparacao.filter(l => l.pe_carregado);
   const cfoVendaTot = carregados.reduce((s,l)=>s+(l.cfo_original||0),0);
   const cfoPeTot    = carregados.reduce((s,l)=>s+(l.cfo_pe||0),0);
   const deltaTot    = cfoPeTot - cfoVendaTot;
-  const pctFinal    = cfoVendaTot ? (deltaTot/cfoVendaTot*100) : 0;   // média final = variação global de custo
-  const cor  = v => v>0.005?'var(--err)':(v<-0.005?'var(--ok)':'var(--text-3)');
-  const pctS = v => `${v>0?'+':''}${Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}%`;
+  const pctFinal    = cfoVendaTot ? (deltaTot/cfoVendaTot*100) : 0;
   const cmpRows = j.comparacao.map(l => {
     const pct = l.cfo_original ? (l.diferenca/l.cfo_original*100) : 0;
     const pe  = l.pe_carregado ? fmt(l.cfo_pe)
               : `<span style="color:var(--text-3);font-size:var(--fs-xs)">PE não carregado</span>`;
     const dif = l.pe_carregado ? `<span style="color:${cor(l.diferenca)}">${sig(l.diferenca)}</span>` : '—';
     const pTd = l.pe_carregado ? `<span style="color:${cor(l.diferenca)}">${pctS(pct)}</span>` : '—';
-    const up  = `<label class="btn-ciclo" style="font-size:var(--fs-xs);padding:2px 8px;cursor:pointer"><i class="ti ti-upload"></i> PE`
-              + `<input type="file" accept=".xml" style="display:none" onchange="pePeUpload(${l.pool_ambiente_id}, this)"></label>`;
     return `<tr><td>${esc(l.ambiente)}</td>`
          + `<td class="num">${fmt(l.cfo_original)}</td>`
          + `<td class="num">${pe}</td>`
          + `<td class="num">${dif}</td>`
-         + `<td class="num">${pTd}</td>`
-         + `<td style="text-align:right">${up}</td></tr>`;
+         + `<td class="num">${pTd}</td></tr>`;
   }).join('');
-  const kpi = (lbl,val,extra='') => `<div style="flex:1;min-width:150px">`
-    + `<div style="font-size:var(--fs-xs);color:var(--text-3);text-transform:uppercase;letter-spacing:.06em">${lbl}</div>`
-    + `<div style="font-family:var(--font-mono);font-size:var(--fs-h3);font-weight:700;${extra}">${val}</div></div>`;
   const header = `<div style="display:flex;gap:var(--sp-5);flex-wrap:wrap;margin-bottom:var(--sp-4)">`
     + kpi('Valor do projeto', fmt(re.val_cont))
     + kpi('Δ custo de fábrica', sig(deltaTot), `color:${cor(deltaTot)}`)
@@ -12895,7 +12964,7 @@ async function peComparacaoRender(){
   const cmpTable = `<div class="table-wrap"><table class="tbl"><thead><tr>`
     + `<th>Ambiente</th><th style="text-align:right">CFO venda</th>`
     + `<th style="text-align:right">CFO PE</th><th style="text-align:right">Δ custo</th>`
-    + `<th style="text-align:right">Δ %</th><th style="text-align:right">Carregar</th></tr></thead><tbody>${cmpRows}</tbody></table></div>`;
+    + `<th style="text-align:right">Δ %</th></tr></thead><tbody>${cmpRows}</tbody></table></div>`;
   cont.innerHTML = header + cmpTable;
 }
 async function pePeUpload(poolAmbienteId, inputFile){

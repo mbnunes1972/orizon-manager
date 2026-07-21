@@ -1378,11 +1378,18 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
 > digitado p/ total antigo + guard furado que salvava o plano negativo). Reinit automático quando o
 > total muda (`_tfAvistaRef`) + validação backend (`mod_fin.validar_plano_pagamento`). Ver `## Sessão 88`.
 >
-> **PENDENTE (retomar por aqui):** Verificação manual no navegador — Fatia 3 (marcadores no PDF exigem
-> modelo referenciá-los), Fatia 4 (coluna Entrega + selo Atrasado, temas claro/escuro), modal de
-> parâmetros com o Custo Especial (Sessão 87) e o fluxo Total Flex + remover ambiente (Sessão 88).
-> Próximas frentes candidatas: Agenda Global (consome a base de atraso do §6), empacotar `comercial`,
-> baseline Alembic.
+> **Sessões 90–91 (2026-07-21):** Revisão de PE reformada por decisão de processo — 11c compara
+> VENDA à vista (motor 2× via `vbva_override`, motor inalterado) com coluna Renegociar; CFO mudou
+> para a AF2 ("Comparar Valores", read-only). Ver `## Sessão 91` e o spec
+> `ciclo/2026-07-21-revisao-pe-venda-renegociacao-design.md`.
+>
+> **PENDENTE (retomar por aqui):** 1) **Fatia 3 da Revisão de PE** (próxima frente): 11e "Negociar
+> Ajuste" (orçamento de ajuste base PE, isenção gated da trava `_contrato_assinado`) + Termo Aditivo
+> (tipo novo em documento_modelos, assinatura loja+cliente) — spec pronto. 2) Verificação manual no
+> navegador — marcadores no PDF (S85), coluna Entrega + selo Atrasado (S86), Custo Especial (S87),
+> Total Flex + remover ambiente (S88), comparação de venda/Renegociar na 11c e CFO na AF2 (S91),
+> temas claro/escuro. Frentes candidatas seguintes: Agenda Global, empacotar `comercial`, baseline
+> Alembic.
 >
 > **(Anterior, 2026-07-19 — mantido abaixo por referência.)**
 
@@ -2313,6 +2320,24 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 91 — Revisão de PE por VENDA + Renegociar (Fatias 1–2 de 3) — decisão de processo
+**Demanda:** a Revisão de PE (11c) deve tratar de VALORES DE VENDA; a comparação de custo de fábrica
+pertence à AF2 (11d, botão "Comparar Valores", sem carregar). Na 11c, checkbox **Renegociar** por
+ambiente; os marcados vão à 11e ("Negociar Ajuste", tela de negociação só com eles). **Decisões do
+usuário (AskUser):** efeito gerencial por ora MAS com **Termo Aditivo** (modelo no painel de documentos,
+assinatura loja+cliente, só a diferença); base = valores do PE. **Viabilidade confirmada:** o XML de PE
+tem o `total` (venda) — mesmo parser do pool; `_negociacao_breakdown` ganhou `vbva_override` e roda o
+MESMO motor 2× (original × PE) → VAVA por ambiente, **motor inalterado**.
+**Fatia 1 (feita):** `extrair_venda_pe`/`montar_comparacao_venda` (puras); colunas `arquivo_pe.
+valor_venda` + `pool_ambientes.renegociar_pe` (migração SQLite+PG); GET `/pe/comparacao` devolve
+`comparacao_venda`+`venda_totais` (backfill lazy do valor_venda re-parseando o XML salvo); POST
+`/pe/renegociar`; tabela da 11c: À vista contrato × PE × Δ × Δ% × Renegociar × Carregar (venda
+maior = verde). E2E `tests/test_pe_comparacao_venda_e2e.py`. **Fatia 2 (feita):** o espelho da 11d
+virou a casa definitiva do CFO — "Comparar Valores", read-only, container próprio (fim da colisão de
+id com a 11c). **Fatia 3 (próxima frente):** orçamento de ajuste (base PE, isenção gated da trava
+`_contrato_assinado`) + Termo Aditivo (tipo novo em documento_modelos, WeasyPrint, assinatura).
+Spec: `docs/superpowers/specs/ciclo/2026-07-21-revisao-pe-venda-renegociacao-design.md`. Suíte 1335.
 
 ## Sessão 90 — Ciclo/Revisão de PE: "Carregar PE" fundido em "Carregar e Comparar Valores"
 **Demanda:** dos 3 botões da Revisão de PE (Carregar Projeto Executivo · Comparar Valores · Desmembrar),

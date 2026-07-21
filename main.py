@@ -949,7 +949,42 @@ class Handler(BaseHTTPRequestHandler):
                 val_cont = (orc.val_cont or 0.0) if orc else 0.0
                 rec_est = mod_pe_comparacao.reconciliacao_estimada(
                     rec.get("provisoes", []), delta_cfo, val_cont)
+                # ── Fatia venda (2026-07-21): comparação de VENDA À VISTA pelo MESMO motor ──
+                # Backfill lazy: PE carregado antes da coluna valor_venda → re-parseia o arquivo salvo.
+                for a in pes:
+                    if (a.valor_venda is None and a.arquivo_path
+                            and str(a.arquivo_path).lower().endswith(".xml")
+                            and os.path.exists(a.arquivo_path)):
+                        try:
+                            with open(a.arquivo_path, "rb") as _f:
+                                a.valor_venda = mod_pe_comparacao.extrair_venda_pe(
+                                    os.path.basename(a.arquivo_path), _f.read())
+                        except Exception:
+                            pass
+                db.commit()
+                comparacao_venda, venda_totais = [], None
+                if orc is not None:
+                    # motor 2×: insumos salvos (original) × VBVA substituído pelo do PE onde carregado
+                    vbva_pe = {a.pool_ambiente_id: a.valor_venda for a in pes
+                               if a.valor_venda is not None and a.pool_ambiente_id in pa_nome}
+                    d_orig = _negociacao_breakdown(orc, db)
+                    d_pe = _negociacao_breakdown(orc, db, vbva_override=vbva_pe) if vbva_pe else d_orig
+                    vava_orig = {amb.get("id"): amb.get("VAVA", 0.0) for amb in d_orig.get("ambientes", [])}
+                    vava_pe_id = {amb.get("id"): amb.get("VAVA", 0.0) for amb in d_pe.get("ambientes", [])}
+                    itens_vava = [(pa_nome[i], vava_orig[i]) for i in vava_orig if i in pa_nome]
+                    vava_pe_nome = {pa_nome[i]: vava_pe_id.get(i, 0.0) for i in vbva_pe if i in pa_nome}
+                    renegs = {(pa.nome_exibicao or pa.nome): bool(pa.renegociar_pe) for pa in pool}
+                    comparacao_venda = mod_pe_comparacao.montar_comparacao_venda(
+                        itens_vava, vava_pe_nome, renegs)
+                    for _l in comparacao_venda:
+                        _l["pool_ambiente_id"] = _id_por_nome.get(_l["ambiente"])
+                    venda_totais = {"vavo_original": d_orig.get("VAVO", 0.0),
+                                    "vavo_pe": d_pe.get("VAVO", 0.0),
+                                    "val_cont_original": d_orig.get("Val_Cont", 0.0),
+                                    "val_cont_pe": d_pe.get("Val_Cont", 0.0)}
                 self.send_json({"ok": True, "comparacao": linhas,
+                                "comparacao_venda": comparacao_venda,
+                                "venda_totais": venda_totais,
                                 "reconciliacao_estimada": rec_est})
             finally:
                 db.close()
@@ -3134,8 +3169,11 @@ class Handler(BaseHTTPRequestHandler):
                 if is_xml:
                     try:
                         valor = mod_pe_comparacao.extrair_cfo_pe(filename, data)
+                        venda = mod_pe_comparacao.extrair_venda_pe(filename, data)
                     except Exception as e:
                         self.send_json({"ok": False, "erro": "XML de PE inválido: %s" % e}); return
+                else:
+                    venda = None
                 reg = (db.query(ArquivoPE)
                          .filter_by(projeto_nome=nome, pool_ambiente_id=pool_ambiente_id, formato=formato).first())
                 if reg is None:
@@ -3143,10 +3181,43 @@ class Handler(BaseHTTPRequestHandler):
                     db.add(reg)
                 reg.arquivo_path     = dest
                 reg.valor_atualizado = valor
+                reg.valor_venda      = venda
                 reg.carregado_em     = datetime.utcnow()
                 reg.carregado_por_id = usuario.get("id")
                 db.commit()
                 self.send_json({"ok": True, "formato": formato, "valor_atualizado": valor})
+            finally:
+                db.close()
+            return
+
+        m_pereneg = re.match(r'^/api/projetos/([^/]+)/pe/renegociar$', path)
+        if m_pereneg:
+            # Fatia venda (2026-07-21): marca/desmarca "Renegociar" num ambiente da Revisão de PE.
+            # Os marcados aparecem na Aprovação do PE pelo Cliente (11e) para o Negociar Ajuste.
+            nome = unquote(m_pereneg.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                req = json.loads(body or b'{}')
+                try:
+                    pa_id = int(req.get("pool_ambiente_id"))
+                except (TypeError, ValueError):
+                    self.send_json({"ok": False, "erro": "pool_ambiente_id ausente/inválido"}, code=400); return
+                pa = db.get(PoolAmbiente, pa_id)
+                if pa is None or pa.projeto_id != nome:
+                    self.send_json({"ok": False, "erro": "Ambiente não pertence ao projeto"}, code=400); return
+                pa.renegociar_pe = 1 if req.get("renegociar") else 0
+                db.commit()
+                self.send_json({"ok": True, "pool_ambiente_id": pa_id,
+                                "renegociar": bool(pa.renegociar_pe)})
             finally:
                 db.close()
             return
@@ -6985,10 +7056,25 @@ class Handler(BaseHTTPRequestHandler):
                     status_por = {e.etapa_codigo: e.status for e in todas}
                     pe_amb = None
                     if codigo == "11c":   # PE por ambiente (tabela de comparação) substitui o doc único
-                        total = db.query(PoolAmbiente).filter_by(projeto_id=nome_safe).count()
-                        com_pe = (db.query(ArquivoPE.pool_ambiente_id)
-                                    .filter_by(projeto_nome=nome_safe).distinct().count())
-                        pe_amb = (total, com_pe)
+                        # Universo = ambientes do ORÇAMENTO DO CONTRATO (o que foi vendido e o que a
+                        # 11c exibe). Ambiente de pool fora do orçamento (removido antes da assinatura)
+                        # não trava a conclusão — não aparece na tabela nem tem upload (QA Vera).
+                        ct = (db.query(Contrato).filter_by(projeto_nome=nome_safe)
+                                .order_by(Contrato.id.desc()).first())
+                        ids_orc = ({oa.pool_ambiente_id for oa in
+                                    db.query(OrcamentoAmbiente).filter_by(orcamento_id=ct.orcamento_id).all()}
+                                   if ct is not None else set())
+                        if ids_orc:
+                            com_pe = (db.query(ArquivoPE.pool_ambiente_id)
+                                        .filter_by(projeto_nome=nome_safe)
+                                        .filter(ArquivoPE.pool_ambiente_id.in_(ids_orc))
+                                        .distinct().count())
+                            pe_amb = (len(ids_orc), com_pe)
+                        else:   # sem contrato/orçamento (legado) → pool inteiro, como antes
+                            total = db.query(PoolAmbiente).filter_by(projeto_id=nome_safe).count()
+                            com_pe = (db.query(ArquivoPE.pool_ambiente_id)
+                                        .filter_by(projeto_nome=nome_safe).distinct().count())
+                            pe_amb = (total, com_pe)
                     ok, erro = mod_ciclo.guarda_conclusao(codigo, tipos_presentes, status_por,
                                                           pe_ambientes=pe_amb)
                     if not ok:
@@ -8739,9 +8825,12 @@ def _params_iniciais_projeto(db, projeto_nome, loja_id):
     return par
 
 
-def _negociacao_breakdown(orc, db):
+def _negociacao_breakdown(orc, db, vbva_override=None):
     """Calcula a cadeia do motor lendo SÓ os insumos salvos (parametros_json, desconto do
-    orçamento, descontos por ambiente, forma_pagamento). Sem overrides do frontend. NÃO grava."""
+    orçamento, descontos por ambiente, forma_pagamento). Sem overrides do frontend. NÃO grava.
+    vbva_override: {pool_ambiente_id: VBVA} — substitui o valor bruto de ambientes específicos
+    (Fatia venda da Revisão de PE: VBVA extraído do XML de PE passa pelo MESMO motor, com os
+    mesmos parâmetros/descontos, para comparar venda à vista maçã-com-maçã). Motor inalterado."""
     import mod_negociacao, mod_provisoes, mod_orcamento_params
     proj = db.query(Projeto).filter_by(nome_safe=orc.projeto_id).first()
     # Carrega cfg da loja uma única vez — usado para defaults de params E para provisões
@@ -8762,7 +8851,8 @@ def _negociacao_breakdown(orc, db):
     for lk in db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all():
         pa = db.get(PoolAmbiente, lk.pool_ambiente_id)
         if pa:
-            ambs.append({"VBVA": pa.budget_total or 0.0, "CFA": pa.order_total or 0.0,
+            vbva = (vbva_override or {}).get(lk.pool_ambiente_id, pa.budget_total or 0.0)
+            ambs.append({"VBVA": vbva, "CFA": pa.order_total or 0.0,
                          "desc_amb_pct": float(lk.desconto_individual_pct or 0.0)})
             ids.append(lk.pool_ambiente_id)
     total_cliente = None

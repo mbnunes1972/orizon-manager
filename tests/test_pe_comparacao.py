@@ -87,3 +87,29 @@ def test_saldo_margem_estimado_soma_so_ambientes_com_pe():
 
     # custo subiu → margem estimada negativa
     assert saldo_margem_estimado(montar_comparacao_pe([("A", 6000.0)], {"A": 6250.0})) == -250.0
+
+
+# ── Fatia venda (2026-07-21): Revisão de PE compara VALORES DE VENDA à vista ──────────────────
+
+def test_extrai_venda_pe_do_total():
+    # a venda do PE é o `total` do ambiente — mesma grandeza que vira budget_total/VBVA no pool
+    caminho = "PROJETOS/Casa_Nova/xmls/Cozinha.xml"
+    if not os.path.exists(caminho):
+        import pytest; pytest.skip("XML de exemplo ausente")
+    conteudo = open(caminho, "rb").read()
+    from mod_pe_comparacao import extrair_venda_pe
+    amb = ler_xml_str("Cozinha.xml", conteudo)
+    assert extrair_venda_pe("Cozinha.xml", conteudo) == round(float(amb.get("total", 0.0)), 2)
+    assert extrair_venda_pe("Cozinha.xml", conteudo) > 0
+
+
+def test_montar_comparacao_venda():
+    from mod_pe_comparacao import montar_comparacao_venda
+    itens = [("Cozinha", 80000.0), ("Sala", 50000.0)]
+    vava_pe = {"Cozinha": 84000.0}
+    linhas = montar_comparacao_venda(itens, vava_pe, {"Cozinha": True})
+    coz, sala = linhas
+    assert coz == {"ambiente": "Cozinha", "vava_original": 80000.0, "vava_pe": 84000.0,
+                   "diferenca": 4000.0, "pe_carregado": True, "renegociar": True}
+    assert sala["pe_carregado"] is False and sala["vava_pe"] == 0.0
+    assert sala["renegociar"] is False and sala["diferenca"] == -50000.0

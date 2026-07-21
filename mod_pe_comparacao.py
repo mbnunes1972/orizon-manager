@@ -44,6 +44,42 @@ def extrair_cfo_pe(arq_nome, xml_conteudo):
                      for item in grupo.get("itens", [])), 2)
 
 
+def extrair_venda_pe(arq_nome, xml_conteudo):
+    """Extrai o VALOR DE VENDA bruto de um XML de PE — o `total` do ambiente, exatamente como o
+    pool extrai `budget_total` (VBVA do motor). Par do `extrair_cfo_pe` (que extrai o custo).
+    Fatia venda (2026-07-21): a Revisão de PE compara venda; o CFO fica para a AF2."""
+    from integracoes.promob_grupos import ler_xml_str
+    amb = ler_xml_str(arq_nome, xml_conteudo)
+    return round(float(amb.get("total", 0.0) or 0.0), 2)
+
+
+def montar_comparacao_venda(itens_vava_original, vava_pe, renegociar=None):
+    """Tabela de comparação de VENDA À VISTA (VAVA) ambiente a ambiente — mesma forma da
+    `montar_comparacao_pe`, com a grandeza de venda (motor) no lugar do CFO.
+
+    itens_vava_original: [(nome_exibicao, vava_original), ...] — VAVA por ambiente do orçamento
+                         do contrato (breakdown do motor). Define ordem e rótulos.
+    vava_pe:             {nome_exibicao: vava_pe} — VAVA recalculado pelo MESMO motor com o VBVA
+                         extraído do XML de PE. Ausente = PE não carregado.
+    renegociar:          {nome_exibicao: bool} — flag "Renegociar" persistida por ambiente.
+    """
+    renegociar = renegociar or {}
+    linhas = []
+    for nome, vava_orig in itens_vava_original:
+        vo = float(vava_orig or 0)
+        carregado = nome in vava_pe
+        vpe = float(vava_pe.get(nome, 0) or 0)
+        linhas.append({
+            "ambiente": nome,
+            "vava_original": vo,
+            "vava_pe": vpe,
+            "diferenca": round(vpe - vo, 2),
+            "pe_carregado": carregado,
+            "renegociar": bool(renegociar.get(nome, False)),
+        })
+    return linhas
+
+
 def reconciliacao_estimada(provisoes, delta_cfo, val_cont, codigo_cfo="2.1.04.06"):
     """Reconciliação ESTIMADA referenciada ao Val_Cont (decisão #9, opção 1) — READ-ONLY, não lança.
 

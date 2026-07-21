@@ -594,6 +594,7 @@ class PoolAmbiente(Base):
     qa_custo_sem_venda    = Column(Integer, nullable=True)
     qa_override_por_id    = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
     qa_override_motivo    = Column(String,  nullable=True)
+    renegociar_pe         = Column(Integer, default=0)   # Revisão de PE (11c): ambiente marcado p/ renegociar (Fatia venda 2026-07-21)
     created_by     = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     created_at     = Column(DateTime, default=datetime.utcnow)
 
@@ -794,6 +795,7 @@ class ArquivoPE(Base):
     formato          = Column(String(10), nullable=False)   # 'xml_pe' | 'promob_pe'
     arquivo_path     = Column(Text,     nullable=True)
     valor_atualizado = Column(Float,    nullable=True)       # CFO do PE (só p/ 'xml_pe'); null = não carregado
+    valor_venda      = Column(Float,    nullable=True)       # VENDA bruta do PE (`total` do XML = VBVA) — Fatia venda 2026-07-21
     carregado_em     = Column(DateTime, default=datetime.utcnow)
     carregado_por_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     __table_args__ = (UniqueConstraint("projeto_nome", "pool_ambiente_id", "formato", name="uq_arquivo_pe"),)
@@ -1306,9 +1308,18 @@ def _migrar_colunas():
             pa_cols = {row[1] for row in cur.fetchall()}
             for col, tipo in [("qa_selo", "VARCHAR(20)"), ("qa_pct_sem_acrescimo", "REAL"),
                               ("qa_markup_xml", "REAL"), ("qa_custo_sem_venda", "INTEGER"),
-                              ("qa_override_por_id", "INTEGER"), ("qa_override_motivo", "TEXT")]:
+                              ("qa_override_por_id", "INTEGER"), ("qa_override_motivo", "TEXT"),
+                              ("renegociar_pe", "INTEGER DEFAULT 0")]:
                 if col not in pa_cols:
                     cur.execute(f"ALTER TABLE pool_ambientes ADD COLUMN {col} {tipo}")
+
+        # ── arquivo_pe: valor de venda do PE (Fatia venda 2026-07-21) ──
+        cur.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='arquivo_pe'")
+        if cur.fetchone() is not None:
+            cur.execute("PRAGMA table_info(arquivo_pe)")
+            ape_cols = {row[1] for row in cur.fetchall()}
+            if "valor_venda" not in ape_cols:
+                cur.execute("ALTER TABLE arquivo_pe ADD COLUMN valor_venda REAL")
 
         # ── orcamento_ambientes ───────────────────────────────────────────────
         cur.execute("PRAGMA table_info(orcamento_ambientes)")
@@ -1773,6 +1784,9 @@ def _migrar_colunas_pg():
         "ALTER TABLE ciclo_etapas ADD COLUMN IF NOT EXISTS data_prevista_conclusao TIMESTAMP",
         "ALTER TABLE ciclo_etapas ADD COLUMN IF NOT EXISTS funcao_responsavel_id INTEGER",
         "ALTER TABLE ciclo_etapas ADD COLUMN IF NOT EXISTS responsavel_funcionario_id INTEGER",
+        # Fatia venda da Revisão de PE (2026-07-21): venda do PE + flag Renegociar por ambiente.
+        "ALTER TABLE arquivo_pe ADD COLUMN IF NOT EXISTS valor_venda DOUBLE PRECISION",
+        "ALTER TABLE pool_ambientes ADD COLUMN IF NOT EXISTS renegociar_pe INTEGER DEFAULT 0",
     ]
     with ENGINE.begin() as conn:
         for s in stmts:
