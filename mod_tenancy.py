@@ -151,10 +151,13 @@ def atribuir_tenant_usuario(ator, dados):
     return (None, None, erros)
 
 
-def perfis_atribuiveis(ator, escopo):
+def perfis_atribuiveis(ator, escopo, loja_id=None):
     """Slugs que `ator` pode atribuir em `escopo` ∈ {loja, rede, plataforma}.
-    Fonte única do dropdown de perfil no modal de usuário. A checagem de que a
-    loja/rede concreta está no escopo do ator é feita na rota (precisa do banco)."""
+    Fonte única do dropdown de perfil no modal de usuário. `loja_id` (bug 2026-07-22):
+    a loja ALVO do novo usuário — super_admin/admin_rede não têm loja própria e sem isto
+    o dropdown caía no fallback genérico, sem os perfis customizados da loja. A checagem
+    de que a loja/rede concreta está no escopo do ator é feita na rota (precisa do banco):
+    só repasse loja_id já validado com pode_ver_loja()."""
     if not perfis.pode(ator.get("nivel"), "gerir_usuarios"):
         return []
     if escopo == "plataforma":
@@ -164,7 +167,7 @@ def perfis_atribuiveis(ator, escopo):
             return ["admin_rede"]
         return []
     if escopo == "loja":
-        _lid = ator.get("active_loja_id") or ator.get("loja_id")
+        _lid = loja_id or ator.get("active_loja_id") or ator.get("loja_id")
         do_banco = perfis.slugs_da_loja(_lid) if _lid else []
         return do_banco or [s for s in perfis.slugs() if s not in ("super_admin", "admin_rede")]
     return []

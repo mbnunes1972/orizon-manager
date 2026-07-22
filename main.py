@@ -1817,10 +1817,20 @@ class Handler(BaseHTTPRequestHandler):
             from urllib.parse import parse_qs
             qs = parse_qs(urlparse(self.path).query)
             escopo = (qs.get("escopo") or [""])[0].strip()
+            loja_q = (qs.get("loja_id") or [""])[0].strip()
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
-                slugs = mod_tenancy.perfis_atribuiveis(ator, escopo)
+                # loja ALVO (bug 2026-07-22): honra o loja_id do request — é o que traz os
+                # perfis customizados da loja pro super_admin/admin_rede, que não têm loja
+                # própria. Só dentro do escopo do ator (senão vazaria nomes de perfil).
+                loja_alvo_id = None
+                if loja_q.isdigit():
+                    _lj = db.get(Loja, int(loja_q))
+                    if _lj is not None and mod_tenancy.pode_ver_loja(
+                            ator, {"id": _lj.id, "rede_id": _lj.rede_id}):
+                        loja_alvo_id = _lj.id
+                slugs = mod_tenancy.perfis_atribuiveis(ator, escopo, loja_id=loja_alvo_id)
                 self.send_json({"ok": True, "perfis": [
                     {"slug": s, "rotulo": perfis.rotulo(s)} for s in slugs]})
             finally:
@@ -11460,6 +11470,10 @@ def main():
             # forçaria o caminho de merge à toa. Idempotentes os dois.
             _mc.migrar_plano_formalismo(_dbp)
             _mc.backfill_plano_todos_owners(_dbp)
+            # Perfis padrão em todas as lojas + padronização de títulos (Gerencial → Gerente,
+            # 2026-07-22). Idempotente.
+            from auth import perfil_store as _pst
+            _pst.backfill_perfis_todas_lojas(_dbp)
         finally:
             _dbp.close()
     except Exception as _e:

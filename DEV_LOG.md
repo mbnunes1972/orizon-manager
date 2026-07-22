@@ -2334,6 +2334,26 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 110 — Gestão geral: usuário sem loja no modal + perfis por loja honrando o alvo + títulos
+**Relato do usuário (super_admin na gestão geral):** modal de novo usuário "pede loja mas não
+disponibiliza opções" e os perfis mostram só Master/Gerencial/Operador ("cadê o Diretor?").
+**Diagnóstico:** (a) na gestão geral o contexto não tem loja/rede → a lista de lojas vinha VAZIA
+e o salvar exige ≥1 loja — beco sem saída; (b) `perfis-permitidos` IGNORAVA o `loja_id` do
+request (usava só a loja do ATOR — super_admin não tem) → caía no fallback genérico, sem os
+perfis customizados da loja-alvo; (c) "Diretor" não é perfil por DESENHO (Perfil-4: cargo virou
+Função; o antigo nível diretoria é o Master — o próprio usuário confirmou "o Master é o usuário
+diretor"). **Correções:** modal na gestão geral carrega TODAS as lojas do escopo (backend já
+filtra tenancy); marcar loja recarrega o dropdown de perfis com os DAQUELA loja
+(`_musrLojaMudou`); `perfis_atribuiveis(ator, escopo, loja_id=)` honra a loja-alvo, com guarda
+`pode_ver_loja` na rota (dir de uma loja não enxerga perfis customizados de outra — testado);
+`criar_perfil` invalida o cache do registro ELE MESMO (antes só a rota fazia; teste em outro
+caminho pegou o cache velho). **Decisões do usuário (AskUser + mensagens):** títulos padronizados
+**Master** (acesso a tudo — é o perfil do diretor/dono) · **Gerente** (rename do rótulo de
+"Gerencial"; slug não muda) · **Operador** (escopo de trabalho); SEM perfil "Diretor" novo.
+`backfill_perfis_todas_lojas` no start: semeia os 3 padrão em toda loja + renomeia
+Gerencial→Gerente (custom preservado). **Super Admin cria outros Super Admins:** já suportado
+(Painel Orizon → Gestores → "+ Novo gestor", escopo plataforma) — travado por teste novo.
+
 ## Sessão 109 — Formalismo pleno: família 5.6 suprimida, rubricas nos grupos contábeis formais
 **Decisão do usuário (fechando o arco 107→109):** "as contas de constituição… granularidade
 desnecessária… deixar correto" — cada rubrica de despesa mora no grupo FORMAL: **CMV**

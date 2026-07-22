@@ -7,10 +7,14 @@ from . import mod_perfis
 # Definição dos 3 perfis padrão (rev3 §2). base == slug para os de sistema.
 _OPERACIONAIS = ["captacao", "cadastro", "comercial",
                  "estoque", "expedicao", "montagem", "assistencias"]
+# Padronização dos títulos (decisão do usuário, 2026-07-22): Master (acesso a tudo — é o
+# perfil do diretor/dono da loja), Gerente (acesso geral, por enquanto) e Operador (acesso ao
+# seu escopo de trabalho). O slug 'gerencial' NÃO muda (usuários existentes apontam pra ele);
+# só o rótulo visível virou "Gerente" — bases antigas: backfill_perfis_todas_lojas.
 PERFIS_PADRAO = [
     {"slug": "master", "nome": "Master", "base": "master",
      "modulos": _OPERACIONAIS + ["fiscal", "financeiro", "folha", "admin", "config"]},
-    {"slug": "gerencial", "nome": "Gerencial", "base": "gerencial",
+    {"slug": "gerencial", "nome": "Gerente", "base": "gerencial",
      "modulos": _OPERACIONAIS + ["fiscal", "financeiro", "folha"]},
     {"slug": "operador", "nome": "Operador", "base": "operador",
      "modulos": _OPERACIONAIS + ["fiscal"]},
@@ -31,7 +35,28 @@ def seed_perfis_loja(db, loja_id):
                             sistema=1))
         criados += 1
     db.commit()
+    if criados:
+        from auth import perfis as _perfis    # import local: evita ciclo no load do módulo
+        _perfis.recarregar()
     return criados
+
+
+def backfill_perfis_todas_lojas(db):
+    """Roda no start (idempotente): garante os perfis padrão em TODAS as lojas e aplica a
+    padronização de títulos de 2026-07-22 ('Gerencial' → 'Gerente' — só quem ainda tem o
+    nome do seed antigo; nome customizado no painel de Perfis não é sobrescrito)."""
+    from database import Loja
+    criados = renomeados = 0
+    for (lid,) in db.query(Loja.id).all():
+        criados += seed_perfis_loja(db, lid)
+    for p in db.query(PerfilAcesso).filter_by(slug="gerencial", nome="Gerencial").all():
+        p.nome = "Gerente"
+        renomeados += 1
+    db.commit()
+    if criados or renomeados:
+        from auth import perfis as _perfis
+        _perfis.recarregar()
+    return {"criados": criados, "renomeados": renomeados}
 
 
 def perfis_da_loja(db, loja_id):
@@ -56,6 +81,10 @@ def criar_perfil(db, loja_id, nome, base, modulos, capacidades=None):
                      modulos_json=json.dumps(list(modulos)),
                      capacidades_json=json.dumps(caps), sistema=0)
     db.add(p); db.commit()
+    # invalida o cache AQUI (não só na rota): quem criar perfil por outro caminho — teste,
+    # seed futuro — deixava slugs_da_loja/rotulo() servindo o registro velho (bug 2026-07-22)
+    from auth import perfis as _perfis
+    _perfis.recarregar()
     return p, ""
 
 

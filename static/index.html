@@ -11756,12 +11756,35 @@ async function _carregarLojasModalUsuario(ctx){
     lojas = d.lojas || [];
   } else if (ctx.loja_id) {
     lojas = [{ id: ctx.loja_id, nome: '(loja atual)' }];
+  } else {
+    // Gestão geral (super_admin/admin_rede sem loja própria — bug 2026-07-22): sem loja no
+    // contexto o modal ficava sem opção nenhuma e o salvar exigia loja — beco sem saída.
+    // Carrega TODAS as lojas do escopo do ator (o backend já filtra por tenancy).
+    const d = await fetch('/api/admin/lojas', {credentials:'same-origin'})
+      .then(r=>r.json()).catch(()=>({lojas:[]}));
+    lojas = d.lojas || [];
   }
   const sel = new Set(ctx.loja_ids || (ctx.loja_id ? [ctx.loja_id] : []));
   box.style.display = lojas.length ? '' : 'none';
   document.getElementById('musr-lojas').innerHTML = lojas.map(l =>
     `<label style="display:block;font-size:12px"><input type="checkbox" class="musr-loja-cb" `
-    + `value="${l.id}" ${sel.has(l.id)?'checked':''}> ${esc(l.nome)}</label>`).join('');
+    + `onchange="_musrLojaMudou()" value="${l.id}" ${sel.has(l.id)?'checked':''}> ${esc(l.nome)}</label>`).join('');
+}
+
+// Ao marcar uma loja, o dropdown de perfil recarrega com os perfis DAQUELA loja (inclusive
+// os customizados dela) — o perfil de acesso é por loja desde a rev3.
+async function _musrLojaMudou(){
+  if (!_modalUserCtx) return;
+  const marcada = document.querySelector('.musr-loja-cb:checked');
+  if (!marcada) return;
+  const q = new URLSearchParams({ escopo: _modalUserCtx.escopo || 'loja', loja_id: marcada.value });
+  const pd = await fetch('/api/admin/usuarios/perfis-permitidos?' + q.toString(),
+    { credentials: 'same-origin' }).then(r => r.json()).catch(() => null);
+  if (!pd || !pd.ok) return;
+  const sel = document.getElementById('musr-perfil');
+  const atual = sel.value;
+  sel.innerHTML = (pd.perfis || []).map(p => `<option value="${p.slug}">${esc(p.rotulo)}</option>`).join('');
+  if (Array.from(sel.options).some(o => o.value === atual)) sel.value = atual;
 }
 
 async function abrirModalUsuario(ctx){

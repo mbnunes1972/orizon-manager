@@ -36,3 +36,24 @@ def test_seed_idempotente():
     perfil_store.seed_perfis_loja(db, 1)
     perfil_store.seed_perfis_loja(db, 1)
     assert db.query(database.PerfilAcesso).filter_by(loja_id=1).count() == 3
+
+
+def test_titulos_padronizados_e_backfill_gerente():
+    """Padronização 2026-07-22: seed nasce com 'Gerente' (slug 'gerencial' NÃO muda) e o
+    backfill renomeia bases antigas — sem sobrescrever nome customizado no painel."""
+    db = _sess()
+    perfil_store.seed_perfis_loja(db, 1)
+    g = db.query(database.PerfilAcesso).filter_by(loja_id=1, slug="gerencial").first()
+    assert g.nome == "Gerente"
+    # base antiga: volta o nome velho e cria loja 2 sem seed nenhum
+    g.nome = "Gerencial"
+    db.commit()
+    out = perfil_store.backfill_perfis_todas_lojas(db)
+    assert out["renomeados"] == 1 and out["criados"] == 3     # loja 2 ganhou o seed
+    assert db.query(database.PerfilAcesso).filter_by(loja_id=1, slug="gerencial").first().nome == "Gerente"
+    # nome customizado é preservado
+    g2 = db.query(database.PerfilAcesso).filter_by(loja_id=2, slug="gerencial").first()
+    g2.nome = "Gestor da Casa"
+    db.commit()
+    perfil_store.backfill_perfis_todas_lojas(db)
+    assert db.query(database.PerfilAcesso).filter_by(loja_id=2, slug="gerencial").first().nome == "Gestor da Casa"

@@ -137,3 +137,43 @@ def test_edita_proprio_contato_permitido(http_client_factory, seed, app_db):
     db.close()
     st, body = c.patch(f"/api/admin/usuarios/{meu_id}", {"telefone": "1199", "email": "eu@loja.com"})
     assert body["ok"] is True
+
+
+def test_perfis_permitidos_super_admin_honra_loja_id(http_client_factory, seed, app_db):
+    """Bug 2026-07-22: super_admin (sem loja própria) criando usuário na gestão geral — o
+    endpoint deve honrar o loja_id do request e devolver os perfis DAQUELA loja, inclusive
+    os customizados (antes ignorava e caía no fallback genérico master/gerencial/operador)."""
+    from auth import perfil_store
+    db = app_db.get_session()
+    perfil_store.seed_perfis_loja(db, seed["loja2_id"])
+    p, err = perfil_store.criar_perfil(db, seed["loja2_id"], "Diretor", "master", ["comercial"])
+    assert p is not None, err
+    db.close()
+    c = _login(http_client_factory, "super")
+    st, body = c.get(f"/api/admin/usuarios/perfis-permitidos?escopo=loja&loja_id={seed['loja2_id']}")
+    assert st == 200 and body["ok"], body
+    rotulos = {x["rotulo"] for x in body["perfis"]}
+    assert "Diretor" in rotulos, rotulos            # perfil customizado da loja aparece
+    slugs = {x["slug"] for x in body["perfis"]}
+    assert {"master", "gerencial", "operador"} <= slugs
+
+
+def test_perfis_permitidos_nao_vaza_loja_fora_do_escopo(http_client_factory, seed, app_db):
+    """dir_l1 pedindo os perfis da loja 2 NÃO recebe os customizados de lá — o loja_id só é
+    honrado dentro do escopo do ator (super/admin_rede da rede/a própria loja)."""
+    c = _login(http_client_factory, "dir_l1")
+    st, body = c.get(f"/api/admin/usuarios/perfis-permitidos?escopo=loja&loja_id={seed['loja2_id']}")
+    assert st == 200 and body["ok"], body
+    rotulos = {x["rotulo"] for x in body["perfis"]}
+    assert "Diretor" not in rotulos                  # criado no teste anterior, loja 2
+
+
+def test_super_admin_cria_outro_super_admin(http_client_factory, seed):
+    """Pedido 2026-07-22: o Super Admin pode criar outros usuários Super Admin (o botão
+    '+ Novo gestor' do Painel Orizon usa escopo=plataforma)."""
+    c = _login(http_client_factory, "super")
+    st, body = c.post("/api/admin/usuarios", {
+        "nome": "Segundo Gestor", "login": "super2", "senha": "s1", "nivel": "super_admin"})
+    assert st == 200 and body["ok"], body
+    st, lst = c.get("/api/admin/usuarios?escopo=plataforma")
+    assert any(u["login"] == "super2" for u in lst["usuarios"])

@@ -16,7 +16,7 @@ PERFIS = {
         "aprovar_medicao_reprovada": True, "gerir_usuarios": True, "gerir_perfis": True,
         "editar_dados_loja": True, "gerir_documentos": True,
         "executar_pe": True, "revisar_pe": True, "registrar_medicao": True},
-    "gerencial": {"rotulo": "Gerencial", "desconto_max": 20.0,
+    "gerencial": {"rotulo": "Gerente", "desconto_max": 20.0,   # rótulo padronizado 2026-07-22 (slug não muda)
         "acesso_operacional": True, "acesso_financeiro": True, "acesso_fiscal": True,
         "acesso_admin": False, "acesso_config": False,
         "ver_parametros": True, "autorizar": True, "aprovar_financeiro": True,
