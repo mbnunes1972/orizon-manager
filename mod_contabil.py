@@ -85,7 +85,10 @@ PLANO_PADRAO = [
     ("4.4.04", "Ganhos com Acordos Financeiros"),   # opção B (2026-07-22): contrapartida-resultado de acrescer/abater
     ("5", "DESPESAS / CUSTOS"),
     ("5.1", "CMV"),
-    ("5.1.01", "CMV Fábrica (Dal Mobile)"), ("5.1.02", "Frete Fábrica"),
+    # 5.1.02 "Frete Fábrica" REMOVIDA do seed (decisão do usuário, 2026-07-22): nenhum evento
+    # do motor a usava e ela convidava ao lançamento manual DUPLICADO — a despesa do frete de
+    # fábrica nasce SEMPRE na 5.6.04, no matching da NF-e. Bases antigas: migrar_plano_faxina_frete.
+    ("5.1.01", "CMV Fábrica (Dal Mobile)"),
     ("5.2", "Custo de Serviço"),
     ("5.2.01", "Montagem"), ("5.2.02", "Comissão Executivo de Montagem"),
     ("5.2.03", "Viagens de Pedido"), ("5.2.04", "Salários Operacionais"),
@@ -116,19 +119,71 @@ PLANO_PADRAO = [
     ("5.5.03", "Custo de Antecipação de Recebíveis"),
     ("5.5.04", "Custo Financeiro sobre Vendas"),   # FASE B: deságio/taxa da financeira (Aymoré/Cartão)
     ("5.5.05", "Perdas com Acordos Financeiros"),   # opção B (2026-07-22): contrapartida-resultado de acrescer/abater
-    ("5.6", "Constituição de Provisões"),
-    ("5.6.01", "Constituição — Provisão de Garantia"),
-    ("5.6.02", "Constituição — Provisão de Montagem"),
-    ("5.6.03", "Constituição — Provisão de Assistência Técnica"),
-    # FASE B2.4: constituição das demais rubricas rastreadas no fechamento (Tipos C e A)
-    ("5.6.04", "Constituição — Provisão de Frete de Fábrica"),
-    ("5.6.05", "Constituição — Provisão de Frete Local"),
-    ("5.6.06", "Constituição — Provisão de Insumos Locais"),
-    ("5.6.07", "Constituição — Provisão de Comissão de Medidor"),
-    ("5.6.08", "Constituição — Provisão de Comissão de Projeto/Executivo"),
-    ("5.6.09", "Constituição — Provisão de Retenção de Comissão de Vendas"),
+    # Família 5.6 renomeada (2026-07-22): o "Constituição —" era herança do fluxo pré-D2, quando
+    # a constituição tocava a DRE no contrato. Desde a FASE D2 a constituição é ativo diferido
+    # (sem DRE) e o que cai nestas contas é o RECONHECIMENTO da despesa (matching da NF-e) —
+    # o nome antigo induzia a achar que havia DUAS contas de despesa por rubrica. Lançamento
+    # avulso direto nelas é permitido (decisão do usuário). A chave da DRE segue
+    # 'constituicao_provisoes' (contrato com o frontend; só o rótulo visível mudou).
+    ("5.6", "Despesas Reconhecidas de Provisões"),
+    ("5.6.01", "Garantia — Despesa Reconhecida"),
+    ("5.6.02", "Montagem — Despesa Reconhecida"),
+    ("5.6.03", "Assistência Técnica — Despesa Reconhecida"),
+    ("5.6.04", "Frete de Fábrica — Despesa Reconhecida"),
+    ("5.6.05", "Frete Local — Despesa Reconhecida"),
+    ("5.6.06", "Insumos Locais — Despesa Reconhecida"),
+    ("5.6.07", "Comissão de Medidor — Despesa Reconhecida"),
+    ("5.6.08", "Comissão de Projeto/Executivo — Despesa Reconhecida"),
+    ("5.6.09", "Retenção de Comissão de Vendas — Despesa Reconhecida"),
     ("5.6.10", "Ajuste de Provisões"),   # FASE D: destino da FALTA (efetivado > provisionado)
 ]
+
+# Nomes do seed ANTERIOR da família 5.6 → novos (migração de bases existentes). Renomeia só
+# a conta que AINDA carrega o nome antigo do seed — nome customizado pelo usuário fica.
+_RENOMES_5_6 = {
+    "5.6":    ("Constituição de Provisões",                                 "Despesas Reconhecidas de Provisões"),
+    "5.6.01": ("Constituição — Provisão de Garantia",                       "Garantia — Despesa Reconhecida"),
+    "5.6.02": ("Constituição — Provisão de Montagem",                       "Montagem — Despesa Reconhecida"),
+    "5.6.03": ("Constituição — Provisão de Assistência Técnica",            "Assistência Técnica — Despesa Reconhecida"),
+    "5.6.04": ("Constituição — Provisão de Frete de Fábrica",               "Frete de Fábrica — Despesa Reconhecida"),
+    "5.6.05": ("Constituição — Provisão de Frete Local",                    "Frete Local — Despesa Reconhecida"),
+    "5.6.06": ("Constituição — Provisão de Insumos Locais",                 "Insumos Locais — Despesa Reconhecida"),
+    "5.6.07": ("Constituição — Provisão de Comissão de Medidor",            "Comissão de Medidor — Despesa Reconhecida"),
+    "5.6.08": ("Constituição — Provisão de Comissão de Projeto/Executivo",  "Comissão de Projeto/Executivo — Despesa Reconhecida"),
+    "5.6.09": ("Constituição — Provisão de Retenção de Comissão de Vendas", "Retenção de Comissão de Vendas — Despesa Reconhecida"),
+}
+
+
+def migrar_plano_faxina_frete(db):
+    """Faxina 2026-07-22 (decisão do usuário) em TODOS os owners, idempotente — roda no start:
+    (1) 5.1.02 "Frete Fábrica": REMOVE se sem lançamento; com movimento, DESATIVA (o histórico
+    fica — movimento nela é indício de duplicação manual a reclassificar). (2) Renomeia a
+    família 5.6 (nomes antigos do seed → novos); nome customizado não é sobrescrito."""
+    owners = db.query(Conta.owner_tipo, Conta.owner_id).distinct().all()
+    removidas = desativadas = renomeadas = 0
+    for ot, oid in owners:
+        c = (db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo="5.1.02")
+               .first())
+        if c is not None:
+            tem_mov = (db.query(Lancamento)
+                         .filter((Lancamento.conta_debito_id == c.id) |
+                                 (Lancamento.conta_credito_id == c.id))
+                         .first() is not None)
+            if tem_mov:
+                if c.ativa:
+                    c.ativa = 0
+                    desativadas += 1
+            else:
+                db.delete(c)
+                removidas += 1
+        for cod, (antigo, novo) in _RENOMES_5_6.items():
+            c6 = (db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid,
+                                            codigo=cod, nome=antigo).first())
+            if c6 is not None:
+                c6.nome = novo
+                renomeadas += 1
+    db.commit()
+    return {"removidas": removidas, "desativadas": desativadas, "renomeadas": renomeadas}
 
 
 def _pai_codigo(codigo):

@@ -11456,6 +11456,9 @@ def main():
         _dbp = get_session()
         try:
             _mc.backfill_plano_todos_owners(_dbp)
+            # Faxina 2026-07-22: remove/desativa a 5.1.02 (Frete Fábrica, morta no motor) e
+            # renomeia a família 5.6 (Constituição → Despesa Reconhecida). Idempotente.
+            _mc.migrar_plano_faxina_frete(_dbp)
         finally:
             _dbp.close()
     except Exception as _e:

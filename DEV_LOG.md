@@ -2334,6 +2334,27 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 107 — Plano de contas: fim da conta duplicada de frete fábrica + renome da família 5.6
+**Dúvida do usuário (procedente):** "duas contas de despesa associadas a frete fábrica —
+`5.1.02 Frete Fábrica` e `5.6.04 Constituição — Provisão de Frete de Fábrica` — receio de
+duplicação". **Diagnóstico:** no fluxo automático (D2) a duplicação é impossível — a despesa do
+frete nasce SEMPRE na 5.6.04 (matching da NF-e: `5.6.04 × 1.1.06.07`); a **5.1.02 não é usada por
+NENHUM evento do motor** (só existia no seed) e o risco era exclusivamente operacional: lançar a
+nota real do frete à mão nela (DRE em dobro + provisão `2.1.04.07` órfã que a Etapa 21 ainda
+"resolveria" como sobra → receita `4.4.02` — distorção dupla). O destino correto da nota real é
+`efetivar_provisao` (`2.1.04.07 × 2.1.01`). **Decisão do usuário:** (1) remover a 5.1.02;
+(2) renomear a família 5.6 tirando o "Constituição —" (herança pré-D2 — o que cai nelas desde a
+D2 é o RECONHECIMENTO; lançamento avulso direto nelas fica permitido). **Implementado (TDD):**
+5.1.02 fora do `PLANO_PADRAO`; família 5.6 renomeada no seed ("<Rubrica> — Despesa Reconhecida",
+grupo "Despesas Reconhecidas de Provisões" — chave da DRE segue `constituicao_provisoes`, só o
+rótulo visível mudou); **`migrar_plano_faxina_frete`** roda no start (junto do backfill,
+idempotente): remove a 5.1.02 sem movimento / **desativa** a com movimento (histórico fica — e
+movimento nela é indício de duplicação manual a reclassificar), renomeia só quem ainda tem o nome
+antigo do seed (custom do usuário preservado). Testes `tests/test_plano_faxina_frete.py` (5).
+**Observação anotada (sem ação, decidir depois):** o mesmo padrão de par existe para Montagem
+(`5.2.01`×`5.6.02`), Frete Local (`5.2.08`×`5.6.05`) e Insumos (`5.2.09`×`5.6.06`) — as contas
+5.2 podem ter uso legítimo fora do ciclo de venda, mas valem a mesma avaliação.
+
 ## Sessão 106 — Cabeçalho no Aditivo + Painel de Documentos: Upload por seletor, Novo Documento e exemplos
 **Spec `contrato-documentos/2026-07-22-cabecalho-aditivo-painel-documentos-design.md`.**
 **Cabeçalho:** `_html_cabecalho()` compartilhado (extraído da capa — um lugar só) agora injetado

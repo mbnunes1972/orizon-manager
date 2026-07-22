@@ -11120,7 +11120,7 @@ async function dreCarregar(){
     + linha('= Lucro Bruto', d.lucro_bruto, {total:true})
     + linha('(−) Despesas Comerciais', -d.despesas_comerciais, {sub:true, chave:'despesas_comerciais'})
     + linha('(−) Despesas Administrativas', -d.despesas_administrativas, {sub:true, chave:'despesas_administrativas'})
-    + linha('(−) Constituição de Provisões', -d.constituicao_provisoes, {sub:true, chave:'constituicao_provisoes'})
+    + linha('(−) Despesas Reconhecidas de Provisões', -d.constituicao_provisoes, {sub:true, chave:'constituicao_provisoes'})
     + linha('= EBITDA', d.ebitda, {total:true})
     + linha('(−) Depreciação', -d.depreciacao, {sub:true})
     + linha('= EBIT', d.ebit, {total:true})
