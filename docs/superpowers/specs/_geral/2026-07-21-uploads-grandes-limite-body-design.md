@@ -96,3 +96,15 @@ registrar como dívida futura se o volume crescer; com teto de 50 MB o risco atu
   sem sites habilitados; acesso direto na porta) → teto do app cobre, nada de infra lá.
   **Produção pendente** (aplicar o 64M nos dois blocos server no próximo deploy de produção).
 - **Parte 4 pendente de gente**: aceite manual com os XMLs reais de 6,3/6,7 MB nos ambientes.
+
+## ⚠️ Causa-raiz nº 2, achada no aceite (2026-07-21): filename ACENTUADO quebrava o multipart
+O aceite no A/B falhou ("não deu o erro, mas não carregou") e a reprodução com o XML real pelo
+endpoint revelou uma segunda causa, independente do teto: filename não-ASCII (`ASuíte Master.xml`)
+no Content-Disposition faz o compat32 devolver `email.header.Header` em vez de str → o `.split(';')`
+de `_parse_multipart`/`_parse_multipart_arquivos` estourava `AttributeError`, a conexão morria sem
+resposta e o browser via o MESMO "Failed to fetch". A diferença real entre os XMLs que subiam
+(`Cozinha.xml`) e os que não subiam (`ASuíte Master.xml`) era o ACENTO — o diagnóstico original
+atribuiu tudo ao tamanho porque em produção o nginx de 1 MB barrava antes. Fix: `_header_texto()`
+via `email.header.decode_header` (bytes crus → UTF-8) nos dois parsers; TDD em
+`tests/test_upload_filename_acentuado.py`. Em produção as DUAS correções são necessárias
+(nginx 64M + este fix chega junto no deploy do app).

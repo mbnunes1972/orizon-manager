@@ -2360,6 +2360,20 @@ o 64M nos DOIS blocos server. Suíte SQLite **1389 passed** / Postgres **1386+2 
 código sem as mudanças desta sessão, via stash; herança da Sessão 103, anotar na frente de
 indicadores, fora do escopo aqui). Deploy A+B (`deploy_ab.sh`). Aceite manual com os XMLs reais
 de 6,3/6,7 MB pendente de gente.
+**Correção no mesmo dia (aceite do usuário: "não deu o erro, mas não carregou o XML"):** o teto
+era só METADE da causa — reproduzido com o XML real de 6,3 MB pelo endpoint (harness + multipart de
+verdade): **`AttributeError: 'Header' object has no attribute 'split'`** no `_parse_multipart`. O
+browser manda o **filename em UTF-8 cru** no Content-Disposition e o policy compat32 devolve
+`email.header.Header` (não str) p/ header não-ASCII → o `.split(';')` estourava, a conexão morria
+SEM resposta e o fetch reportava o MESMO "Failed to fetch" do nginx. **Era por isso que
+`Cozinha.xml` subia e `ASuíte Master.xml` não** (a diferença real era o ACENTO, não só o tamanho —
+os 4 XMLs novos do usuário têm acento no nome). Fix: `_header_texto()` (via
+`email.header.decode_header`, que preserva os bytes crus → UTF-8; `str(Header)` NÃO serve, troca
+os bytes por U+FFFD) aplicado nos DOIS parsers (`_parse_multipart` e `_parse_multipart_arquivos`).
+TDD: `tests/test_upload_filename_acentuado.py` (3: unidade dos 2 parsers + E2E no /pool); repro
+com o XML real de 6,3 MB devolveu `ok/criado/budget_total=65278.02` (o valor validado na spec).
+Suíte SQLite **1392** / Postgres **1389+2** (mesma falha pré-existente de indicadores). Redeploy A+B
+(tag B `v2026.07.21b-homolog`).
 
 ## Sessão 103 — Snapshot de Indicadores (desafio do usuário): liquidez, giro, KPIs, tendências
 **Aba nova "Indicadores"** (1ª do Painel Financeiro): `mod_indicadores.py` PURO (liquidez corrente/

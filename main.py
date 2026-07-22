@@ -6,6 +6,7 @@ import os, io, json, time, re, threading, webbrowser, hashlib, uuid
 import sys
 import logging
 import email
+import email.header
 from email import policy as _email_policy
 from datetime import datetime, date, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -275,12 +276,27 @@ def _tentar_sync_omie(c, db):
 # == HANDLERS HTTP ==
 # == HANDLERS HTTP ==
 # -- Multipart -----------------------------------------------------------------
+def _header_texto(valor):
+    """Valor de header do multipart como str. Com o policy compat32, um header com
+    byte não-ASCII (filename acentuado — caso real: 'ASuíte Master.xml') vem como
+    email.header.Header, não str: o .split(';') dos parsers estourava AttributeError
+    e a conexão morria SEM resposta ("Failed to fetch" no browser). str(Header)
+    também não serve — troca os bytes por U+FFFD. decode_header devolve os bytes
+    crus, que são o UTF-8 que o browser mandou."""
+    if isinstance(valor, email.header.Header):
+        partes = []
+        for dados, _charset in email.header.decode_header(valor):
+            partes.append(dados.decode("utf-8", "replace") if isinstance(dados, bytes) else dados)
+        return "".join(partes)
+    return valor
+
+
 def _parse_multipart(body, ct):
     raw = b"Content-Type: " + ct.encode() + b"\r\n\r\n" + body
     msg = email.message_from_bytes(raw, policy=_email_policy.compat32)
     arquivos, campos = [], {}
     for part in msg.walk():
-        cd = part.get("Content-Disposition", "")
+        cd = _header_texto(part.get("Content-Disposition", ""))
         if not cd:
             continue
         params = {}
@@ -306,7 +322,7 @@ def _parse_multipart_arquivos(body, ct):
     msg = email.message_from_bytes(raw, policy=_email_policy.compat32)
     arquivos, campos = {}, {}
     for part in msg.walk():
-        cd = part.get("Content-Disposition", "")
+        cd = _header_texto(part.get("Content-Disposition", ""))
         if not cd:
             continue
         params = {}
