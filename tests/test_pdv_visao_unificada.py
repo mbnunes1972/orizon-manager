@@ -136,6 +136,16 @@ def test_ui_do_pdv_esconde_o_modulo_financeiro(http_client_factory, pdv, pdv_use
     assert "comercial" in out["usuario"]["modulos_ativos"]   # ciclo comercial segue pleno
 
 
+def test_pdv_user_bloqueado_na_folha(http_client_factory, pdv, pdv_user):
+    """Folha acompanha o Financeiro (depende dele na topologia — QA Vera 🟠):
+    some da UI do PDV e a API nega, mesmo para master do PDV, sem step-up."""
+    c = _login(http_client_factory, pdv_user)
+    st, out = c.get("/api/folha?competencia=2026-07")
+    assert st == 403
+    st, out = c.get("/api/auth/me")
+    assert st == 200 and "folha" not in out["usuario"]["modulos_ativos"]
+
+
 def test_wiring_de_eventos_do_pdv_continua(app_db, pdv):
     """O que se esconde é a TELA: lançamentos no razão do PDV seguem normais."""
     import main as _main, mod_contabil

@@ -441,18 +441,19 @@ def _contabil_ctx(handler, exige_edicao, consolidado_ok=False):
     if not usuario:
         handler.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return None
     db = get_session()
-    # Perfil-4 (rev2 §2): só perfis com acesso ao Financeiro abrem o módulo (Diretoria).
-    if _sem_acesso_modulo(usuario, "financeiro", handler=handler):
-        db.close(); handler.send_json({"ok": False, "erro": "Sem acesso ao módulo Financeiro.", "precisa_stepup": "financeiro"}, code=403); return None
     loja = db.get(Loja, usuario.get("loja_id")) if usuario.get("loja_id") else None
-    if loja is not None and not mod_tenancy.modulo_ativo(loja, "financeiro"):
-        db.close(); handler.send_json({"ok": False, "erro": "Módulo financeiro inativo."}, code=403); return None
     if loja is not None and getattr(loja, "loja_mae_id", None):
         # PDV: o painel financeiro não existe na UI do PDV e a API acompanha — o financeiro
         # é operado pela loja-mãe em visão unificada. Os LANÇAMENTOS do razão do PDV seguem
-        # normais (o wiring de eventos não passa por aqui).
+        # normais (o wiring de eventos não passa por aqui). ANTES do check de perfil para a
+        # mensagem certa chegar ao usuário do PDV (e sem oferta de step-up, que não abriria).
         db.close(); handler.send_json({"ok": False, "erro": "O financeiro do Ponto de Venda "
                                        "é operado pela loja-mãe (visão unificada)."}, code=403); return None
+    # Perfil-4 (rev2 §2): só perfis com acesso ao Financeiro abrem o módulo (Diretoria).
+    if _sem_acesso_modulo(usuario, "financeiro", handler=handler):
+        db.close(); handler.send_json({"ok": False, "erro": "Sem acesso ao módulo Financeiro.", "precisa_stepup": "financeiro"}, code=403); return None
+    if loja is not None and not mod_tenancy.modulo_ativo(loja, "financeiro"):
+        db.close(); handler.send_json({"ok": False, "erro": "Módulo financeiro inativo."}, code=403); return None
     if exige_edicao:
         niv = usuario.get("nivel")
         if not (perfis.pode(niv, "aprovar_financeiro") or perfis.pode(niv, "editar_dados_loja")):
@@ -11290,9 +11291,28 @@ def _bloqueio_comercial(ator):
     return None
 
 
+def _usuario_de_pdv(usuario):
+    """True se a loja do usuário é um Ponto de Venda (loja com mãe, spec 2026-07-22)."""
+    lid = (usuario or {}).get("loja_id")
+    if not lid:
+        return False
+    db = get_session()
+    try:
+        l = db.get(Loja, lid)
+        return bool(l is not None and getattr(l, "loja_mae_id", None))
+    finally:
+        db.close()
+
+
 def _sem_acesso_modulo(usuario, modulo_id, handler=None):
     """True se o PERFIL do usuário não acessa o módulo (Perfil-4 rev2 §2, matriz de acesso).
-    Se `handler` for dado, honra um grant de step-up (senha de quem tem o perfil) na sessão."""
+    Se `handler` for dado, honra um grant de step-up (senha de quem tem o perfil) na sessão.
+
+    PDV (loja com mãe, spec 2026-07-22): Financeiro e Folha do PDV são operados pela
+    loja-mãe — bloqueados aqui para QUALQUER perfil do PDV, sem step-up (QA Vera 🟠).
+    Os lançamentos do razão do PDV seguem vivos (o wiring não passa por aqui)."""
+    if modulo_id in ("financeiro", "folha") and _usuario_de_pdv(usuario):
+        return True
     if perfis.acessa_modulo((usuario or {}).get("nivel"), modulo_id):
         return False
     if handler is not None:

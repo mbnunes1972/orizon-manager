@@ -2539,6 +2539,9 @@ const fmt = n => Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maxim
 // ── Multi-loja: loja ativa + interceptor de fetch ─────────────────
 let _lojaAtiva = null;   // loja ativa atual (multi-loja); null = usa default do backend
 let _finUnidade = null;  // visão unificada (PDV): unidade dos painéis financeiros; null = a própria loja
+// Trocar de loja ativa invalida a unidade escolhida E o cache do seletor (QA Vera 🟡):
+// sem isto, o header X-Unidade-Financeira de um contexto antigo viraria 403 no novo.
+function _finUnidadeReset(){ _finUnidade = null; _finUnidades = null; }
 (function _instalarFetchLojaAtiva(){
   const _origFetch = window.fetch.bind(window);
   window.fetch = async function(input, init){
@@ -9529,18 +9532,19 @@ function adminBreadcrumb(){
 }
 
 function adminIrNivel(n){
-  if (n === 1) { _adminNav.rede = null; _adminNav.loja = null; _adminNav.projeto = null; _lojaAtiva = null; }
-  if (n === 2) { _adminNav.loja = null; _adminNav.projeto = null; _lojaAtiva = null; }
+  if (n === 1) { _adminNav.rede = null; _adminNav.loja = null; _adminNav.projeto = null; _lojaAtiva = null; _finUnidadeReset(); }
+  if (n === 2) { _adminNav.loja = null; _adminNav.projeto = null; _lojaAtiva = null; _finUnidadeReset(); }
   if (n === 3) { _adminNav.projeto = null; }
   _adminNav.nivel = n;
   adminRender();
 }
 
-function adminEntrarRede(id, nome){ _adminNav.rede = { id, nome }; _adminNav.nivel = 2; _adminNav.loja = null; _lojaAtiva = null; adminRender(); }
+function adminEntrarRede(id, nome){ _adminNav.rede = { id, nome }; _adminNav.nivel = 2; _adminNav.loja = null; _lojaAtiva = null; _finUnidadeReset(); adminRender(); }
 async function adminEntrarLoja(id, nome){
   _adminNav.loja = { id, nome };
   _adminNav.nivel = 3;
   _lojaAtiva = id;               // super_admin passa a operar DENTRO desta loja (header X-Loja-Ativa)
+  _finUnidadeReset();
   try {
     const r = await fetch(`/api/admin/lojas/${id}/modulos`, { credentials:'same-origin' });
     const d = await r.json();
@@ -9764,6 +9768,7 @@ function empEscolher(id, ctx){
 // Painel Orizon › Lojas: "Administrar" fixa a loja como ativa e abre o Painel Admin escopado nela.
 function orizonAdministrarLoja(id){
   _lojaAtiva = id ? parseInt(id,10) : null;
+  _finUnidadeReset();
   if (_lojaAtiva) localStorage.setItem('loja_ativa', String(_lojaAtiva));
   ['nav-07','nav-cfg'].forEach(nid => { const n = document.getElementById(nid); if(n) n.style.display=''; });  // revela Admin/Config da loja
   goPage(7);   // Admin (4 abas da empresa: Dados da empresa / Usuários / Perfis de Usuário / Módulos)
@@ -9774,6 +9779,7 @@ document.addEventListener('click', function(ev){
 });
 function empresaTrocar(id){
   _lojaAtiva = id ? parseInt(id,10) : null;
+  _finUnidadeReset();
   if (_lojaAtiva) localStorage.setItem('loja_ativa', String(_lojaAtiva));
   const p7 = document.getElementById('page-07'), p9 = document.getElementById('page-09');
   if (p7 && p7.classList.contains('active')) adminRender();
