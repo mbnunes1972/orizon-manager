@@ -16,4 +16,6 @@ def test_dre_detalhe_nivel3(app_db):
     det = d["detalhe"]["despesas_administrativas"]           # composição nível 3 (Analítico)
     por_cod = {x["codigo"]: x["valor"] for x in det}
     assert por_cod.get("5.4.01") == 300.0 and por_cod.get("5.4.02") == 120.0
-    assert all(x["valor"] != 0 for x in det)                # só contas com movimento
+    # requisito revisado 2026-07-22: o analítico lista o grupo INTEIRO — sem movimento sai 0,00
+    assert por_cod.get("5.4.03") == 0.0
+    assert sum(x["valor"] for x in det) == 420.0            # zeradas não alteram o total

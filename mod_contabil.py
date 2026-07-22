@@ -1535,20 +1535,26 @@ def _mov(db, ot, oid, prefixo, sentido, ini, fim, projeto_id=None):
 
 
 def _detalhe_grupo(db, ot, oid, prefixos, sentido, ini, fim):
-    """Composição nível 3 (analíticas com movimento) de um ou mais prefixos, no sentido pedido.
-    Alimenta o modo Analítico da DRE (v5 §3.1) — Resumido usa só os totais de nível 2."""
+    """Composição nível 3 de um ou mais prefixos, no sentido pedido. Alimenta o modo
+    Analítico da DRE/Balanço (v5 §3.1) — Resumido usa só os totais de nível 2.
+
+    Requisito 2026-07-22 (2ª revisão, supera o "sem movimento → fora" da 1ª): o analítico
+    mostra TODAS as contas analíticas ATIVAS do grupo — sem movimento sai 0,00. O usuário
+    quer enxergar o plano inteiro na DRE/Balanço analíticos (um lançamento "sumido" fica
+    evidente ao lado das contas zeradas). Além delas, QUALQUER conta com lançamento no
+    período aparece — inclusive sintética com lançamento direto (pai convertido pelo
+    backfill) e inativa com histórico: movimento nunca some do demonstrativo."""
     if isinstance(prefixos, str):
         prefixos = [prefixos]
-    # TODAS as contas com LANÇAMENTO no período aparecem (fix 2026-07-22): inclui sintéticas com
-    # lançamento direto (pai convertido pelo backfill) e contas cujo líquido zera mas tiveram
-    # movimento. Sem movimento → fora (pedido do usuário).
     contas = db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid).all()
     linhas = []
     for c in sorted(contas, key=lambda x: x.codigo):
         if not any(c.codigo == p or c.codigo.startswith(p + ".") for p in prefixos):
             continue
         d, cr = _totais_conta(db, ot, oid, c.id, ini, fim)
-        if d == 0 and cr == 0:
+        teve_movimento = (d != 0 or cr != 0)
+        sempre_listada = (c.tipo == "analitica" and bool(c.ativa))
+        if not (sempre_listada or teve_movimento):
             continue
         val = round(cr - d if sentido == "credor" else d - cr, 2)
         linhas.append({"codigo": c.codigo, "nome": c.nome, "valor": val})
