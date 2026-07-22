@@ -35,14 +35,27 @@ def tipo_forma_valida(tipo):
     return tipo in TIPOS or bool(_RE_TIPO_CUSTOM.match(tipo or ""))
 
 
+def _loja_mae_id(db, loja_id):
+    """loja_mae_id quando `loja_id` é um PDV (loja com mãe); None caso contrário."""
+    from database import Loja
+    l = db.get(Loja, loja_id) if loja_id else None
+    return getattr(l, "loja_mae_id", None) if l is not None else None
+
+
 def tipo_existe(db, loja_id, tipo):
-    """Nativo, ou slug customizado REGISTRADO para esta loja."""
+    """Nativo, ou slug customizado REGISTRADO para esta loja (PDV: vale o da mãe)."""
     if tipo in TIPOS:
         return True
     if not _RE_TIPO_CUSTOM.match(tipo or ""):
         return False
-    return (db.query(DocumentoTipo)
-              .filter_by(loja_id=loja_id, slug=tipo).first()) is not None
+    if (db.query(DocumentoTipo)
+          .filter_by(loja_id=loja_id, slug=tipo).first()) is not None:
+        return True
+    mae_id = _loja_mae_id(db, loja_id)
+    if mae_id:
+        return (db.query(DocumentoTipo)
+                  .filter_by(loja_id=mae_id, slug=tipo).first()) is not None
+    return False
 
 
 def tipos_customizados(db, loja_id):
@@ -283,11 +296,23 @@ def ativar(db, modelo_id):
 
 
 def ativo_de(db, loja_id, tipo):
-    return (db.query(DocumentoModelo)
-              .filter(DocumentoModelo.loja_id == loja_id,
-                      DocumentoModelo.tipo == tipo,
-                      DocumentoModelo.ativo == 1)
-              .first())
+    """Modelo ativo de (loja, tipo). PDV (loja com mãe, spec 2026-07-22): sem modelo
+    próprio, vale o modelo ativo da MÃE — juridicamente o cliente contrata com ela."""
+    m = (db.query(DocumentoModelo)
+           .filter(DocumentoModelo.loja_id == loja_id,
+                   DocumentoModelo.tipo == tipo,
+                   DocumentoModelo.ativo == 1)
+           .first())
+    if m is not None:
+        return m
+    mae_id = _loja_mae_id(db, loja_id)
+    if mae_id:
+        return (db.query(DocumentoModelo)
+                  .filter(DocumentoModelo.loja_id == mae_id,
+                          DocumentoModelo.tipo == tipo,
+                          DocumentoModelo.ativo == 1)
+                  .first())
+    return None
 
 
 def corpo_da_versao(db, modelo_versao_id):

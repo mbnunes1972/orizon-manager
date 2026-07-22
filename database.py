@@ -480,6 +480,12 @@ class Loja(Base):
     # em Mercadoria (NF-e produto) + Serviço (NFS-e); override por projeto vive em parametros_json.
     pct_mercadoria = Column(Float, nullable=True, default=65.0)
     pct_servico    = Column(Float, nullable=True, default=35.0)
+    # PDV (Ponto de Venda avançado — spec _geral/2026-07-22-ponto-de-venda-design.md): PDV é uma
+    # Loja com mãe. loja_mae_id NULL = loja plena (comportamento idêntico ao anterior). O PDV
+    # herda da mãe: rede_id (não editável), emissão fiscal (fallback do emitente) e modelos de
+    # documento; razão contábil e tenancy são PRÓPRIOS (owner_id = pdv.id).
+    loja_mae_id = Column(Integer, ForeignKey("lojas.id"), nullable=True)
+    tipo        = Column(String(12), nullable=False, default="loja")   # loja | ponto_venda
 
 
 class ParceiroLoja(Base):
@@ -1613,6 +1619,12 @@ def _migrar_colunas():
             if "pct_servico" not in loja_cols:
                 cur.execute("ALTER TABLE lojas ADD COLUMN pct_servico REAL")
                 cur.execute("UPDATE lojas SET pct_servico = 35.0 WHERE pct_servico IS NULL")
+            # PDV (2026-07-22): loja com mãe. Lojas existentes viram tipo='loja' (plenas).
+            if "loja_mae_id" not in loja_cols:
+                cur.execute("ALTER TABLE lojas ADD COLUMN loja_mae_id INTEGER")
+            if "tipo" not in loja_cols:
+                cur.execute("ALTER TABLE lojas ADD COLUMN tipo VARCHAR(12) DEFAULT 'loja'")
+                cur.execute("UPDATE lojas SET tipo = 'loja' WHERE tipo IS NULL")
         if _tabela_existe(cur, "redes"):
             rede_cols = {c[1] for c in cur.execute("PRAGMA table_info(redes)").fetchall()}
             if "emitente_central_id" not in rede_cols:
@@ -2047,6 +2059,9 @@ def _migrar_colunas_pg():
         "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS bairro TEXT",
         "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS cidade TEXT",
         "ALTER TABLE contraparte_financeira ADD COLUMN IF NOT EXISTS uf VARCHAR(2)",
+        # PDV (2026-07-22): loja com mãe. DEFAULT 'loja' backfila as linhas existentes no ADD.
+        "ALTER TABLE lojas ADD COLUMN IF NOT EXISTS loja_mae_id INTEGER",
+        "ALTER TABLE lojas ADD COLUMN IF NOT EXISTS tipo VARCHAR(12) DEFAULT 'loja'",
     ]
     with ENGINE.begin() as conn:
         for s in stmts:

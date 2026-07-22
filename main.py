@@ -1863,6 +1863,26 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        elif re.match(r'^/api/admin/lojas/(\d+)/pdvs$', path):
+            # Pontos de Venda da loja (spec 2026-07-22): o lojista com editar_dados_loja
+            # VISUALIZA seus PDVs; criar/editar é só super_admin (POST/PUT).
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+            m_pdv = re.match(r'^/api/admin/lojas/(\d+)/pdvs$', path)
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                mae = db.get(Loja, int(m_pdv.group(1)))
+                if mae is None or not mod_tenancy.pode_ver_loja(
+                        ator, {"id": mae.id, "rede_id": mae.rede_id}):
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                pdvs = (db.query(Loja).filter(Loja.loja_mae_id == mae.id)
+                          .order_by(Loja.nome).all())
+                self.send_json({"ok": True, "pdvs": [_loja_dict(l) for l in pdvs]})
+            finally:
+                db.close()
+
         elif re.match(r'^/api/admin/acordos-fabrica/(\d+)/extrato$', path):
             # Extrato do acordo (spec: implantação, aplicações por loja/projeto, acertos)
             usuario = get_usuario_sessao(self)
@@ -7296,6 +7316,69 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            m_pdv = _re.match(r"^/api/admin/lojas/(\d+)/pdvs$", path)
+            if m_pdv:
+                # Criar Ponto de Venda da loja (spec 2026-07-22, Desvio 4): SÓ super_admin.
+                # O PDV nasce SEM emitente (fiscal pela mãe), com rede herdada e config
+                # financeira copiada da mãe (metas/faixas ajustáveis depois).
+                usuario = get_usuario_sessao(self)
+                if not usuario or usuario.get("nivel") != "super_admin":
+                    self.send_json({"ok": False, "erro": "Criar Ponto de Venda é exclusivo "
+                                    "do administrador da plataforma."}, code=403)
+                    return
+                req = json.loads(body) if body else {}
+                db = get_session()
+                try:
+                    mae = db.get(Loja, int(m_pdv.group(1)))
+                    if mae is None:
+                        self.send_json({"ok": False, "erro": "Loja não encontrada"}, code=404)
+                        return
+                    if mae.loja_mae_id:
+                        self.send_json({"ok": False, "erro": "Um Ponto de Venda não pode ter "
+                                        "Pontos de Venda próprios."}, code=400)
+                        return
+                    codigos = [c for (c,) in db.query(Loja.codigo).all() if c]
+                    erros = mod_tenancy.validar_loja(req, codigos)
+                    if erros:
+                        self.send_json({"ok": False, "erro": " ".join(erros)})
+                        return
+                    pdv = Loja(
+                        nome=req["nome"].strip(),
+                        codigo=req["codigo"].strip().upper(),
+                        tipo="ponto_venda",
+                        loja_mae_id=mae.id,
+                        rede_id=mae.rede_id,                    # herdado, não editável
+                        config_financeira_json=mae.config_financeira_json,   # seed = cópia da mãe
+                        pct_mercadoria=mae.pct_mercadoria,
+                        pct_servico=mae.pct_servico,
+                        telefone=(req.get("telefone") or "").strip() or None,
+                        email=(req.get("email") or "").strip() or None,
+                        responsavel=(req.get("responsavel") or "").strip() or None,
+                        cep=(req.get("cep") or "").strip() or None,
+                        logradouro=(req.get("logradouro") or "").strip() or None,
+                        numero=(req.get("numero") or "").strip() or None,
+                        complemento=(req.get("complemento") or "").strip() or None,
+                        bairro=(req.get("bairro") or "").strip() or None,
+                        cidade=(req.get("cidade") or "").strip() or None,
+                        estado=((req.get("estado") or req.get("uf") or "").strip() or None),
+                        testemunha1_nome=(req.get("testemunha1_nome") or "").strip() or None,
+                        testemunha1_cpf=(req.get("testemunha1_cpf") or "").strip() or None,
+                        testemunha2_nome=(req.get("testemunha2_nome") or "").strip() or None,
+                        testemunha2_cpf=(req.get("testemunha2_cpf") or "").strip() or None,
+                    )
+                    db.add(pdv); db.flush()
+                    # Perfis padrão do PDV (master/gerencial/operador) — fiel ao que a
+                    # migração semeia para lojas plenas; sem isto o cadastro de usuários
+                    # do PDV cai no fallback hardcoded.
+                    from auth import perfil_store
+                    perfil_store.seed_perfis_loja(db, pdv.id)
+                    db.commit()
+                    perfis.recarregar()
+                    self.send_json({"ok": True, "pdv": _loja_dict(pdv)})
+                finally:
+                    db.close()
+                return
+
             m_sync = _re.match(r"^/api/admin/omie-sync/(\d+)/retry$", path)
             if m_sync:
                 usuario = get_usuario_sessao(self)
@@ -9925,6 +10008,12 @@ class Handler(BaseHTTPRequestHandler):
                     if not mod_tenancy.pode_editar_dados_loja(ator, loja_d):
                         self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
                         return
+                    # PDV (loja com mãe): cadastro é exclusivo do super_admin — o lojista
+                    # visualiza, não edita (spec 2026-07-22, Desvio 4).
+                    if l.loja_mae_id and not mod_tenancy._eh_super_admin(ator):
+                        self.send_json({"ok": False, "erro": "Ponto de Venda só é editável "
+                                        "pelo administrador da plataforma."}, code=403)
+                        return
                     if "codigo" in req:
                         outros = [c for (c,) in db.query(Loja.codigo)
                                                 .filter(Loja.id != l.id).all() if c]
@@ -9963,7 +10052,9 @@ class Handler(BaseHTTPRequestHandler):
                         l.pct_mercadoria = float(pm); l.pct_servico = float(ps)
                     if perfis.pode(ator.get("nivel"), "gerir_lojas"):
                         if "ativo" in req:   l.ativo = 1 if req["ativo"] else 0
-                        if "rede_id" in req and mod_tenancy._eh_super_admin(ator):
+                        # PDV: rede_id é HERDADO da mãe, não editável (spec 2026-07-22).
+                        if ("rede_id" in req and mod_tenancy._eh_super_admin(ator)
+                                and not l.loja_mae_id):
                             l.rede_id = req["rede_id"]
                         if isinstance(req.get("modulos"), list):
                             l.modulos_ativos = json.dumps([str(mo) for mo in req["modulos"]])
@@ -10969,6 +11060,8 @@ def _loja_dict(l) -> dict:
         "testemunha2_cpf":  l.testemunha2_cpf  or "",
         "pct_mercadoria":   l.pct_mercadoria if l.pct_mercadoria is not None else 65.0,
         "pct_servico":      l.pct_servico    if l.pct_servico    is not None else 35.0,
+        "loja_mae_id": l.loja_mae_id,
+        "tipo":        l.tipo or "loja",
         "ativo":       bool(l.ativo),
         "criado_em":   l.criado_em.strftime("%Y-%m-%d") if l.criado_em else "",
     }
@@ -11367,21 +11460,35 @@ def _filtrar_projetos_por_loja(projetos, db, loja_id, ator=None):
 
 def _loja_dict_para_contrato(db, loja_id):
     """Dict plano dos dados da loja para alimentar/snapshotar o contrato (F3).
-    Retorna {} se não houver loja resolvível."""
+    Retorna {} se não houver loja resolvível.
+
+    PDV (loja com mãe, spec 2026-07-22): a CONTRATADA é a mãe — nome/CNPJ/endereço/
+    contato vêm dela (juridicamente o cliente contrata com a matriz). Ficam do PDV o
+    `codigo` (numeração rastreia a origem da venda) e as testemunhas quando o PDV as
+    tem (cadastro próprio; vazias, caem nas da mãe)."""
     if not loja_id:
         return {}
     loja = db.get(Loja, loja_id)
     if not loja:
         return {}
+    dona = loja   # quem "assina": a própria loja, ou a mãe quando é PDV
+    if getattr(loja, "loja_mae_id", None):
+        mae = db.get(Loja, loja.loja_mae_id)
+        if mae is not None:
+            dona = mae
+    t1n = loja.testemunha1_nome or dona.testemunha1_nome
+    t1c = loja.testemunha1_cpf  or dona.testemunha1_cpf
+    t2n = loja.testemunha2_nome or dona.testemunha2_nome
+    t2c = loja.testemunha2_cpf  or dona.testemunha2_cpf
     return {
         "id": loja.id,
-        "nome": loja.nome or "", "cnpj": loja.cnpj or "", "codigo": loja.codigo or "",
-        "telefone": loja.telefone or "", "email": loja.email or "",
-        "cep": loja.cep or "", "logradouro": loja.logradouro or "",
-        "numero": loja.numero or "", "complemento": loja.complemento or "",
-        "bairro": loja.bairro or "", "cidade": loja.cidade or "", "estado": loja.estado or "",
-        "testemunha1_nome": loja.testemunha1_nome or "", "testemunha1_cpf": loja.testemunha1_cpf or "",
-        "testemunha2_nome": loja.testemunha2_nome or "", "testemunha2_cpf": loja.testemunha2_cpf or "",
+        "nome": dona.nome or "", "cnpj": dona.cnpj or "", "codigo": loja.codigo or "",
+        "telefone": dona.telefone or "", "email": dona.email or "",
+        "cep": dona.cep or "", "logradouro": dona.logradouro or "",
+        "numero": dona.numero or "", "complemento": dona.complemento or "",
+        "bairro": dona.bairro or "", "cidade": dona.cidade or "", "estado": dona.estado or "",
+        "testemunha1_nome": t1n or "", "testemunha1_cpf": t1c or "",
+        "testemunha2_nome": t2n or "", "testemunha2_cpf": t2c or "",
     }
 
 

@@ -2161,6 +2161,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 
+<!-- Modal: Novo Ponto de Venda (spec PDV 2026-07-22) — só super_admin cria -->
+<div id="modal-pdv" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:560px;max-height:90vh;overflow-y:auto">
+    <div class="modal-hdr">
+      <div class="modal-title">Novo Ponto de Venda</div>
+      <span class="modal-close" onclick="fecharModalPdv()">&#x2715;</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      O PDV opera o ciclo comercial completo com painel e resultados próprios; a emissão fiscal,
+      o contrato e o financeiro são da loja-mãe. A configuração financeira nasce copiada da mãe.
+    </div>
+    <div class="grid2" style="gap:12px" id="pdv-form-grid"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="fecharModalPdv()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="pdv-salvar-btn">Criar Ponto de Venda</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Modelo de documento da loja (Task 9) — histórico de versões + wizard de importação -->
 <!-- Upload de Modelo — seletor de tipo (spec 2026-07-22): desemboca no modal de importação -->
 <div id="modal-doc-upload" class="modal-overlay" style="display:none"
@@ -11688,7 +11707,89 @@ async function adminLojaCarregarDados(lid){
       ${f('loja-pct-merc','% Mercadoria (NF-e produto)',loja.pct_mercadoria!=null?loja.pct_mercadoria:65)}
       ${f('loja-pct-serv','% Serviço (NFS-e)',loja.pct_servico!=null?loja.pct_servico:35)}
     </div>
-    <button class="btn btn-primary btn-sm" onclick="adminLojaSalvar(${lid})">Salvar dados da loja</button>`;
+    <button class="btn btn-primary btn-sm" onclick="adminLojaSalvar(${lid})">Salvar dados da loja</button>
+    ${loja.loja_mae_id
+      ? `<div style="margin-top:16px;font-size:12px;color:var(--muted)">
+           Esta unidade é um <strong style="color:var(--text)">Ponto de Venda</strong> — emissão fiscal,
+           contrato e financeiro pela loja-mãe; rede herdada (não editável).</div>`
+      : `<div id="loja-pdvs-box" style="margin-top:20px"></div>`}`;
+  if (!loja.loja_mae_id) adminPdvsCarregar(lid);
+}
+
+// ── Pontos de Venda (spec PDV 2026-07-22): lojista visualiza; super_admin cria/gerencia ──
+async function adminPdvsCarregar(lid){
+  const box = document.getElementById('loja-pdvs-box');
+  if (!box) return;
+  const d = await fetch('/api/admin/lojas/'+lid+'/pdvs', {credentials:'same-origin'})
+    .then(r=>r.json()).catch(()=>null);
+  if (!d || !d.ok) { box.innerHTML = ''; return; }
+  const isSuper = ((_usuarioAtual && _usuarioAtual.nivel) || '') === 'super_admin';
+  const linhas = (d.pdvs||[]).map(p=>`
+    <tr style="border-top:1px solid var(--border)">
+      <td style="padding:4px 6px">${esc(p.nome)}</td>
+      <td>${esc(p.codigo)}</td>
+      <td style="color:var(--muted)">${esc(p.cidade||'—')}</td>
+      <td>${p.ativo ? '✓' : '—'}</td>
+      <td style="text-align:right">${isSuper ? `
+        <button class="btn btn-ghost btn-sm" style="font-size:10px"
+          onclick="pdvToggleAtivo(${p.id}, ${p.ativo ? 0 : 1}, ${lid})">${p.ativo ? 'Desativar' : 'Ativar'}</button>` : ''}
+      </td></tr>`).join('');
+  box.innerHTML = `
+    <div style="border-top:1px solid var(--border);padding-top:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <strong style="font-size:13px">Pontos de Venda</strong>
+        <span style="font-size:11px;color:var(--muted)">vendem com painel e resultados próprios; fiscal, contrato e financeiro pela loja-mãe</span>
+        ${isSuper ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="abrirModalPdv(${lid})">+ Novo Ponto de Venda</button>` : ''}
+      </div>
+      ${linhas ? `<table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="text-align:left;color:var(--muted)">
+          <th style="padding:4px 6px">Nome</th><th>Código</th><th>Cidade</th><th>Ativo</th><th></th></tr></thead>
+        <tbody>${linhas}</tbody></table>`
+        : `<em style="font-size:12px;color:var(--muted)">Nenhum Ponto de Venda cadastrado${isSuper ? '' : ' (o cadastro é feito pelo administrador da plataforma)'}.</em>`}
+    </div>`;
+}
+
+function abrirModalPdv(lid){
+  const f = (id,label)=>`<div><label class="field-label">${label}</label>
+    <input id="${id}" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></div>`;
+  document.getElementById('pdv-form-grid').innerHTML = [
+    f('pdv-nome','Nome'), f('pdv-codigo','Código (3 letras)'),
+    f('pdv-tel','Telefone'), f('pdv-email','E-mail'),
+    f('pdv-cep','CEP'), f('pdv-logradouro','Logradouro'),
+    f('pdv-numero','Número'), f('pdv-bairro','Bairro'),
+    f('pdv-cidade','Cidade'), f('pdv-estado','UF'),
+    f('pdv-t1n','Testemunha 1 — nome'), f('pdv-t1c','Testemunha 1 — CPF'),
+    f('pdv-t2n','Testemunha 2 — nome'), f('pdv-t2c','Testemunha 2 — CPF'),
+  ].join('');
+  document.getElementById('pdv-salvar-btn').onclick = () => salvarModalPdv(lid);
+  document.getElementById('modal-pdv').style.display = 'flex';
+}
+function fecharModalPdv(){ document.getElementById('modal-pdv').style.display = 'none'; }
+
+async function salvarModalPdv(lid){
+  const v = id => document.getElementById(id).value.trim();
+  const payload = {
+    nome: v('pdv-nome'), codigo: v('pdv-codigo'), telefone: v('pdv-tel'), email: v('pdv-email'),
+    cep: v('pdv-cep'), logradouro: v('pdv-logradouro'), numero: v('pdv-numero'),
+    bairro: v('pdv-bairro'), cidade: v('pdv-cidade'), estado: v('pdv-estado'),
+    testemunha1_nome: v('pdv-t1n'), testemunha1_cpf: v('pdv-t1c'),
+    testemunha2_nome: v('pdv-t2n'), testemunha2_cpf: v('pdv-t2c'),
+  };
+  const r = await fetch('/api/admin/lojas/'+lid+'/pdvs', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ await avisoPopup(d.erro||'Erro ao criar o Ponto de Venda.', {titulo:'Ponto de Venda'}); return; }
+  fecharModalPdv();
+  showToast('Ponto de Venda criado.', false);
+  adminPdvsCarregar(lid);
+}
+
+async function pdvToggleAtivo(pdvId, ativo, lid){
+  const r = await fetch('/api/admin/lojas/'+pdvId, {method:'PATCH', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({ativo: !!ativo})});
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ showToast(d.erro||'Erro', true); return; }
+  adminPdvsCarregar(lid);
 }
 
 async function adminLojaSalvar(lid){
