@@ -250,11 +250,15 @@ def _natureza(grupo):
 
 
 def resolver_owner(db, usuario):
-    """(owner_tipo, owner_id) do usuário: rede da loja se houver; senão a loja; admin de rede -> rede."""
+    """(owner_tipo, owner_id) do usuário: rede da loja se houver; senão a loja; admin de rede -> rede.
+    PDV (loja com mãe, spec 2026-07-22): razão PRÓPRIO sempre — owner ("loja", pdv.id), mesmo com
+    rede herdada da mãe; a individualização por unidade é o que a visão unificada consolida depois."""
     rid = usuario.get("rede_id")
     lid = usuario.get("loja_id")
     if lid:
         loja = db.get(Loja, lid)
+        if loja is not None and getattr(loja, "loja_mae_id", None):
+            return ("loja", lid)
         if loja and loja.rede_id:
             return ("rede", loja.rede_id)
         return ("loja", lid)

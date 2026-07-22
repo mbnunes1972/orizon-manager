@@ -102,6 +102,11 @@ def handle_auth_get(handler, path: str) -> bool:
                 _loja_ativa = db.get(Loja, _lid) if _lid else None
                 _ativos = (mod_tenancy.modulos_ativos_da_loja(_loja_ativa)
                            if _loja_ativa else set(_mod.DOMINIOS))
+                # PDV (loja com mãe, spec 2026-07-22): o painel Financeiro não aparece na UI
+                # do PDV — o financeiro é operado pela mãe (visão unificada). Só a TELA some:
+                # modulo_ativo() segue True, então o wiring de lançamentos do razão continua.
+                if _loja_ativa is not None and getattr(_loja_ativa, "loja_mae_id", None):
+                    _ativos = _ativos - {"financeiro"}
                 # Perfil-4 (rev2 §2): o hub reflete os módulos que o PERFIL acessa (matriz), além dos
                 # ativos na loja. Painéis Admin/Config idem (flags p/ o front esconder a navegação).
                 _niv = usuario.get("nivel")

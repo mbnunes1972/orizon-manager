@@ -1379,6 +1379,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div class="page" id="page-12">
     <div class="page-title" id="fin-page-title">Financeiro</div>
     <div class="page-sub" id="fin-page-sub">Configuração financeira: provisões/custos-padrão e plano de contas.</div>
+    <!-- Visão unificada (PDV): seletor de unidade — só aparece quando a loja tem Pontos de Venda -->
+    <div id="fin-unidade-wrap" style="display:none;align-items:center;gap:8px;margin:6px 0 2px"></div>
     <div style="height:8px"></div>
     <div id="fin-panel-ind" style="display:none"><div id="ind-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-prov"><div id="loja-panel-financeiro"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
@@ -2501,6 +2503,7 @@ const fmt = n => Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maxim
 
 // ── Multi-loja: loja ativa + interceptor de fetch ─────────────────
 let _lojaAtiva = null;   // loja ativa atual (multi-loja); null = usa default do backend
+let _finUnidade = null;  // visão unificada (PDV): unidade dos painéis financeiros; null = a própria loja
 (function _instalarFetchLojaAtiva(){
   const _origFetch = window.fetch.bind(window);
   window.fetch = async function(input, init){
@@ -2510,6 +2513,14 @@ let _lojaAtiva = null;   // loja ativa atual (multi-loja); null = usa default do
       if (_lojaAtiva && url.indexOf('/api/') !== -1 && url.indexOf('//') === -1) {
         const h = new Headers(init.headers || (typeof input!=='string' && input.headers) || {});
         h.set('X-Loja-Ativa', String(_lojaAtiva));
+        init.headers = h;
+      }
+      // Visão unificada (PDV): unidade escolhida no seletor do Financeiro acompanha
+      // toda chamada do módulo (exceto o próprio seletor de unidades).
+      if (_finUnidade && url.indexOf('/api/financeiro/') !== -1
+          && url.indexOf('/api/financeiro/unidades') === -1) {
+        const h = new Headers(init.headers || (typeof input!=='string' && input.headers) || {});
+        h.set('X-Unidade-Financeira', String(_finUnidade));
         init.headers = h;
       }
     } catch(e){ /* não bloquear a requisição por erro do interceptor */ }
@@ -10620,7 +10631,34 @@ function finTab(t){
   const tt = document.getElementById('fin-page-title');
   if(tt && sec) tt.textContent = 'Financeiro / ' + sec.lbl;
   _sbModuloAberto = 'financeiro'; _sbSecaoAtiva = t; sbNavRender();   // reflete no acordeão
+  finUnidadeInit();   // visão unificada (PDV): seletor de unidade, se a loja tiver PDVs
   if(sec && sec.load) sec.load();
+}
+
+// ── Visão unificada (PDV, spec 2026-07-22): seletor de unidade dos painéis financeiros ──
+let _finUnidades = null;   // cache das unidades do escopo (null = ainda não buscado)
+async function finUnidadeInit(){
+  if (_finUnidades === null) {
+    const d = await fetch('/api/financeiro/unidades', {credentials:'same-origin'})
+      .then(r=>r.json()).catch(()=>null);
+    _finUnidades = (d && d.ok) ? (d.unidades || []) : [];
+  }
+  const wrap = document.getElementById('fin-unidade-wrap');
+  if (!wrap) return;
+  if (_finUnidades.length < 2){ wrap.style.display = 'none'; return; }
+  const atual = _finUnidade != null ? String(_finUnidade) : String(_finUnidades[0].id);
+  wrap.style.display = 'flex';
+  wrap.innerHTML = '<label style="font-size:11px;color:var(--muted)">Unidade</label>'
+    + '<select id="fin-unidade-sel" onchange="finUnidadeMudar(this.value)" '
+    + 'style="background:var(--surface);border:1px solid var(--border);border-radius:8px;'
+    + 'padding:6px 10px;color:var(--text);font-size:12px">'
+    + _finUnidades.map(u => '<option value="'+u.id+'"'+(atual===String(u.id)?' selected':'')+'>'
+        + esc(u.nome) + (u.tipo==='ponto_venda' ? ' (PDV)' : '') + '</option>').join('')
+    + '</select>';
+}
+function finUnidadeMudar(v){
+  _finUnidade = v || null;
+  finTab(_finSecaoAtual || 'prov');   // recarrega o painel atual na unidade escolhida
 }
 
 // ── Folha de Pagamento (Modulos_Orizon_v10 §2.1): motor — parte fixa (cadastro) + variável (vendas) ──

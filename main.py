@@ -409,10 +409,33 @@ def _aprovador_financeiro(db, login, senha):
     return u
 
 
-def _contabil_ctx(handler, exige_edicao):
+def _lojas_do_escopo(db, ator):
+    """Unidades da VISÃO UNIFICADA financeira (PDV, spec 2026-07-22): para quem abre o
+    painel Financeiro de uma loja-MÃE, devolve [mãe] + PDVs ativos dela; para os demais,
+    [loja ativa]. É OPT-IN painel a painel — NUNCA altera o escopo_operacional global."""
+    lid = ator.get("active_loja_id") or ator.get("loja_id")
+    if not lid:
+        return []
+    unidades = [lid]
+    if perfis.acessa_modulo(ator.get("nivel"), "financeiro"):
+        l = db.get(Loja, lid)
+        if l is not None and not getattr(l, "loja_mae_id", None):
+            unidades += [p.id for p in db.query(Loja)
+                         .filter(Loja.loja_mae_id == lid, Loja.ativo == 1)
+                         .order_by(Loja.id).all()]
+    return unidades
+
+
+def _contabil_ctx(handler, exige_edicao, consolidado_ok=False):
     """(usuario, db, owner_tipo, owner_id) ou envia erro via handler.send_json e retorna None.
     Gate: módulo financeiro ativo na loja; edição exige aprovar_financeiro OU editar_dados_loja.
-    O chamador é responsável por db.close()."""
+    O chamador é responsável por db.close().
+
+    Visão unificada (PDV, spec 2026-07-22): `?unidade=<loja_id>` (ou header
+    X-Unidade-Financeira) troca o owner das consultas/ações para a unidade escolhida,
+    restrito a _lojas_do_escopo (mãe + PDVs dela) — operações continuam atômicas numa
+    unidade por vez. `unidade=consolidado` só nos painéis que declaram consolidado_ok:
+    devolve ot="consolidado" e oid=[(ot, oid) de cada unidade] para o handler somar."""
     import mod_contabil, mod_tenancy
     usuario = get_usuario_sessao(handler)
     if not usuario:
@@ -424,6 +447,12 @@ def _contabil_ctx(handler, exige_edicao):
     loja = db.get(Loja, usuario.get("loja_id")) if usuario.get("loja_id") else None
     if loja is not None and not mod_tenancy.modulo_ativo(loja, "financeiro"):
         db.close(); handler.send_json({"ok": False, "erro": "Módulo financeiro inativo."}, code=403); return None
+    if loja is not None and getattr(loja, "loja_mae_id", None):
+        # PDV: o painel financeiro não existe na UI do PDV e a API acompanha — o financeiro
+        # é operado pela loja-mãe em visão unificada. Os LANÇAMENTOS do razão do PDV seguem
+        # normais (o wiring de eventos não passa por aqui).
+        db.close(); handler.send_json({"ok": False, "erro": "O financeiro do Ponto de Venda "
+                                       "é operado pela loja-mãe (visão unificada)."}, code=403); return None
     if exige_edicao:
         niv = usuario.get("nivel")
         if not (perfis.pode(niv, "aprovar_financeiro") or perfis.pode(niv, "editar_dados_loja")):
@@ -432,6 +461,31 @@ def _contabil_ctx(handler, exige_edicao):
         ot, oid = mod_contabil.resolver_owner(db, usuario)
     except ValueError as e:
         db.close(); handler.send_json({"ok": False, "erro": str(e)}, code=400); return None
+    from urllib.parse import parse_qs as _pq
+    unid = (_pq(urlparse(handler.path).query).get("unidade") or [None])[0]
+    if not unid:
+        unid = (handler.headers.get("X-Unidade-Financeira") or "").strip() or None
+    if unid == "consolidado":
+        if not consolidado_ok:
+            db.close(); handler.send_json({"ok": False, "erro": "Este painel não tem visão "
+                                           "consolidada — escolha uma unidade."}, code=400); return None
+        ator = _ator_dict(db, usuario)
+        unidades = _lojas_do_escopo(db, ator)
+        if len(unidades) < 2:
+            db.close(); handler.send_json({"ok": False, "erro": "Sem Pontos de Venda para "
+                                           "consolidar."}, code=400); return None
+        vistos, owners = set(), []
+        for u in unidades:
+            o = mod_contabil.resolver_owner(db, {"loja_id": u, "rede_id": None})
+            if o not in vistos:
+                vistos.add(o); owners.append(o)
+        return usuario, db, "consolidado", owners
+    if unid is not None:
+        ator = _ator_dict(db, usuario)
+        if not str(unid).isdigit() or int(unid) not in _lojas_do_escopo(db, ator):
+            db.close(); handler.send_json({"ok": False, "erro": "Unidade fora do escopo."},
+                                          code=403); return None
+        ot, oid = mod_contabil.resolver_owner(db, {"loja_id": int(unid), "rede_id": None})
     return usuario, db, ot, oid
 
 
@@ -749,6 +803,23 @@ class Handler(BaseHTTPRequestHandler):
         _REQ_LOJA_ATIVA = _ler_loja_ativa_header(self)
         path = urlparse(self.path).path
         if handle_auth_get(self, path): return
+        if path == "/api/financeiro/unidades":
+            # Visão unificada (PDV, spec 2026-07-22): unidades que o ator pode escolher no
+            # seletor dos painéis financeiros da mãe ([mãe] + PDVs ativos; 1 = sem seletor).
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            usuario, db, ot, oid = ctx
+            try:
+                ator = _ator_dict(db, usuario)
+                ids = _lojas_do_escopo(db, ator)
+                lojas = {l.id: l for l in db.query(Loja).filter(Loja.id.in_(ids)).all()} if ids else {}
+                unidades = [{"id": i, "nome": lojas[i].nome, "codigo": lojas[i].codigo or "",
+                             "tipo": (lojas[i].tipo or "loja")} for i in ids if i in lojas]
+                self.send_json({"ok": True, "unidades": unidades,
+                                "consolidado_disponivel": len(unidades) > 1})
+            finally:
+                db.close()
+            return
         if path == "/api/financeiro/contas":
             ctx = _contabil_ctx(self, exige_edicao=False)
             if ctx is None: return
