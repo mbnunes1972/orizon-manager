@@ -930,7 +930,7 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
         if path == "/api/financeiro/dre":
-            ctx = _contabil_ctx(self, exige_edicao=False)
+            ctx = _contabil_ctx(self, exige_edicao=False, consolidado_ok=True)
             if ctx is None: return
             import mod_contabil
             from urllib.parse import parse_qs
@@ -939,6 +939,10 @@ class Handler(BaseHTTPRequestHandler):
             ini = _parse_data((qs.get("ini") or [None])[0])
             fim = _parse_data((qs.get("fim") or [None])[0])
             try:
+                if ot == "consolidado":
+                    self.send_json({"ok": True,
+                                    "dre": mod_contabil.dre_consolidada(db, oid, ini=ini, fim=fim)})
+                    return
                 self.send_json({"ok": True, "dre": mod_contabil.dre(db, ot, oid, ini=ini, fim=fim)})
             finally:
                 db.close()
@@ -1088,14 +1092,42 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/financeiro/balanco":
-            ctx = _contabil_ctx(self, exige_edicao=False)
+            ctx = _contabil_ctx(self, exige_edicao=False, consolidado_ok=True)
             if ctx is None: return
             import mod_contabil
             from urllib.parse import parse_qs
             usuario, db, ot, oid = ctx
             data = _parse_data((parse_qs(urlparse(self.path).query).get("data") or [None])[0])
             try:
+                if ot == "consolidado":
+                    self.send_json({"ok": True,
+                                    "balanco": mod_contabil.balanco_consolidado(db, oid, data_corte=data)})
+                    return
                 self.send_json({"ok": True, "balanco": mod_contabil.balanco(db, ot, oid, data_corte=data)})
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/rateios":
+            # Rateios mãe→PDV do perímetro (visão unificada) — lista com estado de estorno.
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                ator = _ator_dict(db, usuario)
+                owners, vistos = [], set()
+                for u in _lojas_do_escopo(db, ator):
+                    o = mod_contabil.resolver_owner(db, {"loja_id": u, "rede_id": None})
+                    if o not in vistos:
+                        vistos.add(o); owners.append(o)
+                nomes = {("loja", l.id): l.nome for l in db.query(Loja).all()}
+                itens = mod_contabil.listar_rateios(db, owners)
+                for it in itens:
+                    pdvs = [nomes.get(tuple(o)) for o in it["owners"]
+                            if tuple(o) != owners[0] and nomes.get(tuple(o))]
+                    it["unidade"] = pdvs[0] if pdvs else ""
+                self.send_json({"ok": True, "rateios": itens,
+                                "eliminacoes_pendentes": mod_contabil.eliminacoes_intercompany(db, owners)})
             finally:
                 db.close()
             return
@@ -5201,6 +5233,58 @@ class Handler(BaseHTTPRequestHandler):
                                                 metodologia=dd.get("metodologia", "proporcional_receita"))
                 self.send_json({"ok": True, "periodo": r}, code=201)
             except ValueError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/rateio-pdv":
+            # Rateio ao PDV (spec PDV 2026-07-22 §3): mãe pagou custo em nome do PDV.
+            # Par intercompany ref rateio:<n> — mãe DR 1.1.09 × CR 1.1.01; PDV DR 5.x × CR 2.1.09.
+            # O ator age a partir da PRÓPRIA loja (mãe); a unidade destino vem no corpo.
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                pdv_id = dd.get("pdv_id")
+                ator = _ator_dict(db, usuario)
+                pdv = db.get(Loja, int(pdv_id)) if pdv_id else None
+                if (pdv is None or not pdv.loja_mae_id
+                        or pdv.id not in _lojas_do_escopo(db, ator)):
+                    self.send_json({"ok": False, "erro": "Ponto de Venda fora do escopo."},
+                                   code=403); return
+                owner_pdv = mod_contabil.resolver_owner(db, {"loja_id": pdv.id, "rede_id": None})
+                r = mod_contabil.rateio_ao_pdv(
+                    db, (ot, oid), owner_pdv, dd.get("valor"), dd.get("conta_despesa"),
+                    historico=dd.get("historico", ""), projeto_id=dd.get("projeto_id"),
+                    data=_parse_data(dd.get("data")))
+                self.send_json({"ok": True, **r}, code=201)
+            except (ValueError, TypeError) as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/rateio-pdv/estorno":
+            # Reversão EM PAR do rateio (ref espelhada) — restrita ao perímetro do ator.
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            from database import Lancamento
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                ref = (dd.get("ref") or "").strip()
+                ator = _ator_dict(db, usuario)
+                owners = set()
+                for u in _lojas_do_escopo(db, ator):
+                    owners.add(mod_contabil.resolver_owner(db, {"loja_id": u, "rede_id": None}))
+                legs = db.query(Lancamento).filter_by(ref=ref).all()
+                if not legs or not all((l.owner_tipo, l.owner_id) in owners for l in legs):
+                    self.send_json({"ok": False, "erro": "Rateio fora do escopo."}, code=403); return
+                r = mod_contabil.estornar_rateio(db, ref)
+                self.send_json({"ok": True, **r})
+            except (ValueError, TypeError) as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=400)
             finally:
                 db.close()

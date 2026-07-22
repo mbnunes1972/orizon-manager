@@ -2182,6 +2182,41 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 
+<!-- Modal: Rateio ao PDV (spec PDV 2026-07-22 §3) — par intercompany mãe×PDV, reversível -->
+<div id="modal-rateio" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:620px;max-height:90vh;overflow-y:auto">
+    <div class="modal-hdr">
+      <div class="modal-title">Rateio ao PDV</div>
+      <span class="modal-close" onclick="fecharModalRateio()">&#x2715;</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      A loja-mãe pagou um custo em nome do Ponto de Venda (aluguel, folha compartilhada,
+      marketing…). Lança o par intercompany com a mesma referência nos dois razões:
+      na mãe <strong>1.1.09 × 1.1.01</strong>; no PDV <strong>despesa escolhida × 2.1.09</strong>.
+      Reversível em par pelo Estornar.
+    </div>
+    <div class="grid2" style="gap:12px">
+      <div><label class="field-label">Ponto de Venda</label>
+        <select id="rateio-pdv-sel" onchange="rateioCarregarContas()"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></select></div>
+      <div><label class="field-label">Valor (R$)</label>
+        <input id="rateio-valor" type="number" step="0.01" min="0"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></div>
+      <div><label class="field-label">Rubrica de despesa (no razão do PDV)</label>
+        <select id="rateio-conta-sel"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></select></div>
+      <div><label class="field-label">Histórico</label>
+        <input id="rateio-hist" placeholder="ex.: Aluguel 07/2026 — quota Caraguá"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="fecharModalRateio()">Fechar</button>
+      <button class="btn btn-primary btn-sm" onclick="rateioSalvar()">Lançar rateio</button>
+    </div>
+    <div id="rateio-lista"></div>
+  </div>
+</div>
+
 <!-- Modal: Modelo de documento da loja (Task 9) — histórico de versões + wizard de importação -->
 <!-- Upload de Modelo — seletor de tipo (spec 2026-07-22): desemboca no modal de importação -->
 <div id="modal-doc-upload" class="modal-overlay" style="display:none"
@@ -10654,11 +10689,85 @@ async function finUnidadeInit(){
     + 'padding:6px 10px;color:var(--text);font-size:12px">'
     + _finUnidades.map(u => '<option value="'+u.id+'"'+(atual===String(u.id)?' selected':'')+'>'
         + esc(u.nome) + (u.tipo==='ponto_venda' ? ' (PDV)' : '') + '</option>').join('')
-    + '</select>';
+    + '<option value="consolidado"'+(atual==='consolidado'?' selected':'')+'>Consolidado (mãe + PDVs)</option>'
+    + '</select>'
+    + '<button class="btn btn-ghost btn-sm" onclick="abrirModalRateio()">Rateio ao PDV</button>';
 }
 function finUnidadeMudar(v){
   _finUnidade = v || null;
   finTab(_finSecaoAtual || 'prov');   // recarrega o painel atual na unidade escolhida
+}
+
+// ── Rateio ao PDV (spec PDV §3): mãe pagou custo em nome do PDV — par intercompany ──
+async function abrirModalRateio(){
+  const pdvs = (_finUnidades || []).filter(u => u.tipo === 'ponto_venda');
+  if (!pdvs.length){ showToast('Nenhum Ponto de Venda no escopo.', true); return; }
+  const sel = document.getElementById('rateio-pdv-sel');
+  sel.innerHTML = pdvs.map(u => '<option value="'+u.id+'">'+esc(u.nome)+'</option>').join('');
+  document.getElementById('rateio-valor').value = '';
+  document.getElementById('rateio-hist').value = '';
+  document.getElementById('modal-rateio').style.display = 'flex';
+  rateioCarregarContas();
+  rateioListar();
+}
+function fecharModalRateio(){ document.getElementById('modal-rateio').style.display = 'none'; }
+async function rateioCarregarContas(){
+  // contas de DESPESA (grupo 5, analíticas) do plano do PDV escolhido
+  const pdvId = document.getElementById('rateio-pdv-sel').value;
+  const d = await fetch('/api/financeiro/contas?unidade='+pdvId, {credentials:'same-origin'})
+    .then(r=>r.json()).catch(()=>({}));
+  const flat = [];
+  (function walk(ns){ (ns||[]).forEach(n => { flat.push(n); walk(n.filhos); }); })(d.contas || []);
+  const desps = flat.filter(c => c.codigo.charAt(0) === '5' && c.tipo === 'analitica');
+  document.getElementById('rateio-conta-sel').innerHTML =
+    desps.map(c => '<option value="'+esc(c.codigo)+'">'+esc(c.codigo)+' · '+esc(c.nome)+'</option>').join('');
+}
+async function rateioSalvar(){
+  const valor = parseFloat(document.getElementById('rateio-valor').value);
+  if (!(valor > 0)){ showToast('Informe um valor > 0.', true); return; }
+  const d = await fetch('/api/financeiro/rateio-pdv', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      pdv_id: parseInt(document.getElementById('rateio-pdv-sel').value, 10),
+      valor: valor,
+      conta_despesa: document.getElementById('rateio-conta-sel').value,
+      historico: document.getElementById('rateio-hist').value.trim(),
+    })}).then(r=>r.json()).catch(()=>({}));
+  if(!d.ok){ await avisoPopup(d.erro||'Erro no rateio.', {titulo:'Rateio ao PDV'}); return; }
+  showToast('Rateio lançado ('+d.ref+') nos dois razões.', false);
+  document.getElementById('rateio-valor').value = '';
+  rateioListar();
+  finTab(_finSecaoAtual || 'prov');
+}
+async function rateioEstornar(ref){
+  if (!confirm('Estornar o rateio '+ref+' nos DOIS razões (mãe e PDV)?')) return;
+  const d = await fetch('/api/financeiro/rateio-pdv/estorno', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({ref})})
+    .then(r=>r.json()).catch(()=>({}));
+  if(!d.ok){ showToast(d.erro||'Erro no estorno.', true); return; }
+  showToast('Rateio estornado em par.', false);
+  rateioListar();
+  finTab(_finSecaoAtual || 'prov');
+}
+async function rateioListar(){
+  const box = document.getElementById('rateio-lista');
+  const d = await fetch('/api/financeiro/rateios', {credentials:'same-origin'})
+    .then(r=>r.json()).catch(()=>({}));
+  if(!d.ok){ box.innerHTML = ''; return; }
+  const rows = (d.rateios||[]).map(r =>
+    '<tr style="border-top:1px solid var(--border)'+(r.estornado?';opacity:.55':'')+'">'
+    +'<td style="padding:4px 6px;font-family:var(--font-mono);font-size:11px">'+esc(r.ref)+'</td>'
+    +'<td>'+esc(r.unidade||'')+'</td>'
+    +'<td style="font-family:var(--font-mono)">'+_fBRL(r.valor)+'</td>'
+    +'<td style="color:var(--muted);font-size:11px">'+esc(r.historico||'')+'</td>'
+    +'<td style="text-align:right">'+(r.estornado
+        ? '<span style="font-size:10px;color:var(--muted)">estornado</span>'
+        : '<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="rateioEstornar(\''+esc(r.ref)+'\')">Estornar</button>')
+    +'</td></tr>').join('');
+  box.innerHTML = rows
+    ? '<div style="font-size:11px;color:var(--muted);margin:12px 0 4px">Rateios lançados'
+      +(d.eliminacoes_pendentes ? ' — pendência intercompany: '+_fBRL(d.eliminacoes_pendentes) : '')+'</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:12px"><tbody>'+rows+'</tbody></table>'
+    : '';
 }
 
 // ── Folha de Pagamento (Modulos_Orizon_v10 §2.1): motor — parte fixa (cadastro) + variável (vendas) ──
@@ -10921,6 +11030,12 @@ async function balancoCarregar(){
   const confere = b.confere
     ? '<div style="font-size:10px;color:var(--accent);margin-top:10px">✓ Ativo = Passivo + PL (fecha por partida dobrada)</div>'
     : '<div style="font-size:10px;color:var(--warn);margin-top:10px"><i class="ti ti-alert-triangle"></i> Ativo ≠ Passivo + PL — verificar lançamentos</div>';
+  // Consolidado (PDV): pendência intercompany mãe×PDV eliminada dos dois lados
+  const elim = b.eliminacoes
+    ? '<div style="font-size:11px;color:var(--muted);margin-top:8px">(−) Eliminações intercompany: '
+      +_fBRL(b.eliminacoes)+' — conta corrente mãe×PDV pendente de acerto (1.1.09 × 2.1.09), '
+      +'já abatida do Ativo e do Passivo consolidados.</div>'
+    : '';
   box.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:6px">'+btn('resumido','Resumido')+btn('analitico','Analítico')+'</div>'
     + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:12px;color:var(--muted)">'
     + 'Posição em: <input type="date" id="bal-data" value="'+_balData+'" onchange="balPeriodo()" style="padding:4px 6px;font-size:12px">'
@@ -10931,7 +11046,7 @@ async function balancoCarregar(){
     +'. Balanço não tem "data início": o saldo patrimonial é acumulado — um recorte quebraria Ativo = Passivo + PL.</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">'
     + '<div>'+ativoCol+'</div><div>'+passivoCol+'</div></div>'
-    + confere;
+    + elim + confere;
 }
 
 function reconInit(){
