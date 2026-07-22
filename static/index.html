@@ -12388,18 +12388,28 @@ function _fmtDataBR(s) {
   return isNaN(d) ? '' : d.toLocaleDateString('pt-BR');
 }
 function _cronoLabelEtapa(codigo, dados) {
+  // Duas COLUNAS explícitas e alinhadas (Planejado × Executado), rótulo em cima e data
+  // empilhada embaixo; largura fixa + borda à esquerda delimitam e alinham entre as
+  // etapas (pedido cosmético 2026-07-22). Sem data → "—" (a coluna nunca some, senão
+  // o alinhamento quebra de uma etapa para a outra).
   const prev = _fmtDataBR(dados.data_prevista_conclusao);
   const conc = _fmtDataBR(dados.data_conclusao);
   if (!prev && !conc) return '';
-  const parts = [];
-  if (prev) {
-    const editar = _podeAutorizarFront()
-      ? ` <i class="ti ti-pencil" title="Editar data planejada (requer reautenticação)" style="cursor:pointer;font-size:12px;color:var(--muted)" onclick="event.stopPropagation();cronoAbrirEdicao('${codigo}','${dados.data_prevista_conclusao || ''}')"></i>`
-      : '';
-    parts.push(`<span title="Planejada — extraída do cronograma"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3)">Planejada</span> <i class="ti ti-calendar-event" style="font-size:11px"></i> ${prev}${editar}</span>`);
-  }
-  if (conc) parts.push(`<span style="color:var(--accent)" title="Executada"><span style="font-size:9px;text-transform:uppercase;letter-spacing:.04em">Executada</span> <i class="ti ti-check" style="font-size:11px"></i> ${conc}</span>`);
-  return `<span class="ciclo-crono" style="margin-left:auto;display:inline-flex;gap:12px;font-size:11px;color:var(--muted);align-items:center">${parts.join('')}</span>`;
+  const editar = (prev && _podeAutorizarFront())
+    ? ` <i class="ti ti-pencil" title="Editar data planejada (requer reautenticação)" style="cursor:pointer;font-size:12px;color:var(--muted)" onclick="event.stopPropagation();cronoAbrirEdicao('${codigo}','${dados.data_prevista_conclusao || ''}')"></i>`
+    : '';
+  const col = (rotulo, titulo, corpo) => `
+    <span title="${titulo}" style="display:inline-flex;flex-direction:column;align-items:center;gap:1px;
+                 min-width:96px;padding:0 10px;border-left:1px solid var(--border)">
+      <span style="font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3)">${rotulo}</span>
+      <span style="white-space:nowrap">${corpo}</span>
+    </span>`;
+  return `<span class="ciclo-crono" style="margin-left:auto;display:inline-flex;font-size:11px;color:var(--muted);align-items:stretch">`
+    + col('Planejado', 'Planejado — extraído do cronograma',
+          prev ? `<i class="ti ti-calendar-event" style="font-size:11px"></i> ${prev}${editar}` : '—')
+    + col('Executado', 'Executado — data de conclusão da etapa',
+          conc ? `<span style="color:var(--accent)"><i class="ti ti-check" style="font-size:11px"></i> ${conc}</span>` : '—')
+    + `</span>`;
 }
 
 let _cronoEtapa = null;
