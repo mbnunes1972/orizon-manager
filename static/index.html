@@ -13548,6 +13548,7 @@ async function peComplementoRender(){
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         ${a.tem_pdf ? `<a class="btn-ciclo" style="text-decoration:none" target="_blank" rel="noopener" href="/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo/pdf?v=${Date.now()}"><i class="ti ti-download"></i> Baixar PDF</a>` : ''}
         ${!assinado ? `<button class="btn-ciclo" onclick="peAditivoGerar()"><i class="ti ti-refresh"></i> Regerar</button>` : ''}
+        ${assinado ? `<button class="btn-ciclo" onclick="peAditivoGerar(true)"><i class="ti ti-file-plus"></i> Novo Termo Aditivo</button>` : ''}
         ${!assinado ? sigBtn('loja') : '<span style="color:var(--ok);font-size:.82rem">✓ loja</span>'}
         ${!assinado ? sigBtn('cliente') : '<span style="color:var(--ok);font-size:.82rem">✓ cliente</span>'}
       </div>
@@ -13662,12 +13663,105 @@ async function peAprovacaoAssinar(parte){
   } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Assinar aprovação'}); }
 }
 
-async function peAditivoGerar(){
+// ── Termo Aditivo — wizard de 5 modais sequenciais (spec 2026-07-22) ─────────
+// Cada passo pré-preenche um marcador ADITIVO_* (texto editável + "Restaurar texto
+// padrão"); o backend traz os defaults já adaptados ao caso (sem inclusões/exclusões/
+// alteração de valor → declaração negativa automática). Regerar reabre com o texto
+// salvo da última geração; após assinado, "novo:true" abre o PRÓXIMO aditivo.
+const _ADW_PASSOS = [
+  {chave:'considerandos',  titulo:'Considerandos',
+   dica:'Um CONSIDERANDO por parágrafo — apague os que não se aplicam ao caso concreto.'},
+  {chave:'lista_integral', titulo:'Lista integral de produtos e materiais',
+   dica:'Rol COMPLETO pós-alteração (inclusive ambientes não alterados) — substitui integralmente o do CONTRATO.'},
+  {chave:'inclusoes',      titulo:'Inclusões',
+   dica:'Itens que não constavam do CONTRATO. Sem inclusões, mantenha a declaração negativa.'},
+  {chave:'exclusoes',      titulo:'Exclusões',
+   dica:'Itens que saíram do CONTRATO. Sem exclusões, mantenha a declaração negativa.'},
+  {chave:'valores',        titulo:'Valores e condições de pagamento',
+   dica:'Confira os valores (original → novo → diferença) e detalhe forma, parcelas e datas de pagamento.'},
+];
+let _adw = null;
+
+async function peAditivoGerar(novo){
   if(!projetoAtivo) return;
+  let j;
+  try {
+    j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo/defaults`,
+                    {credentials:'same-origin'}).then(r=>r.json());
+  } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Termo Aditivo'}); return; }
+  if(!j.ok){ await avisoPopup(j.erro||'Erro',{titulo:'Termo Aditivo'}); return; }
+  const salvos = j.blocos_salvos || {};
+  _adw = { novo: !!novo, ordinal: j.ordinal, idx: 0,
+           passos: _ADW_PASSOS.map(p => ({...p, padrao: j.defaults[p.chave] || '',
+                                          texto: salvos[p.chave] || j.defaults[p.chave] || ''})) };
+  document.getElementById('modal-aditivo-wizard').style.display='flex';
+  _adwRender();
+}
+
+function _adwSalvaAtual(){
+  if(_adw) _adw.passos[_adw.idx].texto = document.getElementById('adw-texto').value;
+}
+
+function _adwRender(){
+  const p = _adw.passos[_adw.idx];
+  document.getElementById('adw-titulo').textContent = `${_adw.ordinal} Termo Aditivo — ${p.titulo}`;
+  document.getElementById('adw-passo-rotulo').textContent = `Passo ${_adw.idx+1} de ${_adw.passos.length}`;
+  document.getElementById('adw-dica').textContent = p.dica;
+  document.getElementById('adw-texto').value = p.texto;
+  const ult = _adw.idx === _adw.passos.length - 1;
+  document.getElementById('adw-voltar').style.display  = _adw.idx === 0 ? 'none' : '';
+  document.getElementById('adw-avancar').style.display = ult ? 'none' : '';
+  document.getElementById('adw-preview').style.display = ult ? '' : 'none';
+  document.getElementById('adw-gerar').style.display   = ult ? '' : 'none';
+}
+
+function adwNav(d){
+  _adwSalvaAtual();
+  _adw.idx = Math.min(Math.max(_adw.idx + d, 0), _adw.passos.length - 1);
+  _adwRender();
+}
+
+function adwRestaurar(){
+  const p = _adw.passos[_adw.idx];
+  p.texto = p.padrao;
+  document.getElementById('adw-texto').value = p.padrao;
+}
+
+function adwFechar(){
+  _adw = null;
+  document.getElementById('modal-aditivo-wizard').style.display='none';
+}
+
+function _adwBlocos(){
+  _adwSalvaAtual();
+  const b = {};
+  _adw.passos.forEach(p => b[p.chave] = p.texto);
+  return b;
+}
+
+async function adwPreview(){
+  if(!projetoAtivo || !_adw) return;
+  try {
+    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo`,
+      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({preview:true, blocos:_adwBlocos(), novo:_adw.novo})});
+    const ct = r.headers.get('Content-Type') || '';
+    if(!r.ok || ct.indexOf('pdf') === -1){
+      const j = await r.json().catch(()=>({}));
+      await avisoPopup(j.erro||'Erro no preview.',{titulo:'Termo Aditivo'}); return;
+    }
+    window.open(URL.createObjectURL(await r.blob()), '_blank');
+  } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Termo Aditivo'}); }
+}
+
+async function adwGerar(){
+  if(!projetoAtivo || !_adw) return;
   try {
     const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo`,
-      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:'{}'}).then(r=>r.json());
+      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({blocos:_adwBlocos(), novo:_adw.novo})}).then(r=>r.json());
     if(!j.ok){ await avisoPopup(j.erro||'Erro',{titulo:'Termo Aditivo'}); return; }
+    adwFechar();
     showToast('Termo aditivo gerado.');
     peComplementoRender();
   } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Termo Aditivo'}); }
@@ -15848,6 +15942,38 @@ function bfFechar() {
       <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-pe-compl').style.display='none'">✕</button>
     </div>
     <div id="pe-compl-modal-body"><span style="color:var(--muted);font-size:.82rem">Carregando…</span></div>
+  </div>
+</div>
+
+<!-- Termo Aditivo — wizard de 5 passos (spec 2026-07-22): um marcador ADITIVO_* por passo -->
+<div id="modal-aditivo-wizard"
+     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:600;
+            align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;
+              padding:26px 24px;max-width:760px;width:94%;max-height:88vh;overflow-y:auto;
+              animation:mIn .2s ease;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h3 id="adw-titulo" style="margin:0;font-size:15px;color:var(--text)">Termo Aditivo</h3>
+      <button class="btn btn-ghost btn-sm" onclick="adwFechar()">✕</button>
+    </div>
+    <div id="adw-passo-rotulo" style="font-size:.75rem;letter-spacing:1px;color:var(--muted);
+         text-transform:uppercase;margin-bottom:10px"></div>
+    <p id="adw-dica" style="font-size:.8rem;color:var(--muted);margin:0 0 8px"></p>
+    <textarea id="adw-texto" rows="12"
+              style="width:100%;box-sizing:border-box;background:var(--surface-2);color:var(--text);
+                     border:1px solid var(--border);border-radius:8px;padding:10px;font-size:.85rem;
+                     font-family:inherit;line-height:1.45;resize:vertical"></textarea>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:8px;flex-wrap:wrap">
+      <button class="btn-ciclo" onclick="adwRestaurar()"><i class="ti ti-restore"></i> Restaurar texto padrão</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="adw-voltar" class="btn-ciclo" onclick="adwNav(-1)">‹ Voltar</button>
+        <button id="adw-avancar" class="btn-ciclo" onclick="adwNav(1)">Avançar ›</button>
+        <button id="adw-preview" class="btn-ciclo" style="display:none" onclick="adwPreview()"><i class="ti ti-eye"></i> Visualizar PDF</button>
+        <button id="adw-gerar" style="display:none;background:var(--btn-primary-bg);color:var(--btn-primary-text);
+                border:var(--btn-primary-border);border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer"
+                onclick="adwGerar()">Gerar Termo Aditivo</button>
+      </div>
+    </div>
   </div>
 </div>
 

@@ -2837,6 +2837,57 @@ class Handler(BaseHTTPRequestHandler):
                     db.close()
                 return
 
+            m = _re.match(r'^/api/projetos/([^/]+)/aditivo/defaults$', path)
+            if m:
+                # Wizard do Termo Aditivo (spec 2026-07-22): textos-padrão dos 5 modais +
+                # blocos salvos da última geração (regerar reabre com o texto editado).
+                nome_safe = unquote(m.group(1))
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    if _projeto_da_loja(db, nome_safe, loja_id) is None:
+                        self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                    contrato = (db.query(Contrato).filter_by(projeto_nome=nome_safe)
+                                  .order_by(Contrato.id.desc()).first())
+                    if contrato is None or not _contrato_assinado(nome_safe, db):
+                        self.send_json({"ok": False, "erro": "O termo aditivo exige contrato "
+                                        "assinado."}, code=400); return
+                    orc_aj = (db.query(Orcamento).filter_by(projeto_id=nome_safe, complemento_pe=1)
+                                .order_by(Orcamento.id.desc()).first())
+                    if orc_aj is None:
+                        self.send_json({"ok": False, "erro": "Negocie o complemento antes de gerar "
+                                        "o termo aditivo (11e → Negociar Complemento)."},
+                                       code=400); return
+                    import mod_contrato as _mc
+                    defaults, calc = _aditivo_defaults_blocos(db, nome_safe, contrato, orc_aj)
+                    a = (db.query(Aditivo).filter_by(projeto_nome=nome_safe)
+                           .order_by(Aditivo.id.desc()).first())
+                    blocos_salvos = None
+                    if a is not None and a.status != "assinado" and a.dados_json:
+                        try:
+                            blocos_salvos = (json.loads(a.dados_json).get("blocos") or None)
+                        except Exception:
+                            blocos_salvos = None
+                    n_ord = _aditivo_ordinal_atual(db, contrato, a)
+                    self.send_json({"ok": True,
+                                    "ordinal": _mc.ordinal_aditivo(n_ord),
+                                    "ordinal_num": n_ord,
+                                    "defaults": defaults,
+                                    "blocos_salvos": blocos_salvos,
+                                    "assinado": bool(a is not None and a.status == "assinado"),
+                                    "valores": {"contrato_original": calc["contrato_original"],
+                                                "contrato_novo": calc["contrato_novo"],
+                                                "diferenca": calc["dif"]}})
+                finally:
+                    db.close()
+                return
+
             m = _re.match(r'^/api/projetos/([^/]+)/aditivo/pdf$', path)
             if m:
                 nome_safe = unquote(m.group(1))
@@ -4209,50 +4260,70 @@ class Handler(BaseHTTPRequestHandler):
                 if orc_aj is None:
                     self.send_json({"ok": False, "erro": "Negocie o complemento antes de gerar o termo "
                                     "aditivo (11e → Negociar Complemento)."}, code=400); return
+                # Spec 2026-07-22 (modelo jurídico + modais): o request pode trazer os 5 blocos
+                # editados no wizard ({"blocos": {...}}; ausente/vazio → default), "preview"
+                # (PDF sem persistir NADA) e "novo" (após o último assinado, abre o PRÓXIMO
+                # aditivo — o assinado nunca é regerado).
+                try:
+                    req = json.loads(body) if body else {}
+                except Exception:
+                    req = {}
+                preview = bool(req.get("preview"))
+                blocos_req = req.get("blocos") or {}
                 aditivo = (db.query(Aditivo).filter_by(projeto_nome=nome)
                              .order_by(Aditivo.id.desc()).first())
                 if aditivo is not None and aditivo.status == "assinado":
-                    self.send_json({"ok": False, "erro": "Termo aditivo já assinado — não pode ser "
-                                    "regerado."}, code=403); return
+                    if req.get("novo") or preview:
+                        aditivo = None            # preview/novo trabalham no PRÓXIMO aditivo
+                    else:
+                        self.send_json({"ok": False, "erro": "Termo aditivo já assinado — não pode "
+                                        "ser regerado."}, code=403); return
                 import mod_documentos as _mdoc
-                if aditivo is None:
+                import mod_contrato as _mc
+                # corpo do modelo: versão CONGELADA do aditivo aberto; senão o ativo da loja;
+                # sem ativo, SEED do modelo jurídico padrão (contrato_template/termo_aditivo.md)
+                mv_ativa = None
+                if aditivo is not None and aditivo.modelo_versao_id is not None:
+                    corpo_md = _mdoc.corpo_da_versao(db, aditivo.modelo_versao_id) or ""
+                else:
+                    mv_ativa = _mdoc.ativo_de(db, loja_id, "termo_aditivo")
+                    if mv_ativa is None:
+                        corpo_padrao = _mc.corpo_modelo_aditivo_padrao()
+                        if not corpo_padrao:
+                            self.send_json({"ok": False, "erro": "Nenhum modelo de Termo Aditivo "
+                                            "ativo — importe um em Config → Documentos."},
+                                           code=400); return
+                        if preview:
+                            corpo_md = corpo_padrao        # preview não semeia nada
+                        else:
+                            mv_ativa = _mdoc.criar_versao(
+                                db, loja_id, "termo_aditivo", corpo_padrao,
+                                "termo_aditivo.md (modelo padrão do sistema)", usuario.get("id"))
+                            _mdoc.ativar(db, mv_ativa.id)
+                            corpo_md = corpo_padrao
+                    else:
+                        corpo_md = _mdoc.corpo_da_versao(db, mv_ativa.id) or ""
+                if not preview and aditivo is None:
                     aditivo = Aditivo(projeto_nome=nome, contrato_id=contrato.id,
                                       orcamento_complemento_id=orc_aj.id, loja_id=loja_id)
                     db.add(aditivo); db.flush()
-                if aditivo.modelo_versao_id is None:      # congela o modelo na 1ª geração
-                    mv = _mdoc.ativo_de(db, loja_id, "termo_aditivo")
-                    if mv is None:
-                        self.send_json({"ok": False, "erro": "Nenhum modelo de Termo Aditivo ativo "
-                                        "— importe um em Config → Documentos."}, code=400); return
-                    aditivo.modelo_versao_id = mv.id
-                corpo_md = _mdoc.corpo_da_versao(db, aditivo.modelo_versao_id) or ""
-                # Correção Fatia 3: o orçamento de complemento JÁ é a diferença — o VAVA de cada
-                # ambiente dele é a DIFERENÇA NEGOCIADA (base XML complemento, fator de custos
-                # adicionais e descontos do contrato embutidos; desconto por ambiente aplicado
-                # sobre a diferença). O "original" vem do comparativo (_complemento_diferencas).
-                linhas_cmp, _res_cmp = _complemento_diferencas(db, nome)
-                base_orig = {l["pool_ambiente_id"]: l["vava_contratado"] for l in (linhas_cmp or [])}
-                d_aj = _negociacao_breakdown(orc_aj, db)
-                pa_nome = {pa.id: (pa.nome_exibicao or pa.nome) for pa in
-                           db.query(PoolAmbiente).filter_by(projeto_id=nome).all()}
+                if not preview and aditivo.modelo_versao_id is None:   # congela na 1ª geração
+                    aditivo.modelo_versao_id = mv_ativa.id
                 from mod_contrato import _formatar_valor as _fv
-                linhas_amb, tot_orig, tot_dif = [], 0.0, 0.0
-                for a in d_aj.get("ambientes", []):
-                    vo = round(float(base_orig.get(a.get("id"), 0.0)), 2)
-                    dif_amb = round(float(a.get("VAVA", 0.0)), 2)   # diferença negociada
-                    tot_orig += vo; tot_dif += dif_amb
-                    linhas_amb.append({"pool_ambiente_id": a.get("id"),
-                                       "ambiente": pa_nome.get(a.get("id"), "?"),
-                                       "vava_original": vo,
-                                       "vava_novo": round(vo + dif_amb, 2),
-                                       "diferenca": dif_amb})
-                tot_orig = round(tot_orig, 2)
-                dif = round(tot_dif, 2)
-                tot_novo = round(tot_orig + dif, 2)
+                calc = _aditivo_dados_calculo(db, nome, contrato, orc_aj)
+                linhas_amb = calc["linhas_amb"]
+                tot_orig, tot_novo, dif = (calc["tot_orig_marc"], calc["tot_novo_marc"],
+                                           calc["dif"])
+                defaults, _ = _aditivo_defaults_blocos(db, nome, contrato, orc_aj)
+                blocos = {ch: (str(blocos_req.get(ch) or "").strip() or defaults[ch])
+                          for ch in ("considerandos", "lista_integral", "inclusoes",
+                                     "exclusoes", "valores")}
+                n_ord = _aditivo_ordinal_atual(db, contrato, aditivo)
                 dados = {"ambientes": linhas_amb, "valor_original": tot_orig,
                          "valor_novo": tot_novo, "diferenca": dif,
-                         "num_contrato_original": contrato.num_contrato or ""}
-                if not aditivo.num_aditivo:
+                         "num_contrato_original": contrato.num_contrato or "",
+                         "ordinal": n_ord, "blocos": blocos}
+                if not preview and not aditivo.num_aditivo:
                     from mod_contrato import gerar_num_contrato as _gnc
                     _existing = [x.num_aditivo for x in db.query(Aditivo)
                                  .filter(Aditivo.num_aditivo.isnot(None)).all()]
@@ -4265,11 +4336,16 @@ class Handler(BaseHTTPRequestHandler):
                                "email": usuario.get("email", "") or ""}
                 from mod_contrato import construir_contexto as _cc, gerar_pdf_aditivo as _gpa
                 from mod_contrato import CONTRATOS_DIR as _CDIR
+                # data em que o CONTRATO foi firmado = 1ª assinatura; fallback: geração
+                _ass1 = (db.query(ContratoAssinatura).filter_by(contrato_id=contrato.id)
+                           .order_by(ContratoAssinatura.assinado_em.asc()).first())
+                _dt_ct = (_ass1.assinado_em if _ass1 is not None else None) or contrato.gerado_em
+                num_ta = aditivo.num_aditivo if aditivo is not None else ""
                 ctx = _cc(cliente_dict, usuario_ctx, "", loja_dict)
-                ctx["num_contrato"] = aditivo.num_aditivo
+                ctx["num_contrato"] = num_ta
                 ctx["_corpo_md_aditivo"] = corpo_md
                 ctx["_aditivo"] = {
-                    "num_aditivo": aditivo.num_aditivo,
+                    "num_aditivo": num_ta,
                     "num_contrato_original": contrato.num_contrato or "",
                     "ambientes_txt": "\n".join(
                         "%s: %s → %s (Δ %s)" % (l["ambiente"], _fv(l["vava_original"]),
@@ -4278,7 +4354,28 @@ class Handler(BaseHTTPRequestHandler):
                     "valor_original": _fv(tot_orig),
                     "valor_novo": _fv(tot_novo),
                     "diferenca": _fv(dif),
+                    "ordinal": _mc.ordinal_aditivo(n_ord),
+                    "data_aditivo": datetime.now().strftime("%d/%m/%Y"),
+                    "data_contrato_original": _dt_ct.strftime("%d/%m/%Y") if _dt_ct else "",
+                    **blocos,
                 }
+                if preview:
+                    import tempfile, shutil as _shutil
+                    outdir = tempfile.mkdtemp(prefix="aditivo_preview_")
+                    try:
+                        pdf_path = _gpa(ctx, os.path.join(outdir, "preview.pdf"))
+                        with open(pdf_path, "rb") as fh:
+                            data_pdf = fh.read()
+                    finally:
+                        _shutil.rmtree(outdir, ignore_errors=True)
+                    db.rollback()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/pdf")
+                    self.send_header("Content-Disposition", 'inline; filename="aditivo_preview.pdf"')
+                    self.send_header("Content-Length", len(data_pdf))
+                    self.end_headers()
+                    self.wfile.write(data_pdf)
+                    return
                 pdf_path = _gpa(ctx, os.path.join(_CDIR, "aditivo_%d.pdf" % aditivo.id))
                 aditivo.pdf_path = pdf_path
                 aditivo.dados_json = json.dumps(dados, ensure_ascii=False)
@@ -10066,6 +10163,96 @@ def _complemento_diferencas(db, nome_safe):
         "marcados": len(linhas), "carregados": len(carregadas),
     }
     return linhas, resumo
+
+
+def _aditivo_dados_calculo(db, nome, contrato, orc_aj):
+    """Números do Termo Aditivo numa passada só (spec 2026-07-22): as linhas por ambiente
+    MARCADO (dados/6 marcadores antigos da Fatia 3) + a visão INTEGRAL do contrato
+    pós-alteração (modal 2 — inclui os ambientes NÃO alterados) + inclusões/exclusões
+    detectadas + totais do CONTRATO (original → novo). Inclusão = ambiente do complemento
+    que não consta do orçamento contratado; exclusão = ambiente contratado cujo valor
+    pós-alteração zera. O operador sempre pode editar no wizard — isto é o DEFAULT."""
+    linhas_cmp, _res = _complemento_diferencas(db, nome)
+    base_orig = {l["pool_ambiente_id"]: l["vava_contratado"] for l in (linhas_cmp or [])}
+    d_aj = _negociacao_breakdown(orc_aj, db)
+    pa_nome = {pa.id: (pa.nome_exibicao or pa.nome) for pa in
+               db.query(PoolAmbiente).filter_by(projeto_id=nome).all()}
+    linhas_amb, tot_orig_marc, tot_dif = [], 0.0, 0.0
+    dif_por_amb = {}
+    for a in d_aj.get("ambientes", []):
+        vo = round(float(base_orig.get(a.get("id"), 0.0)), 2)
+        dif_amb = round(float(a.get("VAVA", 0.0)), 2)   # diferença negociada
+        dif_por_amb[a.get("id")] = dif_amb
+        tot_orig_marc += vo; tot_dif += dif_amb
+        linhas_amb.append({"pool_ambiente_id": a.get("id"),
+                           "ambiente": pa_nome.get(a.get("id"), "?"),
+                           "vava_original": vo,
+                           "vava_novo": round(vo + dif_amb, 2),
+                           "diferenca": dif_amb})
+    orc_ct = db.get(Orcamento, contrato.orcamento_id) if contrato.orcamento_id else None
+    d_ct = _negociacao_breakdown(orc_ct, db) if orc_ct is not None else {"ambientes": []}
+    lista_integral, inclusoes, exclusoes = [], [], []
+    ids_ct, tot_ct_orig = set(), 0.0
+    for a in d_ct.get("ambientes", []):
+        aid = a.get("id"); ids_ct.add(aid)
+        vo = round(float(a.get("VAVA", 0.0)), 2)
+        novo = round(vo + dif_por_amb.get(aid, 0.0), 2)
+        tot_ct_orig += vo
+        nome_amb = pa_nome.get(aid, "?")
+        if novo <= 0.005 and vo > 0:
+            exclusoes.append((nome_amb, vo))            # zerou → saiu do rol
+        else:
+            lista_integral.append((nome_amb, novo))
+    for aid, dif_amb in dif_por_amb.items():
+        if aid not in ids_ct:                           # não constava do contrato → inclusão
+            nome_amb = pa_nome.get(aid, "?")
+            lista_integral.append((nome_amb, dif_amb))
+            if dif_amb > 0:
+                inclusoes.append((nome_amb, dif_amb))
+    dif = round(tot_dif, 2)
+    tot_ct_orig = round(tot_ct_orig, 2)
+    return {"linhas_amb": linhas_amb,
+            "tot_orig_marc": round(tot_orig_marc, 2),
+            "tot_novo_marc": round(round(tot_orig_marc, 2) + dif, 2),
+            "dif": dif,
+            "lista_integral": lista_integral, "inclusoes": inclusoes, "exclusoes": exclusoes,
+            "contrato_original": tot_ct_orig,
+            "contrato_novo": round(tot_ct_orig + dif, 2)}
+
+
+def _aditivo_condicoes_default(orc_aj):
+    """Texto-base das condições de pagamento do bloco de valores (modal 5). O complemento
+    nasce à vista/entrada 0 (plano zerado) — plano negociado vira contagem simples; o
+    detalhamento fino é edição do operador no wizard."""
+    try:
+        fp = json.loads(orc_aj.forma_pagamento) if orc_aj.forma_pagamento else {}
+    except Exception:
+        fp = {}
+    parcelas = fp.get("parcelas") or []
+    if len(parcelas) > 1:
+        return "em %d parcelas, conforme plano negociado no complemento" % len(parcelas)
+    return "à vista, na data de assinatura deste TERMO ADITIVO"
+
+
+def _aditivo_defaults_blocos(db, nome, contrato, orc_aj):
+    """(defaults_dict, calc) — os 5 textos-padrão do wizard + os números que os geraram."""
+    import mod_contrato as _mc
+    calc = _aditivo_dados_calculo(db, nome, contrato, orc_aj)
+    defaults = _mc.montar_defaults_aditivo(
+        lista_integral=calc["lista_integral"], inclusoes=calc["inclusoes"],
+        exclusoes=calc["exclusoes"], valor_original=calc["contrato_original"],
+        valor_novo=calc["contrato_novo"], diferenca=calc["dif"],
+        condicoes=_aditivo_condicoes_default(orc_aj))
+    return defaults, calc
+
+
+def _aditivo_ordinal_atual(db, contrato, aditivo=None):
+    """Posição deste aditivo na contagem do contrato (1 → PRIMEIRO…). Sem aditivo aberto
+    (ou com o último assinado), é a posição do PRÓXIMO."""
+    if aditivo is not None and aditivo.status != "assinado" and aditivo.id is not None:
+        return (db.query(Aditivo).filter(Aditivo.contrato_id == contrato.id,
+                                         Aditivo.id < aditivo.id).count() + 1)
+    return db.query(Aditivo).filter_by(contrato_id=contrato.id).count() + 1
 
 
 # ── Ajustes Excepcionais de Fábrica (spec 2026-07-21) — composition root ─────────────────────

@@ -66,6 +66,102 @@ def _formatar_valor(valor: float) -> str:
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+# ── Termo Aditivo — modelo jurídico completo (spec 2026-07-22) ────────────────
+
+_ORDINAIS_ADITIVO = ("PRIMEIRO", "SEGUNDO", "TERCEIRO", "QUARTO", "QUINTO",
+                     "SEXTO", "SÉTIMO", "OITAVO", "NONO", "DÉCIMO")
+
+
+def ordinal_aditivo(n: int) -> str:
+    """Título do termo aditivo: 1 → PRIMEIRO, 2 → SEGUNDO… Acima de 10 cai no
+    numérico ('11º') — juridicamente válido e evita tabela infinita."""
+    if 1 <= n <= len(_ORDINAIS_ADITIVO):
+        return _ORDINAIS_ADITIVO[n - 1]
+    return "%dº" % n
+
+
+def corpo_modelo_aditivo_padrao() -> str:
+    """contrato_template/termo_aditivo.md (modelo jurídico do advogado) — fonte do seed
+    do modelo 'termo_aditivo' para loja sem modelo ativo. '' se o arquivo faltar."""
+    try:
+        with open(os.path.join(CONTRATO_TEMPLATE_DIR, "termo_aditivo.md"),
+                  encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+# Os CONSIDERANDOS são o texto LITERAL do advogado (mod_aditivo.doc, 2022) — não
+# reescrever; um por parágrafo para o operador apagar os que não se aplicam. Os demais
+# textos são a redação da spec. A adaptação ao caso "sem inclusões/exclusões/alteração
+# de valor" é pelo VALOR do marcador (frase negativa própria), não por condicional no
+# template: o motor de substituição continua burro e a numeração 1.1/1.2/2 fica estável.
+ADITIVO_CONSIDERANDOS_PADRAO = (
+    "CONSIDERANDO QUE o CLIENTE solicitou alteração substancial na concepção original do "
+    "Projeto Executivo, tal como definido nos itens 1.5.1; 2.3, alínea (b); 2.3.4 a 2.3.6 "
+    "do CONTRATO;"
+    "\n\n"
+    "CONSIDERANDO QUE o CLIENTE solicitou alteração substancial dos produtos e serviços "
+    "objeto do CONTRATO;"
+    "\n\n"
+    "CONSIDERANDO QUE a medição, tal como definida no item 2.3, alínea (a) do CONTRATO, "
+    "constatou a necessidade de alteração substancial na concepção do Projeto Inicial, com "
+    "impacto relevante no Projeto Executivo que pautará a produção dos bens adquiridos e os "
+    "serviços que lhe são acessórios;"
+)
+
+_ADITIVO_TXT_LISTA = ("Com base na solicitação do CLIENTE, a lista de produtos e materiais "
+                      "adquiridos passa a ser a seguinte, substituindo integralmente, para "
+                      "todos os efeitos, o rol constante do CONTRATO e de seus anexos:")
+_ADITIVO_TXT_INCLUSOES = ("Diante do rol constante do item 1, promove-se a inclusão dos "
+                          "seguintes produtos e materiais, que não constavam do texto "
+                          "original do CONTRATO:")
+_ADITIVO_TXT_SEM_INCLUSOES = ("Registram as PARTES que o presente TERMO ADITIVO não promove "
+                              "a inclusão de produtos ou materiais em relação ao rol "
+                              "original do CONTRATO.")
+_ADITIVO_TXT_EXCLUSOES = ("Diante do rol constante do item 1, promove-se a exclusão dos "
+                          "seguintes produtos e materiais, que constavam do texto original "
+                          "do CONTRATO:")
+_ADITIVO_TXT_SEM_EXCLUSOES = ("Registram as PARTES que o presente TERMO ADITIVO não promove "
+                              "a exclusão de produtos ou materiais em relação ao rol "
+                              "original do CONTRATO.")
+_ADITIVO_TXT_SEM_ALTERACAO_VALORES = (
+    "As alterações promovidas nos itens precedentes não implicam modificação dos valores "
+    "nem das condições de pagamento fixados no CONTRATO, que permanecem integralmente "
+    "vigentes.")
+
+
+def _linhas_ambientes_txt(pares):
+    return "\n".join("- %s: %s" % (nome, _formatar_valor(v)) for nome, v in pares)
+
+
+def montar_defaults_aditivo(lista_integral, inclusoes, exclusoes,
+                            valor_original, valor_novo, diferenca, condicoes="") -> dict:
+    """Textos-padrão dos 5 blocos dos modais sequenciais do Termo Aditivo.
+
+    lista_integral: [(nome, valor)] de TODOS os ambientes vigentes pós-alteração,
+    inclusive os não alterados; inclusoes/exclusoes: [(nome, valor)] detectados pela
+    comparação (vazio → frase negativa automática); valores em R$ do CONTRATO inteiro
+    (original → novo → diferença). O operador edita tudo no wizard antes de gerar."""
+    if abs(diferenca) >= 0.005:
+        valores = ("Diante das alterações promovidas nos itens precedentes, o valor total "
+                   "do CONTRATO passa de %s para %s, resultando em diferença de %s, a ser "
+                   "paga da seguinte forma: %s."
+                   % (_formatar_valor(valor_original), _formatar_valor(valor_novo),
+                      _formatar_valor(diferenca), condicoes or "[condições de pagamento]"))
+    else:
+        valores = _ADITIVO_TXT_SEM_ALTERACAO_VALORES
+    return {
+        "considerandos": ADITIVO_CONSIDERANDOS_PADRAO,
+        "lista_integral": _ADITIVO_TXT_LISTA + "\n" + _linhas_ambientes_txt(lista_integral),
+        "inclusoes": (_ADITIVO_TXT_INCLUSOES + "\n" + _linhas_ambientes_txt(inclusoes)
+                      if inclusoes else _ADITIVO_TXT_SEM_INCLUSOES),
+        "exclusoes": (_ADITIVO_TXT_EXCLUSOES + "\n" + _linhas_ambientes_txt(exclusoes)
+                      if exclusoes else _ADITIVO_TXT_SEM_EXCLUSOES),
+        "valores": valores,
+    }
+
+
 def _formatar_valor_str(v):
     """Aceita número ou string já formatada; devolve 'R$ x.xxx,xx' (ou '' se vazio)."""
     if v is None or v == "":
@@ -563,6 +659,18 @@ def _montar_mapping(ctx, pag):
         # no contrato/proposta saem vazios (padrão dos extras).
         "NUM_ADITIVO":            (ctx.get("_aditivo") or {}).get("num_aditivo", "") or "",
         "NUM_CONTRATO_ORIGINAL":  (ctx.get("_aditivo") or {}).get("num_contrato_original", "") or "",
+        # Modelo jurídico completo do aditivo (spec 2026-07-22): ordinal do título, datas e os
+        # 5 blocos dos modais sequenciais (texto final editado pelo operador, ou o default).
+        # DATA_CONTRATO_ORIGINAL é marcador PRÓPRIO: DATA_CONTRATO segue sendo a do documento
+        # corrente nos demais modelos — sobrecarregá-lo aqui quebraria contratos.
+        "ORDINAL_ADITIVO":        (ctx.get("_aditivo") or {}).get("ordinal", "") or "",
+        "DATA_ADITIVO":           (ctx.get("_aditivo") or {}).get("data_aditivo", "") or "",
+        "DATA_CONTRATO_ORIGINAL": (ctx.get("_aditivo") or {}).get("data_contrato_original", "") or "",
+        "ADITIVO_CONSIDERANDOS":  (ctx.get("_aditivo") or {}).get("considerandos", "") or "",
+        "ADITIVO_LISTA_INTEGRAL": (ctx.get("_aditivo") or {}).get("lista_integral", "") or "",
+        "ADITIVO_INCLUSOES":      (ctx.get("_aditivo") or {}).get("inclusoes", "") or "",
+        "ADITIVO_EXCLUSOES":      (ctx.get("_aditivo") or {}).get("exclusoes", "") or "",
+        "ADITIVO_VALORES":        (ctx.get("_aditivo") or {}).get("valores", "") or "",
         "AMBIENTES_COMPLEMENTO": (ctx.get("_aditivo") or {}).get("ambientes_txt", "") or "",
         "VALOR_ORIGINAL_COMPLEMENTO":  (ctx.get("_aditivo") or {}).get("valor_original", "") or "",
         "VALOR_NOVO_COMPLEMENTO":      (ctx.get("_aditivo") or {}).get("valor_novo", "") or "",
@@ -897,7 +1005,11 @@ def _montar_html_corpo_documento(ctx, corpo_md):
     ctx['_aprovacao_pe'], preenchidos pelo endpoint de geração). TEXTO_COMPLEMENTAR não se
     aplica — removido se o modelo o trouxer."""
     from html import escape
-    mapping = {k: escape(str(v)) for k, v in _montar_mapping(ctx, ctx.get("_pag", {})).items()}
+    # \n → <br>: a substituição de marcadores acontece DEPOIS de o corpo virar <p> por linha
+    # (_html_corpo), então um valor multi-linha (considerandos, listas do aditivo) colapsaria
+    # numa linha só — o HTML ignora \n. O escape vem ANTES; o <br> é nosso, não do lojista.
+    mapping = {k: escape(str(v)).replace("\n", "<br>")
+               for k, v in _montar_mapping(ctx, ctx.get("_pag", {})).items()}
     shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"), encoding="utf-8").read()
     corpo = _html_corpo(corpo_md or "")
     html_doc = shell.replace("<!--CAPA-->", "").replace("<!--CORPO-->", corpo)

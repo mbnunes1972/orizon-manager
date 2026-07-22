@@ -2334,6 +2334,40 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 105 — Termo Aditivo: modelo jurídico do advogado + wizard de 5 modais sequenciais
+**Frente da spec `contrato-documentos/2026-07-22-termo-aditivo-modelo-modais-design.md`:** o corpo-
+esqueleto do `termo_aditivo` (3 linhas) deu lugar ao modelo do advogado (`mod_aditivo.doc` →
+`contrato_template/termo_aditivo.md`, texto jurídico INTACTO, generalizado com marcadores).
+**Backend (TDD):** 8 marcadores novos no `CATALOGO` + `_montar_mapping` NO MESMO commit (anti-drift
+verde): `ORDINAL_ADITIVO` (PRIMEIRO/SEGUNDO…, `ordinal_aditivo()`, >10 vira "11º"), `DATA_ADITIVO`,
+`DATA_CONTRATO_ORIGINAL` (novo DE PROPÓSITO — `DATA_CONTRATO` segue sendo a do documento corrente;
+vem da 1ª assinatura do contrato, fallback `gerado_em`) e os 5 blocos `ADITIVO_*` (considerandos/
+lista_integral/inclusoes/exclusoes/valores). Defaults em `montar_defaults_aditivo` (mod_contrato):
+considerandos = os 3 LITERAIS do advogado (um por parágrafo, p/ apagar os inaplicáveis); lista
+integral = rol COMPLETO pós-alteração (inclui ambientes não alterados; helper
+`_aditivo_dados_calculo` no main soma contrato inteiro: original → novo → diferença ao centavo);
+inclusão detectada = ambiente do complemento fora do orçamento contratado; exclusão = contratado
+que zera; **sem inclusões/exclusões/alteração → frase NEGATIVA automática** (valor do marcador,
+não condicional no template — numeração 1.1/1.2/2 estável). **Armadilha real:** a substituição de
+marcador roda DEPOIS de o corpo virar `<p>` por linha → valor multi-linha colapsaria; `\n`→`<br>`
+no mapping do corpo-documento (só nesse caminho). **Endpoint:** POST `/aditivo` aceita `blocos`
+(editados no wizard; vazio → default), `preview` (PDF inline SEM persistir nada — rollback) e
+`novo` (após assinado, abre o PRÓXIMO aditivo; regerar assinado segue 403); congela
+`modelo_versao_id` na 1ª geração e **semeia o modelo padrão** do `contrato_template/` p/ loja sem
+modelo ativo; blocos+ordinal persistidos no `dados_json` (parte do documento assinado, não
+recalculável). GET `/aditivo/defaults` alimenta o wizard (defaults + blocos salvos p/ regerar).
+Os 6 marcadores da Fatia 3 (`AMBIENTES_COMPLEMENTO` etc.) seguem válidos. **Frontend:** wizard de
+5 passos num modal (textarea editável + "Restaurar texto padrão" + Voltar/Avançar + Visualizar PDF
++ Gerar); "Novo Termo Aditivo" aparece só com o anterior assinado. **Testes:**
+`test_aditivo_modelo.py` (13: ordinal, 4 combinações com/sem inclusões×exclusões, valores com/sem
+alteração, mapping, render do modelo real com `<br>`) + `test_aditivo_wizard_e2e.py` (contrato →
+Revisão de PE com ambiente alterado + ambiente INCLUÍDO → defaults ao centavo 88.888,89→103.333,33
+/ Δ 14.444,44 → preview sem persistir → geração com bloco editado → congelamento → 2º aditivo
+SEGUNDO com o 1º intacto). Suíte SQLite **1405**.
+**Cosmético (pedido em voo):** etapas do ciclo — datas do cronograma agora em DUAS COLUNAS
+explícitas "Planejado" × "Executado" (rótulo em cima, data empilhada embaixo, borda delimitando,
+largura fixa alinhando entre etapas; sem data = "—" pra coluna nunca sumir).
+
 ## Sessão 104 — Uploads grandes: teto de body no app (413 amigável) + nginx 64M no runbook
 **Causa-raiz do `Failed to fetch` ao subir XML de 6,3 MB em produção** (diagnóstico de 2026-07-21):
 nginx sem `client_max_body_size` (default **1 MB**) cortava a conexão com o corpo ainda em trânsito;

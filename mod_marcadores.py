@@ -88,6 +88,17 @@ CATALOGO = {
     # permanece intocado; o aditivo documenta só a diferença).
     "NUM_ADITIVO":                {"rotulo": "Nº do termo aditivo",                          "escopo": "documento"},
     "NUM_CONTRATO_ORIGINAL":      {"rotulo": "Nº do contrato original",                      "escopo": "documento"},
+    # Modelo jurídico completo (spec 2026-07-22): título ordinal, datas e os 5 blocos dos
+    # modais sequenciais (texto editado pelo operador entra no marcador). DATA_CONTRATO_ORIGINAL
+    # é NOVO de propósito — DATA_CONTRATO segue sendo "a data do documento corrente".
+    "ORDINAL_ADITIVO":            {"rotulo": "Ordinal do aditivo (PRIMEIRO/SEGUNDO…)",       "escopo": "documento"},
+    "DATA_ADITIVO":               {"rotulo": "Data do termo aditivo",                        "escopo": "documento"},
+    "DATA_CONTRATO_ORIGINAL":     {"rotulo": "Data em que o contrato original foi firmado",  "escopo": "documento"},
+    "ADITIVO_CONSIDERANDOS":      {"rotulo": "Considerandos (modal 1)",                      "escopo": "documento"},
+    "ADITIVO_LISTA_INTEGRAL":     {"rotulo": "Lista integral de produtos (modal 2)",         "escopo": "documento"},
+    "ADITIVO_INCLUSOES":          {"rotulo": "Inclusões — ou declaração negativa (modal 3)", "escopo": "documento"},
+    "ADITIVO_EXCLUSOES":          {"rotulo": "Exclusões — ou declaração negativa (modal 4)", "escopo": "documento"},
+    "ADITIVO_VALORES":            {"rotulo": "Valores e condições de pagamento (modal 5)",   "escopo": "documento"},
     "AMBIENTES_COMPLEMENTO":      {"rotulo": "Ambientes do complemento (original → novo)",   "escopo": "documento"},
     "VALOR_ORIGINAL_COMPLEMENTO": {"rotulo": "Soma original dos ambientes do complemento",   "escopo": "documento"},
     "VALOR_NOVO_COMPLEMENTO":     {"rotulo": "Soma nova dos ambientes do complemento",       "escopo": "documento"},
