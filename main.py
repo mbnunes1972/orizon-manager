@@ -670,6 +670,27 @@ def porta_do_ambiente(environ=None):
     return p
 
 
+MAX_BODY_MB_DEFAULT = 50  # < client_max_body_size do nginx (64M): o erro amigável sai do app
+
+
+def max_body_bytes(environ=None):
+    """Teto do body em bytes, lido de ORIZON_MAX_BODY_MB (default 50 MB) — mesmo
+    padrão de porta_do_ambiente: valor inválido dá erro CLARO no bootstrap, não
+    default silencioso. Mantido abaixo do teto do nginx (64M) de propósito, para o
+    413 amigável em JSON vir sempre do app, nunca do reset seco do proxy."""
+    environ = os.environ if environ is None else environ
+    raw = environ.get("ORIZON_MAX_BODY_MB")
+    if not raw:                       # ausente ou "" → default
+        return MAX_BODY_MB_DEFAULT * 1024 * 1024
+    try:
+        mb = int(raw)
+    except (TypeError, ValueError):
+        raise ValueError("ORIZON_MAX_BODY_MB inválido: %r (esperado inteiro >= 1)" % (raw,))
+    if mb < 1:
+        raise ValueError("ORIZON_MAX_BODY_MB fora de faixa: %d (esperado >= 1)" % mb)
+    return mb * 1024 * 1024
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -681,6 +702,31 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", len(body))
         self.end_headers()
         self.wfile.write(body)
+
+    def _ler_body(self):
+        """Ponto ÚNICO de leitura do body (do_POST/do_PUT/do_PATCH). Content-Length
+        acima do teto (max_body_bytes) → responde 413 JSON e devolve None SEM ler um
+        byte do corpo — drenar dezenas de MB pra memória só pra recusar seria o
+        próprio problema — e fecha a conexão (Connection: close), senão o cliente
+        segue enviando o resto num socket que ninguém vai ler. O handler chamador
+        deve retornar em silêncio no None. Header ausente/inválido → b'{}' (contrato
+        que as rotas já esperam)."""
+        try:
+            length = int(self.headers.get("Content-Length", 0))
+        except (TypeError, ValueError):
+            length = 0
+        teto = max_body_bytes()
+        if length > teto:
+            body = json.dumps({"ok": False, "erro": "Arquivo grande demais (máx. %d MB)."
+                               % (teto // (1024 * 1024))}, ensure_ascii=False).encode("utf-8")
+            self.send_response(413)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", len(body))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(body)
+            return None
+        return self.rfile.read(length) if length else b'{}'
 
     def do_GET(self):
         global _REQ_LOJA_ATIVA
@@ -3221,8 +3267,8 @@ class Handler(BaseHTTPRequestHandler):
         global _REQ_LOJA_ATIVA
         _REQ_LOJA_ATIVA = _ler_loja_ativa_header(self)
         path   = urlparse(self.path).path
-        length = int(self.headers.get("Content-Length", 0))
-        body   = self.rfile.read(length) if length else b'{}'
+        body   = self._ler_body()
+        if body is None: return   # 413 já respondido pelo _ler_body
 
         if handle_auth_post(self, path, body): return
 
@@ -3251,11 +3297,6 @@ class Handler(BaseHTTPRequestHandler):
                 if "arquivo" not in arquivos:
                     self.send_json({"ok": False, "erro": "Anexe o arquivo do modelo."}, code=400); return
                 fname, dados = arquivos["arquivo"]
-                # DÍVIDA CONHECIDA (não desta frente): o upload não tem teto de tamanho. Nenhum
-                # POST do main.py limita Content-Length — o body é lido inteiro em memória lá no
-                # topo do do_POST, antes de qualquer rota existir. É gap sistêmico do arquivo, e
-                # resolver aqui só nesta rota daria falsa sensação de cobertura; o cap pertence ao
-                # ponto único de leitura do body. Registrado para a frente que endereçar isso.
                 staging_path, sha = _mdoc.guardar_staging(loja_id, tipo, fname, dados)
                 # importa e analisa SEM salvar versão — o lojista pode desistir na revisão.
                 try:
@@ -8670,8 +8711,8 @@ class Handler(BaseHTTPRequestHandler):
         global _REQ_LOJA_ATIVA
         _REQ_LOJA_ATIVA = _ler_loja_ativa_header(self)
         path   = urlparse(self.path).path
-        length = int(self.headers.get("Content-Length", 0))
-        body   = self.rfile.read(length)
+        body   = self._ler_body()
+        if body is None: return   # 413 já respondido pelo _ler_body
 
         # ── PUT /api/financeiro/contas/<id> (renomear/reordenar) ──────────────
         m_conta = re.match(r"^/api/financeiro/contas/(\d+)$", path)
@@ -9112,8 +9153,8 @@ class Handler(BaseHTTPRequestHandler):
         _REQ_LOJA_ATIVA = _ler_loja_ativa_header(self)
         try:
             path = urlparse(self.path).path
-            length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(length) if length else b'{}'
+            body = self._ler_body()
+            if body is None: return   # 413 já respondido pelo _ler_body
 
             # ── Adiantamentos: editar (abater/quitado/valor/competência) ou remover (Fase 5) ──
             m = re.match(r'^/api/adiantamentos/(\d+)$', path)
@@ -11113,6 +11154,7 @@ def main():
     # Porta de bind configurável via ORIZON_PORT (default 8765). Permite 2 instâncias
     # no mesmo servidor (ex.: INTEGRAÇÃO :8765 e PRÉ-HOMOLOGAÇÃO :8766).
     port   = porta_do_ambiente()
+    max_body_bytes()   # valida ORIZON_MAX_BODY_MB no bootstrap: env inválido cai AQUI, não no 1º upload
     # Host de bind configurável: padrão 127.0.0.1 (dev local seguro);
     # em produção defina ORIZON_HOST=0.0.0.0 para aceitar acesso externo.
     host   = os.environ.get("ORIZON_HOST", "127.0.0.1")

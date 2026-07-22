@@ -3388,8 +3388,7 @@ async function docmImportar(){
   fd.append('arquivo', f, f.name);
   fd.append('tipo', _docmCtx.tipo);
   try{
-    const r = await fetch('/api/documentos/modelos/importar', {method:'POST', credentials:'same-origin', body: fd});
-    const d = await r.json().catch(()=>({}));
+    const d = await uploadFormData('/api/documentos/modelos/importar', fd);
     if(!d.ok){
       status.textContent = d.erro || 'Falha ao importar o arquivo.';
       status.style.color = 'var(--err)';
@@ -4418,6 +4417,27 @@ function showToast(msg, isErr){
   t.style.display='block';
   clearTimeout(t._timer);
   t._timer = setTimeout(()=>t.style.display='none', 3000);
+}
+
+// ---- Upload de arquivo (FormData) — helper ÚNICO ----------------------------
+// Todo upload passa por aqui: é o único lugar que traduz o 413 (teto do app/nginx)
+// e a falha de rede em mensagem amigável — nunca vazar "TypeError: Failed to
+// fetch" cru pro usuário. Devolve sempre objeto no contrato {ok, erro?} que as
+// rotas já usam: quem chama só checa d.ok e mostra d.erro.
+const MSG_UPLOAD_REDE = 'Falha de conexão ao enviar o arquivo. Verifique a internet e tente de novo; se persistir, o arquivo pode exceder o limite do servidor.';
+async function uploadFormData(url, fd){
+  let r;
+  try{
+    r = await fetch(url, {method:'POST', credentials:'same-origin', body: fd});
+  }catch(e){
+    return {ok:false, erro: MSG_UPLOAD_REDE};
+  }
+  if(r.status === 413){
+    // o app responde JSON com a mensagem certa; se o 413 vier do proxy (HTML), fallback
+    const d = await r.json().catch(()=>null);
+    return {ok:false, erro:(d && d.erro) || 'Arquivo grande demais (máx. 50 MB).'};
+  }
+  return await r.json().catch(()=>({ok:false, erro:'Resposta inválida do servidor.'}));
 }
 
 // ---- Page 00: Projetos -------------------------------------------------------
@@ -5458,9 +5478,7 @@ async function uploadXmls(fileList){
       for(const f of files){
         const fdPool = new FormData();
         fdPool.append('xmls', f, f.name);
-        const rPool = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/pool',
-                                  {method:'POST', body:fdPool});
-        const dPool = await rPool.json();
+        const dPool = await uploadFormData('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/pool', fdPool);
         if(!dPool.ok){ showToast('Erro no pool: '+(dPool.erro||''), true); continue; }
 
         if(dPool.acao === 'criado'){
@@ -5519,8 +5537,7 @@ async function uploadXmls(fileList){
   const fd = new FormData();
   for(const f of files) fd.append('xmls', f);
   try{
-    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/ambientes/adicionar',{method:'POST',body:fd});
-    const d = await r.json();
+    const d = await uploadFormData('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/ambientes/adicionar', fd);
     if(!d.ok){ st.textContent='Erro: '+(d.erro||'falha'); showToast('Erro ao enviar XMLs', true); return; }
     projetoAtivo = d.projeto;
     (projetoAtivo.ambientes||[]).forEach(a=>{
@@ -5627,8 +5644,7 @@ async function atualizarXml(fileList, arquivoAntigo, idx){
   fd.append('xmls', fileList[0]);
   fd.append('arquivo_substituir', arquivoAntigo);
   try{
-    const r = await fetch('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/ambientes/atualizar',{method:'POST',body:fd});
-    const d = await r.json();
+    const d = await uploadFormData('/projetos/'+encodeURIComponent(projetoAtivo.nome_safe)+'/ambientes/atualizar', fd);
     if(!d.ok){ showToast('Erro: '+(d.erro||'falha'), true); return; }
     projetoAtivo = d.projeto;
     (projetoAtivo.ambientes||[]).forEach(a=>{
@@ -13175,8 +13191,7 @@ async function enviarSolicitacaoMedicao() {
   if (!cred) return;
   const fd = new FormData();
   fd.append('arquivo', f); fd.append('login', cred.login); fd.append('senha', cred.senha);
-  const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/medicao/solicitacao`, {method:'POST', credentials:'same-origin', body: fd});
-  const d = await r.json();
+  const d = await uploadFormData(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/medicao/solicitacao`, fd);
   if (!d.ok) { await avisoPopup(d.erro || 'Falha', {titulo:'Medição'}); return; }
   showToast('Solicitação de medição confirmada!', false);
   await carregarCiclo();
@@ -13220,8 +13235,7 @@ async function enviarParecerMedicao() {
   const fd = new FormData();
   fd.append('planta', f); fd.append('parecer', parecer); fd.append('ambientes_aprovados', ambientes);
   fd.append('login', cred.login); fd.append('senha', cred.senha);
-  const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/medicao/parecer`, {method:'POST', credentials:'same-origin', body: fd});
-  const d = await r.json();
+  const d = await uploadFormData(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/medicao/parecer`, fd);
   if (!d.ok) { await avisoPopup(d.erro || 'Falha', {titulo:'Medição'}); return; }
   showToast(d.parecer === 'reprovado' ? 'Parecer registrado: Reprovado (aguardando decisão).' : 'Medição registrada!', false);
   await carregarCiclo();
@@ -13234,8 +13248,7 @@ async function enviarDecisaoReprovado() {
   if (!cred) return;
   const fd = new FormData();
   fd.append('doc_cliente', f); fd.append('login', cred.login); fd.append('senha', cred.senha);
-  const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/medicao/decisao-reprovado`, {method:'POST', credentials:'same-origin', body: fd});
-  const d = await r.json();
+  const d = await uploadFormData(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/medicao/decisao-reprovado`, fd);
   if (!d.ok) { await avisoPopup(d.erro || 'Falha', {titulo:'Medição'}); return; }
   showToast('Medição liberada (decisão comercial registrada).', false);
   await carregarCiclo();
@@ -13562,8 +13575,7 @@ async function peComplUpload(poolAmbienteId, inputFile){
   fd.append('pool_ambiente_id', poolAmbienteId);
   fd.append('finalidade', 'complemento');
   try {
-    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/upload`,
-                          {method:'POST', credentials:'same-origin', body:fd}).then(r=>r.json());
+    const j = await uploadFormData(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/upload`, fd);
     if(j.ok){ showToast('Complemento carregado.'); peComplementoRender(); }
     else { await avisoPopup(j.erro||'Erro',{titulo:'Carregar Complemento'}); }
   } catch(e){ await avisoPopup('Erro ao enviar o arquivo.',{titulo:'Carregar Complemento'}); }
@@ -13733,8 +13745,7 @@ async function pePeUpload(poolAmbienteId, inputFile){
   fd.append('arquivo', f);
   fd.append('pool_ambiente_id', poolAmbienteId);
   try {
-    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/upload`,
-                          {method:'POST', credentials:'same-origin', body:fd}).then(r=>r.json());
+    const j = await uploadFormData(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/upload`, fd);
     if(j.ok){ showToast('XML de PE carregado.'); peComparacaoRender(); }
     else { await avisoPopup(j.erro||'Erro',{titulo:'Carregar PE'}); }
   } catch(e){ await avisoPopup('Erro ao enviar o arquivo.',{titulo:'Carregar PE'}); }
@@ -13937,10 +13948,8 @@ async function peUpload(codigo, inputFile) {
   fd.append('login', cred.login);
   fd.append('senha', cred.senha);
   try {
-    const r = await fetch(
-      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${codigo}/documento`,
-      { method: 'POST', credentials: 'same-origin', body: fd });
-    const j = await r.json();
+    const j = await uploadFormData(
+      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${codigo}/documento`, fd);
     if (!j.ok) { await avisoPopup(j.erro || 'Falha ao carregar.', {titulo:'PE — Upload'}); return false; }
     showToast('Documento carregado com sucesso!', false);
     await peCarregar(projetoAtivo.nome_safe);
@@ -14068,10 +14077,8 @@ async function enviarPedidosXml(inputFile) {
     for (const f of files) {
       const fd = new FormData();
       fd.append('arquivo', f);
-      const r = await fetch(
-        `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/12/pedido-xml`,
-        { method: 'POST', credentials: 'same-origin', body: fd });
-      const j = await r.json();
+      const j = await uploadFormData(
+        `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/12/pedido-xml`, fd);
       if (!j.ok) {
         await avisoPopup(j.erro || 'Falha ao carregar.', {titulo:'Implantação — Upload'});
         inputFile.value = '';
@@ -14233,8 +14240,7 @@ async function enviarNfeFabrica(inputFile) {
   const f = inputFile.files[0]; if (!f) return;
   const fd = new FormData(); fd.append('arquivo', f);
   try {
-    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/15/nfe-fabrica`, { method: 'POST', credentials: 'same-origin', body: fd });
-    const j = await r.json();
+    const j = await uploadFormData(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/15/nfe-fabrica`, fd);
     if (!j.ok) { await avisoPopup(j.erro || 'Falha ao carregar.', {titulo:'NF-e — Fábrica'}); return; }
     showToast('NF-e da fábrica carregada!', false); await carregarCiclo();
   } catch(e) { await avisoPopup('Erro de rede: ' + e.message, {titulo:'NF-e — Fábrica'}); }
@@ -14353,10 +14359,8 @@ async function peRevisao(codigo, inputRelatorio) {
   fd.append('senha', cred.senha);
   if (motivo) fd.append('motivo', motivo);
   try {
-    const r = await fetch(
-      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${codigo}/revisao`,
-      { method: 'POST', credentials: 'same-origin', body: fd });
-    const j = await r.json();
+    const j = await uploadFormData(
+      `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/${codigo}/revisao`, fd);
     if (!j.ok) { await avisoPopup(j.erro || 'Falha na revisão.', {titulo:'PE — Revisão'}); return; }
     await avisoPopup(
       'Revisão registrada. Fases reabertas: ' + ((j.resetadas || []).join(', ') || '—'),

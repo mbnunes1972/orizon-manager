@@ -249,6 +249,7 @@ cat > /etc/nginx/sites-available/orizon <<'EOF'
 server {
     listen 80;
     server_name orizonsolution.com.br www.orizonsolution.com.br;
+    client_max_body_size 64M;   # > teto do app (50 MB): o 413 amigavel vem sempre do app, nunca do proxy
     location / {
         proxy_pass http://127.0.0.1:8765;
         proxy_set_header Host $host;
@@ -261,6 +262,9 @@ EOF
 ln -sf /etc/nginx/sites-available/orizon /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
 certbot --nginx -d orizonsolution.com.br -d www.orizonsolution.com.br   # HTTPS + redirect automático
+# ATENÇÃO: o certbot cria um 2º bloco server { } (443) — conferir que o client_max_body_size 64M
+# está presente em CADA bloco server (o default do nginx é 1M e derruba upload de XML > 1 MB
+# com "Failed to fetch" no browser, sem status).
 ```
 
 #### Passo 4 — Backup automático (pg_dump diário)

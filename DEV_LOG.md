@@ -2334,6 +2334,33 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 104 — Uploads grandes: teto de body no app (413 amigável) + nginx 64M no runbook
+**Causa-raiz do `Failed to fetch` ao subir XML de 6,3 MB em produção** (diagnóstico de 2026-07-21):
+nginx sem `client_max_body_size` (default **1 MB**) cortava a conexão com o corpo ainda em trânsito;
+e o app não tinha teto NENHUM (dívida anotada no do_POST). Spec
+`_geral/2026-07-21-uploads-grandes-limite-body-design.md`. **Backend (TDD):** `max_body_bytes()`
+(env `ORIZON_MAX_BODY_MB`, default 50 MB, validação fail-fast no bootstrap, padrão
+`porta_do_ambiente`) + `Handler._ler_body()` — ponto ÚNICO de leitura do body usado por
+do_POST/do_PUT/do_PATCH; `Content-Length` acima do teto → **413 JSON amigável SEM ler um byte**
+(o teste de socket cru envia só headers e a resposta imediata prova o não-read) + `Connection:
+close`; header ausente/inválido segue `b'{}'`. App 50 MB **<** nginx 64M de propósito: o erro
+amigável vem sempre do app, nunca do reset seco do proxy. Dívida do importar de modelos quitada.
+**Frontend:** helper único `uploadFormData(url, fd)` — traduz 413 (usa a mensagem JSON do app,
+fallback p/ 413-HTML de proxy) e falha de rede em mensagem amigável (nunca mais `TypeError` cru) —
+adotado nos **13** uploads FormData (pool, adicionar/atualizar legado, importar modelo, medição ×3,
+PE upload ×2, ciclo documento/revisão, pedido-xml da 12, NF-e fábrica da 15); os 3 da medição não
+tinham NENHUM try/catch (rejeição de fetch virava unhandled). `node --check` ok. **Testes:**
+`tests/test_max_body.py` (11: unidade do env, 413 em POST/PUT/PATCH via socket cru, override com
+mensagem dinâmica, rota intocada sob o teto). **Infra:** runbook do `DEV_RULES.md` (Passo 3) ganhou
+o `client_max_body_size 64M` no template + alerta do 2º server block do certbot; **VPS A/B
+(167.88.33.121) NÃO tem nginx** (acesso direto na porta; conferido — nginx inativo, sem sites) →
+teto do app cobre. Produção (`orizonsolution.com.br`) fica p/ o próximo deploy de produção: aplicar
+o 64M nos DOIS blocos server. Suíte SQLite **1389 passed** / Postgres **1386+2 skipped, 1 falha PRÉ-EXISTENTE**
+(`test_endpoint_indicadores_e2e`: timeout dos 5s do HttpClient contra Postgres — reproduz IGUAL no
+código sem as mudanças desta sessão, via stash; herança da Sessão 103, anotar na frente de
+indicadores, fora do escopo aqui). Deploy A+B (`deploy_ab.sh`). Aceite manual com os XMLs reais
+de 6,3/6,7 MB pendente de gente.
+
 ## Sessão 103 — Snapshot de Indicadores (desafio do usuário): liquidez, giro, KPIs, tendências
 **Aba nova "Indicadores"** (1ª do Painel Financeiro): `mod_indicadores.py` PURO (liquidez corrente/
 imediata/**ajustada** — exclui os ativos diferidos 1.1.05/06, que a fórmula clássica contaria e
