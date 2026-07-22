@@ -1,5 +1,14 @@
 # Ponto de Venda (PDV avançado) — conceito, contas e painéis (2026-07-22)
 
+> **STATUS (2026-07-22): IMPLEMENTADO — as 4 fatias, na branch `feat/ponto-de-venda`**
+> (DEV_LOG Sessão 110). Testes: `test_pdv_fundacao.py`, `test_pdv_visao_unificada.py`,
+> `test_pdv_consolidacao.py`. O PDV real de Caraguatatuba é criado por
+> `scripts/criar_pdv_caraguatatuba.py` (idempotente, rodar no VPS) — pendências do
+> Diretor (§Definições) seguem abertas: metas próprias e rateios recorrentes.
+> Desvio da letra da spec: a ocultação do financeiro no PDV NÃO usa `modulos_ativos`
+> (desligar o módulo mataria o wiring de lançamentos do razão) — o filtro é na
+> resposta de `/api/auth/me` + gate 403 no `_contabil_ctx`; `modulo_ativo()` segue True.
+
 ## Demanda
 Modelar o caso Caraguatatuba: ponto de vendas avançado da Inspirium (São José dos Campos), com
 equipe menor mas TODAS as funções comerciais de uma loja — enquanto o processo administrativo,
