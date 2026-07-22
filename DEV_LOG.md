@@ -2334,6 +2334,20 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 108 — Plano de contas: mesma linha nos pares restantes + família 5.6 com nome PURO
+**Decisão do usuário (fechando a observação da S107):** "a despesa sair de um processamento
+contábil de provisão ou ocorrer de um fato direto não muda o teor contábil" → cada rubrica tem
+UMA conta de despesa, a da família 5.6. **Removidas do seed** (verificado: mortas no motor —
+assistências baixa provisões `2.1.04.x`, e o DRE só agrega o grupo `5.2` por prefixo):
+`5.2.01 Montagem`, `5.2.08 Frete Local`, `5.2.09 Insumos` — mesma linha da `5.1.02` (S107).
+**Família 5.6 com nome puro** (sem o "— Despesa Reconhecida" da S107, que só existia para
+desambiguar das duplicatas — mortas as duplicatas, o sufixo perdeu a função): grupo "Despesas
+de Provisões", contas "Garantia"/"Montagem"/"Frete de Fábrica"/etc. `migrar_plano_faxina_frete`
+ampliada: remove/desativa as 4 duplicatas e renomeia aceitando **qualquer geração de nome**
+(seed original "Constituição — …" OU o da S107 — as bases A/B já tinham rodado a S107); nome
+customizado segue preservado. Rótulo da DRE → "(−) Despesas de Provisões" (chave inalterada).
+Testes reescritos cobrindo os dois estados históricos (6). Suíte verde nas duas pontas.
+
 ## Sessão 107 — Plano de contas: fim da conta duplicada de frete fábrica + renome da família 5.6
 **Dúvida do usuário (procedente):** "duas contas de despesa associadas a frete fábrica —
 `5.1.02 Frete Fábrica` e `5.6.04 Constituição — Provisão de Frete de Fábrica` — receio de
