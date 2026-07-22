@@ -18,9 +18,64 @@ import hashlib
 
 from sqlalchemy.exc import IntegrityError
 
-from database import DocumentoModelo
+from database import DocumentoModelo, DocumentoTipo
 
 TIPOS = ("contrato", "proposta", "termo_aditivo", "aprovacao_pe")
+
+# ── Tipos CUSTOMIZADOS ("Novo Documento", spec 2026-07-22) ────────────────────
+# O slug vira componente de DIRETÓRIO em documentos_loja/<loja>/<tipo>/ — a forma
+# doc_[a-z0-9_]+ é path-safe por construção, então os pontos db-free (staging)
+# validam só a FORMA; a EXISTÊNCIA (slug registrado para a loja) é validada onde
+# há sessão de banco (criar_versao / endpoints).
+_RE_TIPO_CUSTOM = re.compile(r"^doc_[a-z0-9_]{1,40}$")
+
+
+def tipo_forma_valida(tipo):
+    """Aceita os nativos e a FORMA dos customizados (path-safe). Não consulta o banco."""
+    return tipo in TIPOS or bool(_RE_TIPO_CUSTOM.match(tipo or ""))
+
+
+def tipo_existe(db, loja_id, tipo):
+    """Nativo, ou slug customizado REGISTRADO para esta loja."""
+    if tipo in TIPOS:
+        return True
+    if not _RE_TIPO_CUSTOM.match(tipo or ""):
+        return False
+    return (db.query(DocumentoTipo)
+              .filter_by(loja_id=loja_id, slug=tipo).first()) is not None
+
+
+def tipos_customizados(db, loja_id):
+    return (db.query(DocumentoTipo).filter_by(loja_id=loja_id)
+              .order_by(DocumentoTipo.id.asc()).all())
+
+
+def _slugificar_nome(nome):
+    import unicodedata
+    s = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode("ascii")
+    s = re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_")
+    return s[:40] or None
+
+
+def criar_tipo(db, loja_id, nome, etapa_ciclo, usuario_id):
+    """Cria um tipo customizado (slug doc_<nome-slugificado>, único por loja).
+    Levanta ValueError com mensagem de usuário; NÃO commita (o chamador decide)."""
+    nome = (nome or "").strip()
+    if not nome:
+        raise ValueError("Dê um nome ao documento.")
+    base = _slugificar_nome(nome)
+    if not base:
+        raise ValueError("Nome inválido — use letras e números.")
+    slug = "doc_" + base
+    ja = db.query(DocumentoTipo).filter_by(loja_id=loja_id, slug=slug).first()
+    if ja is not None:
+        raise ValueError("Já existe um documento com esse nome (%s)." % ja.nome)
+    t = DocumentoTipo(loja_id=loja_id, slug=slug, nome=nome,
+                      etapa_ciclo=(str(etapa_ciclo).strip() or None) if etapa_ciclo else None,
+                      criado_por_id=usuario_id)
+    db.add(t)
+    db.flush()
+    return t
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 DOCS_LOJA_DIR = os.path.join(_THIS_DIR, "documentos_loja")
@@ -32,8 +87,9 @@ _MAX_TENTATIVAS_VERSAO = 8
 
 
 def _validar(tipo, corpo_md):
-    if tipo not in TIPOS:
-        raise ValueError("tipo inválido: %r (aceitos: %s)" % (tipo, ", ".join(TIPOS)))
+    if not tipo_forma_valida(tipo):
+        raise ValueError("tipo inválido: %r (aceitos: %s ou doc_<slug> customizado)"
+                         % (tipo, ", ".join(TIPOS)))
     if not (corpo_md or "").strip():
         raise ValueError("corpo do modelo vazio")
 
@@ -109,7 +165,7 @@ def resolver_staging(loja_id, tipo, nome_recebido):
       3. confinamento real  — realpath + commonpath sob o _staging/ desta loja, e isfile
                               (diretório não serve — foi exatamente o que o '.' explorou).
     """
-    if tipo not in TIPOS:
+    if not tipo_forma_valida(tipo):
         return None
     nome = (nome_recebido or "").strip()
     if not _RE_NOME_STAGING.match(nome):
@@ -165,6 +221,8 @@ def criar_versao(db, loja_id, tipo, corpo_md, origem_nome, usuario_id,
     abandonar arquivo sem dono.
     """
     _validar(tipo, corpo_md)
+    if not tipo_existe(db, loja_id, tipo):    # slug custom precisa estar REGISTRADO na loja
+        raise ValueError("tipo de documento não cadastrado para esta loja: %r" % (tipo,))
     ultima_violacao = None
     for _ in range(_MAX_TENTATIVAS_VERSAO):
         try:

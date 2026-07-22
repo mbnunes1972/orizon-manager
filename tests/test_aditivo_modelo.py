@@ -153,3 +153,19 @@ def test_render_modelo_real_com_blocos():
     # nenhum marcador do aditivo sobrando
     assert "[ADITIVO_" not in html and "[ORDINAL_ADITIVO]" not in html
     assert "[DATA_CONTRATO_ORIGINAL]" not in html
+
+
+def test_aditivo_tem_cabecalho_do_contrato():
+    """Spec 2026-07-22 (cabeçalho): documento de corpo-só sai com o MESMO cabeçalho do
+    contrato — logo + rede à esquerda, número (TA) e data à direita."""
+    corpo = mod_contrato.corpo_modelo_aditivo_padrao()
+    ctx = {"loja": {"nome": "L", "cnpj": "1", "cidade": "SJC"},
+           "_corpo_md_aditivo": corpo, "num_contrato": "TA20260722001",
+           "data_contrato": "22/07/2026",
+           "_aditivo": {"num_aditivo": "TA20260722001", "ordinal": "PRIMEIRO"}}
+    html = mod_contrato.montar_html_aditivo(ctx)
+    assert 'id="cabecalho"' in html
+    assert "logo_dalmobile.png" in html
+    assert "TA20260722001" in html
+    assert "22/07/2026" in html
+    assert "[REDE_IDENTIFICADOR]" not in html   # marcador do cabeçalho resolvido (cai na cidade)

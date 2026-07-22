@@ -2334,6 +2334,32 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 106 — Cabeçalho no Aditivo + Painel de Documentos: Upload por seletor, Novo Documento e exemplos
+**Spec `contrato-documentos/2026-07-22-cabecalho-aditivo-painel-documentos-design.md`.**
+**Cabeçalho:** `_html_cabecalho()` compartilhado (extraído da capa — um lugar só) agora injetado
+nos documentos de **corpo-só** (`_montar_html_corpo_documento`): Termo Aditivo, Aprovação do PE e
+customizados saem com logo + rede + nº (TA/AP) + data, aos moldes do contrato. **Tipos
+customizados:** tabela `documento_tipos` (loja, slug `doc_<nome>`, nome, `etapa_ciclo` opcional;
+único por loja; registrada no manifesto `modulos.py` — o ratchet pegou). Slug path-safe por
+construção (`doc_[a-z0-9_]+` vira diretório em `documentos_loja/`): forma validada nos pontos
+db-free (staging), EXISTÊNCIA onde há banco (`tipo_existe` em criar_versao/endpoints). Endpoints
+`GET/POST /api/documentos/tipos` (POST exige `gerir_documentos`; duplicado/nome vazio = erro
+claro). Todo o fluxo importar→analisar→ativar é REUSADO para os slugs custom. **Painel Config →
+Documentos:** barra de ações com **"Upload de Modelo"** (seletor com nativos + customizados →
+desemboca no modal de importação existente) e **"Novo Documento"** (nome + seletor de etapa do
+ciclo — a INSERÇÃO da geração no ciclo é frente futura, o vínculo fica gravado); card de
+Aprovação do PE entrou (saiu o placeholder "em construção"); cards de customizados mostram a
+etapa. **"Ver exemplo"** em todo card: preview do modelo ATIVO sem importar nada — o endpoint de
+preview agora renderiza POR TIPO (contrato/proposta = capa+corpo; termo_aditivo = corpo-só com
+`_aditivo` de EXEMPLO — ordinal/blocos preenchidos; aprovacao_pe e custom = corpo-só com
+cabeçalho) e sem `corpo_md` resolve o ativo da loja (fallback: padrão do sistema p/ contrato e
+termo_aditivo). **Suíte de formatação (decisão):** a v1 É o pipeline existente (LibreOffice
+achata numeração → corpo_md → análise de marcadores com aprovação humana → preview → ativar);
+proposta v2 registrada na spec: "Formatar com IA" (LLM propõe diff de formatação/cravamento, o
+operador revisa — mesma filosofia dos cravados). Testes: `test_documentos_tipos_e2e.py` (CRUD de
+tipos com permissão/duplicado, importar+ativar+preview de tipo custom, preview por tipo nativo)
++ cabeçalho no `test_aditivo_modelo.py`. Suíte **1409** (SQLite).
+
 ## Sessão 105 — Termo Aditivo: modelo jurídico do advogado + wizard de 5 modais sequenciais
 **Frente da spec `contrato-documentos/2026-07-22-termo-aditivo-modelo-modais-design.md`:** o corpo-
 esqueleto do `termo_aditivo` (3 linhas) deu lugar ao modelo do advogado (`mod_aditivo.doc` →

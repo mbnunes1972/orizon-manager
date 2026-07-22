@@ -1227,6 +1227,28 @@ class DocumentoModelo(Base):
         return value
 
 
+class DocumentoTipo(Base):
+    """Tipo de documento CUSTOMIZADO por loja ("Novo Documento" do painel Config →
+    Documentos, spec 2026-07-22): nome dado pelo usuário + etapa do ciclo associada.
+    Os 4 tipos nativos (contrato/proposta/termo_aditivo/aprovacao_pe) NÃO viram linha
+    aqui. O slug (`doc_<nome-slugificado>`) é a chave usada em documento_modelos.tipo
+    e é path-safe por construção — vira componente de diretório em documentos_loja/.
+    A geração do documento DENTRO do ciclo é frente futura; o vínculo já fica gravado."""
+    __tablename__ = "documento_tipos"
+
+    id            = Column(Integer,  primary_key=True, autoincrement=True)
+    loja_id       = Column(Integer,  ForeignKey("lojas.id"), nullable=False, index=True)
+    slug          = Column(Text,     nullable=False)
+    nome          = Column(Text,     nullable=False)
+    etapa_ciclo   = Column(Text,     nullable=True)   # código da etapa (ETAPAS_CICLO); opcional
+    criado_em     = Column(DateTime, default=datetime.utcnow)
+    criado_por_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("loja_id", "slug", name="uq_documento_tipos_loja_slug"),
+    )
+
+
 class Emitente(Base):
     """Identidade fiscal de 1 CNPJ. Emite documentos; NÃO é a loja vendedora."""
     __tablename__ = "emitente"

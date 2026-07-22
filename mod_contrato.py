@@ -681,6 +681,21 @@ def _montar_mapping(ctx, pag):
     }
 
 
+def _html_cabecalho():
+    """Cabeçalho padrão dos documentos — logo + identificador da rede à esquerda, número e
+    data à direita. Compartilhado entre a capa do contrato/proposta e os documentos de
+    corpo-só (aditivo, aprovação do PE, customizados — spec 2026-07-22): um lugar só."""
+    return """
+<div id="cabecalho">
+  <div class="cab-esq">
+    <img class="logo" src="logo_dalmobile.png">
+    <div class="cab-rede">[REDE_IDENTIFICADOR]</div>
+  </div>
+  <div class="cab-dir">[NUM_CONTRATO]<br>[DATA_CONTRATO]</div>
+</div>
+"""
+
+
 def _html_capa(ctx):
     """Monta o HTML da capa (identificação, endereços, ambientes e pagamento).
 
@@ -691,13 +706,7 @@ def _html_capa(ctx):
     amb = _html_ambientes_linhas(ctx.get("_ambientes") or [])
     parc = _html_parcelas_linhas(ctx.get("_pag") or {})
     return f"""
-<div id="cabecalho">
-  <div class="cab-esq">
-    <img class="logo" src="logo_dalmobile.png">
-    <div class="cab-rede">[REDE_IDENTIFICADOR]</div>
-  </div>
-  <div class="cab-dir">[NUM_CONTRATO]<br>[DATA_CONTRATO]</div>
-</div>
+{_html_cabecalho()}
 
 <div class="consultor">Consultor: [CONSULTOR_NOME] &nbsp;&nbsp;&nbsp; Telefone: [CONSULTOR_TELEFONE]</div>
 
@@ -1012,7 +1021,10 @@ def _montar_html_corpo_documento(ctx, corpo_md):
                for k, v in _montar_mapping(ctx, ctx.get("_pag", {})).items()}
     shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"), encoding="utf-8").read()
     corpo = _html_corpo(corpo_md or "")
-    html_doc = shell.replace("<!--CAPA-->", "").replace("<!--CORPO-->", corpo)
+    # Cabeçalho aos moldes do contrato também nos corpo-só (spec 2026-07-22) — o número
+    # vem de ctx['num_contrato'] (no aditivo, o nº TA) e a data de ctx['data_contrato'].
+    html_doc = (shell.replace("<!--CAPA-->", _html_cabecalho())
+                     .replace("<!--CORPO-->", corpo))
     html_doc = _substituir_marcadores_html(html_doc, mapping)
     return html_doc.replace("[TEXTO_COMPLEMENTAR]", "")
 
@@ -1031,6 +1043,12 @@ def _gerar_pdf_corpo_documento(html_doc: str, destino_pdf: str) -> str:
 def montar_html_aditivo(ctx):
     """Termo Aditivo: corpo do modelo 'termo_aditivo' (ctx['_corpo_md_aditivo'], versão CONGELADA)."""
     return _montar_html_corpo_documento(ctx, ctx.get("_corpo_md_aditivo"))
+
+
+def gerar_pdf_documento_generico(ctx: dict, corpo_md: str, destino_pdf: str) -> str:
+    """Documento customizado ("Novo Documento", spec 2026-07-22): corpo-só + cabeçalho,
+    mesmo shell/confinamento dos demais."""
+    return _gerar_pdf_corpo_documento(_montar_html_corpo_documento(ctx, corpo_md), destino_pdf)
 
 
 def gerar_pdf_aditivo(ctx: dict, destino_pdf: str) -> str:

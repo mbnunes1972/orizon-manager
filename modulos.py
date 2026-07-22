@@ -55,7 +55,8 @@ MODULOS = {
                                 "aditivos", "aditivos_assinaturas",   # Termo Aditivo (Fatia 3 PE)
                                 "aprovacoes_pe", "aprovacoes_pe_assinaturas",   # Aprovação do PE (Fatia 3)
                                 "arquivo_pe", "parcela_projeto", "parcela_ambiente", "medicoes",
-                                "documento_modelos"],
+                                "documento_modelos",
+                                "documento_tipos"],   # tipos customizados ("Novo Documento", 2026-07-22)
                     "rotas": ["/api/orcamentos", "/api/contratos", "/api/medicoes", "/api/comercial",
                               "/api/documentos"]},
     "fiscal":      {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Fiscal", "faixa": "expedicao",

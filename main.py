@@ -3305,6 +3305,28 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, "catalogo": _mmarc.CATALOGO})
                 return
 
+            # GET /api/documentos/tipos — tipos CUSTOMIZADOS da loja ("Novo Documento",
+            # spec 2026-07-22). Os 4 nativos são fixos no frontend.
+            if path == "/api/documentos/tipos":
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                import mod_documentos as _mdoc
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    self.send_json({"ok": True, "tipos": [
+                        {"slug": t.slug, "nome": t.nome, "etapa_ciclo": t.etapa_ciclo or "",
+                         "criado_por_id": t.criado_por_id,
+                         "criado_em": t.criado_em.isoformat() if t.criado_em else None}
+                        for t in _mdoc.tipos_customizados(db, loja_id)]})
+                finally:
+                    db.close()
+                return
+
             # GET /api/documentos/modelos — modelos da loja da sessão (tenancy)
             if path == "/api/documentos/modelos":
                 usuario = get_usuario_sessao(self)
@@ -3339,6 +3361,39 @@ class Handler(BaseHTTPRequestHandler):
 
         if handle_auth_post(self, path, body): return
 
+        # POST /api/documentos/tipos — cria tipo de documento CUSTOMIZADO ("Novo Documento",
+        # spec 2026-07-22): nome + etapa do ciclo associada. Exige gerir_documentos.
+        if path == "/api/documentos/tipos":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            import mod_documentos as _mdoc
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if not perfis.pode(ator.get("nivel"), "gerir_documentos"):
+                    self.send_json({"ok": False, "erro": "Sem permissão para gerir documentos"},
+                                   code=403); return
+                req = json.loads(body) if body else {}
+                try:
+                    t = _mdoc.criar_tipo(db, loja_id, req.get("nome"),
+                                         req.get("etapa_ciclo"), usuario.get("id"))
+                except ValueError as ve:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(ve)}, code=400); return
+                db.commit()
+                self.send_json({"ok": True, "tipo": {"slug": t.slug, "nome": t.nome,
+                                                     "etapa_ciclo": t.etapa_ciclo or ""}})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
         # ── Modelos de documento por loja (Task 8) ──────────────────────────────
         # Os 3 POST exigem sessão + capacidade 'gerir_documentos' (só master por padrão).
         if path == "/api/documentos/modelos/importar":
@@ -3358,8 +3413,9 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Sem permissão para gerir documentos"}, code=403); return
                 arquivos, campos = _parse_multipart_arquivos(body, self.headers.get("Content-Type", ""))
                 tipo = (campos.get("tipo") or "").strip()
-                if tipo not in _mdoc.TIPOS:
-                    self.send_json({"ok": False, "erro": "tipo inválido: %r (aceitos: %s)" %
+                if not _mdoc.tipo_existe(db, loja_id, tipo):
+                    self.send_json({"ok": False, "erro": "tipo inválido: %r (aceitos: %s ou um "
+                                    "documento customizado da loja)" %
                                     (tipo, ", ".join(_mdoc.TIPOS))}, code=400); return
                 if "arquivo" not in arquivos:
                     self.send_json({"ok": False, "erro": "Anexe o arquivo do modelo."}, code=400); return
@@ -3403,6 +3459,24 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Sem permissão para gerir documentos"}, code=403); return
                 req = json.loads(body) if body else {}
                 corpo_md = req.get("corpo_md") or ""
+                tipo_prev = (req.get("tipo") or "contrato").strip()
+                import mod_documentos as _mdoc
+                import mod_contrato as _mc
+                if not _mdoc.tipo_existe(db, loja_id, tipo_prev):
+                    self.send_json({"ok": False, "erro": "tipo inválido: %r" % (tipo_prev,)},
+                                   code=400); return
+                # Sem corpo_md no request = "Ver exemplo" do card: usa o modelo ATIVO da loja
+                # (fallback: padrão do sistema p/ contrato e termo_aditivo). Com corpo_md, é o
+                # texto recém-importado no wizard (comportamento original).
+                if not corpo_md and tipo_prev != "contrato":
+                    mv = _mdoc.ativo_de(db, loja_id, tipo_prev)
+                    if mv is not None:
+                        corpo_md = _mdoc.corpo_da_versao(db, mv.id) or ""
+                    elif tipo_prev == "termo_aditivo":
+                        corpo_md = _mc.corpo_modelo_aditivo_padrao()
+                    if not corpo_md and tipo_prev != "proposta":
+                        self.send_json({"ok": False, "erro": "Nenhum modelo ativo deste documento "
+                                        "— importe um antes de visualizar."}, code=400); return
                 loja_dict = _loja_dict_para_contrato(db, loja_id)
                 # Cliente de EXEMPLO (o preview não pertence a nenhum projeto real); a loja é a
                 # de verdade — é o que deixa o lojista conferir os cravados (CNPJ, endereço...).
@@ -3426,13 +3500,47 @@ class Handler(BaseHTTPRequestHandler):
                 ctx = construir_contexto(cliente_exemplo, usuario_ctx, "", loja_dict)
                 ctx["num_contrato"] = "EXEMPLO"
                 ctx["_ambientes"] = [("Ambiente de exemplo", 15000.0)]
-                # NÃO passa ctx['_db'] nem ctx['_modelo_versao_id']: _corpo_md_preview é
-                # checado primeiro em _resolver_corpo_contrato e nunca toca o banco/versão real.
-                ctx["_corpo_md_preview"] = corpo_md
                 import tempfile, shutil
                 outdir = tempfile.mkdtemp(prefix="doc_preview_")
                 try:
-                    pdf_path = gerar_pdf_contrato("preview", ctx, destino=outdir)
+                    hoje_br = datetime.now().strftime("%d/%m/%Y")
+                    if tipo_prev == "termo_aditivo":
+                        # corpo-só + cabeçalho, com contexto de EXEMPLO dos blocos do wizard
+                        exemplo = _mc.montar_defaults_aditivo(
+                            lista_integral=[("Cozinha", 93333.33), ("Suíte Master", 10000.0)],
+                            inclusoes=[("Adega", 10000.0)], exclusoes=[],
+                            valor_original=88888.89, valor_novo=103333.33, diferenca=14444.44,
+                            condicoes="à vista, na data de assinatura deste TERMO ADITIVO")
+                        ctx["num_contrato"] = "TA-EXEMPLO"
+                        ctx["_corpo_md_aditivo"] = corpo_md
+                        ctx["_aditivo"] = {"num_aditivo": "TA-EXEMPLO",
+                                           "num_contrato_original": "CT-EXEMPLO",
+                                           "ambientes_txt": "Cozinha: R$ 88.888,89 → R$ 93.333,33",
+                                           "valor_original": "R$ 88.888,89",
+                                           "valor_novo": "R$ 103.333,33",
+                                           "diferenca": "R$ 14.444,44",
+                                           "ordinal": "PRIMEIRO", "data_aditivo": hoje_br,
+                                           "data_contrato_original": hoje_br, **exemplo}
+                        pdf_path = _mc.gerar_pdf_aditivo(ctx, os.path.join(outdir, "preview.pdf"))
+                    elif tipo_prev == "aprovacao_pe":
+                        ctx["num_contrato"] = "AP-EXEMPLO"
+                        ctx["_aprovacao_pe"] = {"num_aprovacao": "AP-EXEMPLO",
+                                                "ambientes_txt": "- Cozinha\n- Suíte Master"}
+                        ctx["_corpo_md_aprovacao"] = corpo_md
+                        pdf_path = _mc.gerar_pdf_aprovacao_pe(ctx, os.path.join(outdir, "preview.pdf"))
+                    elif tipo_prev.startswith("doc_"):
+                        pdf_path = _mc.gerar_pdf_documento_generico(
+                            ctx, corpo_md, os.path.join(outdir, "preview.pdf"))
+                    else:
+                        # contrato/proposta: capa + corpo, como sempre. NÃO passa ctx['_db'] nem
+                        # ctx['_modelo_versao_id']: _corpo_md_preview é checado primeiro em
+                        # _resolver_corpo_contrato e nunca toca o banco/versão real; sem corpo,
+                        # o resolvedor cai sozinho no modelo ativo → global do sistema.
+                        if corpo_md:
+                            ctx["_corpo_md_preview"] = corpo_md
+                        elif tipo_prev == "contrato":
+                            ctx["_db"] = db          # "Ver exemplo": resolve ativo → global
+                        pdf_path = gerar_pdf_contrato("preview", ctx, destino=outdir)
                     with open(pdf_path, "rb") as fh:
                         dados_pdf = fh.read()
                     self.send_response(200)
@@ -3465,8 +3573,9 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Sem permissão para gerir documentos"}, code=403); return
                 req = json.loads(body) if body else {}
                 tipo = (req.get("tipo") or "").strip()
-                if tipo not in _mdoc.TIPOS:
-                    self.send_json({"ok": False, "erro": "tipo inválido: %r (aceitos: %s)" %
+                if not _mdoc.tipo_existe(db, loja_id, tipo):
+                    self.send_json({"ok": False, "erro": "tipo inválido: %r (aceitos: %s ou um "
+                                    "documento customizado da loja)" %
                                     (tipo, ", ".join(_mdoc.TIPOS))}, code=400); return
                 corpo_md = req.get("corpo_md") or ""
                 origem_nome = req.get("origem_nome") or None

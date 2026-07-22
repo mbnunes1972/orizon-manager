@@ -2162,6 +2162,41 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 </div>
 
 <!-- Modal: Modelo de documento da loja (Task 9) — histórico de versões + wizard de importação -->
+<!-- Upload de Modelo — seletor de tipo (spec 2026-07-22): desemboca no modal de importação -->
+<div id="modal-doc-upload" class="modal-overlay" style="display:none"
+     onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
+              padding:24px;max-width:420px;width:92%;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <h3 style="margin:0 0 12px;font-size:15px;color:var(--text)">Upload de Modelo</h3>
+    <label style="font-size:12px;color:var(--muted)">Documento</label>
+    <select id="doc-upload-tipo" style="width:100%;margin-top:4px;padding:7px 8px"></select>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-doc-upload').style.display='none'">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="docUploadContinuar()">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Novo Documento — nome + etapa do ciclo (spec 2026-07-22; inserção no ciclo é frente futura) -->
+<div id="modal-doc-novo" class="modal-overlay" style="display:none"
+     onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;
+              padding:24px;max-width:460px;width:92%;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <h3 style="margin:0 0 12px;font-size:15px;color:var(--text)">Novo Documento</h3>
+    <label style="font-size:12px;color:var(--muted)">Nome do documento</label>
+    <input id="doc-novo-nome" type="text" placeholder="Ex.: Ficha de Montagem" style="width:100%;margin:4px 0 12px;padding:7px 8px">
+    <label style="font-size:12px;color:var(--muted)">Etapa do ciclo associada</label>
+    <select id="doc-novo-etapa" style="width:100%;margin-top:4px;padding:7px 8px"></select>
+    <div style="font-size:11px;color:var(--muted);margin-top:6px">A geração deste documento dentro
+      da etapa do ciclo será configurada numa próxima frente — por ora o vínculo fica registrado.</div>
+    <div id="doc-novo-erro" style="font-size:11px;color:var(--err);margin-top:8px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-doc-novo').style.display='none'">Cancelar</button>
+      <button class="btn btn-primary btn-sm" onclick="docNovoCriar()">Criar documento</button>
+    </div>
+  </div>
+</div>
+
 <div id="modal-doc-modelo" class="modal-overlay" style="display:none" onclick="if(event.target===this)fecharModalDocModelo()">
   <div class="modal-box" style="max-width:720px;max-height:90vh;overflow-y:auto">
     <div class="modal-hdr">
@@ -3279,29 +3314,111 @@ async function _docCarregarUsuariosNomeCache(){
 async function cfgDocumentosRender(){
   const box = document.getElementById('cfg-panel-documentos'); if(!box) return;
   box.innerHTML = '<em style="color:var(--muted);font-size:12px">Carregando…</em>';
-  const [d, cat] = await Promise.all([
+  const [d, cat, tps] = await Promise.all([
     fetch('/api/documentos/modelos',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({})),
     fetch('/api/documentos/marcadores',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({})),
+    fetch('/api/documentos/tipos',{credentials:'same-origin'}).then(r=>r.json()).catch(()=>({})),
     _docCarregarUsuariosNomeCache()
   ]);
   if(!d.ok){ box.innerHTML = '<em style="color:var(--err);font-size:12px">'+esc(d.erro||'Erro ao carregar modelos.')+'</em>'; return; }
   _docModelos = d.modelos || [];
   _docPodeGerir = !!d.pode_gerir;
+  _docTiposCustom = (tps && tps.ok && tps.tipos) || [];
   if(cat && cat.ok) _docCatalogo = cat.catalogo || {};
+  const acoes = _docPodeGerir
+    ? '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">'
+      +'<button class="btn btn-primary btn-sm" onclick="abrirModalDocUpload()"><i class="ti ti-upload"></i> Upload de Modelo</button>'
+      +'<button class="btn btn-ghost btn-sm" onclick="abrirModalDocNovo()"><i class="ti ti-file-plus"></i> Novo Documento</button>'
+      +'</div>'
+    : '';
   box.innerHTML =
      '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;max-width:640px">Modelos dos documentos de processo.'
     + (_docPodeGerir ? '' : ' <strong style="color:var(--text)">Somente leitura</strong> — sem a capacidade de gerir documentos, os cards abaixo não abrem.')
     + '</div>'
+    + acoes
     +'<div style="display:grid;grid-template-columns:repeat(auto-fill,240px);gap:12px">'
     + _docCardHtml('contrato', 'Contrato', 'ti-file-text', 'HTML + Markdown → PDF (WeasyPrint)')
-    + _docCardHtml('proposta', 'Proposta comercial', 'ti-file-invoice', 'modelo .docx')
-    + _docCardHtml('termo_aditivo', 'Termo Aditivo', 'ti-file-diff', 'complemento de contrato (Fatia 3 PE)')
-    + '<div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 16px;opacity:.7">'
-      +'<i class="ti ti-files" style="font-size:20px;color:var(--muted)"></i>'
-      +'<div style="font-weight:600;font-size:13px;color:var(--text);margin-top:6px">Demais documentos</div>'
-      +'<div style="font-size:11px;color:var(--muted);margin-top:2px">do processo</div>'
-      +'<div style="font-size:10px;color:var(--warn);margin-top:8px">edição de modelos — em construção</div></div>'
+    + _docCardHtml('proposta', 'Proposta comercial', 'ti-file-invoice', 'capa + corpo do modelo da loja')
+    + _docCardHtml('termo_aditivo', 'Termo Aditivo', 'ti-file-diff', 'complemento de contrato (Revisão de PE)')
+    + _docCardHtml('aprovacao_pe', 'Aprovação do PE', 'ti-file-check', 'aprovação assinável do Projeto Executivo')
+    + _docTiposCustom.map(t => _docCardHtml(t.slug, t.nome, 'ti-file-description',
+        t.etapa_ciclo ? ('Etapa do ciclo: '+esc(_docNomeEtapa(t.etapa_ciclo))) : 'sem etapa associada')).join('')
     +'</div>';
+}
+
+let _docTiposCustom = [];
+
+function _docNomeEtapa(codigo){
+  const e = (typeof ETAPAS_CICLO !== 'undefined') && ETAPAS_CICLO.find(x => x.codigo === String(codigo));
+  return e ? (codigo + ' — ' + e.nome) : String(codigo);
+}
+
+function _docTituloTipo(tipo){
+  const fixos = {contrato:'Contrato', proposta:'Proposta comercial',
+                 termo_aditivo:'Termo Aditivo', aprovacao_pe:'Aprovação do PE'};
+  if(fixos[tipo]) return fixos[tipo];
+  const t = (_docTiposCustom||[]).find(x => x.slug === tipo);
+  return t ? t.nome : tipo;
+}
+
+// "Ver exemplo" do card: preview do modelo ATIVO (sem importar nada) com dados fictícios
+// de cliente + dados reais da loja; corpo-só (aditivo/aprovação/custom) sai com cabeçalho.
+async function docVerExemploTipo(ev, tipo){
+  if(ev) ev.stopPropagation();
+  showToast('Gerando PDF de exemplo…', false);
+  try{
+    const r = await fetch('/api/documentos/modelos/preview', {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({tipo})});
+    if(!r.ok){
+      const d = await r.json().catch(()=>({}));
+      showToast(d.erro||'Erro ao gerar o exemplo.', true);
+      return;
+    }
+    window.open(URL.createObjectURL(await r.blob()), '_blank');
+  }catch(e){ showToast('Erro de rede ao gerar o exemplo.', true); }
+}
+
+function abrirModalDocUpload(){
+  if(!_docPodeGerir) return;
+  const sel = document.getElementById('doc-upload-tipo');
+  const nativos = [['contrato','Contrato'],['proposta','Proposta comercial'],
+                   ['termo_aditivo','Termo Aditivo'],['aprovacao_pe','Aprovação do PE']];
+  sel.innerHTML = nativos.map(([s,n]) => '<option value="'+s+'">'+esc(n)+'</option>').join('')
+    + (_docTiposCustom||[]).map(t => '<option value="'+esc(t.slug)+'">'+esc(t.nome)+'</option>').join('');
+  document.getElementById('modal-doc-upload').style.display='flex';
+}
+function docUploadContinuar(){
+  const tipo = document.getElementById('doc-upload-tipo').value;
+  document.getElementById('modal-doc-upload').style.display='none';
+  abrirModalDocModelo(tipo);
+}
+
+function abrirModalDocNovo(){
+  if(!_docPodeGerir) return;
+  document.getElementById('doc-novo-nome').value = '';
+  const sel = document.getElementById('doc-novo-etapa');
+  sel.innerHTML = '<option value="">— sem etapa —</option>'
+    + (typeof ETAPAS_CICLO !== 'undefined' ? ETAPAS_CICLO : []).map(e =>
+        '<option value="'+esc(e.codigo)+'">'+esc(e.codigo+' — '+e.nome)+'</option>').join('');
+  document.getElementById('doc-novo-erro').textContent = '';
+  document.getElementById('modal-doc-novo').style.display='flex';
+  setTimeout(()=>document.getElementById('doc-novo-nome').focus(), 60);
+}
+async function docNovoCriar(){
+  const nome = document.getElementById('doc-novo-nome').value.trim();
+  const etapa = document.getElementById('doc-novo-etapa').value;
+  const st = document.getElementById('doc-novo-erro');
+  if(!nome){ st.textContent = 'Dê um nome ao documento.'; return; }
+  st.textContent = 'Criando…'; st.style.color = 'var(--muted)';
+  try{
+    const j = await fetch('/api/documentos/tipos', {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({nome, etapa_ciclo: etapa})}).then(r=>r.json());
+    if(!j.ok){ st.textContent = j.erro || 'Erro ao criar.'; st.style.color = 'var(--err)'; return; }
+    document.getElementById('modal-doc-novo').style.display='none';
+    showToast('Documento "'+nome+'" criado — importe o modelo dele.');
+    cfgDocumentosRender();
+  }catch(e){ st.textContent = 'Erro de rede.'; st.style.color = 'var(--err)'; }
 }
 
 function _docModeloAtivo(tipo){
@@ -3317,15 +3434,23 @@ function _docQuemQuando(m){
 function _docCardHtml(tipo, titulo, icone, desc){
   const ativo = _docModeloAtivo(tipo);
   const clicavel = _docPodeGerir;
-  const info = ativo ? ('Versão '+ativo.versao+' ativa'+(ativo.nome?' — '+esc(ativo.nome):'')) : 'Modelo padrão do sistema';
+  const custom = tipo.indexOf('doc_') === 0;
+  const info = ativo ? ('Versão '+ativo.versao+' ativa'+(ativo.nome?' — '+esc(ativo.nome):''))
+                     : (custom ? 'Sem modelo — importe um' : 'Modelo padrão do sistema');
   const rodape = ativo ? ('<div style="font-size:10px;color:var(--muted);margin-top:4px">'+_docQuemQuando(ativo)+'</div>') : '';
+  // "Ver exemplo" fica de fora quando um custom ainda não tem modelo (não há o que renderizar)
+  const verExemplo = (ativo || !custom)
+    ? '<button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:11px;padding:2px 10px" '
+      +'onclick="docVerExemploTipo(event, \''+tipo+'\')"><i class="ti ti-eye"></i> Ver exemplo</button>'
+    : '';
   return '<div '+(clicavel ? ('onclick="abrirModalDocModelo(\''+tipo+'\')" style="cursor:pointer;') : 'style="')
     +'background:var(--surface-2);box-shadow:var(--shadow);border-radius:12px;padding:14px 16px'+(clicavel?'':';opacity:.7')+'">'
     +'<i class="ti '+icone+'" style="font-size:20px;color:var(--muted)"></i>'
     +'<div style="font-weight:600;font-size:13px;color:var(--text);margin-top:6px">'+esc(titulo)+'</div>'
-    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+esc(desc)+'</div>'
+    +'<div style="font-size:11px;color:var(--muted);margin-top:2px">'+desc+'</div>'
     +'<div style="font-size:11px;color:'+(ativo?'var(--ok)':'var(--muted)')+';margin-top:8px;font-weight:600">'+info+'</div>'
     + rodape
+    + verExemplo
     +'</div>';
 }
 
@@ -3333,8 +3458,7 @@ function _docCardHtml(tipo, titulo, icone, desc){
 function abrirModalDocModelo(tipo){
   if(!_docPodeGerir) return;
   _docmCtx = {tipo, corpo_md:null, origem_nome:null, staging:null, origem_sha256:null, analise:null};
-  document.getElementById('docm-titulo').textContent =
-    tipo==='contrato' ? 'Contrato' : tipo==='termo_aditivo' ? 'Termo Aditivo' : 'Proposta comercial';
+  document.getElementById('docm-titulo').textContent = _docTituloTipo(tipo);
   document.getElementById('docm-arquivo').value = '';
   document.getElementById('docm-importar-btn').disabled = true;
   const status = document.getElementById('docm-importar-status');
