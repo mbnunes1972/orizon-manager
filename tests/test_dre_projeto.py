@@ -11,9 +11,9 @@ def test_margem_projeto(app_db):
     mc.registrar_evento(db, "loja", 20, "faturamento", 1000.0, projeto_id="A")
     mc.lancar(db, "loja", 20, conta_debito_id=c("5.1.01"), conta_credito_id=c("2.1.01"), valor=400.0, projeto_id="A")
     mc.lancar(db, "loja", 20, conta_debito_id=c("5.3.01"), conta_credito_id=c("1.1.01"), valor=100.0, projeto_id="A")
-    # FASE D2: a garantia vira DESPESA (5.6.01) só na NF-e (matching pleno, baixa do ativo diferido 1.1.06.03);
+    # FASE D2: a garantia vira DESPESA (5.2.12, formalismo S109) só na NF-e (matching pleno, baixa do ativo diferido 1.1.06.03);
     # a margem lê o custo REALIZADO — simulando aqui o custo já reconhecido na emissão.
-    mc.lancar(db, "loja", 20, conta_debito_id=c("5.6.01"), conta_credito_id=c("1.1.06.03"), valor=30.0, projeto_id="A")
+    mc.lancar(db, "loja", 20, conta_debito_id=c("5.2.12"), conta_credito_id=c("1.1.06.03"), valor=30.0, projeto_id="A")
     r = mc.margem_projeto(db, "loja", 20, "A")
     db.close()
     assert r["receita"] == 1000.0 and r["custo_produto"] == 400.0

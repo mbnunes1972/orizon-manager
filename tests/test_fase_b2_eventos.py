@@ -169,9 +169,9 @@ def test_margem_projeto_expoe_custo_servico(app_db):
     c = lambda cod: db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first().id
     # FASE D2: os custos de serviço viram DESPESA (5.6.x) só na NF-e (matching, baixa do ativo 1.1.06);
     # a margem lê o custo REALIZADO — simulando aqui 500/300/200 já reconhecidos na emissão.
-    mc.lancar(db, ot, oid, conta_debito_id=c("5.6.02"), conta_credito_id=c("1.1.06.02"), valor=500.0, projeto_id="P")  # montagem
-    mc.lancar(db, ot, oid, conta_debito_id=c("5.6.03"), conta_credito_id=c("1.1.06.05"), valor=300.0, projeto_id="P")  # assistência
-    mc.lancar(db, ot, oid, conta_debito_id=c("5.6.01"), conta_credito_id=c("1.1.06.03"), valor=200.0, projeto_id="P")  # garantia
+    mc.lancar(db, ot, oid, conta_debito_id=c("5.2.01"), conta_credito_id=c("1.1.06.02"), valor=500.0, projeto_id="P")  # montagem
+    mc.lancar(db, ot, oid, conta_debito_id=c("5.2.13"), conta_credito_id=c("1.1.06.05"), valor=300.0, projeto_id="P")  # assistência
+    mc.lancar(db, ot, oid, conta_debito_id=c("5.2.12"), conta_credito_id=c("1.1.06.03"), valor=200.0, projeto_id="P")  # garantia
     m = mc.margem_projeto(db, ot, oid, "P")
     assert m["custo_servico"] == 1000.0     # 500 montagem + 300 assistência + 200 garantia (5.6.x do projeto)
     # expor custo_servico NÃO altera a margem (as provisões já são subtraídas individualmente)
@@ -216,7 +216,7 @@ def test_eventos_e_contas_b24_existem(app_db):
         assert ev in mc.EVENTOS and mc.EVENTOS[ev][0] == d and mc.EVENTOS[ev][1] == c, ev
     db = app_db.get_session(); mc.seed_plano(db, "loja", 400)
     cods = {x.codigo for x in db.query(mc.Conta).filter_by(owner_tipo="loja", owner_id=400).all()}
-    for cod in ("5.6.04", "5.6.05", "5.6.06", "5.6.07", "5.6.08", "5.6.09"):
+    for cod in ("5.1.02", "5.2.08", "5.2.09", "5.3.18", "5.3.19", "5.3.20"):
         assert cod in cods, cod
     db.close()
 

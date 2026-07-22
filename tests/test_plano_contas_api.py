@@ -29,7 +29,7 @@ def test_post_cria_e_put_renomeia(http_client_factory, seed, app_db):
 def test_remover_folha(http_client_factory, seed, app_db):
     c = http_client_factory(); c.login("dir_l1", "senha123")
     _, d = c.get("/api/financeiro/contas")
-    folha = _find(d["contas"], "5.6.01")           # Constituição de Provisão (folha)
+    folha = _find(d["contas"], "5.4.01")           # folha sem uso do motor (Aluguel)
     st, r = c.post("/api/financeiro/contas/" + str(folha["id"]) + "/remover", {})
     assert st == 200 and r["acao"] == "apagada"
 

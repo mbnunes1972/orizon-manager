@@ -84,21 +84,22 @@ PLANO_PADRAO = [
     ("4.4.03", "Receita Financeira"),   # FASE B: ramo LOJA — juros do financiamento direto (competência por parcela)
     ("4.4.04", "Ganhos com Acordos Financeiros"),   # opção B (2026-07-22): contrapartida-resultado de acrescer/abater
     ("5", "DESPESAS / CUSTOS"),
+    # Formalismo pleno (decisão do usuário, 2026-07-22, Sessão 109): a despesa de cada rubrica
+    # tem UMA conta, e ela mora no grupo contábil FORMAL — frete sobre compra integra o custo
+    # da mercadoria (CMV), execução/pós-venda é Custo de Serviço, comissões são Despesas
+    # Comerciais. A família 5.6 ("constituição", herança pré-D2) foi suprimida: dava
+    # granularidade desnecessária e duplicava conceitos. O reconhecimento na NF-e (matching
+    # pleno) debita DIRETO nestas contas; lançamento avulso usa as mesmas.
     ("5.1", "CMV"),
-    # 5.1.02 "Frete Fábrica" REMOVIDA do seed (decisão do usuário, 2026-07-22): nenhum evento
-    # do motor a usava e ela convidava ao lançamento manual DUPLICADO — a despesa do frete de
-    # fábrica nasce SEMPRE na 5.6.04, no matching da NF-e. Bases antigas: migrar_plano_faxina_frete.
     ("5.1.01", "CMV Fábrica (Dal Mobile)"),
+    ("5.1.02", "Frete de Fábrica"),
     ("5.2", "Custo de Serviço"),
-    # 5.2.01 Montagem / 5.2.08 Frete Local / 5.2.09 Insumos REMOVIDAS do seed (decisão do
-    # usuário, 2026-07-22, mesma linha da 5.1.02): a despesa de cada rubrica tem UMA conta —
-    # a da família 5.6 — porque vir do processamento de provisão ou de fato direto não muda
-    # o teor contábil. Bases antigas: migrar_plano_faxina_frete.
-    ("5.2.02", "Comissão Executivo de Montagem"),
+    ("5.2.01", "Montagem"), ("5.2.02", "Comissão Executivo de Montagem"),
     ("5.2.03", "Viagens de Pedido"), ("5.2.04", "Salários Operacionais"),
     ("5.2.05", "Ajudante Semanal"), ("5.2.06", "Combustível de Depósito"),
-    ("5.2.07", "Pedágio"),
+    ("5.2.07", "Pedágio"), ("5.2.08", "Frete Local"), ("5.2.09", "Insumos Locais"),
     ("5.2.10", "Manutenção de Veículos"), ("5.2.11", "Viagens de Supervisão"),
+    ("5.2.12", "Garantia"), ("5.2.13", "Assistência Técnica"),
     ("5.3", "Despesas Comerciais"),
     ("5.3.01", "Comissão de Vendedor"), ("5.3.02", "Comissão de Indicador"),
     ("5.3.03", "Comissão Administrativa"), ("5.3.04", "Pontos Programa de Indicação"),
@@ -109,6 +110,10 @@ PLANO_PADRAO = [
     ("5.3.14", "Viagens de Especificador"), ("5.3.15", "Comissão de Arquiteto"),   # FASE A: despesa da comissão de arquiteto (NF-e)
     ("5.3.16", "Benefícios a Funcionários (AT/VA/PS)"),   # Folha Fase 3: benefícios (conta provisória, a validar c/ contabilidade)
     ("5.3.17", "Custo Especial de Projeto"),   # despesa do Custo Especial (5º custo adicional, reconhecida na NF-e)
+    # Formalismo (Sessão 109): comissões de execução saem da família 5.6 para Despesas Comerciais
+    ("5.3.18", "Comissão de Medidor"),
+    ("5.3.19", "Comissão de Projeto/Executivo"),
+    ("5.3.20", "Retenção de Comissão de Vendas"),
     ("5.4", "Despesas Administrativas"),
     ("5.4.01", "Aluguel"), ("5.4.02", "Energia Elétrica"), ("5.4.03", "Água"),
     ("5.4.04", "Telefonia Fixa/Móvel e Internet"), ("5.4.05", "Contabilidade"),
@@ -123,83 +128,116 @@ PLANO_PADRAO = [
     ("5.5.03", "Custo de Antecipação de Recebíveis"),
     ("5.5.04", "Custo Financeiro sobre Vendas"),   # FASE B: deságio/taxa da financeira (Aymoré/Cartão)
     ("5.5.05", "Perdas com Acordos Financeiros"),   # opção B (2026-07-22): contrapartida-resultado de acrescer/abater
-    # Família 5.6 com o nome PURO da rubrica (2026-07-22, Sessões 107–108): o "Constituição —"
-    # era herança do fluxo pré-D2 (constituição tocava a DRE no contrato; desde a D2 ela é
-    # ativo diferido sem DRE, e o que cai aqui é o RECONHECIMENTO no matching da NF-e). E é a
-    # conta ÚNICA da despesa de cada rubrica — "sair de um processamento contábil de provisão
-    # ou ocorrer de um fato direto não muda o teor contábil" (usuário): lançamento avulso
-    # direto é permitido, e as duplicatas 5.1.02/5.2.01/5.2.08/5.2.09 foram removidas.
-    # A chave da DRE segue 'constituicao_provisoes' (contrato com o frontend; só o rótulo).
-    ("5.6", "Despesas de Provisões"),
-    ("5.6.01", "Garantia"),
-    ("5.6.02", "Montagem"),
-    ("5.6.03", "Assistência Técnica"),
-    ("5.6.04", "Frete de Fábrica"),
-    ("5.6.05", "Frete Local"),
-    ("5.6.06", "Insumos Locais"),
-    ("5.6.07", "Comissão de Medidor"),
-    ("5.6.08", "Comissão de Projeto/Executivo"),
-    ("5.6.09", "Retenção de Comissão de Vendas"),
+    # Família 5.6 SUPRIMIDA no formalismo (Sessão 109) — sobra só o Ajuste de Provisões,
+    # destino genérico da FALTA (efetivado > provisionado) na reconciliação/Etapa 21.
+    ("5.6", "Ajustes de Provisões"),
     ("5.6.10", "Ajuste de Provisões"),   # FASE D: destino da FALTA (efetivado > provisionado)
 ]
 
-# Duplicatas MORTAS no motor (nenhum evento lança nelas) removidas do seed — a despesa da
-# rubrica é a conta 5.6 correspondente. 5.1.02 Frete Fábrica (S107) + 5.2.01 Montagem,
-# 5.2.08 Frete Local e 5.2.09 Insumos (S108, mesma linha, decisão do usuário).
-_CONTAS_DUPLICADAS = ("5.1.02", "5.2.01", "5.2.08", "5.2.09")
-
-# Nomes HISTÓRICOS da família 5.6 → nome puro atual. Tupla de antigos porque houve duas
-# gerações de seed (original "Constituição — …" e S107 "… — Despesa Reconhecida") e as bases
-# podem estar em qualquer uma. Renomeia só quem ainda carrega um nome de seed antigo —
-# nome customizado pelo usuário fica.
-_RENOMES_5_6 = {
-    "5.6":    (("Constituição de Provisões", "Despesas Reconhecidas de Provisões"), "Despesas de Provisões"),
-    "5.6.01": (("Constituição — Provisão de Garantia", "Garantia — Despesa Reconhecida"), "Garantia"),
-    "5.6.02": (("Constituição — Provisão de Montagem", "Montagem — Despesa Reconhecida"), "Montagem"),
-    "5.6.03": (("Constituição — Provisão de Assistência Técnica", "Assistência Técnica — Despesa Reconhecida"), "Assistência Técnica"),
-    "5.6.04": (("Constituição — Provisão de Frete de Fábrica", "Frete de Fábrica — Despesa Reconhecida"), "Frete de Fábrica"),
-    "5.6.05": (("Constituição — Provisão de Frete Local", "Frete Local — Despesa Reconhecida"), "Frete Local"),
-    "5.6.06": (("Constituição — Provisão de Insumos Locais", "Insumos Locais — Despesa Reconhecida"), "Insumos Locais"),
-    "5.6.07": (("Constituição — Provisão de Comissão de Medidor", "Comissão de Medidor — Despesa Reconhecida"), "Comissão de Medidor"),
-    "5.6.08": (("Constituição — Provisão de Comissão de Projeto/Executivo", "Comissão de Projeto/Executivo — Despesa Reconhecida"), "Comissão de Projeto/Executivo"),
-    "5.6.09": (("Constituição — Provisão de Retenção de Comissão de Vendas", "Retenção de Comissão de Vendas — Despesa Reconhecida"), "Retenção de Comissão de Vendas"),
+# ── Formalismo pleno (Sessão 109) — migração das bases existentes ────────────────────────────
+# Cada conta de rubrica da família 5.6 vira a conta FORMAL correspondente. A MESMA linha é
+# RECODIFICADA (id preservado → todo o histórico de lançamentos segue junto). Se o código
+# formal já estiver ocupado: alvo sem movimento é apagado (recodifica por cima); alvo COM
+# movimento (duplicata antiga de lançamento manual) recebe os lançamentos da 5.6 (merge —
+# é exatamente a reclassificação da duplicação) e a linha 5.6 morre.
+_FORMALISMO_5_6 = {
+    "5.6.01": ("5.2.12", "5.2", "Garantia"),
+    "5.6.02": ("5.2.01", "5.2", "Montagem"),
+    "5.6.03": ("5.2.13", "5.2", "Assistência Técnica"),
+    "5.6.04": ("5.1.02", "5.1", "Frete de Fábrica"),
+    "5.6.05": ("5.2.08", "5.2", "Frete Local"),
+    "5.6.06": ("5.2.09", "5.2", "Insumos Locais"),
+    "5.6.07": ("5.3.18", "5.3", "Comissão de Medidor"),
+    "5.6.08": ("5.3.19", "5.3", "Comissão de Projeto/Executivo"),
+    "5.6.09": ("5.3.20", "5.3", "Retenção de Comissão de Vendas"),
 }
 
+# Todos os nomes que uma conta destas já teve em QUALQUER geração de seed (original
+# "Constituição — …", S107 "… — Despesa Reconhecida", S108 nome puro, e os nomes das
+# duplicatas antigas dos grupos 5.1/5.2). Renomeia só quem carrega um destes — nome
+# customizado pelo usuário não é sobrescrito.
+_NOMES_HISTORICOS = {
+    "5.6.01": {"Constituição — Provisão de Garantia", "Garantia — Despesa Reconhecida", "Garantia"},
+    "5.6.02": {"Constituição — Provisão de Montagem", "Montagem — Despesa Reconhecida", "Montagem"},
+    "5.6.03": {"Constituição — Provisão de Assistência Técnica",
+               "Assistência Técnica — Despesa Reconhecida", "Assistência Técnica"},
+    "5.6.04": {"Constituição — Provisão de Frete de Fábrica",
+               "Frete de Fábrica — Despesa Reconhecida", "Frete de Fábrica", "Frete Fábrica"},
+    "5.6.05": {"Constituição — Provisão de Frete Local", "Frete Local — Despesa Reconhecida",
+               "Frete Local"},
+    "5.6.06": {"Constituição — Provisão de Insumos Locais", "Insumos Locais — Despesa Reconhecida",
+               "Insumos Locais", "Insumos"},
+    "5.6.07": {"Constituição — Provisão de Comissão de Medidor",
+               "Comissão de Medidor — Despesa Reconhecida", "Comissão de Medidor"},
+    "5.6.08": {"Constituição — Provisão de Comissão de Projeto/Executivo",
+               "Comissão de Projeto/Executivo — Despesa Reconhecida", "Comissão de Projeto/Executivo"},
+    "5.6.09": {"Constituição — Provisão de Retenção de Comissão de Vendas",
+               "Retenção de Comissão de Vendas — Despesa Reconhecida", "Retenção de Comissão de Vendas"},
+}
 
-def migrar_plano_faxina_frete(db):
-    """Faxina 2026-07-22 (decisões do usuário, Sessões 107–108) em TODOS os owners,
-    idempotente — roda no start: (1) duplicatas de despesa mortas no motor
-    (_CONTAS_DUPLICADAS): REMOVE se sem lançamento; com movimento, DESATIVA (o histórico
-    fica — movimento nelas é indício de lançamento manual duplicado a reclassificar).
-    (2) Renomeia a família 5.6 para o nome puro da rubrica, aceitando qualquer geração de
-    nome de seed antigo; nome customizado não é sobrescrito."""
+_NOMES_HISTORICOS_GRUPO_5_6 = ("Constituição de Provisões", "Despesas Reconhecidas de Provisões",
+                               "Despesas de Provisões")
+
+
+def _conta_tem_movimento(db, conta):
+    return (db.query(Lancamento)
+              .filter((Lancamento.conta_debito_id == conta.id) |
+                      (Lancamento.conta_credito_id == conta.id))
+              .first() is not None)
+
+
+def migrar_plano_formalismo(db):
+    """Formalismo pleno (decisão do usuário, 2026-07-22, Sessão 109) em TODOS os owners,
+    idempotente — roda no start ANTES do backfill (senão o seed criaria as contas formais
+    vazias e forçaria o caminho de merge à toa). Ver _FORMALISMO_5_6. Nenhum lançamento se
+    perde: recodificação preserva o id da conta; merge reponta os lançamentos."""
+    ordem_seed = {cod: i for i, (cod, _n) in enumerate(PLANO_PADRAO)}
     owners = db.query(Conta.owner_tipo, Conta.owner_id).distinct().all()
-    removidas = desativadas = renomeadas = 0
+    recodificadas = mescladas = grupos = 0
     for ot, oid in owners:
-        for cod in _CONTAS_DUPLICADAS:
-            c = (db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod)
-                   .first())
+        contas = {c.codigo: c for c in db.query(Conta)
+                  .filter_by(owner_tipo=ot, owner_id=oid).all()}
+        for cod56, (cod_novo, pai_cod, nome_novo) in _FORMALISMO_5_6.items():
+            c = contas.get(cod56)
             if c is None:
                 continue
-            tem_mov = (db.query(Lancamento)
-                         .filter((Lancamento.conta_debito_id == c.id) |
-                                 (Lancamento.conta_credito_id == c.id))
-                         .first() is not None)
-            if tem_mov:
-                if c.ativa:
-                    c.ativa = 0
-                    desativadas += 1
-            else:
-                db.delete(c)
-                removidas += 1
-        for cod, (antigos, novo) in _RENOMES_5_6.items():
-            c6 = (db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod)
-                    .filter(Conta.nome.in_(antigos)).first())
-            if c6 is not None:
-                c6.nome = novo
-                renomeadas += 1
+            alvo = contas.pop(cod_novo, None)
+            if alvo is not None:
+                if not _conta_tem_movimento(db, alvo):
+                    db.delete(alvo)
+                    db.flush()
+                else:
+                    # duplicata antiga com movimento: ela VIRA a conta formal; o histórico
+                    # da 5.6 é repontado pra ela (a reclassificação da duplicação manual)
+                    db.query(Lancamento).filter(Lancamento.conta_debito_id == c.id)\
+                        .update({"conta_debito_id": alvo.id}, synchronize_session=False)
+                    db.query(Lancamento).filter(Lancamento.conta_credito_id == c.id)\
+                        .update({"conta_credito_id": alvo.id}, synchronize_session=False)
+                    db.delete(c)
+                    del contas[cod56]
+                    alvo.ativa = 1
+                    if alvo.nome in _NOMES_HISTORICOS.get(cod56, set()):
+                        alvo.nome = nome_novo
+                    contas[cod_novo] = alvo
+                    mescladas += 1
+                    continue
+            pai = contas.get(pai_cod)
+            c.codigo = cod_novo
+            if pai is not None:
+                c.pai_id = pai.id
+            if c.nome in _NOMES_HISTORICOS.get(cod56, set()):
+                c.nome = nome_novo
+            if cod_novo in ordem_seed:
+                c.ordem = ordem_seed[cod_novo]
+            del contas[cod56]
+            contas[cod_novo] = c
+            recodificadas += 1
+        g = contas.get("5.6")
+        if g is not None and g.nome in _NOMES_HISTORICOS_GRUPO_5_6:
+            g.nome = "Ajustes de Provisões"
+            grupos += 1
     db.commit()
-    return {"removidas": removidas, "desativadas": desativadas, "renomeadas": renomeadas}
+    return {"recodificadas": recodificadas, "mescladas": mescladas, "grupos_renomeados": grupos}
 
 
 def _pai_codigo(codigo):
@@ -502,15 +540,17 @@ EVENTOS = {
     "reverter_juros_direto":         ("2.1.07", "1.1.07", "Estorno de juros a apropriar (troca de ramo do custo financeiro na AF)"),
     # FASE D2: matching pleno na NF-e — reconhece a DESPESA de cada rubrica (5.6.0X, ou 5.1.01 p/ a fábrica)
     # × baixa do ativo diferido (1.1.06.0X). A Provisão (2.1.04.0X) SOBREVIVE — é paga/reconciliada depois.
-    "reconhecimento_despesa_montagem":            ("5.6.02", "1.1.06.02", "Reconhecimento de despesa na NF-e — Montagem"),
-    "reconhecimento_despesa_garantia":            ("5.6.01", "1.1.06.03", "Reconhecimento de despesa na NF-e — Garantia"),
-    "reconhecimento_despesa_assistencia":         ("5.6.03", "1.1.06.05", "Reconhecimento de despesa na NF-e — Assistência Técnica"),
-    "reconhecimento_despesa_frete_fabrica":       ("5.6.04", "1.1.06.07", "Reconhecimento de despesa na NF-e — Frete de Fábrica"),
-    "reconhecimento_despesa_frete_local":         ("5.6.05", "1.1.06.08", "Reconhecimento de despesa na NF-e — Frete Local"),
-    "reconhecimento_despesa_insumos":             ("5.6.06", "1.1.06.09", "Reconhecimento de despesa na NF-e — Insumos Locais"),
-    "reconhecimento_despesa_com_medidor":         ("5.6.07", "1.1.06.10", "Reconhecimento de despesa na NF-e — Comissão de Medidor"),
-    "reconhecimento_despesa_com_proj_exec":       ("5.6.08", "1.1.06.11", "Reconhecimento de despesa na NF-e — Comissão de Projeto/Executivo"),
-    "reconhecimento_despesa_retencao_com_vendas": ("5.6.09", "1.1.06.12", "Reconhecimento de despesa na NF-e — Retenção de Comissão de Vendas"),
+    # Formalismo (Sessão 109): o reconhecimento debita a conta FORMAL da rubrica —
+    # Custo de Serviço (5.2.x), CMV (frete de fábrica) ou Despesas Comerciais (comissões).
+    "reconhecimento_despesa_montagem":            ("5.2.01", "1.1.06.02", "Reconhecimento de despesa na NF-e — Montagem"),
+    "reconhecimento_despesa_garantia":            ("5.2.12", "1.1.06.03", "Reconhecimento de despesa na NF-e — Garantia"),
+    "reconhecimento_despesa_assistencia":         ("5.2.13", "1.1.06.05", "Reconhecimento de despesa na NF-e — Assistência Técnica"),
+    "reconhecimento_despesa_frete_fabrica":       ("5.1.02", "1.1.06.07", "Reconhecimento de despesa na NF-e — Frete de Fábrica"),
+    "reconhecimento_despesa_frete_local":         ("5.2.08", "1.1.06.08", "Reconhecimento de despesa na NF-e — Frete Local"),
+    "reconhecimento_despesa_insumos":             ("5.2.09", "1.1.06.09", "Reconhecimento de despesa na NF-e — Insumos Locais"),
+    "reconhecimento_despesa_com_medidor":         ("5.3.18", "1.1.06.10", "Reconhecimento de despesa na NF-e — Comissão de Medidor"),
+    "reconhecimento_despesa_com_proj_exec":       ("5.3.19", "1.1.06.11", "Reconhecimento de despesa na NF-e — Comissão de Projeto/Executivo"),
+    "reconhecimento_despesa_retencao_com_vendas": ("5.3.20", "1.1.06.12", "Reconhecimento de despesa na NF-e — Retenção de Comissão de Vendas"),
     "reconhecimento_despesa_custo_fabrica":       ("5.1.01", "1.1.06.06", "CMV Fábrica — reconhecimento na NF-e (baixa do ativo diferido)"),
     "reconhecimento_despesa_outros_fornecedores": ("5.1.01", "1.1.06.14", "CMV Outros Fornecedores — reconhecimento na NF-e (baixa do ativo diferido)"),
     # FASE A: matching dos custos adicionais na NF-e — despesa comercial × baixa do ativo diferido
@@ -1604,18 +1644,19 @@ def margem_projeto(db, owner_tipo, owner_id, projeto_id, ini=None, fim=None):
     NÃO aloca despesa fixa (isso é o rateio da Auditoria)."""
     m = lambda pref, sen: _mov(db, owner_tipo, owner_id, pref, sen, ini, fim, projeto_id=projeto_id)
     receita = round(m("4.1", "credor") + m("4.2", "credor"), 2)
-    custo_produto = m("5.1", "devedor")
-    prov_montagem = m("5.6.02", "devedor")
-    prov_assistencia = m("5.6.03", "devedor")
-    prov_garantia = m("5.6.01", "devedor")
-    comissao = m("5.3", "devedor")           # comissão do consultor + demais comerciais tagueados ao projeto
+    custo_produto = m("5.1", "devedor")      # inclui o Frete de Fábrica (5.1.02, formalismo S109)
+    # Formalismo (S109): as despesas das rubricas moram nos grupos formais — os campos prov_*
+    # seguem expostos (mesma leitura de gestão de antes), agora lendo as contas formais.
+    prov_montagem = m("5.2.01", "devedor")
+    prov_assistencia = m("5.2.13", "devedor")
+    prov_garantia = m("5.2.12", "devedor")
+    comissao = m("5.3", "devedor")           # comissão do consultor + medidor/proj-exec/retenção (S109)
     margem = round(receita - custo_produto - prov_montagem - prov_assistencia - prov_garantia - comissao, 2)
-    # Custo de SERVIÇO do projeto (lastro contábil real): Custo de Serviço direto (5.2) + as constituições
-    # 5.6.x (montagem/assistência/garantia), que são o custo estimado dos serviços da venda. Campo
-    # INFORMATIVO / peso de rateio (reconciliar proporcional_custo_direto) — NÃO entra de novo na margem
-    # (as provisões já foram subtraídas acima). Se um dia a execução passar a debitar 5.2 por projeto,
-    # trocar a constituição pela execução aqui (nunca somar as duas, senão duplica o custo).
-    custo_servico = round(m("5.2", "devedor") + prov_montagem + prov_assistencia + prov_garantia, 2)
+    # Custo de SERVIÇO do projeto (lastro contábil real): com o formalismo, montagem/assistência/
+    # garantia/frete local/insumos JÁ moram no 5.2 — o total do grupo cobre tudo, sem somar
+    # nada em separado (somar de novo duplicaria o custo). Campo INFORMATIVO / peso de rateio
+    # (reconciliar proporcional_custo_direto) — NÃO entra de novo na margem.
+    custo_servico = m("5.2", "devedor")
     return {"projeto_id": projeto_id, "receita": receita, "custo_produto": custo_produto,
             "custo_servico": custo_servico,
             "prov_montagem": prov_montagem, "prov_assistencia": prov_assistencia,

@@ -2334,6 +2334,29 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 109 — Formalismo pleno: família 5.6 suprimida, rubricas nos grupos contábeis formais
+**Decisão do usuário (fechando o arco 107→109):** "as contas de constituição… granularidade
+desnecessária… deixar correto" — cada rubrica de despesa mora no grupo FORMAL: **CMV**
+`5.1.02` Frete de Fábrica · **Custo de Serviço** `5.2.01` Montagem, `5.2.08` Frete Local,
+`5.2.09` Insumos Locais, `5.2.12` Garantia, `5.2.13` Assistência Técnica · **Despesas
+Comerciais** `5.3.18` Comissão de Medidor, `5.3.19` Comissão de Projeto/Executivo, `5.3.20`
+Retenção de Comissão de Vendas. Da 5.6 sobra só `5.6.10` Ajuste de Provisões (grupo "Ajustes de
+Provisões"). Os 9 eventos `reconhecimento_despesa_*` debitam as contas formais; constituição
+(ativo diferido × provisão), efetivação, pagamento e conciliação seguem IGUAIS — nenhuma perda
+de lançamento ou de gestão (a granularidade por rubrica continua, mudou o endereço).
+**Consequência buscada: o Lucro Bruto da DRE virou FORMAL** (CMV+CSP agora contém as rubricas;
+comissões descem em Despesas Comerciais; margem bruta dos Indicadores idem, sem tocar
+`mod_indicadores`). `margem_projeto` atualizada (prov_* lêem as contas formais; `custo_servico`
+= grupo 5.2 puro, sem dupla soma; frete de fábrica agora ENTRA na margem via 5.1 — antes ficava
+de fora, gap corrigido de carona). **Migração `migrar_plano_formalismo`** (substitui a da
+faxina; roda no start ANTES do backfill): RECODIFICA a mesma linha de conta (id preservado →
+histórico junto); código formal ocupado sem movimento → apaga e recodifica por cima; ocupado
+POR DUPLICATA COM MOVIMENTO → merge (reponta lançamentos — é a reclassificação da duplicação);
+aceita todas as gerações de nome (original/S107/S108 + duplicatas antigas); custom preservado.
+Rótulo DRE → "(−) Ajustes de Provisões" (chave `constituicao_provisoes` inalterada). Testes:
+`test_plano_formalismo.py` (6, substitui o da faxina) + expectativas de 6 arquivos atualizadas
+(D2/NF-e agora espera CMV+CSP=62.150 com comissões=1.100 no exemplo canônico).
+
 ## Sessão 108 — Plano de contas: mesma linha nos pares restantes + família 5.6 com nome PURO
 **Decisão do usuário (fechando a observação da S107):** "a despesa sair de um processamento
 contábil de provisão ou ocorrer de um fato direto não muda o teor contábil" → cada rubrica tem

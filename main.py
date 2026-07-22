@@ -11455,10 +11455,11 @@ def main():
         import mod_contabil as _mc
         _dbp = get_session()
         try:
+            # ORDEM: formalismo ANTES do backfill — a migração recodifica as contas 5.6 para os
+            # códigos formais; se o backfill rodasse antes, criaria as contas formais vazias e
+            # forçaria o caminho de merge à toa. Idempotentes os dois.
+            _mc.migrar_plano_formalismo(_dbp)
             _mc.backfill_plano_todos_owners(_dbp)
-            # Faxina 2026-07-22: remove/desativa a 5.1.02 (Frete Fábrica, morta no motor) e
-            # renomeia a família 5.6 (Constituição → Despesa Reconhecida). Idempotente.
-            _mc.migrar_plano_faxina_frete(_dbp)
         finally:
             _dbp.close()
     except Exception as _e:

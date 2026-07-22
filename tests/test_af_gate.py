@@ -16,7 +16,7 @@ def test_disparar_delta_de_rubrica_alterada_sem_tocar_dre(app_db):
     out = mc.disparar_deltas_af(db, ot, oid, "P", {"assist": 700.0, "prov_imp": 1000.0}, ref_base="af:P:rev1")
     assert out == {"assistencia": 200.0}    # só a assistência mudou (500→700); impostos igual
     assert _s(db, ot, oid, "2.1.04.05") == 700.0 and _s(db, ot, oid, "1.1.06.05") == 700.0  # provisão + ativo
-    assert _s(db, ot, oid, "5.6.03") == 0.0   # DRE intacta (o delta não reconhece despesa)
+    assert _s(db, ot, oid, "5.2.13") == 0.0   # DRE intacta (o delta não reconhece despesa)
     db.close()
 
 

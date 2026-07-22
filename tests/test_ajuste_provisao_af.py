@@ -20,7 +20,7 @@ def test_aumento_constitui_ativo_e_provisao_sem_tocar_dre(app_db):
     assert lan is not None
     assert _s(db, ot, oid, "2.1.04.06") == 1200.0    # provisão subiu +200
     assert _s(db, ot, oid, "1.1.06.06") == 1200.0    # ativo diferido subiu +200
-    assert _s(db, ot, oid, "5.6.06") == 0.0          # DRE intacta
+    assert _s(db, ot, oid, "5.2.09") == 0.0          # DRE intacta
     assert _s(db, ot, oid, "5.1.01") == 0.0          # CMV/fábrica intacto
     db.close()
 
@@ -31,7 +31,7 @@ def test_reducao_reverte_com_ativo_cheio(app_db):
     mc.ajustar_provisao_delta(db, ot, oid, "P", "custo_fabrica", 1000.0, 700.0, ref="af:P:1:custo_fabrica:rev1")
     assert _s(db, ot, oid, "2.1.04.06") == 700.0     # reverteu -300
     assert _s(db, ot, oid, "1.1.06.06") == 700.0
-    assert _s(db, ot, oid, "5.6.06") == 0.0
+    assert _s(db, ot, oid, "5.2.09") == 0.0
     db.close()
 
 
