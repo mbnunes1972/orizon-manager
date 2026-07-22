@@ -2334,6 +2334,24 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 103 — Snapshot de Indicadores (desafio do usuário): liquidez, giro, KPIs, tendências
+**Aba nova "Indicadores"** (1ª do Painel Financeiro): `mod_indicadores.py` PURO (liquidez corrente/
+imediata/**ajustada** — exclui os ativos diferidos 1.1.05/06, que a fórmula clássica contaria e
+inflaria o índice — capital de giro, margens bruta/EBITDA/líquida, PMR/PMP/giro de carteira,
+tendência, KPIs do funil) + endpoint `/api/financeiro/indicadores?meses=3..24` (coleta razão via
+mod_contabil + funil + séries mensais) + frontend com stat tiles e sparklines SVG (skill dataviz:
+série única em token --accent, tendência SEMPRE seta+texto, tooltips por ponto, janela 3/6/12m,
+"—" p/ denominador zero). **QA Vera (1 alto + 3 médios, todos corrigidos + regressão):**
+🔴 contratos sem filtro de loja vazavam vendas/ticket de QUALQUER loja do banco — escopo agora é
+ÚNICO em todos os blocos (lojas do owner contábil; loja avulsa/outra rede nunca entra);
+🟠 venda passa a contar pela **1ª ASSINATURA** (rascunho gerado não conta; projeto cancelado fora;
+regerar PDF não move a venda de mês — `gerado_em` era resetado a cada regeração);
+🟠 tendência de métricas de FLUXO compara meses FECHADOS (mês parcial × mês cheio leria "queda" o
+mês inteiro; caixa é saldo, compara normal) — rótulo "(meses fechados)" na UI;
+🟠 N+1 dos orçamentos removido (mapa único). + fix de TZ: janelas em UTC (como o banco) — venda
+assinada perto da virada de dia sumia da série. 🟡 perf medida (~63ms/24m em base pequena;
+reavaliar com volume). Suíte **1378/1376+2**.
+
 ## Sessão 102 — DRE/Balanço: período selecionável + TODAS as contas com lançamento
 **Relato do usuário:** a DRE analítica não mostrava todas as contas com lançamento; pediu seletor de
 datas início/fim (e idem no Balanço), com contas sem movimento fora. **Bug REAL encontrado na

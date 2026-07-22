@@ -1380,6 +1380,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div class="page-title" id="fin-page-title">Financeiro</div>
     <div class="page-sub" id="fin-page-sub">Configuração financeira: provisões/custos-padrão e plano de contas.</div>
     <div style="height:8px"></div>
+    <div id="fin-panel-ind" style="display:none"><div id="ind-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-prov"><div id="loja-panel-financeiro"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-plano" style="display:none"><div id="plano-contas-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-lanc" style="display:none"><div id="lancamentos-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
@@ -10118,6 +10119,7 @@ async function adminLojaProjetosCarregar(){
 
 // ── Financeiro: seções no SUBMENU da sidebar (v4 §4) — não mais tabs no conteúdo ──
 const _FIN_SECOES = [
+  {id:'ind',     lbl:'Indicadores',     ic:'gauge',           load:()=>indicadoresCarregar()},
   {id:'prov',    lbl:'Provisões',       ic:'shield-dollar',   load:()=>finDashboardCarregar()},
   {id:'plano',   lbl:'Plano de Contas', ic:'list-tree',       load:()=>planoContasCarregar()},
   {id:'lanc',    lbl:'Lançamentos',     ic:'receipt',         load:()=>lancamentosCarregar()},
@@ -10825,6 +10827,110 @@ async function projDreCarregar(){
 }
 
 function _fBRL(v){ return Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+// ── Snapshot de Indicadores (2026-07-22) — stat tiles + sparklines (série única, tokens do app) ──
+let _indMeses = 6;
+function indMeses(n){ _indMeses = n; indicadoresCarregar(); }
+function _indNum(v, sufixo, casas){
+  if(v === null || v === undefined) return '<span style="color:var(--text-3)">—</span>';
+  return Number(v).toLocaleString('pt-BR',{minimumFractionDigits:casas??2,maximumFractionDigits:casas??2}) + (sufixo||'');
+}
+function _indTendHtml(t){
+  // direção SEMPRE com seta+texto (nunca só cor)
+  if(!t) return '';
+  const m = {alta:['▲','var(--ok)','alta'], queda:['▼','var(--err)','queda'],
+             estavel:['—','var(--text-3)','estável']}[t.dir] || ['—','var(--text-3)','estável'];
+  const pct = t.pct === null || t.pct === undefined ? '' :
+    ' ' + (t.pct>0?'+':'') + Number(t.pct).toLocaleString('pt-BR',{maximumFractionDigits:1}) + '%';
+  return `<span style="font-size:11px;color:${m[1]}">${m[0]} ${m[2]}${pct}</span>`;
+}
+function _indSpark(vals, labels){
+  // sparkline: linha 2px na cor de accent, último ponto marcado com anel, <title> por ponto
+  const w = 150, h = 36, pad = 3;
+  const vs = (vals||[]).map(Number);
+  if(vs.length < 2) return '';
+  const mn = Math.min(...vs), mx = Math.max(...vs);
+  const rng = (mx - mn) || 1;
+  const x = i => pad + i * (w - 2*pad) / (vs.length - 1);
+  const y = v => h - pad - (v - mn) * (h - 2*pad) / rng;
+  const pts = vs.map((v,i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const dots = vs.map((v,i) =>
+    `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="6" fill="transparent">`+
+    `<title>${(labels||[])[i]||''}: R$ ${_fBRL(v)}</title></circle>`).join('');
+  const li = vs.length - 1;
+  return `<svg width="${w}" height="${h}" style="display:block" role="img" aria-label="evolução mensal">
+    <polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="${x(li).toFixed(1)}" cy="${y(vs[li]).toFixed(1)}" r="4" fill="var(--accent)" stroke="var(--surface-2)" stroke-width="2"/>
+    ${dots}</svg>`;
+}
+async function indicadoresCarregar(){
+  const box = document.getElementById('ind-box');
+  if(!box) return;
+  box.innerHTML = '<em style="color:var(--muted);font-size:12px">Calculando…</em>';
+  const r = await fetch('/api/financeiro/indicadores?meses='+_indMeses, {credentials:'same-origin'});
+  if(r.status===403){ box.innerHTML='<em style="color:var(--muted)">Módulo financeiro inativo ou sem acesso.</em>'; return; }
+  const d = (await r.json().catch(()=>({}))).indicadores;
+  if(!d){ box.innerHTML='<em style="color:var(--muted)">Falha ao carregar os indicadores.</em>'; return; }
+  const tile = (lbl, valorHtml, sub) => `
+    <div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:10px;padding:12px 14px;min-width:150px;flex:1">
+      <div style="font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase">${lbl}</div>
+      <div style="font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--text);margin-top:4px">${valorHtml}</div>
+      ${sub ? `<div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div>` : ''}
+    </div>`;
+  const sec = (titulo, inner) => `
+    <div style="margin-bottom:16px">
+      <div style="font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:8px">${titulo}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">${inner}</div>
+    </div>`;
+  const btnM = n => `<button class="btn ${_indMeses===n?'btn-primary':'btn-ghost'} btn-sm" onclick="indMeses(${n})">${n}m</button>`;
+  const L = d.liquidez||{}, M = d.margens||{}, P = d.prazos||{}, C = d.comercial||{};
+  const S = d.series||{}, T = d.tendencias||{};
+  const pctf = v => v===null||v===undefined ? '<span style="color:var(--text-3)">—</span>'
+    : (v*100).toLocaleString('pt-BR',{maximumFractionDigits:1})+'%';
+  const sparkTile = (lbl, chave) => `
+    <div style="background:var(--surface-2);box-shadow:var(--shadow);border-radius:10px;padding:12px 14px;min-width:180px;flex:1">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:10px;letter-spacing:1px;color:var(--muted);text-transform:uppercase">${lbl}</span>
+        <span>${_indTendHtml(T[chave])}${chave !== 'caixa' && d.tend_fluxo_ate_mes_fechado
+          ? ' <span style="font-size:9px;color:var(--text-3)" title="A seta compara meses FECHADOS — o mês corrente parcial distorceria a leitura">(meses fechados)</span>' : ''}</span>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:16px;font-weight:700;margin:4px 0">R$ ${_fBRL((S[chave]||[]).slice(-1)[0]||0)}</div>
+      ${_indSpark(S[chave], S.labels)}
+      <div style="font-size:9px;color:var(--text-3);margin-top:2px">${(S.labels||[])[0]||''} → ${(S.labels||[]).slice(-1)[0]||''} (mês atual)</div>
+    </div>`;
+  box.innerHTML = `
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:14px">
+      <span style="font-size:12px;color:var(--muted)">Janela:</span>
+      ${btnM(3)}${btnM(6)}${btnM(12)}
+      <span style="font-size:11px;color:var(--muted);margin-left:auto">${d.periodo.ini} a ${d.periodo.fim}
+        ${d.balanco_confere ? '' : ' · <span style="color:var(--warn)"><i class="ti ti-alert-triangle"></i> balanço não confere</span>'}</span>
+    </div>
+    ${sec('Tendências (mensal)',
+      sparkTile('Receita líquida','receita') + sparkTile('Lucro líquido','lucro')
+      + sparkTile('Caixa (fim do mês)','caixa') + sparkTile('Vendas (contratos)','vendas'))}
+    ${sec('Liquidez e capital',
+      tile('Liquidez corrente', _indNum(L.corrente), 'Ativo Circ. ÷ Passivo Circ.')
+      + tile('Liquidez ajustada', _indNum(L.ajustada), 'sem os ativos diferidos (1.1.05/06)')
+      + tile('Liquidez imediata', _indNum(L.imediata), 'Caixa ÷ Passivo Circ.')
+      + tile('Capital de giro', 'R$ '+_fBRL(L.capital_giro), 'AC − PC'))}
+    ${sec('Margens do período',
+      tile('Margem bruta', pctf(M.bruta), '')
+      + tile('Margem EBITDA', pctf(M.ebitda), '')
+      + tile('Margem líquida', pctf(M.liquida), ''))}
+    ${sec('Prazos e giro',
+      tile('Giro de carteira', _indNum(P.giro_carteira, '×'), 'receita ÷ contas a receber')
+      + tile('PMR', _indNum(P.pmr_dias, ' dias', 1), 'prazo médio de recebimento')
+      + tile('PMP', _indNum(P.pmp_dias, ' dias', 1), 'prazo médio de pagamento (fábrica/fornecedores)')
+      + tile('A receber', 'R$ '+_fBRL(d.receber), 'clientes + parcelamentos'))}
+    ${sec('Comercial',
+      tile('Pipeline ativo', C.pipeline_ativo??0, (C.quentes??0)+' quentes')
+      + tile('Taxa de conversão', pctf(C.taxa_conversao), C.convertidos+' ganhos · '+C.perdidos+' perdidos')
+      + tile('Vendas no período', 'R$ '+_fBRL(C.vendas_periodo), (C.n_vendas_periodo??0)+' contratos')
+      + tile('Ticket médio', C.ticket_medio===null?'<span style="color:var(--text-3)">—</span>':'R$ '+_fBRL(C.ticket_medio), ''))}
+    <div style="font-size:10px;color:var(--muted)">Escopo: todas as lojas do razão contábil (rede inteira, quando houver).
+    Venda = 1ª ASSINATURA do contrato (rascunho e projeto cancelado não contam; regerar PDF não move a venda de mês).
+    "—" = denominador zero no período. PMP usa Fornecedores (2.1.01) + Provisão de Custo de Fábrica (2.1.04.06).</div>`;
+}
 let _dreModo = 'resumido';   // 'resumido' | 'analitico' (v5 §3.1)
 let _dreIni = '', _dreFim = '';   // período do relatório (2026-07-22)
 function dreSetModo(m){ _dreModo = m; dreCarregar(); }

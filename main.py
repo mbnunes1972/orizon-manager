@@ -66,6 +66,7 @@ import mod_arvore
 import mod_provisoes
 import mod_pe_comparacao
 import mod_ajustes_fabrica
+import mod_indicadores
 from mod_qualidade_xml import avaliar_qualidade_xml
 
 def _enriquecer_projetos_com_status(projetos):
@@ -833,6 +834,126 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/financeiro/indicadores":
+            # Snapshot de Indicadores (2026-07-22): liquidez, margens, prazos/giro, KPIs
+            # comerciais e séries mensais com tendência. Cálculo puro em mod_indicadores;
+            # aqui só a coleta (razão via mod_contabil + funil comercial via queries).
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            from urllib.parse import parse_qs
+            from datetime import date as _date_i, timedelta as _td_i
+            usuario, db, ot, oid = ctx
+            try:
+                meses = max(3, min(24, int((parse_qs(urlparse(self.path).query)
+                                            .get("meses") or ["6"])[0])))
+            except (TypeError, ValueError):
+                meses = 6
+            try:
+                # UTC-naive como TODO o banco (datetime.utcnow) — hoje local desalinharia os
+                # buckets perto da virada de dia e a venda "sumiria" da série (tz skew)
+                hoje = datetime.utcnow().date()
+                # janelas mensais: 1º dia de cada mês, terminando no mês corrente
+                inicios = []
+                anc = hoje.replace(day=1)
+                for _ in range(meses):
+                    inicios.append(anc)
+                    anc = (anc - _td_i(days=1)).replace(day=1)
+                inicios.reverse()
+                ini_periodo = datetime.combine(inicios[0], datetime.min.time())
+                fim_periodo = datetime.combine(hoje, datetime.max.time())
+
+                # ESCOPO ÚNICO (QA Vera 🔴/🟠): todos os blocos respondem pelo OWNER contábil —
+                # as lojas do owner (rede inteira quando a loja pertence a uma; senão a própria).
+                # Nada de query global: loja avulsa/outra rede NUNCA entra.
+                if ot == "rede":
+                    lojas_owner = [l.id for l in db.query(Loja).filter_by(rede_id=oid).all()]
+                else:
+                    lojas_owner = [oid]
+                bal = mod_contabil.balanco(db, ot, oid)
+                dre_per = mod_contabil.dre(db, ot, oid, ini=ini_periodo, fim=fim_periodo)
+                mv = lambda pref, sen, i=None, f=None: mod_contabil._mov(db, ot, oid, pref, sen, i, f)
+                caixa = mv("1.1.01", "devedor")
+                receber = round(mv("1.1.02", "devedor") + mv("1.1.07", "devedor"), 2)
+                diferidos = round(mv("1.1.05", "devedor") + mv("1.1.06", "devedor"), 2)
+                fornecedores = round(mv("2.1.01", "credor") + mv("2.1.04.06", "credor"), 2)
+
+                liq = mod_indicadores.liquidez(bal["ativo"]["circulante"],
+                                               bal["passivo"]["circulante"], caixa, diferidos)
+                marg = mod_indicadores.margens(dre_per)
+                dias_per = (hoje - inicios[0]).days + 1
+                praz = mod_indicadores.prazos_giro(receber, fornecedores,
+                                                   dre_per.get("receita_liquida"),
+                                                   dre_per.get("cmv_csp"), dias_per)
+
+                # funil comercial (Projeto.status) — MESMO escopo do razão (lojas do owner)
+                status_counts = {}
+                for p in db.query(Projeto).filter(Projeto.loja_id.in_(lojas_owner)).all():
+                    st_p = (p.status or "").strip().lower() or "quente"
+                    status_counts[st_p] = status_counts.get(st_p, 0) + 1
+                # VENDA = contrato com 1ª ASSINATURA (QA Vera 🟠): data imutável (regerar o PDF
+                # não move a venda de mês), rascunho não conta, projeto cancelado fora.
+                cancelados = {p.nome_safe for p in db.query(Projeto)
+                              .filter(Projeto.loja_id.in_(lojas_owner),
+                                      Projeto.status == "cancelado").all()}
+                rows_ass = (db.query(ContratoAssinatura, Contrato)
+                              .join(Contrato, ContratoAssinatura.contrato_id == Contrato.id)
+                              .filter(Contrato.loja_id.in_(lojas_owner)).all())
+                primeira_ass = {}   # contrato_id -> datetime da 1ª assinatura
+                ct_por_id = {}
+                for ass, ct in rows_ass:
+                    if ct.projeto_nome in cancelados:
+                        continue
+                    ct_por_id[ct.id] = ct
+                    atual = primeira_ass.get(ct.id)
+                    if atual is None or (ass.assinado_em and ass.assinado_em < atual):
+                        primeira_ass[ct.id] = ass.assinado_em
+                orc_val = {o.id: (o.valor_total or 0.0) for o in
+                           db.query(Orcamento).filter(
+                               Orcamento.id.in_([c.orcamento_id for c in ct_por_id.values()])
+                           ).all()} if ct_por_id else {}
+                vendas_datadas = [(dt, orc_val.get(ct_por_id[cid].orcamento_id, 0.0))
+                                  for cid, dt in primeira_ass.items() if dt is not None]
+                vals_ct = [v for dt, v in vendas_datadas if dt >= ini_periodo]
+                kpis = mod_indicadores.kpis_comerciais(status_counts, vals_ct)
+
+                # séries mensais: receita/lucro (DRE do mês), caixa (posição fim do mês),
+                # vendas (Σ contratos gerados no mês)
+                labels, s_receita, s_lucro, s_caixa, s_vendas = [], [], [], [], []
+                for i, mi_ in enumerate(inicios):
+                    mf = (inicios[i + 1] - _td_i(days=1)) if i + 1 < len(inicios) else hoje
+                    mi_dt = datetime.combine(mi_, datetime.min.time())
+                    mf_dt = datetime.combine(mf, datetime.max.time())
+                    d_m = mod_contabil.dre(db, ot, oid, ini=mi_dt, fim=mf_dt)
+                    labels.append(mi_.strftime("%m/%y"))
+                    s_receita.append(d_m.get("receita_liquida") or 0.0)
+                    s_lucro.append(d_m.get("lucro_liquido") or 0.0)
+                    s_caixa.append(mod_contabil._mov(db, ot, oid, "1.1.01", "devedor",
+                                                     None, mf_dt))
+                    s_vendas.append(round(sum(v for dt, v in vendas_datadas
+                                              if mi_dt <= dt <= mf_dt), 2))
+                series = {"labels": labels, "receita": s_receita, "lucro": s_lucro,
+                          "caixa": s_caixa, "vendas": s_vendas}
+                # Tendência (QA Vera 🟠): métricas de FLUXO comparam meses FECHADOS (o mês
+                # corrente parcial contra o anterior completo leria "queda" o mês inteiro);
+                # caixa é SALDO — posição de hoje vs fim do mês anterior é comparação válida.
+                tend = {}
+                for k in ("receita", "lucro", "vendas"):
+                    tend[k] = mod_indicadores.tendencia(series[k][:-1]
+                                                        if len(series[k]) >= 3 else series[k])
+                tend["caixa"] = mod_indicadores.tendencia(series["caixa"])
+                self.send_json({"ok": True, "indicadores": {
+                    "meses": meses, "periodo": {"ini": inicios[0].isoformat(),
+                                                "fim": hoje.isoformat()},
+                    "liquidez": liq, "margens": marg, "prazos": praz,
+                    "caixa": round(caixa, 2), "receber": receber,
+                    "comercial": kpis, "series": series, "tendencias": tend,
+                    "tend_fluxo_ate_mes_fechado": True,   # a UI rotula a seta dos fluxos
+                    "balanco_confere": bal.get("confere", True)}})
+            finally:
+                db.close()
+            return
+
         if path == "/api/financeiro/balanco":
             ctx = _contabil_ctx(self, exige_edicao=False)
             if ctx is None: return
