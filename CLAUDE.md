@@ -6,7 +6,7 @@ no fim); requisitos em `REQUIREMENTS.md`; specs de design em `docs/superpowers/s
 
 ## O que é
 Sistema de vendas de móveis planejados (loja Dalmóbile). **Backend** Python puro com `http.server`
-(sem framework), SQLAlchemy + SQLite (`orizon.db`). **Frontend** é um único arquivo `static/index.html`
+(sem framework), SQLAlchemy + **PostgreSQL**. **Frontend** é um único arquivo `static/index.html`
 (HTML+CSS+JS inline). Multi-loja/rede (tenancy). Ciclo do projeto em etapas.
 
 ## Layout do código (reorganização 2026-07-15, EM ANDAMENTO)
@@ -29,14 +29,21 @@ Spec: `docs/superpowers/specs/_geral/2026-07-16-motor-5-reestruturacao-app-desig
 ## Ambiente e execução
 - Use **`python3`** (nunca `python`). WSL/Ubuntu.
 - Servidor local: **`./run.sh`** → `http://localhost:8765` (lê `DATABASE_URL` do `.env`, sobe no
-  **PostgreSQL**). O **SQLite foi APOSENTADO no runtime** (Sessão 85): `python3 main.py` pelado, sem
-  `DATABASE_URL`, RECUSA subir (guard; escape só com `ORIZON_ALLOW_SQLITE=1`) — evita cair no `orizon.db`
-  defasado. Em produção `ORIZON_HOST=0.0.0.0`. A mensagem `gio: ... Operation not supported` é inofensiva.
+  **PostgreSQL**). O **SQLite foi REMOVIDO por inteiro** (faxina 2026-07-23, Sessão 111 — o
+  aposentar da S85 e o escape `ORIZON_ALLOW_SQLITE` deixaram de existir): sem `DATABASE_URL`
+  Postgres o app explica e sai; `init_db` recusa dialeto sqlite. A **integração Omie também foi
+  REMOVIDA** na mesma faxina (cookie de sessão virou `orizon_session`; storage local de projetos
+  vive em `integracoes/projetos_store.py`). Em produção `ORIZON_HOST=0.0.0.0`. A mensagem
+  `gio: ... Operation not supported` é inofensiva.
 - **`static/index.html` é lido do disco a cada request** → mudança de frontend = só **Ctrl+F5**, sem
   restart. Mudança em **Python** (`main.py`/módulos) **exige restart** do servidor.
 
 ## Testes (rodar ANTES de commitar/mergear)
 - Backend: **`python3 -m pytest -q`** (deve ficar tudo verde). Siga TDD nos módulos Python.
+  A suíte roda **SEMPRE em Postgres** (faxina 2026-07-23): o conftest deriva o banco de teste
+  `orizon_test` do `DATABASE_URL` do `.env` (override: `TEST_DATABASE_URL`). NUNCA aponte pro
+  banco de dev/produção — o setup dá `DROP SCHEMA CASCADE` por módulo. Postgres local precisa
+  estar de pé (~2m45 a suíte inteira).
 - Frontend: **não há teste JS** → verificação manual no navegador. Para sintaxe, extrair o
   `<script>` e rodar `node --check`.
 
@@ -109,16 +116,15 @@ implementação.
   remanescente das 10 e encerra o projeto com status **`concluido`** (distinto de `fechado`). Projetos
   legados (fluxo antigo) **não migram**. Detalhes: spec
   `docs/superpowers/specs/financeiro/2026-07-12-fase-d2-provisao-completa-conciliacao-final-design.md`.
-- **Banco de dados:** migração **SQLite → PostgreSQL** decidida e **em produção** (VPS dedicada,
-  `orizonsolution.com.br`) desde 2026-07-15. **SQLite APOSENTADO** (o app se recusa a subir sem
-  `DATABASE_URL`; escape `ORIZON_ALLOW_SQLITE=1`). Local (WSL), produção **e o dev/pré-homolog
-  `167.88.33.121`** (migrado 2026-07-19: Postgres 16, dbs `orizon`/`orizon_homolog`, envs
-  `/root/orizon-A.env`+`/root/orizon-B.env`) já rodam Postgres; `DATABASE_URL` seleciona o dialeto. Suíte
-  pytest tem validação opt-in contra Postgres real via `TEST_DATABASE_URL` (`tests/conftest.py`) — achou e
-  corrigiu divergências reais de dialeto (FK enforcement real, `DROP SCHEMA CASCADE` por FK circular,
-  `Lancamento.origem` estourando `VARCHAR(30)`, vários testes com FK fabricada que só SQLite deixa passar).
-  **Alembic ainda não tem baseline** (Etapa 2, pendente). Plano/rationale: `docs/superpowers/specs/_geral/
-  2026-07-15-migracao-postgresql.md`.
+- **Banco de dados: PostgreSQL, e SÓ ele** (migração 2026-07-15; **SQLite REMOVIDO por inteiro**
+  na faxina 2026-07-23 — código de migração raw sqlite3, `DB_PATH`, escape `ORIZON_ALLOW_SQLITE`
+  e o SQLite dos testes deixaram de existir; `init_db` recusa dialeto sqlite). Local (WSL),
+  produção (`orizonsolution.com.br`) **e o dev/pré-homolog `167.88.33.121`** (Postgres 16, dbs
+  `orizon`/`orizon_homolog`, envs `/root/orizon-A.env`+`/root/orizon-B.env`). Migração de schema =
+  `_migrar_colunas_pg` (ADD/DROP COLUMN idempotentes) + `_seed_loja_padrao`. A suíte roda SEMPRE
+  contra Postgres (`orizon_test`, derivado do `.env`; override `TEST_DATABASE_URL`) — FK
+  enforcement real pega id fabricado. **Alembic ainda não tem baseline** (Etapa 2, pendente).
+  Plano/rationale: `docs/superpowers/specs/_geral/2026-07-15-migracao-postgresql.md`.
 - **Segmentação Mercadoria/Serviço + distribuidora Orizon Soluções (decisão 2026-07-16, não implementada):**
   motor fiscal já segrega Val_Cont em mercadoria/serviço (`mod_orcamento_params.SEGMENTACAO_DEFAULT`
   65/35, override por Diretor) e já usa isso pra separar NF-e de NFS-e — mas o **contrato** entregue ao

@@ -2,10 +2,18 @@ from sqlalchemy import create_engine, inspect
 import database
 
 
-def _mem():
-    eng = create_engine("sqlite:///:memory:")
+from conftest import _test_database_url, _reset_schema_pg
+
+
+def _eng_pg():
+    """Engine no Postgres de teste com schema recém-criado (herdeiro do sqlite :memory:)."""
+    eng = create_engine(_test_database_url())
+    _reset_schema_pg(eng)
     database.Base.metadata.create_all(eng)
     return eng
+
+def _mem():
+    return _eng_pg()
 
 
 def test_tabela_perfil_acesso_existe():

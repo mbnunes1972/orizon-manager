@@ -6,14 +6,15 @@ import mod_documentos
 
 
 @pytest.fixture
-def db(tmp_path, monkeypatch):
-    import database
-    monkeypatch.setattr(database, "DB_PATH", str(tmp_path / "t.db"))
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    eng = create_engine("sqlite:///" + str(tmp_path / "t.db"))
-    database.Base.metadata.create_all(eng)
-    s = sessionmaker(bind=eng)()
+def db(db_pg_schema):
+    """Sessão num schema recém-criado do Postgres de teste (sem seeds). As linhas
+    mínimas que os testes referenciam por FK (lojas 1/2, usuário 1) são criadas aqui —
+    no SQLite as FKs fabricadas passavam; no Postgres elas são reais."""
+    s = db_pg_schema.Session()
+    s.add_all([db_pg_schema.Loja(id=1, nome="L1"),
+               db_pg_schema.Loja(id=2, nome="L2"),
+               db_pg_schema.Usuario(id=1, nome="U", login="u1", senha_hash="x", nivel="master")])
+    s.commit()
     yield s
     s.close()
 

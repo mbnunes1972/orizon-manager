@@ -1,7 +1,6 @@
 """FASE D2 · Fase 1 — Plano de Contas: grupo 1.1.06 "Custos a Apropriar" (ativo diferido, espelho de
 2.1.04.x/1.1.05) + 2.1.06 renomeada de "Adiantamento de Clientes" para "Receita a Realizar" (novo seed)
 com migração PONTUAL idempotente para bancos existentes (só renomeia o default antigo)."""
-import sqlite3
 import mod_contabil as mc
 import database
 
@@ -50,37 +49,3 @@ def test_2106_vira_receita_a_realizar_no_seed_novo(app_db):
     db.close()
 
 
-# ── Migração PONTUAL (dados, idempotente, schema_migrations) ─────────────────
-def _mk_conta_db():
-    conn = sqlite3.connect(":memory:")
-    conn.execute("CREATE TABLE conta (id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                 "owner_tipo TEXT, owner_id INTEGER, codigo TEXT, nome TEXT)")
-    return conn
-
-
-def test_migracao_renomeia_2106_default():
-    conn = _mk_conta_db()
-    conn.execute("INSERT INTO conta(owner_tipo,owner_id,codigo,nome) VALUES('loja',1,'2.1.06','Adiantamento de Clientes')")
-    conn.commit()
-    database._run_migracoes(conn)
-    nome = conn.execute("SELECT nome FROM conta WHERE codigo='2.1.06'").fetchone()[0]
-    assert nome == "Receita a Realizar"
-    assert conn.execute("SELECT 1 FROM schema_migrations WHERE id='conta_2106_receita_a_realizar_2026'").fetchone() is not None
-
-
-def test_migracao_2106_preserva_nome_customizado():
-    conn = _mk_conta_db()
-    conn.execute("INSERT INTO conta(owner_tipo,owner_id,codigo,nome) VALUES('loja',1,'2.1.06','Adiantamento do Cliente X')")
-    conn.commit()
-    database._run_migracoes(conn)
-    nome = conn.execute("SELECT nome FROM conta WHERE codigo='2.1.06'").fetchone()[0]
-    assert nome == "Adiantamento do Cliente X"   # customizado pelo owner → não mexe
-
-
-def test_migracao_2106_idempotente():
-    conn = _mk_conta_db()
-    conn.execute("INSERT INTO conta(owner_tipo,owner_id,codigo,nome) VALUES('loja',1,'2.1.06','Adiantamento de Clientes')")
-    conn.commit()
-    database._run_migracoes(conn)
-    database._run_migracoes(conn)
-    assert conn.execute("SELECT COUNT(*) FROM schema_migrations WHERE id='conta_2106_receita_a_realizar_2026'").fetchone()[0] == 1

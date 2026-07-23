@@ -5,16 +5,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 @pytest.fixture(autouse=True)
-def setup_db(tmp_path, monkeypatch):
-    import database
-    db_file = str(tmp_path / "test.db")
-    monkeypatch.setattr(database, "DB_PATH", db_file)
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    engine = create_engine(f"sqlite:///{db_file}", echo=False)
-    monkeypatch.setattr(database, "ENGINE", engine)
-    monkeypatch.setattr(database, "Session", sessionmaker(bind=engine))
-    database.init_db()
+def setup_db(db_pg_limpo):
+    """Banco de teste limpo por função (Postgres — conftest.db_pg_limpo)."""
     yield
 
 

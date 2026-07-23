@@ -90,63 +90,6 @@ def test_etapa_nome_em_sincronia_com_principais():
     assert set(mc.ETAPA_NOME) == set(mc.ETAPAS_PRINCIPAIS)
 
 
-import sqlite3
-import database
-
-
-def _mk_ciclo_db():
-    conn = sqlite3.connect(":memory:")
-    conn.execute("""CREATE TABLE ciclo_etapas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        projeto_nome TEXT, etapa_codigo TEXT, status TEXT)""")
-    conn.executemany(
-        "INSERT INTO ciclo_etapas(projeto_nome, etapa_codigo, status) VALUES(?,?,?)",
-        [("P", "1", "concluido"), ("P", "2", "concluido"), ("P", "3", "concluido"),
-         ("P", "4", "pendente")],
-    )
-    conn.commit()
-    return conn
-
-
-def _codigos(conn):
-    cur = conn.execute("SELECT etapa_codigo FROM ciclo_etapas ORDER BY etapa_codigo")
-    return [r[0] for r in cur.fetchall()]
-
-
-def test_swap_2_3_troca_os_codigos():
-    conn = _mk_ciclo_db()
-    database._run_migracoes(conn)
-    assert _codigos(conn) == ["1", "2", "3", "4"]
-    cur = conn.execute("SELECT id FROM schema_migrations WHERE id='etapas_swap_2_3'")
-    assert cur.fetchone() is not None
-
-
-def test_swap_2_3_idempotente():
-    conn = _mk_ciclo_db()
-    database._run_migracoes(conn)
-    database._run_migracoes(conn)
-    assert _codigos(conn) == ["1", "2", "3", "4"]
-    cur = conn.execute("SELECT COUNT(*) FROM schema_migrations WHERE id='etapas_swap_2_3'")
-    assert cur.fetchone()[0] == 1
-
-
-def test_swap_2_3_inverte_conteudo():
-    conn = sqlite3.connect(":memory:")
-    conn.execute("""CREATE TABLE ciclo_etapas (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        projeto_nome TEXT, etapa_codigo TEXT, status TEXT)""")
-    conn.executemany(
-        "INSERT INTO ciclo_etapas(projeto_nome, etapa_codigo, status) VALUES(?,?,?)",
-        [("P", "2", "era_briefing"), ("P", "3", "era_criacao")],
-    )
-    conn.commit()
-    database._run_migracoes(conn)
-    cur = conn.execute("SELECT etapa_codigo, status FROM ciclo_etapas ORDER BY etapa_codigo")
-    pares = dict(cur.fetchall())
-    assert pares["2"] == "era_criacao"
-    assert pares["3"] == "era_briefing"
-
-
 def test_exige_aprovacao_financeira():
     assert mc.exige_aprovacao_financeira("8") is True
     assert mc.exige_aprovacao_financeira("11d") is True
@@ -237,18 +180,8 @@ def test_etapas_operacionais_registradas():
         assert mc.ETAPAS_OPERACIONAIS[cod]["nome"] == mc.ETAPA_NOME[cod]
 
 
-def test_modelos_ciclo_documento_e_revisao(tmp_path, monkeypatch):
-    import database
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    dbf = str(tmp_path / "t.db")
-    engine = create_engine(f"sqlite:///{dbf}")
-    # monkeypatch restaura os globais no teardown — não deixa `database`
-    # apontando para um banco temp já deletado (espelha o cuidado do conftest).
-    monkeypatch.setattr(database, "DB_PATH", dbf)
-    monkeypatch.setattr(database, "ENGINE", engine)
-    monkeypatch.setattr(database, "Session", sessionmaker(bind=engine))
-    database.init_db()
+def test_modelos_ciclo_documento_e_revisao(db_pg_limpo):
+    database = db_pg_limpo
     s = database.Session()
     d = database.CicloDocumento(projeto_nome="P", etapa_codigo="11a",
                                 tipo="pe_planta_pontos", arquivo_path="ciclo/11a/x.pdf",

@@ -11401,19 +11401,16 @@ def _remover_staging_seguro(caminho):
 
 # == MAIN ==
 def main():
-    # SQLite APOSENTADO no runtime (2026-07-18): rodar `python3 main.py` sem DATABASE_URL caía
-    # silenciosamente no orizon.db (SQLite) defasado, mascarando o banco real (Postgres) e fazendo
-    # projetos "sumirem". O app agora EXIGE Postgres. O pytest segue usando SQLite via conftest, que
-    # rebinda o engine e NÃO passa por main() — então os testes não são afetados.
+    # Postgres OBRIGATÓRIO (faxina 2026-07-23: SQLite removido por inteiro — o escape
+    # ORIZON_ALLOW_SQLITE da S85 deixou de existir). Sem DATABASE_URL, explica e sai.
     import sys as _sys
     import database as _db
-    if _db.ENGINE.dialect.name == "sqlite" and not os.environ.get("ORIZON_ALLOW_SQLITE"):
+    if not _db.DATABASE_URL or not _db.DATABASE_URL.startswith("postgresql"):
         print("=" * 74)
-        print("  DATABASE_URL nao configurada -> o app cairia no SQLite (orizon.db), APOSENTADO.")
-        print("  Configure o PostgreSQL e rode de novo, por exemplo:")
+        print("  DATABASE_URL ausente ou nao-Postgres. O Orizon roda SO em PostgreSQL.")
+        print("  Configure e rode de novo, por exemplo:")
         print("    export DATABASE_URL='postgresql+psycopg2://orizon:SENHA@localhost/orizon'")
         print("    python3 main.py            (ou use ./run.sh)")
-        print("  (Forcar SQLite mesmo assim: ORIZON_ALLOW_SQLITE=1 — nao recomendado.)")
         print("=" * 74)
         _sys.exit(1)
     init_db()

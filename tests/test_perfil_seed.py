@@ -5,10 +5,18 @@ import database
 from auth import perfil_store
 
 
-def _sess():
-    eng = create_engine("sqlite:///:memory:")
+from conftest import _test_database_url, _reset_schema_pg
+
+
+def _eng_pg():
+    """Engine no Postgres de teste com schema recém-criado (herdeiro do sqlite :memory:)."""
+    eng = create_engine(_test_database_url())
+    _reset_schema_pg(eng)
     database.Base.metadata.create_all(eng)
-    S = sessionmaker(bind=eng)
+    return eng
+
+def _sess():
+    S = sessionmaker(bind=_eng_pg())
     db = S()
     db.add(database.Loja(id=1, nome="L1"))
     db.add(database.Loja(id=2, nome="L2"))
