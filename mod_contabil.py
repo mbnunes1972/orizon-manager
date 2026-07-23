@@ -250,11 +250,15 @@ def _natureza(grupo):
 
 
 def resolver_owner(db, usuario):
-    """(owner_tipo, owner_id) do usuário: rede da loja se houver; senão a loja; admin de rede -> rede."""
+    """(owner_tipo, owner_id) do usuário: rede da loja se houver; senão a loja; admin de rede -> rede.
+    PDV (loja com mãe, spec 2026-07-22): razão PRÓPRIO sempre — owner ("loja", pdv.id), mesmo com
+    rede herdada da mãe; a individualização por unidade é o que a visão unificada consolida depois."""
     rid = usuario.get("rede_id")
     lid = usuario.get("loja_id")
     if lid:
         loja = db.get(Loja, lid)
+        if loja is not None and getattr(loja, "loja_mae_id", None):
+            return ("loja", lid)
         if loja and loja.rede_id:
             return ("rede", loja.rede_id)
         return ("loja", lid)
@@ -1640,6 +1644,173 @@ def balanco(db, owner_tipo, owner_id, data_corte=None):
             "patrimonio_liquido": det("3", "credor"),
         },
     }
+
+
+# ── Visão CONSOLIDADA mãe+PDVs (PDV, spec _geral/2026-07-22-ponto-de-venda-design.md) ──
+def _consolidar(res_list):
+    """Merge estrutural de N resultados de mesma forma (dre/balanco por owner):
+    números somam; dicts mergeiam por chave; listas de detalhe mergeiam por `codigo`
+    somando `valor`; bools viram AND (recomputados pelo chamador quando fizer sentido);
+    strings/None ficam do primeiro (períodos/observações são idênticos por construção)."""
+    def merge(vals):
+        v0 = vals[0]
+        if isinstance(v0, bool):
+            return all(bool(v) for v in vals)
+        if isinstance(v0, (int, float)):
+            return round(sum((v or 0) for v in vals), 2)
+        if isinstance(v0, dict):
+            return {k: merge([(v or {}).get(k) for v in vals]) for k in v0}
+        if isinstance(v0, list):
+            por = {}
+            for lst in vals:
+                for item in (lst or []):
+                    k = item.get("codigo")
+                    if k in por:
+                        por[k] = dict(por[k], valor=round(por[k]["valor"] + (item.get("valor") or 0), 2))
+                    else:
+                        por[k] = dict(item)
+            return sorted(por.values(), key=lambda x: x.get("codigo") or "")
+        return v0
+    return merge(res_list)
+
+
+def eliminacoes_intercompany(db, owners, data_corte=None):
+    """Pendência de conta corrente mãe×PDV DENTRO do perímetro consolidado: saldo líquido
+    dos lançamentos com ref `rateio:*` na conta 1.1.09 de cada owner. O espelho 2.1.09 dos
+    PDVs é IGUAL por construção (par espelhado — rateio, estorno e liquidação carregam o
+    mesmo prefixo de ref), então um único lado mede a pendência. Saldos de 1.1.09 de outras
+    origens (ex.: acordos com lojas fora do perímetro) NÃO são eliminados."""
+    total = 0.0
+    for ot, oid in owners:
+        c = _conta_por_codigo(db, ot, oid, "1.1.09")
+        if c is None:
+            continue
+        q = (db.query(Lancamento).filter_by(owner_tipo=ot, owner_id=oid)
+               .filter(Lancamento.ref.like("rateio:%")))
+        if data_corte:
+            q = q.filter(Lancamento.data <= data_corte)
+        for l in q.all():
+            if l.conta_debito_id == c.id:
+                total += l.valor
+            elif l.conta_credito_id == c.id:
+                total -= l.valor
+    return round(total, 2)
+
+
+def dre_consolidada(db, owners, ini=None, fim=None):
+    """DRE Consolidado = soma das DREs de [mãe]+PDVs. Sem eliminação: o rateio não toca a
+    DRE da mãe (1.1.09 × 1.1.01, só balanço) e a despesa aparece UMA vez, no PDV."""
+    res = _consolidar([dre(db, ot, oid, ini=ini, fim=fim) for ot, oid in owners])
+    res["unidades"] = len(owners)
+    return res
+
+
+def balanco_consolidado(db, owners, data_corte=None):
+    """Balanço Consolidado = soma dos balanços de [mãe]+PDVs com ELIMINAÇÃO do saldo
+    intercompany pendente (1.1.09 da credora × 2.1.09 da devedora): os dois lados caem
+    pelo mesmo valor e a linha `eliminacoes` exibe a pendência quando ≠ 0."""
+    res = _consolidar([balanco(db, ot, oid, data_corte=data_corte) for ot, oid in owners])
+    elim = eliminacoes_intercompany(db, owners, data_corte=data_corte)
+    res["eliminacoes"] = elim
+    res["unidades"] = len(owners)
+    if elim:
+        res["ativo"]["circulante"] = round(res["ativo"]["circulante"] - elim, 2)
+        res["ativo"]["total"] = round(res["ativo"]["total"] - elim, 2)
+        res["passivo"]["circulante"] = round(res["passivo"]["circulante"] - elim, 2)
+        res["passivo"]["total"] = round(res["passivo"]["total"] - elim, 2)
+        res["total_passivo_mais_pl"] = round(res["total_passivo_mais_pl"] - elim, 2)
+        for lst, cod in ((res["detalhe"]["ativo_circulante"], "1.1.09"),
+                         (res["detalhe"]["passivo_circulante"], "2.1.09")):
+            for item in lst:
+                if item["codigo"] == cod:
+                    item["valor"] = round(item["valor"] - elim, 2)
+    res["confere"] = abs(res["ativo"]["total"] - res["total_passivo_mais_pl"]) < 0.01
+    return res
+
+
+# ── Rateio ao PDV (custos da mãe em nome do PDV — spec PDV §3) ───────────────
+def _prox_ref_rateio(db):
+    n = db.query(Lancamento).filter(Lancamento.ref.like("rateio:%")).count() + 1
+    while db.query(Lancamento).filter(Lancamento.ref == "rateio:%d" % n).first() is not None:
+        n += 1
+    return "rateio:%d" % n
+
+
+def rateio_ao_pdv(db, owner_mae, owner_pdv, valor, conta_despesa, historico="",
+                  projeto_id=None, data=None):
+    """Rateio administrativo mãe→PDV: a mãe pagou um custo em nome do PDV (aluguel, folha
+    compartilhada, marketing…). Par intercompany com ref ESPELHADA `rateio:<n>` nos DOIS
+    razões — legítimo aqui (diferente do caso fábrica): o ator é a equipe da mãe COM escopo
+    sobre ambos, numa ação administrativa consciente.
+      mãe: DR 1.1.09 (conta corrente a receber) × CR 1.1.01 (caixa)
+      PDV: DR <despesa 5.x da rubrica escolhida> × CR 2.1.09 (conta corrente a pagar)
+    Reversível em par por estornar_rateio(ref)."""
+    if tuple(owner_mae) == tuple(owner_pdv):
+        raise ValueError("rateio exige razões distintos (mãe × PDV)")
+    seed_plano(db, owner_mae[0], owner_mae[1])
+    seed_plano(db, owner_pdv[0], owner_pdv[1])
+    cod = (conta_despesa or "").strip()
+    if not cod.startswith("5"):
+        raise ValueError("a conta do rateio deve ser uma despesa (grupo 5)")
+    c_desp = _conta_por_codigo(db, owner_pdv[0], owner_pdv[1], cod)
+    if c_desp is None or c_desp.tipo != "analitica":
+        raise ValueError("conta %s não é uma despesa analítica do plano do PDV" % cod)
+    cc_receber = _conta_por_codigo(db, owner_mae[0], owner_mae[1], "1.1.09")
+    caixa_mae = _conta_por_codigo(db, owner_mae[0], owner_mae[1], "1.1.01")
+    cc_pagar = _conta_por_codigo(db, owner_pdv[0], owner_pdv[1], "2.1.09")
+    ref = _prox_ref_rateio(db)
+    hist = (historico or "").strip() or ("Rateio ao PDV — " + c_desp.nome)
+    lan_mae = lancar(db, owner_mae[0], owner_mae[1], cc_receber.id, caixa_mae.id, valor,
+                     data=data, projeto_id=projeto_id, origem="rateio_pdv", historico=hist, ref=ref)
+    lan_pdv = lancar(db, owner_pdv[0], owner_pdv[1], c_desp.id, cc_pagar.id, valor,
+                     data=data, projeto_id=projeto_id, origem="rateio_pdv", historico=hist, ref=ref)
+    return {"ref": ref, "mae": lan_mae, "pdv": lan_pdv}
+
+
+def estornar_rateio(db, ref):
+    """Reverte o PAR do rateio: lançamentos invertidos com ref `<ref>:estorno` nos dois
+    razões (a pendência intercompany volta a zero por construção). Idempotente."""
+    ref = (ref or "").strip()
+    if not ref.startswith("rateio:") or ref.endswith(":estorno"):
+        raise ValueError("ref de rateio inválida")
+    legs = db.query(Lancamento).filter_by(ref=ref).order_by(Lancamento.id.asc()).all()
+    if not legs:
+        raise ValueError("rateio %s não encontrado" % ref)
+    ja = db.query(Lancamento).filter_by(ref=ref + ":estorno").order_by(Lancamento.id.asc()).all()
+    if ja:
+        return {"ref": ref + ":estorno", "lancamentos": [_lanc_serial(l) for l in ja],
+                "ja_estornado": True}
+    outs = [lancar(db, l.owner_tipo, l.owner_id, l.conta_credito_id, l.conta_debito_id,
+                   l.valor, projeto_id=l.projeto_id, origem="rateio_pdv",
+                   historico="Estorno — " + (l.historico or ref), ref=ref + ":estorno")
+            for l in legs]
+    return {"ref": ref + ":estorno", "lancamentos": outs, "ja_estornado": False}
+
+
+def listar_rateios(db, owners):
+    """Rateios do perímetro (1 item por ref, legs agrupadas, flag de estorno) — alimenta a
+    tabela da visão unificada. Um rateio entra se QUALQUER leg pertence ao perímetro."""
+    owner_set = {tuple(o) for o in owners}
+    rows = (db.query(Lancamento).filter(Lancamento.ref.like("rateio:%"))
+              .order_by(Lancamento.id.asc()).all())
+    estornados = {l.ref[:-len(":estorno")] for l in rows if (l.ref or "").endswith(":estorno")}
+    por_ref = {}
+    for l in rows:
+        if (l.ref or "").endswith(":estorno"):
+            continue
+        por_ref.setdefault(l.ref, []).append(l)
+    out = []
+    for ref, legs in por_ref.items():
+        if not any((l.owner_tipo, l.owner_id) in owner_set for l in legs):
+            continue
+        l0 = legs[0]
+        out.append({"ref": ref, "valor": l0.valor,
+                    "data": l0.data.isoformat() if l0.data else None,
+                    "historico": l0.historico, "projeto_id": l0.projeto_id,
+                    "owners": [[l.owner_tipo, l.owner_id] for l in legs],
+                    "estornado": ref in estornados})
+    out.sort(key=lambda x: x["ref"], reverse=True)
+    return out
 
 
 # ── DRE por projeto / margem de contribuição (sub-projeto #5) ─────────────────

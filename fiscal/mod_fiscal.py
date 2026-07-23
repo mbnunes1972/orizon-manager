@@ -93,6 +93,13 @@ def resolver_emitente(db, loja, tipo_doc):
         return pe.emitente_id if pe else None
 
     emitente_id = _busca("loja", loja.id)
+    if emitente_id is None and getattr(loja, "loja_mae_id", None):
+        # PDV (loja com mãe, spec 2026-07-22): sem resolução própria, emite pela MÃE —
+        # cadeia completa dela (override da mãe → default da rede → emitente próprio da mãe).
+        from database import Loja
+        mae = db.get(Loja, loja.loja_mae_id)
+        if mae is not None:
+            return resolver_emitente(db, mae, tipo_doc)
     if emitente_id is None:
         emitente_id = _busca("rede", loja.rede_id)
     if emitente_id is None:

@@ -409,19 +409,49 @@ def _aprovador_financeiro(db, login, senha):
     return u
 
 
-def _contabil_ctx(handler, exige_edicao):
+def _lojas_do_escopo(db, ator):
+    """Unidades da VISÃO UNIFICADA financeira (PDV, spec 2026-07-22): para quem abre o
+    painel Financeiro de uma loja-MÃE, devolve [mãe] + PDVs ativos dela; para os demais,
+    [loja ativa]. É OPT-IN painel a painel — NUNCA altera o escopo_operacional global."""
+    lid = ator.get("active_loja_id") or ator.get("loja_id")
+    if not lid:
+        return []
+    unidades = [lid]
+    if perfis.acessa_modulo(ator.get("nivel"), "financeiro"):
+        l = db.get(Loja, lid)
+        if l is not None and not getattr(l, "loja_mae_id", None):
+            unidades += [p.id for p in db.query(Loja)
+                         .filter(Loja.loja_mae_id == lid, Loja.ativo == 1)
+                         .order_by(Loja.id).all()]
+    return unidades
+
+
+def _contabil_ctx(handler, exige_edicao, consolidado_ok=False):
     """(usuario, db, owner_tipo, owner_id) ou envia erro via handler.send_json e retorna None.
     Gate: módulo financeiro ativo na loja; edição exige aprovar_financeiro OU editar_dados_loja.
-    O chamador é responsável por db.close()."""
+    O chamador é responsável por db.close().
+
+    Visão unificada (PDV, spec 2026-07-22): `?unidade=<loja_id>` (ou header
+    X-Unidade-Financeira) troca o owner das consultas/ações para a unidade escolhida,
+    restrito a _lojas_do_escopo (mãe + PDVs dela) — operações continuam atômicas numa
+    unidade por vez. `unidade=consolidado` só nos painéis que declaram consolidado_ok:
+    devolve ot="consolidado" e oid=[(ot, oid) de cada unidade] para o handler somar."""
     import mod_contabil, mod_tenancy
     usuario = get_usuario_sessao(handler)
     if not usuario:
         handler.send_json({"ok": False, "erro": "Não autenticado."}, code=401); return None
     db = get_session()
+    loja = db.get(Loja, usuario.get("loja_id")) if usuario.get("loja_id") else None
+    if loja is not None and getattr(loja, "loja_mae_id", None):
+        # PDV: o painel financeiro não existe na UI do PDV e a API acompanha — o financeiro
+        # é operado pela loja-mãe em visão unificada. Os LANÇAMENTOS do razão do PDV seguem
+        # normais (o wiring de eventos não passa por aqui). ANTES do check de perfil para a
+        # mensagem certa chegar ao usuário do PDV (e sem oferta de step-up, que não abriria).
+        db.close(); handler.send_json({"ok": False, "erro": "O financeiro do Ponto de Venda "
+                                       "é operado pela loja-mãe (visão unificada)."}, code=403); return None
     # Perfil-4 (rev2 §2): só perfis com acesso ao Financeiro abrem o módulo (Diretoria).
     if _sem_acesso_modulo(usuario, "financeiro", handler=handler):
         db.close(); handler.send_json({"ok": False, "erro": "Sem acesso ao módulo Financeiro.", "precisa_stepup": "financeiro"}, code=403); return None
-    loja = db.get(Loja, usuario.get("loja_id")) if usuario.get("loja_id") else None
     if loja is not None and not mod_tenancy.modulo_ativo(loja, "financeiro"):
         db.close(); handler.send_json({"ok": False, "erro": "Módulo financeiro inativo."}, code=403); return None
     if exige_edicao:
@@ -432,6 +462,31 @@ def _contabil_ctx(handler, exige_edicao):
         ot, oid = mod_contabil.resolver_owner(db, usuario)
     except ValueError as e:
         db.close(); handler.send_json({"ok": False, "erro": str(e)}, code=400); return None
+    from urllib.parse import parse_qs as _pq
+    unid = (_pq(urlparse(handler.path).query).get("unidade") or [None])[0]
+    if not unid:
+        unid = (handler.headers.get("X-Unidade-Financeira") or "").strip() or None
+    if unid == "consolidado":
+        if not consolidado_ok:
+            db.close(); handler.send_json({"ok": False, "erro": "Este painel não tem visão "
+                                           "consolidada — escolha uma unidade."}, code=400); return None
+        ator = _ator_dict(db, usuario)
+        unidades = _lojas_do_escopo(db, ator)
+        if len(unidades) < 2:
+            db.close(); handler.send_json({"ok": False, "erro": "Sem Pontos de Venda para "
+                                           "consolidar."}, code=400); return None
+        vistos, owners = set(), []
+        for u in unidades:
+            o = mod_contabil.resolver_owner(db, {"loja_id": u, "rede_id": None})
+            if o not in vistos:
+                vistos.add(o); owners.append(o)
+        return usuario, db, "consolidado", owners
+    if unid is not None:
+        ator = _ator_dict(db, usuario)
+        if not str(unid).isdigit() or int(unid) not in _lojas_do_escopo(db, ator):
+            db.close(); handler.send_json({"ok": False, "erro": "Unidade fora do escopo."},
+                                          code=403); return None
+        ot, oid = mod_contabil.resolver_owner(db, {"loja_id": int(unid), "rede_id": None})
     return usuario, db, ot, oid
 
 
@@ -749,6 +804,23 @@ class Handler(BaseHTTPRequestHandler):
         _REQ_LOJA_ATIVA = _ler_loja_ativa_header(self)
         path = urlparse(self.path).path
         if handle_auth_get(self, path): return
+        if path == "/api/financeiro/unidades":
+            # Visão unificada (PDV, spec 2026-07-22): unidades que o ator pode escolher no
+            # seletor dos painéis financeiros da mãe ([mãe] + PDVs ativos; 1 = sem seletor).
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            usuario, db, ot, oid = ctx
+            try:
+                ator = _ator_dict(db, usuario)
+                ids = _lojas_do_escopo(db, ator)
+                lojas = {l.id: l for l in db.query(Loja).filter(Loja.id.in_(ids)).all()} if ids else {}
+                unidades = [{"id": i, "nome": lojas[i].nome, "codigo": lojas[i].codigo or "",
+                             "tipo": (lojas[i].tipo or "loja")} for i in ids if i in lojas]
+                self.send_json({"ok": True, "unidades": unidades,
+                                "consolidado_disponivel": len(unidades) > 1})
+            finally:
+                db.close()
+            return
         if path == "/api/financeiro/contas":
             ctx = _contabil_ctx(self, exige_edicao=False)
             if ctx is None: return
@@ -859,7 +931,7 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
         if path == "/api/financeiro/dre":
-            ctx = _contabil_ctx(self, exige_edicao=False)
+            ctx = _contabil_ctx(self, exige_edicao=False, consolidado_ok=True)
             if ctx is None: return
             import mod_contabil
             from urllib.parse import parse_qs
@@ -868,6 +940,10 @@ class Handler(BaseHTTPRequestHandler):
             ini = _parse_data((qs.get("ini") or [None])[0])
             fim = _parse_data((qs.get("fim") or [None])[0])
             try:
+                if ot == "consolidado":
+                    self.send_json({"ok": True,
+                                    "dre": mod_contabil.dre_consolidada(db, oid, ini=ini, fim=fim)})
+                    return
                 self.send_json({"ok": True, "dre": mod_contabil.dre(db, ot, oid, ini=ini, fim=fim)})
             finally:
                 db.close()
@@ -1017,14 +1093,42 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/financeiro/balanco":
-            ctx = _contabil_ctx(self, exige_edicao=False)
+            ctx = _contabil_ctx(self, exige_edicao=False, consolidado_ok=True)
             if ctx is None: return
             import mod_contabil
             from urllib.parse import parse_qs
             usuario, db, ot, oid = ctx
             data = _parse_data((parse_qs(urlparse(self.path).query).get("data") or [None])[0])
             try:
+                if ot == "consolidado":
+                    self.send_json({"ok": True,
+                                    "balanco": mod_contabil.balanco_consolidado(db, oid, data_corte=data)})
+                    return
                 self.send_json({"ok": True, "balanco": mod_contabil.balanco(db, ot, oid, data_corte=data)})
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/rateios":
+            # Rateios mãe→PDV do perímetro (visão unificada) — lista com estado de estorno.
+            ctx = _contabil_ctx(self, exige_edicao=False)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                ator = _ator_dict(db, usuario)
+                owners, vistos = [], set()
+                for u in _lojas_do_escopo(db, ator):
+                    o = mod_contabil.resolver_owner(db, {"loja_id": u, "rede_id": None})
+                    if o not in vistos:
+                        vistos.add(o); owners.append(o)
+                nomes = {("loja", l.id): l.nome for l in db.query(Loja).all()}
+                itens = mod_contabil.listar_rateios(db, owners)
+                for it in itens:
+                    pdvs = [nomes.get(tuple(o)) for o in it["owners"]
+                            if tuple(o) != owners[0] and nomes.get(tuple(o))]
+                    it["unidade"] = pdvs[0] if pdvs else ""
+                self.send_json({"ok": True, "rateios": itens,
+                                "eliminacoes_pendentes": mod_contabil.eliminacoes_intercompany(db, owners)})
             finally:
                 db.close()
             return
@@ -1870,6 +1974,26 @@ class Handler(BaseHTTPRequestHandler):
                          if mod_tenancy.pode_ver_loja(
                              ator, {"id": l.id, "rede_id": l.rede_id})]
                 self.send_json({"ok": True, "lojas": [_loja_dict(l) for l in lojas]})
+            finally:
+                db.close()
+
+        elif re.match(r'^/api/admin/lojas/(\d+)/pdvs$', path):
+            # Pontos de Venda da loja (spec 2026-07-22): o lojista com editar_dados_loja
+            # VISUALIZA seus PDVs; criar/editar é só super_admin (POST/PUT).
+            usuario = get_usuario_sessao(self)
+            if not usuario or not perfis.pode(usuario.get("nivel"), "editar_dados_loja"):
+                self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
+            m_pdv = re.match(r'^/api/admin/lojas/(\d+)/pdvs$', path)
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                mae = db.get(Loja, int(m_pdv.group(1)))
+                if mae is None or not mod_tenancy.pode_ver_loja(
+                        ator, {"id": mae.id, "rede_id": mae.rede_id}):
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                pdvs = (db.query(Loja).filter(Loja.loja_mae_id == mae.id)
+                          .order_by(Loja.nome).all())
+                self.send_json({"ok": True, "pdvs": [_loja_dict(l) for l in pdvs]})
             finally:
                 db.close()
 
@@ -5124,6 +5248,58 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
+        if path == "/api/financeiro/rateio-pdv":
+            # Rateio ao PDV (spec PDV 2026-07-22 §3): mãe pagou custo em nome do PDV.
+            # Par intercompany ref rateio:<n> — mãe DR 1.1.09 × CR 1.1.01; PDV DR 5.x × CR 2.1.09.
+            # O ator age a partir da PRÓPRIA loja (mãe); a unidade destino vem no corpo.
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                pdv_id = dd.get("pdv_id")
+                ator = _ator_dict(db, usuario)
+                pdv = db.get(Loja, int(pdv_id)) if pdv_id else None
+                if (pdv is None or not pdv.loja_mae_id
+                        or pdv.id not in _lojas_do_escopo(db, ator)):
+                    self.send_json({"ok": False, "erro": "Ponto de Venda fora do escopo."},
+                                   code=403); return
+                owner_pdv = mod_contabil.resolver_owner(db, {"loja_id": pdv.id, "rede_id": None})
+                r = mod_contabil.rateio_ao_pdv(
+                    db, (ot, oid), owner_pdv, dd.get("valor"), dd.get("conta_despesa"),
+                    historico=dd.get("historico", ""), projeto_id=dd.get("projeto_id"),
+                    data=_parse_data(dd.get("data")))
+                self.send_json({"ok": True, **r}, code=201)
+            except (ValueError, TypeError) as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+        if path == "/api/financeiro/rateio-pdv/estorno":
+            # Reversão EM PAR do rateio (ref espelhada) — restrita ao perímetro do ator.
+            ctx = _contabil_ctx(self, exige_edicao=True)
+            if ctx is None: return
+            import mod_contabil
+            from database import Lancamento
+            usuario, db, ot, oid = ctx
+            try:
+                dd = json.loads(body or b'{}')
+                ref = (dd.get("ref") or "").strip()
+                ator = _ator_dict(db, usuario)
+                owners = set()
+                for u in _lojas_do_escopo(db, ator):
+                    owners.add(mod_contabil.resolver_owner(db, {"loja_id": u, "rede_id": None}))
+                legs = db.query(Lancamento).filter_by(ref=ref).all()
+                if not legs or not all((l.owner_tipo, l.owner_id) in owners for l in legs):
+                    self.send_json({"ok": False, "erro": "Rateio fora do escopo."}, code=403); return
+                r = mod_contabil.estornar_rateio(db, ref)
+                self.send_json({"ok": True, **r})
+            except (ValueError, TypeError) as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
         if path == "/api/financeiro/eventos":
             ctx = _contabil_ctx(self, exige_edicao=True)
             if ctx is None: return
@@ -7302,6 +7478,69 @@ class Handler(BaseHTTPRequestHandler):
                         db.add(UsuarioLoja(usuario_id=u.id, loja_id=l.id))
                     db.commit()
                     self.send_json({"ok": True, "loja": _loja_dict(l)})
+                finally:
+                    db.close()
+                return
+
+            m_pdv = _re.match(r"^/api/admin/lojas/(\d+)/pdvs$", path)
+            if m_pdv:
+                # Criar Ponto de Venda da loja (spec 2026-07-22, Desvio 4): SÓ super_admin.
+                # O PDV nasce SEM emitente (fiscal pela mãe), com rede herdada e config
+                # financeira copiada da mãe (metas/faixas ajustáveis depois).
+                usuario = get_usuario_sessao(self)
+                if not usuario or usuario.get("nivel") != "super_admin":
+                    self.send_json({"ok": False, "erro": "Criar Ponto de Venda é exclusivo "
+                                    "do administrador da plataforma."}, code=403)
+                    return
+                req = json.loads(body) if body else {}
+                db = get_session()
+                try:
+                    mae = db.get(Loja, int(m_pdv.group(1)))
+                    if mae is None:
+                        self.send_json({"ok": False, "erro": "Loja não encontrada"}, code=404)
+                        return
+                    if mae.loja_mae_id:
+                        self.send_json({"ok": False, "erro": "Um Ponto de Venda não pode ter "
+                                        "Pontos de Venda próprios."}, code=400)
+                        return
+                    codigos = [c for (c,) in db.query(Loja.codigo).all() if c]
+                    erros = mod_tenancy.validar_loja(req, codigos)
+                    if erros:
+                        self.send_json({"ok": False, "erro": " ".join(erros)})
+                        return
+                    pdv = Loja(
+                        nome=req["nome"].strip(),
+                        codigo=req["codigo"].strip().upper(),
+                        tipo="ponto_venda",
+                        loja_mae_id=mae.id,
+                        rede_id=mae.rede_id,                    # herdado, não editável
+                        config_financeira_json=mae.config_financeira_json,   # seed = cópia da mãe
+                        pct_mercadoria=mae.pct_mercadoria,
+                        pct_servico=mae.pct_servico,
+                        telefone=(req.get("telefone") or "").strip() or None,
+                        email=(req.get("email") or "").strip() or None,
+                        responsavel=(req.get("responsavel") or "").strip() or None,
+                        cep=(req.get("cep") or "").strip() or None,
+                        logradouro=(req.get("logradouro") or "").strip() or None,
+                        numero=(req.get("numero") or "").strip() or None,
+                        complemento=(req.get("complemento") or "").strip() or None,
+                        bairro=(req.get("bairro") or "").strip() or None,
+                        cidade=(req.get("cidade") or "").strip() or None,
+                        estado=((req.get("estado") or req.get("uf") or "").strip() or None),
+                        testemunha1_nome=(req.get("testemunha1_nome") or "").strip() or None,
+                        testemunha1_cpf=(req.get("testemunha1_cpf") or "").strip() or None,
+                        testemunha2_nome=(req.get("testemunha2_nome") or "").strip() or None,
+                        testemunha2_cpf=(req.get("testemunha2_cpf") or "").strip() or None,
+                    )
+                    db.add(pdv); db.flush()
+                    # Perfis padrão do PDV (master/gerencial/operador) — fiel ao que a
+                    # migração semeia para lojas plenas; sem isto o cadastro de usuários
+                    # do PDV cai no fallback hardcoded.
+                    from auth import perfil_store
+                    perfil_store.seed_perfis_loja(db, pdv.id)
+                    db.commit()
+                    perfis.recarregar()
+                    self.send_json({"ok": True, "pdv": _loja_dict(pdv)})
                 finally:
                     db.close()
                 return
@@ -9935,6 +10174,12 @@ class Handler(BaseHTTPRequestHandler):
                     if not mod_tenancy.pode_editar_dados_loja(ator, loja_d):
                         self.send_json({"ok": False, "erro": "Acesso negado"}, code=403)
                         return
+                    # PDV (loja com mãe): cadastro é exclusivo do super_admin — o lojista
+                    # visualiza, não edita (spec 2026-07-22, Desvio 4).
+                    if l.loja_mae_id and not mod_tenancy._eh_super_admin(ator):
+                        self.send_json({"ok": False, "erro": "Ponto de Venda só é editável "
+                                        "pelo administrador da plataforma."}, code=403)
+                        return
                     if "codigo" in req:
                         outros = [c for (c,) in db.query(Loja.codigo)
                                                 .filter(Loja.id != l.id).all() if c]
@@ -9973,7 +10218,9 @@ class Handler(BaseHTTPRequestHandler):
                         l.pct_mercadoria = float(pm); l.pct_servico = float(ps)
                     if perfis.pode(ator.get("nivel"), "gerir_lojas"):
                         if "ativo" in req:   l.ativo = 1 if req["ativo"] else 0
-                        if "rede_id" in req and mod_tenancy._eh_super_admin(ator):
+                        # PDV: rede_id é HERDADO da mãe, não editável (spec 2026-07-22).
+                        if ("rede_id" in req and mod_tenancy._eh_super_admin(ator)
+                                and not l.loja_mae_id):
                             l.rede_id = req["rede_id"]
                         if isinstance(req.get("modulos"), list):
                             l.modulos_ativos = json.dumps([str(mo) for mo in req["modulos"]])
@@ -10979,6 +11226,8 @@ def _loja_dict(l) -> dict:
         "testemunha2_cpf":  l.testemunha2_cpf  or "",
         "pct_mercadoria":   l.pct_mercadoria if l.pct_mercadoria is not None else 65.0,
         "pct_servico":      l.pct_servico    if l.pct_servico    is not None else 35.0,
+        "loja_mae_id": l.loja_mae_id,
+        "tipo":        l.tipo or "loja",
         "ativo":       bool(l.ativo),
         "criado_em":   l.criado_em.strftime("%Y-%m-%d") if l.criado_em else "",
     }
@@ -11052,9 +11301,28 @@ def _bloqueio_comercial(ator):
     return None
 
 
+def _usuario_de_pdv(usuario):
+    """True se a loja do usuário é um Ponto de Venda (loja com mãe, spec 2026-07-22)."""
+    lid = (usuario or {}).get("loja_id")
+    if not lid:
+        return False
+    db = get_session()
+    try:
+        l = db.get(Loja, lid)
+        return bool(l is not None and getattr(l, "loja_mae_id", None))
+    finally:
+        db.close()
+
+
 def _sem_acesso_modulo(usuario, modulo_id, handler=None):
     """True se o PERFIL do usuário não acessa o módulo (Perfil-4 rev2 §2, matriz de acesso).
-    Se `handler` for dado, honra um grant de step-up (senha de quem tem o perfil) na sessão."""
+    Se `handler` for dado, honra um grant de step-up (senha de quem tem o perfil) na sessão.
+
+    PDV (loja com mãe, spec 2026-07-22): Financeiro e Folha do PDV são operados pela
+    loja-mãe — bloqueados aqui para QUALQUER perfil do PDV, sem step-up (QA Vera 🟠).
+    Os lançamentos do razão do PDV seguem vivos (o wiring não passa por aqui)."""
+    if modulo_id in ("financeiro", "folha") and _usuario_de_pdv(usuario):
+        return True
     if perfis.acessa_modulo((usuario or {}).get("nivel"), modulo_id):
         return False
     if handler is not None:
@@ -11377,21 +11645,35 @@ def _filtrar_projetos_por_loja(projetos, db, loja_id, ator=None):
 
 def _loja_dict_para_contrato(db, loja_id):
     """Dict plano dos dados da loja para alimentar/snapshotar o contrato (F3).
-    Retorna {} se não houver loja resolvível."""
+    Retorna {} se não houver loja resolvível.
+
+    PDV (loja com mãe, spec 2026-07-22): a CONTRATADA é a mãe — nome/CNPJ/endereço/
+    contato vêm dela (juridicamente o cliente contrata com a matriz). Ficam do PDV o
+    `codigo` (numeração rastreia a origem da venda) e as testemunhas quando o PDV as
+    tem (cadastro próprio; vazias, caem nas da mãe)."""
     if not loja_id:
         return {}
     loja = db.get(Loja, loja_id)
     if not loja:
         return {}
+    dona = loja   # quem "assina": a própria loja, ou a mãe quando é PDV
+    if getattr(loja, "loja_mae_id", None):
+        mae = db.get(Loja, loja.loja_mae_id)
+        if mae is not None:
+            dona = mae
+    t1n = loja.testemunha1_nome or dona.testemunha1_nome
+    t1c = loja.testemunha1_cpf  or dona.testemunha1_cpf
+    t2n = loja.testemunha2_nome or dona.testemunha2_nome
+    t2c = loja.testemunha2_cpf  or dona.testemunha2_cpf
     return {
         "id": loja.id,
-        "nome": loja.nome or "", "cnpj": loja.cnpj or "", "codigo": loja.codigo or "",
-        "telefone": loja.telefone or "", "email": loja.email or "",
-        "cep": loja.cep or "", "logradouro": loja.logradouro or "",
-        "numero": loja.numero or "", "complemento": loja.complemento or "",
-        "bairro": loja.bairro or "", "cidade": loja.cidade or "", "estado": loja.estado or "",
-        "testemunha1_nome": loja.testemunha1_nome or "", "testemunha1_cpf": loja.testemunha1_cpf or "",
-        "testemunha2_nome": loja.testemunha2_nome or "", "testemunha2_cpf": loja.testemunha2_cpf or "",
+        "nome": dona.nome or "", "cnpj": dona.cnpj or "", "codigo": loja.codigo or "",
+        "telefone": dona.telefone or "", "email": dona.email or "",
+        "cep": dona.cep or "", "logradouro": dona.logradouro or "",
+        "numero": dona.numero or "", "complemento": dona.complemento or "",
+        "bairro": dona.bairro or "", "cidade": dona.cidade or "", "estado": dona.estado or "",
+        "testemunha1_nome": t1n or "", "testemunha1_cpf": t1c or "",
+        "testemunha2_nome": t2n or "", "testemunha2_cpf": t2c or "",
     }
 
 

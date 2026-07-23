@@ -1339,6 +1339,22 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
+## ⏸️ ESTADO ATUAL (2026-07-22) — retomar aqui
+
+> **Frente PONTO DE VENDA (PDV avançado) COMPLETA na branch `feat/ponto-de-venda`** — 4 fatias,
+> 1 commit cada, suíte **1449 verde** (38 testes novos). PDV = Loja com mãe (`loja_mae_id`/`tipo`):
+> fiscal pela mãe, contrato/modelos da mãe (código próprio na numeração), razão contábil PRÓPRIO,
+> visão unificada com seletor de unidade + Consolidado com eliminações (1.1.09×2.1.09 por refs
+> `rateio:*`), ação Rateio ao PDV reversível em par, financeiro oculto na UI do PDV (lançamentos
+> vivos). Ver `## Sessão 112` e o spec `_geral/2026-07-22-ponto-de-venda-design.md`.
+> **PENDENTE:** merge na `main` + push + re-ingestão do grafo; rodar
+> `scripts/criar_pdv_caraguatatuba.py` no VPS (produção) p/ criar o PDV real; verificação manual
+> no navegador (seção Pontos de Venda no Admin, seletor de unidade/Consolidado no Financeiro,
+> modal Rateio, temas claro/escuro); definições do Diretor (metas do PDV, lista de rateios
+> recorrentes).
+>
+> **(Anterior, 2026-07-20 — mantido abaixo por referência.)**
+
 ## ⏸️ ESTADO ATUAL (2026-07-20) — retomar aqui
 
 > **Tudo na `main`, pushado.** A branch `feat/fatia2-datas-assinatura` (Fatias 2+3 + retirada do SQLite,
@@ -2334,6 +2350,42 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 112 — Ponto de Venda (PDV avançado): frente completa em 4 fatias
+**Spec:** `docs/superpowers/specs/_geral/2026-07-22-ponto-de-venda-design.md` (caso Caraguatatuba).
+Branch `feat/ponto-de-venda`, 1 commit por fatia. **PDV = Loja com mãe**: `lojas.loja_mae_id`
+(self-FK) + `tipo` (loja|ponto_venda), migração leve SQLite+PG. Tenancy/painel/razão vêm de graça.
+- **Fatia 1 (fundação):** `resolver_emitente` ganha o elo da mãe (PDV sem resolução própria emite
+  pela cadeia COMPLETA da mãe; override próprio do PDV ainda vence); documentos do PDV usam modelos
+  (`mod_documentos.ativo_de`/`tipo_existe` com fallback) e dados da CONTRATADA da mãe
+  (`_loja_dict_para_contrato`), mantendo `codigo` do PDV na numeração e testemunhas próprias;
+  endpoints `GET/POST /api/admin/lojas/<id>/pdvs` (lojista vê; criar/editar SÓ super_admin; PDV de
+  PDV negado; `rede_id` herdado e bloqueado no PATCH); PDV nasce sem emitente, com config
+  financeira/segmentação copiadas da mãe e perfis padrão semeados; seção "Pontos de Venda" no
+  cadastro da loja (Admin). Testes `test_pdv_fundacao.py` (17).
+- **Fatia 2 (visão unificada — a sensível):** `resolver_owner` dá ao PDV razão PRÓPRIO
+  (`("loja", pdv.id)`) mesmo com rede herdada — loja plena inalterada; `_lojas_do_escopo(ator)`
+  ([mãe]+PDVs só p/ quem abre o Financeiro da mãe); seletor de unidade OPT-IN via
+  `?unidade=`/`X-Unidade-Financeira` no `_contabil_ctx` (todos os painéis financeiros), unidade
+  fora do escopo = 403, `escopo_operacional` global intocado; painel financeiro some da UI do PDV
+  (auth/me) e a API acompanha (403), MAS o wiring de lançamentos segue vivo (`modulo_ativo`
+  intacto — o que some é a tela). `GET /api/financeiro/unidades` alimenta o seletor.
+  Testes `test_pdv_visao_unificada.py` (11).
+- **Fatia 3 (consolidação+rateios):** `unidade=consolidado` em DRE/Balanço
+  (`dre_consolidada`/`balanco_consolidado`, merge estrutural por owner); eliminação intercompany
+  medida SÓ pelos refs `rateio:*` na 1.1.09 (não toca saldos de acordos com lojas fora do
+  perímetro), abatida dos DOIS lados com linha "eliminações" quando ≠ 0; **Rateio ao PDV**
+  (`rateio_ao_pdv`): par ref espelhada `rateio:<n>` — mãe DR 1.1.09 × CR 1.1.01; PDV DR 5.x ×
+  CR 2.1.09 — legítimo lançar nos dois razões (ator da mãe COM escopo sobre ambos);
+  `estornar_rateio` reverte EM PAR (idempotente); modal com lista/estorno na visão unificada;
+  contas 1.1.09/2.1.09 já existiam (frente Acordos; seed idempotente). Testes
+  `test_pdv_consolidacao.py` (10).
+- **Fatia 4 (Caraguatatuba):** `scripts/criar_pdv_caraguatatuba.py` — idempotente (código `CAR`),
+  vincula à Inspirium (`INS`), herda rede/config, semeia perfis; **SEM migração de histórico**
+  (projetos/lançamentos ficam na mãe; vendas novas nascem no PDV). Rodar no VPS com o
+  `DATABASE_URL` de produção; completar endereço/testemunhas/equipe no Admin.
+**Nota de dialeto:** loja de REDE segue compartilhando o razão da rede (inalterado) — dir de loja
+irmã enxerga a perna da mãe do rateio no ledger compartilhado (consistente com lançamentos), mas o
+estorno exige TODAS as pernas no escopo. `mod_negociacao.py` intocado.
 ## Sessão 111 — DRE/Balanço analíticos com o PLANO INTEIRO + diagnóstico do "sumiu da DRE"
 **Relato:** "lançamento de reconciliação não apareceu na DRE". **Diagnóstico (sem bug de DRE):**
 na tela de Reconciliação de Provisões há DUAS ações com destinos diferentes — **Efetivar**

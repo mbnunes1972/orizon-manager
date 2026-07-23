@@ -1379,6 +1379,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div class="page" id="page-12">
     <div class="page-title" id="fin-page-title">Financeiro</div>
     <div class="page-sub" id="fin-page-sub">Configuração financeira: provisões/custos-padrão e plano de contas.</div>
+    <!-- Visão unificada (PDV): seletor de unidade — só aparece quando a loja tem Pontos de Venda -->
+    <div id="fin-unidade-wrap" style="display:none;align-items:center;gap:8px;margin:6px 0 2px"></div>
     <div style="height:8px"></div>
     <div id="fin-panel-ind" style="display:none"><div id="ind-box"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
     <div id="fin-panel-prov"><div id="loja-panel-financeiro"><em style="color:var(--muted);font-size:12px">Carregando…</em></div></div>
@@ -2161,6 +2163,60 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   </div>
 </div>
 
+<!-- Modal: Novo Ponto de Venda (spec PDV 2026-07-22) — só super_admin cria -->
+<div id="modal-pdv" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:560px;max-height:90vh;overflow-y:auto">
+    <div class="modal-hdr">
+      <div class="modal-title">Novo Ponto de Venda</div>
+      <span class="modal-close" onclick="fecharModalPdv()">&#x2715;</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      O PDV opera o ciclo comercial completo com painel e resultados próprios; a emissão fiscal,
+      o contrato e o financeiro são da loja-mãe. A configuração financeira nasce copiada da mãe.
+    </div>
+    <div class="grid2" style="gap:12px" id="pdv-form-grid"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="fecharModalPdv()">Cancelar</button>
+      <button class="btn btn-primary btn-sm" id="pdv-salvar-btn">Criar Ponto de Venda</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Rateio ao PDV (spec PDV 2026-07-22 §3) — par intercompany mãe×PDV, reversível -->
+<div id="modal-rateio" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:620px;max-height:90vh;overflow-y:auto">
+    <div class="modal-hdr">
+      <div class="modal-title">Rateio ao PDV</div>
+      <span class="modal-close" onclick="fecharModalRateio()">&#x2715;</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      A loja-mãe pagou um custo em nome do Ponto de Venda (aluguel, folha compartilhada,
+      marketing…). Lança o par intercompany com a mesma referência nos dois razões:
+      na mãe <strong>1.1.09 × 1.1.01</strong>; no PDV <strong>despesa escolhida × 2.1.09</strong>.
+      Reversível em par pelo Estornar.
+    </div>
+    <div class="grid2" style="gap:12px">
+      <div><label class="field-label">Ponto de Venda</label>
+        <select id="rateio-pdv-sel" onchange="rateioCarregarContas()"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></select></div>
+      <div><label class="field-label">Valor (R$)</label>
+        <input id="rateio-valor" type="number" step="0.01" min="0"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></div>
+      <div><label class="field-label">Rubrica de despesa (no razão do PDV)</label>
+        <select id="rateio-conta-sel"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></select></div>
+      <div><label class="field-label">Histórico</label>
+        <input id="rateio-hist" placeholder="ex.: Aluguel 07/2026 — quota Caraguá"
+          style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="fecharModalRateio()">Fechar</button>
+      <button class="btn btn-primary btn-sm" onclick="rateioSalvar()">Lançar rateio</button>
+    </div>
+    <div id="rateio-lista"></div>
+  </div>
+</div>
+
 <!-- Modal: Modelo de documento da loja (Task 9) — histórico de versões + wizard de importação -->
 <!-- Upload de Modelo — seletor de tipo (spec 2026-07-22): desemboca no modal de importação -->
 <div id="modal-doc-upload" class="modal-overlay" style="display:none"
@@ -2482,6 +2538,10 @@ const fmt = n => Number(n).toLocaleString('pt-BR',{minimumFractionDigits:2,maxim
 
 // ── Multi-loja: loja ativa + interceptor de fetch ─────────────────
 let _lojaAtiva = null;   // loja ativa atual (multi-loja); null = usa default do backend
+let _finUnidade = null;  // visão unificada (PDV): unidade dos painéis financeiros; null = a própria loja
+// Trocar de loja ativa invalida a unidade escolhida E o cache do seletor (QA Vera 🟡):
+// sem isto, o header X-Unidade-Financeira de um contexto antigo viraria 403 no novo.
+function _finUnidadeReset(){ _finUnidade = null; _finUnidades = null; }
 (function _instalarFetchLojaAtiva(){
   const _origFetch = window.fetch.bind(window);
   window.fetch = async function(input, init){
@@ -2491,6 +2551,14 @@ let _lojaAtiva = null;   // loja ativa atual (multi-loja); null = usa default do
       if (_lojaAtiva && url.indexOf('/api/') !== -1 && url.indexOf('//') === -1) {
         const h = new Headers(init.headers || (typeof input!=='string' && input.headers) || {});
         h.set('X-Loja-Ativa', String(_lojaAtiva));
+        init.headers = h;
+      }
+      // Visão unificada (PDV): unidade escolhida no seletor do Financeiro acompanha
+      // toda chamada do módulo (exceto o próprio seletor de unidades).
+      if (_finUnidade && url.indexOf('/api/financeiro/') !== -1
+          && url.indexOf('/api/financeiro/unidades') === -1) {
+        const h = new Headers(init.headers || (typeof input!=='string' && input.headers) || {});
+        h.set('X-Unidade-Financeira', String(_finUnidade));
         init.headers = h;
       }
     } catch(e){ /* não bloquear a requisição por erro do interceptor */ }
@@ -9464,18 +9532,19 @@ function adminBreadcrumb(){
 }
 
 function adminIrNivel(n){
-  if (n === 1) { _adminNav.rede = null; _adminNav.loja = null; _adminNav.projeto = null; _lojaAtiva = null; }
-  if (n === 2) { _adminNav.loja = null; _adminNav.projeto = null; _lojaAtiva = null; }
+  if (n === 1) { _adminNav.rede = null; _adminNav.loja = null; _adminNav.projeto = null; _lojaAtiva = null; _finUnidadeReset(); }
+  if (n === 2) { _adminNav.loja = null; _adminNav.projeto = null; _lojaAtiva = null; _finUnidadeReset(); }
   if (n === 3) { _adminNav.projeto = null; }
   _adminNav.nivel = n;
   adminRender();
 }
 
-function adminEntrarRede(id, nome){ _adminNav.rede = { id, nome }; _adminNav.nivel = 2; _adminNav.loja = null; _lojaAtiva = null; adminRender(); }
+function adminEntrarRede(id, nome){ _adminNav.rede = { id, nome }; _adminNav.nivel = 2; _adminNav.loja = null; _lojaAtiva = null; _finUnidadeReset(); adminRender(); }
 async function adminEntrarLoja(id, nome){
   _adminNav.loja = { id, nome };
   _adminNav.nivel = 3;
   _lojaAtiva = id;               // super_admin passa a operar DENTRO desta loja (header X-Loja-Ativa)
+  _finUnidadeReset();
   try {
     const r = await fetch(`/api/admin/lojas/${id}/modulos`, { credentials:'same-origin' });
     const d = await r.json();
@@ -9699,6 +9768,7 @@ function empEscolher(id, ctx){
 // Painel Orizon › Lojas: "Administrar" fixa a loja como ativa e abre o Painel Admin escopado nela.
 function orizonAdministrarLoja(id){
   _lojaAtiva = id ? parseInt(id,10) : null;
+  _finUnidadeReset();
   if (_lojaAtiva) localStorage.setItem('loja_ativa', String(_lojaAtiva));
   ['nav-07','nav-cfg'].forEach(nid => { const n = document.getElementById(nid); if(n) n.style.display=''; });  // revela Admin/Config da loja
   goPage(7);   // Admin (4 abas da empresa: Dados da empresa / Usuários / Perfis de Usuário / Módulos)
@@ -9709,6 +9779,7 @@ document.addEventListener('click', function(ev){
 });
 function empresaTrocar(id){
   _lojaAtiva = id ? parseInt(id,10) : null;
+  _finUnidadeReset();
   if (_lojaAtiva) localStorage.setItem('loja_ativa', String(_lojaAtiva));
   const p7 = document.getElementById('page-07'), p9 = document.getElementById('page-09');
   if (p7 && p7.classList.contains('active')) adminRender();
@@ -10601,7 +10672,108 @@ function finTab(t){
   const tt = document.getElementById('fin-page-title');
   if(tt && sec) tt.textContent = 'Financeiro / ' + sec.lbl;
   _sbModuloAberto = 'financeiro'; _sbSecaoAtiva = t; sbNavRender();   // reflete no acordeão
+  finUnidadeInit();   // visão unificada (PDV): seletor de unidade, se a loja tiver PDVs
   if(sec && sec.load) sec.load();
+}
+
+// ── Visão unificada (PDV, spec 2026-07-22): seletor de unidade dos painéis financeiros ──
+let _finUnidades = null;   // cache das unidades do escopo (null = ainda não buscado)
+async function finUnidadeInit(){
+  if (_finUnidades === null) {
+    const d = await fetch('/api/financeiro/unidades', {credentials:'same-origin'})
+      .then(r=>r.json()).catch(()=>null);
+    _finUnidades = (d && d.ok) ? (d.unidades || []) : [];
+  }
+  const wrap = document.getElementById('fin-unidade-wrap');
+  if (!wrap) return;
+  if (_finUnidades.length < 2){ wrap.style.display = 'none'; return; }
+  const atual = _finUnidade != null ? String(_finUnidade) : String(_finUnidades[0].id);
+  wrap.style.display = 'flex';
+  wrap.innerHTML = '<label style="font-size:11px;color:var(--muted)">Unidade</label>'
+    + '<select id="fin-unidade-sel" onchange="finUnidadeMudar(this.value)" '
+    + 'style="background:var(--surface);border:1px solid var(--border);border-radius:8px;'
+    + 'padding:6px 10px;color:var(--text);font-size:12px">'
+    + _finUnidades.map(u => '<option value="'+u.id+'"'+(atual===String(u.id)?' selected':'')+'>'
+        + esc(u.nome) + (u.tipo==='ponto_venda' ? ' (PDV)' : '') + '</option>').join('')
+    + '<option value="consolidado"'+(atual==='consolidado'?' selected':'')+'>Consolidado (mãe + PDVs)</option>'
+    + '</select>'
+    + '<button class="btn btn-ghost btn-sm" onclick="abrirModalRateio()">Rateio ao PDV</button>';
+}
+function finUnidadeMudar(v){
+  _finUnidade = v || null;
+  finTab(_finSecaoAtual || 'prov');   // recarrega o painel atual na unidade escolhida
+}
+
+// ── Rateio ao PDV (spec PDV §3): mãe pagou custo em nome do PDV — par intercompany ──
+async function abrirModalRateio(){
+  const pdvs = (_finUnidades || []).filter(u => u.tipo === 'ponto_venda');
+  if (!pdvs.length){ showToast('Nenhum Ponto de Venda no escopo.', true); return; }
+  const sel = document.getElementById('rateio-pdv-sel');
+  sel.innerHTML = pdvs.map(u => '<option value="'+u.id+'">'+esc(u.nome)+'</option>').join('');
+  document.getElementById('rateio-valor').value = '';
+  document.getElementById('rateio-hist').value = '';
+  document.getElementById('modal-rateio').style.display = 'flex';
+  rateioCarregarContas();
+  rateioListar();
+}
+function fecharModalRateio(){ document.getElementById('modal-rateio').style.display = 'none'; }
+async function rateioCarregarContas(){
+  // contas de DESPESA (grupo 5, analíticas) do plano do PDV escolhido
+  const pdvId = document.getElementById('rateio-pdv-sel').value;
+  const d = await fetch('/api/financeiro/contas?unidade='+pdvId, {credentials:'same-origin'})
+    .then(r=>r.json()).catch(()=>({}));
+  const flat = [];
+  (function walk(ns){ (ns||[]).forEach(n => { flat.push(n); walk(n.filhos); }); })(d.contas || []);
+  const desps = flat.filter(c => c.codigo.charAt(0) === '5' && c.tipo === 'analitica');
+  document.getElementById('rateio-conta-sel').innerHTML =
+    desps.map(c => '<option value="'+esc(c.codigo)+'">'+esc(c.codigo)+' · '+esc(c.nome)+'</option>').join('');
+}
+async function rateioSalvar(){
+  const valor = parseFloat(document.getElementById('rateio-valor').value);
+  if (!(valor > 0)){ showToast('Informe um valor > 0.', true); return; }
+  const d = await fetch('/api/financeiro/rateio-pdv', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+      pdv_id: parseInt(document.getElementById('rateio-pdv-sel').value, 10),
+      valor: valor,
+      conta_despesa: document.getElementById('rateio-conta-sel').value,
+      historico: document.getElementById('rateio-hist').value.trim(),
+    })}).then(r=>r.json()).catch(()=>({}));
+  if(!d.ok){ await avisoPopup(d.erro||'Erro no rateio.', {titulo:'Rateio ao PDV'}); return; }
+  showToast('Rateio lançado ('+d.ref+') nos dois razões.', false);
+  document.getElementById('rateio-valor').value = '';
+  rateioListar();
+  finTab(_finSecaoAtual || 'prov');
+}
+async function rateioEstornar(ref){
+  if (!confirm('Estornar o rateio '+ref+' nos DOIS razões (mãe e PDV)?')) return;
+  const d = await fetch('/api/financeiro/rateio-pdv/estorno', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({ref})})
+    .then(r=>r.json()).catch(()=>({}));
+  if(!d.ok){ showToast(d.erro||'Erro no estorno.', true); return; }
+  showToast('Rateio estornado em par.', false);
+  rateioListar();
+  finTab(_finSecaoAtual || 'prov');
+}
+async function rateioListar(){
+  const box = document.getElementById('rateio-lista');
+  const d = await fetch('/api/financeiro/rateios', {credentials:'same-origin'})
+    .then(r=>r.json()).catch(()=>({}));
+  if(!d.ok){ box.innerHTML = ''; return; }
+  const rows = (d.rateios||[]).map(r =>
+    '<tr style="border-top:1px solid var(--border)'+(r.estornado?';opacity:.55':'')+'">'
+    +'<td style="padding:4px 6px;font-family:var(--font-mono);font-size:11px">'+esc(r.ref)+'</td>'
+    +'<td>'+esc(r.unidade||'')+'</td>'
+    +'<td style="font-family:var(--font-mono)">'+_fBRL(r.valor)+'</td>'
+    +'<td style="color:var(--muted);font-size:11px">'+esc(r.historico||'')+'</td>'
+    +'<td style="text-align:right">'+(r.estornado
+        ? '<span style="font-size:10px;color:var(--muted)">estornado</span>'
+        : '<button class="btn btn-ghost btn-sm" style="font-size:10px" onclick="rateioEstornar(\''+esc(r.ref)+'\')">Estornar</button>')
+    +'</td></tr>').join('');
+  box.innerHTML = rows
+    ? '<div style="font-size:11px;color:var(--muted);margin:12px 0 4px">Rateios lançados'
+      +(d.eliminacoes_pendentes ? ' — pendência intercompany: '+_fBRL(d.eliminacoes_pendentes) : '')+'</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:12px"><tbody>'+rows+'</tbody></table>'
+    : '';
 }
 
 // ── Folha de Pagamento (Modulos_Orizon_v10 §2.1): motor — parte fixa (cadastro) + variável (vendas) ──
@@ -10864,6 +11036,12 @@ async function balancoCarregar(){
   const confere = b.confere
     ? '<div style="font-size:10px;color:var(--accent);margin-top:10px">✓ Ativo = Passivo + PL (fecha por partida dobrada)</div>'
     : '<div style="font-size:10px;color:var(--warn);margin-top:10px"><i class="ti ti-alert-triangle"></i> Ativo ≠ Passivo + PL — verificar lançamentos</div>';
+  // Consolidado (PDV): pendência intercompany mãe×PDV eliminada dos dois lados
+  const elim = b.eliminacoes
+    ? '<div style="font-size:11px;color:var(--muted);margin-top:8px">(−) Eliminações intercompany: '
+      +_fBRL(b.eliminacoes)+' — conta corrente mãe×PDV pendente de acerto (1.1.09 × 2.1.09), '
+      +'já abatida do Ativo e do Passivo consolidados.</div>'
+    : '';
   box.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:6px">'+btn('resumido','Resumido')+btn('analitico','Analítico')+'</div>'
     + '<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:12px;color:var(--muted)">'
     + 'Posição em: <input type="date" id="bal-data" value="'+_balData+'" onchange="balPeriodo()" style="padding:4px 6px;font-size:12px">'
@@ -10874,7 +11052,7 @@ async function balancoCarregar(){
     +'. Balanço não tem "data início": o saldo patrimonial é acumulado — um recorte quebraria Ativo = Passivo + PL.</div>'
     + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:start">'
     + '<div>'+ativoCol+'</div><div>'+passivoCol+'</div></div>'
-    + confere;
+    + elim + confere;
 }
 
 function reconInit(){
@@ -11688,7 +11866,89 @@ async function adminLojaCarregarDados(lid){
       ${f('loja-pct-merc','% Mercadoria (NF-e produto)',loja.pct_mercadoria!=null?loja.pct_mercadoria:65)}
       ${f('loja-pct-serv','% Serviço (NFS-e)',loja.pct_servico!=null?loja.pct_servico:35)}
     </div>
-    <button class="btn btn-primary btn-sm" onclick="adminLojaSalvar(${lid})">Salvar dados da loja</button>`;
+    <button class="btn btn-primary btn-sm" onclick="adminLojaSalvar(${lid})">Salvar dados da loja</button>
+    ${loja.loja_mae_id
+      ? `<div style="margin-top:16px;font-size:12px;color:var(--muted)">
+           Esta unidade é um <strong style="color:var(--text)">Ponto de Venda</strong> — emissão fiscal,
+           contrato e financeiro pela loja-mãe; rede herdada (não editável).</div>`
+      : `<div id="loja-pdvs-box" style="margin-top:20px"></div>`}`;
+  if (!loja.loja_mae_id) adminPdvsCarregar(lid);
+}
+
+// ── Pontos de Venda (spec PDV 2026-07-22): lojista visualiza; super_admin cria/gerencia ──
+async function adminPdvsCarregar(lid){
+  const box = document.getElementById('loja-pdvs-box');
+  if (!box) return;
+  const d = await fetch('/api/admin/lojas/'+lid+'/pdvs', {credentials:'same-origin'})
+    .then(r=>r.json()).catch(()=>null);
+  if (!d || !d.ok) { box.innerHTML = ''; return; }
+  const isSuper = ((_usuarioAtual && _usuarioAtual.nivel) || '') === 'super_admin';
+  const linhas = (d.pdvs||[]).map(p=>`
+    <tr style="border-top:1px solid var(--border)">
+      <td style="padding:4px 6px">${esc(p.nome)}</td>
+      <td>${esc(p.codigo)}</td>
+      <td style="color:var(--muted)">${esc(p.cidade||'—')}</td>
+      <td>${p.ativo ? '✓' : '—'}</td>
+      <td style="text-align:right">${isSuper ? `
+        <button class="btn btn-ghost btn-sm" style="font-size:10px"
+          onclick="pdvToggleAtivo(${p.id}, ${p.ativo ? 0 : 1}, ${lid})">${p.ativo ? 'Desativar' : 'Ativar'}</button>` : ''}
+      </td></tr>`).join('');
+  box.innerHTML = `
+    <div style="border-top:1px solid var(--border);padding-top:14px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <strong style="font-size:13px">Pontos de Venda</strong>
+        <span style="font-size:11px;color:var(--muted)">vendem com painel e resultados próprios; fiscal, contrato e financeiro pela loja-mãe</span>
+        ${isSuper ? `<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="abrirModalPdv(${lid})">+ Novo Ponto de Venda</button>` : ''}
+      </div>
+      ${linhas ? `<table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="text-align:left;color:var(--muted)">
+          <th style="padding:4px 6px">Nome</th><th>Código</th><th>Cidade</th><th>Ativo</th><th></th></tr></thead>
+        <tbody>${linhas}</tbody></table>`
+        : `<em style="font-size:12px;color:var(--muted)">Nenhum Ponto de Venda cadastrado${isSuper ? '' : ' (o cadastro é feito pelo administrador da plataforma)'}.</em>`}
+    </div>`;
+}
+
+function abrirModalPdv(lid){
+  const f = (id,label)=>`<div><label class="field-label">${label}</label>
+    <input id="${id}" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></div>`;
+  document.getElementById('pdv-form-grid').innerHTML = [
+    f('pdv-nome','Nome'), f('pdv-codigo','Código (3 letras)'),
+    f('pdv-tel','Telefone'), f('pdv-email','E-mail'),
+    f('pdv-cep','CEP'), f('pdv-logradouro','Logradouro'),
+    f('pdv-numero','Número'), f('pdv-bairro','Bairro'),
+    f('pdv-cidade','Cidade'), f('pdv-estado','UF'),
+    f('pdv-t1n','Testemunha 1 — nome'), f('pdv-t1c','Testemunha 1 — CPF'),
+    f('pdv-t2n','Testemunha 2 — nome'), f('pdv-t2c','Testemunha 2 — CPF'),
+  ].join('');
+  document.getElementById('pdv-salvar-btn').onclick = () => salvarModalPdv(lid);
+  document.getElementById('modal-pdv').style.display = 'flex';
+}
+function fecharModalPdv(){ document.getElementById('modal-pdv').style.display = 'none'; }
+
+async function salvarModalPdv(lid){
+  const v = id => document.getElementById(id).value.trim();
+  const payload = {
+    nome: v('pdv-nome'), codigo: v('pdv-codigo'), telefone: v('pdv-tel'), email: v('pdv-email'),
+    cep: v('pdv-cep'), logradouro: v('pdv-logradouro'), numero: v('pdv-numero'),
+    bairro: v('pdv-bairro'), cidade: v('pdv-cidade'), estado: v('pdv-estado'),
+    testemunha1_nome: v('pdv-t1n'), testemunha1_cpf: v('pdv-t1c'),
+    testemunha2_nome: v('pdv-t2n'), testemunha2_cpf: v('pdv-t2c'),
+  };
+  const r = await fetch('/api/admin/lojas/'+lid+'/pdvs', {method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ await avisoPopup(d.erro||'Erro ao criar o Ponto de Venda.', {titulo:'Ponto de Venda'}); return; }
+  fecharModalPdv();
+  showToast('Ponto de Venda criado.', false);
+  adminPdvsCarregar(lid);
+}
+
+async function pdvToggleAtivo(pdvId, ativo, lid){
+  const r = await fetch('/api/admin/lojas/'+pdvId, {method:'PATCH', credentials:'same-origin',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({ativo: !!ativo})});
+  const d = await r.json().catch(()=>({}));
+  if(!d.ok){ showToast(d.erro||'Erro', true); return; }
+  adminPdvsCarregar(lid);
 }
 
 async function adminLojaSalvar(lid){
