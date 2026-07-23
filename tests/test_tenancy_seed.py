@@ -4,10 +4,18 @@ import database
 import seed
 
 
-def _mem_session():
-    eng = create_engine("sqlite:///:memory:")
+from conftest import _test_database_url, _reset_schema_pg
+
+
+def _eng_pg():
+    """Engine no Postgres de teste com schema recém-criado (herdeiro do sqlite :memory:)."""
+    eng = create_engine(_test_database_url())
+    _reset_schema_pg(eng)
     database.Base.metadata.create_all(eng)
-    return sessionmaker(bind=eng)()
+    return eng
+
+def _mem_session():
+    return sessionmaker(bind=_eng_pg())()
 
 
 def test_loja_seed_id():

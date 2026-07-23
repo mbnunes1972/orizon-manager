@@ -258,7 +258,6 @@ input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus
 /* Badge de origem */
 .badge-origem { font-size:9px; padding:2px 7px; border-radius:10px; font-weight:700; letter-spacing:.5px; }
 .badge-origem.local { background:var(--accent-soft); color:var(--ok); }
-.badge-origem.omie  { background:var(--info-soft); color:var(--section); }
 /* Ambientes page */
 .proj-header{display:flex;align-items:center;gap:16px;margin-bottom:20px;flex-wrap:wrap}
 .proj-header-nome{font-family:var(--font-display);font-weight:900;font-size:20px}
@@ -1498,7 +1497,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div id="admin-breadcrumb" style="font-size:12px;color:var(--muted);margin-bottom:14px"></div>
     <!-- container único; adminRender() injeta o nível N1/N2/N3 -->
     <div id="admin-console"><em style="color:var(--muted);font-size:12px">Carregando&hellip;</em></div>
-    <!-- Fila Omie removida (Omie em descontinuação; auto-sync de cliente desligado) -->
   </div>
 
   <!-- PAGE 15: Comercial — DASHBOARD (funil de conversão + carteira + volume). View derivada (fonte única). -->
@@ -2667,29 +2665,6 @@ async function _onDescIndBlur(el, key, isEP07){
 }
 
 // ---- Config ------------------------------------------------------------------
-async function loadConfig(){
-  // Os inputs vivem na seção "Credenciais e Tokens" do Admin (só super_admin) — pode não existir.
-  const elKey = document.getElementById('app_key');
-  if(!elKey) return;
-  try{
-    const r = await fetch('/config');
-    const d = await r.json();
-    elKey.value = d.app_key||'';
-    document.getElementById('app_secret').value = d.app_secret||'';
-    document.getElementById('intervalo').value  = d.intervalo||0.5;
-  }catch(e){}
-}
-async function saveConfig(){
-  const cfg = {
-    app_key: document.getElementById('app_key').value,
-    app_secret: document.getElementById('app_secret').value,
-    intervalo: parseFloat(document.getElementById('intervalo').value)||0.5
-  };
-  await fetch('/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)});
-  const h = document.getElementById('save-hint');
-  h.textContent='Salvo'; h.style.color='var(--ok)';
-  setTimeout(()=>h.textContent='',2000);
-}
 
 // ---- Navegacao ---------------------------------------------------------------
 // =====================================================================
@@ -2891,7 +2866,8 @@ function _aterrissarPorPapel(){
 }
 
 function _carregarDadosExtrasUsuario(){
-  const saved = localStorage.getItem('omie_user_extras_' + (_usuarioAtual?.id || ''));
+  const saved = localStorage.getItem('orizon_user_extras_' + (_usuarioAtual?.id || ''))
+    || localStorage.getItem('omie_user_extras_' + (_usuarioAtual?.id || ''));   // migração do nome antigo
   if(!saved) return;
   try {
     const extras = JSON.parse(saved);
@@ -2935,7 +2911,7 @@ function mpTrocarFoto(event){
   const reader = new FileReader();
   reader.onload = e => {
     _aplicarFotoUsuario(e.target.result);
-    const key = 'omie_user_extras_' + (_usuarioAtual?.id || '');
+    const key = 'orizon_user_extras_' + (_usuarioAtual?.id || '');
     const saved = JSON.parse(localStorage.getItem(key) || '{}');
     saved.foto = e.target.result;
     localStorage.setItem(key, JSON.stringify(saved));
@@ -2947,7 +2923,7 @@ function mpSalvarPerfil(){
   const tel = document.getElementById('mp-telefone')?.value || '';
   const wpp = document.getElementById('mp-whatsapp')?.value || '';
   const eml = document.getElementById('mp-email')?.value    || '';
-  const key = 'omie_user_extras_' + (_usuarioAtual?.id || '');
+  const key = 'orizon_user_extras_' + (_usuarioAtual?.id || '');
   const saved = JSON.parse(localStorage.getItem(key) || '{}');
   saved.telefone = tel;
   saved.whatsapp = wpp;
@@ -4010,7 +3986,6 @@ function cfgRenderizarPerfis(){
       <div style="font-size:11px;color:var(--muted);line-height:1.7">
         ${cfg.pode_ver_margens?'✓ Vê margens internas':'✗ Não vê margens'}
         <br>${cfg.pode_editar_total?'✓ Pode editar total':'✗ Não edita total'}
-        <br>${key==='diretoria'?'✓ Vê credenciais Omie':'✗ Credenciais ocultas'}
       </div>
     </div>`).join('');
 
@@ -9617,22 +9592,6 @@ async function adminRenderPlataforma(box){
           || '<tr><td colspan="3" style="color:var(--muted)">Nenhum gestor geral.</td></tr>'}
         </tbody></table>
       </div>`);
-    // Credenciais e Tokens — Núcleo/Plataforma; só Administrador do Sistema (super_admin) enxerga.
-    box.insertAdjacentHTML('beforeend', `
-      <div class="card" style="margin-top:16px">
-        <div class="card-title">Credenciais e Tokens</div>
-        <div style="max-width:420px">
-          <label class="field-label">Omie — App Key</label>
-          <input type="text" id="app_key" placeholder="App Key">
-          <label class="field-label" style="margin-top:10px">Omie — App Secret</label>
-          <input type="password" id="app_secret" placeholder="App Secret">
-          <label class="field-label" style="margin-top:10px">Intervalo (s)</label>
-          <input type="number" id="intervalo" min="0.3" max="10" step="0.1" value="0.5">
-          <div class="actions"><button class="btn btn-primary btn-sm" onclick="saveConfig()">Salvar credenciais</button></div>
-          <div class="sb-save-hint" id="save-hint" style="text-align:left"></div>
-        </div>
-      </div>`);
-    loadConfig();  // preenche os inputs recém-inseridos com os valores salvos
   }
 }
 
@@ -12192,136 +12151,6 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// ---- Aprovacao / Exportacao --------------------------------------------------
-let _expPollTimer = null;
-
-async function aprovarOrcamento() {
-  const _sv = await salvarValorNegociado();
-  if (!_sv.ok) {
-    (typeof avisoPopup === 'function')
-      ? avisoPopup('Não foi possível salvar o orçamento — aprovação cancelada. ' + (_sv.erro || ''))
-      : showToast('Não foi possível salvar o orçamento — aprovação cancelada.', true);
-    return;
-  }
-  const modal      = document.getElementById('modal-exportar');
-  const logBox     = document.getElementById('exp-log-box');
-  const banner     = document.getElementById('exp-status-banner');
-  const confirmBox = document.getElementById('exp-confirm-box');
-  const btnFechar  = document.getElementById('exp-btn-fechar');
-  const btnFecTop  = document.getElementById('exp-btn-fechar-top');
-  const btnCancel  = document.getElementById('exp-btn-cancelar');
-
-  logBox.innerHTML    = '<div style="color:var(--muted)">Iniciando exportacao...</div>';
-  banner.textContent  = 'Enviando para o Omie...';
-  banner.style.background = 'var(--accent-soft)';
-  banner.style.borderColor = 'var(--accent)';
-  banner.style.color  = 'var(--ok)';
-  confirmBox.style.display = 'none';
-  btnFechar.style.display  = 'none';
-  btnFecTop.style.display  = 'none';
-  btnCancel.style.display  = 'inline-flex';
-  modal.style.display = 'flex';
-
-  try {
-    const r = await fetch('/exportar', {
-      method:  'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ambientes: 'todos'}),
-    });
-    const d = await r.json();
-    if (!d.ok) {
-      expSetErro(d.erro || 'Falha ao iniciar exportacao');
-      return;
-    }
-  } catch(e) {
-    expSetErro('Erro de conexao com o servidor');
-    return;
-  }
-
-  if (_expPollTimer) clearInterval(_expPollTimer);
-  _expPollTimer = setInterval(_expPoll, 1500);
-}
-
-async function _expPoll() {
-  try {
-    const r = await fetch('/logs');
-    const d = await r.json();
-
-    const logBox = document.getElementById('exp-log-box');
-    if (d.logs && d.logs.length) {
-      logBox.innerHTML = d.logs.map(l => {
-        const color = l.tipo === 'err'  ? 'var(--err)'
-                    : l.tipo === 'warn' ? 'var(--warn)'
-                    : 'var(--text)';
-        return `<div style="color:${color};padding:2px 0;border-bottom:1px solid var(--border)">${esc(l.msg)}</div>`;
-      }).join('');
-      logBox.scrollTop = logBox.scrollHeight;
-    }
-
-    if (d.confirm) {
-      const box = document.getElementById('exp-confirm-box');
-      document.getElementById('exp-confirm-titulo').textContent = d.confirm.titulo || '';
-      document.getElementById('exp-confirm-corpo').innerHTML    = d.confirm.corpo  || '';
-      box.style.display = 'block';
-    } else {
-      document.getElementById('exp-confirm-box').style.display = 'none';
-    }
-
-    if (d.done) {
-      clearInterval(_expPollTimer);
-      _expPollTimer = null;
-      const banner = document.getElementById('exp-status-banner');
-      banner.textContent  = 'Exportacao concluida — projeto bloqueado e XMLs travados.';
-      banner.style.background  = 'var(--accent-soft)';
-      banner.style.borderColor = 'var(--accent)';
-      banner.style.color  = 'var(--ok)';
-      document.getElementById('exp-btn-fechar').style.display  = 'inline-flex';
-      document.getElementById('exp-btn-fechar-top').style.display = 'block';
-      document.getElementById('exp-btn-cancelar').style.display = 'none';
-      // Recarrega projeto para obter bloqueado:true e atualizar UI
-      if (projetoAtivo && projetoAtivo.nome_safe) {
-        try {
-          const r2 = await fetch('/projetos/' + encodeURIComponent(projetoAtivo.nome_safe));
-          const d2 = await r2.json();
-          if (d2.ok && d2.projeto) { projetoAtivo = d2.projeto; atualizarUIBloqueio(); }
-        } catch(e) {}
-      }
-    }
-  } catch(e) { /* ignora erros transientes de poll */ }
-}
-
-async function expResponderConfirm(resp) {
-  document.getElementById('exp-confirm-box').style.display = 'none';
-  try {
-    await fetch('/confirm', {
-      method:  'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({resp}),
-    });
-  } catch(e) {}
-}
-
-async function expCancelar() {
-  try { await fetch('/cancel', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); } catch(e) {}
-  if (_expPollTimer) { clearInterval(_expPollTimer); _expPollTimer = null; }
-  fecharModalExportar();
-}
-
-function expSetErro(msg) {
-  const banner = document.getElementById('exp-status-banner');
-  banner.textContent  = 'Erro: ' + msg;
-  banner.style.background  = 'var(--err-soft)';
-  banner.style.borderColor = 'var(--err)';
-  banner.style.color  = 'var(--err)';
-  document.getElementById('exp-btn-fechar').style.display  = 'inline-flex';
-  document.getElementById('exp-btn-fechar-top').style.display = 'block';
-  document.getElementById('exp-btn-cancelar').style.display = 'none';
-}
-
-function fecharModalExportar() {
-  if (_expPollTimer) { clearInterval(_expPollTimer); _expPollTimer = null; }
-  document.getElementById('modal-exportar').style.display = 'none';
-}
 
 carregarUsuarioAutenticado();
 
@@ -12336,7 +12165,6 @@ document.addEventListener('keydown', function(e){
     ['modal-perfil-detalhe',   fecharModalPerfilDetalhe],
     ['modal-stepup',           () => fecharModalStepUp(false)],
     ['modal-perfil',           fecharModalPerfil],
-    ['modal-exportar',         fecharModalExportar],
     ['modal-gerente-senha',    tfFecharModalSenha],
     ['modal-tf-aviso',         tfFecharAviso],
     ['modal-cli-encontrado',   mceFechar],
@@ -16202,67 +16030,6 @@ function bfFechar() {
   _bfProjetoNome = null;
 }
 </script>
-
-<!-- Modal: Aprovacao / Exportacao para Omie -->
-<div id="modal-exportar"
-     style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:700;
-            align-items:center;justify-content:center;backdrop-filter:blur(4px)">
-  <div style="background:var(--card);border:1px solid var(--border2);border-radius:16px;
-              padding:28px 24px;max-width:520px;width:96%;animation:mIn .18s ease;
-              box-shadow:0 24px 60px rgba(0,0,0,.55);display:flex;flex-direction:column;gap:14px">
-
-    <!-- Header -->
-    <div style="display:flex;align-items:center;justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:12px">
-        <div style="width:36px;height:36px;flex-shrink:0;border-radius:9px;
-                    background:var(--warn-soft);border:1px solid var(--warn);
-                    display:flex;align-items:center;justify-content:center;font-size:17px">&#x2B06;</div>
-        <div>
-          <div style="font-family:var(--font-display);font-weight:900;font-size:14px">Aprovacao de Orcamento</div>
-          <div style="font-size:10px;color:var(--muted);margin-top:1px">Exportando para o Omie</div>
-        </div>
-      </div>
-      <span id="exp-btn-fechar-top" onclick="fecharModalExportar()"
-            style="cursor:pointer;color:var(--muted);font-size:18px;line-height:1;display:none">&#x2715;</span>
-    </div>
-
-    <!-- Banner de status -->
-    <div id="exp-status-banner"
-         style="font-size:12px;padding:9px 14px;border-radius:8px;
-                background:var(--accent-soft);border:1px solid var(--accent);color:var(--ok)">
-      Iniciando...
-    </div>
-
-    <!-- Log box -->
-    <div id="exp-log-box"
-         style="height:220px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);
-                border-radius:8px;padding:10px 12px;font-family:var(--font-mono);font-size:11px">
-      <div style="color:var(--muted)">Aguardando...</div>
-    </div>
-
-    <!-- Dialogo de confirmacao (oculto ate o backend pedir) -->
-    <div id="exp-confirm-box"
-         style="display:none;background:var(--warn-soft);border:1px solid var(--warn);
-                border-radius:10px;padding:14px">
-      <div id="exp-confirm-titulo"
-           style="font-family:var(--font-sans);font-weight:700;font-size:13px;margin-bottom:6px"></div>
-      <div id="exp-confirm-corpo"
-           style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.6"></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-ok btn-sm" onclick="expResponderConfirm('sim')">Sim</button>
-        <button class="btn btn-ghost btn-sm" onclick="expResponderConfirm('nao')">Nao</button>
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div style="display:flex;justify-content:flex-end">
-      <button id="exp-btn-fechar" class="btn btn-ghost btn-sm"
-              onclick="fecharModalExportar()" style="display:none">Fechar</button>
-      <button id="exp-btn-cancelar" class="btn btn-ghost btn-sm"
-              onclick="expCancelar()">Cancelar</button>
-    </div>
-  </div>
-</div>
 
 <!-- Modal: Liberacao Gerencial (senha) -->
 <div id="modal-gerente-senha"

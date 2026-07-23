@@ -1339,6 +1339,23 @@ Spec/plano: `docs/superpowers/{specs,plans}/2026-07-06-validacao-cpf-cnpj*`.
   ainda testa 409, agora com CPF válido). CPFs de teste válidos: `111.444.777-35`, `390.533.447-05`; CNPJ `11.222.333/0001-81`.
 - **Pendente:** merge desta branch na `main` + re-ingerir MCP.
 
+## ⏸️ ESTADO ATUAL (2026-07-23) — retomar aqui
+
+> **FAXINA Omie+SQLite COMPLETA na branch `chore/faxina-omie-sqlite`** (empilhada sobre
+> `feat/ponto-de-venda`), suíte **1422 verde 100% em Postgres** (orizon_test derivado do `.env`).
+> Omie não existe mais (integração, endpoints, colunas — DROP no PG —, UI, credenciais; cookie
+> `orizon_session`); SQLite não existe mais (nem runtime, nem migrações, nem testes). Ver
+> `## Sessão 113`. **Push RESOLVIDO em definitivo:** chave SSH desta máquina cadastrada no
+> GitHub + remote em SSH — push funciona de dentro das sessões. Branches pushadas e **MERGEADAS
+> na `main`** (PDV → faxina; conflitos com as Sessões 110–111 paralelas resolvidos — minhas
+> sessões renumeradas 112/113; `_detalhe_grupo` combinou o batch de queries com a semântica
+> "plano inteiro"). `orizon.db` destracked + `.gitignore` atualizado. **PENDENTE:** deploy A/B
+> (atenção: re-login geral pelo cookie novo + DROP das colunas omie_* ao subir) e re-ingestão
+> do grafo (Docker Desktop precisa estar aberto). DESCOBERTA: `orizon-manager` é o WORKTREE da
+> `main` deste repo (não um clone à parte) — é dele que a `main` roda local.
+>
+> **(Anterior, 2026-07-22 — mantido abaixo por referência.)**
+
 ## ⏸️ ESTADO ATUAL (2026-07-22) — retomar aqui
 
 > **Frente PONTO DE VENDA (PDV avançado) COMPLETA na branch `feat/ponto-de-venda`** — 4 fatias,
@@ -2349,6 +2366,43 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Investigação "+ Novo Projeto" com duas cores (petróleo claro × verde-menta escuro):** grep completo por cor hardcoded em botão — **causa-raiz NÃO reproduz no fonte atual**. As duas instâncias (`page-00` linha 680 e modal `mceCriarProjeto` linha 1727) usam `class="btn btn-primary btn-sm"` desde 2026-06-15 (`git log -S`), e `.btn-primary{background:var(--accent)}` já é 100% token; `--accent` só é definido nos dois `:root` (escuro default / `[data-theme=light]`), sem override escopado. Os hexes `#1F4B4B`/`#5BB8AC` aparecem **só** na definição dos tokens. Conclusão: a divergência observada é **deploy defasado** (VPS atrás dos commits v8/v10), não bug de fonte — recomendado deploy.
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
+
+## Sessão 113 — FAXINA: Omie removido por inteiro + PostgreSQL como único banco (fim do SQLite)
+**Pedido do usuário:** "não deve existir mais nada do Omie; hoje é para estar tudo em Postgres."
+Branch `chore/faxina-omie-sqlite` (empilhada sobre `feat/ponto-de-venda`), 4 decisões confirmadas:
+suíte Postgres-sempre; DROP das colunas omie_*; cookie renomeado; branch empilhada.
+- **Perf pré-requisito:** `mod_contabil._mov/_detalhe_grupo/_totais_conta/saldo_conta` agregavam
+  em Python com 2 queries POR CONTA — o painel de Indicadores (DRE por mês da série) estourava
+  milhares de round-trips no Postgres (timeout). Agora `_somas_por_conta` (SUM/GROUP BY): 2
+  queries por chamada, mesmos números.
+- **Omie:** `integracoes/mod_omie.py` APAGADO; as funções LOCAIS de projeto (criar/carregar/
+  salvar/listar, XMLs Promob, bloqueio+hash, integridade) viraram `integracoes/projetos_store.py`.
+  Fora: auto-sync de cliente, fila/retry omie-sync, fluxo legado de exportação (endpoints
+  `/exportar`, `/buscar_cliente`, `/vincular_cliente`, `/limpar_cliente`, `/cancel`, `/confirm`,
+  `/logs`, `/config` — todos SEM caller vivo; `aprovarOrcamento()` do frontend era código morto),
+  bloco Omie na criação de projeto, campos `omie_*` do cliente (modelo + **DROP COLUMN** no PG),
+  credenciais no storage/startup, modal de exportação e card de credenciais na UI. **Cookie de
+  sessão: `omie_session` → `orizon_session`** (re-login geral único no deploy); localStorage
+  `omie_user_extras_*` → `orizon_user_extras_*` com leitura de migração.
+- **SQLite:** motor de migrações raw sqlite3 REMOVIDO do `database.py` (`_migrar_pre_schema/
+  _migrar_colunas/_migrar_dados/_run_migracoes/_backfill_loja_operacional/_drop_coluna_margens`,
+  `DB_PATH`, `_resolver_config_db`); `init_db` = create_all + `_migrar_colunas_pg` +
+  `_seed_loja_padrao`, e **recusa dialeto sqlite** com erro claro; guard do `main()` exige
+  `postgresql` (escape `ORIZON_ALLOW_SQLITE` extinto); `reset_ep07.py` apagado (utilitário do
+  orizon.db morto). ARMADILHA vivida: o corte por faixa de linhas levou junto as constantes
+  `_SEED_*` e `FUNCOES_PADRAO` que moravam no MEIO do bloco de migrações — py_compile não pega
+  NameError de runtime; a suíte pegou. Restauradas.
+- **Suíte 100% Postgres:** conftest deriva `orizon_test` do `.env` (override `TEST_DATABASE_URL`)
+  e ganha `_reset_schema_pg` + fixtures por função `db_pg_limpo` (init_db) e `db_pg_schema`
+  (create_all puro) — herdeiras dos sqlite descartáveis por teste. 6 arquivos de teste de
+  migração sqlite APAGADOS (config_db, tenancy_migracao/bootstrap/colunas, migracao_perfis,
+  perfil_migracao_nivel); 16 arquivos convertidos; FKs fabricadas (que só o SQLite deixava
+  passar) corrigidas com linhas reais (lojas/usuário/emitente/ciclo_documento). Suíte **1422
+  verde em ~2m45** (contagem caiu pelos testes de migração removidos; antes 1450 em SQLite).
+- Docs: CLAUDE.md atualizado (backend PostgreSQL; faxina; suíte Postgres-sempre).
+- **Nota:** `orizon.db`/`omie_config.json` locais continuam no disco (e `orizon.db` segue
+  TRACKED no git, sempre sujo) — recomendação: `git rm --cached orizon.db` + ajuste do
+  `.gitignore` numa frente própria (o CLAUDE.md hoje manda nunca tocar nesses arquivos).
 
 ## Sessão 112 — Ponto de Venda (PDV avançado): frente completa em 4 fatias
 **Spec:** `docs/superpowers/specs/_geral/2026-07-22-ponto-de-venda-design.md` (caso Caraguatatuba).

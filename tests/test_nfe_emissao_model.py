@@ -2,26 +2,26 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 
-def test_modelo_nfe_emissao(tmp_path, monkeypatch):
-    import database
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    dbf = str(tmp_path / "t.db")
-    engine = create_engine(f"sqlite:///{dbf}")
-    monkeypatch.setattr(database, "DB_PATH", dbf)
-    monkeypatch.setattr(database, "ENGINE", engine)
-    monkeypatch.setattr(database, "Session", sessionmaker(bind=engine))
-    database.init_db()
+def test_modelo_nfe_emissao(db_pg_limpo):
+    """Persistência do DocumentoFiscal + unicidade do ref. No Postgres as FKs são reais
+    (emitente/loja/ciclo_documento precisam existir — o SQLite deixava id fabricado passar)."""
+    database = db_pg_limpo
     s = database.Session()
+    em = database.Emitente(cnpj="19152134000156", razao_social="EMIT TESTE")
+    doc = database.CicloDocumento(projeto_nome="Proj_L2", etapa_codigo="12",
+                                  tipo="pedido_fabrica", arquivo_path="x.pdf",
+                                  nome_original="x.pdf")
+    s.add_all([em, doc]); s.flush()
+    loja_id = s.query(database.Loja).first().id      # loja seed do init_db
     e = database.DocumentoFiscal(ref="TESTE-1", projeto_nome="Proj_L2", tipo_documento="produto",
-                                 emitente_id=1, loja_id=1,
+                                 emitente_id=em.id, loja_id=loja_id,
                                  status="autorizado", chave_nfe="CH", numero="10", serie="1",
-                                 fabrica_doc_id=7)
+                                 fabrica_doc_id=doc.id)
     s.add(e); s.commit()
     lido = s.query(database.DocumentoFiscal).filter_by(ref="TESTE-1").first()
     assert lido.status == "autorizado" and lido.chave_nfe == "CH" and lido.etapa_codigo == "15"
-    assert lido.fabrica_doc_id == 7
-    assert lido.tipo_documento == "produto" and lido.emitente_id == 1
+    assert lido.fabrica_doc_id == doc.id
+    assert lido.tipo_documento == "produto" and lido.emitente_id == em.id
     from sqlalchemy.exc import IntegrityError
     import pytest
     s.add(database.DocumentoFiscal(ref="TESTE-1"))

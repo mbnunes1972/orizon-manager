@@ -4,68 +4,109 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import pytest
 
 
-@pytest.fixture(scope="module")
-def app_db(tmp_path_factory):
-    """Rebinda a engine de `database` para um banco de teste e cria o schema.
-    Como get_session/init_db lêem os globais em tempo de chamada, o rebind vale
-    para todo o processo (inclusive o servidor em thread).
+def _test_database_url():
+    """URL do banco de TESTE (sempre Postgres — o SQLite saiu da suíte na faxina 2026-07-23).
 
-    Por padrão usa SQLite temporário (rápido, isolado por módulo — arquivo novo a
-    cada módulo). Se a env var TEST_DATABASE_URL estiver setada (ex.:
-    'postgresql+psycopg2://orizon:...@localhost/orizon_test', um banco DEDICADO
-    de teste, nunca o de dev/produção), roda a suíte contra Postgres de verdade —
-    útil pra validar o dialeto real antes de confiar num deploy (ver
-    docs/superpowers/specs/2026-07-15-migracao-postgresql.md). Nesse modo, dropa
-    e recria o schema a cada módulo pra manter o mesmo isolamento que o arquivo
-    SQLite novo dá de graça."""
-    from sqlalchemy import create_engine, text
+    Precedência: TEST_DATABASE_URL explícita; senão deriva do DATABASE_URL do `.env`
+    trocando o database por `orizon_test` (mesmas credenciais do dev local). NUNCA
+    aponte para o banco de dev/produção: o setup dá DROP SCHEMA CASCADE por módulo."""
+    url = os.environ.get("TEST_DATABASE_URL")
+    if url:
+        return url
+    env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    if os.path.exists(env_path):
+        import re as _re
+        with open(env_path, encoding="utf-8") as f:
+            m = _re.search(r"DATABASE_URL\s*=\s*['\"]?(postgresql[^'\"\s]+)", f.read())
+        if m:
+            base = m.group(1)
+            return base.rsplit("/", 1)[0] + "/orizon_test"
+    raise RuntimeError(
+        "Suíte exige Postgres: defina TEST_DATABASE_URL (banco DEDICADO, ex. orizon_test) "
+        "ou tenha um .env com DATABASE_URL Postgres para derivar o orizon_test.")
+
+
+def _reset_schema_pg(engine):
+    """Derruba e recria o schema `public` do banco de TESTE.
+
+    drop_all() falharia: há FK circular real no schema (ex.: Usuario.funcionario_id <->
+    Funcionario.usuario_id) que o SQLAlchemy não consegue ordenar pra DROP. O CASCADE
+    resolve a ordem sozinho.
+
+    Antes do DROP: mata qualquer outra conexão pendurada neste banco de teste (dedicado só
+    pra isso). Em Postgres, um SELECT já abre transação de verdade — se um teste anterior
+    falhou num assert NO MEIO da função (antes do db.close() do fim), a sessão fica "idle
+    in transaction" segurando lock e o DROP SCHEMA trava indefinidamente. Só mata conexões
+    do MESMO role (current_user) — pg_terminate_backend em processo de role SUPERUSER
+    (ex.: autovacuum) dá InsufficientPrivilege e derruba a query inteira."""
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        conn.execute(text(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+            "WHERE datname = current_database() AND pid <> pg_backend_pid() "
+            "AND usename = current_user"))
+    with engine.begin() as conn:
+        conn.execute(text("DROP SCHEMA public CASCADE"))
+        conn.execute(text("CREATE SCHEMA public"))
+
+
+@pytest.fixture(scope="module")
+def app_db():
+    """Rebinda a engine de `database` para o Postgres de TESTE e cria o schema.
+    Como get_session/init_db lêem os globais em tempo de chamada, o rebind vale
+    para todo o processo (inclusive o servidor em thread). Dropa e recria o schema
+    a cada módulo (isolamento equivalente ao antigo arquivo SQLite novo por módulo)."""
+    from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     import database
 
     # guarda os globais originais para restaurar no teardown — assim este módulo
-    # não deixa `database` apontando para um banco temp (já deletado) e quebrando
-    # um futuro teste que use get_session() sem isolamento próprio.
-    orig = (database.DB_PATH, database.ENGINE, database.Session)
+    # não deixa `database` apontando para o banco de teste e quebrando um futuro
+    # uso de get_session() fora da suíte.
+    orig = (database.ENGINE, database.Session)
 
-    test_url = os.environ.get("TEST_DATABASE_URL")
-    if test_url:
-        database.DB_PATH = None
-        database.ENGINE = create_engine(test_url, echo=False)
-        database.Session = sessionmaker(bind=database.ENGINE)
-        # drop_all() falha aqui: há FK circular real no schema (ex.: Usuario.funcionario_id <->
-        # Funcionario.usuario_id) que o SQLAlchemy não consegue ordenar pra DROP (SQLite nunca
-        # validou isso). Derruba o schema inteiro via CASCADE — o Postgres resolve a ordem sozinho.
-        #
-        # Antes do DROP: mata qualquer outra conexão pendurada neste banco de teste (dedicado só
-        # pra isso). Em Postgres, um SELECT já abre transação de verdade — se um teste do módulo
-        # anterior falhou num assert NO MEIO da função (antes de chegar no db.close() do fim), a
-        # sessão fica "idle in transaction" seguranco lock e o DROP SCHEMA trava indefinidamente
-        # (nunca acontecia em SQLite: cada módulo usa um arquivo novo). Achado validando a suíte
-        # contra Postgres de verdade (Etapa 4 da migração) — trava reproduzida e diagnosticada via
-        # pg_stat_activity mostrando `idle in transaction` + `DROP SCHEMA` esperando lock.
-        # só mata conexões do MESMO role (current_user) — um pg_terminate_backend em processo de
-        # role SUPERUSER (ex.: autovacuum) dá InsufficientPrivilege e derruba a query inteira (o
-        # SELECT aborta no meio), quebrando o setup do módulo inteiro em cascata. Restringir a
-        # usename = current_user é tudo que precisamos mesmo (só limpar sessão de teste anterior).
-        with database.ENGINE.begin() as conn:
-            conn.execute(text(
-                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                "WHERE datname = current_database() AND pid <> pg_backend_pid() "
-                "AND usename = current_user"))
-        with database.ENGINE.begin() as conn:
-            conn.execute(text("DROP SCHEMA public CASCADE"))
-            conn.execute(text("CREATE SCHEMA public"))
-    else:
-        db_file = str(tmp_path_factory.mktemp("f4db") / "test.db")
-        database.DB_PATH = db_file
-        database.ENGINE = create_engine(f"sqlite:///{db_file}", echo=False)
-        database.Session = sessionmaker(bind=database.ENGINE)
+    database.ENGINE = create_engine(_test_database_url(), echo=False)
+    database.Session = sessionmaker(bind=database.ENGINE)
+    _reset_schema_pg(database.ENGINE)
 
     database.init_db()
     yield database
 
     database.ENGINE.dispose()
-    database.DB_PATH, database.ENGINE, database.Session = orig
+    database.ENGINE, database.Session = orig
+
+
+@pytest.fixture
+def db_pg_limpo(monkeypatch):
+    """Banco de teste LIMPO por FUNÇÃO, com init_db completo (loja seed etc.) —
+    herdeiro dos antigos SQLite temporários por teste. Rebinda ENGINE/Session via
+    monkeypatch (restaura sozinho no teardown). Yield: o módulo `database`."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    import database
+    eng = create_engine(_test_database_url(), echo=False)
+    _reset_schema_pg(eng)
+    monkeypatch.setattr(database, "ENGINE", eng)
+    monkeypatch.setattr(database, "Session", sessionmaker(bind=eng))
+    database.init_db()
+    yield database
+    eng.dispose()
+
+
+@pytest.fixture
+def db_pg_schema(monkeypatch):
+    """Como db_pg_limpo, mas SÓ create_all (schema vazio, sem seed nenhum) — herdeiro
+    dos fixtures que faziam create_all num sqlite descartável. Yield: o módulo `database`."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    import database
+    eng = create_engine(_test_database_url(), echo=False)
+    _reset_schema_pg(eng)
+    monkeypatch.setattr(database, "ENGINE", eng)
+    monkeypatch.setattr(database, "Session", sessionmaker(bind=eng))
+    database.Base.metadata.create_all(eng)
+    yield database
+    eng.dispose()
 
 
 @pytest.fixture(scope="module")
@@ -210,7 +251,7 @@ class HttpClient:
 
 @pytest.fixture(scope="module")
 def projetos_dir(app_db, seed, tmp_path_factory):
-    """Redireciona PROJETOS_DIR (em storage/main/mod_omie) para um diretório temporário,
+    """Redireciona PROJETOS_DIR (em storage/main/projetos_store) para um diretório temporário,
     deixando o harness hermético quanto a disco — espelha o isolamento do banco.
     Também cria no disco os projetos do seed: a lista de `/projetos` vem do disco e é
     cruzada com `projetos_meta.loja_id`, então o filtro por loja só é exercitável de fato
@@ -218,9 +259,9 @@ def projetos_dir(app_db, seed, tmp_path_factory):
     Depende de `app_db` para garantir que `import main` ocorra após o rebind do banco."""
     import json as _json2
     import storage, main
-    from integracoes import mod_omie
+    from integracoes import projetos_store
     tmp = str(tmp_path_factory.mktemp("projetos"))
-    for mod in (storage, main, mod_omie):
+    for mod in (storage, main, projetos_store):
         if hasattr(mod, "PROJETOS_DIR"):
             mod.PROJETOS_DIR = tmp
     for nome in (seed["projeto_l1"], seed["projeto_l2"]):

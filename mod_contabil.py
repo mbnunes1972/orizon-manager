@@ -452,11 +452,9 @@ def _filtra_periodo(q, ini, fim):
 
 
 def saldo_conta(db, owner_tipo, owner_id, conta_id, ini=None, fim=None):
-    """Saldo da conta na natureza dela (devedora: D−C; credora: C−D)."""
+    """Saldo da conta na natureza dela (devedora: D−C; credora: C−D). Agregado no banco."""
     c = _get_own(db, owner_tipo, owner_id, conta_id)
-    base = db.query(Lancamento).filter_by(owner_tipo=owner_tipo, owner_id=owner_id)
-    deb = sum(l.valor for l in _filtra_periodo(base.filter(Lancamento.conta_debito_id == conta_id), ini, fim).all())
-    cred = sum(l.valor for l in _filtra_periodo(base.filter(Lancamento.conta_credito_id == conta_id), ini, fim).all())
+    deb, cred = _totais_conta(db, owner_tipo, owner_id, conta_id, ini, fim)
     return round(deb - cred if c.natureza == "devedora" else cred - deb, 2)
 
 
@@ -1513,13 +1511,27 @@ def total_a_cobrar_fabrica(db, owner_tipo, owner_id, ini=None, fim=None):
 
 
 # ── DRE societário (sub-projeto #4) ──────────────────────────────────────────
-def _totais_conta(db, ot, oid, conta_id, ini, fim, projeto_id=None):
-    base = db.query(Lancamento).filter_by(owner_tipo=ot, owner_id=oid)
+def _somas_por_conta(db, ot, oid, conta_ids, lado, ini, fim, projeto_id=None):
+    """{conta_id: Σ valor} agregado NO BANCO para um lado ('debito'|'credito') — uma query
+    por lado, em vez de 2 por conta (era o gargalo do painel de Indicadores no Postgres:
+    milhares de round-trips por request; no SQLite in-process nunca doeu)."""
+    if not conta_ids:
+        return {}
+    from sqlalchemy import func
+    col = Lancamento.conta_debito_id if lado == "debito" else Lancamento.conta_credito_id
+    q = (db.query(col, func.coalesce(func.sum(Lancamento.valor), 0.0))
+           .filter(Lancamento.owner_tipo == ot, Lancamento.owner_id == oid)
+           .filter(col.in_(conta_ids)))
     if projeto_id is not None:
-        base = base.filter(Lancamento.projeto_id == projeto_id)
-    deb = sum(l.valor for l in _filtra_periodo(base.filter(Lancamento.conta_debito_id == conta_id), ini, fim).all())
-    cred = sum(l.valor for l in _filtra_periodo(base.filter(Lancamento.conta_credito_id == conta_id), ini, fim).all())
-    return deb, cred
+        q = q.filter(Lancamento.projeto_id == projeto_id)
+    q = _filtra_periodo(q, ini, fim)
+    return dict(q.group_by(col).all())
+
+
+def _totais_conta(db, ot, oid, conta_id, ini, fim, projeto_id=None):
+    deb = _somas_por_conta(db, ot, oid, [conta_id], "debito", ini, fim, projeto_id=projeto_id)
+    cred = _somas_por_conta(db, ot, oid, [conta_id], "credito", ini, fim, projeto_id=projeto_id)
+    return deb.get(conta_id, 0.0), cred.get(conta_id, 0.0)
 
 
 def _mov(db, ot, oid, prefixo, sentido, ini, fim, projeto_id=None):
@@ -1527,14 +1539,11 @@ def _mov(db, ot, oid, prefixo, sentido, ini, fim, projeto_id=None):
     'devedor' = D−C p/ deduções/despesas). `projeto_id` filtra a dimensão gerencial.
     Considera TODAS as contas (não só analíticas): o seed_plano converte um pai em sintética
     quando ele ganha filho no backfill — lançamentos diretos anteriores à conversão sumiam da
-    DRE/Balanço (fix 2026-07-22). Sem dupla contagem: _totais_conta é por lançamento direto."""
-    contas = [c for c in db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid).all()
-              if c.codigo == prefixo or c.codigo.startswith(prefixo + ".")]
-    deb = cred = 0.0
-    for c in contas:
-        d, cr = _totais_conta(db, ot, oid, c.id, ini, fim, projeto_id=projeto_id)
-        deb += d
-        cred += cr
+    DRE/Balanço (fix 2026-07-22). Sem dupla contagem: as somas são por lançamento direto."""
+    ids = [c.id for c in db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid).all()
+           if c.codigo == prefixo or c.codigo.startswith(prefixo + ".")]
+    deb = sum(_somas_por_conta(db, ot, oid, ids, "debito", ini, fim, projeto_id=projeto_id).values())
+    cred = sum(_somas_por_conta(db, ot, oid, ids, "credito", ini, fim, projeto_id=projeto_id).values())
     return round(cred - deb if sentido == "credor" else deb - cred, 2)
 
 
@@ -1550,12 +1559,14 @@ def _detalhe_grupo(db, ot, oid, prefixos, sentido, ini, fim):
     backfill) e inativa com histórico: movimento nunca some do demonstrativo."""
     if isinstance(prefixos, str):
         prefixos = [prefixos]
-    contas = db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid).all()
+    contas = [c for c in db.query(Conta).filter_by(owner_tipo=ot, owner_id=oid).all()
+              if any(c.codigo == p or c.codigo.startswith(p + ".") for p in prefixos)]
+    ids = [c.id for c in contas]
+    debs = _somas_por_conta(db, ot, oid, ids, "debito", ini, fim)
+    creds = _somas_por_conta(db, ot, oid, ids, "credito", ini, fim)
     linhas = []
     for c in sorted(contas, key=lambda x: x.codigo):
-        if not any(c.codigo == p or c.codigo.startswith(p + ".") for p in prefixos):
-            continue
-        d, cr = _totais_conta(db, ot, oid, c.id, ini, fim)
+        d, cr = debs.get(c.id, 0.0), creds.get(c.id, 0.0)
         teve_movimento = (d != 0 or cr != 0)
         sempre_listada = (c.tipo == "analitica" and bool(c.ativa))
         if not (sempre_listada or teve_movimento):

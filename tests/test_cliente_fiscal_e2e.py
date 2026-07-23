@@ -66,11 +66,11 @@ def test_editar_cliente_atualiza_campos_fiscais(http_client_factory, seed):
     assert d3["cliente"]["cnpj"] == "45.997.418/0001-53"
 
 
-def test_cria_cliente_nao_sincroniza_omie_por_padrao(http_client_factory, seed):
-    # Omie em descontinuação (OMIE_AUTO_SYNC off por padrão): cliente novo sai 'dispensado',
-    # fora da fila de sync (que inclui status NULL).
+def test_cliente_sem_rastro_omie(http_client_factory, seed):
+    # Faxina 2026-07-23: a integração Omie foi REMOVIDA do produto — cliente novo não
+    # carrega nenhum campo omie_* na resposta (regressão contra o rastro voltar).
     c = http_client_factory(); c.login("dir_l1", "senha123")
-    st, d = c.post("/api/clientes", {"nome": "Cliente Sem Omie", "cpf": "390.533.447-05",
+    st, d = c.post("/api/clientes", {"nome": "Cliente Pos Faxina", "cpf": "390.533.447-05",
                                      "email": "x@x.com", "telefone": "(12) 90000-0000"})
     assert st == 200 and d["ok"], d
-    assert d["cliente"]["omie_sync_status"] == "dispensado"
+    assert not [k for k in d["cliente"] if "omie" in k.lower()]
