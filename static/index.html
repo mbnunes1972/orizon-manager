@@ -1897,7 +1897,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <label class="ml-f"><span>Telefone</span><input id="ml-telefone"></label>
         <label class="ml-f"><span>E-mail</span><input id="ml-email"></label>
         <label class="ml-f"><span>Responsável</span><input id="ml-responsavel"></label>
-        <label class="ml-f"><span>CEP</span><input id="ml-cep"></label>
+        <label class="ml-f"><span>CEP</span><input id="ml-cep" maxlength="9" placeholder="00000-000" oninput="cepAuto(this, 'ml-')"></label>
         <label class="ml-f"><span>Logradouro</span><input id="ml-logradouro"></label>
         <label class="ml-f"><span>Número</span><input id="ml-numero"></label>
         <label class="ml-f"><span>Bairro</span><input id="ml-bairro"></label>
@@ -4415,21 +4415,28 @@ async function cadFuncoesGarantir(force){
   _funcoesCache = (d && d.ok && d.itens) ? d.itens : [];
   return _funcoesCache;
 }
-// ViaCEP nos cadastros: preenche logradouro/bairro/cidade/uf a partir do CEP
-let _cadCepTimer = null;
-function cadCepBuscar(el){
+// ── ViaCEP compartilhado (melhoria 2026-07-23): digitou o CEP → endereço preenche sozinho ──
+// e o cursor pula para o Número (o único campo que sobra digitar). `prefixo` identifica o
+// formulário: preenche <prefixo>logradouro/bairro/cidade e <prefixo>uf OU <prefixo>estado.
+const _cepTimers = {};
+function cepAuto(el, prefixo){
   const v = el.value.replace(/\D/g,'').slice(0,8);
   el.value = v.length>5 ? v.slice(0,5)+'-'+v.slice(5) : v;
-  clearTimeout(_cadCepTimer);
-  if(v.length===8) _cadCepTimer = setTimeout(async()=>{
+  clearTimeout(_cepTimers[prefixo]);
+  if(v.length===8) _cepTimers[prefixo] = setTimeout(async()=>{
     try{
       const d = await (await fetch('https://viacep.com.br/ws/'+v+'/json/')).json();
       if(d.erro) return;
-      const setF=(id,val)=>{ const e=document.getElementById('cadf-'+id); if(e) e.value=val||''; };
-      setF('logradouro', d.logradouro); setF('bairro', d.bairro); setF('cidade', d.localidade); setF('uf', d.uf);
+      const setF=(id,val)=>{ const e=document.getElementById(prefixo+id); if(e) e.value=val||''; };
+      setF('logradouro', d.logradouro); setF('bairro', d.bairro);
+      setF('cidade', d.localidade); setF('uf', d.uf); setF('estado', d.uf);
+      const num = document.getElementById(prefixo+'numero');
+      if(num && !num.value) num.focus();
     }catch(e){}
   }, 400);
 }
+// atalho legado dos cadastros genéricos (Funcionário/Fornecedor/Terceiro/Contraparte)
+function cadCepBuscar(el){ cepAuto(el, 'cadf-'); }
 function cadEntFechar(){ document.getElementById('modal-cad').style.display='none'; }
 function cadEntRender(item){
   const def = _CAD_DEFS[_cadEntAtual];
@@ -8792,6 +8799,8 @@ async function cliBuscarCEP(cep){
       document.getElementById('cli-cidade').value     = d.localidade || '';
       document.getElementById('cli-estado').value     = d.uf         || '';
       document.getElementById('cli-municipio-ibge').value = d.ibge   || '';  // IBGE p/ NFS-e
+      const _num = document.getElementById('cli-numero');
+      if (_num && !_num.value) _num.focus();   // só falta o número (melhoria 2026-07-23)
     }
   } catch(e){
     erroEl.style.display = 'block';
@@ -10117,21 +10126,7 @@ function afCpAbrirModal(id){
   setTimeout(()=>{ document.getElementById('af-cpm-nome')?.focus(); }, 50);
 }
 
-let _afCpCepTimer = null;
-function afCpCepBuscar(el){
-  const v = el.value.replace(/\D/g,'').slice(0,8);
-  el.value = v.length>5 ? v.slice(0,5)+'-'+v.slice(5) : v;
-  clearTimeout(_afCpCepTimer);
-  if(v.length===8) _afCpCepTimer = setTimeout(async()=>{
-    try{
-      const d = await (await fetch('https://viacep.com.br/ws/'+v+'/json/')).json();
-      if(d.erro) return;
-      const setF=(id,val)=>{ const e=document.getElementById('af-cpm-'+id); if(e && !e.value) e.value=val||''; };
-      setF('logradouro', d.logradouro); setF('bairro', d.bairro);
-      setF('cidade', d.localidade); setF('uf', d.uf);
-    }catch(e){}
-  }, 400);
-}
+function afCpCepBuscar(el){ cepAuto(el, 'af-cpm-'); }
 
 async function afCpSalvar(){
   const payload = {};
@@ -11879,6 +11874,9 @@ function abrirModalPdv(lid){
     f('pdv-t1n','Testemunha 1 — nome'), f('pdv-t1c','Testemunha 1 — CPF'),
     f('pdv-t2n','Testemunha 2 — nome'), f('pdv-t2c','Testemunha 2 — CPF'),
   ].join('');
+  const _cepPdv = document.getElementById('pdv-cep');
+  if (_cepPdv){ _cepPdv.maxLength = 9; _cepPdv.placeholder = '00000-000';
+    _cepPdv.oninput = function(){ cepAuto(this, 'pdv-'); }; }
   document.getElementById('pdv-salvar-btn').onclick = () => salvarModalPdv(lid);
   document.getElementById('modal-pdv').style.display = 'flex';
 }
@@ -15887,6 +15885,8 @@ async function cliViaCepInst(cep) {
       _s('cli-inst-bairro',     d.bairro);
       _s('cli-inst-cidade',     d.localidade);
       _s('cli-inst-uf',         d.uf);
+      const _n = document.getElementById('cli-inst-numero');
+      if (_n && !_n.value) _n.focus();   // só falta o número (melhoria 2026-07-23)
     }
   } catch(e) {}
 }
