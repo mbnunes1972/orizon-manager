@@ -3260,7 +3260,13 @@ class Handler(BaseHTTPRequestHandler):
                     if not mod_tenancy.pode_editar_dados_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                         self.send_json({"ok": False, "erro": "Acesso negado"}, code=403); return
                     em, _attr = _emitente_do_dono(db, "loja", loja)
-                    self.send_json(_fiscal_get(em))
+                    out = _fiscal_get(em)
+                    # PDV (loja com mãe): a emissão sai pelo CNPJ da mãe — o painel avisa
+                    # em vez de parecer "não configurado" (spec PDV 2026-07-22, Desvio 1).
+                    if getattr(loja, "loja_mae_id", None):
+                        mae = db.get(Loja, loja.loja_mae_id)
+                        out["pdv_de"] = mae.nome if mae else "loja-mãe"
+                    self.send_json(out)
                 finally:
                     db.close()
                 return

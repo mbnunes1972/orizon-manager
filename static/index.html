@@ -9577,7 +9577,9 @@ async function adminRenderPlataforma(box){
       </div>
       <table class="cli-table"><thead><tr><th>Nome</th><th>Código</th><th></th></tr></thead><tbody>
       ${(avulsas.lojas||[]).map(l=>`<tr>
-        <td>${esc(l.nome)}</td><td style="color:var(--muted)">${esc(l.codigo||'—')}</td>
+        <td>${esc(l.nome)}${l.tipo==='ponto_venda'
+          ? ` <span style="background:var(--accent-soft);color:var(--accent);font-size:9px;font-weight:700;padding:1px 6px;border-radius:5px;vertical-align:middle">PDV${(()=>{const m=(avulsas.lojas||[]).find(x=>x.id===l.loja_mae_id);return m?' de '+esc(m.nome.split(' ')[0]):'';})()}</span>`
+          : ''}</td><td style="color:var(--muted)">${esc(l.codigo||'—')}</td>
         <td style="text-align:right"><button class="btn btn-ghost btn-sm" style="font-size:10px"
           onclick='adminEntrarLoja(${l.id}, ${_attrJson(l.nome)})'>Entrar ›</button></td></tr>`).join('')
         || '<tr><td colspan="3" style="color:var(--muted)">Nenhuma loja avulsa.</td></tr>'}
@@ -11552,7 +11554,16 @@ async function adminFiscalCarregar(kind, id){
     : `<button class="btn btn-primary btn-sm" ${podeProd?'':'disabled'} title="${podeProd?'':'Confirme todos os campos de teste e defina o token de produção antes de ativar.'}" onclick="adminFiscalAtivarAmbiente('producao')">Ativar Produção</button>`;
   const tokH = d.token_homolog_definido ? '✓ definido — deixe em branco para manter' : 'não definido';
   const tokP = d.token_prod_definido ? '✓ definido — deixe em branco para manter' : 'não definido';
-  panel.innerHTML =
+  const pdvAviso = d.pdv_de
+    ? `<div class="card" style="padding:12px 14px;margin-bottom:12px;border-left:3px solid var(--accent)">
+         <strong style="font-size:13px">Ponto de Venda — emissão fiscal pela loja-mãe</strong>
+         <div style="font-size:12px;color:var(--muted);margin-top:4px">
+           As NF-e/NFS-e deste PDV saem pelo CNPJ de <strong style="color:var(--text)">${esc(d.pdv_de)}</strong>
+           (cadeia de emissão da mãe). A configuração abaixo só é necessária se este PDV
+           ganhar um emitente exclusivo — o padrão é deixar como está.
+         </div></div>`
+    : '';
+  panel.innerHTML = pdvAviso +
     sec('Identificação fiscal') +
     `<div class="grid2" style="gap:14px">${inp('razao_social','Razão social')}${inp('inscricao_estadual','Inscrição estadual')}${inp('inscricao_municipal','Inscrição municipal')}</div>` +
     sec('Regime tributário') +
