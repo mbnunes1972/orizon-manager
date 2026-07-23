@@ -12,11 +12,8 @@ if getattr(sys, 'frozen', False):
 else:
     _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-CONFIG_FILE       = os.path.join(_BASE_DIR, "omie_config.json")
-GRUPOS_CACHE_FILE = os.path.join(_BASE_DIR, "omie_grupos_cache.json")
 PROJETOS_DIR      = os.path.join(_BASE_DIR, "PROJETOS")
 PERFIS_FILE       = os.path.join(_BASE_DIR, "perfis_config.json")
-CPF_CORINGA       = "00000000191"
 
 # == STORAGE LAYER ==
 # Camada de abstração de armazenamento.
@@ -65,23 +62,6 @@ def storage_listar(pasta: str) -> list:
 
 def storage_existe(caminho: str) -> bool:
     return os.path.exists(caminho)
-
-# == CONFIG LAYER ==
-# Configurações do aplicativo (credenciais, intervalo de API).
-# Em produção local: arquivo omie_config.json em disco.
-# Para nuvem: substituir por os.environ ou serviço de segredos.
-# NUNCA commitar omie_config.json — adicioná-lo ao .gitignore.
-
-def config_carregar() -> dict:
-    padrao = {"app_key": "", "app_secret": "", "intervalo": 0.5}
-    if storage_existe(CONFIG_FILE):
-        return storage_ler_json(CONFIG_FILE)
-    # Cria o arquivo com valores vazios na primeira execução
-    storage_salvar_json(CONFIG_FILE, padrao)
-    return padrao
-
-def config_salvar(cfg: dict) -> None:
-    storage_salvar_json(CONFIG_FILE, cfg)
 
 # == PERFIS DE ACESSO E LIMITES ==
 # Controle de permissões por perfil de usuário.
@@ -170,18 +150,9 @@ def perfil_desconto_max() -> float:
 # NUNCA acessar _session diretamente fora desta seção.
 
 _session: dict = {
-    "running": False,
-    "logs": [],
-    "pedidos": [],
-    "confirm_pending": None,
-    "confirm_result": None,
-    "cliente_selecionado": None,
-    "confirm_event": None,
-    "cancel": False,
     "dados_carregados": None,
     "xmls_carregados": None,
     "nome_cliente": None,
-    "excel_atual_caminho": None,
     "idx_negociacao": None,
     "projeto_ativo": None,
 }
@@ -191,12 +162,6 @@ def session_get(chave: str, padrao=None):
 
 def session_set(chave: str, valor) -> None:
     _session[chave] = valor
-
-def session_reset_exportacao() -> None:
-    for k, v in [("running", False), ("logs", []), ("pedidos", []),
-                 ("confirm_pending", None), ("confirm_result", None),
-                 ("confirm_event", None), ("cancel", False)]:
-        _session[k] = v
 
 # -- Helpers basicos ------------------------------------------------------------
 def _sha256_str(s):
@@ -209,37 +174,3 @@ def normalizar(s):
 def so_digitos(s):
     return re.sub(r"[^0-9]", "", s or "")
 
-# -- Cache de grupos ------------------------------------------------------------
-def _load_grupos_cache():
-    if storage_existe(GRUPOS_CACHE_FILE):
-        try:
-            return storage_ler_json(GRUPOS_CACHE_FILE)
-        except Exception:
-            pass
-    return {}
-
-def _save_grupos_cache(cache):
-    storage_salvar_json(GRUPOS_CACHE_FILE, cache)
-
-_grupos_cache = _load_grupos_cache()
-
-# -- Credenciais e rate limit ---------------------------------------------------
-_sleep_interval = [0.5]
-_omie_key       = [""]
-_omie_secret    = [""]
-
-def _set_credenciais(app_key, app_secret):
-    _omie_key[0]    = app_key
-    _omie_secret[0] = app_secret
-
-def get_omie_key() -> str:
-    return _omie_key[0]
-
-def get_omie_secret() -> str:
-    return _omie_secret[0]
-
-def get_sleep_interval() -> float:
-    return _sleep_interval[0]
-
-def set_sleep_interval(val: float) -> None:
-    _sleep_interval[0] = val

@@ -13,7 +13,9 @@ from . import perfis
 
 # ── Configuração ──────────────────────────────────────────────────────────────
 SESSION_DURATION_HOURS = 8
-COOKIE_NAME            = "omie_session"
+# Renomeado de "omie_session" na faxina 2026-07-23 (Omie removido do produto).
+# Efeito colateral consciente: sessões ativas caem UMA vez no deploy (re-login geral).
+COOKIE_NAME            = "orizon_session"
 
 # ── Login ─────────────────────────────────────────────────────────────────────
 def fazer_login(login: str, senha: str) -> dict:

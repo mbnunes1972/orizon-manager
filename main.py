@@ -32,25 +32,19 @@ import mod_escopo
 from urllib.parse import urlparse, unquote
 
 from storage import (
-    _BASE_DIR, PROJETOS_DIR, CPF_CORINGA,
+    _BASE_DIR, PROJETOS_DIR,
     PERFIS_PADRAO, PERFIS_FILE,
     storage_ler_json, storage_salvar_json, storage_salvar_binario,
     storage_salvar_texto, storage_ler_texto, storage_ler_binario,
     storage_existe, storage_listar, storage_deletar,
-    config_carregar, config_salvar,
     perfis_carregar, perfis_salvar,
-    session_get, session_set, session_reset_exportacao,
-    _set_credenciais, _sleep_interval, _omie_key,
-    get_omie_key, get_omie_secret,
+    session_get, session_set,
     so_digitos, normalizar
 )
-from integracoes.mod_omie import (
-    omie_post, buscar_cliente_cpf, pesquisar_clientes, criar_cliente,
-    garantir_conta_corrente, buscar_categoria, criar_pedido,
-    garantir_grupos_omie, exportar_ambientes, gerar_excel,
+from integracoes.projetos_store import (
     _listar_projetos, _buscar_projetos, _carregar_projeto, _salvar_projeto,
     _criar_projeto, _adicionar_ambientes, _arquivar_xmls,
-    _buscar_projetos_omie, _projeto_path, carregar_xmls,
+    _projeto_path, carregar_xmls,
     bloquear_projeto, verificar_integridade_xmls
 )
 from mod_margens import _normalizar_faixas
@@ -233,45 +227,6 @@ def _serve_html():
     path = os.path.join(_STATIC_DIR, "index.html")
     with open(path, encoding="utf-8") as f:
         return f.read()
-
-# Omie em descontinuação: auto-sincronização de cliente no cadastro DESLIGADA por padrão.
-# Reative com a env OMIE_AUTO_SYNC=1 (a sincronização manual "Tentar" na fila segue funcionando).
-_OMIE_AUTO_SYNC = os.environ.get("OMIE_AUTO_SYNC", "").strip().lower() in ("1", "true", "on", "sim")
-
-
-def _tentar_sync_omie(c, db):
-    """Tenta criar cliente no Omie. Atualiza omie_sync_* em c e faz db.commit()."""
-    from datetime import datetime as _dt
-    if not c.cpf:
-        c.omie_sync_status = "pendente"
-        c.omie_sync_erro   = "CPF não informado — necessário para registro no Omie"
-        c.omie_sync_at     = _dt.utcnow()
-        db.commit()
-        return
-
-    cfg = config_carregar()
-    key    = cfg.get("app_key", "")
-    secret = cfg.get("app_secret", "")
-    if not key or not secret:
-        c.omie_sync_status = "pendente"
-        c.omie_sync_erro   = "Credenciais Omie não configuradas"
-        c.omie_sync_at     = _dt.utcnow()
-        db.commit()
-        return
-
-    _set_credenciais(key, secret)
-    try:
-        codigo = criar_cliente(c.nome, c.cpf, lambda msg, tipo="info": None)
-        c.omie_codigo      = str(codigo)
-        c.omie_sync_status = "ok"
-        c.omie_sync_erro   = None
-        c.omie_sync_at     = _dt.utcnow()
-    except Exception as e:
-        c.omie_sync_status = "erro"
-        c.omie_sync_erro   = str(e)
-        c.omie_sync_at     = _dt.utcnow()
-    db.commit()
-
 
 # == HANDLERS HTTP ==
 # == HANDLERS HTTP ==
@@ -1533,9 +1488,6 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
 
-        elif path == "/config":
-            self.send_json(config_carregar())
-
         elif path == "/perfis":
             self.send_json(perfis_carregar())
 
@@ -1544,18 +1496,6 @@ class Handler(BaseHTTPRequestHandler):
             nome  = dados.get("perfil_ativo", "consultor")
             cfg   = dados["perfis"].get(nome, PERFIS_PADRAO["perfis"]["consultor"])
             self.send_json({"perfil_ativo": nome, "config": cfg})
-
-        elif path == "/logs":
-            logs_limpos = [l for l in (session_get("logs") or []) if l["msg"] != "__DONE__"]
-            done = not session_get("running") and len(logs_limpos) > 0
-            self.send_json({
-                "logs":         logs_limpos,
-                "done":         done,
-                "confirm":      session_get("confirm_pending"),
-                "pedidos":      session_get("pedidos", []),
-                "pode_aprovar": session_get("idx_negociacao") is not None,
-                "nome_cliente": session_get("nome_cliente", ""),
-            })
 
         elif path == "/pagamentos":
             # Lista modalidades do mod_fin.py para popular o dropdown
@@ -1631,10 +1571,7 @@ class Handler(BaseHTTPRequestHandler):
                 _enriquecer_projetos_com_status(locais)
                 _enriquecer_projetos_com_parceiro(locais)
                 _enriquecer_projetos_com_atraso(locais)
-                omie_res = _buscar_projetos_omie(q)
-                nomes_locais = {p['nome_projeto'].lower() for p in locais}
-                omie_unicos = [p for p in omie_res if p['nome_projeto'].lower() not in nomes_locais]
-                self.send_json({'ok': True, 'projetos': locais + omie_unicos})
+                self.send_json({'ok': True, 'projetos': locais})
             except Exception as e:
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
             finally:
@@ -1776,24 +1713,6 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": str(e), "parceiros": []})
             finally:
                 db.close()
-
-        elif path == "/api/admin/omie-sync":
-            usuario = get_usuario_sessao(self)
-            if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
-                self.send_json({"ok": False, "erro": "Acesso negado"})
-                return
-            db2 = get_session()
-            try:
-                from sqlalchemy import or_
-                clientes = db2.query(Cliente).filter(
-                    or_(
-                        Cliente.omie_sync_status.in_(["erro", "pendente"]),
-                        Cliente.omie_sync_status.is_(None)
-                    )
-                ).order_by(Cliente.omie_sync_at.desc()).all()
-                self.send_json({"ok": True, "clientes": [_cliente_dict(c) for c in clientes]})
-            finally:
-                db2.close()
 
         elif path == "/api/admin/usuarios":
             usuario = get_usuario_sessao(self)
@@ -5325,11 +5244,7 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
             return
-        if path == "/config":
-            config_salvar(json.loads(body))
-            self.send_json({"ok": True})
-
-        elif path == "/perfis":
+        if path == "/perfis":
             dados = json.loads(body)
             perfis_salvar(dados)
             self.send_json({"ok": True})
@@ -5340,19 +5255,6 @@ class Handler(BaseHTTPRequestHandler):
             cfg["perfil_ativo"] = dados.get("perfil", "consultor")
             perfis_salvar(cfg)
             self.send_json({"ok": True, "perfil_ativo": cfg["perfil_ativo"]})
-
-        elif path == "/cancel":
-            session_set("cancel", True)
-            session_set("running", False)
-            self.send_json({"ok": True})
-
-        elif path == "/confirm":
-            data = json.loads(body)
-            session_set("confirm_result", data["resp"])
-            session_set("confirm_pending", None)
-            if session_get("confirm_event"):
-                session_get("confirm_event").set()
-            self.send_json({"ok": True})
 
         elif path == "/carregar":
             ct               = self.headers.get("Content-Type", "")
@@ -5376,138 +5278,6 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json({"ok": False, "erro": str(e)})
 
-        elif path == "/exportar":
-            req        = json.loads(body)
-            cfg_salvo  = config_carregar()
-            app_key    = req.get("app_key", "")    or cfg_salvo.get("app_key", "")
-            app_secret = req.get("app_secret", "") or cfg_salvo.get("app_secret", "")
-            intervalo  = float(req.get("intervalo") or cfg_salvo.get("intervalo", 0.5))
-            ambientes_sel = req.get("ambientes", "todos")
-            dados = session_get("dados_carregados")
-            nome_safe_para_bloquear = None
-            if not dados:
-                # Fluxo v3: usa o projeto ativo carregado na sessão
-                nome_safe = session_get("projeto_ativo")
-                if not nome_safe:
-                    self.send_json({"ok": False, "erro": "Nenhum projeto ativo. Abra um projeto primeiro."})
-                    return
-                proj = _carregar_projeto(nome_safe)
-                if not proj:
-                    self.send_json({"ok": False, "erro": "Projeto nao encontrado."})
-                    return
-                if proj.get("bloqueado"):
-                    self.send_json({"ok": False, "erro": "Projeto ja aprovado e bloqueado em %s." % proj.get("bloqueado_em", "—")})
-                    return
-                ambs_selecionados = [a for a in proj.get("ambientes", []) if a.get("selecionado", True)]
-                if not ambs_selecionados:
-                    self.send_json({"ok": False, "erro": "Nenhum ambiente selecionado no projeto."})
-                    return
-                dados = {
-                    "ok":            True,
-                    "cliente":       proj.get("cliente", {}),
-                    "ambientes":     ambs_selecionados,
-                    "grupos_ref":    {},
-                }
-                ambientes_sel = "todos"
-                nome_safe_para_bloquear = nome_safe
-            session_set("running", True)
-            session_set("logs", [])
-            session_set("pedidos", [])
-            session_set("confirm_pending", None)
-            session_set("confirm_result", None)
-            session_set("confirm_event", None)
-            session_set("cancel", False)
-            session_set("idx_negociacao", None)
-
-            def log_cb(msg, tipo="info"):
-                if msg == "__DONE__":
-                    session_set("running", False)
-                    return
-                session_get("logs").append({"msg": msg, "tipo": tipo})
-
-            def confirm_cb(tipo, dados_modal):
-                evt = threading.Event()
-                session_set("confirm_event", evt)
-                if tipo == "sem_cpf":
-                    session_set("confirm_pending", {
-                        "tipo": "sem_cpf", "titulo": "CPF nao informado",
-                        "corpo": "O cliente <span class='highlight'>%s</span> nao tem CPF no XML." % dados_modal["nome"],
-                    })
-                elif tipo == "nome_diferente":
-                    session_set("confirm_pending", {
-                        "tipo": "nome_diferente", "titulo": "Nome diferente",
-                        "corpo": "XML: <span class='highlight'>%s</span><br>Omie: <span class='highlight'>%s</span>" % (dados_modal["nome_xml"], dados_modal["nome_omie"]),
-                    })
-                elif tipo == "sem_uf":
-                    session_set("confirm_pending", {
-                        "tipo": "sem_uf", "titulo": "Estado (UF) nao informado",
-                        "corpo": "O cliente <span class='highlight'>%s</span> nao tem UF no cadastro." % dados_modal["nome"],
-                    })
-                evt.wait(timeout=120)
-                return session_get("confirm_result", "")
-
-            def run():
-                try:
-                    pedidos = exportar_ambientes(
-                        app_key, app_secret, dados, ambientes_sel,
-                        log_cb, confirm_cb, intervalo=intervalo,
-                    )
-                    session_set("pedidos", pedidos)
-                    if nome_safe_para_bloquear:
-                        try:
-                            bloquear_projeto(nome_safe_para_bloquear)
-                            log_cb("Projeto bloqueado — XMLs travados com hash SHA-256.", "ok")
-                            session_set("projeto_bloqueado", True)
-                            try:
-                                upsert_projeto_status(nome_safe_para_bloquear, "convertido")
-                            except Exception as e_st:
-                                log_cb(f"Aviso: status convertido não pôde ser salvo: {e_st}", "warn")
-                        except Exception as e_lock:
-                            log_cb("Aviso: nao foi possivel bloquear o projeto: %s" % e_lock, "warn")
-                except Exception as e:
-                    log_cb("ERRO: %s" % e, "err")
-                finally:
-                    session_set("running", False)
-
-            _set_credenciais(app_key, app_secret)
-            threading.Thread(target=run, daemon=True).start()
-            self.send_json({"ok": True})
-
-        elif path == "/buscar_cliente":
-            req   = json.loads(body)
-            query = req.get("query", "").strip()
-            if not query:
-                self.send_json({"ok": False, "erro": "Informe nome ou CPF para buscar"})
-                return
-            cfg = config_carregar()
-            _set_credenciais(cfg.get("app_key", ""), cfg.get("app_secret", ""))
-            try:
-                clientes  = pesquisar_clientes(query)
-                resultado = [
-                    {"codigo": c.get("codigo_cliente_omie"), "nome": c.get("razao_social", ""),
-                     "cpf": c.get("cnpj_cpf", ""), "cidade": c.get("cidade", ""),
-                     "uf": c.get("estado", ""), "email": c.get("email", "")}
-                    for c in clientes
-                ]
-                self.send_json({"ok": True, "clientes": resultado})
-            except Exception as e:
-                self.send_json({"ok": False, "erro": str(e)})
-
-        elif path == "/vincular_cliente":
-            req = json.loads(body)
-            session_set("cliente_selecionado", {
-                "codigo": req["codigo"], "nome": req["nome"],
-                "cpf": req.get("cpf", ""), "uf": req.get("uf", ""),
-            })
-            self.send_json({"ok": True})
-
-        elif path == "/limpar_cliente":
-            session_set("cliente_selecionado", None)
-            self.send_json({"ok": True})
-
-        # == ROTAS DE NEGOCIAÇÃO ==
-        # Stateless: recebem todos os dados no payload e devolvem resultado.
-        # Pronto para nuvem sem alteração de assinatura.
         elif path == "/calcular_aymore":
             req = json.loads(body)
             from mod_fin import calcular_aymore as _calc_ay
@@ -5714,39 +5484,6 @@ class Handler(BaseHTTPRequestHandler):
                 finally:
                     _db_ciclo.close()
 
-                # Garante credenciais carregadas (main() já carrega, mas reforça)
-                if not get_omie_key():
-                    cfg = config_carregar()
-                    if cfg.get('app_key'):
-                        _set_credenciais(cfg['app_key'], cfg['app_secret'])
-
-                # Diagnóstico sempre visível no terminal
-                print("[OMIE] Tentando criar projeto: %r" % nome_proj)
-                print("[OMIE] app_key: %s" % (get_omie_key()[:8] + "..." if get_omie_key() else "VAZIA"))
-
-                # Tenta criar no Omie
-                if get_omie_key():
-                    try:
-                        cod_int = (re.sub(r"[^A-Z0-9]", "", normalizar(nome_proj))[:9]
-                                   + datetime.now().strftime("%y%m%d%H%M"))[:20]
-                        r_omie = omie_post(
-                            "/geral/projetos/", "IncluirProjeto",
-                            {"nome": nome_proj, "inativo": "N", "codInt": cod_int},
-                            lambda *_: None, no_rotate=True, timeout=10
-                        )
-                        print("[OMIE] Resposta bruta: %s" % r_omie)
-                        cod = (r_omie.get("codigo") or r_omie.get("nCodProj")
-                               or r_omie.get("nCod") or r_omie.get("codigo_projeto"))
-                        proj["codigo_projeto_omie"] = cod
-                        print("[OMIE] Projeto criado — codigo_projeto_omie: %s" % cod)
-                    except Exception as e_omie:
-                        proj["codigo_projeto_omie"] = None
-                        proj["codigo_projeto_omie_erro"] = str(e_omie)
-                        print("[OMIE] ERRO ao criar projeto: %s" % e_omie)
-                    _salvar_projeto(proj)
-                else:
-                    print("[OMIE] Credenciais não configuradas — projeto criado apenas localmente.")
-
                 session_set('projeto_ativo', proj['nome_safe'])
                 self.send_json({'ok': True, 'projeto': proj})
             except Exception as e:
@@ -5812,27 +5549,7 @@ class Handler(BaseHTTPRequestHandler):
                 db.add(c)
                 db.commit()
                 db.refresh(c)
-                cliente_id = c.id
-                if not _OMIE_AUTO_SYNC:
-                    # Omie desligado: não sincroniza no cadastro; marca 'dispensado' para não cair na
-                    # fila (que inclui omie_sync_status NULL).
-                    c.omie_sync_status = "dispensado"
-                    db.commit(); db.refresh(c)
                 self.send_json({"ok": True, "cliente": _cliente_dict(c)})
-
-                if _OMIE_AUTO_SYNC:
-                    def _sync_bg():
-                        db2 = get_session()
-                        try:
-                            c2 = db2.get(Cliente, cliente_id)
-                            if c2:
-                                _tentar_sync_omie(c2, db2)
-                        except Exception:
-                            pass
-                        finally:
-                            db2.close()
-
-                    threading.Thread(target=_sync_bg, daemon=True).start()
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)})
@@ -7533,24 +7250,6 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": True, "pdv": _loja_dict(pdv)})
                 finally:
                     db.close()
-                return
-
-            m_sync = _re.match(r"^/api/admin/omie-sync/(\d+)/retry$", path)
-            if m_sync:
-                usuario = get_usuario_sessao(self)
-                if not usuario or not perfis.pode(usuario.get("nivel"), "gerir_usuarios"):
-                    self.send_json({"ok": False, "erro": "Acesso negado"})
-                    return
-                db2 = get_session()
-                try:
-                    c = db2.get(Cliente, int(m_sync.group(1)))
-                    if not c:
-                        self.send_json({"ok": False, "erro": "Cliente não encontrado"})
-                        return
-                    _tentar_sync_omie(c, db2)
-                    self.send_json({"ok": True, "cliente": _cliente_dict(c)})
-                finally:
-                    db2.close()
                 return
 
             m = _re.match(r"^/projetos/([^/]+)/ambientes/(adicionar|remover|atualizar|selecao)$", path)
@@ -10302,10 +10001,6 @@ def _cliente_dict(c) -> dict:
         "inst_cidade":      c.inst_cidade      or "",
         "inst_cep":         c.inst_cep         or "",
         "inst_uf":          c.inst_uf          or "",
-        "omie_codigo":       c.omie_codigo or "",
-        "omie_sync_status":  c.omie_sync_status or "",
-        "omie_sync_erro":    c.omie_sync_erro   or "",
-        "omie_sync_at":      c.omie_sync_at.isoformat() if c.omie_sync_at else "",
         "criado_em":   c.criado_em.strftime("%Y-%m-%d") if c.criado_em else "",
     }
 
@@ -10882,10 +10577,10 @@ def _params_iniciais_projeto(db, projeto_nome, loja_id):
     % do arquiteto = o do próprio parceiro; se ausente, o default da loja. Fidelidade entra
     sempre que houver parceiro. São apenas os valores INICIAIS: uma vez salvos em
     parametros_json, passam a ser respeitados como estão (as edições persistem)."""
-    from integracoes import mod_omie
+    from integracoes import projetos_store
     from mod_orcamento_params import parametros_default_loja
     par = parametros_default_loja(_cfg_financeira_loja(db, loja_id))
-    proj_json = mod_omie._carregar_projeto(projeto_nome) or {}
+    proj_json = projetos_store._carregar_projeto(projeto_nome) or {}
     parceiro_id = proj_json.get("parceiro_id")
     if parceiro_id:
         parc = db.get(Parceiro, int(parceiro_id))
@@ -11721,14 +11416,6 @@ def main():
         print("  (Forcar SQLite mesmo assim: ORIZON_ALLOW_SQLITE=1 — nao recomendado.)")
         print("=" * 74)
         _sys.exit(1)
-    # Carrega credenciais do omie_config.json automaticamente
-    cfg = config_carregar()
-    if cfg.get("app_key") and cfg.get("app_secret"):
-        _set_credenciais(cfg["app_key"], cfg["app_secret"])
-        print("  Credenciais Omie carregadas automaticamente.")
-    else:
-        print("  Aviso: omie_config.json sem credenciais. Configure na sidebar.")
-
     init_db()
     # FASE A (infra contábil): backfill do plano de contas nos owners existentes — planos antigos
     # ganham as contas novas de PLANO_PADRAO (Adiantamento de Clientes, Provisão Custo Fábrica etc.).
@@ -11758,7 +11445,7 @@ def main():
     host   = os.environ.get("ORIZON_HOST", "127.0.0.1")
     server = HTTPServer((host, port), Handler)
     eh_local = host in ("127.0.0.1", "localhost")
-    print("\n  Promob -> Omie  |  Negociacao de Margens  v7.3")
+    print("\n  Orizon Manager")
     print("  Bind: %s:%d" % (host, port))
     if eh_local:
         url = "http://127.0.0.1:%d" % port

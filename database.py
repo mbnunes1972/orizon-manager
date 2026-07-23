@@ -198,10 +198,6 @@ class Cliente(Base):
     inst_cidade            = Column(String(80),  nullable=True)
     inst_cep               = Column(String(9),   nullable=True)
     inst_uf                = Column(String(2),   nullable=True)
-    omie_codigo   = Column(String(40),  nullable=True)
-    omie_sync_status = Column(String(20),  nullable=True)   # ok | erro | pendente
-    omie_sync_erro   = Column(Text,        nullable=True)
-    omie_sync_at     = Column(DateTime,    nullable=True)
     criado_em     = Column(DateTime,    default=datetime.utcnow)
     atualizado_em = Column(DateTime,    onupdate=datetime.utcnow)
     loja_id       = Column(Integer,     ForeignKey("lojas.id"), nullable=True)
@@ -1408,9 +1404,6 @@ def _migrar_colunas():
             ("numero",                 "VARCHAR(20)"),
             ("complemento",            "VARCHAR(100)"),
             ("bairro",                 "VARCHAR(100)"),
-            ("omie_sync_status",       "VARCHAR(20)"),
-            ("omie_sync_erro",         "TEXT"),
-            ("omie_sync_at",           "DATETIME"),
             ("inst_mesmo_residencial", "INTEGER DEFAULT 1"),
             ("inst_logradouro",        "VARCHAR(200)"),
             ("inst_numero",            "VARCHAR(20)"),
@@ -2062,6 +2055,12 @@ def _migrar_colunas_pg():
         # PDV (2026-07-22): loja com mãe. DEFAULT 'loja' backfila as linhas existentes no ADD.
         "ALTER TABLE lojas ADD COLUMN IF NOT EXISTS loja_mae_id INTEGER",
         "ALTER TABLE lojas ADD COLUMN IF NOT EXISTS tipo VARCHAR(12) DEFAULT 'loja'",
+        # Faxina Omie (2026-07-23): integração removida do produto — colunas de sync dropadas
+        # (decisão do Diretor; o dado era só estado da integração morta).
+        "ALTER TABLE clientes DROP COLUMN IF EXISTS omie_codigo",
+        "ALTER TABLE clientes DROP COLUMN IF EXISTS omie_sync_status",
+        "ALTER TABLE clientes DROP COLUMN IF EXISTS omie_sync_erro",
+        "ALTER TABLE clientes DROP COLUMN IF EXISTS omie_sync_at",
     ]
     with ENGINE.begin() as conn:
         for s in stmts:

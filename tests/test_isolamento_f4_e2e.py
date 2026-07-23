@@ -25,7 +25,7 @@ def test_canary_login_via_http(http_client_factory):
     c = http_client_factory()
     status, body = c.login("dir_l1", "senha123")
     assert status == 200 and body.get("ok") is True
-    assert c.cookie and c.cookie.startswith("omie_session=")
+    assert c.cookie and c.cookie.startswith("orizon_session=")
     status, _ = c.get("/api/clientes")
     assert status == 200
 
@@ -237,7 +237,7 @@ def test_colisao_cpf_nao_vaza_cliente_de_outra_loja(http_client_factory, seed, a
 # ── Regressão: guard contra shadowing de `threading` em do_POST ───────────────
 # Um `import threading` (ou `threading = ...`) dentro de do_POST torna `threading`
 # uma variável LOCAL em toda a função, quebrando os usos anteriores com
-# UnboundLocalError (ex.: o sync Omie em background no POST /api/clientes).
+# UnboundLocalError (ex.: um handler que responda em thread de background).
 # Exposto pela suíte E2E e corrigido removendo o import redundante (main.py).
 
 def test_do_post_nao_faz_shadowing_de_threading():
