@@ -1,3 +1,6 @@
+> **HISTÓRICO — módulo REMOVIDO na faxina 2026-07-23 (DEV_LOG Sessão 113).** A integração
+> Omie não existe mais no produto; este spec fica só como registro.
+
 # Módulo de Integração Omie — SPEC
 
 **Status:** `[IMPLEMENTADO]` (parcial)

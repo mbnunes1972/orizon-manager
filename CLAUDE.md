@@ -49,9 +49,10 @@ Spec: `docs/superpowers/specs/_geral/2026-07-16-motor-5-reestruturacao-app-desig
 
 ## Git — o que commitar
 - Branch `main`. Commits descritivos (pt-BR): `feat(...)`, `fix(...)`, `docs: ...`.
-- **NÃO commitar ruído** (já modificado no working tree desde o início, ignorar sempre):
-  `orizon.db`/`*.bak*`, `perfis_config.json`, `.gitignore`, `XML/…`, `.claude/…`, `~$*.docx`, `*.tmp`.
-  **Sempre `git add` só os arquivos da mudança** (nunca `git add .`).
+- **NÃO commitar ruído local**: `XML/…`, `.claude/…`, `~$*.docx`, `*.tmp`, `*.bak*` e artefatos
+  de dado (`orizon.db` legado, `perfis_config.json`) — o `.gitignore` já cobre tudo isso
+  (verificado 2026-07-23: `orizon.db` NÃO é mais tracked; a nota antiga de "working tree sempre
+  sujo" ficou obsoleta). **Sempre `git add` só os arquivos da mudança** (nunca `git add .`).
 - Push: as credenciais do GitHub estão no Git Credential Manager (do usuário) — o push funciona; se
   falhar por credencial, peça ao usuário rodar `!git push origin main`.
 
