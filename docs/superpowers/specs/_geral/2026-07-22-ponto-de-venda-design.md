@@ -115,9 +115,11 @@ saem por PDV (tenancy); o comparativo entre unidades entra na visão unificada d
 - **Rede vs mãe**: PDV pertence à LOJA, não à rede — `rede_id` do PDV espelha o da mãe (herdado,
   não editável) para os relatórios de rede não perderem as vendas do PDV.
 
-## Definições pendentes (Diretor)
-1. Código do PDV Caraguatatuba na numeração de contrato (sugestão: `CAR`).
-2. Metas/faixas de comissão iniciais do PDV (seed copia da Inspirium; ajustar depois?).
-3. Rateios recorrentes mãe→PDV que já se sabe existirem (aluguel? folha?) — lista inicial para a
-   ação de rateio nascer com os casos reais.
-4. Confirmar que projetos históricos de Caraguá ficam na mãe (recomendado acima).
+## Definições do Diretor
+1. **APROVADO (2026-07-22):** código do PDV Caraguatatuba = **`CAR`** na numeração de contrato.
+2. **APROVADO (2026-07-22):** metas/comissões nos moldes atuais — `config_financeira_json`
+   próprio do PDV, seeded como cópia da Inspirium na criação e ajustado depois pelas telas
+   normais de config.
+3. **PENDENTE:** rateios recorrentes mãe→PDV que já se sabe existirem (aluguel? folha?) —
+   lista inicial para a ação de rateio nascer com os casos reais.
+4. **PENDENTE (recomendado sim):** confirmar que projetos históricos de Caraguá ficam na mãe.
