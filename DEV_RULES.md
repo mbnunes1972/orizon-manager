@@ -168,9 +168,10 @@ screen -S orizon-manager -dm bash -c 'cd /root/orizon-manager && ORIZON_HOST=0.0
 sleep 3; ss -ltnp | grep 8765; tail -8 app.log
 ```
 
-### Servidor de produção (orizonsolution.com.br) — em provisionamento (2026-07-15)
+### Servidor de produção (www.orizonone.com.br) — provisionado
 - IP: `179.197.77.9` (Hostinger) | VPS **dedicada** (nada mais rodando nela) | Ubuntu 24.04
-- Domínio `orizonsolution.com.br` — **DNS ainda não apontado** (passo 0 abaixo).
+- **Domínio OFICIAL: `www.orizonone.com.br`** (troca decidida em 2026-07-23; o antigo
+  `orizonsolution.com.br` fica como redirect 301 → novo). Runbook da troca no fim desta seção.
 - Diferente do servidor de DEV **de propósito** — nasce já no padrão profissional, não é o mesmo setup
   replicado: **PostgreSQL** (não SQLite, ver `docs/superpowers/specs/_geral/2026-07-15-migracao-postgresql.md`),
   **systemd** (não `screen` — sobrevive a reboot e reinicia sozinho se cair), **nginx + HTTPS** na frente
@@ -265,6 +266,49 @@ certbot --nginx -d orizonsolution.com.br -d www.orizonsolution.com.br   # HTTPS 
 # ATENÇÃO: o certbot cria um 2º bloco server { } (443) — conferir que o client_max_body_size 64M
 # está presente em CADA bloco server (o default do nginx é 1M e derruba upload de XML > 1 MB
 # com "Failed to fetch" no browser, sem status).
+```
+
+#### Troca de domínio → www.orizonone.com.br (decidida 2026-07-23)
+**Pré-requisito (painel Hostinger, fora do servidor):** o domínio `orizonone.com.br` está no
+PARKING da Hostinger (aponta p/ `2.57.91.91`, página "Parked Domain"). Criar registros **A**:
+`orizonone.com.br` → `179.197.77.9` e `www.orizonone.com.br` → `179.197.77.9` (apagar/substituir
+o apontamento de parking). O certbot abaixo SÓ funciona depois do DNS propagar
+(`getent hosts orizonone.com.br` já devolvendo `179.197.77.9`).
+
+```bash
+# na VPS de produção (ssh root@179.197.77.9), DEPOIS do DNS propagado:
+# 1) site novo (o antigo fica intacto por enquanto)
+cat > /etc/nginx/sites-available/orizonone <<'EOF'
+server {
+    listen 80;
+    server_name orizonone.com.br www.orizonone.com.br;
+    client_max_body_size 64M;   # > teto do app (50 MB) — pendência da frente de uploads (S104)
+    location / {
+        proxy_pass http://127.0.0.1:8765;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/orizonone /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+
+# 2) HTTPS do domínio novo (cria o bloco 443 no arquivo orizonone)
+certbot --nginx -d orizonone.com.br -d www.orizonone.com.br
+# conferir: client_max_body_size 64M presente TAMBÉM no bloco 443 que o certbot criou
+grep -n 'client_max_body_size' /etc/nginx/sites-available/orizonone
+
+# 3) domínio antigo vira redirect permanente: em /etc/nginx/sites-available/orizon,
+#    dentro de CADA server block (80 e 443), substituir o "location / { ... }" inteiro por:
+#        return 301 https://www.orizonone.com.br$request_uri;
+#    (os certificados do domínio antigo continuam sendo renovados — o redirect precisa deles no 443)
+nginx -t && systemctl reload nginx
+
+# 4) prova real
+curl -s -o /dev/null -w '%{http_code}\n' https://www.orizonone.com.br/login          # 200
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://www.orizonsolution.com.br/  # 301 → orizonone
 ```
 
 #### Passo 4 — Backup automático (pg_dump diário)

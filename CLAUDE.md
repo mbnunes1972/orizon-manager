@@ -120,7 +120,8 @@ implementação.
 - **Banco de dados: PostgreSQL, e SÓ ele** (migração 2026-07-15; **SQLite REMOVIDO por inteiro**
   na faxina 2026-07-23 — código de migração raw sqlite3, `DB_PATH`, escape `ORIZON_ALLOW_SQLITE`
   e o SQLite dos testes deixaram de existir; `init_db` recusa dialeto sqlite). Local (WSL),
-  produção (`orizonsolution.com.br`) **e o dev/pré-homolog `167.88.33.121`** (Postgres 16, dbs
+  produção (**`www.orizonone.com.br`**, VPS `179.197.77.9` — domínio trocado 2026-07-23, o antigo
+  `orizonsolution.com.br` vira redirect) **e o dev/pré-homolog `167.88.33.121`** (Postgres 16, dbs
   `orizon`/`orizon_homolog`, envs `/root/orizon-A.env`+`/root/orizon-B.env`). Migração de schema =
   `_migrar_colunas_pg` (ADD/DROP COLUMN idempotentes) + `_seed_loja_padrao`. A suíte roda SEMPRE
   contra Postgres (`orizon_test`, derivado do `.env`; override `TEST_DATABASE_URL`) — FK
