@@ -268,7 +268,7 @@ certbot --nginx -d orizonsolution.com.br -d www.orizonsolution.com.br   # HTTPS 
 # com "Failed to fetch" no browser, sem status).
 ```
 
-#### Troca de domínio → www.orizonone.com.br (decidida 2026-07-23)
+#### Troca de domínio → www.orizonone.com.br (decidida 2026-07-23; **EXECUTADA 2026-07-24** — mantido como referência)
 **Pré-requisito (painel Hostinger, fora do servidor):** o domínio `orizonone.com.br` está no
 PARKING da Hostinger (aponta p/ `2.57.91.91`, página "Parked Domain"). Criar registros **A**:
 `orizonone.com.br` → `179.197.77.9` e `www.orizonone.com.br` → `179.197.77.9` (apagar/substituir
