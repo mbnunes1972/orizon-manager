@@ -2367,6 +2367,16 @@ Fecha a lacuna de largura do Campo de Entrada (v7 só padronizou fundo/borda/alt
 **Regra nova implementada (v9 §4):** o botão **Primário** ganha contraste por **sombra + borda sutil 1px no mesmo matiz do accent, ~15% mais escura** — `.btn-primary{…;border:1px solid color-mix(in srgb, var(--accent) 85%, #000)}`. Theme-adaptive (resolve por tema sozinho), sem cor literal. `box-sizing:border-box` global absorve a borda (sem shift de layout).
 **Dourado → accent nos botões de ação (decisão do usuário: converter p/ primário, com "1 primário por tela"):** o `.btn-ciclo` acabou sendo um **componente compartilhado de ~30 botões** (Baixar/Carregar/Consultar/Emitir/Cancelar + as ações principais), não só 16 Aprovar/Confirmar. Correção **na origem** (como o v9 recomenda): (a) `.btn-ciclo` redefinido como **secundário token-based** (`--surface-2`/`--muted`/`--border`/`--shadow`, hover accent) — utilitários viram secundários; (b) `.btn-amber` (o "Aprovar" da Negociação, referenciado pelo JS — nome preservado) vira **primário accent**; (c) as ações "fecham o negócio" de cada etapa/tela (Confirmar medidor, Liberar, Registrar parecer, Produção Concluída, Concluir Relatório, peConcluir, concluirAprovacaoFinanceira, revisa, gerarContrato, sig-ok, data-act ok, encaminhar Pedidos) trocaram o dourado literal (`#b8960c`/`#1a1200`) e o `var(--dalm-gold)`-como-fundo por **`var(--accent)`+texto branco** — 1 primário por painel de etapa. `--dalm-gold` **mantido** onde é marca legítima (cabeçalhos de documento/seção, bordas de tab — permitido pelo v9). Verificação: CSS 310/310, **scan JS delta zero** (HEAD=CURRENT `(7,4)`), nenhum `<button>` com `b8960c`. _(Fora de escopo, anotado: banners de aviso `#1a1200` e as caixas de modal "Aprovar Orçamento"/"signatário" com borda/heading dourado literal — não são botões; ficam p/ um passe de chrome dedicado.)_
 
+## Sessão 115 — Cadastro de Funcionários de volta ao módulo Cadastro
+**Pedido do usuário:** o cadastro de Funcionários vivia como sub-aba do módulo Folha (entrada
+única `cadEntCarregar('funcionarios')`, painel criado dinamicamente lá). Voltou ao **módulo
+Cadastro**: seção "Funcionários" no submenu da sidebar (entre Clientes e Parceiros), aba+painel
+estático na page-10, `cadTab` alternando o painel (o lazy-load já tratava 'funcionarios' desde
+sempre). A Folha ficou só com a folha do mês + um atalho "Cadastro de funcionários (módulo
+Cadastro)" (`cadIr('funcionarios')`); `_folhaAba`/`folhaAba` removidos. Sem mudança de backend
+(a rota `/api/funcionarios` exige só sessão+escopo — quem tem o módulo Cadastro acessa).
+Frontend-only (Ctrl+F5).
+
 ## Sessão 114 — UX: endereço automático pelo CEP em TODOS os formulários
 Pedido do usuário: digitou o CEP → endereço carrega sozinho, "pedindo só o número".
 Existiam 4 cópias do autofill ViaCEP (cliente, endereço de instalação, cadastros genéricos,

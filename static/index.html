@@ -1284,6 +1284,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
          a navegação em sidebar E tabs. Mantido oculto só para o cadTab() continuar alternando os painéis. -->
     <div class="home-tabs" id="cad-tabs" style="display:none;gap:6px;margin:12px 0 18px;flex-wrap:wrap">
       <button class="home-tab active" data-cadtab="clientes"     onclick="cadTab('clientes')">Clientes</button>
+      <button class="home-tab"        data-cadtab="funcionarios" onclick="cadTab('funcionarios')">Funcionários</button>
       <button class="home-tab"        data-cadtab="fornecedores" onclick="cadTab('fornecedores')">Fornecedores</button>
       <button class="home-tab"        data-cadtab="parceiros"    onclick="cadTab('parceiros')">Parceiros</button>
       <button class="home-tab"        data-cadtab="terceiros"    onclick="cadTab('terceiros')">Terceiros</button>
@@ -1348,6 +1349,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     </div>
 
     <!-- Painéis stub -->
+    <div id="cad-panel-funcionarios" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     <div id="cad-panel-fornecedores" style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
     <div id="cad-panel-terceiros"    style="display:none"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
   </div>
@@ -4307,7 +4309,7 @@ async function assistCriar(){
 function cadTab(qual){
   document.querySelectorAll('#page-10 .home-tab').forEach(b =>
     b.classList.toggle('active', b.getAttribute('data-cadtab') === qual));
-  ['clientes','parceiros','fornecedores','terceiros'].forEach(k => {
+  ['clientes','funcionarios','parceiros','fornecedores','terceiros'].forEach(k => {
     const p = document.getElementById('cad-panel-'+k);
     if(p) p.style.display = (k === qual) ? 'block' : 'none';
   });
@@ -10314,6 +10316,7 @@ const _SB_MODULOS = {
   captacao:   {ic:'target-arrow'},                        // NOVO — em construção
   cadastro:   {ic:'address-book', secoes:[
                  {id:'clientes',     lbl:'Clientes',     ic:'user',           go:()=>cadIr('clientes')},
+                 {id:'funcionarios', lbl:'Funcionários', ic:'id-badge',       go:()=>cadIr('funcionarios')},   // de volta ao Cadastro (2026-07-23)
                  {id:'parceiros',    lbl:'Parceiros',    ic:'users-group',    go:()=>cadIr('parceiros')},
                  {id:'fornecedores', lbl:'Fornecedores', ic:'building-store', go:()=>cadIr('fornecedores')},
                  {id:'terceiros',    lbl:'Terceiros',    ic:'user-cog',       go:()=>cadIr('terceiros')},
@@ -10735,20 +10738,18 @@ async function rateioListar(){
 // ── Folha de Pagamento (Modulos_Orizon_v10 §2.1): motor — parte fixa (cadastro) + variável (vendas) ──
 let _folhaComp = null;   // competência ativa (AAAA-MM)
 function _folhaCompDefault(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
-let _folhaAba = 'folha';
-async function folhaCarregar(){   // entry do módulo Folha: sub-abas Folha do mês | Funcionários
+async function folhaCarregar(){
+  // Entry do módulo Folha. O cadastro de Funcionários VOLTOU ao módulo Cadastro
+  // (pedido do usuário, 2026-07-23) — aqui fica só a folha do mês + o atalho.
   const box = document.getElementById('folha-box'); if(!box) return;
   box.innerHTML =
-    '<div class="home-tabs" style="display:flex;gap:6px;margin-bottom:14px">'
-    +'<button class="home-tab'+(_folhaAba==='folha'?' active':'')+'" onclick="folhaAba(\'folha\')">Folha do mês</button>'
-    +'<button class="home-tab'+(_folhaAba==='func'?' active':'')+'" onclick="folhaAba(\'func\')">Funcionários</button>'
+    '<div style="display:flex;justify-content:flex-end;margin-bottom:8px">'
+    +'<button class="btn btn-ghost btn-sm" style="font-size:11px" onclick="cadIr(\'funcionarios\')">'
+    +'<i class="ti ti-id-badge"></i> Cadastro de funcionários (módulo Cadastro)</button>'
     +'</div>'
-    +'<div id="folha-mes-box" style="display:'+(_folhaAba==='folha'?'block':'none')+'"></div>'
-    +'<div id="cad-panel-funcionarios" style="display:'+(_folhaAba==='func'?'block':'none')+'"></div>';
-  if(_folhaAba==='func') cadEntCarregar('funcionarios');
-  else folhaMesCarregar();
+    +'<div id="folha-mes-box"></div>';
+  folhaMesCarregar();
 }
-function folhaAba(a){ _folhaAba=a; folhaCarregar(); }
 async function folhaMesCarregar(){
   const box = document.getElementById('folha-mes-box'); if(!box) return;
   if(!_folhaComp) _folhaComp = _folhaCompDefault();
