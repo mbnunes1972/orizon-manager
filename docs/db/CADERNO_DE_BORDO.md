@@ -132,7 +132,21 @@ regra 2. A camada contábil, a AF e os E2E continuam devendo verificação.
 **F2-31 Fatia 1 — ACHADO-61** (`out_forn` dos Parâmetros não constituía provisão no contrato).
 [MEDIDO] `main.py:785` com a chave `outros_forn`; comentário de `_PROV_FECHAMENTO` corrigido;
 aceite novo com 3 testes; subconjunto contábil/AF/contrato (553 testes) verde exceto o flake
-já documentado (LP-16). Commits 6120ed6 + e78e74d. **Sem tag e sem deploy.**
+já documentado (LP-16). Commits 6120ed6 + e78e74d. **Sem tag e sem deploy** (na hora).
+
+**F2-31 e F2-32 — tag e deploy** [FEITO nesta sessão, a pedido do Marcelo]. Tag
+`v2026.09.06-beta3` (`131f56d`), push confirmado. Deploy Integração → Homologação (Produção
+NÃO tocada, segue fora da esteira desde 28/08). Sem migration nova nas duas rodadas (F2-31/
+F2-32 só mexeram em código/frontend/testes) — `655716ac5fd8` (F2-30) já estava aplicada nos
+dois servidores; `alembic current` conferido ANTES e DEPOIS do `upgrade head` nos dois, sem
+mudar de valor, exatamente como o Marcelo pediu pra checar:
+
+| ambiente | alembic ANTES | alembic DEPOIS | confirmar.sh | git describe --tags | smoke |
+|---|---|---|---|---|---|
+| Integração (8765) | `655716ac5fd8 (head)` | `655716ac5fd8 (head)` | 15 OK / 0 FALHA | `v2026.09.06-beta3` | 401 login inválido, 200 `login.html` |
+| Homologação (8766) | `655716ac5fd8 (head)` | `655716ac5fd8 (head)` | 15 OK / 0 FALHA | `v2026.09.06-beta3` | 401 login inválido, 200 `login.html` |
+
+Registro completo em `docs/db/IMPLANTAR.md`, "Décimo sexto deploy por tag". Commit `b8f7e4b`.
 
 ### Registrado como pendente (é inventário, não ordem de execução)
 
