@@ -755,6 +755,45 @@ login inválido via `/api/auth/login`, 200 `login.html`) → `git describe
 --tags` confirmado exato nos dois. **Produção NÃO tocada** — tratamento
 próprio, ver `### Produção — diagnóstico de 04/09` acima.
 
+### Décimo sexto deploy por tag — v2026.09.06-beta3 — 06/09/2026
+
+**Sem migration nova** — F2-31/F2-32 mexeram só em código/frontend/testes.
+`655716ac5fd8` (F2-30) já estava aplicada nos dois servidores antes deste
+deploy — `alembic current` conferido ANTES e DEPOIS do `upgrade head` nos
+dois, sem mudar de valor (achado esperado, checado por instrução explícita
+do Marcelo antes de rodar).
+
+F2-31 Fatia 1 — ACHADO-61: `out_forn` dos Parâmetros não constituía provisão
+no fechamento do contrato (par 1.1.06.14×2.1.04.14 pronto em
+`_PROV_FECHAMENTO`, só faltava a chave "outros_forn" no dict `valores` de
+`_fin_provisoes_venda_seguro`). Corrigido; contrato ADITIVO, AF continua
+SUBSTITUTIVO (intocada).
+
+F2-32 — ACHADO-63 (motor da negociação): o desconto anunciado ao cliente tem
+que levar o Bruto ao Valor à Vista (`Bruto×(1−d)=à vista`) pra toda rubrica
+repassada — viagem/brinde deixaram o gross-up divisivo (que inflava o Bruto
+com o desconto), custo especial passou a sofrer o desconto do orçamento em
+VAVO. Fatias 2-4 em `static/index.html`: "Desconto efetivo" no quadro do
+Valor de Contrato; "cliente paga" ao lado de "custa" no painel de apoio;
+ACHADO-64 — o campo visível "Total do Contrato" tinha a lógica morta
+(usava um array sempre vazio no EP-07) enquanto a lógica viva ficava presa
+num campo escondido — unificados, gêmeo morto apagado. Correção pontual
+final: a base de exclusão de comissão (arq/fid não ganham sobre viagem/
+brinde) só desconta pelo fator no caminho REPASSA — no ABSORVE, onde
+viagem/brinde nunca entram no Valor à Vista, a base volta a ser o valor
+cheio de sempre (o ACHADO-63 nunca teve a intenção de mudar quanto a loja
+paga de comissão no absorve — era consequência, não decisão).
+
+Tag `v2026.09.06-beta3` (`131f56d`). Nos dois servidores, nessa ordem
+(Integração, depois Homologação): `systemctl stop` → `git fetch --tags &&
+git checkout v2026.09.06-beta3` → `alembic upgrade head` (`alembic current`
+= `655716ac5fd8 (head)` ANTES e DEPOIS, nos dois — sem mudança) →
+`systemctl start` → `confirmar.sh` 15/0 nos dois → smoke (401 login
+inválido via `/api/auth/login`, 200 `login.html`) → `git describe --tags`
+confirmado exato (`v2026.09.06-beta3`) nos dois. **Produção NÃO tocada** —
+segue fora da esteira desde 28/08, só volta por rebuild a partir de tag, ver
+`### Produção — diagnóstico de 04/09` acima.
+
 ## Conferir o que esta rodando
 
 Nao entrar no servidor pra olhar `git log` — perguntar direto:
