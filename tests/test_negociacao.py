@@ -47,18 +47,22 @@ def test_perda_de_viagem_bri_e_exatamente_d_orc_vezes_custo():
 
 def test_comissao_exclui_custos_no_absorve():
     # absorve (Tog_Cadi false): a comissão NÃO incide sobre viagem/brinde — a base exclui esses
-    # custos SEMPRE, mesmo absorvendo (`base_custos` roda incondicional, fora do if/else do
-    # Tog_Cadi). ACHADO-63 (06/09): `base_custos` agora é (num_via+num_bri)*fator_desc, não mais
-    # o valor cheio — em absorve, fator_desc=0,80 constante (d_amb=0 nos 2 ambientes), então
-    # base_custos total = (2000+500)*0,80 = 2000,00 (não mais 2500,00).
+    # custos SEMPRE (spec 22/06). ACHADO-63/64 (06/09, correção pontual): `base_custos` só usa
+    # `* fator_desc` no REPASSA — no absorve, viagem/brinde nunca entram em VAVA (vbna=vbva,
+    # sem termo_via_bri), então a base continua o valor CHEIO de sempre (2000+500=2500,00), como
+    # ANTES do ACHADO-63. A correção original (rederivada na Fatia 1 do F2-32) tinha aplicado o
+    # `*fator_desc` incondicionalmente por engano — o ACHADO-63 é sobre o Bruto que o cliente
+    # confere na mesa; no absorve não existe Bruto afetado, e a comissão que a loja paga não
+    # pode mudar por uma decisão sobre exibição de desconto (nunca foi decisão, foi consequência
+    # que passou junto — corrigido).
     p = {"incluir_custos": False, "fidelidade_pct": 2.0, "fidelidade_ativa": True,
          "fora_da_sede": True, "custo_viagem": 2000.0, "brinde": 500.0, "brinde_ativo": True,
          "comissao_arq_ativa": False}
     r = mn.calcular_orcamento(AMBS, p, 20.0)
-    vavo = r["VBVO"] * 0.80                            # 20385.19 (absorve, só desconto — inalterado)
-    pro_esperado = 0.02 * (vavo - (2000.0 + 500.0) * 0.80)   # 367.70384 — base agora é 2000,00 (era 2500,00)
+    vavo = r["VBVO"] * 0.80                          # 20385.19 (absorve, só desconto)
+    pro_esperado = 0.02 * (vavo - 2000 - 500)        # 357.70 — exclui viagem+brinde (valor cheio)
     _ap(r["Pro_Fid"], pro_esperado)
-    _ap(r["Val_Liq"], vavo - (pro_esperado + 2000 + 500))   # 17517.49 (cust_ad continua com o custo CHEIO)
+    _ap(r["Val_Liq"], vavo - (pro_esperado + 2000 + 500))   # 17527.49
 
 def test_brinde_recupera_so_fator_desc_nao_mais_blindado():
     # ACHADO-63 (06/09): brinde repassado NÃO é mais blindado do desconto — a loja recupera só

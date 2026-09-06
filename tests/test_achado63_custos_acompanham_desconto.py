@@ -143,3 +143,35 @@ def test_controle_comissao_arquiteto_sozinha_bruto_invariante():
     _ap(d0["VBNO"], 11111.11); _ap(d30["VBNO"], 11111.11)   # Bruto nunca dependeu de d_orc
     _ap(d0["Val_Liq"], 10000.0)
     _ap(d30["Val_Liq"], 7000.0)
+
+
+# ── Assimetria repassa × absorve (ACHADO-63/64, correção 06/09) ─────────────────────────────────
+# `base_custos` (exclusão de viagem/brinde da comissão) só usa `*fator_desc` no REPASSA — no
+# absorve viagem/brinde nunca entram em VAVA, e a base continua o valor CHEIO de sempre. Mesmo
+# cenário (mercadoria=10.000, viagem=1.000, brinde=500, fidelidade=2%, d=30%) nos dois caminhos —
+# fidelidade ativa gross-upa o termo mercadoria também (`termo_arqfid = vbva/fator_com`,
+# fator_com=1−0,02=0,98), então o Bruto do repassa NÃO é simplesmente mercadoria+custo:
+#   REPASSA: termo_arqfid=10000/0,98=10.204,081633; vbna=10.204,081633+1500=11.704,081633
+#            vava=11.704,081633×0,70=8.192,857143; base=(1000+500)×0,70=1.050,00
+#            Pro_Fid = 0,02×(8.192,857143−1.050) = 142,857143 ≈ 142,86
+#   ABSORVE: vbna=10000 (viagem/brinde não entram, e SEM gross-up nenhum — `vbna=vbva` direto);
+#            vava=10000×0,70=7.000,00; base=1000+500=1.500,00 (CHEIA, valor de sempre)
+#            Pro_Fid = 0,02×(7.000−1.500) = 110,00
+# A base (e a fidelidade) são NÚMEROS DIFERENTES nos dois caminhos, de propósito — provando que a
+# assimetria é escopo (o ACHADO-63 é sobre o Bruto que o cliente confere, que só existe no
+# repassa), não um esquecimento.
+
+def test_base_de_comissao_e_descontada_no_repassa_e_cheia_no_absorve():
+    amb = [{"VBVA": 10000.0, "CFA": 4000.0, "desc_amb_pct": 0}]
+    p_base = {"fora_da_sede": True, "custo_viagem": 1000.0,
+              "brinde_ativo": True, "brinde": 500.0,
+              "fidelidade_ativa": True, "fidelidade_pct": 2.0}
+    d_repassa = mn.calcular_orcamento(amb, {**p_base, "incluir_custos": True}, 30.0)
+    d_absorve = mn.calcular_orcamento(amb, {**p_base, "incluir_custos": False}, 30.0)
+    _ap(d_repassa["VBNO"], 11704.08)
+    _ap(d_absorve["VBNO"], 10000.0)   # absorve: Bruto nunca inclui viagem/brinde nem gross-up
+    _ap(d_repassa["Pro_Fid"], 142.86)   # base descontada: (1000+500)×0,70=1050,00
+    _ap(d_absorve["Pro_Fid"], 110.0)    # base CHEIA: 1000+500=1500,00 (valor de sempre)
+    assert d_repassa["Pro_Fid"] != d_absorve["Pro_Fid"], (
+        "a base de comissão TEM que divergir entre repassa e absorve — "
+        "são escopos diferentes do ACHADO-63, não o mesmo número")

@@ -73,10 +73,18 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
         vava = vbna * fator_desc
         # comissão em cadeia, por ambiente: arq NÃO ganha sobre fid; e nem arq nem fid
         # ganham sobre viagem/brinde — a base exclui esses custos SEMPRE (repassados ou
-        # absorvidos), conforme a fórmula `VAVA − viagem − brinde`. ACHADO-63: viagem/brinde
-        # agora entram em VAVA já multiplicados por `fator_desc` (não mais blindados) — a base
-        # excluída tem que refletir o mesmo valor, senão sobra/falta base de comissão.
-        base_custos = (num_via + num_bri) * fator_desc
+        # absorvidos), conforme a fórmula `VAVA − viagem − brinde` (spec 22/06). ACHADO-63/64
+        # (06/09, correção pontual): a assimetria abaixo é ESCOPO, não esquecimento — o
+        # ACHADO-63 é sobre o Bruto que o cliente confere na mesa; no absorve não existe Bruto
+        # afetado (viagem/brinde nunca entram em VBNA/VAVA nesse caminho — `vbna = vbva` acima),
+        # e o que a loja paga de comissão não pode mudar por causa de uma decisão sobre exibição
+        # de desconto. Repassa: viagem/brinde entram em VAVA já multiplicados por `fator_desc`
+        # (ACHADO-63) — a base excluída tem que rastrear esse mesmo valor, senão sobra/falta
+        # base de comissão. Absorve: viagem/brinde NUNCA entram em VAVA — a base sempre foi o
+        # valor CHEIO, e continua sendo (medido: aplicar `* fator_desc` aqui também subia a
+        # base de 17.885,19 pra 18.385,19 nesse caminho, e a comissão junto — consequência que
+        # passou junto da decisão do ACHADO-63, nunca decidida).
+        base_custos = (num_via + num_bri) * fator_desc if tog_cadi else (num_via + num_bri)
         pro_amb = (pct_fid * (vava - base_custos)) if tog_fid else 0.0
         com_amb = (pct_arq * (vava - pro_amb - base_custos)) if tog_carq else 0.0
         pro_fid += pro_amb
