@@ -109,6 +109,17 @@ Executor: **Claude Code** (mão em `mod_negociacao.py`, `tests/`, e a seguir `st
   - ACHADOS_CONTABEIS.md: ACHADO-61 (RESOLVIDO), 62 (ABERTO), 63 e 64 (EM EXECUÇÃO).
   - MODELO_CONTABIL.md: seção nova "A provisão é o valor cheio, não o recuperado".
   - PERCURSO_F2_32.md: plano de teste pronto para o Marcelo executar.
+- **Correção pontual, caminho absorve** (ACHADO-63/64): [FEITO nesta sessão] commit `5812c9d`.
+  Medido: `base_custos` em `mod_negociacao.py` rodava `*fator_desc` incondicional, fora do
+  if/else do `Tog_Cadi` — correto no repassa, errado no absorve (viagem/brinde nunca entram em
+  VAVA nesse caminho; a base sempre foi o valor CHEIO, spec 22/06). Efeito: a loja pagava mais
+  comissão de arquiteto/fidelidade num caminho que o ACHADO-63 nunca decidiu tocar. Corrigido:
+  `base_custos` só desconta no repassa. `test_comissao_exclui_custos_no_absorve` voltou ao valor
+  de antes do ACHADO-63; `test_leleu_ancora` e os 6 aceites do ACHADO-63 (repassa) ficaram
+  intocados (suíte inteira rodada sem alterar nenhum). Teste novo fixando a assimetria de
+  propósito. As 5 camadas verdes (b: 27 passed; c: 601 passed; d: 2681 passed — achado
+  incidental não relacionado, bancada local uma migration atrás do head, corrigido com `alembic
+  upgrade head`; e: 7 E2E, nenhum travou). Sem tag/deploy — última coisa do F2-32.
 
 ### Verificação independente (orientação, 06/09 14:43)
 
