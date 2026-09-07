@@ -125,6 +125,21 @@ caixa_limite_desconto.py` (novo, mostra a caixa sóbria abrindo em vez da vermel
 verdes — (d) pegou um achado incidental (meu comentário colidia com o regex de
 `test_aceite_achado36.py`, +1 na contagem; corrigido). Sem tag — aguardando pedido do Marcelo.
 
+### F2-34 — fechado [FEITO nesta sessão, a pedido do Marcelo]
+
+Commit `ddf78fb`. ACHADO-62: redução de `out_forn` na AF passa de "aceita em silêncio" pra
+RECUSADA (400, nada persiste) — decisão do Marcelo mudando o comportamento anterior de
+propósito (devolver valor à previsão da fábrica não é coerente). Aumento/igual/outra rubrica
+reduzida na mesma submissão continuam funcionando — confirmado viável, não precisou parar e
+perguntar. Achado ao rodar em camadas: um teste-irmão (`test_impostos_continua_funcionando_
+controle_irmao`) submetia `out_forn=0.0` como placeholder, mas herdava 500,00 residual do
+teste anterior (module-scoped) — 0.0 virou uma REDUÇÃO real, recusada; corrigido limpando
+também o `Lancamento` no teste anterior (regra dos irmãos). Frontend: nenhuma mudança — os
+chamadores já escrevem `d.erro` como texto simples (`#_prov-erro`), sem modal. Aceite: 4 testes
+novos (percurso 3.000→4.000→2.000, aumento, no-op, outra rubrica) + 1 rederivado (testava a
+decisão antiga) + 1 E2E (percurso real na tela). 5 camadas verdes (b: 29 passed; c: 650 passed;
+d: 2690 passed; e: 9 E2E, nenhum travou). Sem tag — aguardando pedido do Marcelo.
+
 ## Estado em 06/09/2026
 
 ### Em execução agora
