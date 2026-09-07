@@ -18469,7 +18469,11 @@ def _negociacao_breakdown(orc, db, vbva_override=None, params_override=None,
         amb["id"] = ids[i] if i < len(ids) else None
     # v1: usa o Val_Liq do próprio orçamento como proxy do acumulado mensal do consultor.
     # Fase 2 troca por um acumulador mensal por (consultor, loja, mês). Ver spec/PROVISOES_E_VARIAVEIS.md.
-    com_venda_pct = mod_provisoes.resolver_comissao_venda(cfg, d.get("Val_Liq", 0.0), desc_orc)
+    # F2-38 (07/09, DECIDIDO): SEM o Item Especial — ele não remunera comissão, e sem isto um item
+    # grande podia empurrar o consultor pra uma faixa superior e subir o % sobre a venda INTEIRA
+    # (o efeito mais caro e menos visível medido).
+    com_venda_pct = mod_provisoes.resolver_comissao_venda(
+        cfg, d.get("Val_Liq", 0.0) - _item_especial, desc_orc)
     prov = mod_provisoes.provisoes_orcamento(d, cfg, item_especial=_item_especial,
                                              com_venda_pct=com_venda_pct)
     d.update(prov)

@@ -80,20 +80,23 @@ def test_limitador_desligado_nao_reduz():
 
 
 def test_provisoes_e_margem():
+    # F2-38 (07/09, DECIDIDO): as rubricas % (Com_Adm/Com_Venda/Frete_Loc, aqui) usam base SEM
+    # o Item Especial — base_vl = Val_Liq(2000) - item(300) = 1700; base_vavo = VAVO(2500) -
+    # item(300) = 2200. Frete_Fab (base CFO) não muda — item nunca toca o CFO.
     siglas = {"CFO": 1000.0, "Val_Liq": 2000.0, "VAVO": 2500.0, "Prov_Imp": 0.0}
     c = mod_provisoes.config_financeira_default()
     c["provisoes"].update({"frete_fab_pct": 10.0, "com_adm_pct": 5.0,
                            "frete_loc_pct": 2.0})
     r = mod_provisoes.provisoes_orcamento(siglas, c, item_especial=300.0, com_venda_pct=1.0)
-    assert r["Frete_Fab_Orc"] == 100.0      # 10% × 1000 CFO
-    assert r["Com_Adm_Orc"] == 100.0        # 5% × 2000 Val_Liq
-    assert r["Com_Venda_Orc"] == 20.0       # 1% × 2000 Val_Liq
-    assert r["Frete_Loc_Orc"] == 50.0       # 2% × 2500 VAVO
+    assert r["Frete_Fab_Orc"] == 100.0      # 10% × 1000 CFO (item não toca o CFO)
+    assert r["Com_Adm_Orc"] == 85.0         # 5% × (2000-300) base_vl
+    assert r["Com_Venda_Orc"] == 17.0       # 1% × (2000-300) base_vl
+    assert r["Frete_Loc_Orc"] == 44.0       # 2% × (2500-300) base_vavo
     assert r["Item_Esp"] == 300.0
-    # Cust_Var = 1000 CFO + 300 Item Esp + 100 + 100 + 20 + 0 + 0 + 50 + 0 + 0 + 0 Prov_Imp = 1570
-    assert r["Cust_Var"] == 1570.0
-    # Marg_Cont = (2000 - 1570)/2000 = 0.215
-    assert r["Marg_Cont"] == 0.215
+    # Cust_Var = 1000 CFO + 300 Item Esp + 100 + 85 + 17 + 0 + 0 + 44 + 0 + 0 + 0 Prov_Imp = 1546
+    assert r["Cust_Var"] == 1546.0
+    # Marg_Cont = (2000 - 1546)/2000 = 0.227
+    assert r["Marg_Cont"] == 0.227
 
 
 def test_margem_negativa_e_val_liq_zero():
@@ -182,11 +185,12 @@ def _cfg_fold():
 
 def test_fold_montagem_garantia_no_cust_var():
     # base = VAVO (2500), NÃO Val_Cont — mesmo com Cust_Fin>0 (Val_Cont=2600), o fold usa VAVO.
+    # F2-38: base_vavo = VAVO(2500) - item(300) = 2200 (mesmo motivo do test_provisoes_e_margem).
     siglas = {"CFO": 1000.0, "Val_Liq": 2000.0, "VAVO": 2500.0, "Prov_Imp": 0.0, "Val_Cont": 2600.0}
     r = mod_provisoes.provisoes_orcamento(siglas, _cfg_fold(), item_especial=300.0, com_venda_pct=1.0)
-    assert r["Prov_Mont"] == 200.0          # 8%   × 2500 VAVO
-    assert r["Prov_Gar"] == 12.5            # 0,5% × 2500 VAVO
-    assert r["Cust_Var"] == 1782.5          # 1570 (pré-fold) + 200 + 12,5
+    assert r["Prov_Mont"] == 176.0          # 8%   × (2500-300) base_vavo
+    assert r["Prov_Gar"] == 11.0            # 0,5% × (2500-300) base_vavo
+    assert r["Cust_Var"] == 1733.0          # 1546 (pré-fold, F2-38) + 176 + 11
     assert r["Marg_Cont"] == round((2000.0 - r["Cust_Var"]) / 2000.0, 4)
 
 
@@ -197,7 +201,7 @@ def test_fold_decomposicao_aditiva():
     sem = mod_provisoes.provisoes_orcamento(siglas, c_sem, item_especial=300.0, com_venda_pct=1.0)
     assert com["Cust_Var"] == round(sem["Cust_Var"] + com["Prov_Mont"] + com["Prov_Gar"], 2)
     assert sem["Prov_Mont"] == 0.0 and sem["Prov_Gar"] == 0.0
-    assert sem["Cust_Var"] == 1570.0 and sem["Marg_Cont"] == 0.215   # idêntico ao mundo pré-fold
+    assert sem["Cust_Var"] == 1546.0 and sem["Marg_Cont"] == 0.227   # idêntico ao mundo pré-fold (F2-38)
 
 
 def test_fold_vavo_zero_e_pct_zero():
@@ -207,7 +211,7 @@ def test_fold_vavo_zero_e_pct_zero():
     r_zero_pct = mod_provisoes.provisoes_orcamento(base, c0, item_especial=300.0, com_venda_pct=1.0)
     assert r_zero_vavo["Prov_Mont"] == 0.0 and r_zero_vavo["Prov_Gar"] == 0.0   # VAVO 0 → fold 0
     assert r_zero_pct["Prov_Mont"] == 0.0 and r_zero_pct["Prov_Gar"] == 0.0     # pct 0 → fold 0
-    assert r_zero_pct["Cust_Var"] == 1570.0
+    assert r_zero_pct["Cust_Var"] == 1546.0   # F2-38: pré-fold com base sem o item
 
 
 def test_fold_bate_com_constituicao_contabil():

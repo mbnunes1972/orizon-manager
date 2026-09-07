@@ -289,21 +289,30 @@ def provisoes_orcamento(siglas, cfg, item_especial=0.0, com_venda_pct=0.0):
     prov = (cfg or {}).get("provisoes", {}) or {}
     pc = (cfg or {}).get("provisoes_contabeis", {}) or {}
     item_especial = _f(item_especial)
+    # F2-38 (07/09, DECIDIDO): o Item Especial não remunera comissão nem provisão operacional —
+    # é mercadoria repassada a custo, sem margem pra remunerar (ao contrário do imposto, que é
+    # devido de verdade e por isso `Prov_Imp` continua vindo do motor JÁ com o item — não mexer).
+    # As nove rubricas % abaixo (4 de Val_Liq, 5 de VAVO) usam a base SEM o item; `cust_var` e o
+    # DENOMINADOR de `marg_cont` continuam com o Val_Liq/soma CHEIOS — é isso que produz a
+    # diluição percentual de propósito do ACHADO-65 (margem igual em reais, menor em %).
+    base_vl   = Val_Liq - item_especial
+    base_vavo = VAVO - item_especial
 
     frete_fab = _f(prov.get("frete_fab_pct")) / 100.0 * CFO
-    com_adm   = _f(prov.get("com_adm_pct"))   / 100.0 * Val_Liq
-    com_venda = _f(com_venda_pct)             / 100.0 * Val_Liq
-    com_med   = _f(prov.get("com_med_pct"))   / 100.0 * Val_Liq
-    com_proj  = _f(prov.get("com_proj_exec_pct")) / 100.0 * Val_Liq
-    frete_loc = _f(prov.get("frete_loc_pct")) / 100.0 * VAVO
-    assist    = _f(prov.get("assist_pct"))    / 100.0 * VAVO
-    ins_loc   = _f(prov.get("ins_loc_pct"))   / 100.0 * VAVO
+    com_adm   = _f(prov.get("com_adm_pct"))   / 100.0 * base_vl
+    com_venda = _f(com_venda_pct)             / 100.0 * base_vl
+    com_med   = _f(prov.get("com_med_pct"))   / 100.0 * base_vl
+    com_proj  = _f(prov.get("com_proj_exec_pct")) / 100.0 * base_vl
+    frete_loc = _f(prov.get("frete_loc_pct")) / 100.0 * base_vavo
+    assist    = _f(prov.get("assist_pct"))    / 100.0 * base_vavo
+    ins_loc   = _f(prov.get("ins_loc_pct"))   / 100.0 * base_vavo
     # Fold (FASE 2): provisões contábeis de Montagem/Garantia entram no Cust_Var — base = VAVO
     # (convenção canônica de bases, NOMENCLATURA §"Bases": provisões % sobre a VENDA usam VAVO, valor à
     # vista, DEPOIS de extrair o Cust_Fin) e MESMO arredondamento da constituição no fechamento
     # (mod_contabil.constituir_provisoes_venda, também base VAVO). É VISÃO: não lança nada no razão.
-    prov_mont = round(_f(pc.get("montagem_pct")) / 100.0 * VAVO, 2)
-    prov_gar  = round(_f(pc.get("garantia_pct")) / 100.0 * VAVO, 2)
+    # F2-38: base SEM o Item Especial (mesmo motivo das demais nove — ver acima).
+    prov_mont = round(_f(pc.get("montagem_pct")) / 100.0 * base_vavo, 2)
+    prov_gar  = round(_f(pc.get("garantia_pct")) / 100.0 * base_vavo, 2)
 
     cust_var = (CFO + item_especial + frete_fab + com_adm + com_venda + com_med
                 + com_proj + frete_loc + assist + ins_loc + Prov_Imp + prov_mont + prov_gar)

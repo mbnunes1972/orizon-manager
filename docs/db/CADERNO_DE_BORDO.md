@@ -240,6 +240,33 @@ vivo. Os aceites do ACHADO-63/65/66 e `test_leleu_ancora` — INTOCADOS (nada de
 5 camadas verdes (b/c/d: 2702 passed, 4 xfailed, 0 failed, idêntico ao F2-36 — sem impacto
 esperado; e: 10 E2E, 2 flakes de ambiente conhecidos passaram ao repetir). Sem tag.
 
+### F2-38 — fechado [FEITO nesta sessão, a pedido do Marcelo]
+
+Item Especial sai das comissões e das provisões operacionais (nove rubricas % de `provisoes_
+orcamento`, base Val_Liq ou VAVO) — só o IMPOSTO fica, decisão do Marcelo ("ele não tem o que
+remunerar numa mercadoria repassada a custo, sem margem", mas "o imposto é devido de verdade").
+Correção: as nove passam a usar `Val_Liq`/`VAVO` MENOS o item; `Prov_Imp` continua vindo do
+motor já com o item (intocado); `cust_var` continua somando o item; denominador da margem
+continua o Val_Liq cheio (mantém a diluição do ACHADO-65). `main.py`: a FAIXA de comissão de
+venda também passa a ser resolvida sem o item — sem isso um item grande podia empurrar o
+consultor pra uma faixa superior sobre a venda INTEIRA, o efeito mais caro e menos visível dos
+medidos. Aceite com os números do próprio pacote, reconstruídos à mão (bati exato): Cust_Var
+68.200→73.600 (sobe 5.400 = item 5.000 + imposto 400), margem 11.800→11.400 (cai só o imposto).
+
+Fatia 2 (sintoma "digitar zero não faz nada"): REPRODUZIDO NO NAVEGADOR antes de mexer em código
+— achado: a tag `v2026.09.07-beta2` é anterior ao F2-37, então se o Marcelo testou em
+Homologação, testou sem a caixa com máscara. Isolei via git-checkout temporário do
+`static/index.html` de beta2: "digitar 0" já funcionava até ali; o bug real era "apagar o campo e
+salvar" — o `promptPopup` genérico tratava string vazia como CANCELAR. A caixa própria que o
+F2-37 introduziu não tem esse bug (e `mascaraMoedaInput` normaliza vazio pra "R$ 0" sozinho) —
+nenhum código mudou nesta fatia, só o teste permanente (confirmado que falha em beta2 e passa
+hoje, mesmo padrão do ACHADO-64).
+
+Achado incidental (camada d): 4 testes pré-F2-38 fixavam item_especial>0 com % configuradas —
+rederivados pras bases novas. Os aceites do ACHADO-63/65/66 e `test_leleu_ancora` — INTOCADOS.
+5 camadas verdes (b/c/d: 2707 passed, 4 xfailed, 0 failed; e: 10 E2E, 2 flakes conhecidos
+passaram ao repetir). Sem tag.
+
 ## Estado em 06/09/2026
 
 ### Em execução agora
