@@ -4843,7 +4843,16 @@ padrão de pass-through já usado por `resultado_financeiro`/
 
 ---
 
-## ACHADO-61 — o Outros Fornecedores dos Parâmetros não constituía provisão no contrato · RESOLVIDO 06/09/2026 (F2-31)
+## ACHADO-61 — o Outros Fornecedores dos Parâmetros não constituía provisão no contrato · RESOLVIDO 06/09 e REVERTIDO 07/09/2026
+
+> **REVERTIDO em 07/09 (F2-36), de propósito.** O conserto abaixo estava certo para a porta que
+> existia: o campo de Outros Fornecedores no modal de Parâmetros alimentava `orc.out_forn` na
+> venda e nada era provisionado. Em 07/09 essa porta foi FECHADA — quem inclui mercadoria na
+> venda usa o **Item Especial** (rubrica própria, `1.1.06.22`/`2.1.04.22`), e Outros
+> Fornecedores voltou a ser exclusivamente substituição do Custo de Fábrica, nascendo só na AF
+> e na Conferência do Pedido. `outros_forn` saiu do `valores` do fechamento. Não é regressão: é
+> a premissa original do `_PROV_FECHAMENTO` voltando a valer porque o caminho da venda mudou de
+> dono. Ver ACHADO-65 e a seção do MODELO_CONTABIL.md.
 
 Irmão do ACHADO-59, outra porta. Saído do Teste 7 do Marcelo em
 Homologação (06/09, beta2): digitou R$ 2.000,00 em "Outros
@@ -5035,7 +5044,17 @@ de um par é como este achado nasceu.
 
 ---
 
-## ACHADO-65 — Outros Fornecedores entra no Custo Variável sem receita correspondente · DECIDIDO 06/09/2026
+## ACHADO-65 — Outros Fornecedores entra no Custo Variável sem receita correspondente · RESOLVIDO 07/09/2026 (F2-35 + F2-36)
+
+> **Fechado em duas rodadas.** O F2-35 (06/09) deu o lado da receita reusando `orc.out_forn`
+> para as duas coisas. O F2-36 (07/09) SEPAROU as duas rubricas — decisão do Marcelo: "vamos
+> criar o item especial e separar ele de Out_Forn, dessa forma ele passa a ser um item que entra
+> como Markup = 1 na venda, e Out_Forn fica isolado funcionando como estava, passa a ser uma
+> substituição do CFO". Coluna `Orcamento.item_especial` (migration `9a1b2c3d4e5f`), contas
+> `1.1.06.22`/`2.1.04.22`, despesa em `5.1.01`. Commit `a67a40a`.
+>
+> O texto abaixo descreve o diagnóstico e o desenho da primeira rodada; onde ele disser
+> `out_forn` no contexto da VENDA, leia `item_especial`.
 
 Achado do Marcelo em 06/09, olhando a margem depois do percurso do beta3:
 "Outros Fornecedores não entra em lugar nenhum no cálculo da margem".
@@ -5078,6 +5097,46 @@ que até aqui estava certa mas sem motivo escrito.
   embutida, sem migration (reusa `Orcamento.out_forn`).
 
 Implementação: F2-35, pacote escrito em 06/09.
+
+---
+
+## ACHADO-66 — a migração de Outros Fornecedores contava a mercadoria duas vezes no Custo Variável · RESOLVIDO 07/09/2026 (F2-36)
+
+Achado da orientação em 07/09, ao responder uma pergunta do Marcelo ("se o Outros Fornecedores
+não for lançado na venda, não altera nada, porque virá do CFO?").
+
+**Medido, rodando `mod_provisoes.cust_var_marg_cont` direto:**
+
+```
+venda, sem out_forn ................ Cust_Var 116.000,00   margem 42,00%
+AF migra 3.000 do CFO p/ out_forn .. Cust_Var 119.000,00   margem 40,50%
+```
+
+A fórmula é `cust_var = CFO_congelado + Σ(_RUBRICAS)`, e `out_forn` estava em `_RUBRICAS`. O
+CFO congelado **não cai** com a migração — ele é a base congelada da versão anterior
+(`anterior.cfo`). Então migrar 3.000 do Custo de Fábrica para Outros Fornecedores somava 3.000
+ao custo variável sem tirar nada do outro lado: a mesma mercadoria, contada duas vezes, e a
+margem caindo 1,5 ponto sem custo nenhum ter mudado.
+
+É o mesmo padrão do "bug ①" que o comentário de `_RUBRICAS_CUST_AD` já documentava para o CFO —
+e provavelmente estava errado desde sempre nos projetos com Conferência de Pedido, porque até o
+ACHADO-59 essa rubrica só nascia por migração.
+
+**Resposta à pergunta do Marcelo, que originou o achado:** no motor da NEGOCIAÇÃO ele estava
+certo — `orc.out_forn` só era gravado pela rota da negociação, a AF nunca tocou essa coluna, e
+Bruto/à vista/desconto efetivo/markup não mudavam. No painel da AF, mudava — e mudava errado.
+
+### Conserto (07/09, F2-36)
+
+Não precisou de fórmula nova. Ao separar as duas rubricas (ACHADO-65), `out_forn` passou a ser
+**só** substituição — e somá-lo é sempre duplicar, sem caso legítimo. Saiu de `_RUBRICAS`;
+`item_especial` ocupou o lugar do custo que de fato é novo. `Cust_Var = CFO + Item Especial +
+demais`. Aceite: uma migração de 3.000 na AF deixa o `Cust_Var` INALTERADO.
+
+**Registro de método:** `tests/test_fluxo_completo_e2e.py` afirmava o comportamento defeituoso
+como correto — o teste tinha sido escrito a partir do que o sistema fazia, não do que deveria
+fazer. É o segundo caso desta semana (o primeiro foi o ACHADO-58, "o aceite prova a rota, não a
+tela"). Um teste que nasce de observar o código não protege contra nada; ele congela o defeito.
 
 ---
 

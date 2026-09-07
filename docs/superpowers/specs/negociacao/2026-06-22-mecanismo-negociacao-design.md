@@ -183,7 +183,15 @@ quebrar (c).
 
 O motor ganha uma linha que **não é ambiente e não é custo adicional**: o Item Especial —
 mercadoria comprada de terceiro para entregar ao cliente, editável na tela de negociação
-(botão ao lado de "Novo Ambiente"), persistida em `Orcamento.out_forn`.
+(botão ao lado de "Novo Ambiente"), persistida em `Orcamento.item_especial`.
+
+> **F2-36 (07/09):** a primeira implementação reusou `Orcamento.out_forn` para isto. Foi
+> separado no mesmo dia: Item Especial e Outros Fornecedores são rubricas distintas, com contas
+> próprias (`1.1.06.22`/`2.1.04.22` × `1.1.06.14`/`2.1.04.14`). `out_forn` saiu do motor da
+> negociação por completo — ele é substituição do Custo de Fábrica e nasce só na AF e na
+> Conferência do Pedido. Onde este documento disser `out_forn` no contexto da venda, leia
+> `item_especial`. O conceito completo está em `docs/db/MODELO_CONTABIL.md`, seção "Item
+> Especial e Outros Fornecedores: uma família, duas rubricas".
 
 Onde ele entra:
 
@@ -193,9 +201,11 @@ VBNO      += item            (idem)
 VAVO      += item            (idem — fora do laço de ambientes, nenhum fator o alcança)
 Cust_Ad   NÃO recebe o item  (não é custo adicional da venda — é linha de venda)
 Val_Liq   sobe pelo item     (consequência: é faturamento)
-cust_var  mantém `out_forn`  (o custo é irmão do CFO — NÃO remover)
+cust_var  += item_especial   (custo de mercadoria, irmão do CFO)
+          `out_forn` SAIU de _RUBRICAS em 07/09 (F2-36): é substituição, já está dentro
+          do CFO congelado — somá-lo contava a mesma mercadoria duas vezes (ACHADO-66)
 Val_Cont  inclui o item (via VAVO) → custo financeiro e Prov_Imp o alcançam
-Markup    = Val_Liq / (CFO + out_forn)
+Markup    = Val_Liq / (CFO + item_especial)
 ```
 
 > **Correção de 07/09 (implementação, commit `dac7cb9`).** O desenho escrito em 06/09 punha o

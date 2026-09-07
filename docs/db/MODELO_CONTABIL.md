@@ -289,45 +289,73 @@ projeção que existia ANTES da descoberta e a realizada de DEPOIS diferem
 exatamente por esse valor. É o retrato correto de uma surpresa genuína — não
 um defeito do cálculo.
 
-## Outros Fornecedores: mercadoria comprada para entrega, duas origens [DECIDIDO 06/09/2026]
+## Item Especial e Outros Fornecedores: uma família, duas rubricas [DECIDIDO 07/09/2026]
 
-A rubrica Outros Fornecedores (`1.1.06.14` × `2.1.04.14`) é sempre a mesma coisa —
-**mercadoria comprada para entregar ao cliente**. O que muda é de onde ela vem, e é a
-origem que decide se o Custo de Fábrica é tocado:
+Mercadoria comprada de terceiro para entregar ao cliente aparece de duas maneiras, e elas são
+**rubricas distintas, com contas próprias**. Em 06/09 elas foram tratadas como duas origens de
+uma mesma rubrica; em 07/09 (F2-36) o Marcelo decidiu separá-las, porque os dois mecanismos
+liam o mesmo saldo e se atrapalhavam.
 
-**Origem 1 — a venda.** O consultor inclui um item que a fábrica não fornece (um eletro,
-uma peça de terceiro). O cliente paga por ele. Entra pelo valor cheio no Valor Bruto e no Valor
-à Vista ao mesmo tempo (entrada simétrica, 07/09), sem desconto e sem custos adicionais
-incidindo, e **não reduz o Custo de Fábrica** — é mercadoria a mais, não substituição de nada.
-Como ele não sofre desconto e o Bruto cresce, o **desconto efetivo dilui** — e é o efetivo, não
-o digitado, que fecha `Bruto × (1 − desconto) = à vista`.
+### Item Especial — nasce na VENDA, markup 1
 
-**Origem 2 — a substituição, depois da venda.** Na Aprovação Financeira, parte do que a
-fábrica forneceria passa a vir de outro fornecedor. É a mesma mercadoria trocando de origem,
-então **sai do Custo de Fábrica**, por reclassificação `2.1.04.06 → 2.1.04.14`, pelo
-incremento sobre o saldo vivo.
+`1.1.06.22` × `2.1.04.22`, despesa em `5.1.01` (CMV). Coluna `Orcamento.item_especial`.
 
-Esse é o motivo da assimetria que o razão mostra: aditivo no contrato, substitutivo na AF.
-Não é inconsistência — são duas origens da mesma mercadoria.
+O consultor inclui um item que a fábrica não fornece — um eletro, uma peça de terceiro. **A
+loja compra pelo custo e repassa pelo mesmo valor**: markup 1, sem margem embutida. Entra pelo
+valor cheio no Valor Bruto e no Valor à Vista ao mesmo tempo (entrada simétrica), sem desconto
+e sem custos adicionais incidindo, e **não toca o Custo de Fábrica** — é mercadoria a mais.
 
-**Na margem.** O item entra no `Val_Liq` (é faturamento da venda) e o seu custo permanece no
-`Cust_Var` (é irmão do Custo de Fábrica). A margem em **reais** não muda; a margem em
-**percentual cai**, porque entrou faturamento sem markup diluindo a base. A queda é o sinal
-correto, não um defeito: vender item especial não melhora a margem do projeto.
+Como ele não sofre desconto e o Bruto cresce, o **desconto efetivo dilui**, e é o efetivo — não
+o digitado — que fecha `Bruto × (1 − desconto) = à vista`. O `Desc_Tot`, que é o indicador do
+portão de 35%, dilui junto: foi por isso que a entrada ficou simétrica em vez de só no à vista.
 
-**No markup.** `Markup = Val_Liq / (CFO + Outros Fornecedores)` — as duas parcelas compõem a
-mercadoria comprada. Atenção: esse NÃO é o fator usado pela conciliação de PE, que converte
-diferença de custo de FÁBRICA em valor de contrato e continua usando `Val_Liq / CFO`.
+**Na margem:** entra no `Val_Liq` (é faturamento) e no `Cust_Var` (é custo de mercadoria). A
+margem em **reais** não muda; a margem em **percentual cai**, porque entrou faturamento sem
+markup diluindo a base. A queda é o sinal correto: vender item especial não melhora a margem.
 
-**Vendido pelo custo.** O valor é um só e é o de custo: a loja repassa. Se conseguir comprar
-por menos, a economia não vira margem na venda — aparece como sobra de provisão e volta como
-Receita de Conciliação na competência da conciliação, pelo caminho que já existe. Mesma
-doutrina da seção anterior: a provisão é o valor cheio, e a diferença se resolve no fim.
+**No markup:** `Markup = Val_Liq / (CFO + Item Especial)` — as duas parcelas são mercadoria
+comprada. Atenção: esse NÃO é o fator da conciliação de PE, que converte diferença de custo de
+FÁBRICA em valor de contrato e usa `Val_Liq / CFO` (`_markup_merc_puro`).
 
-**[ABERTO] Imposto.** O item entra no `Val_Cont` e portanto na provisão de impostos, pela
-carga tributária média. A alíquota real varia por tipo de item, e são muitos — o tratamento
-por item é frente fiscal, ainda não desenhada. Até lá, a diferença (para mais ou para menos)
-aparece como saldo na conciliação, como qualquer outra variação de estimativa.
+**Vendido pelo custo:** se a loja conseguir comprar por menos, a economia não vira margem na
+venda — aparece como sobra de provisão e volta como Receita de Conciliação, pelo caminho que já
+existe. Mesma doutrina da seção seguinte: a provisão é o valor cheio.
+
+### Outros Fornecedores — SUBSTITUIÇÃO do Custo de Fábrica
+
+`1.1.06.14` × `2.1.04.14`, despesa em `5.1.01`. Nasce **só** na Aprovação Financeira e na
+Conferência do Pedido (etapa 12), por reclassificação `2.1.04.06 → 2.1.04.14`, pelo incremento
+sobre o saldo vivo. Parte do que a fábrica forneceria passa a vir de outro fornecedor: é a
+mesma mercadoria trocando de origem, e por isso **sai do Custo de Fábrica**.
+
+**Nunca nasce na venda.** A porta que existia nos Parâmetros da negociação foi fechada em
+07/09; quem quiser incluir mercadoria na venda usa o Item Especial. Consequência deliberada:
+o ACHADO-61 (constituição de Outros Fornecedores no fechamento do contrato) foi **revertido** —
+não porque estivesse errado, mas porque a porta que ele consertava deixou de existir.
+
+**Fora do Custo Variável.** Como é substituição, o valor já está dentro do CFO congelado —
+somá-lo de novo conta a mesma mercadoria duas vezes. Era o ACHADO-66, medido em 07/09: uma
+migração de 3.000 derrubava a margem de contribuição de 42,00% para 40,50% sem custo nenhum ter
+mudado. A separação resolveu: `out_forn` saiu de `_RUBRICAS` e o `item_especial` ocupou o lugar
+do custo que de fato é novo. `Cust_Var = CFO + Item Especial + demais rubricas`.
+
+**Redução bloqueada** (ACHADO-62): baixar o valor na AF é recusado, com a gravação inteira
+negada e a coluna da revisão intacta. Devolver ao Custo de Fábrica significaria aumentar a
+previsão da fábrica, que não é coerente com a operação.
+
+### [ABERTO] Imposto
+
+O Item Especial entra no `Val_Cont` e portanto na provisão de impostos, pela carga tributária
+média. A alíquota real varia por tipo de item, e são muitos — tratamento por item é frente
+fiscal, ainda não desenhada. Até lá a diferença (para mais ou para menos) aparece como saldo na
+conciliação, como qualquer outra variação de estimativa.
+
+### Descontinuidade de dados (07/09)
+
+Projetos anteriores ao F2-36 que constituíram Outros Fornecedores no contrato — Teste_7 e
+Projeto 8 — mantêm os lançamentos em `2.1.04.14`. Nada foi reescrito no razão. Os novos usam
+`2.1.04.22`. A migration `9a1b2c3d4e5f` moveu `out_forn → item_especial` na coluna do orçamento
+(o valor ali só podia ser de origem venda: AF e etapa 12 nunca escreveram nessa coluna).
 
 ## A provisão é o valor cheio, não o recuperado [DECIDIDO 06/09/2026]
 

@@ -72,6 +72,30 @@ registrar, parar. Nunca o que decide o que é certo.
 `v2026.09.06-beta3` em Integração e Homologação (Produção NÃO). Contém ACHADO-61, 63 e 64.
 Décimo sexto deploy por tag; conferências na tabela do bloco de 06/09.
 
+### F2-36 — Item Especial separado de Outros Fornecedores (07/09, commit `a67a40a`)
+
+Decisão do Marcelo: são duas rubricas, não duas origens de uma. Item Especial (venda, markup 1)
+ganhou coluna própria (`Orcamento.item_especial`, migration `9a1b2c3d4e5f`) e contas próprias
+(`1.1.06.22`/`2.1.04.22`); Outros Fornecedores voltou a ser exclusivamente substituição do CFO.
+Efeitos: ACHADO-66 resolvido sem fórmula nova (`out_forn` saiu de `_RUBRICAS`), ACHADO-61
+revertido de propósito (a porta da venda mudou de dono). Cinco camadas verdes: 2702 passed,
+0 failed, 10 E2E.
+
+**Não implantado.** A última tag é `v2026.09.07-beta1`, que NÃO contém o F2-36.
+
+Documentação atualizada pela orientação em 07/09, depois do commit: MODELO_CONTABIL.md (seção
+reescrita: "Item Especial e Outros Fornecedores: uma família, duas rubricas"), spec da
+negociação (nota do F2-36 + `item_especial` na tabela do motor), ACHADOS_CONTABEIS.md
+(ACHADO-66 novo; 61 marcado REVERTIDO; 65 marcado RESOLVIDO em duas rodadas).
+
+**[ABERTO] Dois pontos de atenção levantados na revisão, sem dono:**
+- `Saldo_Out_Forn` é lido do razão dentro de `_negociacao_breakdown` (main.py ~18485), que é
+  chamada em laço por `_maior_composto_com_parametros_pct` — uma query de razão por orçamento a
+  cada checagem de limite de desconto. Funciona; vale medir se pesar.
+- Esse mesmo bloco engole a exceção (`except Exception: 0.0`). Se a leitura falhar por um motivo
+  real, o campo mostra 0,00 e ninguém fica sabendo — a família de silêncios que este projeto
+  vem caçando. Um `logging.warning` resolveria.
+
 ### Percurso do Marcelo no beta3 — o que ele achou
 
 - **Funcionou:** Outros Fornecedores nos Parâmetros antes do contrato (3.000, depois 4.000) com
