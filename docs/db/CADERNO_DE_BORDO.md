@@ -65,6 +65,66 @@ registrar, parar. Nunca o que decide o que é certo.
 
 ---
 
+## Estado em 07/09/2026 (madrugada)
+
+### Implantado
+
+`v2026.09.06-beta3` em Integração e Homologação (Produção NÃO). Contém ACHADO-61, 63 e 64.
+Décimo sexto deploy por tag; conferências na tabela do bloco de 06/09.
+
+### Percurso do Marcelo no beta3 — o que ele achou
+
+- **Funcionou:** Outros Fornecedores nos Parâmetros antes do contrato (3.000, depois 4.000) com
+  os lançamentos certos; reabertura da AF1; aumento para 5.000 migrando 2.000 do CFO; alteração
+  de Assistência Técnica.
+- **ACHADO-62 reproduzido:** redução de 4.000 para 2.000 na AF atualizou a coluna Rev1 e não
+  mexeu no razão. Decisão revista: **bloquear com recusa da gravação**, Rev1 intacta.
+- **ACHADO-65 (novo):** Outros Fornecedores entrava no `cust_var` sem receita correspondente em
+  lugar nenhum. Origem do "Item Especial".
+- **Caixas de aviso:** a mensagem do limite cita comissão/fidelidade e um percentual (o composto)
+  que não aparece na tela; e o rosa vem do token `--err`, usado em todo o sistema.
+
+### Pacotes escritos em 06/09, prontos para execução
+
+- **F2-33** — texto das mensagens de limite (dois textos: limite do usuário × maior limite
+  existente) e cor das caixas, em dois passos (reclassificar o que não é erro; depois retonalizar
+  o `--err` para vinho ou laranja escuro).
+- **F2-34** — ACHADO-62: bloqueio com recusa.
+- **F2-35** — Item Especial (ACHADO-65), incluindo o markup `Val_Liq / (CFO + out_forn)` e o
+  cuidado de NÃO deixar essa fórmula vazar para a conciliação de PE.
+
+### Documentação — FEITA pela orientação (07/09, madrugada)
+
+Executor: orientação. Só arquivos em `docs/`. Enquanto isso o Claude Code estava no
+`static/index.html` (última escrita 04:39) — sem interseção.
+
+- `ACHADOS_CONTABEIS.md`: ACHADO-62 com a decisão revista no topo da seção; 63 e 64 marcados
+  RESOLVIDOS com a nota do beta3 e da correção do caminho absorve; **ACHADO-65 novo**, com o
+  conceito das duas origens.
+- `MODELO_CONTABIL.md`: seção "Outros Fornecedores: mercadoria comprada para entrega, duas
+  origens" — inclui a regra do markup e o [ABERTO] do imposto por alíquota de item.
+- Spec da negociação (22/06): nota de revisão com o desenho do Item Especial no motor, a
+  armadilha do desconto efetivo e os dois usos do markup.
+
+Consequência para o F2-35: a linha do pacote que mandava "escrever nos documentos" está
+**cumprida** — ao Claude Code cabe só o comentário no código.
+
+### F2-33 — fechado [FEITO nesta sessão, a pedido do Marcelo]
+
+Commit `c155928`. **A) Texto**: `perfis.desconto_max_absoluto()` (novo, constante do sistema —
+maior `desconto_max` entre perfis de loja, sem override por conta; não precisou parar e
+perguntar, era MEDIDO puro) escolhe entre dois textos sem citar comissão/fidelidade/composto.
+3 sites (main.py ~11469/~11554/~16613) convertidos pra uma função só. **B1**: achado — a caixa
+do print é `mostrarErroModal` (~70 sites no app inteiro), não `_popupOverlay`; só 2 desses 70
+são ESTA mensagem (`salvarDescontoAutomatico`/`_persistirDescontosOrc`) — só esses 2 convertidos
+pra `avisoPopup`, condicionados a `requer_autorizacao`. **B2** (só depois do B1, com a lista na
+mão): `--err` do escuro retonalizado `#C08183`→`#8C373E` (uma 1ª tentativa, `#BC4E57`, ainda lia
+como rosa ao vivo — conferido por screenshot). Tema claro e `--err-line`/`--err-soft` intocados.
+Aceite: `tests/test_f2_33_mensagens_limite_desconto.py` (5) + `tests/test_e2e_browser_f2_33_
+caixa_limite_desconto.py` (novo, mostra a caixa sóbria abrindo em vez da vermelha). 5 camadas
+verdes — (d) pegou um achado incidental (meu comentário colidia com o regex de
+`test_aceite_achado36.py`, +1 na contagem; corrigido). Sem tag — aguardando pedido do Marcelo.
+
 ## Estado em 06/09/2026
 
 ### Em execução agora
