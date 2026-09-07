@@ -29,6 +29,13 @@
    passa a ser cobre #8C5230 nos dois temas; botão primário vira
    cinza-quente #5C5650 (paralelo do cinza-quente escuro). Os dois temas
    passam a compartilhar uma única identidade cromática.
+   v1.8 (F2-33, 06/09): --err do tema escuro retonalizado (#C08183 → #8C373E)
+   — o v1.3 já pretendia "vinho", mas na prática o tom saturava pouco demais
+   pra luminosidade alta que a legibilidade exigia e lia como rosa (achado do
+   Marcelo). Uma 1ª tentativa mais clara (#BC4E57) ainda lia como rosa ao
+   vivo — aprofundado de verdade, mesma família de --err-line (#6B3138).
+   Tema claro (já vinho de verdade, #9C4147) e --err-line/--err-soft dos
+   dois temas (já corretos) não mudaram — só o --err do escuro.
    ------------------------------------------------------------
    REGRAS INEGOCIÁVEIS (v9/v10):
    1. Nenhum componente declara cor em hex literal — sempre var(--token).
@@ -165,9 +172,12 @@
   --warn:      #C2A264;   /* ocre suave — sem amarelo estridente */
   --warn-soft: rgba(194,162,100,.12);
   --warn-line: #6B5528;
-  --err:       #C08183;   /* rosa-vinho empoeirado — piso de legibilidade */
+  --err:       #8C373E;   /* F2-33 (06/09, DECIDIDO): vinho — o antigo (#C08183) e uma 1ª
+                             tentativa mais clara (#BC4E57) ainda liam como rosa (conferido ao
+                             vivo, print). Aprofundado de verdade — mesma família de --err-line
+                             (#6B3138), só um degrau mais claro pra continuar legível como texto. */
   --err-soft:  rgba(107,49,56,.20);
-  --err-line:  #6B3138;   /* vinho profundo — bordas de erro/perigo */
+  --err-line:  #6B3138;   /* vinho profundo — bordas de erro/perigo (já correto, não mexido) */
   /* Status VÍVIDOS (Agenda 2026-08-03) — mais brilho no escuro para pontos pequenos */
   --status-ok:   #4ADE80;
   --status-warn: #FACC15;

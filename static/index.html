@@ -4218,8 +4218,11 @@ async function _persistirDescontosOrc(){
       // Trava real do servidor (achado UAT 2026-08-10) — desconto individual acima do
       // limite do usuário nunca teve fluxo de autorização nesta tela; orienta a usar o
       // desconto global (que já pede senha de gerente) em vez de falhar calado.
-      showToast((d.erro || 'Falha ao salvar desconto individual.') +
-                ' Use o desconto do orçamento (barra lateral) para pedir autorização.', true);
+      // F2-33 (06/09, DECIDIDO): bloqueio de rotina — caixa sóbria, não a vermelha de erro.
+      const msg = (d.erro || 'Falha ao salvar desconto individual.') +
+                  ' Use o desconto do orçamento (barra lateral) para pedir autorização.';
+      if(d.requer_autorizacao) await avisoPopup(msg, {titulo: 'Desconto'});
+      else showToast(msg, true);
     }
   }catch(e){ console.error('Falha ao persistir descontos do orcamento:', e); }
 }
@@ -11013,8 +11016,15 @@ async function salvarDescontoAutomatico(){
       // Servidor recusou (trava real — achado UAT 2026-08-10, antes o backend não validava
       // nada). O front pode ter ficado dessincronizado (_limiteAutorizado stale); reabre a
       // autorização em vez de fingir que salvou.
-      showToast(d.erro || 'Falha ao salvar desconto.', true);
-      if(d.requer_autorizacao){ _limiteAutorizado = null; _credAutorizacaoDesconto = null; }
+      // F2-33 (06/09, DECIDIDO): um bloqueio de rotina (limite de desconto) NÃO é erro — usa a
+      // caixa sóbria (avisoPopup/_popupOverlay), não a vermelha (mostrarErroModal, acionada pelo
+      // toast de erro abaixo). Falha de verdade (rede, servidor fora do ar) continua no toast.
+      if(d.requer_autorizacao){
+        _limiteAutorizado = null; _credAutorizacaoDesconto = null;
+        await avisoPopup(d.erro || 'Falha ao salvar desconto.', {titulo: 'Desconto'});
+      } else {
+        showToast(d.erro || 'Falha ao salvar desconto.', true);
+      }
       // Acha 2026-08-11 (verificação ao vivo da Vera): o toast passa rápido e o campo ficava
       // mostrando o valor REJEITADO enquanto o resumo acima (Valor à Vista etc.) já refletia o
       // último valor de verdade salvo — reverte o campo pro valor persistido pra não ficar

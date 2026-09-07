@@ -432,6 +432,20 @@ def _usuario_autoriza_desconto(db, login, senha, desconto_pct, sessao=None):
     return u
 
 
+def _msg_limite_desconto_excedido(pct_composto):
+    """F2-33 (06/09, DECIDIDO): a mensagem de recusa não cita comissão, fidelidade, "efeito
+    composto" nem percentual — esses números não aparecem em nenhum outro lugar da tela (o
+    "Desconto efetivo" que a tela mostra é OUTRO cálculo, `Desc_Efetivo` do motor de
+    mod_negociacao.py) e expõem a mecânica de comissão/fidelidade a quem está na frente do
+    cliente. Dois textos, porque um só mentia num dos casos: se `pct_composto` ainda cabe no
+    maior limite existente (`perfis.desconto_max_absoluto()` — hoje 50%, o de master), existe
+    QUEM pode autorizar; se nem o maior limite cobre, ninguém pode, e falar em "autorização
+    gerencial" seria oferecer um botão que nunca vai funcionar."""
+    if pct_composto <= perfis.desconto_max_absoluto():
+        return "Limite de desconto excedido. Autorização gerencial necessária."
+    return "Limite máximo de desconto excedido."
+
+
 def _maior_desconto_efetivo_pct(db, orc, novo_desconto_pct=None, overrides_individuais=None):
     """Maior desconto EFETIVO (composto: global × individual por ambiente, mesma fórmula de
     mod_negociacao.calcular_orcamento — fator_desc = (1-d_orc)*(1-d_amb)) entre os ambientes do
@@ -11466,10 +11480,7 @@ class Handler(BaseHTTPRequestHandler):
                             db.commit()
                             self.send_json({"ok": False, "requer_autorizacao": True,
                                 "limite": usuario["limite_desconto"],
-                                "erro": f"Efeito composto de {maior_pct:.1f}% (desconto + comissão "
-                                        f"+ fidelidade) excede seu limite "
-                                        f"({usuario['limite_desconto']:.0f}%). Autorização "
-                                        f"gerencial necessária."}, code=403)
+                                "erro": _msg_limite_desconto_excedido(maior_pct)}, code=403)
                             return
                 p.parametros_json = json.dumps(novos, ensure_ascii=False)
                 db.commit()
@@ -11551,11 +11562,7 @@ class Handler(BaseHTTPRequestHandler):
                             db.commit()   # persiste o log da tentativa mesmo recusando o desconto
                             self.send_json({"ok": False, "requer_autorizacao": True,
                                             "limite": usuario["limite_desconto"],
-                                            "erro": f"Efeito composto de {checagem_pct:.1f}% (desconto "
-                                                    f"global × individual por ambiente, mais comissão/"
-                                                    f"fidelidade já salvas) excede seu limite "
-                                                    f"({usuario['limite_desconto']:.0f}%). Autorização "
-                                                    f"gerencial necessária."}, code=403)
+                                            "erro": _msg_limite_desconto_excedido(checagem_pct)}, code=403)
                             return
                     orc.desconto_pct = novo_desconto
                 db.commit()
@@ -16610,10 +16617,7 @@ class Handler(BaseHTTPRequestHandler):
                         db.commit()
                         self.send_json({"ok": False, "requer_autorizacao": True,
                                         "limite": usuario["limite_desconto"],
-                                        "erro": f"Efeito composto de {maior_pct:.1f}% (individual × "
-                                                f"global, mais comissão/fidelidade já salvas) excede "
-                                                f"seu limite ({usuario['limite_desconto']:.0f}%). "
-                                                f"Autorização gerencial necessária."}, code=403)
+                                        "erro": _msg_limite_desconto_excedido(maior_pct)}, code=403)
                         return
                 by_id = {lk.pool_ambiente_id: lk for lk in links}
                 for pid, pct in limpos.items():

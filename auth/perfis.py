@@ -166,6 +166,15 @@ def desconto_max(slug):
     return PERFIS.get(_base(slug), _DEFAULT)["desconto_max"]
 
 
+def desconto_max_absoluto():
+    """F2-33 (06/09, MEDIDO): não existe um teto absoluto separado — o teto é o maior
+    `desconto_max` entre os perfis de LOJA (`slugs_loja()`; plataforma/rede ficam de fora, não
+    autorizam desconto de loja). `desconto_max` nunca tem override por conta/loja (não está em
+    `CAPS_SELECIONAVEIS` — é propriedade fixa do perfil BASE), então este valor é uma constante
+    do sistema (hoje 50.0, o de `master`), sem custo nem ambiguidade nenhuma pra calcular."""
+    return max((PERFIS[s]["desconto_max"] for s in slugs_loja()), default=0.0)
+
+
 # Permissões por CONTA do Gestor de Rede (2026-08-08, pedido do usuário — "Permissões" na
 # criação/edição). admin_rede não tem loja_id pra pendurar num PerfilAcesso (é por LOJA,
 # nullable=False) — por isso um mecanismo à parte, em Usuario.capacidades_override_json, em vez
