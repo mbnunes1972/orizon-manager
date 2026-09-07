@@ -11677,7 +11677,8 @@ class Handler(BaseHTTPRequestHandler):
                 # aqui reintroduziria a mesma inconsistência ao contrário.
                 import mod_contabil as _mc
                 ot_af, own_af = _mc.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
-                _migracao = 0.0
+                _delta_of = 0.0
+                _atual_out_forn = 0.0
                 if decisao == "revisa":
                     _atual_cfo = round(_mc._mov(db, ot_af, own_af, "2.1.04.06", "credor", None, None,
                                                 projeto_id=orc.projeto_id), 2)
@@ -11685,24 +11686,21 @@ class Handler(BaseHTTPRequestHandler):
                         _atual_out_forn = round(_mc._mov(db, ot_af, own_af, "2.1.04.14", "credor", None, None,
                                                          projeto_id=orc.projeto_id), 2)
                         _novo_out_forn = round(float(itens.get("out_forn") or 0), 2)
-                        # ACHADO-62 (06/09, DECIDIDO — muda a decisão do F2-25/28, de propósito):
-                        # a redução de Outros Fornecedores NÃO é aceita em silêncio (era o defeito:
-                        # `_migracao = max(0, ...)` dava zero, `out_forn` saía do lote genérico —
-                        # a coluna Rev1 gravava o valor NOVO, o razão ficava no ANTIGO) nem só
-                        # avisada — é RECUSADA. Devolver valor ao Custo de Fábrica aumentaria a
-                        # previsão da fábrica, incoerente com a operação (motivo do Marcelo). O
-                        # conserto é a recusa, não o aviso: um popup que informa mas deixa gravar
-                        # deixaria o mesmo descasamento coluna×razão — o documento da decisão tem
-                        # que fechar com o livro (mesma família do ACHADO-16/55). Recusa a
-                        # submissão INTEIRA (nada persiste: nem ProvisaoRegistro, nem lançamento
-                        # de nenhuma rubrica) — não só out_forn, porque gravar as outras rubricas
-                        # aqui produziria um registro que mentiria sobre out_forn mesmo assim.
-                        if _novo_out_forn < _atual_out_forn - 0.005:
-                            self.send_json({"ok": False,
-                                "erro": "Outros Fornecedores não pode ser reduzido: R$ %.2f já provisionado." % _atual_out_forn},
-                                code=400); return
-                        _migracao = max(0.0, round(_novo_out_forn - _atual_out_forn, 2))
-                    itens["custo_fabrica"] = round(_atual_cfo - _migracao, 2)
+                        # F2-39 Fatia 3 (07/09, DECIDIDO — REVERTE o ACHADO-62 de propósito, não
+                        # "erramos e voltamos atrás"): o bloqueio de 06/09 tinha motivo real
+                        # NAQUELE desenho — `out_forn` carregava DUAS naturezas (mercadoria a
+                        # mais vinda da venda + substituição do CFO), e devolver podia inflar a
+                        # fábrica além do que ela forneceria. O F2-36 tirou a natureza aditiva pro
+                        # Item Especial; `out_forn` ficou SÓ substituição — uma fatia recortada do
+                        # CFO congelado. Devolvê-la é desfazer o recorte, não inflar nada: o
+                        # motivo do bloqueio se foi junto com a ambiguidade. Reclassificação
+                        # BIDIRECIONAL agora — `_itens_af.pop("out_forn")` continua (nunca entra
+                        # no lote genérico); só a direção muda. `itens["custo_fabrica"]` reflete
+                        # o razão nas DUAS direções: `_atual_cfo - _delta_of` cobre os dois casos
+                        # (delta>0 tira do CFO; delta<0 devolve ao CFO) — mesma fórmula do F2-30
+                        # Fatia 1, sem precisar de um ramo separado.
+                        _delta_of = round(_novo_out_forn - _atual_out_forn, 2)
+                    itens["custo_fabrica"] = round(_atual_cfo - _delta_of, 2)
                 cust_var, marg = _mprov.cust_var_marg_cont(cfo, vl, itens)
                 existente = db.query(ProvisaoRegistro).filter_by(orcamento_id=oid, versao=versao).first()
                 pode_autorizar = perfis.pode(aprovador.nivel, "autorizar")   # capacidade de step-up (Diretor)
@@ -11749,20 +11747,31 @@ class Handler(BaseHTTPRequestHandler):
                 # calculava o resíduo por SUBTRAÇÃO entre os dois campos digitados — a origem da
                 # confusão do percurso do Teste_6: dois campos alimentando o mesmo cálculo por
                 # caminhos que podiam divergir). `out_forn` sai do lote genérico sempre — nunca
-                # mais um ajuste independente (Achado-59): a MIGRAÇÃO é sempre reclassificação
-                # 2.1.04.06→2.1.04.14, pelo INCREMENTO sobre o saldo atual de Outros Fornecedores
-                # (nunca reduz — mesma direção única de antes, `max(0, ...)`). `custo_fabrica` não
-                # tem entrada em `_AF_ITEM_RUBRICA` (nunca teve) — mesmo que o campo desabilitado
-                # ainda submeta o valor prefill, o lote genérico o ignora sozinho. `_migracao` já
-                # foi calculada ANTES (F2-30 Fatia 1, pra poder sobrescrever `itens["custo_fabrica"]`
-                # antes do registro nascer) — reusada aqui, não recalculada.
+                # um ajuste independente (Achado-59): a MIGRAÇÃO é sempre reclassificação
+                # 2.1.04.06↔2.1.04.14, pelo DELTA sobre o saldo atual de Outros Fornecedores —
+                # F2-39 Fatia 3 reabriu a direção de redução (ver comentário acima). `custo_fabrica`
+                # não tem entrada em `_AF_ITEM_RUBRICA` (nunca teve) — mesmo que o campo
+                # desabilitado ainda submeta o valor prefill, o lote genérico o ignora sozinho.
+                # `_delta_of` já foi calculado ANTES (F2-30 Fatia 1, pra poder sobrescrever
+                # `itens["custo_fabrica"]` antes do registro nascer) — reusado aqui, não recalculado.
                 _itens_af = dict(itens)
                 _itens_af.pop("custo_fabrica", None)
                 _itens_af.pop("out_forn", None)
-                if _migracao > 0:
+                if _delta_of > 0:
                     _mc.reclassificar_provisao(db, ot_af, own_af, orc.projeto_id,
-                                               "2.1.04.06", "2.1.04.14", _migracao,
+                                               "2.1.04.06", "2.1.04.14", _delta_of,
                                                ref=_ref_af + ":outros")
+                elif _delta_of < 0:
+                    # F2-39 Fatia 3: reversão (2.1.04.14→2.1.04.06) — cap defensivo ao saldo atual
+                    # de Outros Fornecedores (redundante por construção: `_novo_out_forn >= 0`
+                    # já garante `-_delta_of <= _atual_out_forn`, mas explícito por segurança,
+                    # como pedido). `reclassificar_provisao` é a MESMA função, só invertida —
+                    # não precisou de lógica nova; o espelho do ativo diferido (1.1.06.14→1.1.06.06)
+                    # já é capado por ela ao saldo ainda não baixado na NF-e (ver mod_contabil.py).
+                    _reducao = min(-_delta_of, _atual_out_forn)
+                    _mc.reclassificar_provisao(db, ot_af, own_af, orc.projeto_id,
+                                               "2.1.04.14", "2.1.04.06", _reducao,
+                                               ref=_ref_af + ":outros_rev")
                 _mc.disparar_deltas_af(db, ot_af, own_af, orc.projeto_id, _itens_af, ref_base=_ref_af)
                 orc.ramo_financeiro_seq = _seq
                 db.commit()

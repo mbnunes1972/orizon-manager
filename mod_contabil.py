@@ -1792,6 +1792,11 @@ _AF_ITEM_RUBRICA = {
 # conta de provisão própria nesta família (rota do ramo financeiro, UI própria, `ramoFinanceiroRender`).
 _PAINEL_ITEM_RUBRICA_TODAS = dict(_AF_ITEM_RUBRICA)
 _PAINEL_ITEM_RUBRICA_TODAS["cust_esp"] = "cust_esp"
+# F2-39 Fatia 2 (07/09): mesmo caso de cust_esp — par ativo×provisão de sempre (1.1.06.22/
+# 2.1.04.22, `_PROV_FECHAMENTO["item_especial"]`), nunca AF-editável (nasce na venda, congelado
+# pela trava de contrato assinado). DEPOIS do dict(_AF_ITEM_RUBRICA) de propósito — não pode
+# vazar pro mapa que `disparar_deltas_af` usa pra ajustar a AF.
+_PAINEL_ITEM_RUBRICA_TODAS["item_especial"] = "item_especial"
 
 
 def disparar_deltas_af(db, owner_tipo, owner_id, projeto_id, itens_alvo, ref_base, data=None):

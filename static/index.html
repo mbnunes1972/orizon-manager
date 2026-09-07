@@ -21265,6 +21265,13 @@ const _PROV_RUBRICAS = [
   // CONGELADO do motor (base da fórmula, nunca muda); esta é o SALDO VIVO da provisão no razão.
   { key: 'custo_fabrica', label: 'Custo de Fábrica (provisão)', readonly: true,
     readonlyTitle: 'Não editável — migre em Outros Fornecedores, a contrapartida é automática' },
+  // F2-39 Fatia 2 (07/09, MEDIDO): a rubrica já entrava certo no Cust_Var (mod_provisoes.
+  // _RUBRICAS já tinha "item_especial") — só faltava aparecer aqui (era só UI). Read-only:
+  // nasce na venda e é congelada pela trava de contrato assinado, nunca editável na AF (main.py
+  // já sobrescreve com o valor do registro anterior, incondicional, no ramo "revisa" — não
+  // acrescentar em mod_contabil._AF_ITEM_RUBRICA).
+  { key: 'item_especial', label: 'Item Especial', readonly: true,
+    readonlyTitle: 'Não editável aqui — o Item Especial é lançado na tela de negociação' },
 ];
 
 function _fmtR(v) {
@@ -21345,15 +21352,21 @@ async function abrirProvisoes(oid, afCodigo) {
     const revLabel = pendingRev === 'rev1' ? 'Rev 1' : 'Rev 2';
     // Editable rubrica inputs for Revisa
     const revisaInputs = _PROV_RUBRICAS.map(rb => {
-      // custo_fabrica é read-only (Passo 2): mostra o SALDO VIVO (atual), não o prefill congelado
-      // da revisão anterior — os outros campos (editáveis) continuam prefill da revisão anterior.
-      const base = (rb.key === 'custo_fabrica' && atual && atual.itens && atual.itens.custo_fabrica != null)
-        ? atual.itens.custo_fabrica : prevItens[rb.key];
-      const prev = base != null ? Number(base).toFixed(2) : '';
+      // custo_fabrica/item_especial são read-only (Passo 2/F2-39): mostram o SALDO VIVO (atual),
+      // não o prefill congelado da revisão anterior — os outros campos (editáveis) continuam
+      // prefill da revisão anterior.
+      const base = ((rb.key === 'custo_fabrica' || rb.key === 'item_especial')
+                   && atual && atual.itens && atual.itens[rb.key] != null)
+        ? atual.itens[rb.key] : prevItens[rb.key];
+      // F2-39 Fatia 1 (07/09, DECIDIDO): formato financeiro — mesma máscara já usada em
+      // #av-entrada-valor (mascaraMoedaInput/parseMoeda), nenhuma nova. Vazio continua vazio
+      // (não "R$ 0,00") — mantém o comportamento de campo nunca preenchido idêntico ao de hoje.
+      const prev = base != null ? ('R$ ' + fmt(base)) : '';
       const ro = rb.readonly ? 'disabled title="' + esc(rb.readonlyTitle || '') + '"' : '';
       return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <label style="font-size:var(--fs-sm);color:var(--muted);flex:1">${esc(rb.label)}</label>
-        <input type="number" step="0.01" id="_prov-inp-${rb.key}" value="${esc(prev)}" ${ro}
+        <input type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00"
+          oninput="mascaraMoedaInput(this)" id="_prov-inp-${rb.key}" value="${esc(prev)}" ${ro}
           style="width:120px;background:var(--input);border:1px solid var(--border);
           color:var(--fg);padding:4px 7px;border-radius:4px;font-size:.82rem;text-align:right${rb.readonly ? ';opacity:.55;cursor:not-allowed' : ''}">
       </div>`;
@@ -21491,7 +21504,7 @@ async function _provAprovar(oid, rev) {
   const itens = {};
   for (const rb of _PROV_RUBRICAS) {
     const el = document.getElementById('_prov-inp-' + rb.key);
-    itens[rb.key] = el ? (parseFloat(el.value) || 0) : 0;
+    itens[rb.key] = el ? parseMoeda(el.value) : 0;   // F2-39 Fatia 1: campo agora com máscara financeira
   }
   const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_financeiro',
     titulo: 'Aprovar Aprovação Financeira',
@@ -21524,7 +21537,7 @@ async function _provAcao(oid, rev, decisao) {
     itens = {};
     for (const rb of _PROV_RUBRICAS) {
       const el = document.getElementById('_prov-inp-' + rb.key);
-      itens[rb.key] = el ? parseFloat(el.value) || 0 : 0;
+      itens[rb.key] = el ? parseMoeda(el.value) : 0;   // F2-39 Fatia 1: campo agora com máscara financeira
     }
   }
 

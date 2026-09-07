@@ -267,6 +267,34 @@ rederivados pras bases novas. Os aceites do ACHADO-63/65/66 e `test_leleu_ancora
 5 camadas verdes (b/c/d: 2707 passed, 4 xfailed, 0 failed; e: 10 E2E, 2 flakes conhecidos
 passaram ao repetir). Sem tag.
 
+### F2-39 — fechado [FEITO nesta sessão, a pedido do Marcelo]
+
+Três fatias no painel da AF. **Fatia 1**: campos de `_PROV_RUBRICAS` ganham máscara financeira
+(`mascaraMoedaInput`/`parseMoeda`, já existentes) — regra dos irmãos conferida antes (grep por
+`_prov-inp-`, achou exatamente os dois leitores documentados, nenhum terceiro). **Fatia 2**: o
+Item Especial ganha linha no painel (era só UI — já entrava certo no Cust_Var desde o F2-36);
+`_PAINEL_ITEM_RUBRICA_TODAS["item_especial"]` alimenta a coluna "Atual" com o saldo vivo de
+2.1.04.22; não editável, não entra em `_AF_ITEM_RUBRICA`. **Fatia 3 — REVERTE o ACHADO-62 de
+propósito**: com a separação do Item Especial (F2-36), `out_forn` deixou de carregar a
+ambiguidade que motivava o bloqueio de 06/09 — devolver ao CFO congelado não infla mais nada, só
+desfaz um recorte. Reclassificação bidirecional (mesma função `reclassificar_provisao`, invertida
+na redução); invariante saldo(2.1.04.06)+saldo(2.1.04.14) == CFO congelado testada em 3 passos
+(0→3.000→1.000→0).
+
+**CUIDADO MEDIDO, reportado sem decidir** (pedido explícito do Marcelo, "não invente a regra"):
+reduzir Outros Fornecedores DEPOIS de parte dele já ter sido reconhecida na NF-e deixa a provisão
+e o ativo diferido do CFO divergentes — a provisão volta cheia, o ativo só recupera até o saldo
+ainda aberto. Medido um cenário concreto (3.000 migrados, 1.000 reconhecidos, reversão total):
+provisão do CFO volta a 100.000, ativo só chega a 99.000 — gap de 1.000. Não corrigido; é decisão
+do Marcelo se isso é caso de conciliação (aceitar o gap) ou se a redução deve ser capada pelo
+saldo do ativo.
+
+Achado incidental (camada d): um terceiro teste testava a recusa antiga
+(`test_f2_28_af_e_contrato.py::test_reduzir_out_forn_e_recusado_no_af1`, fora da lista de dois
+arquivos do pacote) — reescrito igual aos outros. Os aceites do ACHADO-63/65/66 e
+`test_leleu_ancora` — INTOCADOS. 5 camadas verdes (b/c/d: 2709 passed, 4 xfailed, 0 failed — LP-16
+flakou uma vez, confirmado pré-existente; e: 12 E2E, 1 flake conhecido limpou ao repetir). Sem tag.
+
 ## Estado em 06/09/2026
 
 ### Em execução agora

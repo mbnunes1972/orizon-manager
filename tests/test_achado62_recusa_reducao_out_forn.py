@@ -1,16 +1,22 @@
 # -*- coding: utf-8 -*-
-"""F2-34, ACHADO-62 — a redução de Outros Fornecedores na AF é aceita em silêncio.
+"""F2-34, ACHADO-62 — REVERTIDO de propósito pelo F2-39 (07/09). Este arquivo testava a RECUSA da
+redução de Outros Fornecedores; agora testa o oposto, com o MESMO cuidado de não perder a
+história (nenhum teste apagado, todos reescritos com o motivo).
 
-MEDIDO (percurso do Marcelo em beta3, confirmando o diagnóstico de 06/09): subir o valor
-funciona e lança certo; baixar de 4.000 para 2.000 atualizava a coluna Rev1 pra 2.000 e NÃO
-fazia lançamento nenhum — o razão ficava em 4.000. Causa: `_migracao = max(0.0, novo − atual)`
-dava zero na redução, e `out_forn` saía do lote genérico (`_itens_af.pop`), então
-`disparar_deltas_af` também não o ajustava.
+POR QUE MUDOU — registrar assim, porque "erramos e voltamos atrás" seria falso: o bloqueio de
+06/09 tinha motivo real NAQUELE desenho, em que `out_forn` carregava DUAS naturezas — mercadoria
+a mais vinda da venda (aditiva) e substituição do Custo de Fábrica — e devolver ao CFO podia
+inflar a previsão da fábrica além do que ela forneceria. O F2-36 (07/09) separou as duas: a
+natureza aditiva saiu pro Item Especial (conta própria, 1.1.06.22/2.1.04.22); `out_forn` ficou
+SÓ substituição — uma fatia recortada do CFO congelado. Devolvê-la é desfazer o recorte, não
+inflar nada. O motivo do bloqueio se foi junto com a ambiguidade que o F2-36 eliminou.
 
-DECIDIDO (Marcelo, 06/09) — muda a decisão anterior, de propósito: a redução NÃO passa a
-funcionar. É BLOQUEADA. Devolver valor ao Custo de Fábrica significaria aumentar a previsão da
-fábrica, incoerente com a operação. O conserto é a RECUSA, não o aviso — nenhum lançamento,
-nenhum ProvisaoRegistro gravado, a coluna Rev1 permanece com o valor anterior."""
+DECIDIDO (Marcelo, 07/09): "com a inserção do item especial voltamos a poder congelar CFO, e
+Outros Fornecedores pode ser alterado para menos, só não pode ser negativo." Reclassificação
+BIDIRECIONAL (main.py, POST .../provisoes/<rev>, ramo "revisa"): delta > 0 migra
+2.1.04.06→2.1.04.14 (como sempre); delta < 0 devolve 2.1.04.14→2.1.04.06 (`reclassificar_
+provisao`, mesma função, só invertida — nenhuma lógica nova). Invariante que isso estabelece:
+saldo(2.1.04.06) + saldo(2.1.04.14) == CFO congelado, em qualquer sequência de altas e baixas."""
 import json
 
 import mod_contabil as mc
@@ -51,11 +57,58 @@ def _limpar(app_db, seed):
     db.commit(); db.close()
 
 
-def test_percurso_3000_4000_2000_a_reducao_e_recusada(http_client_factory, app_db, seed, projetos_dir):
-    """Reproduz o percurso exato do Marcelo: 3.000 → 4.000 (ok) → 2.000 (recusado, Rev1 intacta)."""
-    _preparar(app_db, seed)
+def test_percurso_encadeado_sobe_desce_e_zera_out_forn_com_cfo_espelhando(
+        http_client_factory, app_db, seed, projetos_dir):
+    """ACEITE F2-39 Fatia 3 (números à mão, CFO congelado 100.000):
+      a) sobe out_forn 0 -> 3.000:  2.1.04.06 = 97.000  2.1.04.14 = 3.000  soma 100.000
+      b) baixa 3.000 -> 1.000:      2.1.04.06 = 99.000  2.1.04.14 = 1.000  soma 100.000
+      c) zera 1.000 -> 0:           2.1.04.06 = 100.000 2.1.04.14 = 0      soma 100.000
+    Em cada passo, `itens["custo_fabrica"]` gravado no Rev1 == saldo vivo de 2.1.04.06 depois."""
+    _preparar(app_db, seed, cfo=100000.0)
     c = http_client_factory(); c.login("dir_l1", "senha123")
     oid = seed["orcamento_l1_id"]
+    nome = seed["projeto_l1"]
+    db = app_db.get_session()
+    ot, oid_ = mc.resolver_owner(db, {"loja_id": seed["loja1_id"], "rede_id": None})
+    db.close()
+
+    def _passo(valor_novo, cfo_esperado, of_esperado):
+        st, body = c.post("/api/orcamentos/%d/provisoes/rev1" % oid,
+                          {"decisao": "revisa", "itens": _base_itens(out_forn=valor_novo),
+                           "login": "dir_l1", "senha": "senha123"})
+        assert st == 200 and body["ok"] is True, body
+        db = app_db.get_session()
+        try:
+            cfo = _saldo(db, ot, oid_, "2.1.04.06", nome)
+            of = _saldo(db, ot, oid_, "2.1.04.14", nome)
+            assert cfo == cfo_esperado, ("2.1.04.06 esperado %r, achou %r" % (cfo_esperado, cfo))
+            assert of == of_esperado, ("2.1.04.14 esperado %r, achou %r" % (of_esperado, of))
+            assert round(cfo + of, 2) == 100000.0, "invariante CFO+Outros Fornecedores == congelado"
+            rev1 = db.query(app_db.ProvisaoRegistro).filter_by(orcamento_id=oid, versao="rev1").first()
+            assert json.loads(rev1.itens_json)["custo_fabrica"] == cfo_esperado, (
+                "itens['custo_fabrica'] gravado tem que refletir o razão DEPOIS da submissão")
+        finally:
+            db.close()
+
+    _passo(3000.0, 97000.0, 3000.0)   # a) sobe 0 -> 3.000
+    _passo(1000.0, 99000.0, 1000.0)   # b) baixa 3.000 -> 1.000
+    _passo(0.0,   100000.0,    0.0)   # c) zera 1.000 -> 0
+
+    _limpar(app_db, seed)
+
+
+def test_reducao_alem_do_saneamento_de_entrada_vira_zero_nao_erro(
+        http_client_factory, app_db, seed, projetos_dir):
+    """F2-39: "valor negativo continua recusado" — pela MESMA sanitização que já existe pra
+    TODAS as rubricas na entrada da rota (`max(0.0, float(v or 0))`, antes de chegar no ramo de
+    Outros Fornecedores) — não é uma trava nova só pra out_forn. Submeter -500 com out_forn em
+    3.000 não gera erro 400: o valor negativo vira 0.0 na sanitização de entrada, e 0.0 é uma
+    redução válida (zera). Não é "recusado" no sentido de rejeitar a submissão — é absorvido
+    pela mesma regra genérica que qualquer outro campo já tem."""
+    _preparar(app_db, seed, cfo=100000.0)
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    oid = seed["orcamento_l1_id"]
+    nome = seed["projeto_l1"]
 
     st, body = c.post("/api/orcamentos/%d/provisoes/rev1" % oid,
                       {"decisao": "revisa", "itens": _base_itens(out_forn=3000.0),
@@ -63,25 +116,57 @@ def test_percurso_3000_4000_2000_a_reducao_e_recusada(http_client_factory, app_d
     assert st == 200 and body["ok"] is True, body
 
     st, body = c.post("/api/orcamentos/%d/provisoes/rev1" % oid,
-                      {"decisao": "revisa", "itens": _base_itens(out_forn=4000.0),
+                      {"decisao": "revisa", "itens": _base_itens(out_forn=-500.0),
                        "login": "dir_l1", "senha": "senha123"})
-    assert st == 200 and body["ok"] is True, body
-
-    st, body = c.post("/api/orcamentos/%d/provisoes/rev1" % oid,
-                      {"decisao": "revisa", "itens": _base_itens(out_forn=2000.0),
-                       "login": "dir_l1", "senha": "senha123"})
-    assert st == 400 and body["ok"] is False, body
-    assert "reduzido" in body["erro"]
-    assert "4000" in body["erro"] or "4.000" in body["erro"] or "4000.00" in body["erro"], body
+    assert st == 200 and body["ok"] is True, body   # sanitizado pra 0.0, não recusado com 400
 
     db = app_db.get_session()
     try:
         ot, oid_ = mc.resolver_owner(db, {"loja_id": seed["loja1_id"], "rede_id": None})
-        assert _saldo(db, ot, oid_, "2.1.04.14", seed["projeto_l1"]) == 4000.0   # inalterado
-        rev1 = db.query(app_db.ProvisaoRegistro).filter_by(orcamento_id=oid, versao="rev1").first()
-        assert json.loads(rev1.itens_json)["out_forn"] == 4000.0   # Rev1 intacta
+        assert _saldo(db, ot, oid_, "2.1.04.14", nome) == 0.0
+        assert _saldo(db, ot, oid_, "2.1.04.06", nome) == 100000.0
     finally:
         db.close()
+    _limpar(app_db, seed)
+
+
+def test_item_especial_intocado_durante_a_migracao_bidirecional_de_out_forn(
+        http_client_factory, app_db, seed, projetos_dir):
+    """ACEITE F2-39 (g): o Item Especial (2.1.04.22) não se move em NENHUM passo da migração de
+    Outros Fornecedores (2.1.04.14) — prova que a separação do F2-36 segurou: as duas rubricas
+    têm par ativo×provisão PRÓPRIO, sem interseção nenhuma no razão."""
+    import main
+    oid = seed["orcamento_l1_id"]
+    nome = seed["projeto_l1"]
+    db = app_db.get_session()
+    orc = db.get(app_db.Orcamento, oid)
+    orc.loja_id = seed["loja1_id"]
+    orc.item_especial = 4000.0
+    db.commit()
+    ot, oid_ = mc.resolver_owner(db, {"loja_id": seed["loja1_id"], "rede_id": None})
+    main._fin_provisoes_venda_seguro(orc, nome, "f239-item-esp:" + nome)
+    db.commit()
+    db.close()
+    _preparar(app_db, seed, cfo=100000.0)
+
+    assert _saldo(app_db.get_session(), ot, oid_, "2.1.04.22", nome) == 4000.0
+
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    for valor in (3000.0, 1000.0, 0.0, 2500.0):
+        st, body = c.post("/api/orcamentos/%d/provisoes/rev1" % oid,
+                          {"decisao": "revisa", "itens": _base_itens(out_forn=valor),
+                           "login": "dir_l1", "senha": "senha123"})
+        assert st == 200 and body["ok"] is True, body
+        db = app_db.get_session()
+        try:
+            assert _saldo(db, ot, oid_, "2.1.04.22", nome) == 4000.0, (
+                "Item Especial não pode se mover por causa de uma migração de Outros Fornecedores")
+        finally:
+            db.close()
+
+    db = app_db.get_session()
+    db.query(mc.Lancamento).filter_by(owner_tipo=ot, owner_id=oid_, projeto_id=nome).delete()
+    db.commit(); db.close()
     _limpar(app_db, seed)
 
 
@@ -127,8 +212,9 @@ def test_valor_igual_e_noop_sem_erro(http_client_factory, app_db, seed, projetos
 
 def test_outra_rubrica_reduzida_na_mesma_submissao_continua_funcionando(
         http_client_factory, app_db, seed, projetos_dir):
-    """A recusa é de out_forn, não da AF inteira — reduzir OUTRA rubrica (assistência) na MESMA
-    submissão onde out_forn fica igual/sobe continua funcionando normalmente."""
+    """A regra de Outros Fornecedores agora é bidirecional por conta própria — nada aqui exigia
+    isolamento de "só out_forn é verificado"; mantido como controle de que reduzir OUTRA rubrica
+    (assistência) na MESMA submissão continua funcionando normalmente."""
     _preparar(app_db, seed)
     c = http_client_factory(); c.login("dir_l1", "senha123")
     oid = seed["orcamento_l1_id"]
@@ -143,7 +229,7 @@ def test_outra_rubrica_reduzida_na_mesma_submissao_continua_funcionando(
     db = app_db.get_session()
     try:
         ot, oid_ = mc.resolver_owner(db, {"loja_id": seed["loja1_id"], "rede_id": None})
-        assert _saldo(db, ot, oid_, "2.1.04.14", seed["projeto_l1"]) == 1000.0   # out_forn intacto
+        assert _saldo(db, ot, oid_, "2.1.04.14", seed["projeto_l1"]) == 1000.0    # out_forn intacto
         assert _saldo(db, ot, oid_, "2.1.04.05", seed["projeto_l1"]) == 300.0    # assist caiu de verdade
     finally:
         db.close()

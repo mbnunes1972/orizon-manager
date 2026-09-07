@@ -1,21 +1,19 @@
 # -*- coding: utf-8 -*-
-"""E2E de NAVEGADOR (Playwright) — F2-34, ACHADO-62 (docs/db/ACHADOS_CONTABEIS.md).
+"""E2E de NAVEGADOR (Playwright) — F2-34, ACHADO-62 — REVERTIDO de propósito pelo F2-39 (07/09).
 
-Reproduz o percurso exato do Marcelo em beta3: no painel de Provisões (AF1), digitar Outros
-Fornecedores 3.000 (ok, lança), depois 4.000 (ok, migra mais 1.000), depois 2.000 (recusado —
-Rev1 continua em 4.000, nenhum lançamento novo, texto simples na própria tela, sem popup de
-erro nem caixa vermelha — ver F2-33).
+Este arquivo provava a RECUSA da redução de Outros Fornecedores; agora prova o oposto — a
+redução (e a devolução total) funcionam de verdade na TELA, não só na API. Ver o docstring de
+`tests/test_achado62_recusa_reducao_out_forn.py` pro motivo completo da reversão (a separação do
+Item Especial no F2-36 tirou a ambiguidade que motivava o bloqueio de 06/09).
 
-Por que este teste TEM que ser de navegador: o critério de aceite inclui que a coluna Rev1 NÃO
-mude na tela após a recusa (não é só "o servidor devolveu 400" — é "o usuário vê o valor
-anterior, não o rejeitado") — isso só o motor do navegador, renderizando o retorno real do
-fetch no DOM, prova.
+Reproduz o percurso: no painel de Provisões (AF1), digitar Outros Fornecedores 3.000 (ok, lança),
+depois 4.000 (ok, migra mais 1.000), depois 2.000 — agora ACEITO, migra de volta 2.000 pro Custo
+de Fábrica. F2-39 Fatia 1 (mesma rodada): o campo ganhou máscara financeira
+(`mascaraMoedaInput`/`parseMoeda`) — o valor abre como "R$ 4.000,00", não mais "4000.00".
 
-Setup: cria Projeto/Orçamento/CFO diretamente por sessão de banco (mesma disciplina de
-`_e2e_bootstrap.py` — sessão própria, guarda de banco antes de escrever) — a tela é dirigida
-pelas MESMAS funções JS que um clique real usa (`abrirProvisoes`, `_provToggleRevisa`,
-`_provAcao`), só pulando os ~6 passos de setup (briefing/ambiente/contrato) que não são o
-objeto deste teste."""
+Por que este teste TEM que ser de navegador: o critério de aceite inclui que a coluna Rev1
+reflita o valor reduzido DE VERDADE na tela (não é só "o servidor devolveu 200" — é "o usuário vê
+o valor novo, renderizado pelo fetch real no DOM") — isso só o motor do navegador prova."""
 import os
 import socket
 import subprocess
@@ -124,7 +122,7 @@ def _seed_orcamento_com_cfo(loja_id, cfo=101446.51):
         db.close()
 
 
-def test_percurso_3000_4000_2000_recusado_na_tela(page, servidor_e2e):
+def test_percurso_3000_4000_2000_a_reducao_e_aceita(page, servidor_e2e):
     base = servidor_e2e
     page.goto(base + "/static/login.html")
     page.fill("#email", "e2e_master")
@@ -136,10 +134,6 @@ def test_percurso_3000_4000_2000_recusado_na_tela(page, servidor_e2e):
     oid = _seed_orcamento_com_cfo(loja_id)
 
     def _fechar_modal_se_existir():
-        # _provAcao, no SUCESSO, já remove o overlay antigo e reabre sozinho — fechar de novo
-        # aqui é no-op nesse caso; no FRACASSO (recusa) o modal antigo fica, com o valor
-        # rejeitado ainda digitado — fechar explicitamente evita duas cópias de #_prov-inp-*
-        # no DOM ao reabrir manualmente.
         page.evaluate("() => { if (window._provModalOv) { window._provModalOv.remove(); "
                      "window._provModalOv = null; } }")
 
@@ -149,8 +143,16 @@ def test_percurso_3000_4000_2000_recusado_na_tela(page, servidor_e2e):
         page.wait_for_selector("#_prov-inp-out_forn", state="attached")
         page.evaluate("() => _provToggleRevisa()")
 
+    def _fmt_brl(valor):
+        # "3000" (dígitos crus, sem vírgula) -> "R$ 3.000" — mascaraMoedaInput só acrescenta
+        # ",XX" quando o próprio texto digitado já tem vírgula (não insere centavos sozinha).
+        inteiro = "{:,.0f}".format(valor).replace(",", ".")
+        return "R$ " + inteiro
+
     def _submeter(valor):
         page.fill("#_prov-inp-out_forn", str(valor))
+        # F2-39 Fatia 1: o oninput da máscara roda no fill — confirma o formato antes de submeter.
+        assert page.input_value("#_prov-inp-out_forn") == _fmt_brl(valor)
         # _provAcao chama pedirCredenciaisGerente(capacidade:'aprovar_financeiro') — essa
         # capacidade SEMPRE pede senha de novo (achado 2026-08-25, mesmo logado com a
         # permissão), então o modal de credenciais abre de verdade aqui.
@@ -171,17 +173,31 @@ def test_percurso_3000_4000_2000_recusado_na_tela(page, servidor_e2e):
     page.wait_for_timeout(1200)
 
     _abrir_e_revisar()
-    # 2.000 → recusado (no fracasso o modal NÃO é trocado — o erro aparece na própria tela)
+    # 2.000 → F2-39: ACEITO agora (era recusado antes da reversão do ACHADO-62) — migra
+    # 2.000 de volta pro Custo de Fábrica, sem erro na tela.
     _submeter(2000)
-    page.wait_for_selector("text=reduzido", timeout=8000)
-    erro = page.locator("#_prov-erro").inner_text()
-    assert "reduzido" in erro and ("4000" in erro or "4.000" in erro or "4000.00" in erro), erro
-
-    # nenhuma caixa de erro/popup — texto simples na própria tela (F2-33)
+    page.wait_for_timeout(1200)
+    assert page.query_selector("#_prov-erro") is None or page.inner_text("#_prov-erro") == ""
     assert page.query_selector("#erro-modal-overlay") is None
 
-    # Rev1 PERSISTIDA continua em 4.000 — reabre fresco (fora do modal com o 2.000 rejeitado
-    # ainda no input) pra confirmar que o servidor não gravou nada.
+    # Rev1 PERSISTIDA reflete o valor REDUZIDO — reabre fresco pra confirmar que o servidor gravou.
     _abrir_e_revisar()
     valor_tela = page.input_value("#_prov-inp-out_forn")
-    assert valor_tela.replace(",", ".") in ("4000.00", "4000"), valor_tela
+    assert valor_tela == "R$ 2.000,00", valor_tela
+
+    # confirma no razão: 2.1.04.14 == 2.000 (final); CFO congelado (101.446,51) menos o que
+    # ainda está migrado (2.000) — invariante CFO_inicial - saldo(2.1.04.14) == saldo(2.1.04.06),
+    # nenhum reconhecimento de NF-e no meio do caminho pra capar o espelho do ativo.
+    db = _sessao_teste()
+    try:
+        import mod_contabil as mc
+        ot, own = mc.resolver_owner(db, {"loja_id": loja_id, "rede_id": None})
+        saldo_of = round(mc._mov(db, ot, own, "2.1.04.14", "credor", None, None,
+                                 projeto_id="AF E2E Achado62"), 2)
+        saldo_cfo = round(mc._mov(db, ot, own, "2.1.04.06", "credor", None, None,
+                                  projeto_id="AF E2E Achado62"), 2)
+        assert saldo_of == 2000.0
+        assert saldo_cfo == 99446.51   # 101.446,51 - 2.000 (o que ficou migrado no final)
+        assert round(saldo_of + saldo_cfo, 2) == 101446.51
+    finally:
+        db.close()

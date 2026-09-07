@@ -103,15 +103,17 @@ def test_editar_out_forn_migra_automaticamente_da_fabrica(http_client_factory, a
         db.commit(); db.close()
 
 
-def test_reduzir_out_forn_e_recusado_no_af1(http_client_factory, app_db, seed, projetos_dir):
-    """ACHADO-62 (06/09, DECIDIDO — muda esta decisão do F2-28, de propósito): migração só numa
-    direção (fábrica → outros) deixou de significar "aceita e ignora silenciosamente a redução"
-    — passa a significar RECUSA da submissão inteira. Devolver valor ao Custo de Fábrica
-    aumentaria a previsão da fábrica, incoerente com a operação (motivo do Marcelo). Antes desta
-    correção, este teste teimava justamente a versão errada da regra ("digitar um valor MENOR de
-    out_forn não devolve nada pra fábrica" — só a metade certa: não devolvia, mas TAMBÉM não
-    recusava, e a coluna Rev1 gravava o valor reduzido enquanto o razão ficava no valor antigo,
-    o próprio ACHADO-62)."""
+def test_reduzir_out_forn_e_aceito_no_af1(http_client_factory, app_db, seed, projetos_dir):
+    """ACHADO-62 REVERTIDO de propósito pelo F2-39 (07/09) — muda esta decisão de novo, e desta
+    vez por um motivo que elimina a ambiguidade em vez de só trocar de lado. O bloqueio de 06/09
+    (testado aqui até o F2-38) tinha motivo real NAQUELE desenho: `out_forn` carregava DUAS
+    naturezas — mercadoria a mais vinda da venda (aditiva) e substituição do Custo de Fábrica —,
+    e devolver ao CFO podia inflar a previsão da fábrica além do que ela forneceria. O F2-36
+    separou as duas: a natureza aditiva foi pro Item Especial (conta própria); `out_forn` ficou
+    SÓ substituição — uma fatia recortada do CFO congelado. Devolvê-la é desfazer o recorte, não
+    inflar nada — o motivo do bloqueio se foi junto com a ambiguidade. Migração agora BIDIRECIONAL:
+    reduzir 300 -> 100 devolve 200 pro Custo de Fábrica (reclassificação 2.1.04.14 -> 2.1.04.06,
+    mesma função `reclassificar_provisao`, só invertida)."""
     _setup_venda(app_db, seed)
     c = http_client_factory(); c.login("dir_l1", "senha123")
     import mod_contabil as _mc
@@ -132,17 +134,20 @@ def test_reduzir_out_forn_e_recusado_no_af1(http_client_factory, app_db, seed, p
     st, body = c.post("/api/orcamentos/%d/provisoes/rev1" % seed["orcamento_l1_id"],
                       {"decisao": "revisa", "itens": {**base, "out_forn": 100.0},
                        "login": "dir_l1", "senha": "senha123"})
-    assert st == 400 and body["ok"] is False, body
-    assert "reduzido" in body["erro"] and "300" in body["erro"], body
+    assert st == 200 and body["ok"] is True, body
     db = app_db.get_session()
     try:
         ot, oid = _mc.resolver_owner(db, {"loja_id": seed["loja1_id"], "rede_id": None})
-        assert _s(db, ot, oid, "2.1.04.14", projeto_id=seed["projeto_l1"]) == 300.0   # inalterado
-        assert _s(db, ot, oid, "2.1.04.06", projeto_id=seed["projeto_l1"]) == 700.0   # inalterado
-        # o registro da revisão continua com o valor ANTERIOR (300), não o 100 recusado
+        assert _s(db, ot, oid, "2.1.04.14", projeto_id=seed["projeto_l1"]) == 100.0   # reduzido de verdade
+        assert _s(db, ot, oid, "2.1.04.06", projeto_id=seed["projeto_l1"]) == 900.0   # 700 + 200 devolvidos
+        assert round(_s(db, ot, oid, "2.1.04.14", projeto_id=seed["projeto_l1"])
+                     + _s(db, ot, oid, "2.1.04.06", projeto_id=seed["projeto_l1"]), 2) == 1000.0
+        # o registro da revisão reflete o valor NOVO (100), e custo_fabrica bate com o razão
         rev1 = db.query(app_db.ProvisaoRegistro).filter_by(
             orcamento_id=seed["orcamento_l1_id"], versao="rev1").first()
-        assert __import__("json").loads(rev1.itens_json)["out_forn"] == 300.0
+        itens_rev1 = __import__("json").loads(rev1.itens_json)
+        assert itens_rev1["out_forn"] == 100.0
+        assert itens_rev1["custo_fabrica"] == 900.0
     finally:
         db.query(app_db.ProvisaoRegistro).filter_by(orcamento_id=seed["orcamento_l1_id"]).delete()
         db.commit(); db.close()
