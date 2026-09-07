@@ -11676,6 +11676,22 @@ class Handler(BaseHTTPRequestHandler):
                         _atual_out_forn = round(_mc._mov(db, ot_af, own_af, "2.1.04.14", "credor", None, None,
                                                          projeto_id=orc.projeto_id), 2)
                         _novo_out_forn = round(float(itens.get("out_forn") or 0), 2)
+                        # ACHADO-62 (06/09, DECIDIDO — muda a decisão do F2-25/28, de propósito):
+                        # a redução de Outros Fornecedores NÃO é aceita em silêncio (era o defeito:
+                        # `_migracao = max(0, ...)` dava zero, `out_forn` saía do lote genérico —
+                        # a coluna Rev1 gravava o valor NOVO, o razão ficava no ANTIGO) nem só
+                        # avisada — é RECUSADA. Devolver valor ao Custo de Fábrica aumentaria a
+                        # previsão da fábrica, incoerente com a operação (motivo do Marcelo). O
+                        # conserto é a recusa, não o aviso: um popup que informa mas deixa gravar
+                        # deixaria o mesmo descasamento coluna×razão — o documento da decisão tem
+                        # que fechar com o livro (mesma família do ACHADO-16/55). Recusa a
+                        # submissão INTEIRA (nada persiste: nem ProvisaoRegistro, nem lançamento
+                        # de nenhuma rubrica) — não só out_forn, porque gravar as outras rubricas
+                        # aqui produziria um registro que mentiria sobre out_forn mesmo assim.
+                        if _novo_out_forn < _atual_out_forn - 0.005:
+                            self.send_json({"ok": False,
+                                "erro": "Outros Fornecedores não pode ser reduzido: R$ %.2f já provisionado." % _atual_out_forn},
+                                code=400); return
                         _migracao = max(0.0, round(_novo_out_forn - _atual_out_forn, 2))
                     itens["custo_fabrica"] = round(_atual_cfo - _migracao, 2)
                 cust_var, marg = _mprov.cust_var_marg_cont(cfo, vl, itens)

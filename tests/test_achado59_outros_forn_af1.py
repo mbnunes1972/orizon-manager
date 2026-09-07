@@ -58,6 +58,13 @@ def test_out_forn_editado_na_af1_gera_evento_real(http_client_factory, app_db, s
         cfo = mc._mov(db, ot, oid, "2.1.04.06", "credor", None, None, projeto_id=seed["projeto_l1"])
         assert cfo == -500.0, "a migração tem que debitar o Custo de Fábrica automaticamente"
     finally:
+        # F2-34 (ACHADO-62, 07/09): limpar só o ProvisaoRegistro não bastava mais — o saldo de
+        # 2.1.04.14 (500,00) sobrevivia no razão (seed/app_db são module-scoped) e o teste
+        # IRMÃO deste arquivo (test_impostos_continua_funcionando_controle_irmao, out_forn=0.0)
+        # passava a ser lido como uma REDUÇÃO de 500→0 — recusada pela trava nova. Limpa também
+        # o Lancamento (regra dos irmãos, mesma lição do F2-29 Fatia D/F2-30 Fatia 1).
+        db.query(mc.Lancamento).filter_by(owner_tipo=ot, owner_id=oid,
+                                          projeto_id=seed["projeto_l1"]).delete()
         db.query(app_db.ProvisaoRegistro).filter_by(orcamento_id=seed["orcamento_l1_id"]).delete()
         db.commit(); db.close()
 

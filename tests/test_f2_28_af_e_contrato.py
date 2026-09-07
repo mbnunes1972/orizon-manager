@@ -103,9 +103,15 @@ def test_editar_out_forn_migra_automaticamente_da_fabrica(http_client_factory, a
         db.commit(); db.close()
 
 
-def test_reduzir_out_forn_nao_reverte_a_migracao(http_client_factory, app_db, seed, projetos_dir):
-    """Migração só numa direção (fábrica → outros), igual antes do F2-28: digitar um valor MENOR
-    de out_forn não devolve nada pra fábrica."""
+def test_reduzir_out_forn_e_recusado_no_af1(http_client_factory, app_db, seed, projetos_dir):
+    """ACHADO-62 (06/09, DECIDIDO — muda esta decisão do F2-28, de propósito): migração só numa
+    direção (fábrica → outros) deixou de significar "aceita e ignora silenciosamente a redução"
+    — passa a significar RECUSA da submissão inteira. Devolver valor ao Custo de Fábrica
+    aumentaria a previsão da fábrica, incoerente com a operação (motivo do Marcelo). Antes desta
+    correção, este teste teimava justamente a versão errada da regra ("digitar um valor MENOR de
+    out_forn não devolve nada pra fábrica" — só a metade certa: não devolvia, mas TAMBÉM não
+    recusava, e a coluna Rev1 gravava o valor reduzido enquanto o razão ficava no valor antigo,
+    o próprio ACHADO-62)."""
     _setup_venda(app_db, seed)
     c = http_client_factory(); c.login("dir_l1", "senha123")
     import mod_contabil as _mc
@@ -119,18 +125,24 @@ def test_reduzir_out_forn_nao_reverte_a_migracao(http_client_factory, app_db, se
         db.close()
     base = {"frete_fab": 0.0, "com_adm": 0.0, "com_venda": 0.0, "com_med": 0.0,
             "com_proj_exec": 0.0, "frete_loc": 0.0, "assist": 0.0, "ins_loc": 0.0, "prov_imp": 0.0}
-    c.post("/api/orcamentos/%d/provisoes/rev1" % seed["orcamento_l1_id"],
+    st1, body1 = c.post("/api/orcamentos/%d/provisoes/rev1" % seed["orcamento_l1_id"],
           {"decisao": "revisa", "itens": {**base, "out_forn": 300.0},
            "login": "dir_l1", "senha": "senha123"})
+    assert st1 == 200 and body1["ok"] is True, body1
     st, body = c.post("/api/orcamentos/%d/provisoes/rev1" % seed["orcamento_l1_id"],
                       {"decisao": "revisa", "itens": {**base, "out_forn": 100.0},
                        "login": "dir_l1", "senha": "senha123"})
-    assert st == 200 and body["ok"] is True, body
+    assert st == 400 and body["ok"] is False, body
+    assert "reduzido" in body["erro"] and "300" in body["erro"], body
     db = app_db.get_session()
     try:
         ot, oid = _mc.resolver_owner(db, {"loja_id": seed["loja1_id"], "rede_id": None})
-        assert _s(db, ot, oid, "2.1.04.14", projeto_id=seed["projeto_l1"]) == 300.0   # não caiu
-        assert _s(db, ot, oid, "2.1.04.06", projeto_id=seed["projeto_l1"]) == 700.0   # não voltou
+        assert _s(db, ot, oid, "2.1.04.14", projeto_id=seed["projeto_l1"]) == 300.0   # inalterado
+        assert _s(db, ot, oid, "2.1.04.06", projeto_id=seed["projeto_l1"]) == 700.0   # inalterado
+        # o registro da revisão continua com o valor ANTERIOR (300), não o 100 recusado
+        rev1 = db.query(app_db.ProvisaoRegistro).filter_by(
+            orcamento_id=seed["orcamento_l1_id"], versao="rev1").first()
+        assert __import__("json").loads(rev1.itens_json)["out_forn"] == 300.0
     finally:
         db.query(app_db.ProvisaoRegistro).filter_by(orcamento_id=seed["orcamento_l1_id"]).delete()
         db.commit(); db.close()
