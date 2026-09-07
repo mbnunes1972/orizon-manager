@@ -289,6 +289,72 @@ projeção que existia ANTES da descoberta e a realizada de DEPOIS diferem
 exatamente por esse valor. É o retrato correto de uma surpresa genuína — não
 um defeito do cálculo.
 
+## Outros Fornecedores: mercadoria comprada para entrega, duas origens [DECIDIDO 06/09/2026]
+
+A rubrica Outros Fornecedores (`1.1.06.14` × `2.1.04.14`) é sempre a mesma coisa —
+**mercadoria comprada para entregar ao cliente**. O que muda é de onde ela vem, e é a
+origem que decide se o Custo de Fábrica é tocado:
+
+**Origem 1 — a venda.** O consultor inclui um item que a fábrica não fornece (um eletro,
+uma peça de terceiro). O cliente paga por ele. Entra pelo valor cheio no Valor Bruto e no Valor
+à Vista ao mesmo tempo (entrada simétrica, 07/09), sem desconto e sem custos adicionais
+incidindo, e **não reduz o Custo de Fábrica** — é mercadoria a mais, não substituição de nada.
+Como ele não sofre desconto e o Bruto cresce, o **desconto efetivo dilui** — e é o efetivo, não
+o digitado, que fecha `Bruto × (1 − desconto) = à vista`.
+
+**Origem 2 — a substituição, depois da venda.** Na Aprovação Financeira, parte do que a
+fábrica forneceria passa a vir de outro fornecedor. É a mesma mercadoria trocando de origem,
+então **sai do Custo de Fábrica**, por reclassificação `2.1.04.06 → 2.1.04.14`, pelo
+incremento sobre o saldo vivo.
+
+Esse é o motivo da assimetria que o razão mostra: aditivo no contrato, substitutivo na AF.
+Não é inconsistência — são duas origens da mesma mercadoria.
+
+**Na margem.** O item entra no `Val_Liq` (é faturamento da venda) e o seu custo permanece no
+`Cust_Var` (é irmão do Custo de Fábrica). A margem em **reais** não muda; a margem em
+**percentual cai**, porque entrou faturamento sem markup diluindo a base. A queda é o sinal
+correto, não um defeito: vender item especial não melhora a margem do projeto.
+
+**No markup.** `Markup = Val_Liq / (CFO + Outros Fornecedores)` — as duas parcelas compõem a
+mercadoria comprada. Atenção: esse NÃO é o fator usado pela conciliação de PE, que converte
+diferença de custo de FÁBRICA em valor de contrato e continua usando `Val_Liq / CFO`.
+
+**Vendido pelo custo.** O valor é um só e é o de custo: a loja repassa. Se conseguir comprar
+por menos, a economia não vira margem na venda — aparece como sobra de provisão e volta como
+Receita de Conciliação na competência da conciliação, pelo caminho que já existe. Mesma
+doutrina da seção anterior: a provisão é o valor cheio, e a diferença se resolve no fim.
+
+**[ABERTO] Imposto.** O item entra no `Val_Cont` e portanto na provisão de impostos, pela
+carga tributária média. A alíquota real varia por tipo de item, e são muitos — o tratamento
+por item é frente fiscal, ainda não desenhada. Até lá, a diferença (para mais ou para menos)
+aparece como saldo na conciliação, como qualquer outra variação de estimativa.
+
+## A provisão é o valor cheio, não o recuperado [DECIDIDO 06/09/2026]
+
+A partir do ACHADO-63 (06/09), os custos adicionais de valor fixo — Custo de
+Viagem, Brinde e Custo Especial — passam a **sofrer o desconto** concedido ao
+cliente: a loja recupera `custo × (1−d)`, não o valor cheio. A regra existe por
+motivo comercial: o desconto anunciado tem que levar o Bruto ao Valor à Vista,
+ou o cliente confere e não bate.
+
+**Isso não toca a provisão.** O brinde custa o que custa; o desconto muda quanto
+o cliente pagou por ele, não quanto a loja vai gastar. A provisão continua sendo
+constituída pelo valor digitado na tela — "o registro em todo o sistema é pelo
+valor colocado na tela" (Marcelo, 06/09) — e o par ativo diferido × provisão
+nasce integral, como as demais rubricas.
+
+A diferença (`custo × d`) é **margem cedida**, e ela aparece onde nasceu: no
+`Val_Liq` da venda, no momento em que o desconto foi concedido. Não é provisão a
+menor, não é despesa antecipada, não é resíduo de conciliação.
+
+Isto foi examinado e recusado explicitamente: provisionar `custo × (1−d)` faria
+o razão prometer um gasto de 750 para uma obrigação de 1.000, e os 250 apareceriam
+na entrega como resíduo sem origem, numa competência posterior — exatamente a
+divergência entre a margem projetada e o livro que este documento existe para
+eliminar. Se o gestor conseguir comprar por menos do que provisionou, a margem
+volta pelo caminho que já existe: sobra de provisão → Receita de Conciliação, na
+competência da conciliação. Nenhum mecanismo novo.
+
 ## As duas visões
 
 `[DECIDIDO 05/09]`

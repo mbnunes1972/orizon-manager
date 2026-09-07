@@ -105,8 +105,8 @@ Por ambiente:
 Se Tog_Cadi (repassa ao cliente):
    VBNA = VBVA / [ (Tog_Carq ? 1−%Com_Arq : 1) · (Tog_Fid ? 1−%Pro_Fid : 1) ]
         + [ (Tog_Cvia ? Cust_Via · (VBVA/VBVO) : 0) + (Tog_Bri ? Bri/Num_Amb : 0) ]
-          / [ (1−%Desc_Orc)·(1−%Desc_Amb) ]
-   # viagem E brinde dentro do colchete /[(1-desc)] → blindados do desconto (recuperados 100%)
+   # viagem E brinde pelo valor de FACE — sofrem o desconto junto com a mercadoria
+   # (ACHADO-63, 06/09/2026; a regra anterior está preservada na nota ao fim desta seção)
 Senão (absorve):
    VBNA = VBVA
 
@@ -122,7 +122,8 @@ VBNO = Σ VBNA          VAVO = Σ VAVA
 
 # comissão EM CADEIA, por ambiente (arq não ganha sobre fid; e nem arq nem fid
 # ganham sobre viagem/brinde — a base SEMPRE exclui esses custos, repassados ou absorvidos):
-#   base_custos = (Tog_Cvia ? Cust_Via·(VBVA/VBVO) : 0) + (Tog_Bri ? Bri/Num_Amb : 0)
+#   base_custos = [ (Tog_Cvia ? Cust_Via·(VBVA/VBVO) : 0) + (Tog_Bri ? Bri/Num_Amb : 0) ]
+#                 · (1−%Desc_Orc)·(1−%Desc_Amb)   # já descontados (ACHADO-63, 06/09/2026)
 #   Pro_Fid_Amb = (Tog_Fid  ? %Pro_Fid · (VAVA − base_custos) : 0)
 #   Com_Arq_Amb = (Tog_Carq ? %Com_Arq · (VAVA − Pro_Fid_Amb − base_custos) : 0)
 Com_Arq_Orc = Σ Com_Arq_Amb
@@ -142,6 +143,104 @@ abate o líquido via `Cust_Ad`); o `Tog_Cadi` diz "repassa (gross-up no VBNA) ou
 
 **Dependência de ordem:** o rateio da viagem usa `VBVA/VBVO`, então `VBVO` é calculado
 antes dos `VBNA`. Não há circularidade (o rateio usa valores de XML, não os negociados).
+
+### Nota de revisão — ACHADO-63 (06/09/2026): gross-up divisivo → valor de face
+
+**A regra anterior**, vigente de 22/06 a 06/09/2026, punha viagem e brinde **dentro** do
+colchete do desconto:
+
+```
+   + [ viagem_amb + brinde_amb ] / [ (1−%Desc_Orc)·(1−%Desc_Amb) ]
+```
+
+Ela recuperava 100% do custo — o desconto multiplicava de volta exatamente o que a divisão
+tinha inflado — e estava certa **quanto a recuperar o custo**. O que ela não considerou é o
+efeito no `VBNO`: o preço de tabela passava a variar conforme o desconto concedido. Medido em
+06/09 sobre uma base de 216.744,05: um brinde de 1.000 entrava no Bruto por 1.428,57 a 30% de
+desconto (excesso = `custo · d/(1−d)`, que a 50% dobra o custo).
+
+**Por que mudou** (decisão do Marcelo, 06/09/2026, com o motivo comercial): o desconto
+anunciado ao cliente tem que levar o Bruto ao Valor à Vista — `Bruto × (1 − desconto) = à
+vista`. Se o consultor aplica 20% e o cliente confere 18%, isso é um problema de mesa de
+negociação, não de exibição. O preço de tabela não pode variar com o desconto concedido.
+
+**Contrapartida assumida:** a loja recupera do cliente só `(1−d)` do custo fixo; a diferença é
+margem cedida e aparece no `Val_Liq` (que cai em `Σ custo − Σ recuperado`). É previsível —
+quem quiser recuperar o valor cheio embute o desconto médio ao digitar o parâmetro, e a tela
+mostra "custa X / cliente paga Y" para a decisão ser tomada com os dois números à vista.
+
+**A provisão contábil NÃO acompanha:** ela continua sendo constituída pelo valor CHEIO — é a
+obrigação real (o brinde custa o que custa). "O registro em todo o sistema é pelo valor
+colocado na tela" (Marcelo, 06/09). Recuperação posterior aparece no saldo da conciliação.
+
+Três propriedades são desejáveis e só duas podem valer ao mesmo tempo: (a) o Bruto não infla
+com o desconto, (b) o custo é recuperado integralmente, (c) `Bruto × (1−d) = à vista`. A regra
+de 22/06 escolheu (b)+(c); a de 06/09 escolhe (a)+(c). A rota (a)+(b) — somar o custo **depois**
+do desconto, como o Custo Especial fazia até 06/09 — foi avaliada e recusada exatamente por
+quebrar (c).
+
+### Nota de revisão — Item Especial e markup (06/09/2026, ACHADO-65)
+
+O motor ganha uma linha que **não é ambiente e não é custo adicional**: o Item Especial —
+mercadoria comprada de terceiro para entregar ao cliente, editável na tela de negociação
+(botão ao lado de "Novo Ambiente"), persistida em `Orcamento.out_forn`.
+
+Onde ele entra:
+
+```
+VBVO      += item            (entrada SIMÉTRICA, valor cheio)
+VBNO      += item            (idem)
+VAVO      += item            (idem — fora do laço de ambientes, nenhum fator o alcança)
+Cust_Ad   NÃO recebe o item  (não é custo adicional da venda — é linha de venda)
+Val_Liq   sobe pelo item     (consequência: é faturamento)
+cust_var  mantém `out_forn`  (o custo é irmão do CFO — NÃO remover)
+Val_Cont  inclui o item (via VAVO) → custo financeiro e Prov_Imp o alcançam
+Markup    = Val_Liq / (CFO + out_forn)
+```
+
+> **Correção de 07/09 (implementação, commit `dac7cb9`).** O desenho escrito em 06/09 punha o
+> item só no VAVO e mandava calcular `Desc_Efetivo = 1 − (VAVO − item)/VBNO`, para preservar
+> `Bruto × (1 − d) = à vista` com o `d` digitado. Ao implementar, o Marcelo reviu para a
+> **entrada simétrica** acima. O motivo é bom e vale registrado: com o item fora do VBVO, o
+> `Desc_Tot` — que é o indicador do portão de 35% — ficava artificialmente BAIXO, mascarando o
+> limite; e com ele fora do VBNO, o desconto efetivo subia em vez de diluir. Entrando nos três,
+> os dois indicadores diluem na proporção certa e o portão continua honesto.
+>
+> Consequência assumida: `Bruto × (1 − desconto DIGITADO) ≠ à vista` quando há item — a
+> diferença é `item × d`. Quem fecha é o **desconto EFETIVO**: `Bruto × (1 − Desc_Efetivo) =
+> à vista`, exato a menos do arredondamento de seis casas do próprio `Desc_Efetivo`. É a mesma
+> situação do desconto por ambiente, e é para isso que o campo do desconto efetivo existe.
+> Medido em 07/09 (mercadoria 216.744,05, item 5.000, desconto 30%): Bruto 221.744,05, à vista
+> 156.720,83, efetivo 29,3235%, `Desc_Tot` 29,32%.
+
+Efeito na margem, de propósito: **igual em reais, menor em percentual**. Entrou faturamento
+sem markup, então dilui. Exemplo: `Val_Liq 100.000 / Cust_Var 60.000` = 40,00%; com item de
+5.000 nos dois, `40.000 / 105.000` = 38,10%.
+
+**Cuidado com a cadeia do desconto:** como o item entra no VAVO e não no VBNO, o desconto
+efetivo tem de ser calculado sobre a mercadoria — `1 − (VAVO − item) / VBNO` — e a tela mostra
+o item como linha própria, depois do desconto:
+
+```
+Bruto → − desconto → à vista dos ambientes → + Item Especial → Valor do Contrato
+```
+
+Pôr o item dentro do Bruto quebraria `Bruto × (1 − d) = à vista` por `item × d`, que é
+exatamente o defeito do ACHADO-63, em outra porta.
+
+**Markup — dois usos, um nome:** o indicador exibido passa a `Val_Liq / (CFO + out_forn)`
+(as duas parcelas compõem mercadoria comprada). A conciliação de PE (`main.py`, chamadas a
+`diferenca_valor_contrato_estimada`) continua com `Val_Liq / CFO`, porque ali o fator converte
+diferença de custo de FÁBRICA em valor de contrato, e diluí-lo por mercadoria de terceiro
+distorceria um número que vira valor de contrato em renegociação.
+
+O conceito completo (as duas origens da rubrica, e por que uma toca o CFO e a outra não) está
+em `docs/db/MODELO_CONTABIL.md`, seção "Outros Fornecedores: mercadoria comprada para entrega".
+
+**Desconto efetivo:** com desconto por ambiente, o percentual global não descreve o conjunto —
+o efetivo é `1 − VAVO/VBNO` (ponderado) e é ele que fecha com o Bruto. Não confundir com o
+composto de `_maior_desconto_efetivo_pct` (main.py), que usa o PIOR ambiente e serve à trava de
+autorização (ACHADO-42, 12/08). São dois números com finalidades diferentes.
 
 ---
 
@@ -255,6 +354,13 @@ Entrada: 2 ambientes — Área Gourmet (`VBVA` 22.830,99 / `CFA` 22.830,99) e Ba
 > `/[(1−%Desc_Orc)·(1−%Desc_Amb)]` (blindados do desconto); a comissão é por ambiente e em
 > cadeia (arq não ganha sobre fid; ambos excluem viagem/brinde). Resultado: com tudo
 > repassado, `Val_Liq` = líquido sem custo e `%Desc_Tot` = `%Desc_Orc`.
+
+> **[REVISADO em 06/09/2026 — ACHADO-63]** A parte "blindagem" deste parágrafo e os números
+> deste exemplo correspondem à regra ANTIGA (gross-up divisivo). Sob a regra vigente, viagem e
+> brinde entram pelo valor de face e sofrem o desconto: `Val_Liq` fica menor em `Σ custo × d` e
+> `%Desc_Tot` fica maior que `%Desc_Orc` na mesma proporção. A comissão em cadeia (arq não ganha
+> sobre fid; ambos excluem viagem/brinde) **não mudou** — só a expressão da base, que agora usa
+> os custos já descontados. O teste-âncora foi atualizado junto com o motor.
 
 Este caso vira o teste unitário-âncora do `mod_negociacao`.
 

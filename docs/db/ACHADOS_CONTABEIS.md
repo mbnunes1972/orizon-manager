@@ -4843,3 +4843,241 @@ padrão de pass-through já usado por `resultado_financeiro`/
 
 ---
 
+## ACHADO-61 — o Outros Fornecedores dos Parâmetros não constituía provisão no contrato · RESOLVIDO 06/09/2026 (F2-31)
+
+Irmão do ACHADO-59, outra porta. Saído do Teste 7 do Marcelo em
+Homologação (06/09, beta2): digitou R$ 2.000,00 em "Outros
+Fornecedores" na tela de Parâmetros da negociação, ANTES da
+assinatura. Na AF1 subiu para R$ 4.000,00 — e a provisão de Custo de
+Fábrica foi reduzida pelos 4.000 inteiros, em vez dos 2.000 de
+diferença.
+
+**Medido, a cadeia inteira:** a tela grava (`main.py`, `orc.out_forn`);
+o motor conta (`mod_provisoes.py`, `cust_var = CFO + out_forn + ...`,
+SOMANDO — não desconta do CFO); o painel exibe. O elo que faltava: o
+dict `valores` de `_fin_provisoes_venda_seguro` (`main.py`), que
+alimenta `constituir_provisoes_fechamento`, **não tinha a chave
+`outros_forn`**. O par ativo×provisão (`1.1.06.14`/`2.1.04.14`) já
+existia pronto desde o ACHADO-59. O razão do Teste 7 confirmou: no lote
+da assinatura (08:23) não há um único lançamento em `2.1.04.14`.
+
+A lógica de delta da AF (`main.py`, `_migracao = max(0, novo − atual)`)
+estava e está CORRETA — ela compara com o saldo vivo do razão. O
+defeito era a ENTRADA: `_atual_out_forn` valia zero porque a provisão
+nunca tinha nascido. Por isso a "diferença" era o valor inteiro.
+
+O comentário de `_PROV_FECHAMENTO` afirmava, desde 05/09, que "nenhum
+chamador passa `outros_forn` em `valores` no fechamento — a rubrica
+nasce vazia". Era premissa de desenho, não medição, e a regra do
+ACHADO-26 (nunca consertar uma ocorrência sem enumerar as irmãs)
+mandava conferir as portas naquele dia. Só uma foi olhada.
+
+### Conserto (06/09)
+
+Chave `"outros_forn": round(float(getattr(orc2, "out_forn", 0) or 0), 2)`
+no dict `valores` (`main.py`), e o comentário de `_PROV_FECHAMENTO`
+corrigido. Regra econômica DECIDIDA: no CONTRATO a rubrica é **aditiva**
+(par próprio, NÃO reduz o CFO — coerente com o motor, que soma); na AF
+é **substitutiva** (migra do CFO pelo delta). Aceite:
+`tests/test_achado61_out_forn_contrato.py` (3 testes) + subconjunto
+contábil/AF/contrato (553 testes) verde, exceto o flake já documentado
+(LP-16, confirmado por A/B com stash). Commits 6120ed6 + e78e74d.
+
+---
+
+## ACHADO-62 — a redução de Outros Fornecedores na AF é silenciosa · DECIDIDO 06/09/2026 (bloquear)
+
+> **DECISÃO REVISTA em 06/09, depois do percurso do beta3 (Marcelo).** O conserto NÃO é fazer a
+> redução funcionar — é **bloqueá-la**, com recusa da gravação. Motivo dele: devolver valor ao
+> Custo de Fábrica significaria AUMENTAR a previsão da fábrica, e isso não é coerente com a
+> operação. O desenho da devolução capada (descrito no fim desta seção) fica registrado como
+> alternativa avaliada e recusada, não como pendência.
+>
+> Comportamento acordado: quando o valor submetido for menor que o saldo de 2.1.04.14, o backend
+> RECUSA a submissão (nada gravado — nem registro, nem lançamento), **a coluna Rev1 permanece com
+> o valor anterior**, e a tela informa o bloqueio. Um aviso que deixasse gravar não resolveria
+> nada: o defeito é o registro da revisão divergir do razão, não a falta de mensagem.
+>
+> Reproduzido pelo Marcelo em `v2026.09.06-beta3`: 3.000 → 4.000 (lançou certo) → 2.000 (Rev1 foi
+> para 2.000, razão ficou em 4.000, nenhum lançamento) → 5.000 (migrou 2.000 do CFO, correto).
+
+Irmão do ACHADO-61, encontrado ao medi-lo. `_migracao = max(0.0, novo −
+atual)` (`main.py`): quando o valor aprovado é MENOR que o saldo, a
+expressão dá zero e nada é lançado. E `out_forn` sai do lote genérico
+(`_itens_af.pop("out_forn")`), então `disparar_deltas_af` também não o
+ajusta. Resultado: baixar de 4.000 para 1.000 grava o registro da
+revisão com 1.000 e deixa o razão em 4.000 — o documento da decisão
+deixa de fechar com o livro (mesma classe do ACHADO-16/55 e da F2-30
+Fatia 1).
+
+Até o ACHADO-61 isso era inalcançável na prática: a rubrica nascia
+zerada e só crescia. Com ela nascendo no contrato, fica alcançável no
+primeiro ciclo. Regra do Marcelo (06/09): "o valor a ser abatido de
+Custo Fábrica é a diferença imposta em cada ciclo de aprovação
+financeira, seja para mais ou para menos".
+
+**Desenho do conserto (escrito, não entregue — F2-31 Fatia 2):** na
+redução `r = atual − novo`, devolver ao CFO por reclassificação inversa
+`2.1.04.14 → 2.1.04.06`, **capada** pelo teto `cap = max(0, cfo_congelado
+− saldo_atual_2.1.04.06)` — a Provisão de Custo de Fábrica nunca pode
+ultrapassar o CFO congelado, senão a devolução criaria provisão de
+fábrica que nunca existiu (justamente a parcela nascida no contrato). O
+resíduo `r − cap` reverte o par próprio via `ajustar_provisao_delta`,
+que já capa pelo saldo do ativo em aberto. Invariante nova, que vale
+além deste conserto: **saldo credor de 2.1.04.06 ≤ CFO congelado**.
+
+---
+
+## ACHADO-63 — o Valor Bruto cresce quando se aplica desconto · RESOLVIDO 06/09/2026 (F2-32)
+
+> Fechado e implantado em `v2026.09.06-beta3` (Integração e Homologação). Inclui a correção do
+> caminho ABSORVE: `base_custos` só aplica o `fator_desc` quando `tog_cadi` é verdadeiro — no
+> absorve o custo não entra no VAVA e a base de comissão volta ao valor cheio, como sempre foi.
+> Sem essa condicional, a loja passaria a pagar mais comissão de arquiteto/fidelidade num caminho
+> que esta decisão nunca tocou (medido: +10,00 de fidelidade no cenário do teste-âncora).
+
+Achado do Marcelo no Projeto 8 (06/09), testando parâmetro por
+parâmetro: com desconto de 30%, inserir Custo de Viagem ou Brinde faz o
+**Valor Bruto crescer**. "O valor bruto deve crescer pela aplicação do
+custo, mas a aplicação do desconto não pode alterar o valor bruto."
+
+**Medido no motor** (base 216.744,05, brinde 1.000, desconto 30%):
+
+| rubrica | desconto | Bruto | à vista | Bruto × (1−d) |
+|---|---|---|---|---|
+| brinde/viagem | 0% | 217.744,05 | 217.744,05 | — |
+| brinde/viagem | 30% | **218.172,62** | 152.720,83 | 152.720,83 |
+| custo especial | 30% | 217.744,05 | 152.720,83 | **152.420,83** |
+
+Duas decisões de projeto, tomadas com um mês de distância, que se
+contradizem — e nenhuma das duas errada por si:
+
+- **22/06** (spec da negociação): viagem e brinde entram DENTRO do
+  colchete do desconto (`/fator_desc`, gross-up divisivo). Recuperam
+  100% do custo e fecham a identidade `Bruto × (1−d) = à vista`, mas
+  inflam o Bruto em `custo × d/(1−d)` — 42,86% do custo a 30%.
+- **20/07** (spec do custo especial): somado FORA do fator. Não infla o
+  Bruto, mas quebra a identidade em `custo × d` (medido: 200,00 num
+  caso de 800 a 25%).
+
+Nas duas rotas o à vista e o Val_Liq são idênticos — não havia dinheiro
+errado, havia número errado na tela. Comissão de arquiteto e fidelidade
+não são afetadas: são percentuais, o gross-up delas não depende de `d`
+(o Marcelo testou uma a uma e confirmou).
+
+**Decidido (Marcelo, 06/09), com o motivo comercial:** vale a rota em
+que os custos de valor fixo ACOMPANHAM o desconto. O desconto anunciado
+tem que levar o Bruto ao à vista; se o consultor aplica 20% e o cliente
+confere 18%, é problema de mesa de negociação. A contrapartida — a loja
+recupera só `(1−d)` do custo — é aceita e previsível. Registro do
+caminho percorrido: a orientação recomendou a rota aditiva (não inflar
+o Bruto, custo blindado) e o Marcelo a barrou por esse motivo; nenhum
+teste teria pego o erro, porque ele não estava no código.
+
+### Conserto (06/09, em execução)
+
+Três pontos em `mod_negociacao.calcular_orcamento`: `termo_via_bri`
+sem a divisão pelo `fator_desc`; `base_custos` das comissões passa a
+usar os custos já descontados (o princípio "arq/fid não ganham sobre
+viagem/brinde" não muda, só a expressão); custo especial passa a
+`VAVO += cust_esp × (1−d_orc)`. O retorno ganhou `Cust_Via_Recup`,
+`Bri_Recup`, `Cust_Esp_Recup` e `Desc_Efetivo` (fonte única para a
+tela — com desconto por ambiente o recuperado é a soma dos fatores de
+cada ambiente, não o valor vezes o desconto global).
+
+**A provisão NÃO acompanha:** continua pelo valor CHEIO, que é a
+obrigação real. "O registro em todo o sistema é pelo valor colocado na
+tela" (Marcelo). O desconto sobre os custos adicionais recai sobre o
+Val_Liq e a margem; recuperação posterior aparece no saldo da
+conciliação, sem mecanismo novo. Nada muda em `mod_contabil`.
+
+**O que se mexe na tela** (não é regressão): Val_Liq cai em `Σ custo −
+Σ recuperado` — medido 825,00 num caso de 3.300 a 25%, ou 0,38 ponto
+percentual no desconto total sobre 216.744. A trava de margem líquida
+negativa fica mais perto. Orçamentos em aberto mudam de número no
+próximo save; contratos assinados não (usam o VAVO gravado).
+
+---
+
+## ACHADO-64 — o campo "Total do Contrato" não faz nada · RESOLVIDO 06/09/2026 (F2-32)
+
+> Fechado e implantado em `v2026.09.06-beta3`. O aceite permanente reproduz o sintoma relatado
+> ("digitei e nada aconteceu"): falha no código antigo, passa no novo.
+
+Relatado pelo Marcelo em 06/09 ("tentei digitar o valor de contrato e
+não aconteceu nada, não houve atualização de valores nem dedução de
+desconto") e medido em seguida: existem DUAS implementações do campo.
+
+- `#neg-total-final` — o herói VISÍVEL — chama `negTotalConfirmar`, que
+  usa `_negBaseValues`/`estrutural`, do caminho LEGADO. No EP-07 esse
+  array nasce vazio e só é `.map()`eado, continuando vazio → a função
+  cai em `if (estTotal <= 0) return` e não faz nada.
+- `#neg-parcelado` — dentro de um `<div style="display:none">`, portanto
+  inalcançável — tem os handlers que ENTENDEM o motor
+  (`negValorTotalIniciarEdicao`/`negValorTotalConfirmar`, via
+  `negValorBrutoAtual` → VBNO) e tratam entrada e taxa de retenção.
+- `calcularValorBrutoCliente` só alimenta o `.map()` do array vazio.
+
+A implementação que funciona está escondida; a que está visível está
+morta. Registro de método: a orientação relatou primeiro um erro
+aritmético nessa inversão (medido, real) sem ter conferido se a função
+estava LIGADA em algum lugar — era defeito latente, não perda em
+operação. Ler uma função não é medir um caminho.
+
+### Conserto (06/09, em execução)
+
+Uma implementação só, no campo visível, lendo o VBNO do motor. A
+fórmula `desconto = 1 − à vista ÷ Bruto` só fica correta DEPOIS do
+ACHADO-63 — é ele que restabelece `à vista = Bruto × (1−d)`. Os dois
+andam juntos. O gêmeo escondido é apagado, depois de enumerar os usos
+de `negMostrarParcelado` (que escreve nele sem guarda) — apagar metade
+de um par é como este achado nasceu.
+
+---
+
+## ACHADO-65 — Outros Fornecedores entra no Custo Variável sem receita correspondente · DECIDIDO 06/09/2026
+
+Achado do Marcelo em 06/09, olhando a margem depois do percurso do beta3:
+"Outros Fornecedores não entra em lugar nenhum no cálculo da margem".
+
+**Medido, e a frase é meio verdadeira — que é o pior caso:**
+- `mod_negociacao.py` não menciona `out_forn` **nenhuma vez**. Ele não existe no VBVO, no Bruto,
+  no à vista, no Val_Liq nem no Cust_Ad. É a margem da NEGOCIAÇÃO.
+- `mod_provisoes.py` (~300) tem `cust_var = CFO + out_forn + ...`, e
+  `marg_cont = (Val_Liq − cust_var) / Val_Liq`. É a margem de CONTRIBUIÇÃO do painel da AF.
+
+São dois motores e duas margens. A rubrica está só na segunda — ou seja, **o custo entrava e a
+receita não existia em lugar nenhum**. A loja aparecia pagando o item e não recebendo por ele.
+Num caso de Val_Liq 100.000 / Cust_Var 60.000, um item de 5.000 derrubava a margem de 40,00%
+para 35,00%, quando o correto é 38,10% (a diluição de vender sem markup).
+
+### Decisão (06/09) — o conceito que faltava
+
+Outros Fornecedores é sempre **mercadoria comprada para entrega**. O que muda é a ORIGEM:
+
+- **Na venda** (novo "Item Especial", editável na tela de negociação): o cliente paga por ela.
+  Entra no VAVO pelo valor cheio, sem desconto e sem custos adicionais incidindo; **não toca o
+  CFO** — é mercadoria a mais.
+- **Por substituição depois da venda** (AF): **sai do CFO** — é a mesma mercadoria trocando de
+  fornecedor, por reclassificação 2.1.04.06 → 2.1.04.14.
+
+Isso dá o porquê da assimetria registrada no ACHADO-61 (aditivo no contrato, substitutivo na AF),
+que até aqui estava certa mas sem motivo escrito.
+
+**Consequências decididas:**
+- O item entra no `Val_Liq` (é faturamento) e o custo CONTINUA no `cust_var` (é irmão do CFO).
+  A margem em REAIS não muda; a margem em PERCENTUAL cai, por diluição — sinal correto: vender
+  item especial não melhora a margem.
+- `Markup` passa a ser `Val_Liq / (CFO + out_forn)`: as duas parcelas compõem mercadoria.
+  **Não vale para a conciliação de PE** — lá o fator continua `Val_Liq / CFO`, porque converte
+  diferença de custo de FÁBRICA em valor de contrato (main.py ~2724 e ~8056).
+- Imposto: o item entra no `Val_Cont`, logo no `Prov_Imp`. A alíquota real por tipo de item é
+  frente fiscal; a diferença aparece como saldo (positivo ou negativo) na conciliação — [ABERTO].
+- Valor único, pelo CUSTO: a loja repassa. Se comprar por menos, a economia vira sobra de
+  provisão e volta como Receita de Conciliação no fim do ciclo. Sem segundo campo, sem margem
+  embutida, sem migration (reusa `Orcamento.out_forn`).
+
+Implementação: F2-35, pacote escrito em 06/09.
+
+---
+
