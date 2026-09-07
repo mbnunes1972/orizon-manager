@@ -1,7 +1,8 @@
 """E2E do início ao fim — fluxo comercial + financeiro, contra o servidor HTTP real.
 
-Percorre: login → negociação (motor + margem real) → Out_Forn → ciclo → contrato (Venda) →
-Provisões (Venda → Rev 1 Concorda → Rev 2 Revisa) → consistência/staleness → isolamento (IDOR).
+Percorre: login → negociação (motor + margem real) → Item Especial → ciclo → contrato (Venda) →
+Provisões (Venda → Rev 1 Concorda → Rev 2 Revisa, migrando Outros Fornecedores na AF) →
+consistência/staleness → isolamento (IDOR).
 
 Notas:
 - `test_fluxo_completo_inicio_ao_fim` exercita o efeito do contrato (gravar a "Venda" das
@@ -94,9 +95,9 @@ def test_fluxo_completo_inicio_ao_fim(app_db, seed, projetos_dir, http_client_fa
     assert s["Cust_Var"] > s["CFO"]          # provisões (frete fábrica etc.) entram no Cust_Var
     assert 0 < s["Marg_Cont"] < 1
 
-    # 3) Out_Forn editável reflete no Cust_Var
-    st, b = c.put("/api/orcamentos/%d/out-forn" % oid, {"out_forn": 1500})
-    assert st == 200 and b["ok"] and b["sombra"]["Out_Forn"] == 1500
+    # 3) Item Especial editável reflete no Cust_Var (F2-36: rota/campo renomeados de out_forn)
+    st, b = c.put("/api/orcamentos/%d/item-especial" % oid, {"item_especial": 1500})
+    assert st == 200 and b["ok"] and b["sombra"]["Item_Esp"] == 1500
 
     # 4) Ciclo do projeto carrega (etapas)
     st, b = c.get("/api/projetos/%s/ciclo" % seed["projeto_l1"])
@@ -124,12 +125,12 @@ def test_fluxo_completo_inicio_ao_fim(app_db, seed, projetos_dir, http_client_fa
     itens_venda = prov["venda"]["itens"]
     assert set(itens_venda.keys()) == {
         "frete_fab", "com_adm", "com_venda", "com_med", "com_proj_exec",
-        "frete_loc", "assist", "ins_loc", "prov_imp", "out_forn", "prov_mont", "prov_gar",
+        "frete_loc", "assist", "ins_loc", "prov_imp", "item_especial", "prov_mont", "prov_gar",
         # F0 (bug ①): custos adicionais + custo financeiro agora entram como linha
         "com_arq", "pro_fid", "cust_via", "brinde", "cust_esp", "custo_financeiro",
         # F2-25 Passo 2 (05/09, DECIDIDO): + Custo de Fábrica, mesma família (linha no painel)
         "custo_fabrica"}
-    assert itens_venda["out_forn"] == 1500           # Out_Forn entrou na Venda
+    assert itens_venda["item_especial"] == 1500      # Item Especial entrou na Venda (F2-36)
     assert itens_venda["frete_fab"] > 0              # taxa de frete fábrica da loja aplicada
 
     # 7) Aprovação Financeira I — Concorda: Rev 1 = cópia da Venda
@@ -142,7 +143,12 @@ def test_fluxo_completo_inicio_ao_fim(app_db, seed, projetos_dir, http_client_fa
     venda_cust_var = b["provisoes"]["venda"]["cust_var"]
     venda_marg = b["provisoes"]["venda"]["marg_cont"]
 
-    # 8) Aprovação Financeira II — Revisa: edita Out_Forn; margem recalcula da base congelada
+    # 8) Aprovação Financeira II — Revisa: migra Outros Fornecedores (AF, ACHADO-59/66). ANTES
+    # do F2-36, migrar out_forn inflava o Cust_Var (a mesma mercadoria contada 2x — ACHADO-66,
+    # a duplicação: CFO congelado não caía, e out_forn ENTRAVA em _RUBRICAS mesmo assim). O
+    # conserto: out_forn saiu de _RUBRICAS (já está dentro do CFO congelado) — a migração não
+    # pode mais mudar Cust_Var/margem. Item Especial (item_especial=1500, passo 3) tem que
+    # sobreviver à revisão intacto (não é editável na AF, não vem no `itens` submetido).
     novos = dict(b["provisoes"]["venda"]["itens"])
     novos["out_forn"] = 5000.0
     st, b = c.post("/api/orcamentos/%d/provisoes/rev2" % oid,
@@ -152,8 +158,9 @@ def test_fluxo_completo_inicio_ao_fim(app_db, seed, projetos_dir, http_client_fa
     rev2 = b["provisoes"]["rev2"]
     assert rev2["decisao"] == "revisa"
     assert rev2["itens"]["out_forn"] == 5000.0
-    assert rev2["cust_var"] > venda_cust_var          # custo maior → margem menor
-    assert rev2["marg_cont"] < venda_marg
+    assert rev2["itens"]["item_especial"] == 1500.0   # sobrevive à revisão (não é editável na AF)
+    assert rev2["cust_var"] == venda_cust_var, "ACHADO-66: migrar Outros Fornecedores não pode mudar o Cust_Var"
+    assert rev2["marg_cont"] == venda_marg
 
     # 9) Consistência: negociação muda APÓS a Venda → aviso de desatualizado
     db = app_db.get_session()

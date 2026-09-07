@@ -32,6 +32,12 @@ PLANO_PADRAO = [
     ("1.1.06.19", "Custo Financeiro a Apropriar"),   # FASE B: ramo FINANCEIRA (Aymoré/Cartão) — despesa financeira diferida
     ("1.1.06.20", "Custo Especial a Apropriar"),   # Custo Especial (5º custo adicional — não rateado nos ambientes)
     ("1.1.06.21", "Comissão Administrativa a Apropriar"),   # 2026-08-12: com_adm passa a ser provisionada (era só visão)
+    # F2-36 (07/09, ACHADO-65/66): Item Especial — mercadoria de terceiro vendida JUNTO, markup 1,
+    # nasce SÓ na venda (nunca na AF/etapa 12 — isso é "Outros Fornecedores", 1.1.06.14/2.1.04.14,
+    # substituição). Par próprio pra não colidir com a leitura de saldo vivo que a AF já faz em
+    # 2.1.04.14 (main.py ~11676) — se caísse ali, a AF leria o item como substituição já
+    # provisionada e recusaria migrações legítimas.
+    ("1.1.06.22", "Item Especial a Apropriar"),
     ("1.1.07", "Recebíveis de Parcelamentos"),   # FASE B: ramo LOJA (financiamento direto) — carrega SÓ os juros (VAVO fica no 1.1.02)
     # Ajustes Excepcionais de Fábrica (spec 2026-07-21): saldos de acordos no razão
     ("1.1.08", "Créditos com a Fábrica"),
@@ -73,6 +79,7 @@ PLANO_PADRAO = [
                                                             # da loja (diretores/gerentes) — mesmo mecanismo das
                                                             # demais (constituída no contrato, efetivada/resolvida
                                                             # via Reconciliação, despesa formal em 5.3.03).
+    ("2.1.04.22", "Provisão de Item Especial"),   # F2-36 (07/09) — par de 1.1.06.22, ver comentário lá
     ("2.1.05", "Financiamento Parcelamento Loja a Pagar"),   # ACHADO-14: renomeado de "Total
     # Flex" — o produto virou "Parcelamento Loja" (mod_fin/__init__.py) mas o nome desta conta
     # nunca acompanhou. Rename em migration própria (R13/R14), não em lista no código.
@@ -1392,6 +1399,9 @@ EVENTOS = {
     # já existia pronto pro reconhecimento de despesa; faltava só esta entrada pra
     # `ajustar_provisao_delta` (via `disparar_deltas_af`) saber ajustar a rubrica direto na AF.
     "fechamento_venda_outros_forn":         ("1.1.06.14", "2.1.04.14", "Constituição — Provisão de Outros Fornecedores (ativo diferido)"),
+    # F2-36 (07/09, ACHADO-65/66): Item Especial — par PRÓPRIO (1.1.06.22/2.1.04.22), nunca
+    # 1.1.06.14/2.1.04.14 (essas são de Outros Fornecedores/substituição — ver PLANO_PADRAO).
+    "fechamento_venda_item_especial":       ("1.1.06.22", "2.1.04.22", "Constituição — Provisão de Item Especial (ativo diferido)"),
     # FASE A (resultado da venda): custos adicionais constituídos como ativo diferido × provisão, sem tocar a DRE
     "fechamento_venda_com_arq":  ("1.1.06.15", "2.1.04.15", "Constituição — Provisão de Comissão de Arquiteto (ativo diferido)"),
     "fechamento_venda_pro_fid":  ("1.1.06.16", "2.1.04.16", "Constituição — Provisão de Programa de Fidelidade (ativo diferido)"),
@@ -1435,6 +1445,7 @@ EVENTOS = {
     "reconhecimento_despesa_retencao_com_vendas": ("5.3.01", "1.1.06.12", "Reconhecimento de despesa na NF-e — Retenção de Comissão de Vendas"),
     "reconhecimento_despesa_custo_fabrica":       ("5.1.01", "1.1.06.06", "CMV Fábrica — reconhecimento na NF-e (baixa do ativo diferido)"),
     "reconhecimento_despesa_outros_fornecedores": ("5.1.01", "1.1.06.14", "CMV Outros Fornecedores — reconhecimento na NF-e (baixa do ativo diferido)"),
+    "reconhecimento_despesa_item_especial":       ("5.1.01", "1.1.06.22", "CMV Item Especial — reconhecimento na NF-e (baixa do ativo diferido)"),
     # FASE A: matching dos custos adicionais na NF-e — despesa comercial × baixa do ativo diferido
     "reconhecimento_despesa_com_arq":  ("5.3.15", "1.1.06.15", "Reconhecimento de despesa na NF-e — Comissão de Arquiteto"),
     "reconhecimento_despesa_pro_fid":  ("5.3.04", "1.1.06.16", "Reconhecimento de despesa na NF-e — Programa de Fidelidade"),
@@ -1662,6 +1673,11 @@ _PROV_FECHAMENTO = {
     # reclassificação (conferência do pedido, etapa 12) e migração da AF — em namespaces de `ref`
     # distintos do fechamento, então não colide com o valor constituído aqui.
     "outros_forn":         "fechamento_venda_outros_forn",
+    # F2-36 (07/09, ACHADO-65/66): `outros_forn` PERMANECE aqui (a AF ainda precisa deste par pra
+    # achar a conta pela chave), mas `_fin_provisoes_venda_seguro` não passa mais essa chave em
+    # `valores` — a rubrica volta a nascer só por reclassificação/migração (etapa 12/AF), nunca
+    # no fechamento do contrato. Item Especial é a chave nova, própria da venda.
+    "item_especial":       "fechamento_venda_item_especial",
     "impostos":            "fechamento_venda_impostos",
     # FASE A (resultado da venda): os 4 custos adicionais
     "com_arq":             "fechamento_venda_com_arq",

@@ -36,7 +36,9 @@ def test_registrar_venda(app_db, seed, projetos_dir):
             orcamento_id=seed["orcamento_l1_id"], versao="venda").first()
         assert r is not None and r.decisao is None
         import json as _j
-        assert set(_j.loads(r.itens_json).keys()) >= {"frete_fab", "out_forn", "prov_imp"}
+        # F2-36 (ACHADO-65/66): out_forn saiu de _RUBRICAS (é substituição, nasce só na AF/etapa
+        # 12) — o snapshot da venda agora tem item_especial no lugar (rubrica própria da venda).
+        assert set(_j.loads(r.itens_json).keys()) >= {"frete_fab", "item_especial", "prov_imp"}
         assert r.cfo == 4000.0          # CFO = order_total
         # idempotente / re-snapshot: chamar de novo não duplica
         main._registrar_provisao_venda(db, orc, por_id=1); db.commit()

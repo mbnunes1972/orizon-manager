@@ -3986,8 +3986,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="display:flex;justify-content:space-between;margin-top:2px"><span style="color:var(--text-3);font-size:var(--fs-xs)">Margem da Venda</span><span id="mp-a-marg-venda" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-2)">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:2px"><span style="color:var(--text-3);font-size:var(--fs-xs)">Margem do Contrato</span><span id="mp-a-marg-contrato" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-2)">—</span></div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"
-             title="Item Especial (ACHADO-65) — edição só pelo botão &quot;Item Especial&quot;, ao lado de &quot;Novo Ambiente&quot;, na tela de negociação.">
-          <span style="color:var(--muted)">Item Especial (Outros Fornecedores)</span>
+             title="Item Especial (ACHADO-65/66) — mercadoria de terceiro vendida junto, markup 1. Edição só pelo botão &quot;Item Especial&quot;, ao lado de &quot;Novo Ambiente&quot;, na tela de negociação.">
+          <span style="color:var(--muted)">Item Especial</span>
+          <span id="mp-item-especial" style="font-family:var(--font-mono)">R$ 0,00</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"
+             title="Outros Fornecedores (F2-36) — substituição do Custo de Fábrica, nasce só na AF/Conferência do Pedido (etapa 12). Saldo vivo do razão, só leitura aqui.">
+          <span style="color:var(--muted)">Outros Fornecedores (substituição)</span>
           <span id="mp-out-forn" style="font-family:var(--font-mono)">R$ 0,00</span>
         </div>
       </div>
@@ -11547,34 +11552,36 @@ async function negPreview() {
 }
 function agendarPreview() { clearTimeout(_previewTimer); _previewTimer = setTimeout(negPreview, 250); }
 
-async function mpSalvarOutForn(val) {
+// F2-36 (07/09, ACHADO-65/66): renomeada de mpSalvarOutForn — Item Especial é conceito PRÓPRIO,
+// não é mais o mesmo `out_forn` da AF/substituição. Rota renomeada junto (/item-especial).
+async function mpSalvarItemEspecial(val) {
   if (!_orcamentoAtivoId) return;
   try {
-    const r = await fetch(`/api/orcamentos/${_orcamentoAtivoId}/out-forn`, {
+    const r = await fetch(`/api/orcamentos/${_orcamentoAtivoId}/item-especial`, {
       method: 'PUT', credentials: 'same-origin',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({out_forn: parseFloat(val) || 0}),
+      body: JSON.stringify({item_especial: parseFloat(val) || 0}),
     });
     const d = await r.json();
     if (d && d.ok && d.sombra) { _previewNeg = d.sombra; _aplicarPreviewNaTela(d.sombra); }
     else if (d && !d.ok) { showToast(d.erro || 'Falha ao salvar Item Especial.', true); }
-  } catch (e) { console.warn('out-forn save:', e); }
+  } catch (e) { console.warn('item-especial save:', e); }
 }
 
-// F2-35 (ACHADO-65): botão "Item Especial", ao lado de "Novo Ambiente" — único ponto de edição
-// de `out_forn` (o campo no modal de Parâmetros virou leitura). Caixa sóbria (promptPopup), não
-// a vermelha de erro — mesmo padrão do F2-33.
+// F2-35 (ACHADO-65), renomeada no F2-36: botão "Item Especial", ao lado de "Novo Ambiente" —
+// único ponto de edição de `item_especial` (o campo no modal de Parâmetros é só leitura). Caixa
+// sóbria (promptPopup), não a vermelha de erro — mesmo padrão do F2-33.
 async function abrirItemEspecial() {
   if (!_orcamentoAtivoId) return;
-  const atual = (_previewNeg && _previewNeg.Out_Forn != null) ? _previewNeg.Out_Forn : 0;
+  const atual = (_previewNeg && _previewNeg.Item_Esp != null) ? _previewNeg.Item_Esp : 0;
   const v = await promptPopup(
-    'Mercadoria comprada de terceiro pra entrega ao cliente, repassada pelo custo — sem desconto, sem margem própria (ACHADO-65).',
-    {titulo: 'Item Especial (Outros Fornecedores)',
+    'Mercadoria comprada de terceiro pra entrega ao cliente, vendida JUNTO na negociação, repassada pelo custo — sem desconto, sem margem própria (ACHADO-65/66).',
+    {titulo: 'Item Especial',
      placeholder: '0,00', valor: atual ? String(atual).replace('.', ',') : ''});
   if (v === null) return;
   const num = parseFloat(String(v).replace(',', '.'));
   if (isNaN(num) || num < 0) { showToast('Valor inválido.', true); return; }
-  await mpSalvarOutForn(num);
+  await mpSalvarItemEspecial(num);
 }
 
 // Aplica o breakdown vindo da RESPOSTA de um save (edição → save → exibe). Fonte única.
@@ -11601,7 +11608,8 @@ function _aplicarPreviewNaTela(s) {
   setR('mp-a-viagem', via, via > 0 ? '− ' : '');     // viagem total do motor (Cust_Via)
   setR('mp-a-brinde', bri, bri > 0 ? '− ' : '');     // brinde total do motor (Bri)
   setR('mp-a-cesp', cesp, cesp > 0 ? '− ' : '');      // custo especial do motor (não rateado)
-  setR('mp-out-forn', s.Out_Forn);   // F2-35: Item Especial (ACHADO-65) — display read-only
+  setR('mp-item-especial', s.Item_Esp);   // F2-36: Item Especial (ACHADO-65/66) — display read-only
+  setR('mp-out-forn', s.Saldo_Out_Forn);  // F2-36: Outros Fornecedores — saldo vivo do razão (AF)
   // ACHADO-63 (06/09), F2-32 Fatia 3: "cliente paga" — SÓ do motor (Cust_Via_Recup/Bri_Recup/
   // Cust_Esp_Recup), nunca recalculado aqui (com desconto por ambiente o recuperado é soma de
   // fatores por ambiente, não o total vezes o desconto global). "Cedida" é a diferença entre os
@@ -11722,10 +11730,13 @@ function abrirModalParams(){
   id('mp-cesp-ativo').checked = !!m.custo_especial_ativo;
   id('mp-cesp').value        = m.custo_especial || 0;
   id('mp-carga-trib').value   = m.carga_trib !== undefined ? m.carga_trib : 8.00;
-  // F2-35: mp-out-forn virou display read-only (edição migrou pro botão "Item Especial",
-  // ao lado de "Novo Ambiente") — preenche com o valor vindo do preview do motor (Out_Forn).
+  // F2-35: mp-item-especial é display read-only (edição migrou pro botão "Item Especial", ao
+  // lado de "Novo Ambiente"). F2-36: mp-out-forn voltou a ser "Outros Fornecedores" (saldo vivo
+  // do razão, Saldo_Out_Forn) — são DOIS conceitos diferentes desde a separação do F2-36.
+  const itemEspEl = id('mp-item-especial');
+  if (itemEspEl) itemEspEl.textContent = 'R$ ' + fmt(Number(_previewNeg && _previewNeg.Item_Esp) || 0);
   const outFornEl = id('mp-out-forn');
-  if (outFornEl) outFornEl.textContent = 'R$ ' + fmt(Number(_previewNeg && _previewNeg.Out_Forn) || 0);
+  if (outFornEl) outFornEl.textContent = 'R$ ' + fmt(Number(_previewNeg && _previewNeg.Saldo_Out_Forn) || 0);
   mpSegPopular(m);   // segmentação Mercadoria × Serviço (override do projeto) — só ao Diretor
   mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde(); mpToggleCustoEspecial();
   // Carrega toggle incluir_custos — sincroniza _incluirCustos com o valor salvo

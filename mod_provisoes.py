@@ -199,13 +199,21 @@ def resolver_comissao_venda(cfg, val_liq_mes, desc_orc_pct):
 
 
 # IMPORTANTE: estas 12 rubricas são exatamente os addendos de Cust_Var em provisoes_orcamento
-# (CFO + out_forn + as 8 rubricas % + Prov_Imp + Prov_Mont + Prov_Gar). cust_var_marg_cont recalcula
-# Cust_Var como CFO + Σ(itens) — então, ao adicionar/remover uma rubrica do motor, atualize ESTE mapa
-# também, senão as duas fórmulas de Cust_Var divergem silenciosamente.
+# (CFO + item_especial + as 8 rubricas % + Prov_Imp + Prov_Mont + Prov_Gar). cust_var_marg_cont
+# recalcula Cust_Var como CFO + Σ(itens) — então, ao adicionar/remover uma rubrica do motor,
+# atualize ESTE mapa também, senão as duas fórmulas de Cust_Var divergem silenciosamente.
+#
+# F2-36 (07/09, ACHADO-66): `out_forn` SAIU daqui — ele é SUBSTITUIÇÃO do Custo de Fábrica (nasce
+# só na AF/etapa 12, por reclassificação 2.1.04.06→2.1.04.14); o valor já está DENTRO do CFO
+# congelado, então somá-lo aqui sempre duplicava a mercadoria (medido: migração de 3.000 sem
+# custo novo nenhum derrubava a margem de 42,00% pra 40,50%). `item_especial` entrou no lugar —
+# é custo NOVO (mercadoria de terceiro vendida na venda), com a receita correspondente já no
+# Val_Liq (via VAVO, mod_negociacao.py), então somar aqui NÃO duplica.
 _RUBRICAS = {
     "frete_fab": "Frete_Fab_Orc", "com_adm": "Com_Adm_Orc", "com_venda": "Com_Venda_Orc",
     "com_med": "Com_Med_Orc", "com_proj_exec": "Com_Proj_Exec_Orc", "frete_loc": "Frete_Loc_Orc",
-    "assist": "Assist_Orc", "ins_loc": "Ins_Loc_Orc", "prov_imp": "Prov_Imp", "out_forn": "Out_Forn",
+    "assist": "Assist_Orc", "ins_loc": "Ins_Loc_Orc", "prov_imp": "Prov_Imp",
+    "item_especial": "Item_Esp",
     "prov_mont": "Prov_Mont", "prov_gar": "Prov_Gar",   # FASE 2: fold Montagem/Garantia (visão)
 }
 
@@ -274,13 +282,13 @@ def cust_var_marg_cont(cfo, val_liq, itens):
     return cust_var, marg
 
 
-def provisoes_orcamento(siglas, cfg, out_forn=0.0, com_venda_pct=0.0):
+def provisoes_orcamento(siglas, cfg, item_especial=0.0, com_venda_pct=0.0):
     s = siglas or {}
     CFO = _f(s.get("CFO")); Val_Liq = _f(s.get("Val_Liq"))
     VAVO = _f(s.get("VAVO")); Prov_Imp = _f(s.get("Prov_Imp"))
     prov = (cfg or {}).get("provisoes", {}) or {}
     pc = (cfg or {}).get("provisoes_contabeis", {}) or {}
-    out_forn = _f(out_forn)
+    item_especial = _f(item_especial)
 
     frete_fab = _f(prov.get("frete_fab_pct")) / 100.0 * CFO
     com_adm   = _f(prov.get("com_adm_pct"))   / 100.0 * Val_Liq
@@ -297,7 +305,7 @@ def provisoes_orcamento(siglas, cfg, out_forn=0.0, com_venda_pct=0.0):
     prov_mont = round(_f(pc.get("montagem_pct")) / 100.0 * VAVO, 2)
     prov_gar  = round(_f(pc.get("garantia_pct")) / 100.0 * VAVO, 2)
 
-    cust_var = (CFO + out_forn + frete_fab + com_adm + com_venda + com_med
+    cust_var = (CFO + item_especial + frete_fab + com_adm + com_venda + com_med
                 + com_proj + frete_loc + assist + ins_loc + Prov_Imp + prov_mont + prov_gar)
     marg_cont = ((Val_Liq - cust_var) / Val_Liq) if Val_Liq else 0.0
     return {
@@ -305,7 +313,7 @@ def provisoes_orcamento(siglas, cfg, out_forn=0.0, com_venda_pct=0.0):
         "Com_Venda_Orc": round(com_venda, 2), "Com_Med_Orc": round(com_med, 2),
         "Com_Proj_Exec_Orc": round(com_proj, 2), "Frete_Loc_Orc": round(frete_loc, 2),
         "Assist_Orc": round(assist, 2), "Ins_Loc_Orc": round(ins_loc, 2),
-        "Out_Forn": round(out_forn, 2),
+        "Item_Esp": round(item_especial, 2),
         "Prov_Mont": prov_mont, "Prov_Gar": prov_gar,
         "Cust_Var": round(cust_var, 2), "Marg_Cont": round(marg_cont, 4),
     }

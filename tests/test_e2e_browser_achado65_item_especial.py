@@ -147,8 +147,10 @@ def test_item_especial_botao_soma_no_bruto_e_no_total_e_campo_do_modal_vira_leit
     v_depois = float(total_depois.replace("R$", "").replace(".", "").replace(",", ".").strip())
     assert round(v_depois - v_antes, 2) == 5000.0, (total_antes, total_depois)
 
-    # ── modal de Parâmetros: #mp-out-forn é um <span> só-leitura, mostrando o valor salvo ─────
+    # ── modal de Parâmetros: #mp-item-especial é um <span> só-leitura, mostrando o valor salvo ──
+    # F2-36: Item Especial e Outros Fornecedores viraram DOIS campos — #mp-out-forn passou a
+    # mostrar o saldo vivo de Outros Fornecedores (substituição da AF), não mais o Item Especial.
     page.click("#btn-params")
     page.wait_for_selector("#modal-params", state="visible")
-    assert page.eval_on_selector("#mp-out-forn", "el => el.tagName") == "SPAN"
-    assert "5.000,00" in page.inner_text("#mp-out-forn")
+    assert page.eval_on_selector("#mp-item-especial", "el => el.tagName") == "SPAN"
+    assert "5.000,00" in page.inner_text("#mp-item-especial")

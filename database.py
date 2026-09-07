@@ -729,7 +729,15 @@ class Orcamento(Base):
     cust_fin     = Column(Float, default=0.0)
     val_cont     = Column(Float, default=0.0)
     prov_imp     = Column(Float, default=0.0)
-    out_forn     = Column(Float, default=0.0)   # Outros Fornecedores (editável Gerente Adm/Fin)
+    # F2-36 (07/09, ACHADO-65/66): `out_forn` deixou de ser gravável pela negociação — a rota
+    # PUT que o alimentava virou /item-especial. Congelado a partir da migration F2-36 (backfill
+    # zera todo mundo, migrando o valor pra `item_especial`); nada mais escreve aqui. Mantido
+    # (não dropado) só por histórico — a AF/Conferência continuam operando por razão/itens_json,
+    # nunca por esta coluna.
+    out_forn     = Column(Float, default=0.0)
+    # Item Especial (F2-36): mercadoria de terceiro vendida JUNTO, markup 1 — nasce só na venda,
+    # nunca na AF/etapa 12 (isso é `out_forn`/2.1.04.14, substituição). Ver mod_negociacao.py.
+    item_especial = Column(Float, default=0.0)
     # Fatia B (resultado financeiro): ramo do custo financeiro confirmado na AF (box).
     ramo_financeiro     = Column(String,  nullable=True)   # loja|loja_antecipacao|financeira (NULL = auto pela forma de pagamento)
     ramo_financeiro_seq = Column(Integer, default=0)       # contador p/ ref idempotente de troca de ramo

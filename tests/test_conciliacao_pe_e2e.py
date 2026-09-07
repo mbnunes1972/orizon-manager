@@ -19,13 +19,13 @@ def _setup(app_db, seed, cfo_original=30000.0, budget=80000.0):
     orc = db.get(app_db.Orcamento, oid)
     nome = orc.projeto_id
     orc.markup = 2.0
-    # F2-35 (ACHADO-65): a conciliação de PE deixou de ler `orc.markup` direto — agora recomputa
-    # `(val_liq - out_forn) / cfo` (`_markup_merc_puro`, main.py) pra nunca ser diluída pelo Item
-    # Especial. Este teste isola a rota de PE (bypass do motor completo, comentário acima) e
-    # precisa manter os TRÊS campos coerentes pro markup 2.0 continuar saindo 2.0 daqui.
+    # F2-35/F2-36 (ACHADO-65/66): a conciliação de PE deixou de ler `orc.markup` direto — agora
+    # recomputa `(val_liq - item_especial) / cfo` (`_markup_merc_puro`, main.py) pra nunca ser
+    # diluída pelo Item Especial. Este teste isola a rota de PE (bypass do motor completo,
+    # comentário acima) e precisa manter os TRÊS campos coerentes pro markup 2.0 sair 2.0 daqui.
     orc.cfo = 15000.0
     orc.val_liq = 30000.0
-    orc.out_forn = 0.0
+    orc.item_especial = 0.0
     orc.desconto_pct = 0.0   # previsibilidade: VAVA contratado == VBVA (sem desconto/custo adicional)
     # limpa resíduo de outros testes deste arquivo (DROP SCHEMA é só por MÓDULO, não por teste —
     # o mesmo projeto/orçamento de `seed` é reaproveitado em todas as funções aqui).
@@ -148,15 +148,15 @@ def test_get_conciliacao_mostra_diferenca_e_sem_decisao(http_client_factory, see
 
 
 def test_get_conciliacao_markup_imune_ao_item_especial(http_client_factory, seed, app_db):
-    """F2-35 (ACHADO-65): Item Especial dilui o markup EXIBIDO de propósito, mas a conciliação de
-    PE tem que continuar vendo o markup só de mercadoria de fábrica — mesmos números de
-    `test_get_conciliacao_mostra_diferenca_e_sem_decisao` (markup 2.0, diferença 6000.0), agora
-    com out_forn=5000.0 (e val_liq subindo pelo mesmo tanto, coerente com o motor: item entra em
-    Val_Liq pelo valor cheio)."""
+    """F2-35/F2-36 (ACHADO-65/66): Item Especial dilui o markup EXIBIDO de propósito, mas a
+    conciliação de PE tem que continuar vendo o markup só de mercadoria de fábrica — mesmos
+    números de `test_get_conciliacao_mostra_diferenca_e_sem_decisao` (markup 2.0, diferença
+    6000.0), agora com item_especial=5000.0 (e val_liq subindo pelo mesmo tanto, coerente com o
+    motor: item entra em Val_Liq pelo valor cheio)."""
     nome, pid, oid = _setup(app_db, seed, cfo_original=30000.0)
     db = app_db.get_session()
     orc = db.get(app_db.Orcamento, oid)
-    orc.out_forn = 5000.0
+    orc.item_especial = 5000.0
     orc.val_liq = 35000.0   # 30000 (mercadoria, igual ao teste-irmão) + 5000 (item, valor cheio)
     db.commit(); db.close()
     _carrega_pe(app_db, nome, pid, cfo_pe=33000.0)

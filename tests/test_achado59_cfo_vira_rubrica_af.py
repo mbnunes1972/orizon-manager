@@ -76,8 +76,8 @@ def test_cust_var_nao_dobra_com_cfo_virando_linha(app_db, seed):
     import mod_provisoes as mp
     cfo = 4000.0
     val_liq = 9000.0
-    itens_sem_cfo = {"frete_fab": 100.0, "out_forn": 50.0}
-    itens_com_cfo = {"frete_fab": 100.0, "out_forn": 50.0, "custo_fabrica": cfo}   # painel novo manda isto também
+    itens_sem_cfo = {"frete_fab": 100.0, "item_especial": 50.0}
+    itens_com_cfo = {"frete_fab": 100.0, "item_especial": 50.0, "custo_fabrica": cfo}   # painel novo manda isto também
     cust_var_sem, marg_sem = mp.cust_var_marg_cont(cfo, val_liq, itens_sem_cfo)
     cust_var_com, marg_com = mp.cust_var_marg_cont(cfo, val_liq, itens_com_cfo)
     assert cust_var_sem == cust_var_com == round(cfo + 100.0 + 50.0, 2), (

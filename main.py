@@ -791,12 +791,13 @@ def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
                 "retencao_com_vendas": d.get("Com_Venda_Orc"),
                 # FASE D2: Custo de Fábrica (= CFO congelado) passa a ser provisionado no contrato (era só na NF-e)
                 "custo_fabrica":       round(float(getattr(orc2, "cfo", 0) or 0), 2),
-                # ACHADO-61 (06/09, percurso Teste_7) — irmão do ACHADO-59: a rubrica já tinha campo
-                # na negociação (Parâmetros) e já entrava no Cust_Var do motor (soma, não desconta do
-                # CFO — mod_provisoes.py), mas nunca nascia no razão no fechamento do contrato. No
-                # CONTRATO é ADITIVO (par próprio 1.1.06.14 × 2.1.04.14, não mexe no CFO); na AF é
-                # SUBSTITUTIVO (migra do CFO pelo delta — já implementado, ver `_migracao`).
-                "outros_forn":         round(float(getattr(orc2, "out_forn", 0) or 0), 2),
+                # F2-36 (07/09, ACHADO-65/66, REVERTE o ACHADO-61 de propósito): Item Especial é
+                # a rubrica que nasce NA VENDA (par próprio 1.1.06.22×2.1.04.22, não mexe no CFO) —
+                # "Outros Fornecedores" (out_forn/2.1.04.14) volta a nascer SÓ por reclassificação
+                # (etapa 12) ou migração da AF, a premissa original do `_PROV_FECHAMENTO` antes do
+                # ACHADO-61: o campo dos Parâmetros que alimentava `out_forn` na venda deixou de
+                # existir (virou Item Especial, conceito próprio), então essa porta fecha de volta.
+                "item_especial":       round(float(getattr(orc2, "item_especial", 0) or 0), 2),
                 "impostos":            d.get("Prov_Imp"),
                 # FASE A (resultado da venda): os 4 custos adicionais viram provisão (valores do breakdown;
                 # 0 quando o toggle do custo está desligado → não lança). JÁ deduzidos do Val_Liq, então
@@ -11648,6 +11649,14 @@ class Handler(BaseHTTPRequestHandler):
                     except (TypeError, ValueError):
                         self.send_json({"ok": False, "erro": "Valores de itens inválidos"}, code=400); return
                     cfo, vl = anterior.cfo, anterior.val_liq   # base congelada (versão anterior: venda p/ rev1, rev1 p/ rev2)
+                    # F2-36 (07/09, ACHADO-65/66): Item Especial não é editável na AF (nasce só na
+                    # venda, congelado após a assinatura — `_contrato_assinado` trava a rota que o
+                    # edita) — a tela nunca o submete aqui. `item_especial` agora soma em
+                    # `_RUBRICAS` (mod_provisoes.py), então sem isto toda revisão apagaria sua
+                    # contribuição ao Cust_Var (regra dos irmãos: ele é a ÚNICA rubrica que soma
+                    # em Cust_Var mas nunca vem no `itens` da AF — carrega do registro ANTERIOR).
+                    itens["item_especial"] = float(
+                        json.loads(anterior.itens_json).get("item_especial") or 0)
                 else:
                     self.send_json({"ok": False, "erro": "decisao deve ser concorda|revisa"}, code=400); return
                 # F2-30 Fatia 1 (06/09, medido no percurso do Teste_6, beta5): Custo de Fábrica
@@ -16656,8 +16665,9 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
-        # ── PUT /api/orcamentos/<id>/out-forn — editar outros fornecedores ──
-        m_out = re.match(r"^/api/orcamentos/(\d+)/out-forn$", path)
+        # ── PUT /api/orcamentos/<id>/item-especial — editar Item Especial (F2-36, renomeada de
+        #    /out-forn — out_forn deixou de ser editável na negociação, ACHADO-65/66) ──
+        m_out = re.match(r"^/api/orcamentos/(\d+)/item-especial$", path)
         if m_out:
             oid = int(m_out.group(1))
             usuario = get_usuario_sessao(self)
@@ -16683,7 +16693,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Contrato assinado — alterações não permitidas."}, code=403)
                     return
                 try:
-                    orc.out_forn = max(0.0, float(req.get("out_forn") or 0))
+                    orc.item_especial = max(0.0, float(req.get("item_especial") or 0))
                 except (TypeError, ValueError):
                     self.send_json({"ok": False, "erro": "Valor inválido"}, code=400)
                     return
@@ -17804,16 +17814,18 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
 
 
 def _markup_merc_puro(orc):
-    """ACHADO-65 (07/09): a conciliação de PE precisa do markup só de mercadoria de FÁBRICA —
-    sem o Item Especial (`out_forn`, mercadoria de terceiro), que dilui `orc.markup`/`orc.val_liq`
-    de propósito (ver mod_negociacao.py, topo do arquivo, e docs/superpowers/specs/negociacao/
-    2026-06-22-mecanismo-negociacao-design.md, "Nota de revisão" — ali diluí-lo distorceria um
-    número que vira valor de contrato em renegociação). `out_forn` entra em `Val_Liq` pelo valor
-    CHEIO (sem desconto), então subtrair de volta recupera o Val_Liq de mercadoria pura sem
-    precisar recalcular o motor inteiro."""
+    """ACHADO-65/66 (07/09, renomeado no F2-36): a conciliação de PE precisa do markup só de
+    mercadoria de FÁBRICA — sem o Item Especial (`item_especial`, mercadoria de terceiro vendida
+    junto), que dilui `orc.markup`/`orc.val_liq` de propósito (ver mod_negociacao.py, topo do
+    arquivo, e docs/superpowers/specs/negociacao/2026-06-22-mecanismo-negociacao-design.md, "Nota
+    de revisão" — ali diluí-lo distorceria um número que vira valor de contrato em renegociação).
+    `item_especial` entra em `Val_Liq` pelo valor CHEIO (sem desconto), então subtrair de volta
+    recupera o Val_Liq de mercadoria pura sem precisar recalcular o motor inteiro. NÃO é
+    `out_forn` — esse virou um conceito de substituição da AF (ACHADO-66), não entra mais no
+    motor da negociação nem em Val_Liq."""
     if orc is None or not orc.cfo:
         return 0.0
-    val_liq_merc = float(orc.val_liq or 0.0) - float(orc.out_forn or 0.0)
+    val_liq_merc = float(orc.val_liq or 0.0) - float(orc.item_especial or 0.0)
     return val_liq_merc / float(orc.cfo)
 
 
@@ -18445,22 +18457,35 @@ def _negociacao_breakdown(orc, db, vbva_override=None, params_override=None,
     pool_proj = db.query(PoolAmbiente).filter_by(projeto_id=orc.projeto_id).all()
     n_total_proj = len(pool_proj) or None
     vbvo_proj = sum((pa.budget_total or 0.0) for pa in pool_proj) or None
-    _out_forn = float(orc.out_forn or 0.0)
+    _item_especial = float(orc.item_especial or 0.0)
     d0 = mod_negociacao.calcular_orcamento(ambs, params, desc_orc,
                                            n_total_proj=n_total_proj, vbvo_proj=vbvo_proj,
-                                           out_forn=_out_forn)
+                                           item_especial=_item_especial)
     cust_fin = 0.0 if total_cliente is None else max(0.0, total_cliente - d0["VAVO"])
     d = mod_negociacao.calcular_orcamento(ambs, params, desc_orc, cust_fin=cust_fin,
                                           n_total_proj=n_total_proj, vbvo_proj=vbvo_proj,
-                                          out_forn=_out_forn)
+                                          item_especial=_item_especial)
     for i, amb in enumerate(d.get("ambientes", [])):
         amb["id"] = ids[i] if i < len(ids) else None
     # v1: usa o Val_Liq do próprio orçamento como proxy do acumulado mensal do consultor.
     # Fase 2 troca por um acumulador mensal por (consultor, loja, mês). Ver spec/PROVISOES_E_VARIAVEIS.md.
     com_venda_pct = mod_provisoes.resolver_comissao_venda(cfg, d.get("Val_Liq", 0.0), desc_orc)
-    prov = mod_provisoes.provisoes_orcamento(d, cfg, out_forn=(orc.out_forn or 0.0),
+    prov = mod_provisoes.provisoes_orcamento(d, cfg, item_especial=_item_especial,
                                              com_venda_pct=com_venda_pct)
     d.update(prov)
+    # F2-36 (07/09): #mp-out-forn (modal de Parâmetros) exibe o saldo VIVO de Outros Fornecedores
+    # (2.1.04.14, substituição via AF/Conferência) — NÃO é `orc.out_forn` (coluna congelada pela
+    # migration, nunca mais escrita) nem `item_especial` (rubrica própria da venda, já em `d`).
+    # Leitura de razão aqui é uma exceção deliberada ao contrato "sem I/O" desta função (mesmo
+    # padrão do "Atual" da AF, F2-28 Passo 1a) — evita duplicar a query em cada rota que devolve
+    # sombra (regra dos irmãos). Falha graciosamente pra 0,0 (projeto/loja sem razão ainda).
+    try:
+        import mod_contabil as _mc
+        _ot_neg, _own_neg = _mc.resolver_owner(db, {"loja_id": orc.loja_id, "rede_id": None})
+        d["Saldo_Out_Forn"] = round(_mc._mov(db, _ot_neg, _own_neg, "2.1.04.14", "credor", None, None,
+                                             projeto_id=orc.projeto_id), 2)
+    except Exception:
+        d["Saldo_Out_Forn"] = 0.0
     return d
 
 

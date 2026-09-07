@@ -168,6 +168,32 @@ ficaram INTOCADOS. 5 camadas verdes (a: 10 passed; b/c/d: 2698 passed, 4 xfailed
 achado incidental, +2 `showToast` novos exigiram atualizar a contagem de `test_aceite_
 achado36.py`, 133→135; e: 10 E2E, nenhum travou). Sem tag — aguardando pedido do Marcelo.
 
+### F2-36 — fechado [FEITO nesta sessão, a pedido do Marcelo]
+
+Migration `9a1b2c3d4e5f`. ACHADO-65/66: corrige o F2-35, que reusou `out_forn` pra duas coisas
+diferentes — Item Especial (venda, markup 1, nunca toca o CFO) × Outros Fornecedores
+(substituição do CFO, só na AF/etapa 12). Coluna nova `item_especial` + backfill (bancada local:
+0 linhas afetadas — 1 orçamento total, nenhum com out_forn≠0; Teste_7/Projeto 8 ficam pra
+Homologação reportar no deploy). Contas novas 1.1.06.22/2.1.04.22 via PLANO_PADRAO — descoberta
+no meio do caminho: "sem migration" só vale pros owners REAIS (seed_plano lazy); os 3 owners
+fixos de teste (`orizon_baseline_teste`) exigiram o MESMO insert literal de `655716ac5fd8`
+(pego pelos testes de gabarito, não pela instrução original). Motor: `out_forn=`→`item_especial=`
+(econômico do ACHADO-65 intacto, só o nome mudou). Cust_Var: `out_forn` SAI de `_RUBRICAS` (já
+tava dentro do CFO congelado — duplicava a mercadoria, ACHADO-66: migração de 3.000 sem custo
+novo derrubava a margem 42%→40,5%); `item_especial` entra no lugar. Achado ao implementar: a AF
+nunca submete `item_especial` (não editável lá) — a revisão precisou carregar o valor do registro
+ANTERIOR explicitamente, senão toda revisão zerava a contribuição dele ao Cust_Var. Contrato:
+ganha `item_especial`, PERDE `outros_forn` — reverte o ACHADO-61 de propósito (a porta fecha).
+Tela: botão grava `item_especial`; `/out-forn` removida, `/item-especial` no lugar; `#mp-out-forn`
+volta a mostrar o saldo VIVO de Outros Fornecedores (leitura de razão nova em
+`_negociacao_breakdown`, exceção deliberada ao "sem I/O"); Item Especial ganhou span próprio.
+14 falhas incidentais na camada (d) — todas rename/rederivação esperada, sem bug novo revelado
+(destaque: `test_fluxo_completo_e2e.py` testava que migrar Outros Fornecedores AUMENTAVA o
+Cust_Var — exatamente o ACHADO-66; invertido). Os SEIS aceites do ACHADO-63 e `test_leleu_ancora`
+— INTOCADOS. 5 camadas verdes (b/c/d: 2702 passed, 4 xfailed, 0 failed; e: 10 E2E, nenhum
+travou). Sem tag — aguardando pedido do Marcelo. **Pendente:** o documento de 06/09
+("Nota de revisão", design spec) ainda fala em `out_forn`/"VBNO NÃO recebe o item" — reconciliar.
+
 ## Estado em 06/09/2026
 
 ### Em execução agora

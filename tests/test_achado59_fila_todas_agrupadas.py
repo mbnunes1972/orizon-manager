@@ -27,13 +27,16 @@ def test_fila_lista_rubricas_nunca_tocadas_como_fechadas_zeradas(http_client_fac
 
     # o universo elegível pra fila = todas as contas 2.1.04.% do plano, exceto as sem mecanismo
     # (_PROV_PAINEL_EXCLUI) e as de rota própria (_PROV_FORA_DO_VEREDITO, Impostos/Cust_Fin,
-    # ACHADO-01) — 21 no plano, 4 excluídas, 17 sempre aparecem pra este projeto.
+    # ACHADO-01). Contagem do universo TOTAL calculada do próprio PLANO_PADRAO (data-driven, como
+    # o painel — F2-36/ACHADO-65/66 acrescentou 2.1.04.22 e este teste não pode quebrar de novo
+    # na próxima conta nova).
+    total_no_plano = len([c for c, _ in mc.PLANO_PADRAO if c.startswith("2.1.04.")])
     excluir = mc._PROV_PAINEL_EXCLUI | mc._PROV_FORA_DO_VEREDITO
-    assert len(linhas) == 21 - len(excluir), (
+    assert len(linhas) == total_no_plano - len(excluir), (
         "a fila tem que listar TODAS as rubricas elegíveis pro projeto, tocadas ou não — %r"
         % sorted(r["codigo"] for r in linhas))
 
-    # a única rubrica com movimento fica em_aberto; as outras 16, nunca tocadas, aparecem
+    # a única rubrica com movimento fica em_aberto; as outras, nunca tocadas, aparecem
     # zeradas — visíveis, mas sem ação (não somem, não é a mesma coisa que "ninguém olhou").
     cfo = next(r for r in linhas if r["codigo"] == "2.1.04.06")
     assert cfo["grupo"] == "em_aberto" and cfo["saldo_aberto"] == 1000.0
