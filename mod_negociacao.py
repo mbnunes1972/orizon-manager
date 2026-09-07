@@ -10,6 +10,21 @@ de usar gross-up DIVISIVO (que inflava o Bruto e fazia o preço de tabela variar
 custo especial passou a sofrer o desconto do orçamento em VAVO (senão a identidade quebrava).
 Comissão de arquiteto e fidelidade continuam com gross-up divisivo (`vbva/fator_com`) — são
 PERCENTUAIS, não dependem de `d`, já satisfazem a identidade sem mudança nenhuma.
+
+ACHADO-65 (07/09, DECIDIDO): Item Especial (`out_forn`, "Outros Fornecedores" nascido NA VENDA —
+ver docs/db/ACHADOS_CONTABEIS.md ACHADO-65 e docs/superpowers/specs/negociacao/
+2026-06-22-mecanismo-negociacao-design.md, "Nota de revisão") é tratado como item de "markup 1":
+sem desconto, sem margem própria. Entra pelo MESMO valor cheio em VBVO, VBNO e VAVO (nem
+concentra, nem dilui a proporção de um ambiente isolado — soma nos dois lados de qualquer
+composto agregado). ATENÇÃO: o documento de 06/09 (escrito antes desta conversa) diz "VBNO NÃO
+recebe o item" e dá `Desc_Efetivo = 1-(VAVO-item)/VBNO` — isso foi revisto em conversa com o
+Marcelo em 07/09 pra entrada simétrica (VBVO+VBNO+VAVO), com `Desc_Tot`/`Desc_Efetivo` SEM
+fórmula especial (a diluição sai de graça da simetria). Documento ainda não atualizado — reconciliar
+com a sessão que o escreveu antes de considerá-lo autoritativo de novo. NÃO entra em Cust_Ad (não é
+custo adicional da venda, é linha de venda) nem no loop por ambiente (não é ambiente, não gera
+comissão de arquiteto/fidelidade). `Markup` (Val_Liq/CFO) passa a `Val_Liq/(CFO+out_forn)` — as
+duas parcelas compõem mercadoria — MAS isso é só pro indicador exibido; a conciliação de PE precisa
+do markup só de mercadoria de FÁBRICA (ver `_markup_merc_puro` em main.py).
 """
 
 
@@ -20,7 +35,8 @@ def _f(v):
         return 0.0
 
 
-def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_proj=None, vbvo_proj=None):
+def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_proj=None,
+                       vbvo_proj=None, out_forn=0.0):
     """Ver docstring do plano/§4. `params` no formato parametros_json do projeto."""
     p = params or {}
     tog_cadi = bool(p.get("incluir_custos", False))      # master: repassa/absorve
@@ -36,6 +52,7 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
     cust_esp = _f(p.get("custo_especial")) if tog_cesp else 0.0
     pct_trib = _f(p.get("carga_trib")) / 100.0
     d_orc    = _f(desc_orc_pct) / 100.0
+    out_forn = _f(out_forn)
 
     ambs = [{"VBVA": _f(a.get("VBVA")), "CFA": _f(a.get("CFA")),
              "d_amb": _f(a.get("desc_amb_pct")) / 100.0} for a in (ambientes or [])]
@@ -118,11 +135,21 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
         # enquanto VBNO também recebia o valor cheio — a identidade VAVO == VBNO*(1−d) quebrava
         # exatamente em `cust_esp * d_orc`.
         VAVO += cust_esp * (1 - d_orc)
+
+    # ACHADO-65 (07/09): Item Especial ("markup 1") — mesmo valor cheio nos três, fora do loop
+    # por ambiente (não é ambiente, não gera comissão). Ver nota no topo do arquivo.
+    if out_forn:
+        VBVO += out_forn
+        VBNO += out_forn
+        VAVO += out_forn
+
     cust_ad = (com_arq + pro_fid + (total_via if tog_cvia else 0.0)
                + (total_bri if tog_bri else 0.0) + cust_esp)
     val_liq = VAVO - cust_ad
     desc_tot = ((VBVO - val_liq) / VBVO) if VBVO > 0 else 0.0
-    markup = (val_liq / CFO) if CFO > 0 else 0.0
+    # ACHADO-65: indicador EXIBIDO dilui por mercadoria de terceiro (as duas parcelas compõem
+    # mercadoria) — a conciliação de PE usa outro cálculo, ver `_markup_merc_puro` em main.py.
+    markup = (val_liq / (CFO + out_forn)) if (CFO + out_forn) > 0 else 0.0
     val_cont = VAVO + _f(cust_fin)
     prov_imp = pct_trib * val_cont
 
@@ -143,5 +170,6 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
         "Bri_Recup":      round(recup_bri if tog_bri else 0.0, 2),
         "Cust_Esp_Recup": round(cust_esp * (1 - d_orc), 2),
         "Desc_Efetivo":   round((1 - VAVO / VBNO), 6) if VBNO > 0 else 0.0,
+        "Out_Forn": round(out_forn, 2),
         "ambientes": out_ambs,
     }

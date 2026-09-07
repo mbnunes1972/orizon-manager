@@ -45,12 +45,14 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
     `grep` (linha a linha; perde a chamada de main.py:4211/index.html que quebra em duas linhas).
     200 no candidato v2026.09.01-beta1 (antes desta rodada); 36 convertidos no B2
     (financeiro/provisões); 31 convertidos no F2-23/ACHADO-36 (ciclo — Projeto/Transferência de
-    etapa/PE/Medição, ver `FAIXAS_CICLO` abaixo); 133 seguem no resto do sistema — higiene, fica
-    pra depois."""
+    etapa/PE/Medição, ver `FAIXAS_CICLO` abaixo); 133 seguiam no resto do sistema — higiene, fica
+    pra depois; +2 novos no F2-35 (ACHADO-65, 07/09): `mpSalvarOutForn` (falha de rede/servidor
+    do PUT out-forn) e `abrirItemEspecial` (valor inválido digitado na caixa) — sites NOVOS, não
+    conversão de nenhum toast existente, então o total sobe pra 135."""
     with open(INDEX_HTML, encoding="utf-8") as f:
         conteudo = f.read()
     total = len(re.findall(r"showToast\([^;]*,\s*true\)", conteudo))
-    assert total == 133, "a contagem mudou — reveja o número reportado (%d)" % total
+    assert total == 135, "a contagem mudou — reveja o número reportado (%d)" % total
 
 
 # ── F2-23 (04/09) — faixa do ciclo (Projeto/Transferência de etapa/PE/Medição) ───────────────────

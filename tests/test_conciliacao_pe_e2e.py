@@ -19,6 +19,13 @@ def _setup(app_db, seed, cfo_original=30000.0, budget=80000.0):
     orc = db.get(app_db.Orcamento, oid)
     nome = orc.projeto_id
     orc.markup = 2.0
+    # F2-35 (ACHADO-65): a conciliação de PE deixou de ler `orc.markup` direto — agora recomputa
+    # `(val_liq - out_forn) / cfo` (`_markup_merc_puro`, main.py) pra nunca ser diluída pelo Item
+    # Especial. Este teste isola a rota de PE (bypass do motor completo, comentário acima) e
+    # precisa manter os TRÊS campos coerentes pro markup 2.0 continuar saindo 2.0 daqui.
+    orc.cfo = 15000.0
+    orc.val_liq = 30000.0
+    orc.out_forn = 0.0
     orc.desconto_pct = 0.0   # previsibilidade: VAVA contratado == VBVA (sem desconto/custo adicional)
     # limpa resíduo de outros testes deste arquivo (DROP SCHEMA é só por MÓDULO, não por teste —
     # o mesmo projeto/orçamento de `seed` é reaproveitado em todas as funções aqui).
@@ -138,6 +145,28 @@ def test_get_conciliacao_mostra_diferenca_e_sem_decisao(http_client_factory, see
     assert body["etapa_status"] == "pendente"
     assert body["motivo_reprovacao"] is None
     assert body["rev2_aprovada"] is False
+
+
+def test_get_conciliacao_markup_imune_ao_item_especial(http_client_factory, seed, app_db):
+    """F2-35 (ACHADO-65): Item Especial dilui o markup EXIBIDO de propósito, mas a conciliação de
+    PE tem que continuar vendo o markup só de mercadoria de fábrica — mesmos números de
+    `test_get_conciliacao_mostra_diferenca_e_sem_decisao` (markup 2.0, diferença 6000.0), agora
+    com out_forn=5000.0 (e val_liq subindo pelo mesmo tanto, coerente com o motor: item entra em
+    Val_Liq pelo valor cheio)."""
+    nome, pid, oid = _setup(app_db, seed, cfo_original=30000.0)
+    db = app_db.get_session()
+    orc = db.get(app_db.Orcamento, oid)
+    orc.out_forn = 5000.0
+    orc.val_liq = 35000.0   # 30000 (mercadoria, igual ao teste-irmão) + 5000 (item, valor cheio)
+    db.commit(); db.close()
+    _carrega_pe(app_db, nome, pid, cfo_pe=33000.0)
+
+    c = _login(http_client_factory)
+    st, body = c.get(f"/api/projetos/{nome}/pe/conciliacao")
+    assert st == 200 and body["ok"], body
+    assert body["markup"] == 2.0, "Item Especial não pode vazar pro markup da conciliação de PE"
+    amb = body["fases"][0]["ambientes"][0]
+    assert amb["diferenca_valor_contrato"] == 6000.0   # idêntico ao teste sem Item Especial
 
 
 def test_get_conciliacao_usa_fator_venda_quando_pe_tem_xml_com_venda(http_client_factory, seed, app_db):

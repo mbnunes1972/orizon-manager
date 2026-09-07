@@ -140,6 +140,34 @@ novos (percurso 3.000→4.000→2.000, aumento, no-op, outra rubrica) + 1 rederi
 decisão antiga) + 1 E2E (percurso real na tela). 5 camadas verdes (b: 29 passed; c: 650 passed;
 d: 2690 passed; e: 9 E2E, nenhum travou). Sem tag — aguardando pedido do Marcelo.
 
+### F2-35 — fechado [FEITO nesta sessão, a pedido do Marcelo]
+
+ACHADO-65: Outros Fornecedores é sempre mercadoria comprada pra entrega — na venda (Item
+Especial, novo) o cliente paga por ela; na AF (já implementado) ela sai do CFO por substituição.
+Antes, o custo já entrava em `cust_var` sem receita correspondente em lugar nenhum (margem caía
+de verdade). Enumerados antes de mexer todos os consumidores de `orc.markup`: 3 sites de
+conciliação de PE + 1 display + 1 escrita + o motor — nenhum quarto apareceu, reportado ao
+Marcelo antes de decidir a fórmula. **Desenho revisto em conversa** (diverge do texto de 06/09
+em docs/superpowers/specs/negociacao/2026-06-22-mecanismo-negociacao-design.md, "Nota de
+revisão" — documento NÃO atualizado, reconciliar com a sessão que o escreveu): o item entra pelo
+MESMO valor cheio em VBVO, VBNO **e** VAVO (não só VAVO, como o texto de 06/09 dizia) — item de
+"markup 1", fora do loop por ambiente. Motivo: só assim `Desc_Tot`/`Desc_Efetivo` diluem
+corretamente em vez de ficar artificialmente baixas — achado no meio do caminho, `Desc_Tot`
+alimenta um gate client-side de 35% (`_verificarLimiteDescTotal`) que ficaria mascarado sem a
+simetria. `Markup` exibido dilui de propósito (`Val_Liq/(CFO+out_forn)`); a conciliação de PE
+NUNCA vê essa diluição (`_markup_merc_puro`, novo, recupera o valor de mercadoria pura
+localmente). `cust_var` mantém `out_forn` — margem de contribuição igual em reais, menor em
+percentual (diluição de propósito). Reusa `Orcamento.out_forn`, sem migration. Frontend: botão
+"Item Especial" ao lado de "Novo Ambiente", caixa sóbria (`promptPopup`); `#mp-out-forn` no modal
+de Parâmetros virou só-leitura; `PUT /out-forn` ganhou a trava `_contrato_assinado` + recálculo
+da sombra. Achado incidental: um teste de conciliação de PE fixava `orc.markup` direto sem
+`cfo`/`val_liq` coerentes — corrigido, mais um teste novo provando imunidade ao Item Especial.
+Aceite: `tests/test_achado65_item_especial.py` (7, valores à mão) + `tests/test_e2e_browser_
+achado65_item_especial.py` (1, novo). Os SEIS aceites do ACHADO-63 e `test_leleu_ancora`
+ficaram INTOCADOS. 5 camadas verdes (a: 10 passed; b/c/d: 2698 passed, 4 xfailed, 0 failed —
+achado incidental, +2 `showToast` novos exigiram atualizar a contagem de `test_aceite_
+achado36.py`, 133→135; e: 10 E2E, nenhum travou). Sem tag — aguardando pedido do Marcelo.
+
 ## Estado em 06/09/2026
 
 ### Em execução agora

@@ -2721,7 +2721,7 @@ class Handler(BaseHTTPRequestHandler):
 
                 orc_ct, vava_ct, fator_ca, d_orc_pct, d_amb_pct, _vavo_ct, _cad_ct, ja_contratado = \
                     _pe_fator_contexto(db, nome)
-                markup = float(orc_ct.markup or 0.0) if orc_ct else 0.0
+                markup = _markup_merc_puro(orc_ct)
 
                 decisoes = {d.pool_ambiente_id: d for d in
                             db.query(ConciliacaoPeFase).filter_by(projeto_nome=nome).all()}
@@ -8053,7 +8053,7 @@ class Handler(BaseHTTPRequestHandler):
                 diferenca_cfo = round(float(arq.valor_atualizado) - float(pa.order_total or 0.0), 2)
                 orc_ct, vava_ct, fator_ca, d_orc_pct, d_amb_pct, _vavo_ct, _cad_ct, _ja_contratado = \
                     _pe_fator_contexto(db, nome)
-                markup = float(orc_ct.markup or 0.0) if orc_ct else 0.0
+                markup = _markup_merc_puro(orc_ct)
                 dvc = _mconc.diferenca_valor_contrato_estimada(
                     diferenca_cfo=diferenca_cfo, markup=markup, valor_venda_pe=arq.valor_venda,
                     vava_contratado=vava_ct.get(pool_ambiente_id, 0.0),
@@ -16676,12 +16676,25 @@ class Handler(BaseHTTPRequestHandler):
                 if orc is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
+                # F2-35 (07/09): o Item Especial agora entra no motor (VBVO/VBNO/VAVO/Val_Cont) —
+                # mesma trava das demais edições de negociação, senão o valor do contrato assinado
+                # mudaria depois da assinatura.
+                if _contrato_assinado(orc.projeto_id, db):
+                    self.send_json({"ok": False, "erro": "Contrato assinado — alterações não permitidas."}, code=403)
+                    return
                 try:
                     orc.out_forn = max(0.0, float(req.get("out_forn") or 0))
                 except (TypeError, ValueError):
                     self.send_json({"ok": False, "erro": "Valor inválido"}, code=400)
                     return
                 db.commit()
+                # o Item Especial agora afeta as colunas sombra materializadas (val_liq/markup/
+                # vavo/val_cont) — sem recalcular aqui elas ficariam defasadas até a próxima
+                # edição de negociação (mesmo padrão de _persistirDescontosOrc/PUT descontos).
+                try:
+                    _recalcular_orcamento(orc, db); db.commit()
+                except Exception:
+                    db.rollback()
                 self.send_json({"ok": True, "sombra": _negociacao_breakdown(orc, db)})
                 return
             except Exception as e:
@@ -17790,6 +17803,20 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
     return linhas, resumo
 
 
+def _markup_merc_puro(orc):
+    """ACHADO-65 (07/09): a conciliação de PE precisa do markup só de mercadoria de FÁBRICA —
+    sem o Item Especial (`out_forn`, mercadoria de terceiro), que dilui `orc.markup`/`orc.val_liq`
+    de propósito (ver mod_negociacao.py, topo do arquivo, e docs/superpowers/specs/negociacao/
+    2026-06-22-mecanismo-negociacao-design.md, "Nota de revisão" — ali diluí-lo distorceria um
+    número que vira valor de contrato em renegociação). `out_forn` entra em `Val_Liq` pelo valor
+    CHEIO (sem desconto), então subtrair de volta recupera o Val_Liq de mercadoria pura sem
+    precisar recalcular o motor inteiro."""
+    if orc is None or not orc.cfo:
+        return 0.0
+    val_liq_merc = float(orc.val_liq or 0.0) - float(orc.out_forn or 0.0)
+    return val_liq_merc / float(orc.cfo)
+
+
 def _pe_fator_contexto(db, nome_safe, excluir_orcamento_id=None):
     """Contexto do fator VAVA/VBVA por ambiente contratado — compartilhado entre a Conciliação de
     PE/AF2 (decisão) e o Complemento de Projeto de fato (`_complemento_diferencas`/
@@ -17869,7 +17896,7 @@ def _pe_ambientes_pendentes_decisao(db, nome_safe):
     id_por_nome = {v: k for k, v in pa_nome.items()}
     orc_ct, vava_ct, fator_ca, d_orc_pct, d_amb_pct, _vavo_ct, _cad_ct, _ja_contratado = \
         _pe_fator_contexto(db, nome_safe)
-    markup = float(orc_ct.markup or 0.0) if orc_ct else 0.0
+    markup = _markup_merc_puro(orc_ct)
     pendentes = set()
     for _l in linhas:
         if not _l["pe_carregado"]:
@@ -18418,11 +18445,14 @@ def _negociacao_breakdown(orc, db, vbva_override=None, params_override=None,
     pool_proj = db.query(PoolAmbiente).filter_by(projeto_id=orc.projeto_id).all()
     n_total_proj = len(pool_proj) or None
     vbvo_proj = sum((pa.budget_total or 0.0) for pa in pool_proj) or None
+    _out_forn = float(orc.out_forn or 0.0)
     d0 = mod_negociacao.calcular_orcamento(ambs, params, desc_orc,
-                                           n_total_proj=n_total_proj, vbvo_proj=vbvo_proj)
+                                           n_total_proj=n_total_proj, vbvo_proj=vbvo_proj,
+                                           out_forn=_out_forn)
     cust_fin = 0.0 if total_cliente is None else max(0.0, total_cliente - d0["VAVO"])
     d = mod_negociacao.calcular_orcamento(ambs, params, desc_orc, cust_fin=cust_fin,
-                                          n_total_proj=n_total_proj, vbvo_proj=vbvo_proj)
+                                          n_total_proj=n_total_proj, vbvo_proj=vbvo_proj,
+                                          out_forn=_out_forn)
     for i, amb in enumerate(d.get("ambientes", [])):
         amb["id"] = ids[i] if i < len(ids) else None
     # v1: usa o Val_Liq do próprio orçamento como proxy do acumulado mensal do consultor.

@@ -1552,6 +1552,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
                   style="font-size:11px;padding:4px 10px">Ambientes</button>
           <button id="btn-novo-ambiente" class="btn btn-ghost btn-sm" onclick="abrirModalNovoAmbiente()"
                   style="font-size:11px;padding:4px 10px">Novo Ambiente</button>
+          <button id="btn-item-especial" class="btn btn-ghost btn-sm" onclick="abrirItemEspecial()"
+                  title="Mercadoria de terceiro comprada pra entrega, repassada pelo custo — ACHADO-65"
+                  style="font-size:11px;padding:4px 10px">Item Especial</button>
         </div>
         <!-- Ações — Aprovar é a de maior peso (fecha o negócio): primário único.
              Salvar/Imprimir: secundários. Os ids #btn-salvar-orcamento/#btn-aprovar-orcamento
@@ -3982,11 +3985,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <div style="display:flex;justify-content:space-between;margin-top:4px"><span style="color:var(--muted)">Margem de Contribuição</span><span id="mp-a-marg-cont" style="font-family:var(--font-mono)">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:2px"><span style="color:var(--text-3);font-size:var(--fs-xs)">Margem da Venda</span><span id="mp-a-marg-venda" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-2)">—</span></div>
         <div style="display:flex;justify-content:space-between;margin-top:2px"><span style="color:var(--text-3);font-size:var(--fs-xs)">Margem do Contrato</span><span id="mp-a-marg-contrato" style="font-family:var(--font-mono);font-size:var(--fs-xs);color:var(--text-2)">—</span></div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
-          <label for="mp-out-forn" style="color:var(--muted)">Outros fornecedores (R$)</label>
-          <input id="mp-out-forn" type="number" min="0" step="0.01" value="0"
-            style="width:110px;padding:3px 6px;background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:var(--font-mono);text-align:right"
-            onchange="mpSalvarOutForn(this.value)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px"
+             title="Item Especial (ACHADO-65) — edição só pelo botão &quot;Item Especial&quot;, ao lado de &quot;Novo Ambiente&quot;, na tela de negociação.">
+          <span style="color:var(--muted)">Item Especial (Outros Fornecedores)</span>
+          <span id="mp-out-forn" style="font-family:var(--font-mono)">R$ 0,00</span>
         </div>
       </div>
     </div>
@@ -11520,7 +11522,7 @@ function _mpRenderSombra(liquidoHoje, margemHoje) {
           ${linha('Custos adicionais',     '—', fmtR(s.cust_ad))}
           ${linha('Valor líquido',  fmtR(Number(liquidoHoje) || 0), fmtR(s.val_liq))}
           ${linha('Desconto total', fmtP(Number(margemHoje) || 0), fmtP((s.desc_tot_pct || 0) * 100))}
-          ${linha('Markup (Liq/CFO)', '—', (Number(s.markup) || 0).toFixed(3))}
+          ${linha('Markup (Líq / mercadoria)', '—', (Number(s.markup) || 0).toFixed(3))}
         </tbody>
       </table>
     </div>`;
@@ -11555,7 +11557,24 @@ async function mpSalvarOutForn(val) {
     });
     const d = await r.json();
     if (d && d.ok && d.sombra) { _previewNeg = d.sombra; _aplicarPreviewNaTela(d.sombra); }
+    else if (d && !d.ok) { showToast(d.erro || 'Falha ao salvar Item Especial.', true); }
   } catch (e) { console.warn('out-forn save:', e); }
+}
+
+// F2-35 (ACHADO-65): botão "Item Especial", ao lado de "Novo Ambiente" — único ponto de edição
+// de `out_forn` (o campo no modal de Parâmetros virou leitura). Caixa sóbria (promptPopup), não
+// a vermelha de erro — mesmo padrão do F2-33.
+async function abrirItemEspecial() {
+  if (!_orcamentoAtivoId) return;
+  const atual = (_previewNeg && _previewNeg.Out_Forn != null) ? _previewNeg.Out_Forn : 0;
+  const v = await promptPopup(
+    'Mercadoria comprada de terceiro pra entrega ao cliente, repassada pelo custo — sem desconto, sem margem própria (ACHADO-65).',
+    {titulo: 'Item Especial (Outros Fornecedores)',
+     placeholder: '0,00', valor: atual ? String(atual).replace('.', ',') : ''});
+  if (v === null) return;
+  const num = parseFloat(String(v).replace(',', '.'));
+  if (isNaN(num) || num < 0) { showToast('Valor inválido.', true); return; }
+  await mpSalvarOutForn(num);
 }
 
 // Aplica o breakdown vindo da RESPOSTA de um save (edição → save → exibe). Fonte única.
@@ -11582,6 +11601,7 @@ function _aplicarPreviewNaTela(s) {
   setR('mp-a-viagem', via, via > 0 ? '− ' : '');     // viagem total do motor (Cust_Via)
   setR('mp-a-brinde', bri, bri > 0 ? '− ' : '');     // brinde total do motor (Bri)
   setR('mp-a-cesp', cesp, cesp > 0 ? '− ' : '');      // custo especial do motor (não rateado)
+  setR('mp-out-forn', s.Out_Forn);   // F2-35: Item Especial (ACHADO-65) — display read-only
   // ACHADO-63 (06/09), F2-32 Fatia 3: "cliente paga" — SÓ do motor (Cust_Via_Recup/Bri_Recup/
   // Cust_Esp_Recup), nunca recalculado aqui (com desconto por ambiente o recuperado é soma de
   // fatores por ambiente, não o total vezes o desconto global). "Cedida" é a diferença entre os
@@ -11702,9 +11722,10 @@ function abrirModalParams(){
   id('mp-cesp-ativo').checked = !!m.custo_especial_ativo;
   id('mp-cesp').value        = m.custo_especial || 0;
   id('mp-carga-trib').value   = m.carga_trib !== undefined ? m.carga_trib : 8.00;
-  // preenche out_forn com o valor vindo do preview do motor (Out_Forn)
+  // F2-35: mp-out-forn virou display read-only (edição migrou pro botão "Item Especial",
+  // ao lado de "Novo Ambiente") — preenche com o valor vindo do preview do motor (Out_Forn).
   const outFornEl = id('mp-out-forn');
-  if (outFornEl) outFornEl.value = (_previewNeg && _previewNeg.Out_Forn != null) ? _previewNeg.Out_Forn : 0;
+  if (outFornEl) outFornEl.textContent = 'R$ ' + fmt(Number(_previewNeg && _previewNeg.Out_Forn) || 0);
   mpSegPopular(m);   // segmentação Mercadoria × Serviço (override do projeto) — só ao Diretor
   mpToggleArq(); mpToggleFid(); mpToggleViagem(); mpToggleBrinde(); mpToggleCustoEspecial();
   // Carrega toggle incluir_custos — sincroniza _incluirCustos com o valor salvo
@@ -19590,7 +19611,7 @@ function _aplicarLockNegociacaoPosAssinatura(){
 
 function atualizarBotoesAprovacao() {
   const assinado = (typeof _contratoAssinado !== 'undefined') && _contratoAssinado;
-  ['btn-pool','btn-novo-ambiente','btn-novo-orc'].forEach(id => {
+  ['btn-pool','btn-novo-ambiente','btn-item-especial','btn-novo-orc'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = assinado ? 'none' : '';
   });
