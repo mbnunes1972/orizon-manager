@@ -11568,18 +11568,45 @@ async function mpSalvarItemEspecial(val) {
   } catch (e) { console.warn('item-especial save:', e); }
 }
 
-// F2-35 (ACHADO-65), renomeada no F2-36: botão "Item Especial", ao lado de "Novo Ambiente" —
-// único ponto de edição de `item_especial` (o campo no modal de Parâmetros é só leitura). Caixa
-// sóbria (promptPopup), não a vermelha de erro — mesmo padrão do F2-33.
+// F2-35 (ACHADO-65), renomeada no F2-36: botão "Item Especial", ao lado de "Novo Ambiente" (e
+// clicar na linha da tabela, F2-37) — único ponto de edição de `item_especial` (o campo no modal
+// de Parâmetros é só leitura). Caixa sóbria (`_popupOverlay`, mesmo primitivo do `promptPopup`),
+// não a vermelha de erro — mesmo padrão do F2-33. F2-37: campo com formato financeiro — reusa a
+// máscara já existente (`mascaraMoedaInput`/`parseMoeda`, mesmo padrão de `#av-entrada-valor`),
+// NÃO escreve máscara nova; por isso não dá pra usar o `promptPopup` genérico (não tem gancho de
+// `oninput`) — caixa própria, só pra este campo.
 async function abrirItemEspecial() {
   if (!_orcamentoAtivoId) return;
   const atual = (_previewNeg && _previewNeg.Item_Esp != null) ? _previewNeg.Item_Esp : 0;
-  const v = await promptPopup(
-    'Mercadoria comprada de terceiro pra entrega ao cliente, vendida JUNTO na negociação, repassada pelo custo — sem desconto, sem margem própria (ACHADO-65/66).',
-    {titulo: 'Item Especial',
-     placeholder: '0,00', valor: atual ? String(atual).replace('.', ',') : ''});
+  const valorInicial = atual ? ('R$ ' + fmt(atual)) : '';
+  const v = await new Promise((resolve) => {
+    const ov = _popupOverlay(
+      '<h4 style="margin:0 0 10px;color:var(--accent);font-size:1rem">Item Especial</h4>' +
+      '<p style="margin:0 0 10px;color:var(--fg);font-size:.9rem;white-space:pre-line">Mercadoria comprada de terceiro ' +
+      'pra entrega ao cliente, vendida JUNTO na negociação, repassada pelo custo — sem desconto, sem margem própria ' +
+      '(ACHADO-65/66).</p>' +
+      '<input id="_ie-inp" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00" value="' + esc(valorInicial) + '" ' +
+      'oninput="mascaraMoedaInput(this)" ' +
+      'style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);color:var(--fg);' +
+      'padding:8px 10px;border-radius:6px;font-size:.9rem;margin-bottom:14px;text-align:right">' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+      '<button data-act="cancel" style="background:none;border:1px solid var(--muted);color:var(--muted);' +
+      'border-radius:5px;padding:6px 16px;cursor:pointer;font-size:.85rem">Cancelar</button>' +
+      '<button data-act="ok" style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);' +
+      'border-radius:5px;padding:7px 18px;font-size:.88rem;font-weight:700;cursor:pointer">Salvar</button>' +
+      '</div>');
+    const inp = ov.querySelector('#_ie-inp');
+    const fin = (val) => { ov.remove(); document.removeEventListener('keydown', onKey); resolve(val); };
+    const ok = () => fin(inp.value);
+    const onKey = (e) => { if (e.key === 'Escape') fin(null); else if (e.key === 'Enter') ok(); };
+    ov.querySelector('[data-act="ok"]').onclick = ok;
+    ov.querySelector('[data-act="cancel"]').onclick = () => fin(null);
+    ov.addEventListener('click', (e) => { if (e.target === ov) fin(null); });
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => { inp.focus(); inp.select(); }, 60);
+  });
   if (v === null) return;
-  const num = parseFloat(String(v).replace(',', '.'));
+  const num = parseMoeda(v);
   if (isNaN(num) || num < 0) { showToast('Valor inválido.', true); return; }
   await mpSalvarItemEspecial(num);
 }
@@ -11692,6 +11719,41 @@ function _aplicarPreviewNaTela(s) {
       if (cAv) cAv.textContent = 'R$ ' + fmt(vava);
       if (cFn) cFn.textContent = 'R$ ' + fmt(Math.round(vava * _finFactor * 100) / 100);
     });
+  }
+  // ── linha do Item Especial na tabela (F2-37): mesmo padrão das células por ambiente — só o
+  // MOTOR escreve o valor (nunca calculado aqui de novo — seria a 2ª porta do ACHADO-63). VAVO
+  // já inclui o item (mod_negociacao.py), então o rodapé (#neg-total-avista, abaixo) bate sem
+  // somar nada — a linha só EXIBE uma fatia do que o total já contém. Sem checkbox (não é
+  // ambiente; "remover" é zerar o valor pelo botão "Item Especial", não desmarcar).
+  const _itemEsp = Number(s.Item_Esp) || 0;
+  const _tbodyNeg = id('neg-tbody');
+  let _trItemEsp = document.querySelector('tr[data-item-especial="1"]');
+  if (_itemEsp > 0.005) {
+    if (!_trItemEsp && _tbodyNeg) {
+      _tbodyNeg.insertAdjacentHTML('beforeend', `<tr data-item-especial="1" style="cursor:pointer"
+          title="Item Especial — mercadoria de terceiro vendida junto, sem desconto (ACHADO-65). Clique para editar."
+          onclick="abrirItemEspecial()">
+        <td style="width:40px;padding:10px 8px;border-bottom:1px solid var(--border)"></td>
+        <td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;font-style:italic;color:var(--muted)">
+          Item Especial &#x270F;
+        </td>
+        <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;width:80px">
+          <input type="text" value="0" disabled
+                 style="width:60px;text-align:right;padding:3px 6px;font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none;opacity:.55;cursor:not-allowed">
+        </td>
+        <td data-col="avista" style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:var(--muted)">R$ —</td>
+        <td data-col="fin" style="text-align:right;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:700;color:var(--ok)">R$ —</td>
+      </tr>`);
+      _trItemEsp = document.querySelector('tr[data-item-especial="1"]');
+    }
+    if (_trItemEsp) {
+      const cAvIE = _trItemEsp.querySelector('[data-col="avista"]');
+      const cFnIE = _trItemEsp.querySelector('[data-col="fin"]');
+      if (cAvIE) cAvIE.textContent = 'R$ ' + fmt(_itemEsp);
+      if (cFnIE) cFnIE.textContent = 'R$ ' + fmt(Math.round(_itemEsp * _finFactor * 100) / 100);
+    }
+  } else if (_trItemEsp) {
+    _trItemEsp.remove();
   }
   const _elTAv = id('neg-total-avista');
   if (_elTAv) _elTAv.textContent = 'R$ ' + fmt(_vavo);   // total à vista (VAVO)

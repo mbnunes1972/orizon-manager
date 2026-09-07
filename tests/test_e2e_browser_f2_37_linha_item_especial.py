@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-"""E2E de NAVEGADOR (Playwright) — F2-35, ACHADO-65 (docs/db/ACHADOS_CONTABEIS.md).
+"""E2E de NAVEGADOR (Playwright) — F2-37 (Marcelo, 07/09).
 
-Item Especial (Outros Fornecedores nascido na VENDA): botão novo ao lado de "Novo Ambiente",
-caixa sóbria (promptPopup) pra editar o valor, campo #mp-out-forn no modal de Parâmetros virou
-SÓ LEITURA (edição migrou pro botão). Critério de aceite: clicar o botão, digitar um valor, salvar
-— e ver a tela de negociação (Valor Bruto, Total do Contrato) e o modal de Parâmetros reagirem ao
-motor de verdade, não a um campo morto.
+O Item Especial vira LINHA na tabela de ambientes (Fatia 1) e o campo da caixa de edição ganha
+formato financeiro (Fatia 2, `mascaraMoedaInput`/`parseMoeda` — já existentes, nenhuma máscara
+nova). Critério de aceite: item lançado → linha aparece (Desc. % = 0 não editável, à vista =
+valor cheio); item zerado → linha some; total da tabela bate com o VAVO do motor SEM somar de
+novo (a linha só EXIBE uma fatia do que o total já contém).
 
-Por que este teste TEM que ser de navegador: o fio que liga o clique do botão → promptPopup →
-mpSalvarOutForn → PUT /out-forn → _aplicarPreviewNaTela só existe encadeado no DOM real; nenhuma
-chamada de API isolada prova que o botão certo dispara a caixa certa e que a tela se atualiza."""
+Por que este teste TEM que ser de navegador: a linha é inserida/removida no DOM por
+`_aplicarPreviewNaTela` (JS), reagindo ao preview do motor — nenhuma chamada de API isolada prova
+que a estrutura da tabela reage certo, nem que a máscara formata ao vivo enquanto o usuário digita."""
 import os
 import socket
 import subprocess
@@ -23,7 +23,7 @@ REPO = os.path.join(os.path.dirname(__file__), "..")
 NOME_BANCO_ESPERADO = "orizon_e2e"
 TEST_DB_URL = "postgresql+psycopg2://orizon:senha_local_qualquer@localhost/%s" % NOME_BANCO_ESPERADO
 
-XML_ONE_AMBIENTE = '''<PROJECT DESCRIPTION="Cozinha E2E" DATE="01/01/2026"><CATEGORY DESCRIPTION="Cozinha"><ITEMS>
+XML_ONE_AMBIENTE = '''<PROJECT DESCRIPTION="Cozinha E2E F2-37" DATE="01/01/2026"><CATEGORY DESCRIPTION="Cozinha"><ITEMS>
 <ITEM REFERENCE="A" DESCRIPTION="Modulados" UNIT="UN" QUANTITY="1" SHOWPRICE="Y">
 <PRICE TABLE="100000" TOTAL="100000"><MARGINS><ORDER TOTAL="70000"/><BUDGET TOTAL="100000"/></MARGINS></PRICE></ITEM>
 </ITEMS></CATEGORY></PROJECT>'''
@@ -89,7 +89,7 @@ def page(page):
     return page
 
 
-def test_item_especial_botao_soma_no_bruto_e_no_total_e_campo_do_modal_vira_leitura(page, servidor_e2e):
+def test_linha_item_especial_aparece_some_e_nao_duplica_o_total(page, servidor_e2e):
     base = servidor_e2e
 
     page.goto(base + "/static/login.html")
@@ -99,7 +99,7 @@ def test_item_especial_botao_soma_no_bruto_e_no_total_e_campo_do_modal_vira_leit
     page.wait_for_url(base + "/")
 
     page.click('button:has-text("Novo Projeto")')
-    page.fill("#novo-proj-nome", "Achado65 E2E")
+    page.fill("#novo-proj-nome", "F237 E2E")
     page.fill("#novo-proj-cli", "Cliente E2E")
     page.wait_for_selector("#np-cli-dropdown div")
     page.click("#np-cli-dropdown div")
@@ -123,35 +123,54 @@ def test_item_especial_botao_soma_no_bruto_e_no_total_e_campo_do_modal_vira_leit
     except Exception:
         pass
     page.click("#btn-novo-ambiente")
-    xml_path = "/tmp/e2e_achado65_ambiente.xml"
+    xml_path = "/tmp/e2e_f237_ambiente.xml"
     with open(xml_path, "w", encoding="utf-8") as f:
         f.write(XML_ONE_AMBIENTE)
     page.set_input_files("#xml-input-amb", xml_path)
     page.wait_for_selector("#neg-subtotal:has-text('100.000,00')", timeout=10000)
 
-    total_antes = page.inner_text("#neg-total")
+    # ── ANTES: sem Item Especial, a linha não existe ──────────────────────────────────────────
+    assert page.query_selector('tr[data-item-especial="1"]') is None
 
-    # ── botão "Item Especial" abre a caixa sóbria (F2-37: campo com máscara financeira), não a
-    # vermelha de erro ────────────────────────────────────────────────────────────────────────
+    # ── digita o valor: a caixa mostra o formato financeiro AO VIVO ("R$ 5.000,00") ────────────
     page.click("#btn-item-especial")
     page.wait_for_selector("#_ie-inp", state="visible")
-    page.fill("#_ie-inp", "5000")   # mascaraMoedaInput lê dígitos crus: "5000" -> "R$ 5.000"
+    inp = page.locator("#_ie-inp")
+    inp.click()
+    inp.press_sequentially("5000,00")   # digitado tecla a tecla — exercita mascaraMoedaInput no oninput
+    assert inp.input_value() == "R$ 5.000,00"
     page.click('[data-act="ok"]')
-    page.wait_for_timeout(1000)   # await interno de mpSalvarItemEspecial (fetch + redesenho)
+    page.wait_for_timeout(1000)
 
-    # ── Valor Bruto sobe pelo item (VBNO simétrico — "markup 1") ──────────────────────────────
-    page.wait_for_selector("#neg-subtotal:has-text('105.000,00')", timeout=8000)
+    # ── DEPOIS: a linha aparece com Desc. % = 0 (não editável) e à vista = valor cheio ─────────
+    tr = page.locator('tr[data-item-especial="1"]')
+    tr.wait_for(state="visible", timeout=8000)
+    assert "Item Especial" in tr.inner_text()
+    desc_input = tr.locator("input[type='text'][disabled]")
+    assert desc_input.input_value() == "0"
+    assert desc_input.is_disabled()
+    avista_cell = tr.locator('[data-col="avista"]')
+    assert "5.000,00" in avista_cell.inner_text()
+    fin_cell = tr.locator('[data-col="fin"]')
+    assert "5.000,00" in fin_cell.inner_text()   # sem financiamento nesta modalidade (à vista): fin == avista
 
-    # ── Total do Contrato sobe EXATO o valor do item (Val_Cont inclui via VAVO) ───────────────
-    total_depois = page.inner_text("#neg-total")
-    v_antes = float(total_antes.replace("R$", "").replace(".", "").replace(",", ".").strip())
-    v_depois = float(total_depois.replace("R$", "").replace(".", "").replace(",", ".").strip())
-    assert round(v_depois - v_antes, 2) == 5000.0, (total_antes, total_depois)
+    # ── não-duplicação: o rodapé (Valor à Vista, soma dos ambientes) bate com o VAVO do motor,
+    # que já inclui o item — a linha da tabela só EXIBE uma fatia, não soma de novo ────────────
+    total_avista = page.inner_text("#neg-total-avista")
+    v = float(total_avista.replace("R$", "").replace(".", "").replace(",", ".").strip())
+    assert v == 105000.0, ("total da tabela tem que ser EXATAMENTE VAVO (100.000 dos ambientes + "
+                           "5.000 do item, sem duplicar) — leu %r" % total_avista)
 
-    # ── modal de Parâmetros: #mp-item-especial é um <span> só-leitura, mostrando o valor salvo ──
-    # F2-36: Item Especial e Outros Fornecedores viraram DOIS campos — #mp-out-forn passou a
-    # mostrar o saldo vivo de Outros Fornecedores (substituição da AF), não mais o Item Especial.
-    page.click("#btn-params")
-    page.wait_for_selector("#modal-params", state="visible")
-    assert page.eval_on_selector("#mp-item-especial", "el => el.tagName") == "SPAN"
-    assert "5.000,00" in page.inner_text("#mp-item-especial")
+    # ── clicar na linha abre a MESMA caixa do botão (uma porta só) ─────────────────────────────
+    tr.click()
+    page.wait_for_selector("#_ie-inp", state="visible")
+    assert page.inner_text("h4") == "Item Especial"
+    page.click('[data-act="cancel"]')
+
+    # ── item zerado → a linha SOME ─────────────────────────────────────────────────────────────
+    page.click("#btn-item-especial")
+    page.wait_for_selector("#_ie-inp", state="visible")
+    page.fill("#_ie-inp", "0")
+    page.click('[data-act="ok"]')
+    page.wait_for_timeout(1000)
+    page.wait_for_selector('tr[data-item-especial="1"]', state="detached", timeout=8000)

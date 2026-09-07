@@ -81,7 +81,10 @@ Efeitos: ACHADO-66 resolvido sem fórmula nova (`out_forn` saiu de `_RUBRICAS`),
 revertido de propósito (a porta da venda mudou de dono). Cinco camadas verdes: 2702 passed,
 0 failed, 10 E2E.
 
-**Não implantado.** A última tag é `v2026.09.07-beta1`, que NÃO contém o F2-36.
+**Implantado** em `v2026.09.07-beta2` (Homologação conferida 07/09 13:25): migration
+`655716ac5fd8 → 9a1b2c3d4e5f`, **3 orçamentos** com `out_forn != 0` migrados para
+`item_especial`, `confirmar.sh` 15 OK / 0 FALHA, 1057 colunas (era 1056), serviço ativo, tag
+exata. Produção NÃO tocada.
 
 Documentação atualizada pela orientação em 07/09, depois do commit: MODELO_CONTABIL.md (seção
 reescrita: "Item Especial e Outros Fornecedores: uma família, duas rubricas"), spec da
@@ -217,6 +220,25 @@ Cust_Var — exatamente o ACHADO-66; invertido). Os SEIS aceites do ACHADO-63 e 
 — INTOCADOS. 5 camadas verdes (b/c/d: 2702 passed, 4 xfailed, 0 failed; e: 10 E2E, nenhum
 travou). Sem tag — aguardando pedido do Marcelo. **Pendente:** o documento de 06/09
 ("Nota de revisão", design spec) ainda fala em `out_forn`/"VBNO NÃO recebe o item" — reconciliar.
+
+### F2-37 — fechado [FEITO nesta sessão, a pedido do Marcelo]
+
+Só `static/index.html` + testes E2E — nenhum arquivo Python mudou. Fatia 1: Item Especial virou
+linha na tabela de ambientes (`renderTabelaNeg`), inserida/removida/atualizada por
+`_aplicarPreviewNaTela` (fonte única — nada calculado em `renderTabelaNeg`, seria a 2ª porta do
+ACHADO-63). Sem checkbox, Desc.% fixo em "0" (disabled, mesmo padrão visual da AF), À vista/Com
+financiamento vêm do motor (`s.Item_Esp`, escalado pelo mesmo `_finFactor` das células de
+ambiente). Rodapé já bate sem somar nada — o item já está dentro do VAVO. Clicar na linha (agora
+o `<tr>` inteiro, não só o nome) abre a mesma caixa do botão. Fatia 2: campo da caixa ganhou
+máscara financeira reusando `mascaraMoedaInput`/`parseMoeda` (nenhuma máscara nova) — como o
+`promptPopup` genérico não tem gancho de `oninput`, virou uma caixa própria com o mesmo primitivo
+(`_popupOverlay`). Fatia 3 (só medição): 30 campos `type="number" step="0.01"` no arquivo (a
+estimativa do pacote era 32 — contagem própria, reportada sem forçar bater), classificados
+dinheiro/percentual/outro e entregues ao Marcelo — nada alterado. Aceite: E2E novo prova
+linha aparece/some, não-duplicação do total, clique na linha, digitação mostra "R$ 5.000,00" ao
+vivo. Os aceites do ACHADO-63/65/66 e `test_leleu_ancora` — INTOCADOS (nada de Python mudou).
+5 camadas verdes (b/c/d: 2702 passed, 4 xfailed, 0 failed, idêntico ao F2-36 — sem impacto
+esperado; e: 10 E2E, 2 flakes de ambiente conhecidos passaram ao repetir). Sem tag.
 
 ## Estado em 06/09/2026
 
