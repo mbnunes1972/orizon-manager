@@ -771,9 +771,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
    nome disponível ao passar o mouse — usar em qualquer lugar que mostra só o código, sem nome
    ao lado (ver _contaTitleAttr()). */
 .conta-hint { border-bottom: 1px dotted var(--muted); cursor: help; }
+
+/* F2-41 (docs/db/TAREFA_F2_41_FONTE_UNICA_COMPLEMENTO.md): textos de APOIO INTERNO (desconto
+   global, carga de custos adicionais, divergência de sombra) — úteis pra nós em Homologação,
+   nunca pra tela na frente do cliente. Decisão do Marcelo: MARCAR, não apagar — interruptor
+   único no <body>, default OFF (esconde). Ligar em Homologação: data-apoio="on" no <body>. */
+body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
 </style>
 </head>
-<body>
+<body data-apoio="off">
 
 <!-- Frame fixo de topo (2026-08-23): marca+loja / Pendências+Responsabilidades (Fase 6) / usuário —
      substitui o que antes vivia no topo e no rodapé da sidebar. -->
@@ -22396,8 +22402,13 @@ function _peComplModalRender(){
     </tr>`;
   }).join('');
   const r = st.resumo || {};
+  // F2-41: parágrafo expõe desconto global/carga de custos adicionais na frente do cliente —
+  // apoio-dev (interruptor único data-apoio, default off, docs/db/TAREFA_F2_41_FONTE_UNICA_
+  // COMPLEMENTO.md). Divergência de sombra (motor × proporção) idem — nunca cobrada, só medida.
+  const divTotal = r.divergencia_total || 0;
+  const divMax = r.divergencia_maxima_abs || 0;
   body.innerHTML = `
-    <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:10px;line-height:1.7">
+    <div class="apoio-dev" style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:10px;line-height:1.7">
       À vista do complemento = XML × (à vista ÷ bruto do MESMO ambiente no contrato) — descontos
       (global ${pctS(r.desc_global_pct||0)}) e carga de custos adicionais
       (${pctS(r.pct_custos_adicionais||0)} sobre o à vista) idênticos aos negociados no contrato.
@@ -22412,6 +22423,7 @@ function _peComplModalRender(){
       <div>Diferença bruta: <strong style="font-family:var(--font-mono);color:${corD(totalBruto)}">${sig(totalBruto)}</strong></div>
       <div>Desconto: <strong style="font-family:var(--font-mono);color:var(--ok)">${fmt(totalDesc)}</strong></div>
       <div style="font-size:.95rem">Complemento: <strong style="font-family:var(--font-mono)">${fmt(totalCobrar)}</strong></div>
+      <div class="apoio-dev" style="font-size:var(--fs-xs);color:var(--text-3)">Sombra (motor×proporção): divergência total ${sig(divTotal)}, máxima |${fmt(divMax)}|</div>
     </div>
     ${_peComplModalPagamentoHtml()}
     <div style="display:flex;justify-content:flex-end;margin-top:14px">

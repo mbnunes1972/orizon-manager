@@ -17809,11 +17809,27 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
     d_amb_ct = {k: v / 100.0 for k, v in d_amb_pct.items()}
     compls = {a.pool_ambiente_id: a for a in
               db.query(ArquivoPE).filter_by(projeto_nome=nome_safe, formato="xml_compl").all()}
+    marcados = [pa for pa in (db.query(PoolAmbiente).filter_by(projeto_id=nome_safe)
+                 .order_by(PoolAmbiente.id.asc()).all()) if pa.renegociar_pe]
+    # F2-41 Rodada 1 (docs/db/TAREFA_F2_41_FONTE_UNICA_COMPLEMENTO.md): SOMBRA — mede o valor que
+    # o MOTOR daria pro mesmo ambiente (vbva_override, mesmo mecanismo da tela "Comparação de
+    # Valores", main.py:2666-2677), ao lado do valor por proporção que já é o que se cobra. Uma
+    # chamada só, com TODAS as substituições de uma vez — nunca dentro do laço de ambientes (já
+    # existe um caso aberto de leitura de razão em laço dentro de `_negociacao_breakdown`; não
+    # criar um segundo). NÃO muda `diferenca`/o que é cobrado — só mede, ao lado.
+    _sombra_override = {pa.id: compls[pa.id].valor_venda for pa in marcados
+                        if compls.get(pa.id) is not None and compls[pa.id].valor_venda is not None}
+    _vava_motor_por_id = {}
+    if _sombra_override:
+        try:
+            _d_motor = _negociacao_breakdown(orc_ct, db, vbva_override=_sombra_override)
+            _vava_motor_por_id = {a.get("id"): float(a.get("VAVA", 0.0))
+                                  for a in _d_motor.get("ambientes", [])}
+        except Exception as _e:
+            print("[F2-41-SOMBRA] motor falhou (ambiente) — seguindo sem sombra:", _e)
+            _vava_motor_por_id = {}
     linhas = []
-    for pa in (db.query(PoolAmbiente).filter_by(projeto_id=nome_safe)
-                 .order_by(PoolAmbiente.id.asc()).all()):
-        if not pa.renegociar_pe:
-            continue
+    for pa in marcados:
         nome_amb = pa.nome_exibicao or pa.nome
         vc = round(vava_ct.get(pa.id, 0.0), 2)                # PURO do contrato — fator à vista/bruto
         vc_base = round(ja_contratado.get(pa.id, vc), 2)      # contrato + aditivos assinados
@@ -17821,6 +17837,7 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
         a = compls.get(pa.id)
         carregado = a is not None and a.valor_venda is not None
         va_compl = dif = cfo_dif = 0.0
+        vava_motor = divergencia = None
         if carregado:
             if vbva_c > 0 and vc > 0:
                 va_compl = round(float(a.valor_venda) * (vc / vbva_c), 2)
@@ -17829,11 +17846,16 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
                                  * (1 - d_amb_ct.get(pa.id, 0.0)) * fator_ca, 2)
             dif = round(va_compl - vc_base, 2)
             cfo_dif = round(float(a.valor_atualizado or 0.0) - float(pa.order_total or 0.0), 2)
+            if pa.id in _vava_motor_por_id:
+                vava_motor = round(_vava_motor_por_id[pa.id], 2)
+                divergencia = round(vava_motor - va_compl, 2)
         linhas.append({"pool_ambiente_id": pa.id, "ambiente": nome_amb,
                        "vava_contratado": vc_base, "vava_complemento": va_compl,
                        "diferenca": dif, "cfo_diferenca": cfo_dif,
-                       "compl_carregado": carregado})
+                       "compl_carregado": carregado,
+                       "vava_motor": vava_motor, "divergencia": divergencia})
     carregadas = [l for l in linhas if l["compl_carregado"]]
+    _divs = [l["divergencia"] for l in carregadas if l["divergencia"] is not None]
     resumo = {
         "pct_custos_adicionais": round((cad_ct / vavo_ct * 100.0) if vavo_ct else 0.0, 4),
         "fator_ca": round(fator_ca, 6),
@@ -17842,7 +17864,16 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
         "total_complemento": round(sum(l["vava_complemento"] for l in carregadas), 2),
         "total_diferenca": round(sum(l["diferenca"] for l in carregadas), 2),
         "marcados": len(linhas), "carregados": len(carregadas),
+        "divergencia_total": round(sum(_divs), 2) if _divs else 0.0,
+        "divergencia_maxima_abs": round(max(abs(d) for d in _divs), 2) if _divs else 0.0,
     }
+    if _divs:
+        print("[F2-41-SOMBRA] projeto=%r ambientes=%r divergencia_total=%.2f divergencia_maxima_abs=%.2f"
+              % (nome_safe,
+                 [{"ambiente": l["ambiente"], "vava_complemento": l["vava_complemento"],
+                   "vava_motor": l["vava_motor"], "divergencia": l["divergencia"]}
+                  for l in carregadas if l["divergencia"] is not None],
+                 resumo["divergencia_total"], resumo["divergencia_maxima_abs"]))
     return linhas, resumo
 
 
@@ -17987,12 +18018,27 @@ def _complemento_diferencas_fase(db, nome_safe, parcela_id, excluir_orcamento_id
     pes = {a.pool_ambiente_id: a for a in
            db.query(ArquivoPE).filter_by(projeto_nome=nome_safe, formato="xml_pe").all()}
     pa_por_id = {pa.id: pa for pa in db.query(PoolAmbiente).filter_by(projeto_id=nome_safe).all()}
-    linhas = []
+    validas = []
     for d in decisoes:
         pa = pa_por_id.get(d.pool_ambiente_id)
         arq = pes.get(d.pool_ambiente_id)
         if pa is None or arq is None or arq.valor_venda is None:
             continue
+        validas.append((d, pa, arq))
+    # F2-41 Rodada 1 (sombra) — mesma disciplina de `_complemento_diferencas`: uma chamada só do
+    # motor, com todas as substituições de venda PE de uma vez, fora do laço de ambientes.
+    _sombra_override = {pa.id: arq.valor_venda for _, pa, arq in validas}
+    _vava_motor_por_id = {}
+    if _sombra_override:
+        try:
+            _d_motor = _negociacao_breakdown(orc_ct, db, vbva_override=_sombra_override)
+            _vava_motor_por_id = {a.get("id"): float(a.get("VAVA", 0.0))
+                                  for a in _d_motor.get("ambientes", [])}
+        except Exception as _e:
+            print("[F2-41-SOMBRA] motor falhou (fase) — seguindo sem sombra:", _e)
+            _vava_motor_por_id = {}
+    linhas = []
+    for d, pa, arq in validas:
         nome_amb = pa.nome_exibicao or pa.nome
         vc = round(vava_ct.get(pa.id, 0.0), 2)                # PURO do contrato — fator à vista/bruto
         vc_base = round(ja_contratado.get(pa.id, vc), 2)      # contrato + aditivos assinados
@@ -18001,10 +18047,16 @@ def _complemento_diferencas_fase(db, nome_safe, parcela_id, excluir_orcamento_id
             valor_venda_pe=arq.valor_venda, vava_contratado=vc, vbva_contratado=vbva_c,
             fator_ca=fator_ca, desconto_orc_pct=d_orc_pct,
             desconto_amb_pct=d_amb_pct.get(pa.id, 0.0))
+        vava_motor = divergencia = None
+        if pa.id in _vava_motor_por_id:
+            vava_motor = round(_vava_motor_por_id[pa.id], 2)
+            divergencia = round(vava_motor - va_compl, 2)
         linhas.append({"pool_ambiente_id": pa.id, "ambiente": nome_amb,
                        "vava_contratado": vc_base, "vava_complemento": va_compl,
                        "diferenca": round(va_compl - vc_base, 2),
-                       "cfo_diferenca": d.diferenca_cfo, "compl_carregado": True})
+                       "cfo_diferenca": d.diferenca_cfo, "compl_carregado": True,
+                       "vava_motor": vava_motor, "divergencia": divergencia})
+    _divs = [l["divergencia"] for l in linhas if l["divergencia"] is not None]
     resumo = {
         "pct_custos_adicionais": round((cad_ct / vavo_ct * 100.0) if vavo_ct else 0.0, 4),
         "fator_ca": round(fator_ca, 6),
@@ -18013,7 +18065,16 @@ def _complemento_diferencas_fase(db, nome_safe, parcela_id, excluir_orcamento_id
         "total_complemento": round(sum(l["vava_complemento"] for l in linhas), 2),
         "total_diferenca": round(sum(l["diferenca"] for l in linhas), 2),
         "ambientes": len(linhas),
+        "divergencia_total": round(sum(_divs), 2) if _divs else 0.0,
+        "divergencia_maxima_abs": round(max(abs(d) for d in _divs), 2) if _divs else 0.0,
     }
+    if _divs:
+        print("[F2-41-SOMBRA] projeto=%r fase=%r ambientes=%r divergencia_total=%.2f divergencia_maxima_abs=%.2f"
+              % (nome_safe, parcela_id,
+                 [{"ambiente": l["ambiente"], "vava_complemento": l["vava_complemento"],
+                   "vava_motor": l["vava_motor"], "divergencia": l["divergencia"]}
+                  for l in linhas if l["divergencia"] is not None],
+                 resumo["divergencia_total"], resumo["divergencia_maxima_abs"]))
     return linhas, resumo
 
 

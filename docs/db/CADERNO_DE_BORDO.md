@@ -504,3 +504,32 @@ botão — reescrito pro fluxo novo.
 
 5 camadas verdes (b/c/d: 2712 passed, 4 xfailed, 0 failed; e: 16 E2E — 3 novos —, 2 flakes de
 ambiente conhecidos passaram ao repetir). Sem tag.
+
+### F2-41 — fechado [FEITO nesta sessão, a pedido do Marcelo]
+
+Rodada 1 (de duas): medir a divergência entre a tela "Comparação de Valores" e o modal do
+complemento — mesmo ambiente, dois números (achado do Marcelo, +52,07 e −5,66 medidos). São
+duas fórmulas: a tela roda o motor 2× (`vbva_override`); o modal usa a proporção
+(`valor_venda_PE × VAVA/VBVA` contratado). Hipótese (medida, não corrigida): à vista = k×VBVA + F,
+F = custo FIXO (viagem/brinde — não comissão %, que escala igual nas duas); a proporção multiplica
+o F junto com a mercadoria, o motor não. Confirmei por sanidade fora dos 4 testes pedidos: só
+comissão % não diverge (0,00); com F fixo de verdade, diverge (−93,75 num caso de teste) — bate
+com a hipótese.
+
+Não trocou a fonte (decisão do Marcelo, registrada no pacote): `valor_complemento_por_fator`
+alimenta 3 consumidores, unificados em 15/08 exatamente pra não divergirem — trocar um só
+recriaria aquele achado ao contrário. Rodada 2 troca, com percursos acumulados.
+
+Feito: `vava_motor`/`divergencia` por linha + `divergencia_total`/`divergencia_maxima_abs` no
+resumo, em `_complemento_diferencas` e `_complemento_diferencas_fase` — sombra, nunca usada pro
+que é cobrado (`diferenca` intocado, testado). Uma chamada só de motor por invocação (nunca
+dentro do laço de ambientes), provado por contagem via mock — constante em 2 (1 baseline +1
+sombra), independente do número de ambientes. Log `[F2-41-SOMBRA]` grepável. 4 testes de
+propriedade rodando contra o comportamento ATUAL — nenhum falhou, incluindo o 2 (sem vazamento
+entre ambientes no motor), que resolve o "buraco de observação" do pacote (a tela hoje não
+consegue provar isso). Cabeçalho do modal + linha de divergência viraram `apoio-dev` — escondidos
+do cliente por padrão (`data-apoio` no `<body>`, default off; marcar, não apagar).
+
+5 camadas verdes (b/c: 2718 passed, 4 xfailed, 0 failed, 1 error isolado por contenção de
+recursos — E2E rodando junto com a suíte pesada — confirmado não-achado ao isolar; e: 17 E2E, 1
+novo, nenhum travou). Sem tag.
