@@ -405,3 +405,102 @@ trabalho do Claude Code nesta rodada (regra 1).
 - **Produção**: fora da esteira desde 28/08, aguarda rebuild a partir de tag; o serviço roda
   como root, a corrigir só no rebuild. NÃO TOCAR até lá.
 - Topologia `papel_cnpj` + `pct_mercadoria`/`pct_servico` no painel fiscal.
+
+---
+
+## 07/09 — Medição: marcas da 11c × vínculos do orçamento de complemento
+
+Registro de uma **restrição medida**, não de um defeito ativo. Vale para quem for mexer em
+`POST /pe/complemento/orcamento` (`main.py:8285-8316`).
+
+Dois conjuntos de ambientes convivem no complemento e são lidos por caminhos diferentes:
+
+- **As marcas da 11c** (`PoolAmbiente.renegociar_pe`) — é o que `_complemento_diferencas`
+  (`main.py:17792`) percorre, e portanto é o que a tabela do modal `Negociar Complemento`
+  mostra, ao vivo, a cada abertura.
+- **Os vínculos do orçamento** (`OrcamentoAmbiente`) — é o que `_negociacao_breakdown`
+  (`main.py:18443`) percorre, e portanto é o que a negociação calcula e o que o Termo Aditivo
+  carrega (`_aditivo_dados_calculo`, `main.py:18003`).
+
+O que é negociado é a **interseção** dos dois. Os dois só coincidem porque o POST resincroniza
+os vínculos com as marcas em toda chamada (8300-8308), antes de o usuário chegar à página 2.
+
+Se esse resync deixar de rodar: um ambiente marcado DEPOIS da criação do orçamento aparece na
+tabela com sua diferença e **não entra no aditivo** — cobrança a menos, silenciosa, com a tela
+mostrando um número que o documento não carrega. Família ACHADO-16/55. Um ambiente desmarcado
+depois vira linha de valor zero: inofensivo no número, sujo na tela.
+
+**Consequência para quem for editar aquela chamada:** o resync é o que fecha a tela com o
+documento; o wipe do plano de pagamento (8312-8313) é outra coisa, e é separável — o vazamento
+que o wipe descontaminava tem hoje guardas próprias a montante no `index.html`
+(`_carregandoOrcamento`, 10485; `_ultimoPagSig`, 10490). Separar o wipe: sim. Separar o
+resync: não.
+
+## 08/09 — Achado do Claude Code: "Salvar" invisível para o complemento pós-assinatura
+
+Cinco lugares decidem a mesma coisa ("o que trava depois do contrato assinado"). Quatro
+excetuam o complemento; um não:
+
+| # | Onde | Excetua o complemento? |
+|---|------|------------------------|
+| 1 | `main.py:16888` — `PATCH /orcamentos/<id>/valor` | **sim** (`not getattr(orc,"complemento_pe",0)`) |
+| 2 | `main.py:16590` — `PUT /api/orcamentos/<id>/descontos` | **sim** |
+| 3 | `static/index.html:25067` — `_negSaveTravado()` (auto-save) | **sim** |
+| 4 | `static/index.html:8183` — `ativarOrcamento` → `_aplicarLockNegociacaoPosAssinatura()` | **sim** |
+| 5 | `static/index.html:19699-19701` — `atualizarBotoesAprovacao` | **NÃO** |
+
+O (5) chama o helper único para destravar os CAMPOS e logo abaixo esconde
+`#btn-salvar-orcamento` e `#btn-aprovar-orcamento` sem olhar qual orçamento está ativo. Resultado
+medido: no complemento os campos ficam editáveis e não há botão para salvar. O backend já aceita
+o salvamento (1) — a porta está aberta e o corredor, fechado.
+
+Não é política nova, é omissão: o comentário do próprio helper (19665-19667) diz que
+`atualizarBotoesAprovacao` o usa para esta decisão, e ela usa só para os campos.
+
+**Limite do conserto:** a exceção vale para `#btn-salvar-orcamento` e para mais nada.
+`btn-pool`, `btn-novo-ambiente`, `btn-item-especial` e `btn-novo-orc` continuam escondidos —
+acrescentar ambiente à mão num complemento quebraria a igualdade marcas↔vínculos registrada na
+medição de 07/09. `#btn-aprovar-orcamento` também continua escondido: complemento não se aprova,
+vira Termo Aditivo.
+
+### F2-40 — fechado [FEITO nesta sessão, a pedido do Marcelo]
+
+Fatia 1: "Negociar Complemento" saiu do bloco de upload de XML e foi pro cabeçalho do card
+"Aprovação do Projeto Executivo" — mesma etapa 11e (medido: o botão NUNCA esteve na 11c, só as
+marcas; a premissa do pacote estava errada nesse ponto, corrigida pela medição, não pela
+suposição). Condição de exibição idêntica (`linhas.length > 0`), reusada via 3º parâmetro de
+`bloco()`. Mensagem de erro da Conciliação/AF2 (~22765) trocada por um texto que aponta pro
+caminho real (`GET /orcamentos` não filtra complemento_pe; `POST /aditivo` aceita `parcela_id`)
+em vez de mandar pra 11e, que nunca alcança o complemento por fase — correção de Marcelo em cima
+da minha medição, não invenção. Inventário: 0 complementos por fase em Homologação hoje.
+
+Fatia 2: modal virou a tela do mockup — Desc.%/A cobrar por ambiente, totais no rodapé, sem
+desconto global (motor já zera `d_orc` pro complemento). Dispatch por dimensão
+(`_peComplDispatch`) preparado pra fase, porta não ligada (aviso escrito no ponto do dispatch
+pra quem for ligar depois — o endpoint da fase funde comparativo+escrita numa chamada só).
+"Gerar Termo Aditivo" reusa a rota de descontos existente + o padrão de autorização de
+`salvarParametrosAuto`. Faixa de pagamento NÃO duplicada (sidebar de ~154 ids, nunca pensada pra
+duas instâncias) — handoff pra página 2 (mesmo padrão de navegação que o botão antigo já usava),
+com o botão travado até `forma_pagamento` existir.
+
+Decisão do reset em `POST /pe/complemento/orcamento` (`docs/db/TAREFA_F2_40_RESET_COMPLEMENTO.md`):
+o apagar de forma_pagamento virou condicional (só cria ou `{"reiniciar": true}`); o resync dos
+vínculos continua incondicional (a medição de 07/09 acima, intocada).
+
+Achado do Claude Code registrado logo acima (08/09, "Salvar invisível pro complemento") —
+**consertado**: toggle de Salvar/Aprovar movido pra dentro de `_aplicarLockNegociacaoPosAssinatura`
+(o helper único de verdade agora), removida a cópia divergente de `atualizarBotoesAprovacao`.
+Prova ida-e-volta (contratado↔complemento) no E2E.
+
+Fatia 3: etapas 8/11d somem por inteiro (nem sub-aba, nem card, nem aviso) pra quem não tem
+`pode_aprovar_financeiro` — `_fichaVisivelParaUsuario` filtra a lista de sub-abas e redireciona
+qualquer tentativa de seleção forçada pra mãe. Navegação entre etapas vizinhas provada intacta
+por E2E com um usuário nível "operador".
+
+Achado incidental de regra dos irmãos: `test_aceite_achado36.py::FAIXAS_CICLO` tinha 4/6
+intervalos de linha desatualizados pelo deslocamento da Fatia 1/2 (recalculados função por
+função); `test_e2e_browser_conciliacao_final.py` (suíte padrão) ainda clicava o fluxo antigo do
+botão — reescrito pro fluxo novo.
+
+5 camadas verdes (b/c/d: 2712 passed, 4 xfailed, 0 failed; e: 16 E2E — 3 novos —, 2 flakes de
+ambiente conhecidos passaram ao repetir). Sem tag.

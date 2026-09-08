@@ -103,18 +103,30 @@ def test_complemento_por_diferenca_ponta_a_ponta(http_client_factory, seed, app_
     st, body = c.post(f"/api/orcamentos/{oid}/margens", {"desconto_pct": 5})
     assert st == 403, body
 
-    # 4b) contaminação (bug do teste do usuário): o pagamento do CONTRATADO vazava para o
-    # complemento via tela+auto-save — total_cliente do contrato inflava o cust_fin e o
-    # Val_Cont virava o total do contrato. Um novo "Negociar Complemento" DESCONTAMINA:
-    # plano zerado (padrão à vista, entrada 0) e valor_total = diferença.
+    # 4b) docs/db/TAREFA_F2_40_RESET_COMPLEMENTO.md (decisão 08/09): o apagar do plano de
+    # pagamento deixou de ser incondicional — só roda quando o orçamento nasce NESTA chamada, ou
+    # quando o corpo pede {"reiniciar": true}. Reabrir (a F2-40 chama este mesmo endpoint a cada
+    # abertura do modal, read-existing-first) preserva o plano que o gerente já salvou. Plano
+    # REALISTA (à vista, total_cliente = a própria diferença negociada 4.000,00) — não o payload
+    # "contaminado" do teste antigo: aquele simulava o vazamento que motivava o apagar
+    # incondicional, e o próprio apagar era o que o limpava; sem ele, a defesa é a montante, no
+    # front (`_carregandoOrcamento`/`_ultimoPagSig`, index.html:10485/10490), não mais aqui.
     db = app_db.get_session()
     oc = db.get(app_db.Orcamento, aj_id)
-    oc.forma_pagamento = json.dumps({"tipo": "tf", "total_cliente": 200000.0,
-                                     "entrada_valor": 10000.0})
+    oc.forma_pagamento = json.dumps({"tipo": "avista", "total_cliente": 4000.0,
+                                     "entrada_valor": 0.0})
     db.commit(); db.close()
     st, body = c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
     assert st == 200 and body["ok"], body
     assert abs(body["orcamento"]["valor_total"] - 4000.0) < 0.05, body["orcamento"]["valor_total"]
+    db = app_db.get_session()
+    assert db.get(app_db.Orcamento, aj_id).forma_pagamento is not None, (
+        "sem {'reiniciar': true}, reabrir o complemento já existente PRESERVA o plano de "
+        "pagamento — não é mais apagado a cada chamada")
+    db.close()
+    # ... e {"reiniciar": true} continua descontaminando sob pedido explícito.
+    st, body = c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {"reiniciar": True})
+    assert st == 200 and body["ok"], body
     db = app_db.get_session()
     assert db.get(app_db.Orcamento, aj_id).forma_pagamento is None
     db.close()
@@ -251,6 +263,213 @@ def test_aditivo_assinado_constitui_provisao_contabil(http_client_factory, seed,
     rec_depois = mod_contabil.reconciliacao(db, ot, owner_id, projeto_id=nome)
     for p in rec_depois["provisoes"]:
         assert abs(p["saldo_aberto"]) < 0.01, p   # tudo resolvido → saldo zero
+    db.close()
+
+
+def _limpar_marcas_e_complemento(app_db, nome):
+    """seed/app_db são module-scoped neste arquivo (mesmo projeto reusado por TODOS os testes) —
+    sem isto, marcas (renegociar_pe) deixadas por um teste anterior vazam pro `marcados` deste.
+    NÃO apaga o Orcamento de complemento antigo (pode ter Recebivel/Lancamento referenciando-o,
+    de um teste anterior que já assinou aditivo) — a própria guarda do aditivo assinado
+    (main.py:8290-8292) já garante que a próxima chamada cria um Orcamento NOVO quando precisa;
+    limpar as marcas basta pra isolar o `marcados` (o resync cuida do resto: adiciona/remove
+    vínculos do orçamento que a chamada efetivamente reaproveitar ou criar)."""
+    db = app_db.get_session()
+    for pa in db.query(app_db.PoolAmbiente).filter_by(projeto_id=nome).all():
+        pa.renegociar_pe = 0
+    db.commit(); db.close()
+
+
+def test_resync_ambiente_marcado_depois_da_criacao_entra_na_negociacao_e_no_aditivo(
+        http_client_factory, seed, app_db):
+    """docs/db/TAREFA_F2_40_RESET_COMPLEMENTO.md, aceite 1: o resync dos vínculos continua
+    INCONDICIONAL em toda chamada — só o apagar do plano de pagamento virou condicional. Marcar um
+    3º ambiente DEPOIS que o complemento já existe, e reabrir (SEM reiniciar), tem que refletir nos
+    vínculos: sem isto, o ambiente aparece na tabela do modal (marcas ao vivo, _complemento_diferencas)
+    com sua diferença, mas nunca entra na negociação nem no aditivo (vínculos,
+    _negociacao_breakdown) — cobrança a menos, silenciosa (família ACHADO-16/55)."""
+    nome, pid, oid = _setup(app_db, seed)   # _setup já marca "Cozinha" (pid) renegociar_pe=1
+    _limpar_marcas_e_complemento(app_db, nome)
+    c = _login(http_client_factory, "dir_l1")
+
+    db = app_db.get_session()
+    db.query(app_db.PoolAmbiente).filter_by(id=pid).update({"renegociar_pe": 1})   # Cozinha de novo
+    pa2 = app_db.PoolAmbiente(nome="Sala", nome_exibicao="Sala", xml_path="fake/sala.xml",
+                             ambientes_json="{}", projeto_id=nome,
+                             budget_total=40000.0, order_total=16000.0)
+    db.add(pa2); db.flush()
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pa2.id, ordem=2))
+    pa2.renegociar_pe = 1
+    pid2 = pa2.id
+    pa3 = app_db.PoolAmbiente(nome="Quarto", nome_exibicao="Quarto", xml_path="fake/quarto.xml",
+                             ambientes_json="{}", projeto_id=nome,
+                             budget_total=20000.0, order_total=8000.0)
+    db.add(pa3); db.flush()
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pa3.id, ordem=3))
+    pa3.renegociar_pe = 0   # 3º ambiente existe, mas AINDA NÃO marcado
+    pid3 = pa3.id
+    db.commit(); db.close()
+
+    _upsert_compl(app_db, nome, pid, venda=84000.0, cfo=32000.0)
+    _upsert_compl(app_db, nome, pid2, venda=44000.0, cfo=17000.0)
+
+    st, body = c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
+    assert st == 200 and body["ok"], body
+    aj_id = body["orcamento"]["id"]
+
+    import main as _main
+    db = app_db.get_session()
+    d = _main._negociacao_breakdown(db.get(app_db.Orcamento, aj_id), db)
+    assert len(d["ambientes"]) == 2, d["ambientes"]
+    db.close()
+
+    # marca o 3º ambiente DEPOIS que o complemento já existe
+    db = app_db.get_session()
+    db.query(app_db.PoolAmbiente).filter_by(id=pid3).update({"renegociar_pe": 1})
+    db.commit(); db.close()
+    _upsert_compl(app_db, nome, pid3, venda=22000.0, cfo=8500.0)
+
+    # reabre SEM reiniciar — o resync (incondicional) tem que puxar o 3º ambiente pros vínculos
+    st, body = c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
+    assert st == 200 and body["ok"], body
+    assert body["orcamento"]["id"] == aj_id, "mesmo orçamento — read-existing-first/create-once"
+
+    db = app_db.get_session()
+    d = _main._negociacao_breakdown(db.get(app_db.Orcamento, aj_id), db)
+    assert len(d["ambientes"]) == 3, (
+        "o 3º ambiente marcado DEPOIS da criação tem que entrar nos vínculos ao reabrir — %r"
+        % d["ambientes"])
+    db.close()
+
+    # ...e no Termo Aditivo (mesma fonte: vínculos, via _negociacao_breakdown)
+    import mod_documentos
+    db = app_db.get_session()
+    mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
+                                     "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"
+                                     "2. Complemento: [VALOR_COMPLEMENTO].\n", "t.md", None)
+    mod_documentos.ativar(db, mv.id)
+    db.close()
+    # {"novo": true}: o projeto (module-scoped, testes anteriores deste arquivo) já pode ter um
+    # aditivo ASSINADO de outra rodada — POST /aditivo olha o mais recente do PROJETO inteiro
+    # (main.py ~9410-9417), não só do orc_aj escolhido; sem "novo" a chamada recusaria com "já
+    # assinado", mesmo o orc_aj (id=aj_id) sendo novo e sem aditivo próprio ainda.
+    st, body = c.post(f"/api/projetos/{nome}/aditivo", {"novo": True})
+    assert st == 200 and body["ok"], body
+    assert len(body["aditivo"]["dados"]["ambientes"]) == 3, body["aditivo"]["dados"]["ambientes"]
+
+
+def test_resync_ambiente_desmarcado_depois_da_criacao_nao_deixa_linha_fantasma(
+        http_client_factory, seed, app_db):
+    """docs/db/TAREFA_F2_40_RESET_COMPLEMENTO.md, aceite 2: desmarcar um ambiente depois que o
+    complemento já existe tem que REMOVER o vínculo (não só zerar o valor) ao reabrir — senão
+    sobra uma linha fantasma de R$ 0,00 na negociação/aditivo."""
+    nome, pid, oid = _setup(app_db, seed)
+    _limpar_marcas_e_complemento(app_db, nome)
+    c = _login(http_client_factory, "dir_l1")
+
+    db = app_db.get_session()
+    db.query(app_db.PoolAmbiente).filter_by(id=pid).update({"renegociar_pe": 1})   # Cozinha de novo
+    pa2 = app_db.PoolAmbiente(nome="Sala", nome_exibicao="Sala", xml_path="fake/sala.xml",
+                             ambientes_json="{}", projeto_id=nome,
+                             budget_total=40000.0, order_total=16000.0)
+    db.add(pa2); db.flush()
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pa2.id, ordem=2))
+    pa2.renegociar_pe = 1
+    pid2 = pa2.id
+    pa3 = app_db.PoolAmbiente(nome="Quarto", nome_exibicao="Quarto", xml_path="fake/quarto.xml",
+                             ambientes_json="{}", projeto_id=nome,
+                             budget_total=20000.0, order_total=8000.0)
+    db.add(pa3); db.flush()
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pa3.id, ordem=3))
+    pa3.renegociar_pe = 1
+    pid3 = pa3.id
+    db.commit(); db.close()
+
+    _upsert_compl(app_db, nome, pid, venda=84000.0, cfo=32000.0)
+    _upsert_compl(app_db, nome, pid2, venda=44000.0, cfo=17000.0)
+    _upsert_compl(app_db, nome, pid3, venda=22000.0, cfo=8500.0)
+
+    st, body = c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
+    assert st == 200 and body["ok"], body
+    aj_id = body["orcamento"]["id"]
+
+    import main as _main
+    db = app_db.get_session()
+    d = _main._negociacao_breakdown(db.get(app_db.Orcamento, aj_id), db)
+    assert len(d["ambientes"]) == 3, d["ambientes"]
+    db.close()
+
+    # desmarca o 3º ambiente DEPOIS que o complemento já existe
+    db = app_db.get_session()
+    db.query(app_db.PoolAmbiente).filter_by(id=pid3).update({"renegociar_pe": 0})
+    db.commit(); db.close()
+
+    st, body = c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
+    assert st == 200 and body["ok"], body
+
+    db = app_db.get_session()
+    d = _main._negociacao_breakdown(db.get(app_db.Orcamento, aj_id), db)
+    assert len(d["ambientes"]) == 2, (
+        "desmarcar tem que REMOVER o vínculo, não deixar uma linha fantasma de zero — %r"
+        % d["ambientes"])
+    ids_restantes = {a["id"] for a in d["ambientes"]}
+    assert pid3 not in ids_restantes
+    db.close()
+
+
+def test_reset_pos_aditivo_assinado_cria_orcamento_novo_com_pagamento_zerado(
+        http_client_factory, seed, app_db):
+    """docs/db/TAREFA_F2_40_RESET_COMPLEMENTO.md, aceite 4: a guarda do aditivo assinado (8290-8292)
+    fica intacta — "create-once" não pode significar "reusar sempre". Complemento com aditivo
+    assinado apontando pra ele → nova chamada cria orçamento NOVO (id diferente) com o plano de
+    pagamento zerado (nasceu nesta chamada, então _criou_agora aplica o apagar mesmo assim)."""
+    nome, pid, oid = _setup(app_db, seed)
+    _limpar_marcas_e_complemento(app_db, nome)
+    db = app_db.get_session()
+    db.query(app_db.PoolAmbiente).filter_by(id=pid).update({"renegociar_pe": 1})   # Cozinha de novo
+    db.commit(); db.close()
+    c = _login(http_client_factory, "dir_l1")
+    _upsert_compl(app_db, nome, pid, venda=84000.0, cfo=32000.0)
+
+    st, body = c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
+    assert st == 200 and body["ok"], body
+    aj1_id = body["orcamento"]["id"]
+
+    db = app_db.get_session()
+    db.get(app_db.Orcamento, aj1_id).forma_pagamento = json.dumps(
+        {"tipo": "avista", "total_cliente": 4444.44, "entrada_valor": 1.0})
+    db.commit(); db.close()
+
+    import mod_documentos
+    db = app_db.get_session()
+    mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
+                                     "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"
+                                     "2. Complemento: [VALOR_COMPLEMENTO].\n", "t.md", None)
+    mod_documentos.ativar(db, mv.id)
+    db.close()
+    st, body = c.post(f"/api/projetos/{nome}/aditivo", {})
+    assert st == 200 and body["ok"], body
+    for parte, quem in (("loja", "Rep Loja"), ("cliente", "Cliente L1")):
+        corpo = {"parte": parte, "nome": quem, "cpf": "111.444.777-35"}
+        if parte == "cliente":
+            corpo["forma_pagamento"] = json.dumps(
+                {"tipo": "avista", "total_cliente": 4444.44, "entrada_valor": 1.0})
+        st, body = c.post(f"/api/projetos/{nome}/aditivo/assinar", corpo)
+        assert st == 200, body
+    assert body["status"] == "assinado"
+
+    # nova revisão do mesmo ambiente → guarda do aditivo assinado dispara Orcamento NOVO
+    _upsert_compl(app_db, nome, pid, venda=90000.0, cfo=34000.0)
+    st, body = c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
+    assert st == 200 and body["ok"], body
+    aj2_id = body["orcamento"]["id"]
+    assert aj2_id != aj1_id, "aditivo assinado — a próxima rodada tem que criar um orçamento NOVO"
+    assert body["orcamento"]["forma_pagamento"] == "", (
+        "orçamento novo nasce com o plano de pagamento zerado — %r" % body["orcamento"])
+
+    db = app_db.get_session()
+    assert db.get(app_db.Orcamento, aj1_id).forma_pagamento is not None, (
+        "o orçamento #1 (já assinado) nunca é tocado de novo")
     db.close()
 
 

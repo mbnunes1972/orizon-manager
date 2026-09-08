@@ -19672,6 +19672,11 @@ function _orcamentoComplementoAtivo(){
 
 // Correção Fatia 3: aplica o lock pós-assinatura respeitando o complemento — e, no complemento,
 // re-trava SÓ o desconto global (o motor o força a zero; a alavanca é o desconto por ambiente).
+// F2-40 (achado ao ligar a faixa de pagamento do complemento): Salvar/Aprovar entraram aqui
+// também — viviam DUPLICADOS dentro de atualizarBotoesAprovacao, que só roda em eventos de
+// ciclo (nunca ao TROCAR de orçamento via ativarOrcamento, main gap medido). Esta função É o
+// "helper único" que o comentário de _orcamentoComplementoAtivo() já dizia ser — agora de
+// verdade: os dois chamadores (atualizarBotoesAprovacao e ativarOrcamento) convergem aqui.
 function _aplicarLockNegociacaoPosAssinatura(){
   const compl = _orcamentoComplementoAtivo();
   aplicarBloqueioNegociacao(!compl);
@@ -19680,6 +19685,11 @@ function _aplicarLockNegociacaoPosAssinatura(){
     if (nd) { nd.readOnly = true;
               nd.title = 'Complemento: desconto global travado (zero) — use o desconto por ambiente.'; }
   }
+  // Salvar continua liberado pro complemento (backend já aceita — PATCH .../valor e PUT
+  // .../descontos isentam explicitamente `complemento_pe`, main.py:16888/16590); Aprovar
+  // continua escondido pros dois — complemento não se "aprova", vira Termo Aditivo.
+  const bs = document.getElementById('btn-salvar-orcamento');  if (bs) bs.style.display = compl ? '' : 'none';
+  const ba = document.getElementById('btn-aprovar-orcamento'); if (ba) ba.style.display = 'none';
 }
 
 function atualizarBotoesAprovacao() {
@@ -19698,8 +19708,8 @@ function atualizarBotoesAprovacao() {
     _aplicarLockNegociacaoPosAssinatura();
     const actionRow = document.querySelector('#page-02 .action-row');
     if (actionRow) {
-      const bs = document.getElementById('btn-salvar-orcamento');  if (bs) bs.style.display = 'none';
-      const ba = document.getElementById('btn-aprovar-orcamento'); if (ba) ba.style.display = 'none';
+      // Salvar/Aprovar: decididos dentro de _aplicarLockNegociacaoPosAssinatura (chamada
+      // logo acima) — único lugar, não duplicar o check aqui (F2-40, achado da divergência).
       // Rever Orçamento some assim que qualquer parte assina (sem desfazer pós-assinatura)
       const br = actionRow.querySelector('#btn-rever-orcamento'); if (br) br.remove();
       const assinarExistente = actionRow.querySelector('#btn-assinar-contrato');
@@ -19959,7 +19969,10 @@ function renderCiclo() {
     _cicloFichaProjeto = projetoAtivo.nome_safe;
     _cicloEtapaAtiva = null;                     // trocou de projeto → volta à etapa atual
   }
-  if (!_cicloEtapaAtiva || !_fichaEtapaDef(_cicloEtapaAtiva)) _cicloEtapaAtiva = _fichaEtapaAtual();
+  // F2-40 Fatia 3: idem — _cicloEtapaAtiva pode ter sobrevivido de uma troca de usuário (SPA sem
+  // reload); nunca deixa a tela abrir direto numa '8'/'11d' que este usuário não pode ver.
+  if (!_cicloEtapaAtiva || !_fichaEtapaDef(_cicloEtapaAtiva) || !_fichaVisivelParaUsuario(_cicloEtapaAtiva))
+    _cicloEtapaAtiva = _fichaEtapaAtual();
   const wrap = document.createElement('div');
   wrap.className = 'ficha-wrap';
   wrap.innerHTML = `<div class="ficha-lombada" id="ficha-lombada"></div>
@@ -20083,6 +20096,16 @@ function _fichaTituloGrupo(mae) {
   return _FICHA_GRUPO_NOME[mae] || (d ? d.nome : mae);
 }
 
+// F2-40 Fatia 3: '8' (AF1) e '11d' (AF2) somem por INTEIRO — nem sub-aba, nem card, nem aviso —
+// para quem não tem pode_aprovar_financeiro (antes só trocavam o conteúdo por um aviso restrito,
+// mas a sub-aba e o card continuavam visíveis/clicáveis). Não mexe em '_statusFichario'/
+// '_etapaSatisfeita' — o gate de "grupo concluído" continua lendo _cicloData no backend,
+// intocado; só a UI deixa de oferecer a etapa a quem não pode agir nela.
+function _fichaVisivelParaUsuario(codigo) {
+  if (codigo !== '8' && codigo !== '11d') return true;
+  return !!(_usuarioAtual && _usuarioAtual.pode_aprovar_financeiro);
+}
+
 function _fichaRenderLombada() {
   const box = document.getElementById('ficha-lombada');
   if (!box) return;
@@ -20131,7 +20154,7 @@ function _fichaRenderConteudo() {
   // Sub-abas (mini-fichário) quando a etapa selecionada — ou sua mãe — tem sub-etapas (11/17).
   let subs = '';
   if (_FICHA_SUBS[mae]) {
-    const itens = [mae, ..._FICHA_SUBS[mae]];
+    const itens = [mae, ..._FICHA_SUBS[mae]].filter(_fichaVisivelParaUsuario);
     subs = '<div class="ficha-subs">' + itens.map(c => {
       const d = _fichaEtapaDef(c); const s = _statusFichario(c);
       const numExibSub = _fichaNumeroExibicao(c);
@@ -20241,6 +20264,10 @@ function _fichaEfeitos(codigo) {
 }
 
 function _fichaSelecionar(codigo) {
+  // F2-40 Fatia 3: defesa contra _cicloEtapaAtiva ficar apontando pra '8'/'11d' de uma sessão
+  // anterior (ex.: troca de usuário sem recarregar a página) — quem não pode ver essas etapas
+  // nunca as abre, mesmo se alguém tentar chamar _fichaSelecionar('8')/('11d') diretamente.
+  if (!_fichaVisivelParaUsuario(codigo)) codigo = _fichaMae(codigo);
   _cicloEtapaAtiva = codigo;
   _fichaRenderLombada();
   _fichaRenderConteudo();
@@ -21168,15 +21195,13 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
       <button class="btn-ciclo" onclick="cancelarContrato()" style="background:var(--cancel);color:var(--cancel-on);border-color:var(--cancel);font-weight:700"><i class="ti ti-file-x"></i> Cancelar contrato</button>
     </div>` : '';
   // Fichário fase 2 (2026-08-02): o painel de Provisões renderiza DIRETO na tela da etapa
-  // (slot abaixo; _fichaEfeitos dispara abrirProvisoes). O acesso espelha o backend: GET
-  // /provisoes e a aprovação exigem aprovar_financeiro (Gerente Adm/Fin e Diretores) — para
-  // os demais, aviso claro em vez de um botão que levaria a 403.
-  const _podeAF = !!(_usuarioAtual && _usuarioAtual.pode_aprovar_financeiro);
-  const _btnProvisoes = _podeAF
-    ? `<div id="prov-inline-slot" style="flex:1;min-width:280px;margin-top:4px">
-         <span style="color:var(--muted);font-size:.82rem">Carregando provisões…</span></div>`
-    : `<div style="font-size:.82rem;color:var(--muted)"><i class="ti ti-lock"></i>
-         Aprovação financeira restrita ao Gerente Administrativo/Financeiro e Diretores.</div>`;
+  // (slot abaixo; _fichaEfeitos dispara abrirProvisoes). F2-40 Fatia 3: esta função só é chamada
+  // para codigo '8'/'11d', e essas etapas deixaram de ser navegáveis (sub-aba, card e o antigo
+  // aviso restrito somem por inteiro — _fichaVisivelParaUsuario) para quem não tem
+  // pode_aprovar_financeiro — o ramo "sem permissão" que existia aqui morreu por inteiro junto
+  // (nunca mais executa: ninguém sem a capacidade chega a este ponto).
+  const _btnProvisoes = `<div id="prov-inline-slot" style="flex:1;min-width:280px;margin-top:4px">
+         <span style="color:var(--muted);font-size:.82rem">Carregando provisões…</span></div>`;
   if (concluido) {
     const dt = dados.concluido_em
       ? _fmtDataBR(dados.concluido_em)
@@ -22076,11 +22101,11 @@ async function peComplementoRender(){
       </div>`).join('');
     complHtml = `
       <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:4px">Carregar Complemento de Projeto (XML por ambiente — pode ser idêntico ao PE)</div>
-      ${rows}
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
-        <button class="btn-ciclo" onclick="abrirModalComplemento()"><i class="ti ti-arrows-exchange"></i> Negociar Complemento</button>
-      </div>`;
+      ${rows}`;
   }
+  // F2-40 Fatia 1: "Negociar Complemento" saiu daqui (bloco de upload de XML) e foi para o
+  // cabeçalho do card "Aprovação do Projeto Executivo" logo abaixo — mesma etapa 11e, condição
+  // de exibição IDÊNTICA (linhas.length > 0, medida e reusada, não reinventada).
   // ── Aprovação do Projeto Executivo (documento assinável — substitui o "PE Assinado") ──
   // Achado do usuário 2026-08-19: mesmas regras do Contrato/Solicitação de Medição — usa o
   // renderer de assinatura compartilhado (_renderSecaoAssinaturaUnificada) em vez dos inputs
@@ -22153,13 +22178,21 @@ async function peComplementoRender(){
         <div style="font-size:var(--fs-xs);color:var(--text-3);margin-top:4px">Para uma NOVA renegociação (o assinado acima nunca é alterado) — negocie o complemento de novo antes.</div>
       </div>` : ''}`;
   }
-  const bloco = (titulo, corpo) => `
+  const bloco = (titulo, corpo, headerExtra) => `
     <div style="margin-top:12px;border-top:1px dashed var(--border);padding-top:10px">
-      <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px">${titulo}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+        <div style="font-size:9px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase">${titulo}</div>
+        ${headerExtra || ''}
+      </div>
       ${corpo}
     </div>`;
+  // F2-40 Fatia 1: botão "Negociar Complemento" no cabeçalho deste card (mesma condição que
+  // hoje governa o antigo local no bloco de upload — linhas.length > 0 — medida e reusada).
+  const negociarBtn = linhas.length
+    ? `<button class="btn-ciclo" onclick="abrirModalComplemento()"><i class="ti ti-arrows-exchange"></i> Negociar Complemento</button>`
+    : '';
   cont.innerHTML = complHtml
-    + bloco('Aprovação do Projeto Executivo', apHtml)
+    + bloco('Aprovação do Projeto Executivo', apHtml, negociarBtn)
     + (linhas.length ? bloco('Termo Aditivo', adHtml) : '');
 }
 
@@ -22178,26 +22211,191 @@ async function peComplUpload(poolAmbienteId, inputFile){
   } catch(e){ await avisoPopup('Erro ao enviar o arquivo.',{titulo:'Carregar Complemento'}); }
 }
 
-async function abrirModalComplemento(){
+// F2-40 Fatia 2: dispatch por DIMENSÃO do complemento — hoje só 'ambiente' (parcela_id=None) tem
+// chamador de verdade (o botão da 11e). 'fase' fica pronto na forma, mas SEM porta de entrada
+// ligada nesta rodada (decisão do Marcelo, 08/09) — quem ligar precisa ler o aviso abaixo primeiro.
+//
+// AVISO para quem for ligar a porta da fase: o endpoint fundido (POST .../pe/complemento/fase/<id>)
+// satisfaz num único POST os dois papéis que aqui são dois (GET comparativo somente-leitura +
+// POST get-or-create/resync). Se o modal um dia chamar esse endpoint só para MOSTRAR o
+// comparativo da fase, ele vai criar o orçamento e resincronizar vínculos como efeito colateral —
+// abrir a tela para olhar passaria a gravar. Antes de ligar essa porta: ou o endpoint da fase
+// ganha um modo somente-leitura próprio, ou o modal só o chama depois de uma ação EXPLÍCITA do
+// usuário (nunca no simples abrir do modal, como o dispatch de 'ambiente' faz hoje).
+function _peComplDispatch(dim){
+  dim = dim || { tipo: 'ambiente' };
+  const enc = encodeURIComponent(projetoAtivo.nome_safe);
+  if (dim.tipo === 'fase') {
+    const url = `/api/projetos/${enc}/pe/complemento/fase/${dim.parcela_id}`;
+    return { comparativoUrl: url, orcamentoUrl: url, parcelaId: dim.parcela_id };
+  }
+  return {
+    comparativoUrl: `/api/projetos/${enc}/pe/complemento/comparativo`,
+    orcamentoUrl:   `/api/projetos/${enc}/pe/complemento/orcamento`,
+    parcelaId: null,
+  };
+}
+
+let _peComplModalState = null;   // {orcId, dim, linhas, descontos:{pool_ambiente_id:pct}, formaPagamento, formaPagamentoLabel}
+
+async function abrirModalComplemento(dim){
   if(!projetoAtivo) return;
+  dim = dim || { tipo: 'ambiente' };
   const modal = document.getElementById('modal-pe-compl');
   const body = document.getElementById('pe-compl-modal-body');
   if(!modal || !body) return;
   modal.style.display = 'flex';
   body.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Carregando…</span>';
-  let j;
-  try { j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/complemento/comparativo`,
-                        {credentials:'same-origin'}).then(r=>r.json()); }
+  const disp = _peComplDispatch(dim);
+  let cmp;
+  try { cmp = await fetch(disp.comparativoUrl, {credentials:'same-origin'}).then(r=>r.json()); }
   catch(e){ body.innerHTML = '<span style="color:var(--err)">Erro ao carregar.</span>'; return; }
-  if(!j.ok){ body.innerHTML = `<span style="color:var(--err)">${esc(j.erro||'Erro')}</span>`; return; }
+  if(!cmp.ok){ body.innerHTML = `<span style="color:var(--err)">${esc(cmp.erro||'Erro')}</span>`; return; }
+  // Read-existing-first / create-once (docs/db/TAREFA_F2_40_RESET_COMPLEMENTO.md): procura o
+  // orçamento de complemento JÁ existente por uma leitura sem efeito colateral antes de chamar o
+  // get-or-create — reabrir este modal não pode apagar o plano de pagamento que o gerente já salvou.
+  let orc = null;
+  try {
+    const lista = await fetch(`/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/orcamentos`)
+      .then(r=>r.json());
+    orc = (lista.orcamentos||[]).find(o => o.complemento_pe && (o.parcela_id ?? null) === disp.parcelaId) || null;
+  } catch(e){}
+  if (!orc) {
+    let criado;
+    try {
+      criado = await fetch(disp.orcamentoUrl, {method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'}, body:'{}'}).then(r=>r.json());
+    } catch(e){ body.innerHTML = '<span style="color:var(--err)">Erro ao criar o complemento.</span>'; return; }
+    if (!criado.ok) { body.innerHTML = `<span style="color:var(--err)">${esc(criado.erro||'Erro')}</span>`; return; }
+    orc = criado.orcamento;
+  }
+  let formaPagamentoLabel = orc.forma_pagamento || '';
+  if (orc.forma_pagamento) {
+    try {
+      const d = await fetch('/pagamentos').then(r=>r.json());
+      const m = (d.modalidades||[]).find(x=>x.codigo===orc.forma_pagamento);
+      if (m) formaPagamentoLabel = m.descricao;
+    } catch(e){}
+  }
+  _peComplModalState = {
+    orcId: orc.id, dim,
+    linhas: cmp.linhas || [], resumo: cmp.resumo || {},
+    descontos: {},
+    formaPagamento: orc.forma_pagamento || '',
+    formaPagamentoLabel,
+  };
+  _peComplModalRender();
+}
+
+function _peComplModalDescChange(el){
+  const st = _peComplModalState;
+  if(!st) return;
+  const pid = parseInt(el.dataset.pid, 10);
+  let v = parseFloat(el.value);
+  if (!(v >= 0)) v = 0;
+  if (v > 100) v = 100;
+  st.descontos[pid] = v;
+  _peComplModalRender();
+}
+
+function _peComplModalPagamentoHtml(){
+  const st = _peComplModalState;
+  if (st.formaPagamento) {
+    return `<div style="margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;font-size:.85rem">
+      Forma de pagamento: <strong>${esc(st.formaPagamentoLabel)}</strong>
+      <button class="btn-ciclo" style="font-size:var(--fs-xs);padding:2px 8px;margin-left:8px"
+        onclick="peComplModalDefinirPagamento()">Alterar</button>
+    </div>`;
+  }
+  return `<div style="margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;font-size:.85rem;color:var(--warn)">
+    <i class="ti ti-alert-triangle"></i> Forma de pagamento ainda não definida — o Termo Aditivo não
+    pode ser gerado sem ela.
+    <button class="btn-ciclo" style="margin-left:8px" onclick="peComplModalDefinirPagamento()">Definir forma de pagamento</button>
+  </div>`;
+}
+
+// F2-40 Fatia 2: a faixa de pagamento (à vista/parcelado loja/financeira, entrada, parcelas) NÃO
+// foi duplicada dentro deste modal — é uma sidebar de página 2 amarrada a ~150 ids fixos (#neg-*,
+// #sb-*, #tf-*...), nunca pensada pra rodar em duas instâncias ao mesmo tempo. Em vez de duplicar
+// (ou reescrever cálculo, que o motor já resolve), este handoff ativa o MESMO orçamento na tela
+// real e devolve o usuário aqui depois — mesmo padrão de navegação que abrirModalComplemento()
+// já usava antes desta fatia (fecharCiclo+goPage(2)+ativarOrcamento).
+async function peComplModalDefinirPagamento(){
+  const st = _peComplModalState;
+  if (!st || !st.orcId) return;
+  document.getElementById('modal-pe-compl').style.display = 'none';
+  fecharCiclo();
+  goPage(2);
+  await carregarOrcamentos();
+  await ativarOrcamento(st.orcId);
+  showToast('Defina a forma de pagamento do complemento — depois volte à etapa 11e para gerar o Termo Aditivo.');
+}
+
+async function _peComplModalSalvarDescontos(credenciais){
+  const st = _peComplModalState;
+  const descontos = {};
+  (st.linhas||[]).forEach(l => { descontos[l.pool_ambiente_id] = st.descontos[l.pool_ambiente_id] || 0; });
+  const reqBody = Object.assign({descontos}, credenciais || {});
+  try {
+    const r = await fetch(`/api/orcamentos/${st.orcId}/descontos`,
+      {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(reqBody)});
+    const d = await r.json();
+    if (d.ok) return true;
+    if (d.requer_autorizacao && !credenciais){
+      const cred = await pedirCredenciaisGerente({capacidade:'aprovar_financeiro',
+        titulo:'Desconto do complemento acima do limite', mensagem: d.erro});
+      if (cred) return await _peComplModalSalvarDescontos(cred);
+      return false;
+    }
+    await avisoPopup(d.erro || 'Falha ao salvar os descontos do complemento.', {titulo:'Complemento de Projeto'});
+    return false;
+  } catch(e){ await avisoPopup('Erro de rede.', {titulo:'Complemento de Projeto'}); return false; }
+}
+
+async function peComplModalGerarAditivo(){
+  const st = _peComplModalState;
+  if (!st || !st.orcId || !st.formaPagamento) return;
+  if (!(await _peComplModalSalvarDescontos())) return;
+  try {
+    const body = st.dim && st.dim.tipo === 'fase' ? JSON.stringify({parcela_id: st.dim.parcela_id}) : '{}';
+    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo`,
+      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body}).then(r=>r.json());
+    if(!j.ok){ await avisoPopup(j.erro||'Erro',{titulo:'Termo Aditivo'}); return; }
+    document.getElementById('modal-pe-compl').style.display = 'none';
+    showToast('Termo aditivo gerado.');
+    peComplementoRender();
+  } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Termo Aditivo'}); }
+}
+
+function _peComplModalRender(){
+  const st = _peComplModalState;
+  const body = document.getElementById('pe-compl-modal-body');
+  if(!st || !body) return;
   const {fmt, sig, pctS} = _peCmpHelpers();
   const corD = v => v>0.005?'var(--warn)':(v<-0.005?'var(--ok)':'var(--text-3)');
-  const r = j.resumo || {};
-  const rows = (j.linhas||[]).map(l => `
-    <tr><td>${esc(l.ambiente)}</td>
+  const linhas = st.linhas || [];
+  let totalBruto = 0, totalDesc = 0, totalCobrar = 0;
+  const rows = linhas.map(l => {
+    const diff = l.diferenca || 0;
+    // F2-40: linha sem diferença real (não carregado, ou diferença zero) não entra na negociação
+    // — Desc.% desabilitado e excluída dos totais (mockup: "esmaecida/—").
+    const zero = !l.compl_carregado || Math.abs(diff) < 0.005;
+    const pct = st.descontos[l.pool_ambiente_id] || 0;
+    const aCobrar = zero ? 0 : Math.round(diff * (1 - pct/100) * 100) / 100;
+    if (!zero) { totalBruto += diff; totalDesc += (diff - aCobrar); totalCobrar += aCobrar; }
+    return `<tr style="${zero ? 'opacity:.55' : ''}">
+      <td>${esc(l.ambiente)}</td>
       <td class="num">${fmt(l.vava_contratado)}</td>
       <td class="num">${l.compl_carregado ? fmt(l.vava_complemento) : '<span style="color:var(--text-3);font-size:var(--fs-xs)">não carregado</span>'}</td>
-      <td class="num">${l.compl_carregado ? `<span style="color:${corD(l.diferenca)}">${sig(l.diferenca)}</span>` : '—'}</td></tr>`).join('');
+      <td class="num">${l.compl_carregado ? `<span style="color:${corD(diff)}">${sig(diff)}</span>` : '—'}</td>
+      <td class="num">${zero ? '—' : `<input type="number" min="0" max="100" step="0.01" value="${pct}"
+        data-pid="${l.pool_ambiente_id}" onchange="_peComplModalDescChange(this)"
+        style="width:64px;text-align:right;background:var(--input);border:1px solid var(--border);
+        border-radius:4px;color:var(--fg);padding:2px 4px">%`}</td>
+      <td class="num">${zero ? '—' : `<strong style="font-family:var(--font-mono)">${fmt(aCobrar)}</strong>`}</td>
+    </tr>`;
+  }).join('');
+  const r = st.resumo || {};
   body.innerHTML = `
     <div style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:10px;line-height:1.7">
       À vista do complemento = XML × (à vista ÷ bruto do MESMO ambiente no contrato) — descontos
@@ -22208,29 +22406,20 @@ async function abrirModalComplemento(){
     <div class="table-wrap"><table class="tbl"><thead><tr>
       <th>Ambiente</th><th style="text-align:right">À vista (contrato)</th>
       <th style="text-align:right">À vista (complemento)</th><th style="text-align:right">Diferença</th>
+      <th style="text-align:right">Desc. %</th><th style="text-align:right">A cobrar</th>
     </tr></thead><tbody>${rows}</tbody></table></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
-      <span style="font-size:.85rem">Diferença total:
-        <strong style="font-family:var(--font-mono);color:${corD(r.total_diferenca||0)}">${sig(r.total_diferenca||0)}</strong>
-        <span style="color:var(--text-3);font-size:var(--fs-xs)"> (${r.carregados||0}/${r.marcados||0} carregados)</span></span>
+    <div style="margin-top:10px;font-size:.85rem;display:flex;flex-direction:column;gap:3px;align-items:flex-end">
+      <div>Diferença bruta: <strong style="font-family:var(--font-mono);color:${corD(totalBruto)}">${sig(totalBruto)}</strong></div>
+      <div>Desconto: <strong style="font-family:var(--font-mono);color:var(--ok)">${fmt(totalDesc)}</strong></div>
+      <div style="font-size:.95rem">Complemento: <strong style="font-family:var(--font-mono)">${fmt(totalCobrar)}</strong></div>
+    </div>
+    ${_peComplModalPagamentoHtml()}
+    <div style="display:flex;justify-content:flex-end;margin-top:14px">
       <button class="btn-ciclo" style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);font-weight:700"
-              onclick="document.getElementById('modal-pe-compl').style.display='none';peComplementoNegociar()">
-        <i class="ti ti-arrows-exchange"></i> Negociar Complemento</button>
+              ${st.formaPagamento ? '' : 'disabled title="Defina a forma de pagamento primeiro"'}
+              onclick="peComplModalGerarAditivo()">
+        <i class="ti ti-file-plus"></i> Gerar Termo Aditivo</button>
     </div>`;
-}
-
-async function peComplementoNegociar(){
-  if(!projetoAtivo) return;
-  try {
-    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/pe/complemento/orcamento`,
-      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:'{}'}).then(r=>r.json());
-    if(!j.ok){ await avisoPopup(j.erro||'Erro',{titulo:'Negociar Complemento'}); return; }
-    fecharCiclo();
-    goPage(2);
-    await carregarOrcamentos();               // recarrega a lista (o default trava no contratado)
-    await ativarOrcamento(j.orcamento.id);    // ...e ativa o COMPLEMENTO explicitamente
-    showToast('Complemento ativo — negocie as diferenças (desconto por ambiente).');
-  } catch(e){ await avisoPopup('Erro de rede.',{titulo:'Negociar Complemento'}); }
 }
 
 async function peAprovacaoGerar(){
@@ -22761,8 +22950,12 @@ async function peConciliacaoGerarComplemento(parcelaId){
       {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:'{}'}).then(r=>r.json());
     if(!j.ok){ await avisoPopup(j.erro||'Erro', {titulo:'Gerar Complemento'}); return; }
     const {fmt} = _peCmpHelpers();
-    await avisoPopup(`Complemento gerado: ${fmt(j.resumo.total_complemento)} (diferença ${fmt(j.resumo.total_diferenca)}).\n` +
-      'Acesse "Negociar Complemento" na etapa 11e para gerar o Termo Aditivo desta fase.',
+    // F2-40: a 11e só enxerga o complemento por AMBIENTE (parcela_id=None) — o complemento POR
+    // FASE criado aqui não aparece lá (mecanismos distintos, medido). O caminho real hoje é a
+    // tela de orçamentos comum: GET /projetos/<nome>/orcamentos não filtra complemento_pe, e
+    // POST .../aditivo aceita parcela_id para escolher qual complemento vira o Termo Aditivo.
+    await avisoPopup(`Complemento da fase gerado: ${fmt(j.resumo.total_complemento)} (diferença ${fmt(j.resumo.total_diferenca)}).\n` +
+      `Abra o orçamento "${j.orcamento.nome}" na tela de orçamentos para negociar e gerar o Termo Aditivo.`,
       {titulo:'Complemento de Projeto'});
   } catch(e){ await avisoPopup('Erro de rede: ' + _detalheErroRede(e), {titulo:'Gerar Complemento'}); }
 }
@@ -25712,7 +25905,7 @@ function bfFechar() {
      style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:600;
             align-items:center;justify-content:center;backdrop-filter:blur(4px)">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;
-              padding:26px 24px;max-width:680px;width:94%;max-height:86vh;overflow-y:auto;
+              padding:26px 24px;max-width:820px;width:94%;max-height:86vh;overflow-y:auto;
               animation:mIn .2s ease;box-shadow:0 24px 60px rgba(0,0,0,.5)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <h3 style="margin:0;font-size:15px;color:var(--text)">Complemento de Projeto — comparativo</h3>

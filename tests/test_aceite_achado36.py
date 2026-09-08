@@ -60,14 +60,17 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 # (abrir projeto, transferir etapa, ClickSign de PE e de Medição), espalhadas pelo arquivo.
 FAIXAS_CICLO = [
     (7932, 7980),      # abrirProjeto
-    (19793, 19840),    # _cicloTransferResponder / _cicloTransferConfirmar
-    (22147, 22220),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
+    (19883, 19929),    # _cicloTransferResponder / _cicloTransferConfirmar
+    (22459, 22531),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
                        # verificarClickSignPEAgora / reenviarConviteClickSignPE
-    (22664, 22682),    # peConciliacaoReprovar
-    (23498, 23552),    # toggleSalvarEtapa / reabrirEtapaCascata
-    (24214, 24325),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
+    (22980, 22997),    # peConciliacaoReprovar
+    (23814, 23864),    # toggleSalvarEtapa / reabrirEtapaCascata
+    (24582, 24681),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
                        # _confirmarEnvioClickSignMedicao / verificarClickSignMedicaoAgora /
                        # reenviarConviteClickSignMedicao
+    # F2-40 (08/09): linhas deslocadas pela Fatia 1/2 (botão "Negociar Complemento" movido +
+    # modal reescrito, ~150 linhas novas entre a 11c e a 11e) — mesmas 4 funções de antes,
+    # conteúdo intocado, só a numeração absoluta mudou (medido função por função, não chutado).
 ]
 
 

@@ -8271,6 +8271,10 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": _err}, code=403); return
                 if _projeto_da_loja(db, nome, loja_id) is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                try:
+                    _req_peaj = json.loads(body.decode("utf-8", "replace")) if body else {}
+                except (ValueError, UnicodeDecodeError):
+                    _req_peaj = {}
                 marcados = [pa.id for pa in db.query(PoolAmbiente)
                             .filter_by(projeto_id=nome).order_by(PoolAmbiente.id.asc()).all()
                             if pa.renegociar_pe]
@@ -8290,6 +8294,7 @@ class Handler(BaseHTTPRequestHandler):
                 if orc is not None and db.query(Aditivo).filter_by(
                         orcamento_complemento_id=orc.id, status="assinado").first() is not None:
                     orc = None
+                _criou_agora = False
                 if orc is None:
                     maior = max([o.ordem or 0 for o in
                                  db.query(Orcamento).filter_by(projeto_id=nome).all()] or [0])
@@ -8297,7 +8302,14 @@ class Handler(BaseHTTPRequestHandler):
                                     desconto_pct=0.0, complemento_pe=1, loja_id=loja_id,
                                     created_by=usuario.get("id"))
                     db.add(orc); db.flush()
-                # sincroniza os vínculos com as marcas atuais (marcar/desmarcar na 11c reflete aqui)
+                    _criou_agora = True
+                # Sincroniza os vínculos com as marcas atuais (marcar/desmarcar na 11c reflete aqui).
+                # INCONDICIONAL, sempre (docs/db/TAREFA_F2_40_RESET_COMPLEMENTO.md, decisão 2-b): é o
+                # que garante que a tabela do modal (marcas ao vivo, _complemento_diferencas) e o que
+                # entra na negociação/aditivo (vínculos, _negociacao_breakdown) falem do mesmo conjunto
+                # de ambientes — sem isto, um ambiente marcado DEPOIS da criação aparece na tela com
+                # sua diferença mas nunca entra no aditivo (cobrança a menos, silenciosa, família
+                # ACHADO-16/55).
                 atuais = {oa.pool_ambiente_id: oa for oa in
                           db.query(OrcamentoAmbiente).filter_by(orcamento_id=orc.id).all()}
                 for i, pid in enumerate(marcados):
@@ -8306,13 +8318,20 @@ class Handler(BaseHTTPRequestHandler):
                 for pid, oa in atuais.items():
                     if pid not in set(marcados):
                         db.delete(oa)
-                # Correção (teste do usuário): a negociação do complemento PARTE do padrão À VISTA
-                # com entrada R$ 0,00 — cada "Negociar Complemento" zera o plano de pagamento salvo.
-                # Também descontamina o vazamento antigo (o painel do contratado era capturado pela
-                # tela e persistido aqui via auto-save, puxando o total_cliente do CONTRATO para o
-                # cust_fin do complemento → Val_Cont virava o total do contrato).
-                orc.forma_pagamento = None
-                orc.negociacao_json = None
+                # Apagar o plano de pagamento SÓ quando o orçamento nasceu nesta chamada, ou quando o
+                # chamador pede explicitamente {"reiniciar": true} (docs/db/TAREFA_F2_40_RESET_COMPLEMENTO.md,
+                # decisão 2-c). Deixou de ser incondicional: a F2-40 reabre este orçamento com frequência
+                # (o modal de negociação chama este mesmo endpoint a cada abertura, read-existing-first),
+                # e apagar toda vez destruiria o plano de pagamento que o gerente acabou de salvar.
+                # Seguro porque o vazamento que motivou o apagar incondicional (painel do contratado
+                # capturado pela tela e persistido aqui via auto-save) já tem duas guardas próprias, a
+                # montante: `_carregandoOrcamento` suprime o auto-save durante a carga
+                # (static/index.html:10485) e `_ultimoPagSig` bloqueia o ciclo preview→painel→save
+                # (static/index.html:10490) — se qualquer uma delas cair, o apagar incondicional volta
+                # a ser necessário.
+                if _criou_agora or bool(_req_peaj.get("reiniciar")):
+                    orc.forma_pagamento = None
+                    orc.negociacao_json = None
                 db.flush()
                 try:
                     _recalcular_orcamento(orc, db)
@@ -9437,11 +9456,16 @@ class Handler(BaseHTTPRequestHandler):
                           for ch in ("considerandos", "lista_integral", "inclusoes",
                                      "exclusoes", "valores")}
                 n_ord = _aditivo_ordinal_atual(db, contrato, aditivo)
-                # Achado do usuário (2026-08-25): "Negociar Complemento" (11e) REAPROVEITA o mesmo
-                # Orcamento entre rodadas de renegociação e zera forma_pagamento a cada abertura —
-                # sem congelar aqui, a condição de pagamento desta rodada se perde quando a próxima
-                # começar. Snapshot estruturado (não só a frase textual dos `blocos`), pra Visão
-                # Geral do Projeto mostrar o histórico real de condições, uma por renegociação.
+                # Achado do usuário (2026-08-25): cada rodada de renegociação pós-assinatura cria um
+                # Orcamento de complemento NOVO (guarda do 6-b, docs/db/TAREFA_ACHADO21.md) — o desta
+                # rodada não sobrevive além dela. Sem congelar aqui, a condição de pagamento fica
+                # ilegível assim que a próxima rodada nasce (o novo Orcamento começa com
+                # forma_pagamento=None). Snapshot estruturado (não só a frase textual dos `blocos`),
+                # pra Visão Geral do Projeto mostrar o histórico real de condições, uma por
+                # renegociação. F2-40 (docs/db/TAREFA_F2_40_RESET_COMPLEMENTO.md): dentro da MESMA
+                # rodada, reabrir o complemento não zera mais forma_pagamento a cada chamada — só na
+                # criação (aqui) ou com {"reiniciar": true} — o que este snapshot protege é a
+                # fronteira ENTRE rodadas, que continua existindo.
                 try:
                     _fp_snapshot = json.loads(orc_aj.forma_pagamento) if orc_aj.forma_pagamento else None
                 except Exception:
@@ -18309,6 +18333,8 @@ def _orcamento_dict(o) -> dict:
         "created_at":      o.created_at.strftime("%Y-%m-%d %H:%M") if o.created_at else "",
         "updated_at":      o.updated_at.strftime("%Y-%m-%d %H:%M") if o.updated_at else "",
         "complemento_pe":       bool(getattr(o, "complemento_pe", 0)),   # Fatia 3 PE: orçamento de ajuste
+        "parcela_id":      getattr(o, "parcela_id", None),   # F2-40: distingue complemento por
+                           # ambiente (None) de complemento por fase (id da ParcelaProjeto)
         "ambientes":       [],  # preenchido por rotas específicas
         # ── modo sombra: derivados do motor de negociação (Task 7) ──
         "sombra": _sombra_dict(o),

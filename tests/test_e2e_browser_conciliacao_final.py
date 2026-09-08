@@ -301,28 +301,44 @@ def test_fluxo_terminal_conciliacao_final_pela_fila(page, servidor_e2e):
     # mais adiante, esperando "Negociar Complemento". #btn-abrir-ciclo não serve pra isso aqui: com
     # o painel já ativo ele fica coberto pelo próprio painel (intercepta o clique) — chama
     # carregarCiclo() direto em vez de clicar num botão que só existe pra ABRIR o painel fechado.
+    # F2-40 Fatia 1/2 (08/09): "Negociar Complemento" saiu do bloco de upload de XML e foi pro
+    # cabeçalho do card "Aprovação do Projeto Executivo" (mesma etapa 11e); o clique agora abre a
+    # tela cheia do modal (Desc.%/A cobrar/totais + faixa de pagamento por handoff), não mais um
+    # comparativo que só levava pra página 2 direto. NUNCA usar seletor page-wide pra botões que
+    # também existem no card por trás do modal ("Gerar Termo Aditivo" tem cópia própria no bloco
+    # "Termo Aditivo" de peComplementoRender) — sempre escopar em `corpo`.
     page.evaluate("() => carregarCiclo()")
     ciclo.locator(".ficha-tab", has_text="Projeto executivo").first.click()
     page.wait_for_timeout(500)
     page.click("text=Aprovação do PE pelo cliente")
     page.wait_for_selector('button:has-text("Negociar Complemento")', timeout=10000)
-    page.click('button:has-text("Negociar Complemento")')   # abre o modal comparativo
-    page.wait_for_timeout(500)
-    page.locator('button:has-text("Negociar Complemento")').last.click()   # confirma dentro do modal
-    page.wait_for_selector("text=Complemento ativo", timeout=10000)
+    page.click('button:has-text("Negociar Complemento")')   # abre o modal — tela cheia (F2-40 Fatia 2)
 
-    # peComplementoNegociar() fecha o painel de propósito (fecharCiclo(); goPage(2) — navega pra
-    # Negociação depois de negociar o complemento) — painel FECHADO de verdade agora, então
-    # #btn-abrir-ciclo é o certo aqui (ao contrário do refresh acima, onde o painel seguia aberto
-    # e o mesmo botão ficava coberto pelo próprio painel).
+    modal = page.locator("#modal-pe-compl")
+    modal.wait_for(state="visible", timeout=10000)
+    corpo = page.locator("#pe-compl-modal-body")
+    corpo.locator('button:has-text("Definir forma de pagamento")').wait_for(state="visible", timeout=10000)
+    corpo.locator('button:has-text("Definir forma de pagamento")').click()   # handoff — ativa o complemento na página 2
+
+    page.locator("#btn-salvar-orcamento").wait_for(state="visible", timeout=10000)
+    page.click("#btn-salvar-orcamento")   # plano à vista/entrada 0 (default de um complemento recém-criado)
+    page.wait_for_selector("text=Orçamento salvo", timeout=10000)
+
+    # peComplModalDefinirPagamento() já fechou o Ciclo de propósito (mesmo padrão da antiga
+    # peComplementoNegociar()) — #btn-abrir-ciclo é o certo aqui, painel FECHADO de verdade.
     page.click("#btn-abrir-ciclo")
     ciclo.wait_for(state="visible", timeout=10000)
     ciclo.locator(".ficha-tab", has_text="Projeto executivo").first.click()
     page.wait_for_timeout(500)
     page.click("text=Aprovação do PE pelo cliente")
-    page.wait_for_selector('button:has-text("Gerar Termo Aditivo")', timeout=10000)
-    page.click('button:has-text("Gerar Termo Aditivo")')
+    page.wait_for_selector('button:has-text("Negociar Complemento")', timeout=10000)
+    page.click('button:has-text("Negociar Complemento")')   # reabre — forma de pagamento já salva
+    modal.wait_for(state="visible", timeout=10000)
+    corpo.locator('button:has-text("Gerar Termo Aditivo"):not([disabled])').wait_for(
+        state="visible", timeout=10000)
+    corpo.locator('button:has-text("Gerar Termo Aditivo")').click()
     page.wait_for_selector("text=Termo aditivo gerado", timeout=10000)
+    modal.wait_for(state="hidden", timeout=5000)
 
     page.fill("#pe-ad-nome", "Rep Loja E2E")
     page.fill("#pe-ad-cpf", "111.444.777-35")
