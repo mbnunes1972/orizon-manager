@@ -10,13 +10,18 @@ default do valor aprovado — SEMPRE a mesma que vai virar o Complemento/Estorno
 divergir (achado do usuário 2026-08-15: a tela mostrava CFO×markup médio do orçamento enquanto o
 Complemento gerado cobrava pelo fator VAVA/VBVA do ambiente, e os dois números divergiam sem o
 gerente perceber ao aprovar a decisão):
-- Caminho principal: `valor_complemento_por_fator` (fator proporcional VAVA/VBVA do ambiente
-  contratado sobre o valor de venda do PE) — carrega o desconto e os custos adicionais exatamente
-  como negociados naquele ambiente; MESMA fórmula usada em `main._complemento_diferencas_fase`
-  pra gerar o Complemento de Projeto de fato.
-- Fallback: `diferenca_valor_contrato` (CFO × Markup médio do orçamento) — só quando não há
+- **Caminho oficial (F2-42, docs/db/TAREFA_F2_42_FONTE_UNICA_E_INTERFACE.md)**: `vava_motor` — o
+  próprio MOTOR (`mod_negociacao.calcular_orcamento`, via `_negociacao_breakdown(...,
+  vbva_override=...)`), fornecido pelo chamador (este módulo não faz I/O). Bate exato com o que
+  `main._complemento_diferencas[_fase]` cobra de fato — os dois usam a MESMA fonte agora.
+- **Sombra/fallback**: `valor_complemento_por_fator` (fator proporcional VAVA/VBVA do ambiente
+  contratado sobre o valor de venda do PE) — foi o caminho oficial até a Rodada 1/2 do F2-41/42;
+  medido que diverge do motor sempre que há custo adicional rateado em partes IGUAIS (brinde) em
+  vez de proporcional ao bruto (viagem, que não diverge). Continua existindo como fallback (motor
+  indisponível) e como sombra medida (`divergencia` no resumo do Complemento).
+- Fallback final: `diferenca_valor_contrato` (CFO × Markup médio do orçamento) — só quando não há
   `valor_venda_pe` (PE carregado sem XML, ou registro anterior à Fatia venda 2026-07-21 sem o
-  campo preenchido).
+  campo preenchido) nem `vava_motor`.
 
 Spec: docs/superpowers/specs/financeiro/2026-08-14-conciliacao-pe-af2-complemento-credito-design.md
 """
@@ -124,11 +129,23 @@ def valor_complemento_por_fator(valor_venda_pe, vava_contratado, vbva_contratado
 
 def diferenca_valor_contrato_estimada(diferenca_cfo, markup, valor_venda_pe=None,
                                       vava_contratado=0.0, vbva_contratado=0.0,
-                                      fator_ca=1.0, desconto_orc_pct=0.0, desconto_amb_pct=0.0):
+                                      fator_ca=1.0, desconto_orc_pct=0.0, desconto_amb_pct=0.0,
+                                      vava_motor=None):
     """Diferença de Valor de Contrato pra decisão/exibição na AF2 — a MESMA grandeza que acaba
-    virando o Complemento/Estorno de fato, calculada com o `valor_complemento_por_fator` sempre
-    que possível (ver docstring do módulo). Fallback pro CFO×Markup só quando não há
-    `valor_venda_pe` disponível."""
+    virando o Complemento/Estorno de fato.
+
+    F2-42 (docs/db/TAREFA_F2_42_FONTE_UNICA_E_INTERFACE.md): a fonte OFICIAL passou a ser o MOTOR
+    (`vava_motor` — o CALLER roda `_negociacao_breakdown(..., vbva_override=...)`, porque este
+    módulo é lógica PURA, sem I/O/banco, e não pode chamar o motor sozinho). Medido: a proporção
+    (`valor_complemento_por_fator`) trata QUALQUER custo adicional como se fosse proporcional ao
+    bruto do ambiente — falso pro rateio IGUAL do brinde (`mod_negociacao.py:80-81`, `num_bri =
+    bri/den_bri`, dividido em partes iguais, não por bruto) — divergindo do motor sempre que há
+    brinde > 0 e o ambiente muda de valor. `valor_complemento_por_fator` vira FALLBACK só quando
+    `vava_motor` não foi fornecido (motor não pôde rodar) ou `valor_venda_pe` é None (sem XML
+    ainda) — o chamador é responsável por logar esse fallback com prefixo próprio
+    (`[F2-42-FALLBACK]`), nunca em silêncio."""
+    if vava_motor is not None:
+        return round(float(vava_motor) - float(vava_contratado or 0), 2)
     if valor_venda_pe is not None:
         va = valor_complemento_por_fator(valor_venda_pe, vava_contratado, vbva_contratado,
                                          fator_ca, desconto_orc_pct, desconto_amb_pct)

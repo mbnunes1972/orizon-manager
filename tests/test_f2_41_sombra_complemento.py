@@ -48,7 +48,7 @@ def test_xml_identico_diferenca_zero_nas_duas_formulas(app_db, seed):
         assert linhas and len(linhas) == 1
         l = linhas[0]
         assert abs(l["diferenca"]) < 0.02, l
-        assert l["vava_motor"] is not None, "sombra tinha que ter calculado (XML carregado)"
+        assert l["vava_proporcao"] is not None, "sombra tinha que ter calculado (XML carregado)"
         assert abs(l["divergencia"]) < 0.02, l
         assert abs(resumo["divergencia_total"]) < 0.02
         assert abs(resumo["divergencia_maxima_abs"]) < 0.02
@@ -56,25 +56,12 @@ def test_xml_identico_diferenca_zero_nas_duas_formulas(app_db, seed):
         db.close()
 
 
-def test_aceite_1_sombra_nao_muda_o_que_e_cobrado(app_db, seed):
-    """Aceite 1 do pacote: `diferenca` (o que é cobrado) fixado com o número já conhecido de
-    `test_complemento_pe_e2e.py::test_complemento_por_diferenca_ponta_a_ponta` (mesmo cenário:
-    arq 10% repassado, venda 84.000 → diferença 4.444,44) — prova direta de que adicionar
-    `vava_motor`/`divergencia` ao lado não mudou o número que já existia antes desta rodada."""
-    nome, pid, oid = _setup(app_db, seed)
-    _isolar_marcas(app_db, nome, pid)
-    _upsert_compl(app_db, nome, pid, venda=84000.0, cfo=32000.0)
-    db = app_db.get_session()
-    try:
-        linhas, resumo = main._complemento_diferencas(db, nome)
-        l = next(x for x in linhas if x["pool_ambiente_id"] == pid)
-        assert abs(l["diferenca"] - 4444.44) < 0.05, (
-            "F2-41 não pode mudar o que é cobrado — %r" % l)
-        assert abs(resumo["total_diferenca"] - 4444.44) < 0.05
-        # a sombra é um campo A MAIS, não uma substituição — os dois convivem na mesma linha
-        assert "vava_motor" in l and "divergencia" in l
-    finally:
-        db.close()
+# NOTA (F2-42, Rodada 2): o teste que vivia aqui — "sombra não muda o que é cobrado" — testava
+# exatamente a garantia que a Rodada 1 dava e a Rodada 2 decidiu INVERTER de propósito (decisão
+# do Marcelo: "bater exato, o motor é a fonte única" — `diferenca` passou a vir do motor, não
+# mais da proporção). Não é regra dos irmãos silenciosa: é a mudança que este pacote pediu.
+# A prova equivalente pra Rodada 2 (agora `diferenca` bate com o MOTOR, não mais intocado) vive
+# em tests/test_f2_42_fonte_unica_e_interface.py.
 
 
 def _seed_dois_ambientes(app_db, seed, budgets_orders):
@@ -241,8 +228,8 @@ def test_aceite_3_uma_chamada_de_motor_por_invocacao_nao_escala_com_ambientes(ap
 def test_aceite_2_e_3_complemento_diferencas_fase_tambem_tem_sombra_em_uma_chamada(app_db, seed):
     """Mesma prova do aceite 2/3, agora para `_complemento_diferencas_fase` (complemento por
     FASE, alimentado por `ConciliacaoPeFase`/`xml_pe` em vez de `renegociar_pe`/`xml_compl`) —
-    `vava_motor`/`divergencia` presentes e uma única chamada ao motor, também sem escalar com o
-    número de ambientes."""
+    `vava_proporcao`/`divergencia` presentes e uma única chamada ao motor, também sem escalar com
+    o número de ambientes."""
     nome, oid, pids = _seed_dois_ambientes(
         app_db, seed, [(80000.0, 30000.0), (40000.0, 16000.0), (20000.0, 8000.0)])
     db0 = app_db.get_session()
@@ -263,7 +250,7 @@ def test_aceite_2_e_3_complemento_diferencas_fase_tambem_tem_sombra_em_uma_chama
             linhas, resumo = main._complemento_diferencas_fase(db, nome, parcela_id=None)
             assert len(linhas) == 3
             for l in linhas:
-                assert l["vava_motor"] is not None
+                assert l["vava_proporcao"] is not None
                 assert l["divergencia"] is not None
             assert "divergencia_total" in resumo and "divergencia_maxima_abs" in resumo
             chamadas = _spy.call_count

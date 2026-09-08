@@ -11587,10 +11587,11 @@ async function abrirItemEspecial() {
   const valorInicial = atual ? ('R$ ' + fmt(atual)) : '';
   const v = await new Promise((resolve) => {
     const ov = _popupOverlay(
+      // F2-42 C1: texto visível ao cliente NÃO cita achado nenhum — a referência fica só aqui,
+      // em comentário de código (ACHADO-65/66, docs/db/ACHADOS_CONTABEIS.md).
       '<h4 style="margin:0 0 10px;color:var(--accent);font-size:1rem">Item Especial</h4>' +
-      '<p style="margin:0 0 10px;color:var(--fg);font-size:.9rem;white-space:pre-line">Mercadoria comprada de terceiro ' +
-      'pra entrega ao cliente, vendida JUNTO na negociação, repassada pelo custo — sem desconto, sem margem própria ' +
-      '(ACHADO-65/66).</p>' +
+      '<p style="margin:0 0 10px;color:var(--fg);font-size:.9rem;white-space:pre-line">Produto ou serviço ' +
+      'negociado pelo valor de custo. Este item não tem aplicação de descontos.</p>' +
       '<input id="_ie-inp" type="text" inputmode="numeric" autocomplete="off" placeholder="R$ 0,00" value="' + esc(valorInicial) + '" ' +
       'oninput="mascaraMoedaInput(this)" ' +
       'style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);color:var(--fg);' +
@@ -17725,6 +17726,16 @@ async function salvarOrcamento(){
   } else {
     showToast('Orçamento salvo. Adicione ambientes para concluir a etapa "Orçamento".', false);
   }
+
+  // F2-42 C4: no complemento, Salvar acontecia sem ação aparente — peComplModalDefinirPagamento()
+  // manda o usuário pra página 2 (faixa de pagamento real, não duplicável — ver comentário ali) e
+  // avisa por toast pra "voltar à 11e", mas ninguém volta sozinho: o usuário fica sem saber se
+  // salvou. Volta direto pro fichário, na 11e, de onde o Termo Aditivo é gerado — só no
+  // complemento; a negociação normal (sem complemento_pe) segue exatamente como antes.
+  if (_orcamentoComplementoAtivo()) {
+    abrirCiclo();
+    _fichaSelecionar('11e');
+  }
 }
 
 // Event listeners drag-drop para o modal de novo ambiente
@@ -22242,7 +22253,7 @@ function _peComplDispatch(dim){
   };
 }
 
-let _peComplModalState = null;   // {orcId, dim, linhas, descontos:{pool_ambiente_id:pct}, formaPagamento, formaPagamentoLabel}
+let _peComplModalState = null;   // {orcId, dim, linhas, descontos:{pool_ambiente_id:pct}, formaPagamento}
 
 async function abrirModalComplemento(dim){
   if(!projetoAtivo) return;
@@ -22275,20 +22286,14 @@ async function abrirModalComplemento(dim){
     if (!criado.ok) { body.innerHTML = `<span style="color:var(--err)">${esc(criado.erro||'Erro')}</span>`; return; }
     orc = criado.orcamento;
   }
-  let formaPagamentoLabel = orc.forma_pagamento || '';
-  if (orc.forma_pagamento) {
-    try {
-      const d = await fetch('/pagamentos').then(r=>r.json());
-      const m = (d.modalidades||[]).find(x=>x.codigo===orc.forma_pagamento);
-      if (m) formaPagamentoLabel = m.descricao;
-    } catch(e){}
-  }
+  // F2-42 C2: `orc.forma_pagamento` é o JSON inteiro capturado por _capturarPagamento() (tipo/
+  // nome_forma/parcelas/...), NÃO um "codigo" de /pagamentos — o lookup antigo aqui nunca batia,
+  // e a tela caía sempre no fallback (o JSON cru, dumpado na tela: 6 linhas com 10 parcelas).
   _peComplModalState = {
     orcId: orc.id, dim,
     linhas: cmp.linhas || [], resumo: cmp.resumo || {},
     descontos: {},
     formaPagamento: orc.forma_pagamento || '',
-    formaPagamentoLabel,
   };
   _peComplModalRender();
 }
@@ -22304,11 +22309,28 @@ function _peComplModalDescChange(el){
   _peComplModalRender();
 }
 
+// F2-42 C2: resumo de UMA LINHA da forma de pagamento — nunca o JSON cru (`orc.forma_pagamento`
+// é o objeto inteiro de `_capturarPagamento()`: tipo/nome_forma/parcelas/entrada_valor/...; com
+// 10 parcelas, dumpado direto ocupava 6 linhas). Mesma leitura de `parc.length` que
+// `_negResumoLinhasHtml` já usa (não reinventa a extração, só o formato de exibição — uma linha,
+// sem "(liquidação)"/rótulos extras, como o mockup pediu).
+function _peComplModalFormaPagamentoResumo(jsonStr){
+  let p;
+  try { p = JSON.parse(jsonStr); } catch(e) { return null; }
+  if (!p) return null;
+  const parc = Array.isArray(p.parcelas) ? p.parcelas : [];
+  const parcelamento = parc.length > 1
+    ? `${parc.length}× ${'R$ ' + fmt(parc[parc.length - 1].valor)}`
+    : ('R$ ' + fmt(p.total_cliente || (parc[0] && parc[0].valor) || 0));
+  return `${p.nome_forma || '—'} — ${parcelamento}`;
+}
+
 function _peComplModalPagamentoHtml(){
   const st = _peComplModalState;
   if (st.formaPagamento) {
+    const resumo = _peComplModalFormaPagamentoResumo(st.formaPagamento) || 'plano salvo';
     return `<div style="margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;font-size:.85rem">
-      Forma de pagamento: <strong>${esc(st.formaPagamentoLabel)}</strong>
+      Forma de pagamento: <strong>${esc(resumo)}</strong>
       <button class="btn-ciclo" style="font-size:var(--fs-xs);padding:2px 8px;margin-left:8px"
         onclick="peComplModalDefinirPagamento()">Alterar</button>
     </div>`;
@@ -22419,10 +22441,8 @@ function _peComplModalRender(){
       <th style="text-align:right">À vista (complemento)</th><th style="text-align:right">Diferença</th>
       <th style="text-align:right">Desc. %</th><th style="text-align:right">A cobrar</th>
     </tr></thead><tbody>${rows}</tbody></table></div>
-    <div style="margin-top:10px;font-size:.85rem;display:flex;flex-direction:column;gap:3px;align-items:flex-end">
-      <div>Diferença bruta: <strong style="font-family:var(--font-mono);color:${corD(totalBruto)}">${sig(totalBruto)}</strong></div>
-      <div>Desconto: <strong style="font-family:var(--font-mono);color:var(--ok)">${fmt(totalDesc)}</strong></div>
-      <div style="font-size:.95rem">Complemento: <strong style="font-family:var(--font-mono)">${fmt(totalCobrar)}</strong></div>
+    <div style="margin-top:10px;font-size:.95rem;display:flex;flex-direction:column;gap:3px;align-items:flex-end">
+      <div>${totalDesc !== 0 ? 'Diferença (com desconto)' : 'Diferença'}: <strong style="font-family:var(--font-mono);color:${corD(totalCobrar)}">${sig(totalCobrar)}</strong></div>
       <div class="apoio-dev" style="font-size:var(--fs-xs);color:var(--text-3)">Sombra (motor×proporção): divergência total ${sig(divTotal)}, máxima |${fmt(divMax)}|</div>
     </div>
     ${_peComplModalPagamentoHtml()}

@@ -551,3 +551,42 @@ e no estado atual ela existe só na conversa.
 
 **Ação: virar teste commitado** (F2-42, junto com a rodada 2). Um teste que prova que a
 divergência tem causa — não só que ela existe.
+
+### F2-42 — fechado [FEITO nesta sessão, a pedido do Marcelo]
+
+Rodada 2: a causa virou teste commitado (item pendente do fim da Rodada 1) e a fonte trocou de
+verdade. Projeto 11 (8 ambientes de Homologação, teste real do Marcelo) mediu parcela fixa
+implícita ≈R$66,40 em TODOS os 8, nos dois sentidos de variação — `mod_negociacao.py:80-81`
+confirma o mecanismo: `num_via` é proporcional ao bruto (não diverge), `num_bri` é dividido em
+partes IGUAIS por ambiente (é a divergência inteira), Custo Especial não entra no à vista por
+ambiente (fora do mecanismo).
+
+Decisão do Marcelo: bater exato. `vava_motor` (a sombra da Rodada 1) vira oficial; a proporção
+(`valor_complemento_por_fator`, fórmula intocada) vira sombra/fallback. Os 3 consumidores
+(Complemento por ambiente, por fase, e a decisão da AF2) movem juntos — continuam unificados,
+só que agora do lado do motor, não da proporção. Fallback com log próprio (`[F2-42-FALLBACK]`)
+quando o motor não alcança um ambiente — nunca silencioso.
+
+4 testes de propriedade provam a causa por fechamento algébrico: só percentual → zero; +viagem
+(proporcional) → zero; +brinde (fixo) → divergência bate com `F×(VBVA_pe/VBVA_ct−1)` dentro de
+centavo; +Custo Especial → zero. É o teste commitado que a Rodada 1 deixou pendente.
+
+Interface: 5 itens. Achado incidental ao medir o C2 (JSON dumpado no modal): bug pré-existente
+do próprio F2-40 — o lookup de `forma_pagamento` contra `/pagamentos` nunca podia bater (compara
+o JSON inteiro de `_capturarPagamento()` contra um `codigo`), então a tela sempre caía no dump
+cru. C5 (o botão "Definir forma de pagamento" que "some depois do primeiro uso") foi medido
+antes de corrigir, por pedido explícito do Marcelo: a hipótese dele (trava invertida) não bateu
+com o código — não existe trava nenhuma na renderização, só um toggle de rótulo. O defeito real
+que dava essa impressão era o próprio C2 (dump de 6 linhas empurrando o controle de troca pra
+fora da vista) — já corrigido; C5 não precisou de código próprio, só a medição e um E2E provando
+que o controle nunca desaparece.
+
+**Pendência explícita, não resolvida nesta rodada:** o gabarito de números reais do Projeto 11
+(aceite do pacote — 8 valores exatos de "À vista (complemento)", total −3.118,72) não foi
+verificado — esta sessão não tem acesso aos dados brutos (budget/venda/config) dos 8 ambientes
+de Homologação pra reconstruir o cenário exato num teste. Fica com o Marcelo: ou verificar os 8
+números direto em Homologação depois do deploy, ou passar os dados brutos pra um teste dedicado.
+
+5 camadas verdes (b/c/d: 2725 passed, 4 xfailed, 0 failed; e: E2E tocados/novos — fatia1/2/3
+F2-40, apoio-dev F2-41, conciliação final, mais 1 E2E novo dedicado a C4/C5 — todos verdes, um
+por vez). Sem tag.

@@ -2724,6 +2724,21 @@ class Handler(BaseHTTPRequestHandler):
                     _pe_fator_contexto(db, nome)
                 markup = _markup_merc_puro(orc_ct)
 
+                # F2-42 (docs/db/TAREFA_F2_42_FONTE_UNICA_E_INTERFACE.md): esta prévia da AF2 é um
+                # dos 3 consumidores de `valor_complemento_por_fator` que se movem JUNTOS pro
+                # motor — uma chamada só, todas as substituições de uma vez, fora do laço abaixo.
+                _sombra_override_af2 = {pid: v for pid, v in venda_por_pid.items() if v is not None}
+                _vava_motor_af2 = {}
+                if orc_ct is not None and _sombra_override_af2:
+                    try:
+                        _d_motor_af2 = _negociacao_breakdown(orc_ct, db, vbva_override=_sombra_override_af2)
+                        _vava_motor_af2 = {a.get("id"): float(a.get("VAVA", 0.0))
+                                          for a in _d_motor_af2.get("ambientes", [])}
+                    except Exception as _e:
+                        print("[F2-41-SOMBRA] motor falhou (AF2 prévia) — seguindo com fallback:", _e)
+                        _vava_motor_af2 = {}
+                _fallbacks_af2 = []
+
                 decisoes = {d.pool_ambiente_id: d for d in
                             db.query(ConciliacaoPeFase).filter_by(projeto_nome=nome).all()}
                 parc_de_ambiente = {pa2.pool_ambiente_id: pa2.parcela_id for pa2 in
@@ -2750,12 +2765,15 @@ class Handler(BaseHTTPRequestHandler):
                     # por `ja_contratado` aqui infuenciaria o FATOR também, não só a subtração —
                     # fora do escopo desta tarefa (ACHADO-21 mira o Complemento de fato, não a
                     # prévia da AF2; ver docs/db/TAREFA_ACHADO21.md, "não mexer" + passo 7).
+                    if venda_por_pid.get(pid) is not None and pid not in _vava_motor_af2:
+                        _fallbacks_af2.append(_l["ambiente"])
                     _l["diferenca_valor_contrato"] = _mconc.diferenca_valor_contrato_estimada(
                         diferenca_cfo=_l["diferenca"], markup=markup, valor_venda_pe=venda_por_pid.get(pid),
                         vava_contratado=vava_ct.get(pid, 0.0),
                         vbva_contratado=float(pa_l.budget_total or 0.0) if pa_l else 0.0,
                         fator_ca=fator_ca, desconto_orc_pct=d_orc_pct,
-                        desconto_amb_pct=d_amb_pct.get(pid, 0.0))
+                        desconto_amb_pct=d_amb_pct.get(pid, 0.0),
+                        vava_motor=_vava_motor_af2.get(pid))
                     _l["decisao"] = ({"tipo_decisao": d.tipo_decisao, "valor_aprovado": d.valor_aprovado}
                                      if d is not None else None)
                     # C2 (docs/db/TAREFA_PERCURSO_0209.md): fonte única pra tela decidir qual UI
@@ -2764,6 +2782,9 @@ class Handler(BaseHTTPRequestHandler):
                     _l["precisa_reconhecimento"] = _mconc.precisa_reconhecimento(
                         _l["diferenca_valor_contrato"], _l["diferenca"])
                     fases_por_id[fase_id]["ambientes"].append(_l)
+                if _fallbacks_af2:
+                    print("[F2-42-FALLBACK] projeto=%r ambientes=%r — motor indisponível na prévia "
+                          "da AF2, caiu na proporção (valor_complemento_por_fator)" % (nome, _fallbacks_af2))
 
                 fases_out = []
                 for fase_id, f in fases_por_id.items():
@@ -8055,12 +8076,31 @@ class Handler(BaseHTTPRequestHandler):
                 orc_ct, vava_ct, fator_ca, d_orc_pct, d_amb_pct, _vavo_ct, _cad_ct, _ja_contratado = \
                     _pe_fator_contexto(db, nome)
                 markup = _markup_merc_puro(orc_ct)
+                # F2-42: 3º consumidor de valor_complemento_por_fator movido pro motor — um único
+                # ambiente por chamada aqui, então "uma chamada só" já vale por construção.
+                _vava_motor_1amb = None
+                if orc_ct is not None and arq.valor_venda is not None:
+                    try:
+                        _d_motor_1amb = _negociacao_breakdown(
+                            orc_ct, db, vbva_override={pool_ambiente_id: arq.valor_venda})
+                        _vava_motor_1amb = next(
+                            (float(a.get("VAVA", 0.0)) for a in _d_motor_1amb.get("ambientes", [])
+                             if a.get("id") == pool_ambiente_id), None)
+                        if _vava_motor_1amb is None:
+                            print("[F2-42-FALLBACK] projeto=%r ambiente=%r — motor não devolveu o "
+                                  "ambiente, caiu na proporção" % (nome, pa.nome_exibicao or pa.nome))
+                    except Exception as _e:
+                        print("[F2-41-SOMBRA] motor falhou (decisão AF2/ambiente) — seguindo com "
+                              "fallback:", _e)
+                        print("[F2-42-FALLBACK] projeto=%r ambiente=%r — motor indisponível, caiu "
+                              "na proporção" % (nome, pa.nome_exibicao or pa.nome))
                 dvc = _mconc.diferenca_valor_contrato_estimada(
                     diferenca_cfo=diferenca_cfo, markup=markup, valor_venda_pe=arq.valor_venda,
                     vava_contratado=vava_ct.get(pool_ambiente_id, 0.0),
                     vbva_contratado=float(pa.budget_total or 0.0),
                     fator_ca=fator_ca, desconto_orc_pct=d_orc_pct,
-                    desconto_amb_pct=d_amb_pct.get(pool_ambiente_id, 0.0))
+                    desconto_amb_pct=d_amb_pct.get(pool_ambiente_id, 0.0),
+                    vava_motor=_vava_motor_1amb)
                 tipo_decisao = (req.get("tipo_decisao") or "").strip()
                 valor_aprovado = req.get("valor_aprovado")
                 try:
@@ -17777,22 +17817,30 @@ def _pool_ambiente_dict(pa) -> dict:
 
 
 def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
-    """Correção da Fatia 3 (2026-07-21): diferenças por ambiente MARCADO para complemento —
-        à_vista_complemento_i = venda_XML_complemento_i × (VAVA_contratado_i / VBVA_contratado_i)
-        diferença_i           = à_vista_complemento_i − VAVA_contratado_i
-    O fator é a razão do PRÓPRIO ambiente contratado (à vista ÷ bruto): carrega os descontos do
-    contrato e a carga de custos adicionais EXATAMENTE como negociados naquele ambiente — objetivo
-    do usuário ("ajuste proporcional relativo aos custos adicionais" + "desconto aplicado de forma
-    idêntica"). Propriedade de validação (vale em QUALQUER composição — arq/fid/viagem/brinde;
-    o fator único 1/(1−p) falhava com brinde e Custo Especial): XML idêntico ⇒ diferença ZERO.
-    O Custo Especial fica naturalmente FORA (não está no VAVA por ambiente — coerente com a
-    definição dele: não acompanha ambiente). O percentual único p = Cust_Ad/VAVO segue no resumo
-    como INFORMAÇÃO (exibido no Apoio à negociação); fallback do fator se VBVA contratado = 0.
+    """Diferenças por ambiente MARCADO para complemento.
+
+    F2-42 (docs/db/TAREFA_F2_42_FONTE_UNICA_E_INTERFACE.md, Rodada 2 — decisão do Marcelo:
+    "bater exato, o motor é a fonte única"): o valor OFICIAL (o que é cobrado) vem do MOTOR
+    (`_negociacao_breakdown(orc_ct, db, vbva_override={...})`, `vava_complemento` no retorno de
+    cada linha) — NÃO mais da proporção. Causa medida (não mais hipótese): `mod_negociacao.py:
+    80-81` rateia viagem PROPORCIONAL ao bruto (a proporção reproduz exato — divergência zero) mas
+    BRINDE em partes IGUAIS por ambiente — uma parcela FIXA que a proporção antiga multiplicava
+    junto com a mercadoria, produzindo a divergência inteira sempre que o ambiente muda de valor
+    (Custo Especial não entra no à vista por ambiente — não pode causar divergência por
+    definição). A proporção (Fatia 3, 2026-07-21) virou SOMBRA/fallback, `vava_proporcao` no
+    retorno:
+        vava_proporcao_i = venda_XML_complemento_i × (VAVA_contratado_i / VBVA_contratado_i)
+    Ela carrega o desconto e a carga de custos adicionais como se fossem TODOS proporcionais ao
+    ambiente — verdade pra viagem, falsa pra brinde. `divergencia = vava_proporcao − vava_
+    complemento` continua no resumo, agora do outro lado. Se o motor não puder calcular um
+    ambiente (exceção, ou ambiente não vinculado ao orçamento contratado), a cobrança cai na
+    proporção — sempre com log `[F2-42-FALLBACK]`, nunca em silêncio.
 
     ACHADO-21 (docs/db/TAREFA_ACHADO21.md, 6-b): a diferença é calculada contra o que já foi
     CONTRATADO (contrato + aditivos já assinados, via `_pe_fator_contexto`), não contra o
     contrato sozinho — senão a mesma diferença de uma revisão anterior (já virada aditivo
-    assinado) seria cobrada de novo. O fator à vista/bruto continua vindo só do contrato puro.
+    assinado) seria cobrada de novo. O fator à vista/bruto (`vc`, usado só pela proporção-sombra)
+    continua vindo só do contrato puro.
 
     `excluir_orcamento_id`: quando esta função está sendo chamada para recomputar o breakdown do
     PRÓPRIO orçamento de um aditivo já assinado (main.py:17239, `_negociacao_breakdown` passa
@@ -17811,12 +17859,13 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
               db.query(ArquivoPE).filter_by(projeto_nome=nome_safe, formato="xml_compl").all()}
     marcados = [pa for pa in (db.query(PoolAmbiente).filter_by(projeto_id=nome_safe)
                  .order_by(PoolAmbiente.id.asc()).all()) if pa.renegociar_pe]
-    # F2-41 Rodada 1 (docs/db/TAREFA_F2_41_FONTE_UNICA_COMPLEMENTO.md): SOMBRA — mede o valor que
-    # o MOTOR daria pro mesmo ambiente (vbva_override, mesmo mecanismo da tela "Comparação de
-    # Valores", main.py:2666-2677), ao lado do valor por proporção que já é o que se cobra. Uma
-    # chamada só, com TODAS as substituições de uma vez — nunca dentro do laço de ambientes (já
-    # existe um caso aberto de leitura de razão em laço dentro de `_negociacao_breakdown`; não
-    # criar um segundo). NÃO muda `diferenca`/o que é cobrado — só mede, ao lado.
+    # F2-42 (docs/db/TAREFA_F2_42_FONTE_UNICA_E_INTERFACE.md): a causa da divergência medida na
+    # Rodada 1 deixou de ser hipótese — mod_negociacao.py:80-81 rateia VIAGEM proporcional ao
+    # bruto (a proporção reproduz exato) mas BRINDE em partes IGUAIS por ambiente (uma parcela
+    # FIXA que a proporção multiplica junto com a mercadoria — é a divergência inteira quando o
+    # ambiente muda de valor). Decisão do Marcelo: o MOTOR é a fonte OFICIAL — `vava_motor` (já
+    # calculado aqui desde a Rodada 1, uma chamada só, todas as substituições de uma vez) vira o
+    # valor que É COBRADO; a proporção (`vava_proporcao`) vira a sombra/fallback.
     _sombra_override = {pa.id: compls[pa.id].valor_venda for pa in marcados
                         if compls.get(pa.id) is not None and compls[pa.id].valor_venda is not None}
     _vava_motor_por_id = {}
@@ -17826,9 +17875,10 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
             _vava_motor_por_id = {a.get("id"): float(a.get("VAVA", 0.0))
                                   for a in _d_motor.get("ambientes", [])}
         except Exception as _e:
-            print("[F2-41-SOMBRA] motor falhou (ambiente) — seguindo sem sombra:", _e)
+            print("[F2-41-SOMBRA] motor falhou (ambiente) — seguindo com fallback:", _e)
             _vava_motor_por_id = {}
     linhas = []
+    _fallbacks = []
     for pa in marcados:
         nome_amb = pa.nome_exibicao or pa.nome
         vc = round(vava_ct.get(pa.id, 0.0), 2)                # PURO do contrato — fator à vista/bruto
@@ -17836,24 +17886,35 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
         vbva_c = float(pa.budget_total or 0.0)
         a = compls.get(pa.id)
         carregado = a is not None and a.valor_venda is not None
-        va_compl = dif = cfo_dif = 0.0
-        vava_motor = divergencia = None
+        va_proporcao = dif = cfo_dif = 0.0
+        va_oficial = divergencia = None
         if carregado:
             if vbva_c > 0 and vc > 0:
-                va_compl = round(float(a.valor_venda) * (vc / vbva_c), 2)
+                va_proporcao = round(float(a.valor_venda) * (vc / vbva_c), 2)
             else:   # fallback (ambiente contratado sem valor): fator único aproximado
-                va_compl = round(float(a.valor_venda) * (1 - d_orc_ct)
-                                 * (1 - d_amb_ct.get(pa.id, 0.0)) * fator_ca, 2)
-            dif = round(va_compl - vc_base, 2)
+                va_proporcao = round(float(a.valor_venda) * (1 - d_orc_ct)
+                                     * (1 - d_amb_ct.get(pa.id, 0.0)) * fator_ca, 2)
             cfo_dif = round(float(a.valor_atualizado or 0.0) - float(pa.order_total or 0.0), 2)
             if pa.id in _vava_motor_por_id:
-                vava_motor = round(_vava_motor_por_id[pa.id], 2)
-                divergencia = round(vava_motor - va_compl, 2)
+                va_oficial = round(_vava_motor_por_id[pa.id], 2)
+                divergencia = round(va_proporcao - va_oficial, 2)
+            else:
+                # F2-42: motor não pôde calcular ESTE ambiente (falhou por inteiro, ou o
+                # ambiente não está de fato vinculado ao orçamento contratado) — cai na
+                # proporção, mas OBSERVÁVEL, nunca em silêncio (ver log abaixo).
+                va_oficial = va_proporcao
+                divergencia = 0.0
+                _fallbacks.append(nome_amb)
+            dif = round(va_oficial - vc_base, 2)
         linhas.append({"pool_ambiente_id": pa.id, "ambiente": nome_amb,
-                       "vava_contratado": vc_base, "vava_complemento": va_compl,
+                       "vava_contratado": vc_base, "vava_complemento": va_oficial,
+                       "vava_proporcao": va_proporcao,
                        "diferenca": dif, "cfo_diferenca": cfo_dif,
                        "compl_carregado": carregado,
-                       "vava_motor": vava_motor, "divergencia": divergencia})
+                       "divergencia": divergencia})
+    if _fallbacks:
+        print("[F2-42-FALLBACK] projeto=%r ambientes=%r — motor indisponível, cobrança caiu na "
+              "proporção (valor_complemento_por_fator)" % (nome_safe, _fallbacks))
     carregadas = [l for l in linhas if l["compl_carregado"]]
     _divs = [l["divergencia"] for l in carregadas if l["divergencia"] is not None]
     resumo = {
@@ -17867,12 +17928,12 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
         "divergencia_total": round(sum(_divs), 2) if _divs else 0.0,
         "divergencia_maxima_abs": round(max(abs(d) for d in _divs), 2) if _divs else 0.0,
     }
-    if _divs:
+    if any(abs(d) > 0.005 for d in _divs):
         print("[F2-41-SOMBRA] projeto=%r ambientes=%r divergencia_total=%.2f divergencia_maxima_abs=%.2f"
               % (nome_safe,
                  [{"ambiente": l["ambiente"], "vava_complemento": l["vava_complemento"],
-                   "vava_motor": l["vava_motor"], "divergencia": l["divergencia"]}
-                  for l in carregadas if l["divergencia"] is not None],
+                   "vava_proporcao": l["vava_proporcao"], "divergencia": l["divergencia"]}
+                  for l in carregadas if l["divergencia"] is not None and abs(l["divergencia"]) > 0.005],
                  resumo["divergencia_total"], resumo["divergencia_maxima_abs"]))
     return linhas, resumo
 
@@ -17973,6 +18034,19 @@ def _pe_ambientes_pendentes_decisao(db, nome_safe):
     orc_ct, vava_ct, fator_ca, d_orc_pct, d_amb_pct, _vavo_ct, _cad_ct, _ja_contratado = \
         _pe_fator_contexto(db, nome_safe)
     markup = _markup_merc_puro(orc_ct)
+    # F2-42: 3º consumidor de valor_complemento_por_fator movido pro motor — uma chamada só,
+    # todas as substituições de venda PE de uma vez, fora do laço abaixo.
+    _sombra_override_pend = {pid: v for pid, v in venda_por_pid.items() if v is not None}
+    _vava_motor_pend = {}
+    if orc_ct is not None and _sombra_override_pend:
+        try:
+            _d_motor_pend = _negociacao_breakdown(orc_ct, db, vbva_override=_sombra_override_pend)
+            _vava_motor_pend = {a.get("id"): float(a.get("VAVA", 0.0))
+                                for a in _d_motor_pend.get("ambientes", [])}
+        except Exception as _e:
+            print("[F2-41-SOMBRA] motor falhou (pendências AF2) — seguindo com fallback:", _e)
+            _vava_motor_pend = {}
+    _fallbacks_pend = []
     pendentes = set()
     for _l in linhas:
         if not _l["pe_carregado"]:
@@ -17981,14 +18055,20 @@ def _pe_ambientes_pendentes_decisao(db, nome_safe):
         if pid is None:
             continue
         pa_l = pa_por_id.get(pid)
+        if venda_por_pid.get(pid) is not None and pid not in _vava_motor_pend:
+            _fallbacks_pend.append(_l["ambiente"])
         dvc = _mconc.diferenca_valor_contrato_estimada(
             diferenca_cfo=_l["diferenca"], markup=markup, valor_venda_pe=venda_por_pid.get(pid),
             vava_contratado=vava_ct.get(pid, 0.0),
             vbva_contratado=float(pa_l.budget_total or 0.0) if pa_l else 0.0,
             fator_ca=fator_ca, desconto_orc_pct=d_orc_pct,
-            desconto_amb_pct=d_amb_pct.get(pid, 0.0))
+            desconto_amb_pct=d_amb_pct.get(pid, 0.0),
+            vava_motor=_vava_motor_pend.get(pid))
         if _mconc.decisao_e_necessaria(dvc, _l["diferenca"]):
             pendentes.add(pid)
+    if _fallbacks_pend:
+        print("[F2-42-FALLBACK] projeto=%r ambientes=%r — motor indisponível nas pendências da "
+              "AF2, caiu na proporção" % (nome_safe, _fallbacks_pend))
     return pendentes
 
 
@@ -17997,9 +18077,12 @@ def _complemento_diferencas_fase(db, nome_safe, parcela_id, excluir_orcamento_id
     ambiente entra pela decisão 'cobrar' registrada em `ConciliacaoPeFase` (AF2/11d), não mais
     pela flag manual `renegociar_pe` da 11c; o valor de venda vem DIRETO do XML de PE
     (`ArquivoPE.formato='xml_pe'`), sem exigir o 3º upload `xml_compl` que o mecanismo legado
-    pedia. Mesma fórmula (fator proporcional VAVA/VBVA do ambiente contratado), agora em
-    `mod_conciliacao_pe.valor_complemento_por_fator`. `parcela_id=None` = projeto não
-    desmembrado (fase única implícita).
+    pedia. `parcela_id=None` = projeto não desmembrado (fase única implícita).
+
+    F2-42 (Rodada 2, ver docstring de `_complemento_diferencas`): o valor OFICIAL vem do MOTOR
+    (`vava_complemento`); `valor_complemento_por_fator` (`mod_conciliacao_pe`) virou sombra/
+    fallback (`vava_proporcao`), com `divergencia = vava_proporcao − vava_complemento` no resumo,
+    e fallback observável (`[F2-42-FALLBACK]`) quando o motor não puder calcular um ambiente.
 
     ACHADO-21 (docs/db/TAREFA_ACHADO21.md, 6-b): a diferença é calculada contra o que já foi
     CONTRATADO (contrato + aditivos já assinados, via `_pe_fator_contexto`), não contra o
@@ -18025,8 +18108,8 @@ def _complemento_diferencas_fase(db, nome_safe, parcela_id, excluir_orcamento_id
         if pa is None or arq is None or arq.valor_venda is None:
             continue
         validas.append((d, pa, arq))
-    # F2-41 Rodada 1 (sombra) — mesma disciplina de `_complemento_diferencas`: uma chamada só do
-    # motor, com todas as substituições de venda PE de uma vez, fora do laço de ambientes.
+    # F2-42 — mesma disciplina de `_complemento_diferencas`: uma chamada só do motor, com todas
+    # as substituições de venda PE de uma vez, fora do laço de ambientes.
     _sombra_override = {pa.id: arq.valor_venda for _, pa, arq in validas}
     _vava_motor_por_id = {}
     if _sombra_override:
@@ -18035,27 +18118,35 @@ def _complemento_diferencas_fase(db, nome_safe, parcela_id, excluir_orcamento_id
             _vava_motor_por_id = {a.get("id"): float(a.get("VAVA", 0.0))
                                   for a in _d_motor.get("ambientes", [])}
         except Exception as _e:
-            print("[F2-41-SOMBRA] motor falhou (fase) — seguindo sem sombra:", _e)
+            print("[F2-41-SOMBRA] motor falhou (fase) — seguindo com fallback:", _e)
             _vava_motor_por_id = {}
     linhas = []
+    _fallbacks = []
     for d, pa, arq in validas:
         nome_amb = pa.nome_exibicao or pa.nome
         vc = round(vava_ct.get(pa.id, 0.0), 2)                # PURO do contrato — fator à vista/bruto
         vc_base = round(ja_contratado.get(pa.id, vc), 2)      # contrato + aditivos assinados
         vbva_c = float(pa.budget_total or 0.0)
-        va_compl = _mconc.valor_complemento_por_fator(
+        va_proporcao = _mconc.valor_complemento_por_fator(
             valor_venda_pe=arq.valor_venda, vava_contratado=vc, vbva_contratado=vbva_c,
             fator_ca=fator_ca, desconto_orc_pct=d_orc_pct,
             desconto_amb_pct=d_amb_pct.get(pa.id, 0.0))
-        vava_motor = divergencia = None
         if pa.id in _vava_motor_por_id:
-            vava_motor = round(_vava_motor_por_id[pa.id], 2)
-            divergencia = round(vava_motor - va_compl, 2)
+            va_oficial = round(_vava_motor_por_id[pa.id], 2)
+            divergencia = round(va_proporcao - va_oficial, 2)
+        else:
+            va_oficial = va_proporcao
+            divergencia = 0.0
+            _fallbacks.append(nome_amb)
         linhas.append({"pool_ambiente_id": pa.id, "ambiente": nome_amb,
-                       "vava_contratado": vc_base, "vava_complemento": va_compl,
-                       "diferenca": round(va_compl - vc_base, 2),
+                       "vava_contratado": vc_base, "vava_complemento": va_oficial,
+                       "vava_proporcao": va_proporcao,
+                       "diferenca": round(va_oficial - vc_base, 2),
                        "cfo_diferenca": d.diferenca_cfo, "compl_carregado": True,
-                       "vava_motor": vava_motor, "divergencia": divergencia})
+                       "divergencia": divergencia})
+    if _fallbacks:
+        print("[F2-42-FALLBACK] projeto=%r fase=%r ambientes=%r — motor indisponível, cobrança "
+              "caiu na proporção (valor_complemento_por_fator)" % (nome_safe, parcela_id, _fallbacks))
     _divs = [l["divergencia"] for l in linhas if l["divergencia"] is not None]
     resumo = {
         "pct_custos_adicionais": round((cad_ct / vavo_ct * 100.0) if vavo_ct else 0.0, 4),
@@ -18068,12 +18159,12 @@ def _complemento_diferencas_fase(db, nome_safe, parcela_id, excluir_orcamento_id
         "divergencia_total": round(sum(_divs), 2) if _divs else 0.0,
         "divergencia_maxima_abs": round(max(abs(d) for d in _divs), 2) if _divs else 0.0,
     }
-    if _divs:
+    if any(abs(d) > 0.005 for d in _divs):
         print("[F2-41-SOMBRA] projeto=%r fase=%r ambientes=%r divergencia_total=%.2f divergencia_maxima_abs=%.2f"
               % (nome_safe, parcela_id,
                  [{"ambiente": l["ambiente"], "vava_complemento": l["vava_complemento"],
-                   "vava_motor": l["vava_motor"], "divergencia": l["divergencia"]}
-                  for l in linhas if l["divergencia"] is not None],
+                   "vava_proporcao": l["vava_proporcao"], "divergencia": l["divergencia"]}
+                  for l in linhas if abs(l["divergencia"]) > 0.005],
                  resumo["divergencia_total"], resumo["divergencia_maxima_abs"]))
     return linhas, resumo
 

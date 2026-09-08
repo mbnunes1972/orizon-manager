@@ -531,9 +531,21 @@ def test_propriedade_zero_com_composicao_completa(http_client_factory, seed, app
     for l in minhas:
         assert abs(l["diferenca"]) < 0.02, l    # zero por construção, em qualquer composição
 
-    # crescimento de 10% num ambiente → diferença = 10% do à vista contratado DAQUELE ambiente
+    # F2-42 (Rodada 2): "diferença = 10% do à vista contratado" só valia sob a PROPORÇÃO (que
+    # multiplica o brinde — parcela FIXA — junto com a mercadoria). Com o motor como fonte
+    # oficial, o brinde NÃO cresce 10% junto — cresce só a parte proporcional (k·VBVA). A
+    # verdade-terreno agora é o que o PRÓPRIO motor calcula com o mesmo vbva_override que
+    # `_complemento_diferencas` usa — não mais uma fórmula fechada de "10% do contratado".
+    import main as _main
     pid0, b0, o0 = pas[0]
     _upsert_compl(app_db, nome, pid0, venda=b0 * 1.10, cfo=o0)
     st, body = c.get(f"/api/projetos/{nome}/pe/complemento/comparativo")
     l = [x for x in body["linhas"] if x["pool_ambiente_id"] == pid0][0]
-    assert abs(l["diferenca"] - 0.10 * l["vava_contratado"]) < 0.05, l
+    db = app_db.get_session()
+    orc_ct = db.get(app_db.Orcamento, oid)
+    d_motor = _main._negociacao_breakdown(orc_ct, db, vbva_override={pid0: b0 * 1.10})
+    vava_motor_pid0 = next(a["VAVA"] for a in d_motor["ambientes"] if a["id"] == pid0)
+    db.close()
+    assert abs(l["diferenca"] - (vava_motor_pid0 - l["vava_contratado"])) < 0.02, (
+        "diferenca tem que bater com o que o PRÓPRIO motor calcula pro ambiente crescido — %r "
+        "(motor: %.2f)" % (l, vava_motor_pid0))

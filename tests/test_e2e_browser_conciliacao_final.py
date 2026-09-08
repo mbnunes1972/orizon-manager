@@ -324,13 +324,11 @@ def test_fluxo_terminal_conciliacao_final_pela_fila(page, servidor_e2e):
     page.click("#btn-salvar-orcamento")   # plano à vista/entrada 0 (default de um complemento recém-criado)
     page.wait_for_selector("text=Orçamento salvo", timeout=10000)
 
-    # peComplModalDefinirPagamento() já fechou o Ciclo de propósito (mesmo padrão da antiga
-    # peComplementoNegociar()) — #btn-abrir-ciclo é o certo aqui, painel FECHADO de verdade.
-    page.click("#btn-abrir-ciclo")
+    # F2-42 C4: Salvar no complemento agora devolve sozinho pra 11e (abrirCiclo+_fichaSelecionar) —
+    # antes disso, peComplModalDefinirPagamento() só fechava o Ciclo de propósito e o usuário
+    # tinha que reabrir manualmente (#btn-abrir-ciclo + navegar de novo até a 11e); "Salvar sem
+    # ação aparente" era exatamente essa lacuna. Painel e ficha já chegam prontos aqui.
     ciclo.wait_for(state="visible", timeout=10000)
-    ciclo.locator(".ficha-tab", has_text="Projeto executivo").first.click()
-    page.wait_for_timeout(500)
-    page.click("text=Aprovação do PE pelo cliente")
     page.wait_for_selector('button:has-text("Negociar Complemento")', timeout=10000)
     page.click('button:has-text("Negociar Complemento")')   # reabre — forma de pagamento já salva
     modal.wait_for(state="visible", timeout=10000)

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """E2E de NAVEGADOR (Playwright) — F2-40 Fatia 2 (docs/db/ROTEIRO.md): o modal "Negociar
-Complemento" virou a tela cheia do mockup — Desc.% por ambiente, coluna "A cobrar", totais no
-rodapé (Diferença bruta/Desconto/Complemento), SEM campo de desconto global (o motor já neutraliza
+Complemento" virou a tela cheia do mockup — Desc.% por ambiente, coluna "A cobrar", rodapé com
+"Diferença" (F2-42 C3: uma linha só, o valor a cobrar — ver comentário abaixo), SEM campo de
+desconto global (o motor já neutraliza
 d_orc pra orçamento de complemento). A faixa de pagamento NÃO foi duplicada dentro do modal — o
 "Gerar Termo Aditivo" fica travado até `forma_pagamento` existir, com um caminho explícito
 ("Definir forma de pagamento") que ativa o mesmo orçamento na tela real (página 2, sidebar já
@@ -174,16 +175,22 @@ def test_modal_complemento_desc_pct_totais_e_travamento_por_pagamento(page, serv
     linha_real = corpo.locator("tr", has_text="e2e_a58_ambiente")
     input_desc = linha_real.locator('input[type="number"]')
     assert input_desc.count() == 1, "linha com diferença real tem que ter o input de Desc.%"
-    assert "Diferença bruta" in corpo.inner_text() and "Complemento" in corpo.inner_text()
+    # F2-42 C3: rodapé é UMA linha só ("Diferença", ou "Diferença (com desconto)" quando algum
+    # ambiente tem Desc.% != 0) — sem "Desconto" separado, sem repetir o valor em "Complemento".
+    assert "Diferença" in corpo.inner_text()
+    assert "Desconto:" not in corpo.inner_text()
 
-    # ── Muda Desc.% pra 10 — "A cobrar" da linha e o total "Complemento" têm que recalcular ────
+    # ── Muda Desc.% pra 10 — "A cobrar" da linha e o total no rodapé têm que recalcular ─────────
     input_desc.fill("10")
     input_desc.dispatch_event("change")
     page.wait_for_timeout(300)
     # diferença real: 154.000 − 140.000 = 14.000 (fator 1, sem custo adicional configurado);
     # 10% de desconto ⇒ A cobrar = 12.600,00
     assert "12.600,00" in corpo.inner_text(), (
-        "A cobrar/Complemento tem que refletir os 10% de desconto sobre a diferença — texto atual:\n"
+        "A cobrar/rodapé tem que refletir os 10% de desconto sobre a diferença — texto atual:\n"
+        + corpo.inner_text())
+    assert "Diferença (com desconto)" in corpo.inner_text(), (
+        "com desconto por ambiente != 0, o rodapé tem que avisar 'com desconto' — texto atual:\n"
         + corpo.inner_text())
 
     # ── "Gerar Termo Aditivo" travado: sem forma_pagamento ainda ──────────────────────────────
@@ -206,6 +213,13 @@ def test_modal_complemento_desc_pct_totais_e_travamento_por_pagamento(page, serv
     # nenhum cálculo novo, é o mesmo botão/rota que qualquer orçamento usa.
     page.click("#btn-salvar-orcamento")
     page.wait_for_selector("text=Orçamento salvo", timeout=10000)
+
+    # F2-42 C4: Salvar no complemento agora devolve sozinho pra 11e (abrirCiclo+_fichaSelecionar) —
+    # a prova disso é o teste dedicado (test_f2_42_c4_...); aqui o interesse é o toggle Salvar/
+    # Aprovar abaixo, que vive na tela REAL de negociação (#page-02) — fecha o ciclo pra vê-la de
+    # novo, senão fica escondida atrás do overlay (regra .ciclo-on) e o teste não veria nada.
+    page.evaluate("() => { fecharCiclo(); }")
+    page.wait_for_timeout(200)
 
     # ── Achado ao ligar este handoff (F2-40): atualizarBotoesAprovacao() escondia Salvar pra
     # QUALQUER orçamento pós-assinatura sem checar _orcamentoComplementoAtivo() — só
@@ -275,5 +289,79 @@ def test_modal_complemento_desc_pct_totais_e_travamento_por_pagamento(page, serv
         assert abs(por_amb[pid_real]["diferenca"] - 12600.0) < 0.05, por_amb[pid_real]
     finally:
         db_final.bind.dispose(); db_final.close()
+
+    assert page_errs == [], "erro de JS durante o percurso: %r" % page_errs
+
+
+def test_f2_42_c4_salvar_volta_pra_11e_e_c5_botao_pagamento_nao_desaparece(page, servidor_e2e):
+    """F2-42 C4/C5. C4: Salvar (#btn-salvar-orcamento) no complemento, na tela real de negociação,
+    tinha "ação sem efeito aparente" — sem devolver o usuário à 11e (de onde o Termo Aditivo é
+    gerado), o usuário não sabia se salvou. C5: a hipótese do Marcelo pro botão "Definir forma de
+    pagamento" que "some depois do primeiro uso" era uma trava invertida — MEDIDO (ver
+    docs/db/CADERNO_DE_BORDO.md, entrada F2-42): não existe trava nenhuma na renderização do
+    botão, só um toggle de rótulo (Definir/Alterar) sobre `formaPagamento`; o defeito real medido
+    era o C2 (JSON cru de 6 linhas empurrando o botão pra baixo/fora da vista) — já corrigido nesta
+    rodada. Este teste prova que, corrigido o C2, reabrir o modal depois de definir o pagamento
+    SEMPRE mostra um botão de troca visível e clicável — nunca "some"."""
+    base = servidor_e2e
+    page_errs = []
+    page.on("pageerror", lambda exc: page_errs.append(str(exc)))
+
+    nome = _criar_projeto_e_assinar_contrato(page, base, "E2E F2-42 C4C5")
+    _marcar_concluidas(nome, ["8", "9", "10", "11", "11a", "11b", "11c", "11d"])
+    _seed_segundo_ambiente_e_complementos(nome)
+
+    page.evaluate("async () => { await carregarCiclo(); }")
+    page.evaluate("() => { _fichaSelecionar('11e'); }")
+    page.wait_for_selector('button:has-text("Negociar Complemento")', timeout=10000)
+    page.click('button:has-text("Negociar Complemento")')
+
+    modal = page.locator("#modal-pe-compl")
+    modal.wait_for(state="visible", timeout=10000)
+    corpo = page.locator("#pe-compl-modal-body")
+    corpo.locator('button:has-text("Gerar Termo Aditivo")').wait_for(state="visible", timeout=10000)
+
+    # Sem plano ainda: o botão de DEFINIR está visível — ponto de partida do "primeiro uso".
+    assert corpo.locator('button:has-text("Definir forma de pagamento")').is_visible()
+    assert "JSON cru" not in corpo.inner_text()   # sem dump: C2 continua corrigido nesta rota
+
+    orc_id_esperado = _orcamento_complemento_id(nome)
+    assert orc_id_esperado is not None
+    corpo.locator('button:has-text("Definir forma de pagamento")').click()
+    page.wait_for_selector("#neg-desconto", timeout=10000)
+    page.wait_for_timeout(500)
+    assert page.evaluate("() => _orcamentoAtivoId") == orc_id_esperado
+
+    # ── C4: Salvar tem que devolver, sozinho, pra 11e (sem chamada manual a abrirCiclo/_fichaSelecionar) ──
+    ciclo = page.locator("#ciclo-panel")
+    assert ciclo.is_hidden(), "pré-condição: ciclo fechado antes de salvar (handoff fechou ao sair)"
+    page.click("#btn-salvar-orcamento")
+    page.wait_for_selector("text=Orçamento salvo", timeout=10000)
+    ciclo.wait_for(state="visible", timeout=10000)
+    assert page.evaluate("() => _cicloEtapaAtiva") == "11e", (
+        "Salvar no complemento tem que devolver à 11e sozinho — ficha ativa: %r"
+        % page.evaluate("() => _cicloEtapaAtiva"))
+
+    # ── C5: reabre o modal (o ciclo já está na 11e, como o C4 deixou) — o controle de troca da
+    # forma de pagamento tem que estar VISÍVEL e CLICÁVEL, nunca ausente. ────────────────────────
+    page.wait_for_selector('button:has-text("Negociar Complemento")', timeout=10000)
+    page.click('button:has-text("Negociar Complemento")')
+    modal.wait_for(state="visible", timeout=10000)
+    corpo.locator('button:has-text("Gerar Termo Aditivo"):not([disabled])').wait_for(
+        state="visible", timeout=10000)
+
+    btn_troca = corpo.locator('button:has-text("Alterar")')
+    assert btn_troca.count() == 1, (
+        "depois do 1º uso, o controle de troca da forma de pagamento sumiu do modal — "
+        "corpo atual:\n" + corpo.inner_text())
+    assert btn_troca.is_visible() and btn_troca.is_enabled()
+    assert corpo.locator('button:has-text("Definir forma de pagamento")').count() == 0, (
+        "com plano já definido, não pode sobrar o botão de PRIMEIRO uso — só o de troca (Alterar)")
+
+    # Clica "Alterar" de novo: o mesmo caminho de handoff segue funcional, não é um beco sem saída.
+    btn_troca.click()
+    page.wait_for_selector("#neg-desconto", timeout=10000)
+    page.wait_for_timeout(300)
+    assert page.evaluate("() => _orcamentoAtivoId") == orc_id_esperado
 
     assert page_errs == [], "erro de JS durante o percurso: %r" % page_errs
