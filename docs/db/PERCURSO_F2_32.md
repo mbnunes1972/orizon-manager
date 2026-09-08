@@ -114,3 +114,78 @@ do campo com Tab.
   precisar de recalibração.
 - **Orçamentos em aberto mudam de número** no próximo save. Contratos assinados
   não mudam (usam o VAVO gravado na assinatura).
+
+---
+
+# Percurso da leva de 07/09 — F2-37 a F2-40
+
+Escrito em 07/09. **Atenção: são QUATRO pacotes numa tag só.** A última implantada é a
+`v2026.09.06-beta2`, que contém até o F2-36; F2-37, F2-38, F2-39 e F2-40 sobem juntos. Percorra
+os quatro blocos, mesmo que só o último pareça novo — é a primeira vez que os três do meio veem
+uma tela de verdade.
+
+> Regra do percurso, de novo: quando um passo falhar, **pare ali** e anote o número que apareceu
+> ao lado do esperado.
+
+## A — Item Especial na tela (F2-37)
+
+1. Na negociação, botão **Item Especial** ao lado de "Novo Ambiente". Lançar um valor.
+2. Esperado: linha na tabela de ambientes, **Desc. % fixo em 0 e não editável**, à vista pelo
+   valor cheio, e "Com financiamento" pelo mesmo fator das outras linhas.
+3. O rodapé da tabela **não pode somar duas vezes** — o total à vista tem que continuar igual ao
+   Valor à Vista do cabeçalho.
+4. Zerar o item pela caixa: a linha some. **Apagar o campo** (deixar vazio) e salvar: mesma coisa.
+   Era isso que estava quebrado antes do F2-37, então vale testar os dois jeitos.
+5. A caixa de edição mostra **R$ formatado** enquanto se digita.
+
+## B — Item Especial fora das bases (F2-38)
+
+Este é o bloco dos números; vale abrir o painel de provisões antes e depois.
+
+6. Com um Item Especial lançado, conferir no painel da AF:
+   - **comissões** (administrativa, venda, medidor, projeto) **não mudam** com o item;
+   - **montagem, garantia, assistência, frete local, insumos** **não mudam**;
+   - **imposto muda** — é a única coisa que o item alcança;
+   - a **margem em reais** cai exatamente o valor do imposto do item, e nada além.
+7. Se o item for grande, conferir que a **faixa de comissão de venda não sobe** por causa dele.
+
+## C — Painel da AF (F2-39)
+
+8. Todos os campos do painel agora têm **formato monetário**. Digitar 4000 → "R$ 4.000,00";
+   aprovar → o valor gravado é 4000,00. Testar também 12345,67, para o ponto de milhar não virar
+   separador decimal.
+9. **Item Especial aparece como linha** no painel, não editável, com a coluna **"Atual"** mostrando
+   o saldo de 2.1.04.22.
+10. **Outros Fornecedores voltou a aceitar redução.** Sequência: subir de 0 para 3.000, baixar
+    para 1.000, zerar. A cada passo, `2.1.04.06 + 2.1.04.14` tem que continuar igual ao CFO
+    congelado. Valor negativo continua recusado.
+11. O Item Especial **não se move** em nenhum desses passos.
+
+## D — Complemento (F2-40)
+
+12. Na **Aprovação do Projeto Executivo (11e)**, botão **Gerar Complemento** no cabeçalho do card
+    — e **não** mais no bloco de upload de XML.
+13. O modal abre com a tabela contrato × complemento × diferença, coluna de **desconto por
+    ambiente** e os totais. Ambiente sem diferença: campo desabilitado, "—" em A cobrar.
+14. **Não existe campo de desconto global** — se aparecer um, é defeito: o motor o neutraliza.
+15. Desconto acima do limite do perfil: pede autorização, pela trava que já existe.
+16. **Condição de pagamento**: escolher e conferir que o Termo Aditivo sai com ela. Se o aditivo
+    sair à vista sem ninguém ter escolhido, é o defeito que o pacote mandou evitar.
+17. **Gerar Termo Aditivo** → aditivo criado sobre o complemento certo.
+
+## E — Aprovação financeira fora da vista (F2-40 Fatia 3)
+
+18. Entrar com um perfil **sem** `pode_aprovar_financeiro` (um consultor) e percorrer o ciclo:
+    as etapas **8 e 11d não aparecem** — nem aba, nem card, nem aviso de restrição.
+19. A navegação do ciclo continua funcionando de ponta a ponta, e as etapas seguintes continuam
+    esperando corretamente a aprovação de quem pode.
+
+## F — Exploratório, se sobrar fôlego: o caminho "Cobrar" da AF2
+
+[ABERTO 07/09] Medido: existem **zero** complementos por fase em Homologação. O mecanismo tem
+rota, dimensão própria no Termo Aditivo e mensagem de sucesso — e nunca produziu uma linha.
+
+20. Na AF2 (11d), com divergência de PE, clicar **Cobrar** e gerar o complemento da fase.
+21. Conferir que a mensagem aponta o **nome do orçamento** e que ele aparece no seletor de
+    orçamentos, negociável como qualquer outro.
+22. Anotar o que quebrar. É a primeira vez que esse caminho é percorrido desde 14/08.

@@ -317,6 +317,19 @@ markup diluindo a base. A queda é o sinal correto: vender item especial não me
 comprada. Atenção: esse NÃO é o fator da conciliação de PE, que converte diferença de custo de
 FÁBRICA em valor de contrato e usa `Val_Liq / CFO` (`_markup_merc_puro`).
 
+**Fora das bases das outras rubricas** [DECIDIDO 07/09, F2-38]. Nove rubricas do painel são
+percentuais de `Val_Liq` (comissões administrativa, de venda, de medidor e de projeto/executivo)
+ou de `VAVO` (frete local, assistência, insumos, montagem, garantia). O Item Especial **não entra
+em nenhuma delas** — e a faixa da comissão de venda também é resolvida sem ele, senão um item
+grande empurraria o vendedor para uma faixa superior sobre a venda inteira. Mercadoria repassada
+a custo, sem margem, não remunera comissão nem gera montagem ou garantia de móvel.
+
+**A única exceção é o imposto:** ele sai na nota, então é devido de verdade e permanece no
+`Prov_Imp`. Medido num item de 5.000 (comissões 6%, provisões operacionais 7,5%, carga 8%): o
+`Cust_Var` sobe **5.400,00** — o item mais o imposto dele — e a margem em reais cai exatamente
+**400,00**. Antes da correção subia 6.075,00 e a margem caía 1.075,00, com 675,00 de comissão e
+provisão que não tinham o que remunerar.
+
 **Vendido pelo custo:** se a loja conseguir comprar por menos, a economia não vira margem na
 venda — aparece como sobra de provisão e volta como Receita de Conciliação, pelo caminho que já
 existe. Mesma doutrina da seção seguinte: a provisão é o valor cheio.
@@ -339,9 +352,17 @@ migração de 3.000 derrubava a margem de contribuição de 42,00% para 40,50% s
 mudado. A separação resolveu: `out_forn` saiu de `_RUBRICAS` e o `item_especial` ocupou o lugar
 do custo que de fato é novo. `Cust_Var = CFO + Item Especial + demais rubricas`.
 
-**Redução bloqueada** (ACHADO-62): baixar o valor na AF é recusado, com a gravação inteira
-negada e a coluna da revisão intacta. Devolver ao Custo de Fábrica significaria aumentar a
-previsão da fábrica, que não é coerente com a operação.
+**Redução permitida, capada pelo que ainda não foi reconhecido** (ACHADO-62, revertido em
+07/09). O gerente financeiro pode reduzir Outros Fornecedores, até zerar — o custo volta para a
+fábrica, e a invariante `saldo(2.1.04.06) + saldo(2.1.04.14) = CFO congelado` se mantém. Negativo
+é recusado.
+
+O limite é o **saldo ainda em aberto**: a parcela já reconhecida na NF-e virou custo na
+competência da entrega, e desfazê-la não é reclassificação — é reversão de despesa, cujo lugar é
+a conciliação. Pedir mais que o saldo aberto é recusado, com o máximo possível na mensagem. Como
+as duas Aprovações Financeiras acontecem ANTES da emissão, isso não deveria ocorrer; a trava
+existe para o caminho excepcional da AF reaberta em revisão, que é justamente onde ninguém
+olharia.
 
 ### [ABERTO] Imposto
 

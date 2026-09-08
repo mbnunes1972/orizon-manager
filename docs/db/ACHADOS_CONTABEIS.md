@@ -4894,7 +4894,36 @@ contábil/AF/contrato (553 testes) verde, exceto o flake já documentado
 
 ---
 
-## ACHADO-62 — a redução de Outros Fornecedores na AF é silenciosa · DECIDIDO 06/09/2026 (bloquear)
+## ACHADO-62 — a redução de Outros Fornecedores na AF é silenciosa · RESOLVIDO 07/09/2026 (F2-39)
+
+> **A decisão virou duas vezes, e as duas estavam certas no desenho vigente. Leia nesta ordem.**
+>
+> **06/09 — bloquear.** Motivo do Marcelo: devolver valor ao Custo de Fábrica aumentaria a
+> previsão da fábrica, incoerente com a operação. Correto NAQUELE desenho, em que `out_forn`
+> carregava duas naturezas — mercadoria a mais (vinda da venda) e substituição do CFO.
+>
+> **07/09 — permitir, capado.** Depois do F2-36, a natureza aditiva saiu para o Item Especial e
+> `out_forn` ficou sendo SÓ substituição: uma fatia recortada do CFO congelado. Devolvê-la é
+> desfazer o recorte, e a invariante `saldo(2.1.04.06) + saldo(2.1.04.14) = CFO congelado` passa
+> a valer. Reclassificação bidirecional, negativo recusado. Não foi erro de julgamento revertido:
+> foi a resposta certa a uma ambiguidade que deixou de existir.
+>
+> **O teto** [DECIDIDO 07/09, medido pelo Claude Code e não inventado]: a redução alcança só o
+> saldo AINDA EM ABERTO. `reclassificar_provisao` move o passivo inteiro mas espelha o ativo
+> diferido só na parte não baixada na NF-e — num cenário de teste sobraram 1.000 de diferença.
+> A parcela já reconhecida virou custo na competência da entrega; desfazê-la é reversão de
+> despesa, e o lugar dela é a conciliação. Pedir mais que o saldo aberto é recusado, com o máximo
+> possível na mensagem.
+>
+> **Por que a trava importa mesmo sendo caminho impossível** (Marcelo, 07/09): as duas Aprovações
+> Financeiras acontecem ANTES da emissão, então isso não deveria ocorrer. É exatamente por isso
+> que precisa de trava — o defeito que só aparece na AF reaberta em revisão é o que ninguém
+> encontraria a tempo.
+>
+> Testes que fixavam a recusa foram reescritos, não apagados: `test_achado62_recusa_reducao_
+> out_forn.py`, `test_e2e_browser_achado62_recusa_reducao.py` e — achado pelo executor, fora da
+> lista que a orientação passou — `test_f2_28_af_e_contrato.py::test_reduzir_out_forn_e_recusado_
+> no_af1`.
 
 > **DECISÃO REVISTA em 06/09, depois do percurso do beta3 (Marcelo).** O conserto NÃO é fazer a
 > redução funcionar — é **bloqueá-la**, com recusa da gravação. Motivo dele: devolver valor ao

@@ -16,9 +16,16 @@ retorno: **`Cust_Esp`**.
   distribui proporcional ao VBVA e brinde igual por ambiente (pelo pool do projeto,
   `n_total_proj`/`vbvo_proj`); o Custo Especial ignora esse contexto e entra **integral** em qualquer
   subconjunto de ambientes.
-- **Repassado** (`incluir_custos` ON): `VBNO += cf` e `VAVO += cf` **fora do fator de desconto**
-  (blindado — o cliente paga o valor cheio; `Val_Liq` e `Desc_Tot` ficam idênticos ao cenário sem o
-  custo). `Val_Cont = VAVO + Cust_Fin` já o carrega → contrato/marcadores/NF-e herdam sem mudança.
+- **Repassado** (`incluir_custos` ON): `VBNO += cf` e `VAVO += cf · (1−%Desc_Orc)` — o custo entra
+  no Bruto pelo valor de face e **sofre o desconto do orçamento**, como viagem e brinde.
+  `Val_Cont = VAVO + Cust_Fin` já o carrega → contrato/marcadores/NF-e herdam sem mudança.
+  **[REVISADO em 06/09/2026 — ACHADO-63]** Até 06/09 era `VAVO += cf` **fora do fator de
+  desconto** (blindado; `Val_Liq` e `Desc_Tot` idênticos ao cenário sem o custo). Essa era a
+  única das cinco rubricas de custo adicional que quebrava a identidade que o cliente confere na
+  mesa — `Bruto × (1 − desconto) = à vista` —, por `cf × d` (medido: 200,00 num caso de 800 a
+  25%). Passou a seguir a mesma regra das outras. A provisão contábil continua pelo valor CHEIO:
+  o desconto muda quanto o cliente pagou, não quanto a loja vai gastar. Ver a nota do ACHADO-63
+  em `docs/superpowers/specs/negociacao/2026-06-22-mecanismo-negociacao-design.md` §4.
 - **Absorvido** (OFF): preço ao cliente inalterado; `cust_ad += cf` abate o `Val_Liq`.
 - **Comissões arq/fid não incidem** sobre ele (são calculadas por ambiente; o custo especial vive fora).
 - Consequência assumida: com o custo especial ativo, **Σ `Val_Liq` dos ambientes ≠ `Val_Liq` do orçamento** —
