@@ -533,3 +533,21 @@ do cliente por padrão (`data-apoio` no `<body>`, default off; marcar, não apag
 5 camadas verdes (b/c: 2718 passed, 4 xfailed, 0 failed, 1 error isolado por contenção de
 recursos — E2E rodando junto com a suíte pesada — confirmado não-achado ao isolar; e: 17 E2E, 1
 novo, nenhum travou). Sem tag.
+
+## 08/09 — F2-41 Rodada 1: o experimento que não foi commitado
+
+A rodada 1 entrou (`f7e6d04`): sombra calculando as duas fórmulas, `diferenca` intocada, uma
+chamada de motor por invocação (provada por contagem), quatro propriedades verdes — incluindo a
+do vazamento, que a tela não consegue medir.
+
+**O achado mais forte da rodada ficou de fora do repositório.** Fora dos testes commitados, o
+Claude Code montou um experimento controlado: cenário só com comissão percentual → divergência
+ZERO; o mesmo cenário com um custo genuinamente fixo (viagem + brinde) → divergência real.
+
+Isso é de outra natureza que os dois pontos de campo do teste do Marcelo. Campo é correlação
+(dois ambientes, mesmo `F` implícito ≈ 357). Isto é um experimento: liga e desliga a variável
+suspeita e a divergência aparece e some junto. É a evidência que sustenta a decisão da rodada 2,
+e no estado atual ela existe só na conversa.
+
+**Ação: virar teste commitado** (F2-42, junto com a rodada 2). Um teste que prova que a
+divergência tem causa — não só que ela existe.
