@@ -628,3 +628,18 @@ pra pid_a e pid_b. Nenhum dado de Homologação fixado no teste. 8 testes do arq
 Suíte completa sem E2E reconferida (2726 passed, 4 xfailed, 0 failed) — 1 falha isolada em
 `test_aceite_achado12.py` (timeout de socket contra geração de PDF sob carga da suíte inteira,
 reproduzida 2×, limpa isolada) confirmada contenção de recursos, não lógica.
+
+## 09/09 — Os flakes têm cara de família, não de casos isolados
+
+Quinta ocorrência: `test_aceite_achado12.py`, timeout de socket de 5 s do cliente HTTP contra a
+geração de PDF, sob carga da suíte inteira. Reproduzido duas vezes, limpo isolado.
+
+Somando às anteriores (LP-16, LP-21, `test_achado_c4_reaprovar_af_silenciosa.py`,
+`test_e2e_browser_conciliacao_final.py`), o padrão é o mesmo em todas: **timeout sob carga
+paralela, nunca falha de lógica, sempre verde isolado**. Cinco casos com a mesma assinatura
+deixam de ser cinco problemas e passam a ser um.
+
+O método já registrado para LP-16/LP-21 vale para o conjunto: comparar os cinco procurando a
+causa comum — provavelmente o timeout fixo do cliente HTTP de teste, dimensionado para máquina
+ociosa — em vez de perseguir cada um. Continua **sem dono**; é candidato natural a uma rodada
+curta quando a linha do complemento fechar.

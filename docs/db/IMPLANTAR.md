@@ -794,6 +794,77 @@ confirmado exato (`v2026.09.06-beta3`) nos dois. **Produção NÃO tocada** —
 segue fora da esteira desde 28/08, só volta por rebuild a partir de tag, ver
 `### Produção — diagnóstico de 04/09` acima.
 
+### Lacuna no registro — v2026.09.07-beta1 e beta2 — 07/09/2026
+
+As duas tags de 07/09 foram criadas e implantadas (Homologação estava em
+`v2026.09.07-beta2` até 08/09), mas **não foram registradas aqui**. Registro
+da lacuna em si, já que o conteúdo exato daquelas rodadas não foi anotado no
+momento: o que sabemos é a linhagem (`51f14b2` e anteriores) e que os pacotes
+em curso eram F2-33 a F2-36. Fica o método: o deploy só está fechado quando a
+entrada existe neste arquivo — é ele que responde "o que está rodando", não o
+`git log` do servidor.
+
+### Décimo sétimo deploy por tag — v2026.09.08-beta1 — 08/09/2026
+
+**Sem migration nova** — F2-37 a F2-40 mexeram só em código/frontend/testes.
+`alembic current` = `9a1b2c3d4e5f (head)` ANTES e DEPOIS nos dois, sem mudar.
+
+Quatro pacotes numa tag: F2-37 (Item Especial vira linha da tabela, campo com
+máscara financeira), F2-38 (Item Especial isento de comissão e provisão
+operacional; imposto permanece), F2-39 (máscara financeira na AF, linha do
+Item Especial no painel, reversão do ACHADO-62 com a regra do teto — a redução
+alcança só o saldo ainda em aberto), F2-40 (Gerar Complemento numa casa só, na
+11e; o modal virou a tela do mockup; etapas 8 e 11d invisíveis para quem não
+tem `pode_aprovar_financeiro`). Junto, a decisão do reset em
+`POST /pe/complemento/orcamento` (`docs/db/TAREFA_F2_40_RESET_COMPLEMENTO.md`):
+o resync dos vínculos continua incondicional, só o apagar do plano de pagamento
+virou condicional (`main.py:8332`). E o conserto do gate que escondia o
+"Salvar" do complemento pós-assinatura — cinco lugares decidem o lock, quatro
+excetuavam o complemento e `atualizarBotoesAprovacao` não.
+
+Tag `v2026.09.08-beta1` (`319614f`). Nos dois diretórios: `systemctl stop` →
+`git fetch --tags && git checkout` → `alembic upgrade head` (sem mudança) →
+`systemctl start` → `confirmar.sh` 15/0 nos dois → `git describe --tags` exato
+nos dois. **Produção NÃO tocada.**
+
+**Correção do smoke, registrada porque custou uma confusão:** o comando estava
+escrito como `200 login.html`, e `curl http://127.0.0.1:8765/login.html`
+devolve **404** — correto, não é defeito. O `do_GET` não tem rota `.html`
+(`main.py:4130-4160`: só imagens e CSS por extensão); quem entrega a tela de
+login é o nginx, em `/login`, e o `curl` na porta de loopback fala direto com
+o app, por baixo do nginx. O smoke certo no nível do app é a **raiz**:
+`curl http://127.0.0.1:8765/` → **302** (redireciona para `/login` quando não
+há sessão, `main.py:3461-3466`). Daqui em diante: **302 na raiz + 401 no login
+inválido**, nos dois.
+
+### Décimo oitavo deploy por tag — v2026.09.08-beta2 — 08/09/2026
+
+**Sem migration nova.** `alembic current` = `9a1b2c3d4e5f (head)` ANTES e
+DEPOIS nos dois, sem mudar.
+
+F2-41 Rodada 1 — a sombra do cálculo do complemento
+(`docs/db/TAREFA_F2_41_FONTE_UNICA_COMPLEMENTO.md`). Duas fórmulas calculam o
+mesmo número e divergem: a Comparação de Valores roda o motor com
+`vbva_override` (`main.py:2666-2677`), o modal do complemento usa a proporção
+`valor_venda_PE × (VAVA_ct ÷ VBVA_ct)`
+(`mod_conciliacao_pe.valor_complemento_por_fator:118`). No teste do Marcelo em
+Homologação: +52,07 num ambiente e −5,66 no outro, com o contratado batendo à
+casa decimal nos dois. Esta rodada **NÃO troca a fonte** — calcula as duas,
+cobra pela atual, registra a divergência (`vava_motor`, `divergencia`,
+`divergencia_total`) e traz quatro testes de propriedade, incluindo o do
+vazamento, que a tela é estruturalmente incapaz de fazer. A troca fica para a
+Rodada 2, com os percursos acumulados: `valor_complemento_por_fator` tem três
+consumidores (incluindo a decisão da AF2), unificados em 15/08 justamente para
+não divergirem.
+
+Tag `v2026.09.08-beta2` (`ca032a4`). Mesmo procedimento; `confirmar.sh` 15/0
+nos dois; smoke **302 na raiz + 401 no login inválido** nos dois (o formato
+corrigido acima). **Produção NÃO tocada.**
+
+**Como ler a sombra depois dos percursos**, sem abrir tela nenhuma:
+
+    journalctl -u orizon-b --since today --no-pager | grep F2-41-SOMBRA
+
 ## Conferir o que esta rodando
 
 Nao entrar no servidor pra olhar `git log` — perguntar direto:
