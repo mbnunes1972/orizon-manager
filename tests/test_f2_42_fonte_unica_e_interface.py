@@ -204,6 +204,84 @@ def test_aceite_4_fallback_log_nao_aparece_em_cenario_normal(app_db, seed, capsy
     assert "[F2-42-FALLBACK]" not in saida, saida
 
 
+def test_propriedade_tela_e_modal_concordam_por_ambiente_com_brinde(app_db, seed, http_client_factory):
+    """A promessa visível ao usuário, não o gabarito de um projeto: pra QUALQUER projeto, o
+    "à vista (complemento)" do modal bate, ambiente a ambiente, com o "à vista (PE)" da tela
+    "Comparação de Valores"/Revisão de PE (`main.py:2666-2677`) — mesmo os dois caminhos
+    montando conjuntos de override DIFERENTES pro motor (a tela usa TODO `xml_pe` carregado; o
+    modal só os ambientes MARCADOS via `xml_compl`, `_complemento_diferencas`). BRINDE é o único
+    caso em que as duas fórmulas ANTIGAS divergiam (Part B, teste 3) — cenário sintético com
+    brinde, 3 ambientes: pid_a/pid_b marcados (entram nos dois caminhos), pid_c só carregado na
+    tela (nunca marcado — só o modal o exclui). O teste do vazamento do F2-41 garante que ter
+    pid_c no override da tela e não no do modal não muda o VAVA de pid_a/pid_b; este teste fecha
+    isso de ponta a ponta, pelos dois endpoints de verdade — não fixa números de nenhuma
+    instalação real (esses ficam com o Marcelo, na tela, depois do deploy)."""
+    nome, pid_a, oid = _setup(app_db, seed)   # Cozinha marcada, contrato assinado, arq 10%
+    c = _login(http_client_factory, "dir_l1")
+
+    db = app_db.get_session()
+    orc = db.get(main.Orcamento, oid)
+    orc.desconto_pct = 0.0
+    proj = db.query(main.Projeto).filter_by(nome_safe=nome).first()
+    params = json.loads(proj.parametros_json)
+    params.update({"brinde_ativo": True, "brinde": 500.0})
+    proj.parametros_json = json.dumps(params)
+
+    pa_b = main.PoolAmbiente(nome="PB1", nome_exibicao="PB1", xml_path="fake/pb1.xml",
+                             ambientes_json="{}", projeto_id=nome,
+                             budget_total=40000.0, order_total=16000.0)
+    db.add(pa_b); db.flush()
+    db.add(main.OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pa_b.id, ordem=2))
+    pa_b.renegociar_pe = 1   # MARCADO — entra no override do modal também
+    pid_b = pa_b.id
+
+    pa_c = main.PoolAmbiente(nome="PB2", nome_exibicao="PB2", xml_path="fake/pb2.xml",
+                             ambientes_json="{}", projeto_id=nome,
+                             budget_total=60000.0, order_total=22000.0)
+    db.add(pa_c); db.flush()
+    db.add(main.OrcamentoAmbiente(orcamento_id=oid, pool_ambiente_id=pa_c.id, ordem=3))
+    # pa_c NÃO marcado — só entra no override da TELA (xml_pe), nunca no do modal.
+    pid_c = pa_c.id
+
+    venda_a, venda_b, venda_c = 95000.0, 36000.0, 70000.0
+    db.add(main.ArquivoPE(projeto_nome=nome, pool_ambiente_id=pid_a, formato="xml_pe",
+                          valor_venda=venda_a, valor_atualizado=34000.0))
+    db.add(main.ArquivoPE(projeto_nome=nome, pool_ambiente_id=pid_b, formato="xml_pe",
+                          valor_venda=venda_b, valor_atualizado=17000.0))
+    db.add(main.ArquivoPE(projeto_nome=nome, pool_ambiente_id=pid_c, formato="xml_pe",
+                          valor_venda=venda_c, valor_atualizado=25000.0))
+    db.commit(); db.close()
+
+    _upsert_compl(app_db, nome, pid_a, venda=venda_a, cfo=34000.0)
+    _upsert_compl(app_db, nome, pid_b, venda=venda_b, cfo=17000.0)
+
+    # Tela "Comparação de Valores" (Revisão de PE): override com TODO xml_pe carregado (3 ambientes).
+    st, body = c.get(f"/api/projetos/{nome}/pe/comparacao")
+    assert st == 200 and body["ok"], body
+    vava_pe_por_id = {l["pool_ambiente_id"]: l["vava_pe"]
+                      for l in body["comparacao_venda"] if l["pe_carregado"]}
+    assert {pid_a, pid_b, pid_c} <= set(vava_pe_por_id), vava_pe_por_id
+
+    # Modal do Complemento: _complemento_diferencas, override só dos MARCADOS (xml_compl) —
+    # pid_c nunca aparece aqui, prova que o conjunto É de fato diferente do da tela.
+    db = app_db.get_session()
+    try:
+        linhas, _resumo = main._complemento_diferencas(db, nome)
+    finally:
+        db.close()
+    vava_compl_por_id = {l["pool_ambiente_id"]: l["vava_complemento"] for l in linhas}
+    assert pid_a in vava_compl_por_id and pid_b in vava_compl_por_id
+    assert pid_c not in vava_compl_por_id, "pid_c não foi marcado — não pode aparecer no modal"
+
+    # A PROMESSA: pra quem está nos dois (a, b), o valor bate — mesmo com conjuntos de override
+    # diferentes (pid_c só na tela) e brinde ativo (o caso que fazia as fórmulas antigas divergir).
+    for pid in (pid_a, pid_b):
+        assert abs(vava_pe_por_id[pid] - vava_compl_por_id[pid]) < 0.02, (
+            "'à vista (PE)' da Revisão de PE tem que bater com 'à vista (complemento)' do "
+            "modal, ambiente a ambiente — pid=%r tela=%.2f modal=%.2f"
+            % (pid, vava_pe_por_id[pid], vava_compl_por_id[pid]))
+
+
 def test_fallback_e_observavel_quando_motor_nao_calcula_o_ambiente(app_db, seed, capsys):
     """O fallback tem que ser EXCEÇÃO OBSERVÁVEL, nunca caminho silencioso: se o ambiente
     carregado (xml_compl) não está de fato vinculado ao orçamento contratado (o motor não pode

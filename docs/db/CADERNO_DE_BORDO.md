@@ -590,3 +590,41 @@ números direto em Homologação depois do deploy, ou passar os dados brutos pra
 5 camadas verdes (b/c/d: 2725 passed, 4 xfailed, 0 failed; e: E2E tocados/novos — fatia1/2/3
 F2-40, apoio-dev F2-41, conciliação final, mais 1 E2E novo dedicado a C4/C5 — todos verdes, um
 por vez). Sem tag.
+
+## 09/09 — O gabarito do Projeto 11 não precisa dos dados brutos
+
+O aceite do F2-42 pedia os oito valores exatos do Projeto 11 (total −3.118,72). O Claude Code
+relatou que não conseguiu verificá-lo por não ter os dados brutos de Homologação, e pediu que
+alguém os extraísse para fixar um teste de regressão neles.
+
+**Não é o artefato certo, e a pendência se resolve de outro jeito.** Aqueles oito números eram
+um substituto para a propriedade que realmente importa:
+
+> para QUALQUER projeto, o "à vista (complemento)" do modal é igual, ambiente a ambiente, ao
+> "à vista (PE)" da tela de Revisão de PE.
+
+Isso é testável sinteticamente, com brinde no cenário (o único caso em que as duas divergiam),
+sem depender de projeto nenhum da base. Fixar oito reais de um projeto de Homologação num teste
+unitário seria frágil pelo motivo oposto ao que se quer: quebraria quando alguém mexesse na
+configuração daquela loja, por razão nenhuma ligada ao código.
+
+Vale notar que a propriedade quase decorre do que já está provado: se substituir o VBVA de um
+ambiente não move o VAVA de outro (teste do vazamento, F2-41), então os dois caminhos podem
+montar conjuntos de override diferentes — a tela usa todos os PEs carregados, o modal só os
+marcados — e ainda assim chegar ao mesmo VAVA por ambiente. O teste do invariante fecha isso
+de ponta a ponta, que é a promessa visível ao usuário.
+
+Os oito números do Projeto 11 seguem valendo — como **conferência de percurso** em Homologação,
+as duas telas lado a lado, não como teste.
+
+**Feito (Claude Code, mesmo dia):** o invariante virou teste commitado —
+`test_propriedade_tela_e_modal_concordam_por_ambiente_com_brinde`, em
+`tests/test_f2_42_fonte_unica_e_interface.py`. Cenário sintético, 3 ambientes, brinde ativo:
+pid_a/pid_b marcados (entram no override dos dois caminhos — `xml_pe` na tela, `xml_compl` no
+modal), pid_c só carregado na tela (`xml_pe`, nunca marcado) — os dois conjuntos de override
+saem DIFERENTES de propósito (a tela inclui os 3, o modal só 2), e mesmo assim `vava_pe` (tela,
+`GET /pe/comparacao`) e `vava_complemento` (modal, `main._complemento_diferencas`) batem exato
+pra pid_a e pid_b. Nenhum dado de Homologação fixado no teste. 8 testes do arquivo verdes.
+Suíte completa sem E2E reconferida (2726 passed, 4 xfailed, 0 failed) — 1 falha isolada em
+`test_aceite_achado12.py` (timeout de socket contra geração de PDF sob carga da suíte inteira,
+reproduzida 2×, limpa isolada) confirmada contenção de recursos, não lógica.
