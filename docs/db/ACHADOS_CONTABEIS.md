@@ -5169,3 +5169,83 @@ tela"). Um teste que nasce de observar o código não protege contra nada; ele c
 
 ---
 
+## ACHADO-67 — o painel à vista recalculava por variável, não por visibilidade · CLASSE FECHADA 09/09/2026 (F2-43) · INSTÂNCIA EM ABERTO
+
+Origem: percurso do Marcelo em Homologação (`v2026.09.09-beta1`, 09/09). Ao entrar em
+"Negociar Complemento" e seguir para "Definir forma de pagamento", a tela abriu numa negociação
+à vista com **plano de pagamento estranho, valores que não eram do complemento e juros aparentes
+numa condição que não tem juros**. Selecionar Cartão de Crédito e voltar para À vista fazia o
+problema desaparecer.
+
+**O que esse "desaparecer" já dizia:** trocar de modalidade e voltar é um *re-render*, não uma
+correção de dado. O dado persistido estava certo; quem errava era a primeira renderização.
+
+### O que a medição achou — e o que ela NÃO achou
+
+A reprodução ponta a ponta do sintoma **falhou** na bancada, inclusive com atraso de rede
+forçado. O que a medição achou foi outra coisa, real e independente do relato: das **cinco**
+modalidades de pagamento, só a à vista (`avistaRecalcular`, `static/index.html` ~10080) **não
+tinha entrada em `_atualizarPaineisAbertos()`** (~10505). As outras quatro (Aymoré, Cartão, VP,
+Total Flex) recalculam por **visibilidade do painel no DOM**
+(`painel-*.style.display !== 'none'`) a cada preview do motor; a à vista recalculava sob um gate
+à parte — `_tipoAtivo === 'avista'` (~11715) —, uma variável JS separada da visibilidade real.
+
+Se essa variável ficasse um passo atrás do DOM, `#av-liq-valor` e `window._planoPagamento`
+ficavam com o plano de ANTES. É a **mesma classe** do precedente de 2026-08-17 (comentário já
+existente no código, "chegou a mostrar um Total do Contrato MENOR que o Valor à Vista,
+impossível pela fórmula real"), por uma **porta diferente** — regra dos irmãos, ACHADO-26.
+
+**Achado incidental, útil pra quem for medir depois:** `#neg-parcelado` é hoje um **gêmeo morto**
+— apagado do DOM no ACHADO-64 (06/09). A caixa viva equivalente é `#neg-total-final`, escrita
+direto por `_aplicarPreviewNaTela`, que nunca fica presa. Quem fotografar o estado da tela deve
+olhar `#av-liq-valor` e `#neg-total-final`, não `#neg-parcelado`.
+
+### Conserto (09/09, F2-43, `a1647b4`)
+
+`avistaRecalcular` ganhou a mesma entrada por visibilidade que os outros quatro painéis já
+tinham, dentro de `_atualizarPaineisAbertos()`, com timer próprio (`_avTimer`, 200ms — mesmo
+padrão dos irmãos). O gate frágil por variável foi **removido, não duplicado**: os dois pontos
+que escrevem `_tipoAtivo` (`onPagamentoChange`) sempre alternam DOM e variável juntos, sem
+`await` no meio, e a leitura que sobrava não tinha razão de existir ao lado da checagem de
+visibilidade.
+
+Sem risco de salvar plano velho: o auto-save do pagamento (`agendarSalvarPagamento`) tem debounce
+de **500ms** e lê `window._planoPagamento` de dentro do próprio timer, com guarda de assinatura
+anti-loop. 200 < 500 — o save sempre lê o plano já recalculado.
+
+### O aceite: invariante, não reprodução
+
+A corrida não reproduzia; o invariante, sim. `tests/test_f2_43_avista_concorda_apos_preview.py`
+envenena `#av-liq-valor`/`#av-r-liq-valor`/`window._planoPagamento` com um plano de outro
+orçamento e atrasa `_tipoAtivo`, dispara `_aplicarPreviewNaTela` (o mesmo ponto de entrada real
+de qualquer preview) e afirma que as três caixas concordam com `#neg-avista`. Controle negativo
+feito com `git stash`: contra o código velho falhou **pela razão certa** — `#neg-avista` já em
+R$ 140.000,00 e `#av-liq-valor` preso em R$ 999.999,99.
+
+Mesmo movimento do F2-42, que trocou o gabarito de oito números reais do Projeto 11 por uma
+propriedade sintética: **o que não se reproduz pode ainda assim se provar como invariante.**
+
+### Por que a INSTÂNCIA continua em aberto
+
+A classe está fechada. O sintoma que o Marcelo viu, **não**.
+
+A tentativa única de provocar a corrida (atrasando só o preview do CONTRATADO, 1,5s, com o
+complemento sem atraso) mostrou uma **janela real, não hipotética**: no instante do handoff a
+tela exibia R$ 140.000,00 — valor do **contratado**, não os R$ 14.000,00 do complemento — e só
+**2,5s depois** corrigiu sozinha. Isso bate com o mecanismo já registrado de que
+`carregarOrcamentos()` (chamado por `peComplModalDefinirPagamento`) reativa de passagem o
+orçamento ANTERIOR antes de `ativarOrcamento` do complemento.
+
+**O que não se sabe:** se a autocorreção em 2,5s é o conserto desta rodada agindo. O `_avTimer` é
+de 200ms — uma ordem de grandeza menor. Pode ter sido um preview legítimo posterior do próprio
+complemento. Ou seja: **o F2-43 pode ser necessário sem ser suficiente** para o sintoma relatado.
+
+Confirmação pendente de **percurso em Homologação**, não de teste: duas ou três entradas no
+complemento pela 11e, com a captura de console armada (item 8.4.5-bis de
+`docs/db/PERCURSO_HOMOLOGACAO.md`). Se o plano estranho não voltar, este achado vira RESOLVIDO.
+Se voltar, o alvo é o handoff — `carregarOrcamentos()` reativando o orçamento anterior — e não
+mais o painel à vista.
+
+Pacote: `docs/db/TAREFA_F2_43_PAGAMENTO_COMPLEMENTO.md`.
+
+---

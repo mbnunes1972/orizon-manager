@@ -383,6 +383,38 @@ uma vez.
 *Adiado:* não é item de bloco nenhum; achado ao verificar que o F2-30 não
 regrediu nada, não que o F2-30 tenha causado isto.
 
+
+**LP-22 · Os E2E de navegador dividem um banco só, e o boot faz DDL.**
+Achado em 10/09, ao rodar a bateria de regressão do F2-43: o servidor E2E
+morreu no boot com `DeadlockDetected` em `_migrar_colunas_pg()`, no
+`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS senha_provisoria`. Dois
+processos travados um no outro fazendo DDL no MESMO `orizon_e2e`.
+
+A causa é estrutural, não acidental: **cada módulo de E2E de navegador sobe
+o próprio servidor** (padrão da casa — fixture `servidor_e2e` por arquivo,
+porta própria), e todo boot passa por `init_db()` → `_migrar_colunas_pg()`,
+que a R1 congelou mas que continua rodando DDL a cada partida. Dois boots
+próximos no mesmo banco = deadlock.
+
+**É primo dos cinco flakes já listados (LP-16, LP-21 e os três irmãos), mas
+de espécie diferente:** aqueles FALHAM por timeout de socket de 5s; este
+falha por lock de DDL, e a mensagem não se parece nada com as outras. A
+causa comum é a mesma — E2E compartilhando um banco só, sem serialização.
+Com o sexto caso registrado em 09/09 (`test_e2e_browser_negociacao_layout.py`,
+travado no upload do XML sob carga), a família chega a sete ocorrências.
+
+**Pior que falhar: travar.** Em 09/09 uma bateria de E2E ficou **12 horas
+pendurada** — pytest vivo, Chromium vivo, `main.py` vivo, CPU zerada,
+segurando o lock do `orizon_e2e` e bloqueando qualquer execução seguinte.
+Só apareceu porque alguém foi olhar o `ps`. O E2E de navegador não tem
+timeout nenhum.
+
+*Mitigação proposta (não implementada):* `--timeout` global no `pytest.ini`
+(pytest-timeout), pra que o pior caso vire uma falha legível em vez de um
+bloqueio silencioso. Não resolve a causa — resolve a descoberta.
+*Adiado:* achado ao verificar o F2-43, não é item de bloco nenhum.
+
+
 ---
 
 ## Fechados — não são adiamento, e por isso não estão na lista acima
