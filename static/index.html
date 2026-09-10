@@ -10067,6 +10067,7 @@ function tfMostrarPainel(mostrar) {
   }
 }
 
+let _avTimer = null;
 function avistaMostrarPainel(mostrar) {
   _negModExibir('avista', mostrar);
   if (mostrar) {
@@ -10503,6 +10504,16 @@ function agendarSalvarPagamento(){
   }, 500);
 }
 function _atualizarPaineisAbertos(){
+  // F2-43 (docs/db/TAREFA_F2_43_PAGAMENTO_COMPLEMENTO.md): à vista era a ÚNICA das cinco
+  // modalidades sem entrada aqui — recalculava só sob o gate `_tipoAtivo==='avista'` (variável
+  // JS separada, ~11715, removido). Se essa variável ficasse um passo atrás da visibilidade
+  // real do painel (troca de orçamento em voo, fetch de faixas que resolve depois do preview),
+  // #neg-parcelado/#av-liq-valor/_planoPagamento ficavam com o plano de ANTES — mesma classe do
+  // precedente 2026-08-17 abaixo, por uma porta diferente. Mesmo padrão dos outros 4: gate por
+  // VISIBILIDADE do painel no DOM, não por variável.
+  if (document.getElementById('painel-avista').style.display !== 'none') {
+    clearTimeout(_avTimer); _avTimer = setTimeout(avistaRecalcular, 200);
+  }
   if (document.getElementById('painel-aymore').style.display !== 'none') {
     clearTimeout(_ayTimer); _ayTimer = setTimeout(atualizarAymore, 200);
   }
@@ -11710,10 +11721,11 @@ function _aplicarPreviewNaTela(s) {
   // — nunca ao só CARREGAR/VER o orçamento. Ficavam com o que a tela restaurou do forma_pagamento
   // SALVO (total_cliente), desatualizado assim que desconto/ambientes mudam depois de salvo —
   // chegou a mostrar um "Total do Contrato" MENOR que o "Valor à Vista", impossível pela fórmula
-  // real. Fix: reusa avistaRecalcular() (fonte única da fórmula à vista) sempre que o preview do
-  // motor atualiza — ela lê '#neg-avista' (setado logo acima, já fresco) via _ayGetValorVenda().
-  if (typeof _tipoAtivo !== 'undefined' && _tipoAtivo === 'avista'
-      && typeof avistaRecalcular === 'function') avistaRecalcular();
+  // real. Fix original: chamar avistaRecalcular() aqui sob `_tipoAtivo === 'avista'`. F2-43
+  // (docs/db/TAREFA_F2_43_PAGAMENTO_COMPLEMENTO.md) mediu que esse gate por VARIÁVEL podia ficar
+  // um passo atrás do painel realmente visível — trocado pelo gate por visibilidade em
+  // _atualizarPaineisAbertos() (~10505), chamado alguns comandos acima, no mesmo padrão dos
+  // outros 4 painéis (que nunca dependeram de `_tipoAtivo`).
   // ── células por ambiente: à vista (VAVA) e financiada (VAVA × Val_Cont/VAVO) ──
   const _vavo = Number(s.VAVO) || 0;
   const _finFactor = _vavo > 0 ? ((Number(s.Val_Cont) || _vavo) / _vavo) : 1;
