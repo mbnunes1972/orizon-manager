@@ -415,6 +415,52 @@ bloqueio silencioso. Não resolve a causa — resolve a descoberta.
 *Adiado:* achado ao verificar o F2-43, não é item de bloco nenhum.
 
 
+
+**LP-23 · Montador é pago por volume MONTADO, e a tela só sabe falar de venda.**
+Achado do Marcelo em 10/09, configurando a Remuneração das funções em
+Homologação: o modal "Remuneração — Montador" oferece "Usa comissão de vendas
+por metas", "Comissão por meta?" e um seletor **Base: Líquido de Vendas**. Para
+o Montador nada disso descreve o que ele recebe — a remuneração variável dele é
+por **volume montado**, não por venda.
+
+**O motor já faz a conta certa.** `mod_comissao.preparar_comissao_etapa` dispara
+na conclusão da etapa **17 (Montagem)** com papel `montagem` (`PAPEL_POR_ETAPA`),
+e a base é **Σ `order_total` dos ambientes atribuídos àquele montador no Mapa de
+Atribuições** (`base_ambientes`; atribuição de projeto inteiro = todos os
+ambientes). Isso É volume montado. O item nasce em `comissao_folha` com
+`origem='papel'`, e a Folha soma. O próprio comentário de `ComissaoFolha.base`
+já registra a ambiguidade: *"Σ order_total dos ambientes (ou vendas líq.)"* —
+**dois significados, um campo, e a tela só nomeia um deles.**
+
+**O que falta é a TELA, não o cálculo.** O `%` que o motor aplica sai de
+`_pct_funcao(funcao, base)` → `mod_folha._resolver_pct_funcao` → `funcao.
+comissao_json`. Ou seja: o MESMO campo que a tela rotula "comissão de vendas"
+é o que parametriza a comissão de papel do montador. Consequências medidas:
+
+- o rótulo **mente** sobre o que o número faz (base é volume montado, não
+  líquido de vendas);
+- o seletor "Base: Líquido de Vendas" oferece uma opção que não se aplica à
+  função escolhida — família do "a tela oferece o que o servidor não faz"
+  (ACHADOS 32/33/39/41/49/50);
+- `preparar_comissao_etapa` pula quem tem `pct <= 0` (*"função do executor sem
+  comissão → sem item"*). Com o campo em 0, o montador **não gera item nenhum**,
+  em silêncio, e nada na tela diz por quê.
+
+**O desenho que falta**, para a rodada que pegar isto:
+1. a tela distinguir as **três naturezas de base** que já existem no motor —
+   venda líquida (Consultor, faixas da LOJA), volume executado por papel
+   (Montador/Medidor/Projetista, `order_total` dos ambientes do Mapa), e base
+   digitada na Folha (demais funções) — e mostrar só a que vale para a função;
+2. faixas **por volume montado** (m², ou faixa de `order_total`), no lugar de
+   faixas por venda, para quem é remunerado por papel;
+3. dizer na tela que 0% significa "não gera comissão", em vez de silêncio.
+
+*Não implementado.* Ligar isto sem (1) é o que produz o achado ao contrário:
+número certo com rótulo errado, que é pior que número errado — ninguém confere
+o que parece coerente. *Adiado:* achado ao preparar dado de teste da Folha, não
+é item de bloco nenhum.
+
+
 ---
 
 ## Fechados — não são adiamento, e por isso não estão na lista acima
