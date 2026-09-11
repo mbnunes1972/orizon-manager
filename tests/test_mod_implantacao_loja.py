@@ -52,6 +52,10 @@ def origem_configurada(app_db, seed):
         gerente_vendas = db.query(Funcao).filter_by(loja_id=loja_id, nome="Gerente de Vendas").first()
         gerente_vendas.salario_fixo = 4500.0
         gerente_vendas.beneficios_json = json.dumps({"va": {"on": True, "valor": 800}})
+        gerente_vendas.comissao_fixa = 300.0
+        gerente_vendas.usa_comissao_vendas = 1
+        gerente_vendas.comissao_json = json.dumps({"por_meta": True, "base": "liquido",
+                                                   "faixas": [{"venda_ate": None, "pct": 1.0}]})
         db.add(Funcao(loja_id=loja_id, nome="Cargo Só Desta Loja", status="ativo",
                       salario_fixo=1000.0, usa_comissao_vendas=0))
 
@@ -150,6 +154,57 @@ def test_identidade_recusada_sem_a_flag_e_nunca_silenciosa(app_db, origem_config
         assert em.focus_token_prod_enc is None
         assert any("identidade" in r for r in rel["recusado"]), (
             "a recusa tem que aparecer no relatório, não silenciar")
+    finally:
+        db.close()
+
+
+def test_remuneracao_nao_copia_por_padrao_e_avisa(app_db, origem_configurada):
+    """DECIDIDO 11/09: salário é decisão trabalhista de CADA loja — sem --copiar-remuneracao,
+    salario_fixo/beneficios_json/comissao_fixa ficam de fora, mas comissao_json/
+    usa_comissao_vendas (percentual, política comercial) viajam sempre. A recusa aparece no
+    relatório, não silencia."""
+    db = app_db.get_session()
+    try:
+        artefato = mil.exportar_config_loja(db, origem_configurada)
+        origem_gv = next(f for f in artefato["funcoes"] if f["nome"] == "Gerente de Vendas")
+        assert origem_gv["salario_fixo"] == 4500.0, "pré-condição: a origem tem salário setado"
+
+        nova = mil.criar_loja_base(db, nome="Sem Remuneracao", codigo="SRM")
+        rel = mil.aplicar_config_loja(db, nova.id, artefato)   # sem excecoes
+
+        gv = db.query(Funcao).filter_by(loja_id=nova.id, nome="Gerente de Vendas").first()
+        assert gv.salario_fixo is None, "salário não pode copiar sem a flag"
+        assert gv.beneficios_json is None, "benefícios não podem copiar sem a flag"
+        assert gv.comissao_fixa is None or gv.comissao_fixa == 0.0, (
+            "comissão fixa (dinheiro) não pode copiar sem a flag")
+        # Percentual/política comercial viaja SEMPRE, com a flag ou sem — só o dinheiro é gateado.
+        assert gv.usa_comissao_vendas == 1
+        assert json.loads(gv.comissao_json)["faixas"][0]["pct"] == 1.0
+        extra = db.query(Funcao).filter_by(loja_id=nova.id, nome="Cargo Só Desta Loja").first()
+        assert extra is not None and extra.salario_fixo is None, (
+            "função nova também nasce sem remuneração, mesma regra")
+
+        assert any("remuneração" in r.lower() and "não copiada" in r.lower()
+                  for r in rel["recusado"]), (
+            "a recusa da remuneração tem que aparecer no relatório: %r" % rel["recusado"])
+    finally:
+        db.close()
+
+
+def test_copiar_remuneracao_com_a_flag_explicita(app_db, origem_configurada):
+    """Com --copiar-remuneracao, os três campos de dinheiro viajam de verdade — caso específico
+    da Loja Teste (herdar a folha de teste de 10/09), não o default."""
+    db = app_db.get_session()
+    try:
+        artefato = mil.exportar_config_loja(db, origem_configurada)
+        nova = mil.criar_loja_base(db, nome="Com Remuneracao", codigo="CRM")
+        rel = mil.aplicar_config_loja(db, nova.id, artefato, excecoes={"copiar_remuneracao": True})
+
+        gv = db.query(Funcao).filter_by(loja_id=nova.id, nome="Gerente de Vendas").first()
+        assert gv.salario_fixo == 4500.0
+        assert json.loads(gv.beneficios_json) == {"va": {"on": True, "valor": 800}}
+        assert not any("remuneração" in r.lower() and "não copiada" in r.lower()
+                      for r in rel["recusado"])
     finally:
         db.close()
 

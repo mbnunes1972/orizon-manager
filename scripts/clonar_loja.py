@@ -9,6 +9,12 @@ Mesmo mecanismo (`mod_implantacao_loja.py`) serve dois casos:
 CONFIGURAÇÃO viaja, DADO não. Segredo (tokens, certificado) nunca sai do banco de origem —
 nem no clone, nem no artefato exportado. Identidade (CNPJ, razão social, inscrições) só é
 ESCRITA no destino com `--permitir-identidade` — sem a flag, o script diz o que recusou.
+Remuneração em dinheiro da Função (salário, benefícios, comissão fixa) só é ESCRITA com
+`--copiar-remuneracao` — sem a flag, viaja só a estrutura (percentual de comissão/faixas), e o
+script diz que a remuneração não copiou (DECIDIDO 11/09: salário é decisão de cada loja).
+
+A REFERÊNCIA é Homologação, não a bancada local — medido 11/09, ver mod_implantacao_loja.py.
+Contra a bancada isto é ENSAIO do mecanismo, não a operação real.
 
 Guardas (mesmo padrão de seed_funcionarios_homolog.py):
   - afirma o NOME do banco antes de qualquer escrita (`--banco-esperado`, default
@@ -26,8 +32,10 @@ Uso:
   #    e gravando. --permitir-identidade é a decisão do Marcelo (11/09) de copiar cnpj/razão
   #    social da Inspirium — condicional a este ambiente (só há credencial de homologação em
   #    uso); em Produção esta flag não se liga (ver docstring de aplicar_config_loja).
+  #    --copiar-remuneracao é ESPECÍFICO da Loja Teste: ela herda a folha de teste montada em
+  #    10/09 pra não obrigar refazer esse trabalho — loja real em Produção nunca liga isto.
   python3 scripts/clonar_loja.py clone --origem-loja 1 --nome "Loja Teste" --codigo TES \\
-      --permitir-identidade --aceitar-divergencia 1.1.09 --aplicar
+      --permitir-identidade --copiar-remuneracao --aceitar-divergencia 1.1.09 --aplicar
 
   # Exportar (Etapa 1b) — o artefato pode ser versionado no git (sem segredo, ver docstring
   # do módulo):
@@ -107,6 +115,9 @@ def cmd_clone(args):
         print("  emitente: %s" % ("sim" if artefato["emitente"] else "não (origem sem Emitente)"))
         print("  identidade (cnpj/razão social) será aplicada: %s" %
               ("sim" if args.permitir_identidade else "NÃO — falta --permitir-identidade"))
+        print("  remuneração (salario_fixo/beneficios/comissao_fixa) será copiada: %s" %
+              ("sim" if args.copiar_remuneracao else
+               "NÃO — configure na tela de Funções (falta --copiar-remuneracao)"))
 
         if not args.aplicar:
             print("\nPLANO apenas. Rode de novo com --aplicar pra gravar.")
@@ -123,6 +134,7 @@ def cmd_clone(args):
         rel = mil.aplicar_config_loja(db, nova.id, artefato, excecoes={
             "permitir_identidade": args.permitir_identidade,
             "divergencias_gabarito_aceitas": args.aceitar_divergencia,
+            "copiar_remuneracao": args.copiar_remuneracao,
         })
         _relatorio(rel)
         print("\nGRAVADO. Rode `mod_contabil.varrer_orfaos_gabarito` (R16) antes de considerar concluído.")
@@ -173,6 +185,9 @@ def cmd_importar(args):
               (args.nome, args.codigo, args.rede_id))
         print("  identidade (cnpj/razão social) será aplicada: %s" %
               ("sim" if args.permitir_identidade else "NÃO — falta --permitir-identidade"))
+        print("  remuneração (salario_fixo/beneficios/comissao_fixa) será copiada: %s" %
+              ("sim" if args.copiar_remuneracao else
+               "NÃO — configure na tela de Funções (falta --copiar-remuneracao)"))
         if not args.aplicar:
             print("\nPLANO apenas. Rode de novo com --aplicar pra gravar.")
             return
@@ -186,6 +201,7 @@ def cmd_importar(args):
         rel = mil.aplicar_config_loja(db, nova.id, artefato, excecoes={
             "permitir_identidade": args.permitir_identidade,
             "divergencias_gabarito_aceitas": args.aceitar_divergencia,
+            "copiar_remuneracao": args.copiar_remuneracao,
         })
         _relatorio(rel)
         print("\nGRAVADO. Rode `mod_contabil.varrer_orfaos_gabarito` (R16) antes de considerar concluído.")
@@ -206,6 +222,9 @@ def main():
     p_clone.add_argument("--codigo", required=True, help="3 letras, unique (ex.: TES)")
     p_clone.add_argument("--rede-id", type=int, default=None)
     p_clone.add_argument("--permitir-identidade", action="store_true")
+    p_clone.add_argument("--copiar-remuneracao", action="store_true",
+                         help="copia salario_fixo/beneficios_json/comissao_fixa das Funções "
+                              "(default: NÃO copia — salário é decisão de cada loja)")
     p_clone.add_argument("--aceitar-divergencia", action="append", default=[],
                          metavar="CODIGO", help="repetível — código de conta/centro de custo")
     p_clone.add_argument("--aplicar", action="store_true")
@@ -223,6 +242,9 @@ def main():
     p_imp.add_argument("--codigo", required=True)
     p_imp.add_argument("--rede-id", type=int, default=None)
     p_imp.add_argument("--permitir-identidade", action="store_true")
+    p_imp.add_argument("--copiar-remuneracao", action="store_true",
+                       help="copia salario_fixo/beneficios_json/comissao_fixa das Funções "
+                            "(default: NÃO copia — salário é decisão de cada loja)")
     p_imp.add_argument("--aceitar-divergencia", action="append", default=[], metavar="CODIGO")
     p_imp.add_argument("--aplicar", action="store_true")
     p_imp.set_defaults(func=cmd_importar)

@@ -17,16 +17,27 @@ Regra que governa tudo: CONFIGURAÇÃO viaja, DADO não. Nunca toca: Cliente, Pr
 Contrato, Aditivo, Lancamento, ProvisaoRegistro, ComissaoFolha, FolhaPagamento, Funcionario,
 Usuario, Agenda, CicloDocumento — nenhuma tabela de instância.
 
-O que o artefato NUNCA carrega (mesmo dentro do processo, antes de virar JSON):
+O que o artefato NUNCA ESCREVE no destino por padrão (mesmo carregando o dado, pra manter uma
+fonte só de verdade — ver `exportar_config_loja`/`aplicar_config_loja`):
   - segredo: `focus_token_homolog_enc`/`focus_token_prod_enc`, certificado (`cert_validade`/
     `cert_cnpj` — são identidade-adjacentes, não só segredo; ficam de fora do artefato, mesmo
-    sem valor secreto neles hoje);
+    sem valor secreto neles hoje) — este NUNCA sai do banco de origem, nem marcado;
   - identidade (CNPJ, razão social, inscrições) viaja marcada `identidade: True` — só é
     ESCRITA por `aplicar_config_loja` se `excecoes.get("permitir_identidade")` for
     explicitamente True. Em Produção essa flag não se liga (ver docstring de `aplicar_config_loja`);
+  - remuneração em dinheiro da Função (`salario_fixo`, `beneficios_json`, `comissao_fixa`) —
+    DECIDIDO 11/09: salário é decisão trabalhista de CADA loja, não configuração de sistema. Só
+    é ESCRITA se `excecoes.get("copiar_remuneracao")` for explicitamente True (default False —
+    mesmo padrão do `permitir_identidade`, a exceção é declarada, nunca implícita).
+    `comissao_json`/`usa_comissao_vendas` (percentual — política comercial) viajam sempre;
   - dado de instância;
   - a árvore contábil inteira — só a LISTA de divergências (`divergencias_gabarito`), pra
     conferência humana; o destino sempre SEMEIA (`aplicar_gabarito_completo`), nunca copia.
+
+A REFERÊNCIA é Homologação, não a bancada local (medido 11/09: plano de contas/centro de custo
+batem nos dois, mas Funções, `config_financeira_json.fuso_horario` e `Emitente` divergem — a
+bancada tem a estrutura, Homologação tem a configuração de verdade). O clone de produção real
+roda contra Homologação; contra a bancada é ensaio do mecanismo, não a operação em si.
 """
 import json
 from datetime import datetime
@@ -269,10 +280,18 @@ def aplicar_config_loja(db, loja_destino_id, artefato, excecoes=None):
         `artefato["gabarito_divergencias"]` aplicar por cima do gabarito semeado — decisão
         humana, tomada fora desta função (ver `divergencias_gabarito`); sem a lista, NENHUMA
         divergência é aplicada (default seguro: só o gabarito).
+      - "copiar_remuneracao" (bool, default False): só com True `salario_fixo`/`beneficios_json`/
+        `comissao_fixa` de cada Função são escritos. Salário é decisão trabalhista de CADA loja,
+        não configuração de sistema (DECIDIDO 11/09) — `comissao_json`/`usa_comissao_vendas`
+        (percentual, política comercial) viajam sempre, com flag ou sem. Existe por um motivo
+        específico e datado: a Loja Teste herda a folha de teste já montada na Inspirium em
+        10/09, pra não obrigar refazer esse trabalho só pra continuar testando. Loja real em
+        Produção nunca liga esta flag — nasce sem salário nenhum, cada uma define o seu.
 
     Retorna relatório: {"recusado": [...], "aplicado": {...}}."""
     excecoes = excecoes or {}
     permitir_identidade = bool(excecoes.get("permitir_identidade"))
+    copiar_remuneracao = bool(excecoes.get("copiar_remuneracao"))
     codigos_aceitos = excecoes.get("divergencias_gabarito_aceitas") or []
 
     loja = db.get(Loja, loja_destino_id)
@@ -320,11 +339,23 @@ def aplicar_config_loja(db, loja_destino_id, artefato, excecoes=None):
         alvo.atribuicoes_json = json.dumps(f["atribuicoes"]) if f["atribuicoes"] is not None else None
         alvo.remuneracao_padrao = f["remuneracao_padrao"]
         alvo.regime_trabalho = f["regime_trabalho"]; alvo.regime_contratacao = f["regime_contratacao"]
-        alvo.descricao = f["descricao"]; alvo.salario_fixo = f["salario_fixo"]
-        alvo.beneficios_json = json.dumps(f["beneficios"]) if f["beneficios"] is not None else None
+        alvo.descricao = f["descricao"]
+        # Percentual é política comercial — viaja sempre, com a flag ou sem.
         alvo.comissao_json = json.dumps(f["comissao"]) if f["comissao"] is not None else None
-        alvo.usa_comissao_vendas = f["usa_comissao_vendas"]; alvo.comissao_fixa = f["comissao_fixa"]
+        alvo.usa_comissao_vendas = f["usa_comissao_vendas"]
+        # Valor em dinheiro — só com --copiar-remuneracao (DECIDIDO 11/09): salário é decisão
+        # trabalhista de CADA loja, não configuração de sistema.
+        if copiar_remuneracao:
+            alvo.salario_fixo = f["salario_fixo"]
+            alvo.beneficios_json = json.dumps(f["beneficios"]) if f["beneficios"] is not None else None
+            alvo.comissao_fixa = f["comissao_fixa"]
     aplicado["funcoes"] = {"criadas": funcoes_criadas, "atualizadas": funcoes_atualizadas}
+    if copiar_remuneracao:
+        aplicado["remuneracao"] = "copiada (--copiar-remuneracao)"
+    else:
+        recusado.append(
+            "%d funções copiadas, remuneração (salario_fixo/beneficios_json/comissao_fixa) NÃO "
+            "copiada; configure na tela de Funções." % len(artefato["funcoes"]))
 
     # ── Documentos-modelo: só cria a versão ativa=1 que ainda não existe (por tipo+corpo_md) ──
     existentes_d = {d.tipo: d for d in db.query(DocumentoModelo)
