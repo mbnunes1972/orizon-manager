@@ -4167,6 +4167,27 @@ let _lojaAtiva = null;   // loja ativa atual (multi-loja); null = usa default do
         if (ok) { resp = await _origFetch(input, init); }
       }
     }
+    // ACHADO-68 (docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md): espia toda resposta (sem consumir
+    // o body do chamador — resp.clone()) por dois campos que main.py injeta via
+    // _resposta_pos_aprovacao_financeira. NUNCA decide autorização — isso é sempre do servidor,
+    // a cada request; isto só ajusta a TELA (pular o modal, ou avisar+deslogar).
+    try {
+      const _d68 = await resp.clone().json();
+      if (_d68 && typeof _d68 === 'object') {
+        if (_d68.janela_aprovar_financeiro_expira_em_ms) {
+          window._janelaAprovarFinanceiroExpiraEm = _d68.janela_aprovar_financeiro_expira_em_ms;
+        }
+        if (_d68.sessao_encerrada) {
+          window._janelaAprovarFinanceiroExpiraEm = 0;
+          if (typeof avisoPopup === 'function') {
+            avisoPopup(_d68.sessao_msg || 'Sessão encerrada.', {titulo: 'Sessão encerrada'})
+              .then(() => { window.location.href = '/login'; });
+          } else {
+            window.location.href = '/login';
+          }
+        }
+      }
+    } catch(e) { /* resposta não é JSON (PDF, HTML etc.) — fora do escopo deste interceptor */ }
     return resp;
   };
 })();
@@ -23316,7 +23337,10 @@ async function cancelarContrato(){
     desfecho = await _escolherDesfechoCancelamento();
     if (!desfecho) return;   // voltou, sem fazer nada
   }
-  const cred = await pedirCredenciaisGerente({capacidade: null,
+  // ACHADO-68 (10/09): categoria 3 — ato terminal e irreversível, SEMPRE pede senha. Era
+  // `capacidade: null` (sempre pedia só por `null` ser falsy no dispatcher — efeito
+  // colateral de tipo, não intenção escrita); agora é um marcador explícito.
+  const cred = await pedirCredenciaisGerente({capacidade: 'sempre_pedir',
     titulo: 'Cancelar contrato',
     mensagem: 'Exige senha de Gerente ou superior. Antes da 2ª assinatura, cancela livre. Depois da 2ª assinatura, estorna TODOS os lançamentos e trava o projeto PARA SEMPRE. Indisponível após a NF-e.' });
   if(!cred) return;
@@ -24268,17 +24292,41 @@ function pedirCredenciaisGerente(opts) {
   opts = opts || {};
   // 2026-07-24: logado com a permissão não redigita senha — resolve direto sem modal
   // (o backend aceita request SEM credenciais quando a sessão tem a capacidade).
-  // opts.capacidade: qual permissão libera o atalho (default 'autorizar'); null = sempre pergunta.
-  // Achado do usuário (2026-08-25): a folga NÃO vale pra eventos financeiros — "deve ocorrer em
-  // todos os casos que não envolvam eventos financeiros". `aprovar_financeiro` sempre pede a
-  // senha de novo, mesmo pra quem já tem a capacidade — reautenticação como passo extra de
-  // confiança antes de mexer no razão contábil, deliberadamente sem atalho.
+  // opts.capacidade: qual permissão libera o atalho (default 'autorizar').
+  //
+  // ACHADO-68 (10/09, docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md): três categorias, não uma
+  // regra só. (1) 'aprovar_financeiro' — nunca tem ESTE atalho (folga NÃO vale pra eventos
+  // financeiros, achado do usuário 2026-08-25), mas ganhou uma JANELA própria no servidor
+  // (15min, `_aprovador_financeiro`/`_STEPUP_GRANTS`) — pede a senha uma vez, não a cada
+  // passo; ver o comentário de `_aprovador_financeiro` em main.py, a janela não é decidida
+  // aqui na tela. (2) as demais capacidades — atalho de sempre, inalterado. (3) atos
+  // IRREVERSÍVEIS — `capacidade: 'sempre_pedir'`, reconhecido por NOME (não por ser falsy,
+  // como `null` fazia sem querer antes) — nunca tem atalho e nunca ganha janela: um ato
+  // terminal não tem problema de repetição a resolver, e uma janela aberta por OUTRA
+  // intenção (ex.: aprovação financeira em andamento) não pode virar permissão de passagem
+  // pra isto.
   const cap = (opts.capacidade === undefined) ? 'autorizar' : opts.capacidade;
-  if (cap && cap !== 'aprovar_financeiro' && _usuarioAtual && _usuarioAtual['pode_' + cap]) {
+  if (cap && cap !== 'aprovar_financeiro' && cap !== 'sempre_pedir'
+      && _usuarioAtual && _usuarioAtual['pode_' + cap]) {
+    return Promise.resolve({ auto: true });
+  }
+  // ACHADO-68: janela de aprovar_financeiro — pula o modal se uma janela ainda válida foi
+  // aberta por uma ação financeira anterior NESTA sessão. É só a TELA otimizando quando
+  // pergunta; quem decide de verdade é o servidor (`_aprovador_financeiro`), a cada request —
+  // se o palpite daqui estiver errado (ex.: expirou entre o clique e o request), o backend
+  // recusa e o chamador mostra o erro normal, como sempre mostrou pra qualquer recusa.
+  if (cap === 'aprovar_financeiro' && window._janelaAprovarFinanceiroExpiraEm
+      && Date.now() < window._janelaAprovarFinanceiroExpiraEm) {
     return Promise.resolve({ auto: true });
   }
   const titulo = opts.titulo || 'Autorização gerencial';
-  const mensagem = opts.mensagem || 'Esta ação exige login e senha de gerente/diretor.';
+  let mensagem = opts.mensagem || 'Esta ação exige login e senha de gerente/diretor.';
+  // ACHADO-68, regra 2: quem está logado não tem a capacidade → qualquer credencial que
+  // funcionar aqui é de outra pessoa (sessão emprestada, por definição) — avisa ANTES.
+  if (cap === 'aprovar_financeiro' && _usuarioAtual && !_usuarioAtual['pode_aprovar_financeiro']) {
+    mensagem = 'Você está autorizando com as credenciais de outro usuário nesta sessão. Ao ' +
+      'concluir a operação, esta sessão será encerrada.\n\n' + mensagem;
+  }
   return new Promise((resolve) => {
     const ov = _popupOverlay(
       '<h4 style="margin:0 0 8px;color:var(--warn);font-size:1rem">&#x1F512; ' + esc(titulo) + '</h4>' +

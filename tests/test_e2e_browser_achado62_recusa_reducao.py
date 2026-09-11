@@ -13,7 +13,16 @@ de Fábrica. F2-39 Fatia 1 (mesma rodada): o campo ganhou máscara financeira
 
 Por que este teste TEM que ser de navegador: o critério de aceite inclui que a coluna Rev1
 reflita o valor reduzido DE VERDADE na tela (não é só "o servidor devolveu 200" — é "o usuário vê
-o valor novo, renderizado pelo fetch real no DOM") — isso só o motor do navegador prova."""
+o valor novo, renderizado pelo fetch real no DOM") — isso só o motor do navegador prova.
+
+ACHADO-68 (11/09, docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md): a garantia de 25/08 — "aprovar_
+financeiro SEMPRE pede senha de novo, mesmo pra quem já tem a capacidade" — foi invertida DE
+PROPÓSITO por uma janela de 15min (pede uma vez, as ações financeiras seguintes na mesma sessão
+não pedem mais). Mesmo padrão do F2-42 removendo `test_aceite_1_sombra_nao_muda_o_que_e_cobrado`
+com o motivo escrito. Por isso as 3 submissões abaixo (3.000/4.000/2.000) agora esperam o modal
+de credenciais SÓ na 1ª — a 2ª e a 3ª PROVAM a janela: o teste falha se o modal aparecer de novo
+(sinal de que a janela quebrou) e falha se ele não aparecer na 1ª (sinal de que a janela está
+vazando pra sessões/ações que nunca autenticaram)."""
 import os
 import socket
 import subprocess
@@ -149,33 +158,42 @@ def test_percurso_3000_4000_2000_a_reducao_e_aceita(page, servidor_e2e):
         inteiro = "{:,.0f}".format(valor).replace(",", ".")
         return "R$ " + inteiro
 
-    def _submeter(valor):
+    def _submeter(valor, espera_modal):
         page.fill("#_prov-inp-out_forn", str(valor))
         # F2-39 Fatia 1: o oninput da máscara roda no fill — confirma o formato antes de submeter.
         assert page.input_value("#_prov-inp-out_forn") == _fmt_brl(valor)
-        # _provAcao chama pedirCredenciaisGerente(capacidade:'aprovar_financeiro') — essa
-        # capacidade SEMPRE pede senha de novo (achado 2026-08-25, mesmo logado com a
-        # permissão), então o modal de credenciais abre de verdade aqui.
+        # _provAcao chama pedirCredenciaisGerente(capacidade:'aprovar_financeiro'). ACHADO-68:
+        # só a 1ª ação financeira da sessão pede senha de verdade — as seguintes, dentro da
+        # janela de 15min, não mostram modal nenhum (ver docstring do arquivo).
         page.evaluate("() => { _provAcao(%d, 'rev1', 'revisa'); }" % oid)
-        page.wait_for_selector("#_cred-login", state="visible")
-        page.fill("#_cred-login", "e2e_master")
-        page.fill("#_cred-senha", "senha123")
-        page.click('[data-act="ok"]')
+        if espera_modal:
+            page.wait_for_selector("#_cred-login", state="visible")
+            page.fill("#_cred-login", "e2e_master")
+            page.fill("#_cred-senha", "senha123")
+            page.click('[data-act="ok"]')
+        else:
+            # Prova POSITIVA da janela, não só "o teste passou por acaso": afirma que o modal
+            # NÃO aparece — se a janela quebrar (deixar de cobrir), isto falha aqui, antes até
+            # de qualquer asserção de negócio mais adiante.
+            page.wait_for_timeout(300)
+            assert page.locator("#_cred-login").count() == 0, (
+                "modal de credenciais apareceu de novo dentro da janela de 15min do ACHADO-68 "
+                "— a janela parou de cobrir esta ação")
 
     _abrir_e_revisar()
-    # 3.000 → ok (sucesso remove o modal velho e abre um novo sozinho)
-    _submeter(3000)
+    # 3.000 → ok, 1ª ação financeira da sessão: modal aparece de verdade, abre a janela.
+    _submeter(3000, espera_modal=True)
     page.wait_for_timeout(1200)   # await interno de _provAcao (fetch + reabertura do modal)
 
     _abrir_e_revisar()
-    # 4.000 → ok
-    _submeter(4000)
+    # 4.000 → ok, dentro da janela: SEM modal (prova a janela, não só tolera a ausência dela).
+    _submeter(4000, espera_modal=False)
     page.wait_for_timeout(1200)
 
     _abrir_e_revisar()
     # 2.000 → F2-39: ACEITO agora (era recusado antes da reversão do ACHADO-62) — migra
-    # 2.000 de volta pro Custo de Fábrica, sem erro na tela.
-    _submeter(2000)
+    # 2.000 de volta pro Custo de Fábrica, sem erro na tela. Ainda dentro da janela: sem modal.
+    _submeter(2000, espera_modal=False)
     page.wait_for_timeout(1200)
     assert page.query_selector("#_prov-erro") is None or page.inner_text("#_prov-erro") == ""
     assert page.query_selector("#erro-modal-overlay") is None

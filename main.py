@@ -379,9 +379,29 @@ def _parse_multipart_arquivos(body, ct):
 _STEPUP_GRANTS = {}   # {(token, recurso): expira_em_epoch}
 _STEPUP_TTL = 30 * 60
 
+# ACHADO-68 (10/09, docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md): janela de reaprovação de
+# aprovar_financeiro — 15 min, POR CAPACIDADE (chave (token, 'aprovar_financeiro'), nunca vaza
+# pra outro recurso). Reusa o mesmo `_STEPUP_GRANTS` do step-up de módulo (financeiro/folha/
+# fiscal) em vez de um mecanismo paralelo — só o TTL é próprio; o step-up de módulo continua em
+# _STEPUP_TTL (30min).
+_APROVAR_FINANCEIRO_JANELA_SEGUNDOS = 15 * 60
 
-def _stepup_conceder(token, recurso):
-    _STEPUP_GRANTS[(token, recurso)] = time.time() + _STEPUP_TTL
+
+def _stepup_purgar_expirados():
+    """`_STEPUP_GRANTS` é um dict de PROCESSO — sem isto, só cresce: `_stepup_valido` limpa a
+    própria chave quando ALGUÉM a consulta depois de expirada, mas uma janela que ninguém nunca
+    mais consulta (ex.: a pessoa fechou a aba sem outra ação financeira) fica pra sempre. Chamado
+    a cada `_stepup_conceder` — concessões são raras (uma por aprovação financeira/step-up de
+    módulo), então a varredura sai barata e o dict nunca acumula mais que o necessário."""
+    agora = time.time()
+    for chave, exp in list(_STEPUP_GRANTS.items()):
+        if exp <= agora:
+            _STEPUP_GRANTS.pop(chave, None)
+
+
+def _stepup_conceder(token, recurso, ttl=None):
+    _stepup_purgar_expirados()
+    _STEPUP_GRANTS[(token, recurso)] = time.time() + (ttl if ttl is not None else _STEPUP_TTL)
 
 
 def _stepup_valido(token, recurso):
@@ -391,6 +411,15 @@ def _stepup_valido(token, recurso):
     if exp:
         _STEPUP_GRANTS.pop((token, recurso), None)
     return False
+
+
+def _stepup_revogar_todos(token):
+    """ACHADO-68: chamado no logout — nenhuma janela de step-up (nenhum recurso, não só
+    aprovar_financeiro) sobrevive à sessão que a abriu."""
+    if not token:
+        return
+    for chave in [k for k in _STEPUP_GRANTS if k[0] == token]:
+        _STEPUP_GRANTS.pop(chave, None)
 
 
 def _usuario_com_capacidade(db, login, senha, capacidade, sessao=None):
@@ -593,9 +622,119 @@ def _bloqueio_execucao_etapa(db, nome_safe, loja_id, codigo):
     return None
 
 
-def _aprovador_financeiro(db, login, senha, sessao=None):
-    """Usuario apto a aprovar financeiro, ou None. Sessão-primeiro: ver _usuario_com_capacidade."""
-    return _usuario_com_capacidade(db, login, senha, "aprovar_financeiro", sessao=sessao)
+class _AprovadorFinanceiro:
+    """Resultado de `_aprovador_financeiro` (ACHADO-68). Continua se comportando como o Usuario
+    (ou None) de antes pros 15 chamadores existentes — `if not aprovador`, `aprovador.id`,
+    `aprovador.nome` — sem precisar mudar nenhuma dessas linhas: `__bool__` reflete se autorizou,
+    `__getattr__` delega pro Usuario de verdade. O dado NOVO é `.sessao_emprestada` — quando True,
+    o chamador tem que invalidar a sessão ao concluir a operação (regra 2 do ACHADO-68); nenhum
+    chamador antigo lê esse atributo, então nenhum se comporta diferente até ser migrado."""
+    def __init__(self, usuario, sessao_emprestada=False, token=None):
+        self.usuario = usuario
+        self.sessao_emprestada = sessao_emprestada
+        self.token = token   # pro chamador, sem precisar re-extrair do Cookie pra encerrar a sessão
+
+    def __bool__(self):
+        return self.usuario is not None
+
+    def __getattr__(self, nome):
+        return getattr(self.usuario, nome)
+
+
+_SESSAO_EMPRESTADA_MSG = (
+    "Você autorizou esta ação com credenciais de outro usuário. Por segurança, esta sessão "
+    "foi encerrada — faça login novamente.")
+
+
+def _encerrar_sessao_emprestada(token):
+    """ACHADO-68, regra 2: sessão emprestada não sobrevive à operação que autorizou — invalida
+    o TOKEN de verdade (Sessao.ativa=0, não só um aviso de tela) e revoga qualquer janela de
+    step-up que por acaso exista nele."""
+    if not token:
+        return
+    from database import Sessao as _Sessao
+    db = get_session()
+    try:
+        db.query(_Sessao).filter_by(token=token).update({"ativa": 0})
+        db.commit()
+    finally:
+        db.close()
+    _stepup_revogar_todos(token)
+
+
+def _resposta_pos_aprovacao_financeira(aprovador, resp):
+    """ACHADO-68, regras 1 e 2: chamar envolvendo a resposta de SUCESSO de cada endpoint que usa
+    `_aprovador_financeiro` (nunca as de erro — 'ao concluir a operação', não a cada tentativa).
+
+    Sessão emprestada: encerra a sessão de verdade agora e injeta os campos que a tela usa pra
+    avisar e mandar pro login. Senão, se há janela válida neste token, informa a expiração (ms
+    epoch) — a TELA usa isto só pra decidir se pula o modal na PRÓXIMA ação; quem decide de
+    verdade, a cada request, continua sendo `_aprovador_financeiro` no servidor."""
+    if getattr(aprovador, "sessao_emprestada", False):
+        _encerrar_sessao_emprestada(aprovador.token)
+        resp = dict(resp)
+        resp["sessao_encerrada"] = True
+        resp["sessao_msg"] = _SESSAO_EMPRESTADA_MSG
+        return resp
+    token = getattr(aprovador, "token", None)
+    if token:
+        exp = _STEPUP_GRANTS.get((token, "aprovar_financeiro"))
+        if exp and exp > time.time():
+            resp = dict(resp)
+            resp["janela_aprovar_financeiro_expira_em_ms"] = int(exp * 1000)
+    return resp
+
+
+def _aprovador_financeiro(db, login, senha, sessao=None, handler=None):
+    """Usuario apto a aprovar financeiro, envolto em `_AprovadorFinanceiro` — ACHADO-68
+    (docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md). `aprovar_financeiro` é a ÚNICA capacidade com
+    JANELA: `_usuario_com_capacidade` genérico (sessão-primeiro, pra sempre) continua servindo
+    as 9 demais capacidades sem tocar aqui — não é o mesmo mecanismo, de propósito.
+
+    `handler`: o BaseHTTPRequestHandler da requisição, só pra extrair o token da sessão (mesmo
+    padrão de `_sem_acesso_modulo`). Sem ele, a janela nunca abre nem é consultada (fail-safe:
+    sem token, cada chamada exige credenciais — nunca o contrário).
+
+    A pergunta que decide tudo NÃO é "a sessão logada tem a capacidade", é "as credenciais
+    digitadas são do PRÓPRIO dono da sessão" — correção de 11/09: a versão anterior abria
+    janela pra QUALQUER credencial válida numa sessão que já tinha a capacidade, mesmo credencial
+    de OUTRA pessoa — exatamente a escalada que o ramo de sessão emprestada existe pra impedir,
+    só que entrando por uma porta que não checava isso. Três ramos:
+
+    1. Sem credenciais: só autoriza se já existe janela válida NESTE token — nunca
+       "sessão-primeiro" puro (a 1ª senha continua obrigatória, janela ou não).
+    2. Credenciais de quem é dono desta sessão (usuário validado == `sessao['id']`): autoriza e
+       ABRE a janela de 15min no token. Nunca `sessao_emprestada`.
+    3. Credenciais de QUALQUER outra pessoa — mesmo que a sessão logada TAMBÉM tenha
+       `aprovar_financeiro` por conta própria: autoriza a operação (a permissão de quem digitou
+       é real), mas NUNCA abre janela, e marca `sessao_emprestada=True` — o chamador encerra a
+       sessão ao concluir (regra 2 do ACHADO-68). Uma janela aberta por outra intenção não pode
+       virar cobertura pra isto."""
+    token = None
+    if handler is not None:
+        from auth.auth_routes import get_token_from_cookie
+        token = get_token_from_cookie(handler.headers.get("Cookie", ""))
+
+    u_sessao = db.get(Usuario, sessao["id"]) if sessao else None
+    sem_credenciais = not (login or "").strip() and not (senha or "")
+
+    if sem_credenciais:
+        if (u_sessao and u_sessao.ativo and token
+                and _stepup_valido(token, "aprovar_financeiro")):
+            return _AprovadorFinanceiro(u_sessao, sessao_emprestada=False, token=token)
+        return _AprovadorFinanceiro(None, token=token)
+
+    u = _usuario_com_capacidade(db, login, senha, "aprovar_financeiro")
+    if not u:
+        return _AprovadorFinanceiro(None, token=token)
+
+    propria_credencial = bool(u_sessao and u.id == u_sessao.id)
+    if propria_credencial:
+        if token:
+            _stepup_conceder(token, "aprovar_financeiro", ttl=_APROVAR_FINANCEIRO_JANELA_SEGUNDOS)
+        return _AprovadorFinanceiro(u, sessao_emprestada=False, token=token)
+
+    return _AprovadorFinanceiro(u, sessao_emprestada=True, token=token)
 
 
 def _auditoria_pe_jsonl(nome_safe, registro):
@@ -7434,7 +7573,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Valores inválidos"}, code=400); return
             db = get_session()
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 ator = _ator_dict(db, usuario)
@@ -7461,7 +7600,8 @@ class Handler(BaseHTTPRequestHandler):
                 if req.get("aplicar_ajustes", True):
                     ajustes_out = _aplicar_ajustes_conferencia(db, ot, own_id, loja_id, nome, custo_novo)
                 db.commit()
-                self.send_json({"ok": True, "lancamentos": out, "ajustes": ajustes_out})
+                self.send_json(_resposta_pos_aprovacao_financeira(
+                    aprovador, {"ok": True, "lancamentos": out, "ajustes": ajustes_out}))
             finally:
                 db.close()
             return
@@ -8056,7 +8196,7 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(body) if body else {}
             db = get_session()
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 ator = _ator_dict(db, usuario)
@@ -8157,7 +8297,8 @@ class Handler(BaseHTTPRequestHandler):
                 _auditoria_pe_jsonl(nome, {
                     "quando": datetime.utcnow().isoformat(), "quem": aprovador.id,
                     "etapa": "11d", "parcela_id": parcela_id, **montada})
-                self.send_json({"ok": True, "decisao": montada})
+                self.send_json(_resposta_pos_aprovacao_financeira(
+                    aprovador, {"ok": True, "decisao": montada}))
             finally:
                 db.close()
             return
@@ -8239,7 +8380,7 @@ class Handler(BaseHTTPRequestHandler):
                                 "antes de concluir." % len(faltam),
                         "faltam": faltam}, code=400); return
                 # Só agora — com a certeza de que a aprovação VAI acontecer — a credencial é gasta.
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 _set_etapa_status(db, nome, "11d", "concluido", aprovador.id)
@@ -8249,7 +8390,7 @@ class Handler(BaseHTTPRequestHandler):
                     "AF2 (Conciliação de PE) aprovada por %s." % (aprovador.nome or aprovador.login),
                     "pe_af2_aprovada", aprovador.id)
                 db.commit()
-                self.send_json({"ok": True})
+                self.send_json(_resposta_pos_aprovacao_financeira(aprovador, {"ok": True}))
             finally:
                 db.close()
             return
@@ -8270,7 +8411,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Informe o motivo da reprovação."}, code=400); return
             db = get_session()
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para reprovar"}, code=403); return
                 ator = _ator_dict(db, usuario)
@@ -8288,7 +8429,7 @@ class Handler(BaseHTTPRequestHandler):
                     % (aprovador.nome or aprovador.login, motivo),
                     "pe_af2_reprovada", aprovador.id)
                 db.commit()
-                self.send_json({"ok": True})
+                self.send_json(_resposta_pos_aprovacao_financeira(aprovador, {"ok": True}))
             finally:
                 db.close()
             return
@@ -11686,7 +11827,7 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(body) if body else {}
             db = get_session()
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 ator = _ator_dict(db, usuario)
@@ -11839,7 +11980,8 @@ class Handler(BaseHTTPRequestHandler):
                 _mc.disparar_deltas_af(db, ot_af, own_af, orc.projeto_id, _itens_af, ref_base=_ref_af)
                 orc.ramo_financeiro_seq = _seq
                 db.commit()
-                self.send_json({"ok": True, "travada": True})
+                self.send_json(_resposta_pos_aprovacao_financeira(
+                    aprovador, {"ok": True, "travada": True}))
             finally:
                 db.close()
             return
@@ -11858,7 +12000,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "ramo inválido"}, code=400); return
             db = get_session()
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 ator = _ator_dict(db, usuario)
@@ -11878,7 +12020,8 @@ class Handler(BaseHTTPRequestHandler):
                     orc.ramo_financeiro_seq = seq
                 orc.ramo_financeiro = ramo_novo
                 db.commit()
-                self.send_json({"ok": True, "ramo": ramo_novo, "cust_fin": cust_fin})
+                self.send_json(_resposta_pos_aprovacao_financeira(
+                    aprovador, {"ok": True, "ramo": ramo_novo, "cust_fin": cust_fin}))
             finally:
                 db.close()
             return
@@ -11900,7 +12043,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Informe o custo real (> 0)"}, code=400); return
             db = get_session()
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 ator = _ator_dict(db, usuario)
@@ -11923,7 +12066,8 @@ class Handler(BaseHTTPRequestHandler):
                                                       ref="antecip:%s:%d" % (orc.projeto_id, seq))
                 orc.ramo_financeiro_seq = seq
                 db.commit()
-                self.send_json({"ok": True, "reconhecido": bool(lan)})
+                self.send_json(_resposta_pos_aprovacao_financeira(
+                    aprovador, {"ok": True, "reconhecido": bool(lan)}))
             finally:
                 db.close()
             return
@@ -11945,7 +12089,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Informe o valor recebido (> 0)"}, code=400); return
             db = get_session()
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 ator = _ator_dict(db, usuario)
@@ -11963,7 +12107,8 @@ class Handler(BaseHTTPRequestHandler):
                                               ref_base="jloja:%s:%d" % (orc.projeto_id, seq))
                 orc.ramo_financeiro_seq = seq
                 db.commit()
-                self.send_json({"ok": True, "apropriado": mv or 0.0})
+                self.send_json(_resposta_pos_aprovacao_financeira(
+                    aprovador, {"ok": True, "apropriado": mv or 0.0}))
             finally:
                 db.close()
             return
@@ -11979,7 +12124,7 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(body) if body else {}
             db = get_session()
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 ator = _ator_dict(db, usuario)
@@ -12012,10 +12157,10 @@ class Handler(BaseHTTPRequestHandler):
                 rec.confirmado_em = data_conf
                 rec.confirmado_por_id = usuario.get("id")
                 db.commit()
-                self.send_json({"ok": True, "recebivel": {
+                self.send_json(_resposta_pos_aprovacao_financeira(aprovador, {"ok": True, "recebivel": {
                     "id": rec.id, "status": rec.status, "valor_confirmado": rec.valor_confirmado,
                     "confirmado_em": rec.confirmado_em.isoformat() if rec.confirmado_em else None,
-                }, "lancado": bool(lan)})
+                }, "lancado": bool(lan)}))
             finally:
                 db.close()
             return
@@ -12032,7 +12177,7 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(body) if body else {}
             db = get_session()
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 ator = _ator_dict(db, usuario)
@@ -12060,7 +12205,8 @@ class Handler(BaseHTTPRequestHandler):
                                         "valor_antigo": antigo.isoformat() if antigo else None,
                                         "valor_novo": nova_dt.isoformat()})))
                 db.commit()
-                self.send_json({"ok": True, "recebivel": {"id": rec.id, "data_prevista": rec.data_prevista.isoformat()}})
+                self.send_json(_resposta_pos_aprovacao_financeira(aprovador, {"ok": True, "recebivel": {
+                    "id": rec.id, "data_prevista": rec.data_prevista.isoformat()}}))
             finally:
                 db.close()
             return
@@ -12078,7 +12224,7 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(body) if body else {}
             db = get_session()
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 ator = _ator_dict(db, usuario)
@@ -12102,8 +12248,9 @@ class Handler(BaseHTTPRequestHandler):
                     acao="marcar_recebivel_duvidoso", projeto_nome=rec.projeto_nome,
                     contexto=json.dumps({"recebivel_id": rec.id, "valor": rec.valor_previsto})))
                 db.commit()
-                self.send_json({"ok": True, "recebivel": {"id": rec.id, "status": rec.status,
-                                "duvidoso_em": rec.duvidoso_em.isoformat()}, "lancado": bool(lan)})
+                self.send_json(_resposta_pos_aprovacao_financeira(aprovador, {"ok": True, "recebivel": {
+                    "id": rec.id, "status": rec.status,
+                    "duvidoso_em": rec.duvidoso_em.isoformat()}, "lancado": bool(lan)}))
             finally:
                 db.close()
             return
@@ -12125,7 +12272,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Fração deve estar entre 0 e 1 (ex.: 0.5 = 50%)"}, code=400); return
             db = get_session()
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
                     self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 ator = _ator_dict(db, usuario)
@@ -12143,7 +12290,8 @@ class Handler(BaseHTTPRequestHandler):
                 out_ajx = _reverter_aplicacoes_fabrica(db, ot, own_id, orc.projeto_id, fracao, _ref_dev)
                 orc.ramo_financeiro_seq = seq
                 db.commit()
-                self.send_json({"ok": True, "revertido": out, "ajustes_revertidos": out_ajx})
+                self.send_json(_resposta_pos_aprovacao_financeira(
+                    aprovador, {"ok": True, "revertido": out, "ajustes_revertidos": out_ajx}))
             finally:
                 db.close()
             return
@@ -12169,6 +12317,13 @@ class Handler(BaseHTTPRequestHandler):
             req = json.loads(body) if body else {}
             db = get_session()
             try:
+                # ACHADO-68 (categoria 3, docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md): cancelamento de
+                # contrato é IRREVERSÍVEL — sempre pede senha, sem atalho e sem janela, de propósito.
+                # NÃO passar `handler=self` aqui: é o que mantém este ponto FORA do mecanismo de
+                # janela (nunca abre uma, nunca consulta uma) mesmo reusando `_aprovador_financeiro`
+                # só pra validar a credencial. Uma janela aberta por OUTRA aprovação financeira não
+                # pode virar permissão de passagem pra isto — não "conserte" isto adicionando o
+                # `handler=self` que os outros 14 pontos têm.
                 aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
                 if not aprovador or not perfis.pode(aprovador.nivel, "autorizar"):
                     self.send_json({"ok": False, "erro": "Cancelamento de contrato exige senha de Gerente ou superior"}, code=403); return
@@ -14320,7 +14475,7 @@ class Handler(BaseHTTPRequestHandler):
                 req = json.loads(body) if body else {}
                 db = get_session()
                 try:
-                    aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                    aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                     if not aprovador:
                         self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                     ator = _ator_dict(db, usuario)
@@ -14334,7 +14489,8 @@ class Handler(BaseHTTPRequestHandler):
                     if not contrato:
                         self.send_json({"ok": False, "erro": "Contrato não encontrado"}, code=404); return
                     if contrato.financeiro_concluido_em is not None:
-                        self.send_json({"ok": True, "ja_concluido": True}); return
+                        self.send_json(_resposta_pos_aprovacao_financeira(
+                            aprovador, {"ok": True, "ja_concluido": True})); return
                     faltas = []
                     if contrato.status != "vigente":
                         faltas.append("Contrato ainda não está vigente (falta assinatura das duas partes).")
@@ -14366,7 +14522,7 @@ class Handler(BaseHTTPRequestHandler):
                     contrato.financeiro_concluido_em = _mc.agora_no_fuso(db, ot_fin, own_fin)
                     contrato.financeiro_concluido_por_id = aprovador.id
                     db.commit()
-                    self.send_json({"ok": True})
+                    self.send_json(_resposta_pos_aprovacao_financeira(aprovador, {"ok": True}))
                 except Exception as e:
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -17097,7 +17253,7 @@ class Handler(BaseHTTPRequestHandler):
                     # Aprovação financeira (8/11d): exige login+senha de quem pode aprovar.
                     aprovador = None
                     if novo_status in mod_ciclo.STATUS_CONCLUSIVOS and mod_ciclo.exige_aprovacao_financeira(etapa_cod):
-                        aprovador = _aprovador_financeiro(db, req.get("login", ""), req.get("senha", ""), sessao=usuario)
+                        aprovador = _aprovador_financeiro(db, req.get("login", ""), req.get("senha", ""), sessao=usuario, handler=self)
                         if not aprovador:
                             self.send_json({
                                 "ok": False,
@@ -17224,7 +17380,8 @@ class Handler(BaseHTTPRequestHandler):
                                 "passagem automática de fase falhou (%s/%s): %s",
                                 nome_safe, etapa_cod, _e)
                     db.commit()
-                    self.send_json({"ok": True, "etapa_codigo": etapa_cod, "status": etapa.status})
+                    self.send_json(_resposta_pos_aprovacao_financeira(
+                        aprovador, {"ok": True, "etapa_codigo": etapa_cod, "status": etapa.status}))
                 except Exception as e:
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)

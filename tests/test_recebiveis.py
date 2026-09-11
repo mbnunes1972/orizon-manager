@@ -2,7 +2,17 @@
 mod_contabil.EVENTOS — nada dava baixa em Contas a Receber (1.1.02). Cobre a materialização pura
 (mod_recebiveis.materializar) por ramo de pagamento, o motor de confirmação
 (mod_contabil.registrar_recebimento_venda) e os endpoints HTTP (confirmar + previstos no
-fluxo-caixa)."""
+fluxo-caixa).
+
+ACHADO-68 (11/09, docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md): os testes HTTP abaixo (confirmar/
+reprogramar/duvidoso, todos gate por `aprovar_financeiro`) contavam com "sessão-primeiro sempre"
+— `dir_l1` logado, sem credencial no corpo, e o servidor autorizava na cara. O ACHADO-68 inverteu
+essa garantia DE PROPÓSITO: mesmo quem tem a capacidade digita a senha na 1ª ação financeira da
+sessão; só as SEGUINTES, dentro da janela de 15min, dispensam. Mesmo padrão do F2-42 removendo
+`test_aceite_1_sombra_nao_muda_o_que_e_cobrado` com o motivo escrito. Por isso a 1ª chamada
+financeira de cada cenário abaixo agora leva `login`/`senha` explícitos; chamadas SEGUINTES na
+MESMA sessão (`c`, mesmo cookie) continuam com corpo vazio de propósito — a janela tem que
+cobri-las, e isso testa a própria janela de brinde."""
 import json
 from datetime import date
 
@@ -168,11 +178,11 @@ def _criar_recebivel_com_saldo(app_db, seed, tag, valor=4000.0, data_prevista=No
 def test_confirmar_recebivel_http(http_client_factory, seed, app_db):
     rid = _criar_recebivel_com_saldo(app_db, seed, "t1", valor=4000.0)
     c = http_client_factory(); c.login("dir_l1", "senha123")
-    st, d = c.post("/api/recebiveis/%d/confirmar" % rid, {})
+    st, d = c.post("/api/recebiveis/%d/confirmar" % rid, {"login": "dir_l1", "senha": "senha123"})
     assert st == 200 and d["ok"] is True, d
     assert d["recebivel"]["status"] == "confirmado"
     assert d["recebivel"]["valor_confirmado"] == 4000.0
-    # segunda confirmação → 409
+    # segunda confirmação → 409 (corpo vazio de propósito: a janela aberta acima cobre)
     st2, d2 = c.post("/api/recebiveis/%d/confirmar" % rid, {})
     assert st2 == 409 and d2["ok"] is False
 
@@ -180,7 +190,8 @@ def test_confirmar_recebivel_http(http_client_factory, seed, app_db):
 def test_confirmar_recebivel_valor_override(http_client_factory, seed, app_db):
     rid = _criar_recebivel_com_saldo(app_db, seed, "t2", valor=6000.0)
     c = http_client_factory(); c.login("dir_l1", "senha123")
-    st, d = c.post("/api/recebiveis/%d/confirmar" % rid, {"valor": 2500.0})
+    st, d = c.post("/api/recebiveis/%d/confirmar" % rid,
+                   {"valor": 2500.0, "login": "dir_l1", "senha": "senha123"})
     assert st == 200 and d["ok"] is True, d
     assert d["recebivel"]["valor_confirmado"] == 2500.0
 
@@ -195,7 +206,7 @@ def test_fluxo_caixa_lista_previstos_e_some_apos_confirmar(http_client_factory, 
     assert rid in ids
     linha = next(p for p in d["previstos"] if p["id"] == rid)
     assert linha["valor_previsto"] == 1500.0 and linha["projeto"] == seed["projeto_l1"]
-    c.post("/api/recebiveis/%d/confirmar" % rid, {})
+    c.post("/api/recebiveis/%d/confirmar" % rid, {"login": "dir_l1", "senha": "senha123"})
     st2, d2 = c.get("/api/financeiro/fluxo-caixa?de=%s&ate=%s" % (hoje, hoje))
     assert rid not in {p["id"] for p in d2["previstos"]}
 
@@ -228,7 +239,7 @@ def test_endpoint_recebiveis_vencido(http_client_factory, seed, app_db):
 def test_endpoint_recebiveis_confirmado_aparece_nos_totais(http_client_factory, seed, app_db):
     rid = _criar_recebivel_com_saldo(app_db, seed, "t6", valor=3300.0)
     c = http_client_factory(); c.login("dir_l1", "senha123")
-    c.post("/api/recebiveis/%d/confirmar" % rid, {})
+    c.post("/api/recebiveis/%d/confirmar" % rid, {"login": "dir_l1", "senha": "senha123"})
     st, d = c.get("/api/financeiro/recebiveis?projeto=%s" % seed["projeto_l1"])
     assert st == 200 and d["ok"] is True, d
     linha = next(r for r in d["recebiveis"] if r["id"] == rid)
@@ -293,7 +304,8 @@ def test_registrar_recebimento_duvidoso_credita_1_1_10(app_db):
 def test_endpoint_reprogramar_muda_data(http_client_factory, seed, app_db):
     rid = _criar_recebivel_com_saldo(app_db, seed, "t8", valor=1200.0, data_prevista=date(2020, 1, 1))
     c = http_client_factory(); c.login("dir_l1", "senha123")
-    st, d = c.post("/api/recebiveis/%d/reprogramar" % rid, {"data_prevista": "2027-01-15"})
+    st, d = c.post("/api/recebiveis/%d/reprogramar" % rid,
+                   {"data_prevista": "2027-01-15", "login": "dir_l1", "senha": "senha123"})
     assert st == 200 and d["ok"] is True, d
     assert d["recebivel"]["data_prevista"] == "2027-01-15"
     st2, d2 = c.get("/api/financeiro/recebiveis")
@@ -304,7 +316,8 @@ def test_endpoint_reprogramar_muda_data(http_client_factory, seed, app_db):
 def test_endpoint_reprogramar_audita_log_acao_gerencial(http_client_factory, seed, app_db):
     rid = _criar_recebivel_com_saldo(app_db, seed, "t9", valor=700.0, data_prevista=date(2020, 1, 1))
     c = http_client_factory(); c.login("dir_l1", "senha123")
-    c.post("/api/recebiveis/%d/reprogramar" % rid, {"data_prevista": "2027-02-01"})
+    c.post("/api/recebiveis/%d/reprogramar" % rid,
+          {"data_prevista": "2027-02-01", "login": "dir_l1", "senha": "senha123"})
     db = app_db.get_session()
     log = (db.query(app_db.LogAcaoGerencial).filter_by(acao="reprogramar_recebivel")
            .order_by(app_db.LogAcaoGerencial.id.desc()).first())
@@ -317,7 +330,8 @@ def test_endpoint_reprogramar_audita_log_acao_gerencial(http_client_factory, see
 def test_endpoint_reprogramar_bloqueado_se_ja_confirmado(http_client_factory, seed, app_db):
     rid = _criar_recebivel_com_saldo(app_db, seed, "t10", valor=400.0)
     c = http_client_factory(); c.login("dir_l1", "senha123")
-    c.post("/api/recebiveis/%d/confirmar" % rid, {})
+    c.post("/api/recebiveis/%d/confirmar" % rid, {"login": "dir_l1", "senha": "senha123"})
+    # corpo vazio de propósito: a janela aberta pelo confirmar acima cobre este reprogramar
     st, d = c.post("/api/recebiveis/%d/reprogramar" % rid, {"data_prevista": "2027-01-01"})
     assert st == 409 and d["ok"] is False
 
@@ -325,14 +339,14 @@ def test_endpoint_reprogramar_bloqueado_se_ja_confirmado(http_client_factory, se
 def test_endpoint_duvidoso_reclassifica_e_bloqueia_dobra(http_client_factory, seed, app_db):
     rid = _criar_recebivel_com_saldo(app_db, seed, "t11", valor=2500.0)
     c = http_client_factory(); c.login("dir_l1", "senha123")
-    st, d = c.post("/api/recebiveis/%d/duvidoso" % rid, {})
+    st, d = c.post("/api/recebiveis/%d/duvidoso" % rid, {"login": "dir_l1", "senha": "senha123"})
     assert st == 200 and d["ok"] is True, d
     assert d["recebivel"]["status"] == "duvidoso"
     st2, d2 = c.get("/api/financeiro/recebiveis")
     linha = next(r for r in d2["recebiveis"] if r["id"] == rid)
     assert linha["status"] == "duvidoso" and linha["vencido"] is False
     assert d2["totais"]["duvidoso"] >= 2500.0
-    # não pode marcar como duvidoso de novo
+    # não pode marcar como duvidoso de novo (corpo vazio de propósito: janela cobre)
     st3, d3 = c.post("/api/recebiveis/%d/duvidoso" % rid, {})
     assert st3 == 409 and d3["ok"] is False
 
@@ -340,7 +354,8 @@ def test_endpoint_duvidoso_reclassifica_e_bloqueia_dobra(http_client_factory, se
 def test_endpoint_confirmar_apos_duvidoso_credita_1_1_10(http_client_factory, seed, app_db):
     rid = _criar_recebivel_com_saldo(app_db, seed, "t12", valor=1800.0)
     c = http_client_factory(); c.login("dir_l1", "senha123")
-    c.post("/api/recebiveis/%d/duvidoso" % rid, {})
+    c.post("/api/recebiveis/%d/duvidoso" % rid, {"login": "dir_l1", "senha": "senha123"})
+    # corpo vazio de propósito: a janela aberta pelo duvidoso acima cobre este confirmar
     st, d = c.post("/api/recebiveis/%d/confirmar" % rid, {})
     assert st == 200 and d["ok"] is True, d
     assert d["recebivel"]["status"] == "confirmado"

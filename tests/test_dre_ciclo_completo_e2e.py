@@ -352,8 +352,14 @@ def test_ciclo_completo_tres_visoes_dre(app_db, seed, projetos_dir, contratos_di
     finally:
         db.close()
     portao_recebimento = {"recebiveis_encontrados": len(rec_ids)}
-    for rid in rec_ids:
-        st, b = c.post("/api/recebiveis/%d/confirmar" % rid, {})
+    # ACHADO-68 (11/09, docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md): confirmar é gate por
+    # aprovar_financeiro, que passou a pedir a senha só na 1ª ação financeira da sessão (janela
+    # de 15min cobre as seguintes) — antes era "sessão-primeiro sempre". Mesmo padrão do F2-42
+    # removendo test_aceite_1_sombra_nao_muda_o_que_e_cobrado com o motivo escrito. Só a 1ª
+    # confirmação do laço leva credencial; as demais, corpo vazio de propósito, testam a janela.
+    for i, rid in enumerate(rec_ids):
+        corpo = {"login": "dir_l1", "senha": "senha123"} if i == 0 else {}
+        st, b = c.post("/api/recebiveis/%d/confirmar" % rid, corpo)
         assert st == 200 and b.get("ok"), (rid, b)
     marco("7_recebimento")
 

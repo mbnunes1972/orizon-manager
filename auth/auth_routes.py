@@ -62,6 +62,9 @@ def handle_auth_get(handler, path: str) -> bool:
         token  = get_token_from_cookie(cookie)
         if token:
             fazer_logout(token)
+            # ACHADO-68: nenhuma janela de step-up (módulo OU aprovar_financeiro) sobrevive ao logout.
+            import main as _main
+            _main._stepup_revogar_todos(token)
         handler.send_response(302)
         handler.send_header("Location", "/login")
         handler.send_header("Set-Cookie", f"{COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly")
@@ -167,6 +170,9 @@ def handle_auth_post(handler, path: str, body: bytes) -> bool:
         token  = get_token_from_cookie(cookie)
         if token:
             fazer_logout(token)
+            # ACHADO-68: nenhuma janela de step-up (módulo OU aprovar_financeiro) sobrevive ao logout.
+            import main as _main
+            _main._stepup_revogar_todos(token)
         _send_json(handler, {"ok": True})
         return True
 
