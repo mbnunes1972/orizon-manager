@@ -414,6 +414,73 @@ timeout nenhum.
 bloqueio silencioso. Não resolve a causa — resolve a descoberta.
 *Adiado:* achado ao verificar o F2-43, não é item de bloco nenhum.
 
+**Atualização 10/09 (Claude Code) — entrega (a) feita, medição dos Passos 1/2
+em `docs/db/TAREFA_ESTABILIDADE_SUITE.md`:**
+
+**(a) feito.** `pytest.ini` ganhou `timeout = 300` (pytest-timeout, instalado);
+provado com um `time.sleep(600)` descartável virando falha legível com
+`--timeout=3` (não esperei os 300s de verdade pra provar o mecanismo — o
+override por linha de comando É a interface pretendida) e com um teste rápido
+confirmando que o teto de 300s do ini não afeta teste normal. Isso cobre o
+pior caso do item acima (o travamento de 12h) — não a causa.
+
+**Passo 1 (o timeout de 5s do HttpClient) — hipótese DERRUBADA.**
+Instrumentei `urllib.request.urlopen` (temporário, `ORIZON_MEDIR_SUITE=1` em
+`tests/conftest.py`, revertido depois de medir) e rodei `pytest -q` completo
+duas vezes (2750 passed, 4 xfailed, ~590s cada, nenhuma das sete ocorrências
+apareceu nas duas rodadas). Das 2767 chamadas reais do `HttpClient`
+(`timeout=5`): p50 = 0,005s, p95 ≈ 0,06s, **máximo 1,08–1,18s**. Nenhuma
+chegou perto do teto de 5s. **O timeout de 5s não é a causa comum** — não
+ajustei o número; a hipótese cai, como o item 4 do aceite pede.
+
+**Passo 2 (a corrida de boot) — medição inconclusiva, registro honesto.**
+A mesma instrumentação, aplicada a `subprocess.Popen` e ao `urlopen(timeout=1)`
+dos loops de boot dos ~30 arquivos que definem `servidor_e2e` (o padrão citado
+acima), **não capturou nenhuma chamada real dessas** nas duas rodadas
+completas — 0 `popen_start`, 0 `urlopen` sem `/login` — apesar de os boots
+claramente terem acontecido (a suíte passou). Verifiquei em escala menor (6 e
+depois 13 arquivos de E2E de navegador só) e a MESMA instrumentação capturou
+certinho (12 e 26 subprocessos, pareados). Não achei a causa da diferença em
+escala grande — cheguei a descartar dupla-importação de `tests.conftest`
+(ninguém importa assim) e reassinatura direta de `subprocess.Popen` em
+qualquer teste (nenhuma ocorrência) — mas não persegui além disso; é um
+artefato da FERRAMENTA de medição, não do sistema medido, e não vale gastar
+mais rodadas de 10 minutos nele sem uma pista melhor.
+
+Dado estrutural que SEI por leitura, não por instrumentação: são exatamente
+**30 arquivos**, cada um com `servidor_e2e` `scope="module"` — sem
+`pytest-xdist` instalado e sem nenhum plugin de reordenação, `pytest -q`
+roda os 30 boots em SÉRIE, um processo por vez. Isso não prova ausência de
+corrida (o deadlock do item 7 é evidência de que ela existe às vezes), mas
+sugere que ela não nasce do agendamento do próprio pytest numa rodada serial
+única — os candidatos que sobram são (i) duas invocações de pytest rodando ao
+mesmo tempo (dois terminais, dois jobs de CI) ou (ii) uma corrida fina no
+fechamento da conexão Postgres do processo anterior, abaixo do que dá pra ver
+por fora do processo com timestamps de `urlopen`/`Popen` no lado do cliente.
+Provar (ii) provavelmente exige instrumentar DENTRO do próprio `main.py`/
+`_migrar_colunas_pg()` (logar timestamp de início/fim da DDL num arquivo), não
+por fora.
+
+**Não avancei para (b)/(c)** — só a entrega (a) e a medição, como pedido.
+
+**Atualização 11/09 (Claude Code) — aceite 1 da Rodada 2: reproduzido, e pior do que a
+hipótese previa.** Duas invocações de `pytest -q` completas, disparadas ao mesmo tempo contra
+os mesmos bancos (`orizon_test`/`orizon_e2e`), do zero. Resultado: paredes de `E`/`F` desde os
+primeiros 10% da suíte em AMBAS — não "alguns flakes a mais", é colisão sistemática. O `--timeout`
+global (entrega (a)) disparou várias vezes (confirmado no log — dump de stack de
+`pytest-timeout`), o que já muda o quadro da Rodada 1: não é um travamento único e silencioso,
+é uma sequência de MUITOS testes cada um pagando até 300s de timeout contra um banco
+corrompido pela concorrência — some numa suíte de ~2755 testes, isso soma horas de verdade
+(as duas rodadas ainda estavam vivas **mais de 24h depois**, achadas por acidente enquanto eu
+media outra coisa — mesmo padrão do achado original, "só apareceu porque alguém foi olhar o
+`ps`"). Não consegui um stack trace limpo da causa exata (sem `py-spy` com root neste ambiente;
+`pg_stat_activity` não mostrava lock-wait no instante em que investiguei — o processo parecia
+""rodando"", não travado num lock específico, o que sugere thrashing/degradação, não
+necessariamente um deadlock de DDL puro toda vez). Encerrei os dois processos (e os Chromiums
+órfãos deles) pra liberar o banco — não valia mais continuar a reprodução, o resultado já estava
+inequívoco. **Confirma o enunciado da Rodada 2**: duas invocações simultâneas não são seguras, e
+o guard (item (c) da Rodada 2) é o próximo passo — ainda não implementado.
+
 
 
 **LP-23 · Montador é pago por volume MONTADO, e a tela só sabe falar de venda.**

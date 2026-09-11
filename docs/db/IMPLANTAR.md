@@ -865,6 +865,38 @@ corrigido acima). **Produção NÃO tocada.**
 
     journalctl -u orizon-b --since today --no-pager | grep F2-41-SOMBRA
 
+### Décimo nono deploy por tag — v2026.09.09-beta1 — 09/09/2026
+
+**Sem migration nova.** `alembic current` = `9a1b2c3d4e5f (head)` ANTES e DEPOIS nos dois.
+
+F2-42 Rodada 2 (`docs/db/TAREFA_F2_42_FONTE_UNICA_E_INTERFACE.md`) — a fonte única do
+complemento. A Rodada 1 mediu; esta trocou. O `diferenca` cobrado passa a vir do MOTOR
+(`vava_motor`), e a proporção (`valor_complemento_por_fator`, fórmula intocada) vira sombra e
+fallback, com log próprio `[F2-42-FALLBACK]`. Os três consumidores — complemento por ambiente,
+por fase e a decisão da AF2 — moveram juntos, agora do lado do motor.
+
+A causa foi PROVADA antes da troca, não suposta. Segundo teste do Marcelo (Projeto 11, oito
+ambientes, de R$ 9,5 mil a R$ 63 mil, variações de −17,58% a +6,89% nos dois sentidos): a
+parcela fixa implícita deu ≈ R$ 66,40 em TODOS os oito, e 66,40 × (soma das variações) = −10,40
+contra os −10,42 da diferença dos totais. A linha responsável é `mod_negociacao.py:80-81` —
+viagem é rateada proporcionalmente ao bruto (não diverge), **brinde é `bri/den_bri`, dividido em
+partes iguais** (é a divergência inteira); Custo Especial não é rateado por ambiente e está fora.
+Quatro testes de propriedade fecham a álgebra `F × (VBVA_pe/VBVA_ct − 1)`.
+
+Interface, cinco itens dos dois testes do Marcelo: texto do Item Especial sem referência a
+achado (C1); modal não dumpa mais o JSON cru da forma de pagamento — defeito pré-existente do
+F2-40 (C2); rodapé numa linha só, "Diferença"/"Diferença (com desconto)" (C3); Salvar no
+complemento devolve à 11e sozinho (C4); C5 medido antes de corrigir — a hipótese da trava
+invertida não bateu com o código, o defeito real era o C2.
+
+O gabarito de números reais do Projeto 11 virou **propriedade sintética** (`e022b79`): teste que
+dá conjuntos de override DIFERENTES aos dois caminhos e afirma o mesmo VAVA por ambiente. Fixar
+oito reais de Homologação num teste unitário quebraria por mudança de configuração da loja, não
+do código. Os oito números seguem como conferência de percurso, na tela.
+
+Tag `v2026.09.09-beta1` (`871817b`). Mesmo procedimento nos dois; `confirmar.sh` 15/0; smoke
+302 na raiz + 401 no login inválido nos dois. **Produção NÃO tocada.**
+
 ## Conferir o que esta rodando
 
 Nao entrar no servidor pra olhar `git log` — perguntar direto:

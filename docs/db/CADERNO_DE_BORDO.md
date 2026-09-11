@@ -643,3 +643,85 @@ O método já registrado para LP-16/LP-21 vale para o conjunto: comparar os cinc
 causa comum — provavelmente o timeout fixo do cliente HTTP de teste, dimensionado para máquina
 ociosa — em vez de perseguir cada um. Continua **sem dono**; é candidato natural a uma rodada
 curta quando a linha do complemento fechar.
+
+## 10/09 — F2-43: a assimetria de avistaRecalcular virou conserto; a corrida do handoff, medida mas em aberto
+
+`docs/db/TAREFA_F2_43_PAGAMENTO_COMPLEMENTO.md`. O relato original (11e → Negociar Complemento →
+Definir forma de pagamento abrindo com plano estranho, juros aparentes numa condição sem juros)
+**não foi reproduzido** na primeira rodada de medição (09/09): nas tentativas feitas, o handoff
+sempre deixava `_tipoAtivo='avista'` setado antes de qualquer preview do motor chegar.
+
+A medição não voltou vazia, porém: das cinco modalidades de pagamento, só à vista
+(`avistaRecalcular`, `static/index.html:~10080`) **não tinha entrada** em
+`_atualizarPaineisAbertos()` (~10505) — as outras quatro (Aymoré/Cartão/VP/TF) recalculam por
+VISIBILIDADE do painel no DOM toda vez que um preview do motor chega; à vista só recalculava sob
+um gate à parte, `_tipoAtivo === 'avista'` (variável JS separada da visibilidade real do painel,
+~11715). Se essa variável ficasse um passo atrás do DOM, `#av-liq-valor`/`window._planoPagamento`
+ficavam com o plano de ANTES — mesma classe do precedente de 2026-08-17 (comentário já existente
+no código), por uma porta diferente.
+
+Essa assimetria é testável sem depender de complemento nem de dois orçamentos — é a promessa que
+vale pra QUALQUER negociação: depois de qualquer preview do motor, a caixa à vista concorda com
+`#neg-avista` do MESMO preview, não importa o que estivesse na tela ou em `_tipoAtivo` antes.
+Achado incidental ao escrever o teste: `#neg-parcelado` (um dos 8 itens que o doc original pedia
+pra fotografar) é hoje um **gêmeo morto** — apagado do DOM no ACHADO-64 (06/09); a caixa viva
+equivalente é `#neg-total-final`, escrita direto por `_aplicarPreviewNaTela` (nunca fica presa).
+
+**Feito (Claude Code, mesmo dia):** teste
+`tests/test_f2_43_avista_concorda_apos_preview.py` — envenena `#av-liq-valor`/`#av-r-liq-valor`/
+`window._planoPagamento` com um plano de outro orçamento/modalidade e atrasa `_tipoAtivo`, dispara
+`_aplicarPreviewNaTela` (o mesmo ponto de entrada real de qualquer preview) e afirma que as três
+caixas concordam com `#neg-avista`. Rodado primeiro como `xfail(strict=True)` contra o código
+velho (capturou o defeito pela razão certa — `#neg-avista` já em R$140.000,00, `#av-liq-valor`
+preso em R$999.999,99); conserto: `avistaRecalcular` ganhou a mesma entrada por visibilidade que
+os outros 4 painéis já tinham, dentro de `_atualizarPaineisAbertos()` (timer próprio `_avTimer`);
+o gate frágil por variável (~11715) foi removido, não duplicado — os dois pontos de escrita de
+`_tipoAtivo` (`onPagamentoChange`) sempre alternam DOM e variável juntos, sem `await` no meio, e a
+única leitura de `_tipoAtivo` que sobrava não tinha razão pra continuar existindo ao lado da
+checagem de visibilidade. Marcador `xfail` removido, teste verde. Suíte de regressão (só os 5 E2E
+de navegador que tocam a tela de negociação — os demais candidatos são só backend, alheios a uma
+mudança 100% de JS de tela): 5 passed; 1 falha (`test_e2e_browser_negociacao_layout.py`, travou no
+upload do XML do ambiente, ANTES do trecho tocado) reproduzida limpa isolada — sexto flake da
+família já registrada acima (timeout sob carga paralela), não desta mudança.
+
+**Corrida do handoff, tentativa única (pedido explícito do usuário — não repetir sem pedir de
+novo):** a 1ª medição (09/09) tinha atrasado os previews do contratado E do complemento por
+igual, o que só preserva a ordem em vez de provocar a corrida. Nesta tentativa, atrasei SÓ o
+preview do CONTRATADO (`page.route` filtrado por `/api/orcamentos/<id_contratado>/negociacao-
+preview`, 1,5s) com o complemento sem atraso nenhum. Resultado, uma rodada só: na foto tirada no
+instante em que `#neg-desconto` aparece (handoff recém-concluído), a tela já mostrava
+R$140.000,00 — o valor do CONTRATADO (venda do próprio ambiente, não os R$14.000,00 de diferença
+do complemento) — e só 2,5s depois corrigiu sozinha para R$14.000,00. Bate com a nota já registrada
+de que `carregarOrcamentos()` (chamado pelo handoff) reativa de passagem o `_orcamentoAtivoId`
+ANTERIOR (o contratado) antes de `ativarOrcamento` do complemento — aqui, diferente da 1ª
+medição, o número chegou a aparecer na tela por uma janela real, não só no log do servidor. Não
+tenho certeza de que a autocorreção em 2,5s seja o conserto desta rodada agindo (o timer de
+`_avTimer` é de 200ms, bem menor) — pode ser um preview legítimo subsequente do próprio
+complemento chegando depois. **Não investiguei mais fundo — foi a única tentativa pedida.** Fica
+registrado como pista concreta de que o handoff tem uma janela de corrida real, não hipotética,
+para quem pegar esta linha depois. Script descartado após a rodada (não é teste commitado — não
+reproduz de forma determinística sem o atraso artificial de rede).
+
+## 10/09 — Estabilidade da suíte: (a) entregue, Passo 1 derruba a hipótese do timeout de 5s
+
+`docs/db/TAREFA_ESTABILIDADE_SUITE.md` (LP-16/LP-21/LP-22). Detalhe completo em
+`docs/db/LISTA_PARALELA.md` (entrada "Atualização 10/09" sob LP-22); aqui só o resumo.
+
+**(a) feito:** `pytest.ini` ganhou `timeout = 300` (pytest-timeout). Prova: um `time.sleep(600)`
+descartável, com `--timeout=3`, virou falha legível com stack — não um travamento. Transforma o
+pior caso (12h pendurado) numa falha visível; não resolve a causa.
+
+**Passo 1 medido, hipótese derrubada:** instrumentei `urllib.request.urlopen` temporariamente
+(revertido depois) e rodei `pytest -q` completo duas vezes (2750 passed, 4 xfailed, ~590s cada,
+zero das sete ocorrências). Das 2767 chamadas reais do `HttpClient` (timeout=5s): p95≈0,06s,
+máximo 1,08-1,18s. Nunca chegou perto do teto — **o timeout de 5s não é a causa comum**. Não
+ajustei o número; a hipótese cai.
+
+**Passo 2 (corrida de boot), inconclusivo por limitação da própria instrumentação:** a mesma
+instrumentação, aplicada a `subprocess.Popen`/`urlopen` dos ~30 boots de `servidor_e2e`, não
+capturou nada nas rodadas completas (funcionava em lotes menores, de 6 e 13 arquivos — não achei
+a causa da diferença em escala grande, e não persegui além de descartar dupla-importação e
+reassinatura direta de `Popen`). Fato estrutural por leitura: sem xdist, 30 boots rodam em série
+numa `pytest -q` — a corrida do item 7, se existir, é entre invocações de pytest concorrentes ou
+uma janela fina no fechamento da conexão Postgres, abaixo do que dá pra medir por fora do
+processo. Não avancei para (b)/(c) — só (a) e a medição, como pedido.
