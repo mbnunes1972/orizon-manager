@@ -15,6 +15,7 @@ alembic
 
 # Apenas para rodar a suíte de testes (não é necessário em produção):
 # pytest
+# pytest-timeout
 cryptography
 
 # Só para o E2E de navegador (tests/test_e2e_browser_conciliacao_final.py — fora da suíte
