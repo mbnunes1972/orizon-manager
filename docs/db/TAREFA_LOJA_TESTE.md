@@ -300,3 +300,75 @@ ninguém.
 - **Higiene de credenciais antes de dado real entrar.** As dez contas de teste criadas em 10/09
   têm senha `orizon123` e `senha_provisoria=0`. Antes de existir cliente real nesta base, elas
   trocam de senha ou saem, e os usuários das lojas do piloto nascem com `senha_provisoria=1`.
+
+
+## Etapa 1 EXECUTADA em Homologação (11/09) — o que a execução ensinou
+
+Rodada em `orizon_homologacao`, servidor do serviço B, com o repositório na tag
+`v2026.09.09-beta1` e os dois arquivos novos trazidos por `git show origin/main:<arquivo>` —
+sem mover o servidor da tag.
+
+```
+python3 scripts/clonar_loja.py --banco-esperado orizon_homologacao clone --origem-loja 1 \
+    --nome "Loja Teste" --codigo TES --permitir-identidade --copiar-remuneracao --aplicar
+```
+
+Resultado: **Loja Teste = id 15**, rede_id 1 (a mesma da Inspirium). O relatório trouxe
+`divergências contra o gabarito: NENHUMA`, 3 perfis, 15 funções, 4 documentos-modelo,
+emitente aplicado, `remuneracao: copiada (--copiar-remuneracao)`.
+
+**Idempotência provada sem querer.** A segunda execução do `--aplicar` disse
+`loja já existe (id=15) — reaplicando config por cima` e devolveu `criados: 0` em tudo, com os
+4 documentos-modelo `pulados_ja_iguais`. Não foi um teste planejado; foi uma repetição acidental
+que virou evidência.
+
+**R16 satisfeita depois da gravação:** `varrer_orfaos_gabarito` devolveu zero em todos os
+campos — `encontrados_conta`, `encontrados_centro_custo`, `retidos_*`.
+
+**A configuração financeira chegou inteira.** `config_financeira_json` da loja 15 traz as faixas
+da Inspirium (3% até 100k, 4% até 150k, 5% até 200k, 6% até 300k), `meta_mensal` 500.000 e o
+`limitador_desconto` com os dois degraus (30% → −1pp, 35% → −2pp). A função Consultor de Vendas
+chegou com `usa_comissao_vendas=1` e `salario_fixo=2000.0` — este último só porque a flag foi
+passada.
+
+### O achado da execução: o clone leva FUNÇÕES, não FUNCIONÁRIOS
+
+A Loja Teste nasceu com **15 funções e zero pessoas** — `Funcionario` e `Usuario` deram 0 na
+consulta. Isso não estava escrito em lugar nenhum do plano, e não é detalhe de teste: **numa
+implantação real é um passo a mais**, entre "a loja existe configurada" e "alguém consegue
+entrar nela".
+
+Duas consequências para quando este mecanismo virar atalho de implantação:
+
+1. O relatório do `clone` deveria **dizer** que a loja destino ficou sem usuário — hoje ele
+   informa o que copiou e cala sobre o que a loja ainda não tem para funcionar. Mesmo espírito
+   da linha da remuneração não copiada: uma exceção que se anuncia vale mais que uma que só
+   existe no código.
+2. Não adianta procurar um usuário de rede para contornar: as duas lojas estão na rede 1 e
+   **nenhum usuário do banco tem `rede_id` preenchido**. Foi medido, não suposto.
+
+O contorno usado foi `scripts/seed_loja15.py` — irmão do `seed_funcionarios_homolog.py`, que não
+serve para uma segunda loja porque checa `login` **globalmente** e pularia os dez. O novo usa
+sufixo `15` nos logins e a faixa 910.xxx de CPF (o outro usa 900.xxx), e é idempotente por login
+e por CPF-dentro-da-loja. Semeou 11 contas: 1 `master` (`admtes`), 2 `gerencial`
+(`rvieira15`, `alopes15`) e 8 `operador`, cobrindo os dez papéis. Amarração 1:1
+`Funcionario.usuario_id` ↔ `Usuario.funcionario_id` conferida nos dois sentidos — é o que
+`mod_folha._upsert_itens_venda` exige.
+
+**Higiene:** essas 11 entram na mesma dívida já registrada no "Fora do escopo" — senha
+`orizon123`, `senha_provisoria=0`. São 21 contas nessa condição em Homologação agora.
+
+### O que ainda falta para fechar a Etapa 1
+
+O **aceite 6** continua aberto: criar um projeto na Loja Teste (entrar como `cantunes15`) e ver
+as faixas de comissão aparecerem na negociação. O lado do dado está provado acima; falta a tela.
+Três coisas a conferir lá: a faixa muda de degrau ao cruzar 100k/150k/200k/300k; o limitador de
+desconto morde acima de 30% e de 35%; e o cabeçalho mostra "Loja Teste", não Inspirium — este
+último é onde a identidade herdada pelo `--permitir-identidade` apareceria.
+
+**A Etapa 2 (limpar os projetos da Inspirium) segue bloqueada** até o aceite 6 passar: enquanto
+a tela não confirmar, a Inspirium é a única cópia boa da configuração.
+
+**Dívida de identidade, a não esquecer:** a Loja Teste carrega hoje o CNPJ e a razão social da
+Inspirium. Inofensivo em Homologação — o token da Focus é de homologação. Mas esta loja **não
+viaja para Produção** com a identidade herdada.
