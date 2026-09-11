@@ -5249,3 +5249,131 @@ mais o painel à vista.
 Pacote: `docs/db/TAREFA_F2_43_PAGAMENTO_COMPLEMENTO.md`.
 
 ---
+
+## ACHADO-68 — a senha pedida a cada passo, e a sessão emprestada · RESOLVIDO 11/09/2026 (`4db4830`)
+
+Achado do Marcelo em 10/09, percorrendo Homologação (`v2026.09.09-beta1`):
+
+> "Nos mecanismos de aprovação é solicitada a senha, porém a cada passo ele pede novamente. (…)
+> O normal será o acesso ser feito pelo usuário com permissão, e nesse caso não deveria ter que
+> entrar com senha, dado que o usuário tem a permissão."
+
+### Não era defeito — era uma decisão anterior dele mesmo
+
+`pedirCredenciaisGerente` (`static/index.html`) **já tinha** o atalho para quem tem a
+capacidade, e `aprovar_financeiro` estava excluída dele **de propósito**. O comentário no código
+guarda a origem: *"Achado do usuário (2026-08-25): a folga NÃO vale pra eventos financeiros (…)
+reautenticação como passo extra de confiança antes de mexer no razão contábil, deliberadamente
+sem atalho."*
+
+Isso muda a natureza do trabalho: não se corrigiu um esquecimento, **substituiu-se uma regra por
+outra**. A decisão de 25/08 fica registrada como **revista**, não como erro — ela tinha razão
+declarada, e a razão continua valendo; o que mudou é o custo aceitável para honrá-la.
+
+### DECIDIDO (Marcelo, 10/09) — três categorias, não duas
+
+1. **`aprovar_financeiro`** → **janela de reaprovação de 15 min**. A senha é pedida uma vez e
+   abre janela no token; os passos seguintes não pedem. Preserva o ato deliberado que a decisão
+   de 25/08 queria e elimina o atrito de reautenticar a cada passo da MESMA operação.
+2. **Demais capacidades** → atalho de hoje, inalterado.
+3. **Atos irreversíveis** → **sempre pedem**, sem janela e sem atalho. `cancelarContrato` é o
+   primeiro membro.
+
+**A categoria 3 estava certa por acidente.** `cancelarContrato` passava `capacidade: null`, e
+como `null` é falsy o atalho nunca era alcançado — comportamento correto por coincidência de
+linguagem, não por intenção declarada. Passou a usar um marcador explícito (`'sempre_pedir'`),
+pelo mesmo motivo da R12: estado que depende de alguém lembrar é estado que uma refatoração
+futura absorve sem perceber.
+
+**A janela é por CAPACIDADE, não por sessão.** Abrir para `aprovar_financeiro` não libera
+`executar_pe` nem nenhuma outra — autenticar com uma intenção não pode conceder outra.
+
+### Enumeração (regra dos irmãos, ACHADO-26)
+
+**29 chamadas reais** de `pedirCredenciaisGerente` — não 32, como o pacote dizia: aquele número
+saiu de um `grep -c` que contou dois comentários e a própria definição da função. 19 de
+`aprovar_financeiro`, 9 de outras capacidades, 1 de `sempre_pedir`.
+
+Reconciliando com o backend: dos 19 pontos de tela, **17 passam** por `_aprovador_financeiro`
+(14 rotas distintas, algumas compartilhadas). **Dois não passam** — `salvarParametrosAuto`
+(`/parametros`) e `_peComplModalSalvarDescontos` (`/descontos`) —, e usam
+`_usuario_autoriza_desconto`, mecanismo diferente.
+
+### Conserto
+
+Reusa o step-up que já existia (`_STEPUP_GRANTS`/`_stepup_conceder`/`_stepup_valido`, até então
+só para acesso a módulo) em vez de criar um paralelo — só generaliza o TTL.
+`_aprovador_financeiro` ganha três ramos: sessão **com** a capacidade + credencial → valida e
+abre janela; sessão **com** a capacidade sem credencial → autoriza só se a janela vale (a
+primeira senha **continua obrigatória**, nunca "sessão-primeiro" puro); sessão **sem** a
+capacidade → é sessão emprestada por definição, autoriza pela credencial de terceiro, **nunca**
+abre janela, e sinaliza `sessao_emprestada`.
+
+O retorno (`_AprovadorFinanceiro`) preserva o contrato de verdade/`.id` do `Usuario`/`None`
+anterior, então os pontos de chamada não quebraram sem serem tocados. Logout (as duas rotas)
+revoga toda janela do token.
+
+Frontend: o interceptor de `fetch` que já tratava `precisa_stepup` passou a espiar também a
+janela e o `sessao_encerrada` — **nenhum dos 17 pontos de chamada foi tocado individualmente**.
+O servidor continua decidindo a cada request; o cache da tela é aposta otimista, e quando erra o
+backend recusa como sempre recusou.
+
+### Testes — e por que 11 deles mudaram
+
+7 novos provam janela abre / expira por tempo absoluto / morre no logout / não vaza entre
+sessões nem usuários / sessão emprestada nunca ganha janela.
+
+**11 testes existentes foram atualizados de propósito.** Eles afirmavam o comportamento antigo
+("sessão-primeiro sempre"), que esta decisão substitui — mesma situação do F2-42, que removeu o
+`test_aceite_1_sombra_nao_muda_o_que_e_cobrado` dizendo que a garantia fora invertida
+deliberadamente. **O teste de quando isso é legítimo:** a asserção expressa uma REGRA que
+alguém decidiu, ou um COMPORTAMENTO que alguém observou? Aqui era regra. Teste nascido de
+observar o código é o que congela defeito (ACHADO-58, ACHADO-66).
+
+**Controle negativo, antes de alterar qualquer um:** confirmado que os 10 de backend falhavam
+pela razão certa (403 "Senha/perfil inválido para aprovar"). As 4 que pareciam diferentes
+(log ausente, status errado, 403 em vez de 409) eram **cascata da mesma causa** — um
+`post(..., {})` anterior cujo 403 ninguém checava, deixando o estado seguinte errado. Achado de
+teste, não de código: teste que engole status em silêncio faz o passo seguinte mentir.
+
+No E2E, a expectativa foi **invertida, não afrouxada**: a 1ª submissão mostra o modal, a 2ª e a
+3ª afirmam que ele **não aparece**. Um helper tolerante ("preenche se aparecer") passaria com ou
+sem a janela funcionando — teria trocado uma prova por uma conveniência.
+
+### Lacuna conhecida — registrada com motivo, não esquecida
+
+`/parametros` e `/descontos` ficam **fora** desta rodada. `_usuario_autoriza_desconto` autoriza
+por **limiar numérico** (`limite_desconto >= desconto_pct`), não por capacidade booleana: uma
+janela copiada de lá liberaria, por 15 minutos, qualquer desconto até o teto da pessoa —
+**concederia mais do que foi autorizado**. Uma janela correta ali teria de ser presa ao VALOR
+autorizado, e isso é desenho novo, não reuso.
+
+### Achado incidental — registrado, não consertado
+
+`salvarParametrosAuto` é **auto-save por edição**: `agendarParametros()` → `setTimeout(…, 500)`.
+Se o composto comissão/fidelidade passar do limite no meio da digitação, o modal de senha
+dispara 500 ms depois — **por edição, não por operação deliberada**. Primo do ACHADO-53. Janela
+nenhuma resolve isso; é defeito próprio, ainda sem dono.
+
+### Correção de registro
+
+O pacote original citava `LogAutorizacao` onde é **`LogAcaoGerencial`** (`autorizador_id`) —
+`LogAutorizacao` pertence à família do limite de desconto, com `desconto_solicit`/
+`desconto_limite`. Erro de quem escreveu o pacote, corrigido nas quatro menções.
+
+### Pendente de confirmação — não afirmar como feito
+
+Duas verificações pedidas e **não respondidas** no fechamento:
+
+- que o token da **sessão emprestada** é invalidado **no servidor** (requisição posterior com
+  ele recebe 401), e não só redirecionado na tela. Sem isso, o encerramento é cosmético — é
+  exatamente a classe registrada em 2026-08-10 (*"a autorização gerencial da tela era só
+  decoração de UI, sem trava real no servidor"*);
+- que **todos os 15** pontos de `_aprovador_financeiro` passam `handler=self`. Um que fique sem
+  nunca consulta a janela, e o caminho continua funcionando — ninguém nota.
+
+Regressão relacionada: **272 passed, 0 failed**. A suíte COMPLETA ainda não rodou depois disto.
+
+Pacote: `docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md`.
+
+---
