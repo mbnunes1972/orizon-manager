@@ -94,3 +94,4 @@ __pycache__/
 .playwright-mcp/
 
 docs/db/config_*.sql
+Claude outputs/
