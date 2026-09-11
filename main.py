@@ -685,15 +685,21 @@ def _resposta_pos_aprovacao_financeira(aprovador, resp):
     return resp
 
 
-def _aprovador_financeiro(db, login, senha, sessao=None, handler=None):
+def _aprovador_financeiro(db, login, senha, sessao=None, *, handler):
     """Usuario apto a aprovar financeiro, envolto em `_AprovadorFinanceiro` — ACHADO-68
     (docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md). `aprovar_financeiro` é a ÚNICA capacidade com
     JANELA: `_usuario_com_capacidade` genérico (sessão-primeiro, pra sempre) continua servindo
     as 9 demais capacidades sem tocar aqui — não é o mesmo mecanismo, de propósito.
 
     `handler`: o BaseHTTPRequestHandler da requisição, só pra extrair o token da sessão (mesmo
-    padrão de `_sem_acesso_modulo`). Sem ele, a janela nunca abre nem é consultada (fail-safe:
-    sem token, cada chamada exige credenciais — nunca o contrário).
+    padrão de `_sem_acesso_modulo`). OBRIGATÓRIO — só-por-nome, sem default (docs/db/
+    TAREFA_ACHADO68_VERIFICACAO.md, Ponta 2): esquecer este parâmetro num ponto novo produzia um
+    mecanismo cego em silêncio (a função rodava, nunca via a sessão, e a única consequência era
+    a janela nunca funcionar, sem ninguém perceber) — mesma classe do ACHADO-25. Agora é
+    `TypeError` na primeira execução. Passe `handler=None` OU um handler de verdade — nunca
+    omita: `None` explícito continua fail-safe (sem token, cada chamada exige credenciais —
+    nunca o contrário) e é a escolha DELIBERADA de `/cancelamento` (categoria 3 — ver o
+    comentário lá: nunca pode se beneficiar de uma janela aberta por OUTRA aprovação).
 
     A pergunta que decide tudo NÃO é "a sessão logada tem a capacidade", é "as credenciais
     digitadas são do PRÓPRIO dono da sessão" — correção de 11/09: a versão anterior abria
@@ -12319,12 +12325,14 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 # ACHADO-68 (categoria 3, docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md): cancelamento de
                 # contrato é IRREVERSÍVEL — sempre pede senha, sem atalho e sem janela, de propósito.
-                # NÃO passar `handler=self` aqui: é o que mantém este ponto FORA do mecanismo de
+                # `handler=None` EXPLÍCITO (obrigatório desde a verificação de 11/09 — Ponta 2 de
+                # TAREFA_ACHADO68_VERIFICACAO.md): é o que mantém este ponto FORA do mecanismo de
                 # janela (nunca abre uma, nunca consulta uma) mesmo reusando `_aprovador_financeiro`
                 # só pra validar a credencial. Uma janela aberta por OUTRA aprovação financeira não
-                # pode virar permissão de passagem pra isto — não "conserte" isto adicionando o
+                # pode virar permissão de passagem pra isto — não "conserte" isto trocando pro
                 # `handler=self` que os outros 14 pontos têm.
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario)
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"),
+                                                  sessao=usuario, handler=None)
                 if not aprovador or not perfis.pode(aprovador.nivel, "autorizar"):
                     self.send_json({"ok": False, "erro": "Cancelamento de contrato exige senha de Gerente ou superior"}, code=403); return
                 ator = _ator_dict(db, usuario)

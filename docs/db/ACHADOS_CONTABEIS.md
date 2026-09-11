@@ -5361,19 +5361,41 @@ O pacote original citava `LogAutorizacao` onde é **`LogAcaoGerencial`** (`autor
 `LogAutorizacao` pertence à família do limite de desconto, com `desconto_solicit`/
 `desconto_limite`. Erro de quem escreveu o pacote, corrigido nas quatro menções.
 
-### Pendente de confirmação — não afirmar como feito
+### Verificação 11/09 — as duas pontas soltas, medidas (`docs/db/TAREFA_ACHADO68_VERIFICACAO.md`)
 
-Duas verificações pedidas e **não respondidas** no fechamento:
+As duas provas pendentes do fechamento anterior, feitas com teste de integração HTTP (não de
+navegador — navegador prova que a tela navegou, nunca que o token morreu):
 
-- que o token da **sessão emprestada** é invalidado **no servidor** (requisição posterior com
-  ele recebe 401), e não só redirecionado na tela. Sem isso, o encerramento é cosmético — é
-  exatamente a classe registrada em 2026-08-10 (*"a autorização gerencial da tela era só
-  decoração de UI, sem trava real no servidor"*);
-- que **todos os 15** pontos de `_aprovador_financeiro` passam `handler=self`. Um que fique sem
-  nunca consulta a janela, e o caminho continua funcionando — ninguém nota.
+**Ponta 1 — o token morre no servidor: PASSOU, sem conserto.** `cons_l1` (operador, sem
+`aprovar_financeiro`) autentica; `T` = seu token. Uma requisição comum com `T` devolve 200.
+Dentro da MESMA sessão, `dir_l1` (tem a capacidade) autoriza `/recebiveis/<id>/reprogramar` e a
+operação **conclui**. A MESMA requisição repetida com o MESMO `T` devolve **401** — medido, não
+suposto. O mecanismo de 10/09 já invalidava de verdade; a lacuna era só não ter prova.
+`LogAcaoGerencial` também conferido: `autorizador_id` = `dir_l1` (quem digitou), `solicitante_id`
+= `cons_l1` (quem estava logado) — a janela dispensa a digitação, nunca o registro.
 
-Regressão relacionada: **272 passed, 0 failed**. A suíte COMPLETA ainda não rodou depois disto.
+**Caminho triste, medido e levado ao Marcelo — decisão pendente, não decidida sozinho:** uma
+operação que FALHA depois do aprovador (ex.: campo obrigatório vazio, 400) nunca chega em
+`_resposta_pos_aprovacao_financeira` (só roda na resposta de SUCESSO) — a sessão emprestada
+**sobrevive** a uma falha no meio, hoje. Registrado como comportamento atual, não como certo ou
+errado; muda só se o Marcelo decidir que "morre sempre" vale também para o erro.
 
-Pacote: `docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md`.
+**Ponta 2 — enumeração real: 15, não um `grep -c`.** Todas as 15 chamadas de
+`_aprovador_financeiro` estão em `main.py`; 14 passavam `handler=self`, 1 (`/cancelamento`,
+categoria 3) não passava nada — omissão que já era intencional (impedir que uma janela aberta
+por OUTRA aprovação vazasse para o cancelamento), mas indistinguível de um esquecimento futuro
+sem olhar o comentário. **Conserto que vale mesmo com as 15 corretas:** `handler` virou
+obrigatório (`*, handler` — só-por-nome, sem default; `sessao` mantém o default por não ser o
+que este pacote pediu). O ponto de `/cancelamento` passou a escrever `handler=None` EXPLÍCITO —
+mesmo efeito de antes, agora visível em vez de ausente. Esquecer `handler` num ponto novo é
+`TypeError` na hora, não mais um mecanismo cego que nunca abre janela em silêncio — mesma lição
+do ACHADO-25. Teste novo prova a falha barulhenta.
+
+Regressão: `python3 -m pytest -q` **completo** (não bateria focada) — **2773 passed, 4 xfailed,
+0 failed**. Não rodava inteiro desde o fechamento do ACHADO-68; corrigido no caminho um órfão de
+arquitetura (`mod_implantacao_loja.py`, de `TAREFA_LOJA_TESTE.md`, ainda sem classificação em
+`modulos.py` — foi pro `SHELL`, mesmo papel de `main.py`/`seed.py`: orquestra domínio sem ser um).
+
+Pacotes: `docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md`, `docs/db/TAREFA_ACHADO68_VERIFICACAO.md`.
 
 ---

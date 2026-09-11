@@ -152,15 +152,29 @@ def test_sessao_sem_capacidade_e_emprestada_nunca_abre_janela(app_db, seed):
         db.close()
 
 
-def test_sem_handler_nunca_abre_nem_consulta_janela(app_db, seed):
-    """Fail-safe: sem `handler` (logo, sem token), a janela nunca é concedida nem consultada —
-    cada chamada exige credenciais, nunca o contrário."""
+def test_handler_none_explicito_nunca_abre_nem_consulta_janela(app_db, seed):
+    """Fail-safe: com `handler=None` EXPLÍCITO (o caso de /cancelamento — categoria 3), a janela
+    nunca é concedida nem consultada — cada chamada exige credenciais, nunca o contrário."""
     db = app_db.get_session()
     try:
         _, usuario = _login("dir_l1")
         sessao = {"id": usuario["id"]}
-        assert main._aprovador_financeiro(db, "dir_l1", "senha123", sessao=sessao)  # sem handler
-        assert not main._aprovador_financeiro(db, "", "", sessao=sessao)  # sem handler, sem credenciais
+        assert main._aprovador_financeiro(db, "dir_l1", "senha123", sessao=sessao, handler=None)
+        assert not main._aprovador_financeiro(db, "", "", sessao=sessao, handler=None)
+    finally:
+        db.close()
+
+
+def test_handler_obrigatorio_falha_barulhenta_em_vez_de_degradar(app_db, seed):
+    """docs/db/TAREFA_ACHADO68_VERIFICACAO.md, Ponta 2 — o conserto que vale mesmo com os 15
+    pontos corretos: esquecer `handler` agora é `TypeError` na hora, não um mecanismo cego que
+    silenciosamente nunca abre janela (mesma lição do ACHADO-25 — falha barulhenta > silenciosa)."""
+    db = app_db.get_session()
+    try:
+        _, usuario = _login("dir_l1")
+        sessao = {"id": usuario["id"]}
+        with pytest.raises(TypeError):
+            main._aprovador_financeiro(db, "dir_l1", "senha123", sessao=sessao)   # sem handler
     finally:
         db.close()
 

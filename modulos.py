@@ -141,7 +141,12 @@ MODULOS = {
 }
 
 # Arquivos que NÃO são módulo (shell/compositor e utilitários). O teste de cobertura os ignora.
-SHELL = {"main.py", "seed.py", "modulos.py"}
+# mod_implantacao_loja.py (docs/db/TAREFA_LOJA_TESTE.md): mesmo papel de main.py/seed.py — um
+# ORQUESTRADOR que chama auth.perfil_store (núcleo), seed.criar_funcoes_seed (shell) e
+# mod_contabil.aplicar_gabarito_completo (domínio financeiro) pra provisionar uma loja; não é
+# ele mesmo um domínio desligável, então não cabe em NUCLEO (violaria "núcleo não importa
+# domínio") nem em nenhum DOMINIO específico.
+SHELL = {"main.py", "seed.py", "modulos.py", "mod_implantacao_loja.py"}
 
 # mod_nfe é COMPARTILHADO (parser=produção, pricing=fiscal): lotado em 'fiscal' no manifesto, mas
 # 'comercial' (dono da medição/qualidade de XML) também pode importá-lo.
