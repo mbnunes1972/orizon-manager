@@ -5415,15 +5415,21 @@ Uma operação reordenada de exemplo (`/api/recebiveis/<id>/reprogramar`, item 3
 validação completa (loja/escopo, existência, status, formato de data) roda inteira antes de
 `_aprovador_financeiro` ser chamado.
 
-**Achado durante a verificação, não no pacote original: corrida real entre resposta e teardown.**
-O primeiro desenho matava a sessão só no `finally` — que só roda DEPOIS de `self.send_json(...);
-return` em qualquer falha de validação. Isso abre uma janela real: o cliente recebe a resposta e
-já dispara a próxima requisição antes de o `finally` da primeira terminar de gravar `Sessao.ativa
-= 0`. Isolado, a folga de agendamento de thread é grande o bastante pra o `finally` sempre vencer
-a corrida — o teste correspondente (item 1 do aceite) passava sozinho, sempre. **Rodando a suíte
-inteira, sob a carga real de ~2780 testes, a corrida se manifestou de forma determinística nas
-duas primeiras execuções completas** (mesmo teste, mesma contagem, nas duas). Isolamento mascarava
-o defeito; só a suíte cheia mediu.
+**Achado durante a verificação, não no pacote original: defeito de ordenação com janela sub-
+milissegundo entre resposta e teardown.** O primeiro desenho matava a sessão só no `finally` — que
+só roda DEPOIS de `self.send_json(...); return` em qualquer falha de validação. Medido direto (via
+`test_achado68_verificacao.py::test_adendo_item1...` instrumentado com `time.perf_counter()`,
+cliente e servidor no mesmo processo, mesmo relógio): a resposta de falha sai do servidor **~0,7ms
+antes** de o commit que mata a sessão terminar, e a margem até a próxima requisição chegar é de
+**~0,5ms**. Isolado (rodei o prefixo de 77 arquivos que antecede este módulo, 339s, com a mesma
+instrumentação e o conserto desligado), essa margem some positiva — o `finally` sempre termina
+antes de a segunda requisição ser processada — e o teste sempre passa. **Sob a suíte inteira
+(~2780 testes), o deslocamento de latência é sistemático, não aleatório, e inverte o sinal dessa
+margem de forma consistente** — por isso o comportamento pareceu determinístico DENTRO de cada
+contexto (sempre passa isolado, sempre falha nas duas execuções completas medidas): não é uma
+alegação de concorrência ao acaso, é uma janela de ordenação estreita cujo sinal muda de regime
+conforme a carga real do processo/banco, sem que eu tenha isolado qual recurso específico causa o
+deslocamento sistemático sob carga plena.
 
 **Conserto real:** matar a sessão emprestada dentro de `_aprovador_financeiro`, no instante em que
 a credencial de terceiro é validada — antes de devolver o `_AprovadorFinanceiro` pro chamador,
@@ -5467,6 +5473,63 @@ janela, acima). O teste antigo que MEDIA sobrevivência ao erro
 (`test_ponta1_medido_falha_no_meio_nao_mata_a_sessao_hoje`) foi substituído pelos itens 1 e 3 — sua
 premissa (falha DEPOIS do aprovador em `/reprogramar`) deixou de existir com a reordenação do
 item 3.
+
+### Verificação pedida: alguma tela precisa de 2ª requisição na mesma sessão emprestada?
+
+Checado no frontend (`static/index.html`), não deduzido: **sim, um fluxo quebra agora.**
+`_patchEtapa()` (L23594, atende `/api/projetos/<nome>/ciclo/<codigo>` para os códigos 12/13/14 —
+`encaminharPedidosFabrica`/`salvarNumerosPedidos`/`producaoConcluida`) tem um encadeamento no
+próprio ramo de FALHA: se a resposta vier com `d.codigo === 'bloqueador_ativo'` (L23604), mostra um
+popup de confirmação e, confirmado, chama `abrirConversaProjeto()` (L23609), que busca
+`/api/projetos/<nome>/conversa` reaproveitando o MESMO cookie de sessão — nunca a credencial do
+gerente. Antes do ADENDO, uma falha nunca matava a sessão, então isto funcionava. Com "morre
+sempre", se a credencial que falhou o PATCH era emprestada, a sessão já está morta quando este
+encadeamento dispara — `abrirConversaProjeto()` recebe 401 em vez de abrir a conversa. Regressão
+real e estreita: só ocorre com (credencial emprestada) + (este PATCH específico) + (falha
+`bloqueador_ativo`) + (usuário confirma o popup).
+
+Achado à parte, não novo: a maioria das 14 rotas encadeia um refresh de tela no ramo de SUCESSO
+(`carregarCiclo()`, `ramoFinanceiroRender()`, `_reconReloadAtivo()`, `peConciliacaoRender()`,
+`carregarDadosContrato()`), reaproveitando o cookie de sessão, não a credencial digitada. Isto já
+quebrava desde o desenho original do ACHADO-68 de 10/09 (sessão já morria no sucesso antes deste
+ADENDO existir) — o conserto deste ADENDO não muda esse timing, só estende a mesma regra pro
+caminho de falha. O interceptor global de `fetch` (`_instalarFetchLojaAtiva`, L4144) que reage a
+`sessao_encerrada` também não protege nenhum destes encadeamentos: o redirecionamento pro `/login`
+é fire-and-forget (não é `await`ado), então nunca bloqueia nem cancela a chamada seguinte — só
+alcança a tela depois.
+
+### Dívida assumida conscientemente: a decisão de 11/09 era um PAR, e só metade generalizou
+
+A decisão do ADENDO tinha duas partes inseparáveis: **"a sessão emprestada morre sempre"** +
+**"a validação roda antes de pedir a senha"**. A primeira mora no caminho comum
+(`_aprovador_financeiro`) e vale, sem exceção, para as 14 rotas do mecanismo. A segunda só foi
+aplicada em **3 das 14**: `/api/projetos/<nome>/ciclo/11d/aprovar` (pré-existente), `/api/
+recebiveis/<id>/reprogramar` (item 3 deste ADENDO) e `/api/projetos/<nome>/ciclo/<codigo>` (PATCH
+genérico, várias checagens já antes do aprovador).
+
+**Nas outras 11, o cenário que motivou a decisão não foi eliminado — foi movido:**
+
+1. `/api/projetos/<nome>/conferencia`
+2. `/api/projetos/<nome>/pe/conciliacao/<id>`
+3. `/api/projetos/<nome>/ciclo/11d/reprovar` (só o `motivo` é checado antes; loja/escopo/status,
+   depois)
+4. `/api/orcamentos/<id>/provisoes/rev1|rev2`
+5. `/api/orcamentos/<id>/ramo-financeiro` (só a validade do `ramo` é checada antes)
+6. `/api/orcamentos/<id>/antecipacao` (só `valor > 0` é checado antes)
+7. `/api/orcamentos/<id>/receita-financeira` (só `valor > 0` é checado antes)
+8. `/api/recebiveis/<id>/confirmar`
+9. `/api/recebiveis/<id>/duvidoso`
+10. `/api/orcamentos/<id>/devolucao` (só a `fração` é checada antes)
+11. `/api/projetos/<nome>/contrato/concluir-financeiro`
+
+Nestas 11, uma requisição condenada por motivo trivial (loja/escopo errado, recurso não
+encontrado, estado que não permite a ação — nenhum deles relacionado à aprovação em si) **ainda
+gasta a senha do gerente**, e agora, com a regra "morre sempre", **mata a sessão do operador
+junto**. É exatamente o cenário que Marcelo nomeou ao decidir: *"prender o operador fora do
+sistema numa falha besta"*. A decisão de 11/09 não ignorou esse risco — pediu os dois consertos
+juntos precisamente para evitá-lo. Ele não foi eliminado aqui; foi **restrito** a 3 rotas e
+**permanece aberto** nas outras 11. Registrado como dívida consciente, não esquecimento — decisão
+de quando/se fechar (reordenar as 11, uma a uma, mesmo molde do item 3) é do Marcelo.
 
 Pacotes: `docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md`, `docs/db/TAREFA_ACHADO68_VERIFICACAO.md`.
 

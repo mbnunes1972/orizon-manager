@@ -168,9 +168,17 @@ Todos os 5 itens do aceite — relato completo em **ACHADO-68 → "ADENDO 12/09"
 `docs/db/ACHADOS_CONTABEIS.md`. Resumo: item 4 negativo (não ganha janela, seguro prosseguir);
 itens 1-3 provados com testes novos; item 5 medido como **determinismo**, não "verde" — 2
 execuções completas idênticas antes do conserto (1 failed, mesmo teste, mesma contagem) revelaram
-uma corrida real entre `send_json` e o `finally` que mata a sessão, visível só sob carga da suíte
-cheia. Consertada na origem (`_aprovador_financeiro` mata a sessão antes de devolver o resultado,
-não no `finally` do endpoint).
+um defeito de ordenação com janela sub-milissegundo entre `send_json` e o `finally` que mata a
+sessão — medido (não suposto): a resposta sai ~0,7ms antes de o commit terminar, margem de ~0,5ms
+até a requisição seguinte; isolado essa margem é sempre positiva (testado com 339s de suíte antes
+deste módulo), sob a suíte inteira o deslocamento de latência é sistemático e inverte o sinal —
+detalhe completo em ACHADOS_CONTABEIS.md. Consertada na origem (`_aprovador_financeiro` mata a
+sessão antes de devolver o resultado, não no `finally` do endpoint).
+
+**Dívida assumida, não fechada:** a decisão de 11/09 era um par ("morre sempre" + "validar antes
+da senha"). Só 3 das 14 rotas ganharam a segunda metade (`/ciclo/11d/aprovar`, `/reprogramar`,
+`/ciclo/<codigo>` genérico); as outras 11 seguem pedindo a senha antes de validar o resto — relato
+completo, com as 11 nomeadas, em ACHADOS_CONTABEIS.md § "Dívida assumida conscientemente".
 
 Registro honesto do item 5: **uma execução completa verde pós-conserto, e uma segunda tentativa
 abortada pelo travamento de teardown — não por falha de teste.** A suíte é determinística com
