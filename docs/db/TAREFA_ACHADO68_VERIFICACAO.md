@@ -107,3 +107,55 @@ Isto **não é refatoração cosmética** — é transformar uma falha silencios
 Ao fechar, atualizar a entrada **ACHADO-68** em `docs/db/ACHADOS_CONTABEIS.md` dizendo o que as
 duas provas acharam — inclusive se acharam que estava tudo certo. Verificação que confirma vale
 registro igual a verificação que reprova.
+
+---
+
+# ADENDO — o caminho triste, DECIDIDO (Marcelo, 11/09)
+
+As duas pontas passaram na medição de 11/09 (relatório na entrada ACHADO-68 de
+`docs/db/ACHADOS_CONTABEIS.md`): o 401 é real, `LogAcaoGerencial` grava
+`autorizador_id`/`solicitante_id` corretos, as 15 chamadas foram enumeradas, e `handler` virou
+obrigatório com `/cancelamento` declarando `handler=None` explícito.
+
+Restou a pergunta que a medição levantou e não decidiu: **hoje a sessão emprestada sobrevive a uma
+operação que falha depois do aprovador** — o código que mata a sessão nunca é alcançado.
+
+## A decisão
+
+**A sessão emprestada termina quando o ato de autorização termina, qualquer que seja o desfecho:**
+conclusão, falha ou cancelamento. Uma regra só, sem ramificação por tipo de erro.
+
+**Razão.** A sessão emprestada não é perigosa por estar aberta; é perigosa porque foi **elevada uma
+vez** com a senha de outra pessoa, e o operador volta ao teclado. Se a elevação sobrevive à falha,
+o caminho triste vira o caminho **preferido** por quem quiser abusar: provoca um erro de propósito,
+o gerente sai, e a sessão elevada fica. Uma regra que trata o sucesso com mais rigor que a falha
+está invertida.
+
+## O conserto que vem junto — e sem o qual a decisão dói
+
+**A validação acontece ANTES de pedir a senha do gerente, não depois.**
+
+O caso que motivou a dúvida — campo obrigatório vazio — não deveria nunca chegar a queimar uma
+autorização. Validando primeiro e autorizando por último, o "erro besta" deixa de existir: a senha
+só é pedida quando a operação está pronta para ser executada. Sobra o erro genuíno (banco fora,
+falha de integração), raro, e no qual encerrar a sessão é o comportamento certo mesmo.
+
+Sobre "trancar o operador fora do sistema": ele não fica trancado — entra de novo com o login dele.
+O que ele perde é o formulário preenchido, o que é mais um argumento para validar antes.
+
+## A conferir antes de considerar fechado
+
+**A sessão emprestada realmente não ganha a janela de 15 minutos?** O pacote de 10/09 diz que não
+deveria — *"sessão emprestada não ganha janela, porque ela termina junto com a operação"*. Se na
+implementação ela ganhar, isso é **defeito independente desta decisão e mais urgente que ela**:
+seriam 15 minutos de elevação nas mãos de quem não tem a capacidade. Meça antes de mexer no resto.
+
+## Aceite do adendo
+
+1. Teste que prova a morte da sessão emprestada numa operação que **falha** depois do aprovador —
+   o mesmo 401 da Ponta 1, por outro caminho.
+2. Teste equivalente para **cancelamento**.
+3. Ao menos uma operação financeira com autorização reordenada: validação completa **antes** do
+   pedido de credenciais. Teste que prova que entrada inválida é recusada **sem** pedir senha.
+4. Medição escrita de se a sessão emprestada ganha ou não a janela de 15 min.
+5. `python3 -m pytest -q` completo, verde.

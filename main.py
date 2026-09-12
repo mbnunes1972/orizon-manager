@@ -662,6 +662,23 @@ def _encerrar_sessao_emprestada(token):
     _stepup_revogar_todos(token)
 
 
+def _encerrar_sessao_emprestada_se_necessario(aprovador):
+    """ADENDO 11/09 (docs/db/TAREFA_ACHADO68_VERIFICACAO.md) — DECIDIDO: a sessão emprestada
+    termina quando o ato de autorização termina, qualquer que seja o desfecho (conclusão, falha
+    ou exceção), uma regra só, sem ramificação por tipo de erro. Chamar no `finally` de TODO
+    endpoint que usa `_aprovador_financeiro` (`aprovador` pode ser `None` se a exceção/`return`
+    aconteceu antes da linha que o atribui — inofensivo, `getattr(None, ...)` cai no default).
+
+    Razão da regra única: uma sessão que só morre no sucesso é a que um abuso preferiria —
+    provocar erro de propósito, o gerente sair, e a elevação ficar viva. `_resposta_pos_
+    aprovacao_financeira` já chama isto no caminho de sucesso (pra montar a resposta com
+    `sessao_encerrada`/`sessao_msg`); chamar de novo aqui é idempotente (só religa `ativa=0` e
+    revoga um step-up já vazio) — a chamada que importa é a que cobre os caminhos que NUNCA
+    passam por `_resposta_pos_aprovacao_financeira`: `return` de validação e `except`."""
+    if aprovador is not None and getattr(aprovador, "sessao_emprestada", False):
+        _encerrar_sessao_emprestada(aprovador.token)
+
+
 def _resposta_pos_aprovacao_financeira(aprovador, resp):
     """ACHADO-68, regras 1 e 2: chamar envolvendo a resposta de SUCESSO de cada endpoint que usa
     `_aprovador_financeiro` (nunca as de erro — 'ao concluir a operação', não a cada tentativa).
@@ -740,6 +757,19 @@ def _aprovador_financeiro(db, login, senha, sessao=None, *, handler):
             _stepup_conceder(token, "aprovar_financeiro", ttl=_APROVAR_FINANCEIRO_JANELA_SEGUNDOS)
         return _AprovadorFinanceiro(u, sessao_emprestada=False, token=token)
 
+    # ACHADO-68 ADENDO, correção de 12/09 (medida na suíte cheia, nunca isolada — ver
+    # docs/db/TAREFA_ACHADO68_VERIFICACAO.md): matar a sessão aqui, ANTES de devolver o
+    # `_AprovadorFinanceiro` pro chamador, não no `finally` do endpoint. A versão anterior
+    # confiava no `finally` (que só roda DEPOIS do `self.send_json(...); return` de qualquer
+    # falha de validação) — isso abre uma corrida real: o cliente recebe a resposta e já dispara
+    # a PRÓXIMA requisição antes de o `finally` da PRIMEIRA terminar de gravar `ativa=0`, e sob a
+    # carga da suíte inteira (não isolada) essa janela é larga o bastante pra perder a corrida de
+    # verdade. Matando aqui — antes de qualquer `send_json` do endpoint acontecer — a sessão já
+    # está morta no banco quando a primeira resposta sai, corrida nenhuma. As chamadas em
+    # `_resposta_pos_aprovacao_financeira` e no `finally` de cada endpoint (`_encerrar_sessao_
+    # emprestada_se_necessario`) continuam existindo como rede de segurança idempotente, não como
+    # o mecanismo principal.
+    _encerrar_sessao_emprestada(token)
     return _AprovadorFinanceiro(u, sessao_emprestada=True, token=token)
 
 
@@ -7578,6 +7608,7 @@ class Handler(BaseHTTPRequestHandler):
             except (TypeError, ValueError):
                 self.send_json({"ok": False, "erro": "Valores inválidos"}, code=400); return
             db = get_session()
+            aprovador = None
             try:
                 aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
@@ -7609,6 +7640,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(_resposta_pos_aprovacao_financeira(
                     aprovador, {"ok": True, "lancamentos": out, "ajustes": ajustes_out}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -8201,6 +8233,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
             req = json.loads(body) if body else {}
             db = get_session()
+            aprovador = None
             try:
                 aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
@@ -8306,6 +8339,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(_resposta_pos_aprovacao_financeira(
                     aprovador, {"ok": True, "decisao": montada}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -8328,6 +8362,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
             req = json.loads(body) if body else {}
             db = get_session()
+            aprovador = None
             try:
                 # ACHADO-38 (docs/db/TAREFA_PERCURSO_0109.md, item B3): estado primeiro, credencial
                 # só quando a ação vai mesmo acontecer — a ordem antiga validava a senha do gerente
@@ -8398,6 +8433,7 @@ class Handler(BaseHTTPRequestHandler):
                 db.commit()
                 self.send_json(_resposta_pos_aprovacao_financeira(aprovador, {"ok": True}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -8416,6 +8452,7 @@ class Handler(BaseHTTPRequestHandler):
             if not motivo:
                 self.send_json({"ok": False, "erro": "Informe o motivo da reprovação."}, code=400); return
             db = get_session()
+            aprovador = None
             try:
                 aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
@@ -8437,6 +8474,7 @@ class Handler(BaseHTTPRequestHandler):
                 db.commit()
                 self.send_json(_resposta_pos_aprovacao_financeira(aprovador, {"ok": True}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -11832,6 +11870,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
             req = json.loads(body) if body else {}
             db = get_session()
+            aprovador = None
             try:
                 aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
@@ -11989,6 +12028,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(_resposta_pos_aprovacao_financeira(
                     aprovador, {"ok": True, "travada": True}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -12005,6 +12045,7 @@ class Handler(BaseHTTPRequestHandler):
             if ramo_novo not in ("loja", "loja_antecipacao", "financeira"):
                 self.send_json({"ok": False, "erro": "ramo inválido"}, code=400); return
             db = get_session()
+            aprovador = None
             try:
                 aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
@@ -12029,6 +12070,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(_resposta_pos_aprovacao_financeira(
                     aprovador, {"ok": True, "ramo": ramo_novo, "cust_fin": cust_fin}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -12048,6 +12090,7 @@ class Handler(BaseHTTPRequestHandler):
             if valor <= 0:
                 self.send_json({"ok": False, "erro": "Informe o custo real (> 0)"}, code=400); return
             db = get_session()
+            aprovador = None
             try:
                 aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
@@ -12075,6 +12118,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(_resposta_pos_aprovacao_financeira(
                     aprovador, {"ok": True, "reconhecido": bool(lan)}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -12094,6 +12138,7 @@ class Handler(BaseHTTPRequestHandler):
             if valor <= 0:
                 self.send_json({"ok": False, "erro": "Informe o valor recebido (> 0)"}, code=400); return
             db = get_session()
+            aprovador = None
             try:
                 aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
@@ -12116,6 +12161,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(_resposta_pos_aprovacao_financeira(
                     aprovador, {"ok": True, "apropriado": mv or 0.0}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -12129,6 +12175,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
             req = json.loads(body) if body else {}
             db = get_session()
+            aprovador = None
             try:
                 aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
@@ -12168,6 +12215,7 @@ class Handler(BaseHTTPRequestHandler):
                     "confirmado_em": rec.confirmado_em.isoformat() if rec.confirmado_em else None,
                 }, "lancado": bool(lan)}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -12182,10 +12230,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
             req = json.loads(body) if body else {}
             db = get_session()
+            aprovador = None
             try:
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
-                if not aprovador:
-                    self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
+                # ACHADO-68 ADENDO (11/09, docs/db/TAREFA_ACHADO68_VERIFICACAO.md, item 3):
+                # validação COMPLETA antes de gastar a credencial — não depois. Era daqui, com
+                # `data_prevista` vazia, que veio a dúvida sobre a sessão emprestada sobreviver
+                # a uma falha; a resposta certa não é decidir o que fazer com a falha, é fazer o
+                # "erro besta" (campo obrigatório vazio) parar de existir DEPOIS da senha gasta.
                 ator = _ator_dict(db, usuario)
                 loja_id, _err = mod_tenancy.escopo_operacional(ator)
                 if _err:
@@ -12202,6 +12253,11 @@ class Handler(BaseHTTPRequestHandler):
                     nova_dt = None
                 if nova_dt is None:
                     self.send_json({"ok": False, "erro": "Informe a nova data prevista (AAAA-MM-DD)"}, code=400); return
+
+                # Só agora — com a certeza de que a operação VAI acontecer — a credencial é gasta.
+                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
+                if not aprovador:
+                    self.send_json({"ok": False, "erro": "Senha/perfil inválido para aprovar"}, code=403); return
                 antigo = rec.data_prevista
                 rec.data_prevista = nova_dt
                 db.add(LogAcaoGerencial(
@@ -12214,6 +12270,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(_resposta_pos_aprovacao_financeira(aprovador, {"ok": True, "recebivel": {
                     "id": rec.id, "data_prevista": rec.data_prevista.isoformat()}}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -12229,6 +12286,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
             req = json.loads(body) if body else {}
             db = get_session()
+            aprovador = None
             try:
                 aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
@@ -12258,6 +12316,7 @@ class Handler(BaseHTTPRequestHandler):
                     "id": rec.id, "status": rec.status,
                     "duvidoso_em": rec.duvidoso_em.isoformat()}, "lancado": bool(lan)}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -12277,6 +12336,7 @@ class Handler(BaseHTTPRequestHandler):
             if not (0 < fracao <= 1):
                 self.send_json({"ok": False, "erro": "Fração deve estar entre 0 e 1 (ex.: 0.5 = 50%)"}, code=400); return
             db = get_session()
+            aprovador = None
             try:
                 aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                 if not aprovador:
@@ -12299,6 +12359,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(_resposta_pos_aprovacao_financeira(
                     aprovador, {"ok": True, "revertido": out, "ajustes_revertidos": out_ajx}))
             finally:
+                _encerrar_sessao_emprestada_se_necessario(aprovador)
                 db.close()
             return
 
@@ -14482,6 +14543,7 @@ class Handler(BaseHTTPRequestHandler):
                 import mod_ciclo as _mcic
                 req = json.loads(body) if body else {}
                 db = get_session()
+                aprovador = None
                 try:
                     aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"), sessao=usuario, handler=self)
                     if not aprovador:
@@ -14535,6 +14597,7 @@ class Handler(BaseHTTPRequestHandler):
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
+                    _encerrar_sessao_emprestada_se_necessario(aprovador)
                     db.close()
                 return
 
@@ -17178,6 +17241,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Use o fluxo de Medição para concluir esta etapa."}, code=400)
                     return
                 db = get_session()
+                aprovador = None
                 try:
                     ator = _ator_dict(db, usuario)
                     loja_id, _err = mod_tenancy.escopo_operacional(ator)
@@ -17259,7 +17323,8 @@ class Handler(BaseHTTPRequestHandler):
                                 "mais de um candidato." % len(faltam)}, code=409)
                             return
                     # Aprovação financeira (8/11d): exige login+senha de quem pode aprovar.
-                    aprovador = None
+                    # (`aprovador` já nasce None no topo do bloco, cobrindo o `finally` inteiro —
+                    # ver ACHADO-68 ADENDO; não precisa de um segundo `= None` aqui.)
                     if novo_status in mod_ciclo.STATUS_CONCLUSIVOS and mod_ciclo.exige_aprovacao_financeira(etapa_cod):
                         aprovador = _aprovador_financeiro(db, req.get("login", ""), req.get("senha", ""), sessao=usuario, handler=self)
                         if not aprovador:
@@ -17394,6 +17459,7 @@ class Handler(BaseHTTPRequestHandler):
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
                 finally:
+                    _encerrar_sessao_emprestada_se_necessario(aprovador)
                     db.close()
                 return
 

@@ -68,6 +68,32 @@ def test_ponta1_sessao_emprestada_morre_no_servidor_nao_so_na_tela(http_client_f
         "não no servidor: %r" % (st3, d3))
 
 
+def test_adendo_item4_sessao_emprestada_nao_ganha_a_janela_de_15min(http_client_factory, seed, app_db):
+    """ADENDO (docs/db/TAREFA_ACHADO68_VERIFICACAO.md): 'se a sessão emprestada ganhar a janela,
+    isso é defeito independente e MAIS URGENTE — seriam 15 minutos de elevação nas mãos de quem
+    não tem a capacidade.' Medição de ponta a ponta (HTTP, não a chamada direta da função):
+    a resposta de uma operação por sessão emprestada nunca traz o campo que indicaria janela
+    aberta, e o dict interno de janelas nunca ganha entrada para este token."""
+    import main
+    rid = _criar_recebivel_com_saldo(app_db, seed, "adendo4")
+    c = _login(http_client_factory, "cons_l1")
+    token_antes = dict(main._STEPUP_GRANTS)
+
+    st, d = c.post("/api/recebiveis/%d/reprogramar" % rid,
+                   {"data_prevista": "2027-03-01", "login": "dir_l1", "senha": "senha123"})
+    assert st == 200 and d["ok"] is True, d
+    assert d.get("sessao_encerrada") is True
+
+    assert "janela_aprovar_financeiro_expira_em_ms" not in d, (
+        "a resposta de uma sessão emprestada NUNCA pode sinalizar janela aberta: %r" % d)
+    # Nenhuma entrada NOVA em _STEPUP_GRANTS depois da operação (a única mudança aceitável seria
+    # a limpeza feita por _stepup_revogar_todos ao encerrar a sessão — nunca uma concessão nova).
+    novas_chaves = set(main._STEPUP_GRANTS) - set(token_antes)
+    assert not novas_chaves, (
+        "sessão emprestada abriu janela de verdade no dict interno — defeito grave, "
+        "independente da decisão do adendo: %r" % novas_chaves)
+
+
 def test_ponta1_log_grava_o_autorizador_nao_o_dono_da_sessao(http_client_factory, seed, app_db):
     """'A janela dispensa a digitação, nunca o registro de quem autorizou o quê.'"""
     rid = _criar_recebivel_com_saldo(app_db, seed, "p1log")
@@ -96,31 +122,93 @@ def test_ponta1_log_grava_o_autorizador_nao_o_dono_da_sessao(http_client_factory
         db.close()
 
 
-def test_ponta1_medido_falha_no_meio_nao_mata_a_sessao_hoje(http_client_factory, seed, app_db):
-    """MEDIÇÃO, não decisão (docs/db/TAREFA_ACHADO68_VERIFICACAO.md: 'meça o que o código faz
-    hoje... e pergunte ao Marcelo se for diferente de sempre morre'). Comportamento ATUAL: a
-    operação que FALHA depois do aprovador (aqui, data_prevista inválida — 400) NUNCA chega em
-    `_resposta_pos_aprovacao_financeira` (só chamada na resposta de SUCESSO), então a sessão
-    emprestada SOBREVIVE a uma falha no meio. Isto não é asserção de que está certo — é registro
-    do que É, pra decisão do Marcelo (uma sessão que sobrevive ao erro pode ser porta aberta;
-    uma que morre no meio de um erro pode prender o operador fora do sistema)."""
-    rid = _criar_recebivel_com_saldo(app_db, seed, "p1falha")
-    c = _login(http_client_factory, "cons_l1")
+def test_adendo_item1_sessao_emprestada_morre_em_falha_pos_aprovador(http_client_factory, seed, app_db):
+    """ADENDO (docs/db/TAREFA_ACHADO68_VERIFICACAO.md), decisão de 11/09: 'a sessão emprestada
+    termina quando o ato de autorização termina, qualquer que seja o desfecho — conclusão, falha
+    ou cancelamento'. Prova via /duvidoso, que NÃO foi reordenado (ao contrário de /reprogramar,
+    ver item 3): ele chama `_aprovador_financeiro` ANTES de checar `rec.status == 'previsto'`,
+    então um recebível fora desse estado produz um 409 genuíno DEPOIS de a credencial já ter
+    sido gasta — o mesmo 401 da Ponta 1, por outro caminho."""
+    rid = _criar_recebivel_com_saldo(app_db, seed, "adendo1")
+    # Estado inválido pra /duvidoso, direto no banco — sem passar pelo endpoint (que gastaria
+    # a credencial de propósito só pra chegar aqui e não mediria nada de novo).
+    db = get_session()
+    try:
+        rec = db.get(Recebivel, rid)
+        rec.status = "confirmado"
+        db.commit()
+    finally:
+        db.close()
 
+    c = _login(http_client_factory, "cons_l1")
     st, d = c.get("/api/auth/me")
     assert st == 200
 
-    # data_prevista vazia -> 400, DEPOIS do aprovador ter validado a credencial de dir_l1
-    # (sessao_emprestada=True já teria sido calculado), mas ANTES de qualquer commit/resposta
-    # de sucesso — _resposta_pos_aprovacao_financeira nunca roda neste caminho.
-    st_falha, d_falha = c.post("/api/recebiveis/%d/reprogramar" % rid,
-                               {"data_prevista": "", "login": "dir_l1", "senha": "senha123"})
-    assert st_falha == 400 and d_falha["ok"] is False, d_falha
+    st_falha, d_falha = c.post("/api/recebiveis/%d/duvidoso" % rid,
+                               {"login": "dir_l1", "senha": "senha123"})
+    assert st_falha == 409 and d_falha["ok"] is False, d_falha
     assert "sessao_encerrada" not in d_falha
 
     st_depois, d_depois = c.get("/api/auth/me")
-    assert st_depois == 200, (
-        "MEDIDO: hoje a sessão emprestada SOBREVIVE a uma operação que falhou no meio "
-        "(esperado 200, comportamento atual). Se isso for indesejado, é decisão do Marcelo, "
-        "não dedução deste teste — ver Ponta 1 do TAREFA_ACHADO68_VERIFICACAO.md."
-    )
+    assert st_depois == 401, (
+        "ADENDO: a sessão emprestada tem que morrer mesmo quando a operação falha depois do "
+        "aprovador — mesma regra do sucesso, sem ramificação por tipo de erro: %r" % d_depois)
+
+
+def test_adendo_item2_sessao_emprestada_morre_em_excecao_no_confirmar(http_client_factory, seed, app_db, monkeypatch):
+    """ADENDO item 2: teste equivalente ao item 1, mas para o 'cancelamento' — aqui, uma exceção
+    genuína no meio da operação (banco/integração fora do ar), não uma falha de regra de negócio.
+    /confirmar não tem try/except em volta de `mod_contabil.registrar_recebimento_venda`, e
+    `do_POST` não tem wrapper global de exceção (medido: a exceção propaga até o `http.server`,
+    que fecha a conexão sem resposta HTTP limpa — RemoteDisconnected/ConnectionResetError, ambos
+    OSError). Mas o `finally:` do endpoint roda do mesmo jeito — semântica normal de exceção em
+    Python, sem fronteira de thread/processo entre o `elif` e quem o chama — e é ele que mata a
+    sessão emprestada. O teste prova isso: a conexão quebra sem status HTTP, e mesmo assim a
+    PRÓXIMA requisição com o mesmo cookie já está morta."""
+    def _explode(*a, **kw):
+        raise RuntimeError("falha forçada — ADENDO item 2 (banco/integração fora do ar)")
+
+    monkeypatch.setattr(mc, "registrar_recebimento_venda", _explode)
+
+    rid = _criar_recebivel_com_saldo(app_db, seed, "adendo2")
+    c = _login(http_client_factory, "cons_l1")
+    st, d = c.get("/api/auth/me")
+    assert st == 200
+
+    try:
+        c.post("/api/recebiveis/%d/confirmar" % rid, {"login": "dir_l1", "senha": "senha123"})
+    except OSError:
+        # Esperado: sem wrapper global de exceção, o handler morre no meio e a conexão fecha
+        # sem resposta HTTP limpa — o que importa aqui não é a resposta, é o que sobra da sessão.
+        pass
+
+    st_depois, d_depois = c.get("/api/auth/me")
+    assert st_depois == 401, (
+        "ADENDO: a sessão emprestada tem que morrer mesmo quando a operação quebra com uma "
+        "exceção genuína no meio — o `finally:` do endpoint é quem garante isso: %r" % d_depois)
+
+
+def test_adendo_item3_validacao_antes_da_senha_no_reprogramar(http_client_factory, seed, app_db, monkeypatch):
+    """ADENDO item 3: ao menos uma operação reordenada — validação completa ANTES do pedido de
+    credenciais. /reprogramar foi a escolhida (era a que motivou a dúvida original: data_prevista
+    vazia). Prova: entrada inválida é recusada com 400 SEM NUNCA chamar `_aprovador_financeiro`
+    — nem login nem senha vão no corpo, e mesmo assim a validação dispara primeiro (se a ordem
+    antiga ainda estivesse em vigor, a ausência de credencial teria produzido 403, não 400)."""
+    import main
+    chamadas = []
+    original = main._aprovador_financeiro
+
+    def _espiao(*a, **kw):
+        chamadas.append((a, kw))
+        return original(*a, **kw)
+
+    monkeypatch.setattr(main, "_aprovador_financeiro", _espiao)
+
+    rid = _criar_recebivel_com_saldo(app_db, seed, "adendo3")
+    c = _login(http_client_factory, "cons_l1")
+
+    st, d = c.post("/api/recebiveis/%d/reprogramar" % rid, {"data_prevista": ""})
+    assert st == 400 and d["ok"] is False, d
+    assert not chamadas, (
+        "a credencial foi checada ANTES da validação — a senha seria gasta num pedido que já "
+        "ia falhar por motivo alheio à aprovação: %r" % chamadas)
