@@ -159,3 +159,22 @@ seriam 15 minutos de elevação nas mãos de quem não tem a capacidade. Meça a
    pedido de credenciais. Teste que prova que entrada inválida é recusada **sem** pedir senha.
 4. Medição escrita de se a sessão emprestada ganha ou não a janela de 15 min.
 5. `python3 -m pytest -q` completo, verde.
+
+---
+
+## Fechamento (12/09)
+
+Todos os 5 itens do aceite — relato completo em **ACHADO-68 → "ADENDO 12/09"**,
+`docs/db/ACHADOS_CONTABEIS.md`. Resumo: item 4 negativo (não ganha janela, seguro prosseguir);
+itens 1-3 provados com testes novos; item 5 medido como **determinismo**, não "verde" — 2
+execuções completas idênticas antes do conserto (1 failed, mesmo teste, mesma contagem) revelaram
+uma corrida real entre `send_json` e o `finally` que mata a sessão, visível só sob carga da suíte
+cheia. Consertada na origem (`_aprovador_financeiro` mata a sessão antes de devolver o resultado,
+não no `finally` do endpoint).
+
+Registro honesto do item 5: **uma execução completa verde pós-conserto, e uma segunda tentativa
+abortada pelo travamento de teardown — não por falha de teste.** A suíte é determinística com
+bancos limpos e sem invocação concorrente (é o que as 3 primeiras execuções mostram, sempre o
+mesmo resultado); o que falta é proteção de tempo no teardown do navegador — Achado 2 de
+`docs/db/TAREFA_ESTABILIDADE_RODADA3.md` (Passo 2b, ainda não entregue; terceira ocorrência em
+dois dias), tarefa separada, fora daqui.

@@ -5396,6 +5396,78 @@ Regressão: `python3 -m pytest -q` **completo** (não bateria focada) — **2773
 arquitetura (`mod_implantacao_loja.py`, de `TAREFA_LOJA_TESTE.md`, ainda sem classificação em
 `modulos.py` — foi pro `SHELL`, mesmo papel de `main.py`/`seed.py`: orquestra domínio sem ser um).
 
+### ADENDO 12/09 — o caminho triste, decidido por Marcelo e fechado
+
+Decisão de Marcelo (`docs/db/TAREFA_ACHADO68_VERIFICACAO.md`, ADENDO): a sessão emprestada
+termina quando o ato de autorização termina, **qualquer que seja o desfecho** — conclusão, falha
+ou exceção, uma regra só, sem ramificação por tipo de erro. Vem junto: a validação de negócio
+passa a rodar **antes** do pedido de credenciais, não depois, pra a senha nunca ser gasta num
+pedido que já ia falhar por motivo alheio à aprovação.
+
+**Pré-checagem pedida por Marcelo, medida antes de mexer no resto:** a sessão emprestada ganha a
+janela de 15 min? **Não** — medido em dois níveis (unitário, direto na função; HTTP, com leitura
+do dict interno `_STEPUP_GRANTS` antes/depois da operação). Seguro prosseguir.
+
+**Conserto:** `_encerrar_sessao_emprestada_se_necessario`, chamada no `finally` dos 14 endpoints
+que usam `_aprovador_financeiro` com handler real — garante que a sessão morre em QUALQUER saída
+(sucesso, `return` de validação, exceção não tratada), não só na resposta de sucesso como antes.
+Uma operação reordenada de exemplo (`/api/recebiveis/<id>/reprogramar`, item 3 do aceite):
+validação completa (loja/escopo, existência, status, formato de data) roda inteira antes de
+`_aprovador_financeiro` ser chamado.
+
+**Achado durante a verificação, não no pacote original: corrida real entre resposta e teardown.**
+O primeiro desenho matava a sessão só no `finally` — que só roda DEPOIS de `self.send_json(...);
+return` em qualquer falha de validação. Isso abre uma janela real: o cliente recebe a resposta e
+já dispara a próxima requisição antes de o `finally` da primeira terminar de gravar `Sessao.ativa
+= 0`. Isolado, a folga de agendamento de thread é grande o bastante pra o `finally` sempre vencer
+a corrida — o teste correspondente (item 1 do aceite) passava sozinho, sempre. **Rodando a suíte
+inteira, sob a carga real de ~2780 testes, a corrida se manifestou de forma determinística nas
+duas primeiras execuções completas** (mesmo teste, mesma contagem, nas duas). Isolamento mascarava
+o defeito; só a suíte cheia mediu.
+
+**Conserto real:** matar a sessão emprestada dentro de `_aprovador_financeiro`, no instante em que
+a credencial de terceiro é validada — antes de devolver o `_AprovadorFinanceiro` pro chamador,
+portanto antes de qualquer `send_json` do endpoint acontecer. Corrida eliminada por construção: a
+sessão já está morta no banco antes de a primeira resposta sair. As chamadas em `_resposta_pos_
+aprovacao_financeira` e no `finally` de cada endpoint continuam existindo, agora como rede de
+segurança idempotente, não como o mecanismo que garante a regra.
+
+**Determinismo, o critério real do item 5 (não "verde"):**
+
+| execução | resultado |
+|---|---|
+| 1 (antes do conserto) | 1 failed, 2775 passed, 4 xfailed |
+| 2 (antes do conserto) | 1 failed, 2775 passed, 4 xfailed — **mesmo teste, mesma contagem** |
+| 3 (depois do conserto) | 0 failed, 2776 passed, 4 xfailed |
+| 4 (depois do conserto) | **abortada**, não falhada — Achado 2 de `TAREFA_ESTABILIDADE_RODADA3.md` aos ~45min: timeout de 300s disparou num E2E, teardown do Playwright entrou em espera ativa e nunca voltou; morta por SIGTERM, sem órfão de Chromium. Nenhum `FAILED` apareceu antes do travamento — em particular, nenhum relacionado a `_aprovador_financeiro`. Terceira ocorrência do Achado 2 em dois dias. |
+
+O comportamento do ACHADO-68 foi determinístico nas duas condições medidas: falha igual duas
+vezes antes do conserto, limpo depois. Item 5 registrado com honestidade: **uma execução completa
+verde pós-conserto, e uma segunda tentativa abortada pelo travamento de teardown — não por falha
+de teste.** A suíte É determinística com bancos limpos e sem invocação concorrente (é o que os
+runs 1-3 mostram: mesmo resultado, sempre); o que falta é proteção de tempo no teardown do
+navegador — não é resultado errático, é um teardown que pode girar para sempre depois de um
+timeout. Essa causa já está aberta e escopada em `docs/db/TAREFA_ESTABILIDADE_RODADA3.md`
+(Passo 2b, ainda não entregue), fora da fronteira deste ADENDO.
+
+**Nota à parte:** antes destas quatro execuções, uma rodada anterior (fora deste pacote) tinha
+girado 12h a ~99% CPU até ser interrompida com `kill -9` — o rastro dessa interrupção (clientes
+órfãos derrubando com `SSL connection has been closed unexpectedly`) tinha deixado `orizon_test`/
+`orizon_e2e` sujos; os bancos foram recriados (`orizon` e `orizon_baseline_teste` não tocados)
+antes da execução 1 acima.
+
+Testes novos (`tests/test_achado68_verificacao.py`): item 1 (sessão morre em falha genuína pós-
+aprovador, via `/duvidoso`, que não foi reordenado de propósito — é o representante que ainda
+autoriza antes de checar a regra de negócio), item 2 (sessão morre em exceção genuína, via
+`/confirmar` com `mod_contabil.registrar_recebimento_venda` forçado a estourar — mede de caminho
+que, sem wrapper global de exceção em `do_POST`, a conexão quebra sem status HTTP, e mesmo assim o
+`finally:` roda), item 3 (entrada inválida em `/reprogramar` recusada sem NUNCA chamar
+`_aprovador_financeiro`, provado por espião no lugar do usuário real), item 4 (medição negativa da
+janela, acima). O teste antigo que MEDIA sobrevivência ao erro
+(`test_ponta1_medido_falha_no_meio_nao_mata_a_sessao_hoje`) foi substituído pelos itens 1 e 3 — sua
+premissa (falha DEPOIS do aprovador em `/reprogramar`) deixou de existir com a reordenação do
+item 3.
+
 Pacotes: `docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md`, `docs/db/TAREFA_ACHADO68_VERIFICACAO.md`.
 
 ---
