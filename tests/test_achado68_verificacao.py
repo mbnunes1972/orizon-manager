@@ -125,10 +125,20 @@ def test_ponta1_log_grava_o_autorizador_nao_o_dono_da_sessao(http_client_factory
 def test_adendo_item1_sessao_emprestada_morre_em_falha_pos_aprovador(http_client_factory, seed, app_db):
     """ADENDO (docs/db/TAREFA_ACHADO68_VERIFICACAO.md), decisão de 11/09: 'a sessão emprestada
     termina quando o ato de autorização termina, qualquer que seja o desfecho — conclusão, falha
-    ou cancelamento'. Prova via /duvidoso, que NÃO foi reordenado (ao contrário de /reprogramar,
-    ver item 3): ele chama `_aprovador_financeiro` ANTES de checar `rec.status == 'previsto'`,
-    então um recebível fora desse estado produz um 409 genuíno DEPOIS de a credencial já ter
-    sido gasta — o mesmo 401 da Ponta 1, por outro caminho."""
+    ou cancelamento', e 'encerrar de verdade, com uma mensagem que explique por quê'. Prova via
+    /duvidoso, que NÃO foi reordenado (ao contrário de /reprogramar, ver item 3): ele chama
+    `_aprovador_financeiro` ANTES de checar `rec.status == 'previsto'`, então um recebível fora
+    desse estado produz um 409 genuíno DEPOIS de a credencial já ter sido gasta — o mesmo 401 da
+    Ponta 1, por outro caminho.
+
+    MUDANÇA DELIBERADA (12/09, a pedido de Marcelo): a asserção sobre `sessao_encerrada` na
+    resposta de FALHA se inverteu. Antes: `"sessao_encerrada" not in d_falha` — a sessão morria em
+    silêncio, sem avisar, e o `_patchEtapa()` do frontend (bloqueador_ativo) encadeava
+    `abrirConversaProjeto()` numa sessão já morta, batendo 401 numa tela quebrada. A metade
+    "encerrar de verdade, com mensagem" do ADENDO só tinha sido feita pro caminho de sucesso.
+    Agora: a resposta de falha TAMBÉM carrega `sessao_encerrada`/`sessao_msg` (injetado em
+    `Handler.send_json`, não em cada rota) — a tela mostra a recusa E o aviso de sessão encerrada
+    antes de levar ao login, em vez de um redirecionamento mudo."""
     rid = _criar_recebivel_com_saldo(app_db, seed, "adendo1")
     # Estado inválido pra /duvidoso, direto no banco — sem passar pelo endpoint (que gastaria
     # a credencial de propósito só pra chegar aqui e não mediria nada de novo).
@@ -147,7 +157,14 @@ def test_adendo_item1_sessao_emprestada_morre_em_falha_pos_aprovador(http_client
     st_falha, d_falha = c.post("/api/recebiveis/%d/duvidoso" % rid,
                                {"login": "dir_l1", "senha": "senha123"})
     assert st_falha == 409 and d_falha["ok"] is False, d_falha
-    assert "sessao_encerrada" not in d_falha
+    # O motivo da recusa continua presente — o aviso de sessão encerrada se soma a ele, nunca
+    # o substitui (o operador precisa saber os dois: por que recusou, e que foi deslogado).
+    assert d_falha.get("erro"), "a recusa perdeu o motivo: %r" % d_falha
+    assert d_falha.get("sessao_encerrada") is True, (
+        "ADENDO 12/09: a resposta de FALHA também tem que avisar que a sessão emprestada "
+        "encerrou — silêncio aqui é o que deixava o frontend encadear numa sessão morta: %r"
+        % d_falha)
+    assert d_falha.get("sessao_msg"), "avisou que encerrou mas não disse por quê: %r" % d_falha
 
     st_depois, d_depois = c.get("/api/auth/me")
     assert st_depois == 401, (

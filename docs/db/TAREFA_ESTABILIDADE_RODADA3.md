@@ -151,3 +151,48 @@ entre o servidor de um módulo e o DDL do seguinte"**.
 Abrir entrada para os sete flakes conhecidos, acrescentando o oitavo medido hoje:
 `test_e2e_browser_f2_40_fatia2_modal_complemento` — falhou em `Page.fill("#ct-previsao-medicao")`
 numa execução isolada e passou na seguinte, também isolada.
+
+---
+
+## (b) — fechado (12/09): a causa não era falta de prazo, era o MÉTODO do prazo
+
+**Causa-raiz, medida, não suposta.** `_sync()` do Playwright Python (`_impl/_sync_base.py`) não usa
+uma thread de fundo — usa `greenlet`, troca de pilha **cooperativa numa única thread do SO**
+(`faulthandler.dump_traceback(all_threads=True)`, provocado de propósito, mostrou UMA thread só no
+processo inteiro). O método `'signal'` do pytest-timeout (default aqui) levanta uma exceção via
+`SIGALRM` num ponto **arbitrário** do bytecode em execução. Quando esse ponto cai dentro do laço
+`while not task.done(): self._dispatcher_fiber.switch()`, a interrupção corrompe o laço de
+despacho asyncio/greenlet: `task.done()` nunca mais fica `True`, e a única thread do processo entra
+num laço ocupado (~99% CPU) **sem esperar nada externo**. Prova de que não é espera por recurso
+externo: matar o processo do navegador, e depois a árvore inteira de descendentes (navegador +
+driver Node.js), não mudou o stack travado em nada, nas duas vezes — descartando por medição a
+hipótese inicial de "prazo próprio via watchdog que mata o navegador". Um watchdog externo não
+conserta uma corrupção que é inteiramente interna ao laço de eventos do próprio Python.
+
+**Por isso "prazo próprio" não é um relógio adicional — é trocar o MÉTODO.** `tests/conftest.py`
+agora força `method='thread'` (via `_get_item_settings`, não por marcador — um teste com
+`@pytest.mark.timeout(N)` próprio ganha dois marcadores "timeout" no item, e `get_closest_marker`
+só lê um) para todo item que usa fixture `page`/`context`/`browser`. O método `'thread'` nunca
+injeta exceção no código em execução — só observa de fora, numa thread de verdade, e chama
+`os._exit()` se o prazo estourar — não tem como corromper o que nunca tenta interromper.
+
+**Escopo revisto pelo Marcelo (12/09):** a frase original ("nunca a suíte inteira, nunca uma
+noite") juntava dois pesos muito diferentes na mesma decisão. Perder a noite era inaceitável;
+perder a execução custa segundos até rodar de novo — só a segunda metade era requisito real. Um
+supervisor externo que reinicia o pytest pulando o teste travado foi considerado e **recusado**:
+pularia teste da suíte sem ninguém decidir (a mesma coisa que a fronteira "nenhum teste sai do
+`pytest -q`" já proíbe), e construir tolerância para um defeito ainda não diagnosticado é a ordem
+errada. Ficam dois requisitos, não três: nome do teste legível no que for impresso antes de sair
+(`tests/conftest.py` embrulha `timeout_timer` só pra imprimir `FAILED <nodeid>` antes do
+`os._exit` do original), e o processo termina sozinho — nunca mais "fica pra alguém matar".
+
+**Prova por travamento provocado (item 3 do aceite):** teste descartável (`page.wait_for_timeout
+(600_000)` com `@pytest.mark.timeout(3)`), rodado 3 vezes seguidas: `FAILED <nodeid>` visível,
+processo termina sozinho em ~5,3-5,4s (exit code 1) nas três — nunca mais os 12h/45min medidos
+antes. Apagado depois de confirmado, mesmo papel do `time.sleep(600)` da Rodada 1.
+
+**Pergunta que fica aberta, e importa mais que este item:** por que um teste passa de 300s? Um
+teste de 5 minutos não é lento — é outra coisa, e é candidato a ser a MESMA causa que aparece como
+flake desde o LP-16. Com o nome do teste agora sempre visível no relatório, a próxima ocorrência
+dá pra isolar e medir isoladamente — se isso se resolver, a ideia do supervisor (recusada acima)
+nunca precisa voltar à mesa.

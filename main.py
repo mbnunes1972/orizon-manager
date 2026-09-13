@@ -770,6 +770,13 @@ def _aprovador_financeiro(db, login, senha, sessao=None, *, handler):
     # emprestada_se_necessario`) continuam existindo como rede de segurança idempotente, não como
     # o mecanismo principal.
     _encerrar_sessao_emprestada(token)
+    # ADENDO 11/09 dizia "encerrar de verdade, com uma mensagem que explique por quê" — isso só
+    # tinha sido feito pro caminho de SUCESSO (`_resposta_pos_aprovacao_financeira`). Marcado aqui,
+    # no handler da requisição, pra `send_json` (abaixo) anexar `sessao_encerrada`/`sessao_msg` em
+    # QUALQUER resposta deste request — sucesso ou falha —, sem precisar tocar os ~40 pontos de
+    # `send_json` de falha espalhados pelas 14 rotas.
+    if handler is not None:
+        handler._sessao_emprestada_encerrada_msg = _SESSAO_EMPRESTADA_MSG
     return _AprovadorFinanceiro(u, sessao_emprestada=True, token=token)
 
 
@@ -1873,6 +1880,17 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def send_json(self, data, code=200):
+        # ACHADO-68 ADENDO (12/09): se `_aprovador_financeiro` matou uma sessão emprestada nesta
+        # requisição (`_sessao_emprestada_encerrada_msg` setado lá), toda resposta desta requisição
+        # carrega o aviso — sucesso OU falha. Antes só o caminho de sucesso avisava; uma falha
+        # depois do aprovador matava a sessão em silêncio, sem dizer o motivo da recusa nem que a
+        # sessão morreu junto. `"sessao_encerrada" not in data` evita sobrescrever o que
+        # `_resposta_pos_aprovacao_financeira` já montou explicitamente no caminho de sucesso.
+        if (isinstance(data, dict) and "sessao_encerrada" not in data
+                and getattr(self, "_sessao_emprestada_encerrada_msg", None)):
+            data = dict(data)
+            data["sessao_encerrada"] = True
+            data["sessao_msg"] = self._sessao_emprestada_encerrada_msg
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json; charset=utf-8")

@@ -2,6 +2,73 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import pytest
+import pytest_timeout as _pytest_timeout
+
+
+# ── RODADA3 Achado 2 (docs/db/TAREFA_ESTABILIDADE_RODADA3.md) — o método 'signal' do
+# pytest-timeout não serve para testes de Playwright ─────────────────────────────────────────
+#
+# CAUSA-RAIZ (medida 12/09, não suposta): o `_sync()` do Playwright Python (`_impl/_sync_base.py`)
+# não usa uma thread de fundo — usa `greenlet`, troca de pilha COOPERATIVA numa ÚNICA thread do
+# SO (`faulthandler.dump_traceback(all_threads=True)` durante um travamento provocado mostrou
+# só UMA thread no processo inteiro). O método 'signal' (default daqui, `HAVE_SIGALRM=True`)
+# levanta uma exceção via SIGALRM num ponto ARBITRÁRIO do bytecode em execução. Quando esse ponto
+# cai no meio do laço `while not task.done(): self._dispatcher_fiber.switch()`, a interrupção
+# corrompe o estado do laço de despacho asyncio/greenlet: `task.done()` nunca mais fica True, e a
+# própria thread (a única do processo) entra num laço ocupado — sem esperar NADA externo. Prova:
+# matar o processo do navegador, e depois a árvore INTEIRA de descendentes (navegador + driver
+# Node.js), não mudou o stack travado em nada, nas duas vezes — a espera nunca foi por um
+# recurso de fora do processo. Nenhum watchdog externo (matar processo, checar E/S) consegue
+# consertar uma corrupção que é inteiramente interna ao laço de eventos do próprio Python.
+#
+# CONSERTO: método 'thread' pra testes que usam Playwright — ele NUNCA injeta exceção no código
+# em execução (só observa de fora numa thread de verdade e chama `os._exit()` se o prazo
+# estourar), então não tem como corromper o que nunca tenta interromper. Trade-off aceito
+# (decisão de Marcelo, 12/09): o processo inteiro termina no travamento — não dá pra continuar a
+# suíte na mesma execução —, mas isso custa segundos até rodar de novo, nunca mais uma noite.
+# Constrói tolerância a um defeito específico (um supervisor que pula o teste e continua) foi
+# considerado e recusado: seria tirar teste da suíte sem ninguém decidir, e a causa nem estava
+# diagnosticada ainda quando a ideia surgiu.
+_get_item_settings_original = _pytest_timeout._get_item_settings
+
+
+def _get_item_settings_com_thread_pra_playwright(item, marker=None):
+    """Substitui (não soma) o método pra 'thread' em testes de Playwright — tentei primeiro
+    marcar via `item.add_marker(pytest.mark.timeout(method="thread"))` em
+    `pytest_collection_modifyitems`, e não funcionou: um teste com `@pytest.mark.timeout(3)`
+    próprio (decorator) ganha DOIS marcadores "timeout" no item, e `get_closest_marker` só lê
+    UM — o do decorator venceu, `method` continuou "signal". Substituir o CAMPO depois do
+    resolvido, aqui, ignora essa disputa de prioridade entre marcadores de propósito."""
+    settings = _get_item_settings_original(item, marker=marker)
+    if {"page", "context", "browser"} & set(item.fixturenames):
+        settings = settings._replace(method="thread")
+    return settings
+
+
+_pytest_timeout._get_item_settings = _get_item_settings_com_thread_pra_playwright
+
+
+_timeout_timer_original = _pytest_timeout.timeout_timer
+
+
+def _timeout_timer_com_nodeid(item, settings):
+    """Envolve `timeout_timer` (método 'thread') só pra imprimir o nodeid ANTES do `os._exit` do
+    original — sem isso, quem lê o log só vê pontos e um `+++ Timeout +++` sem saber qual teste
+    foi (já aconteceu: precisei contar caracteres e cruzar com `--collect-only` pra descobrir).
+    Fica ANTES do original, protegido por `try/except` — nunca pode ser o motivo de o `os._exit`
+    do original deixar de rodar (medido: uma exceção não tratada aqui mataria esta thread em
+    silêncio, sem chamar `os._exit` nenhum — pior que não ter o aviso do nodeid)."""
+    try:
+        terminal = item.config.get_terminal_writer()
+        terminal.write_line("")
+        terminal.write_line("FAILED %s" % item.nodeid, red=True, bold=True)
+        terminal.flush()
+    except Exception:
+        print("FAILED %s" % item.nodeid, file=sys.stderr, flush=True)
+    _timeout_timer_original(item, settings)
+
+
+_pytest_timeout.timeout_timer = _timeout_timer_com_nodeid
 
 
 @pytest.fixture(autouse=True)

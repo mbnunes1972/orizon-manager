@@ -4179,8 +4179,14 @@ let _lojaAtiva = null;   // loja ativa atual (multi-loja); null = usa default do
         }
         if (_d68.sessao_encerrada) {
           window._janelaAprovarFinanceiroExpiraEm = 0;
+          // ADENDO 12/09: numa resposta de FALHA (ok:false), a sessão morre junto — mostra os
+          // dois motivos ao operador (a recusa E o fim da sessão) antes de levar ao login; um
+          // redirecionamento mudo escondia o motivo da recusa atrás do aviso genérico.
+          const _msg = (_d68.ok === false && _d68.erro)
+            ? (_d68.erro + '\n\n' + (_d68.sessao_msg || 'Sessão encerrada.'))
+            : (_d68.sessao_msg || 'Sessão encerrada.');
           if (typeof avisoPopup === 'function') {
-            avisoPopup(_d68.sessao_msg || 'Sessão encerrada.', {titulo: 'Sessão encerrada'})
+            avisoPopup(_msg, {titulo: 'Sessão encerrada'})
               .then(() => { window.location.href = '/login'; });
           } else {
             window.location.href = '/login';
@@ -23601,6 +23607,11 @@ async function _patchEtapa(codigo, payload, okMsg, titulo) {
         body: JSON.stringify(payload) });
     const d = await r.json();
     if (!d.ok) {
+      // ADENDO 12/09: se a sessão morreu junto com esta recusa (credencial emprestada — ACHADO-68
+      // ADENDO, "morre sempre"), NÃO encadear mais nada nela — abrirConversaProjeto() bateria 401
+      // e quebraria a tela. O interceptor global (_instalarFetchLojaAtiva) já mostra a recusa
+      // (d.erro) junto com o aviso de sessão encerrada e leva ao login; aqui só degrada.
+      if (d.sessao_encerrada) return false;
       if (d.codigo === 'bloqueador_ativo') {
         // Fatia 3: causa DIFERENTE da trava sequencial — oferece o atalho pra Conversa.
         const abrir = await confirmarPopup(
