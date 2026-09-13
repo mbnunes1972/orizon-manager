@@ -42,11 +42,131 @@ numa tag e deixa "o que esta rodando" dependente de quando alguem olhou o
 `git log`. Mesmo comando nos dois diretorios (nao ha mais tag "so de
 homolog" — Integracao e Homologacao acompanham a mesma linhagem de tags):
 
-    cd /root/orizon-manager  && git fetch origin --tags && git checkout <tag>
-    cd /root/orizon-homolog  && git fetch origin --tags && git checkout <tag>
+    cd /root/orizon-manager  && git fetch --tags && git checkout <tag>
+    cd /root/orizon-homolog  && git fetch --tags && git checkout <tag>
+
+(`git fetch --tags`, sem `origin` explicito — forma que todo deploy real
+usa; `git fetch origin --tags` é equivalente com um único remote, mas deixou
+de ser o que se digita de fato, então deixou de ser o que fica escrito aqui.)
 
 Confira nos dois com `git describe --tags` (ver `## Conferir o que esta
-rodando`) que a tag bate com a criada na bancada antes de seguir.
+rodando`) que a tag bate com a criada na bancada antes de seguir. **Antes
+disso**, ver `## Deploy rotineiro — procedimento padrão` logo abaixo: o
+checkout tem uma pré-condição que descobrimos faltando do jeito caro, em
+13/09.
+
+## Deploy rotineiro — procedimento padrão (a cada tag, com ou sem migration)
+
+Escrito em 13/09/2026, depois de acumular duas dezenas de deploys por tag
+sem nunca existir um bloco único de referência — cada entrada em
+`## Executado` repetia (e às vezes divergia) a mesma sequência de cabeça.
+Este é o bloco canônico; entradas novas em `## Executado` citam este
+procedimento e registram só o que **divergiu** dele (migration aplicada,
+achado no caminho, número medido). Mesmo bloco nos dois serviços — troque
+`orizon-a`/`orizon-manager`/`orizon-A.env`/`orizon_integracao` por
+`orizon-b`/`orizon-homolog`/`orizon-B.env`/`orizon_homologacao`.
+
+```bash
+cd /root/orizon-manager                      # ou /root/orizon-homolog
+
+# 0. O repositorio tem que estar LIMPO antes do checkout — ver a lição de
+#    13/09 abaixo. Qualquer linha começando com "??" tem que ser resolvida
+#    ANTES de continuar (mover pra fora do repositório, nunca `git add`
+#    de arquivo que não deveria estar versionado, nunca `rm` sem olhar
+#    o que é).
+git status --short                           # tem que devolver VAZIO
+
+# 1. Backup — SEMPRE antes de parar o serviço (regra, não mais "depende"
+#    — ver o porquê abaixo)
+mkdir -p /root/backups
+sudo -u postgres pg_dump orizon_integracao > /root/backups/integracao_pre_$(date +%Y%m%d_%H%M).sql
+ls -lh /root/backups/ | tail -2               # confira o tamanho antes de seguir
+
+# 2. Parar o serviço
+systemctl stop orizon-a
+
+# 3. Atualizar o código pra tag (checkout, nunca pull)
+git fetch --tags && git checkout <tag>
+git describe --tags                          # espera: <tag> exata, sem "-N-g<hash>"
+
+# 4. Migration (idempotente — rodar mesmo quando não há migration nova)
+set -a; . /root/orizon-A.env; set +a
+alembic upgrade head
+alembic current                              # confirme o head esperado
+
+# 5. Subir — e ESPERAR antes de testar (ver o porquê abaixo)
+systemctl start orizon-a
+sleep 10
+systemctl status orizon-a --no-pager | head -15
+journalctl -u orizon-a -n 40 --no-pager
+
+# 6. Conferência estrutural — bash explícito (ver o porquê abaixo)
+bash docs/db/confirmar.sh                    # espera 15 OK / 0 FALHA
+
+# 7. Smoke — a porta não vem do .env (ver o porquê abaixo), descubra com:
+ss -lntp | grep python3                      # ou: journalctl -u orizon-a | grep -i porta
+PORTA=8765                                   # substitua pela porta real lida acima
+curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:${PORTA}/"                     # espera 302
+curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:${PORTA}/static/login.html"    # espera 200
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "http://127.0.0.1:${PORTA}/api/auth/login" \
+  -H 'Content-Type: application/json' -d '{"login":"nao-existe","senha":"x"}'             # espera 401
+```
+
+### Por que cada regra deste bloco existe
+
+**Passo 0, `git status --short` vazio.** Lição de 13/09, custou um deploy
+falso em Homologação: arquivos trazidos ao servidor por `git show
+origin/main:<arquivo> > <arquivo>` (um jeito de copiar um arquivo específico
+pro disco sem fazer checkout de nada) ficam **untracked** no diretório. Se
+esses MESMOS arquivos passarem a existir no commit da tag de destino, `git
+checkout <tag>` **aborta** — recusa sobrescrever untracked. O perigo não é
+só o abortar: os comandos seguintes do bloco (migration, start, smoke,
+`confirmar.sh`) **continuam rodando**, só que contra o código **velho**
+(o checkout nunca aconteceu) — e `confirmar.sh` deu **15 OK** sobre o
+schema/código errado, um verde que não provava nada. Resolvido movendo os
+três arquivos afetados pra fora do repositório
+(`/root/backups/untracked_20260913/`) e refazendo o checkout, que aí passou
+limpo. Daqui em diante, `git status --short` vazio é PRÉ-CONDIÇÃO do
+checkout, não uma conferência opcional.
+
+**Passo 1, backup ANTES de parar o serviço.** Decisão de 13/09, resolvendo a
+divergência que existia no histórico (alguns deploys faziam antes, outros
+depois, nenhuma regra escrita). `pg_dump` contra o banco **no ar** já é
+consistente (MVCC — não precisa de um mundo parado para um snapshot
+correto), e fazer o backup ANTES tem uma vantagem que fazer depois não tem:
+se o `pg_dump` falhar (disco cheio, permissão, o que for), você descobre
+**sem ter derrubado nada** — o serviço antigo continua rodando enquanto
+você resolve. Backup depois de parar significa: se ele falhar, você já
+está com o serviço fora do ar E sem rede de segurança.
+
+**Passo 5, `sleep 10` depois do `systemctl start`.** Lição de 13/09: sem
+esperar, o primeiro `curl` do smoke devolve `000` (conexão recusada/vazia)
+porque o processo ainda está dentro do `init_db()` de boot (Passo 3.8 já
+avisava disso pro rebuild completo — vale igual pro deploy rotineiro, só
+não estava escrito aqui). Dez segundos é a margem medida em 13/09, não um
+número exato de algum log de arranque — se o smoke ainda vier `000` depois
+disso, é o serviço mesmo que não subiu, não falta de tempo.
+
+**Passo 6, `bash docs/db/confirmar.sh`, nunca `./docs/db/confirmar.sh`.**
+Lição de 13/09: o arquivo não tem bit de execução no clone do servidor
+(`git` não preserva `+x` de todo checkout/ambiente), e `./` sem `+x` dá
+"Permission denied". `bash <caminho>` não depende do bit — funciona sempre.
+
+**Passo 7, a porta vem de `ss -lntp`, não do `.env`.** Suposição errada
+registrada e corrigida em 13/09: `ORIZON_PORT` **não existe** em
+`orizon-A.env`/`orizon-B.env` — presumir que existiria (como uma entrada
+anterior deste documento supôs) levaria a compor uma URL de smoke com uma
+porta que não é a real. A porta de cada serviço se descobre no processo
+vivo (`ss -lntp`), não se lê de configuração. Medido em 13/09:
+**Integração 8765, Homologação 8766** — mas isso é o valor de HOJE, não uma
+constante; releia a cada deploy.
+
+**Os três caminhos do smoke, exatos (correção que já existia desde 08/09,
+reafirmada com números de 13/09):** `/` → **302** (raiz sem sessão
+redireciona pro login, `main.py`); `/static/login.html` → **200** (arquivo
+estático de verdade — não confundir com o `/login.html` SEM `/static/`, que
+dá **404** porque não existe rota `.html` fora de `/static/`); `POST
+/api/auth/login` com credencial inexistente → **401**.
 
 ## Passo 3 — por ambiente
 
@@ -896,6 +1016,53 @@ do código. Os oito números seguem como conferência de percurso, na tela.
 
 Tag `v2026.09.09-beta1` (`871817b`). Mesmo procedimento nos dois; `confirmar.sh` 15/0; smoke
 302 na raiz + 401 no login inválido nos dois. **Produção NÃO tocada.**
+
+### Vigésimo deploy por tag — v2026.09.13-beta2 — 13/09/2026
+
+**1 migration nova** — `5325ac7badfa` (ACHADO-69, Passo 3: `aditivos` ganha `assinatura_canal`
++ 3 colunas de ClickSign — 4 `ADD COLUMN`, nenhuma outra tabela tocada). Termo Aditivo entra
+como quarto caso do mecanismo comum de assinatura eletrônica (`mod_assinatura.py`); pacote
+inteiro (Passos 0-3, ACHADO-70 junto) documentado em
+`docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md` e `docs/db/ACHADOS_CONTABEIS.md` § ACHADO-69.
+
+Este é o primeiro deploy a seguir o `## Deploy rotineiro — procedimento padrão` escrito hoje —
+e o motivo dele existir foi medido no próprio deploy, não suposto antes:
+
+**Integração (`orizon-a`, porta 8765):** backup em
+`/root/backups/integracao_pre_20260913_2058.sql` → `git status --short` vazio → `systemctl
+stop` → `git fetch --tags && git checkout v2026.09.13-beta2` → `alembic upgrade head`
+(`5325ac7badfa (head)` confirmado) → `systemctl start` → `sleep 10` → `bash
+docs/db/confirmar.sh` **15 OK / 0 FALHA** → smoke `/` 302, `/static/login.html` 200, `POST
+/api/auth/login` 401. Sem incidente.
+
+**Homologação (`orizon-b`, porta 8766) — o deploy falso.** `git checkout v2026.09.13-beta2`
+**abortou** silenciosamente: três arquivos deste diretório tinham sido trazidos ao servidor em
+algum momento anterior via `git show origin/main:<arquivo> > <arquivo>` (copia o conteúdo pro
+disco sem passar por `checkout`/`add`/`commit`) e ficaram **untracked** — e esses mesmos três
+arquivos passaram a existir no commit de `v2026.09.13-beta2`, então o `git checkout` recusou
+sobrescrevê-los. O bloco de comandos **não parou aí**: migration, `systemctl start`, `sleep
+10` e `bash docs/db/confirmar.sh` rodaram todos em sequência, contra o código **antigo** (o
+checkout nunca tinha acontecido) — e `confirmar.sh` devolveu **15 OK / 0 FALHA** sobre esse
+schema/código errado, um verde que não provava nada. Percebido ao conferir `git describe
+--tags` (não batia com `v2026.09.13-beta2`) antes do smoke. Os três arquivos untracked foram
+movidos para `/root/backups/untracked_20260913/` (fora do repositório, preservados — não
+apagados), o checkout refeito e passou limpo; migration, restart, `sleep 10`, `confirmar.sh`
+(15/0 de verdade desta vez) e smoke (302/200/401) repetidos do zero. Backup próprio desta
+rodada em `/root/backups/homologacao_pre_20260913_2109.sql`.
+
+**A lição, generalizada no procedimento padrão acima:** `git status --short` vazio virou
+pré-condição do checkout, não conferência opcional — e um `confirmar.sh` verde depois de um
+checkout que não se confirmou como tendo dado certo (`git describe --tags` batendo com a tag
+alvo) não prova nada, prova só que o código que já estava lá continua íntegro.
+
+**Dado preservado, conferido no meio do incidente:** Loja Teste (id 15, 11 usuários) e
+Inspirium (10 funcionários da folha) — nenhum dos dois é alcançado pela migration (só toca
+`aditivos`) nem pelo incidente do checkout (nunca houve `DROP`/recriação de banco em momento
+nenhum deste deploy; o `git checkout` que abortou não tem esse tipo de efeito colateral, só
+deixa o código no estado anterior).
+
+`confirmar.sh` 15/0 nos dois (a segunda rodada de Homologação sendo a que vale). Smoke 302/200/401
+nos dois. **Produção NÃO tocada.**
 
 ## Conferir o que esta rodando
 
