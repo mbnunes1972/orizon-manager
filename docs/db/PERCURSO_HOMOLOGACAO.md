@@ -651,6 +651,116 @@ autosave ao abrir.
 
 ---
 
+## 15 · A sequência ClickSign (ACHADO-69) — Contrato → Aprovação do PE → Solicitação de medição → Termo Aditivo, nos dois canais
+
+Decisão do Marcelo em 11/09, no momento de escolher entre espelhar a Aprovação do PE numa quarta
+cópia ou extrair o mecanismo comum: *"vamos fazer o mais certo. Testamos em sequência."* Esta é
+essa sequência, escrita pela primeira vez — nunca esteve neste documento, porque nenhum dos
+quatro documentos tinha sido percorrido pela ClickSign na mão até agora. A suíte prova o
+servidor (`tests/test_*clicksign*.py`, `tests/test_achado70_cancelamento_envelope.py`,
+`tests/test_e2e_browser_termo_aditivo_clicksign.py` — este último contra um servidor ClickSign
+FALSO, nunca a rede real); esta seção prova o sistema, contra a ClickSign de sandbox de verdade.
+
+### 15.0 · Antes de começar
+
+- **Integração ClickSign configurada para a loja de Homologação**, com token de **sandbox** de
+  verdade (Config → Integrações). Sem isto, o botão "Assinatura ClickSign" aparece mas a
+  integração recusa com "não configurada" — não é achado, é pré-requisito faltando.
+- **Duas caixas de e-mail reais** que você controle (uma pra "loja", uma pra "cliente") — os
+  convites da ClickSign chegam nelas de verdade. Pode ser a mesma caixa com endereço `+loja`/
+  `+cliente`, se o seu provedor aceitar.
+- Um projeto novo, percorrido até o Contrato assinável (etapas 1-4 deste percurso).
+
+Faça os quatro documentos **na ordem em que aparecem no ciclo** — é a ordem que valida que o
+mecanismo comum (`mod_assinatura.py`) não tem efeito colateral de um documento vazando pro
+próximo. Em **cada** documento, os dois canais, nesta ordem: primeiro confira que o canal
+**interno** continua exatamente como sempre (controle — se ele mudou, a extração do mecanismo
+quebrou algo que não devia), depois o canal **ClickSign** inteiro.
+
+### 15.1 · Contrato (etapa 7)
+
+15.1.1 **Canal interno, controle.** Gere o contrato, clique "Imprimir", confirme loja+cliente na
+caixa interna. Continua exatamente como em 5.1-5.3 deste percurso.
+
+15.1.2 Gere um **segundo** contrato (ou use um segundo projeto) para o canal ClickSign — um
+contrato já assinado não oferece mais escolha de canal.
+
+15.1.3 **Canal ClickSign.** Clique "Assinatura ClickSign". O modal pede e-mail da loja, do
+cliente e (só o Contrato tem isto) **testemunhas** — deixe as duas em branco numa rodada e
+preenchidas na outra, testemunha sem e-mail não pode ser convocada. Confirme e envie.
+
+15.1.4 Confira na sua caixa de e-mail: convite chegou para loja e cliente (e testemunhas, se
+preenchidas). Assine os dois (e as testemunhas, se houver) **na tela da ClickSign**, não na do
+Orizon — é isso que o canal remoto significa.
+
+15.1.5 De volta ao Orizon, clique **"Verificar agora"**. Tem que virar "assinado" — a
+reconciliação reconsulta a API, nunca confia em cache local.
+
+15.1.6 **Cancelamento (a razão de existir do ACHADO-70).** Antes de assinar (num terceiro
+contrato, ou refazendo o envio), cancele o orçamento de origem pela tela de cancelamento. Confira
+que **chega um e-mail** avisando que a assinatura não é mais necessária, e no painel da ClickSign
+o envelope aparece cancelado — não pendurado pra sempre.
+
+### 15.2 · Aprovação do PE (etapa 11d/11e)
+
+15.2.1 **Canal interno, controle.** Igual a 6.x/8.3 deste percurso.
+
+15.2.2 **Canal ClickSign.** Mesmo roteiro de 15.1.3-15.1.5, sem testemunha (a Aprovação do PE não
+oferece o campo — LP-24, pergunta em aberto, não é lacuna desta entrega).
+
+15.2.3 **Cancelamento — dois gatilhos, não um (achado independente do ACHADO-70).** Envie pra
+ClickSign e **reprove a AF2** (`/ciclo/11d/reprovar`) antes de assinar: confira o e-mail de
+cancelamento e o envelope cancelado na ClickSign. Depois, num envio novo, em vez de reprovar,
+clique **Regerar**: o mesmo cancelamento tem que acontecer — é o segundo ponto, independente do
+primeiro, que só apareceu ao medir antes de ligar.
+
+### 15.3 · Solicitação de medição (etapa 9)
+
+15.3.1 **Canal interno, controle.** Igual a 7.1 deste percurso.
+
+15.3.2 **Canal ClickSign.** Mesmo roteiro de 15.1.3-15.1.5, sem testemunha (decisão registrada de
+17/08 — não é lacuna).
+
+15.3.3 **Cancelamento — só por Regerar.** A Solicitação de medição não tem verbo de reprovação
+próprio; envie pra ClickSign e clique em **Regerar** a solicitação. Confira e-mail de
+cancelamento e envelope cancelado.
+
+### 15.4 · Termo Aditivo (etapa 11e) — o motivo de tudo isto ter começado
+
+15.4.1 **Canal interno, controle.** Gere o Termo Aditivo, assine loja e cliente — a segunda
+assinatura abre o modal de forma de pagamento (ACHADO-25, 8.4.13 deste percurso). Confira que o
+razão do projeto ganhou as provisões da diferença negociada.
+
+15.4.2 Negocie um **novo** complemento (renegocie um ambiente a mais, ou gere "novo Termo
+Aditivo") pra ter um segundo aditivo, sem assinatura, pro canal ClickSign.
+
+15.4.3 **Canal ClickSign — a diferença deste documento.** Clique "Assinatura ClickSign". **O
+modal de forma de pagamento vem PRIMEIRO**, antes do de confirmar e-mails — o Aditivo não tem
+outro instante síncrono pra perguntar isso na conclusão remota (ACHADO-21 6-c). Preencha a forma
+de pagamento, depois confirme e-mails, envie.
+
+15.4.4 Assine os dois lados na ClickSign de verdade. Volte ao Orizon, "Verificar agora" → tem que
+virar "assinado".
+
+15.4.5 **A igualdade contábil, na tela.** Abra o razão do projeto. A provisão da diferença
+constituída por ESTE aditivo (canal ClickSign) tem que ter a mesma NATUREZA da que 15.4.1
+constituiu pelo canal interno — mesmas contas, mesmo tipo de lançamento (`fechamento_venda_
+custo_fabrica` e as demais rubricas do breakdown). Os VALORES serão diferentes (as duas
+negociações têm diferenças diferentes) — o que se confere aqui é que o canal não muda O QUE é
+lançado, só quem clicou. A prova de que os NÚMEROS batem para uma MESMA diferença já está feita
+pela suíte (`test_aditivo_clicksign_e2e.py::test_assinatura_completa_via_clicksign_constitui_
+as_mesmas_provisoes_do_canal_interno`) — este passo do percurso é a conferência visual, no razão
+de verdade, não uma repetição do teste.
+
+15.4.6 **Cancelamento — por Regerar.** Envie um terceiro aditivo pra ClickSign e clique "Regerar"
+antes de assinar. Mesma conferência de e-mail + envelope cancelado dos três anteriores.
+
+15.4.7 **Reenviar convite (os quatro documentos, achado do usuário 2026-08-19).** Em qualquer um
+dos quatro ainda pendente na ClickSign, clique "Reenviar convite" e confirme que chega um novo
+e-mail — a API da ClickSign renotifica TODOS os signatários pendentes de uma vez, nunca só um.
+
+---
+
 ## O que este percurso NÃO cobre, e por quê
 
 **F2-21 — NF-e H e NF-e P: SUSPENSO.** O item pressupunha que a emissão é um
