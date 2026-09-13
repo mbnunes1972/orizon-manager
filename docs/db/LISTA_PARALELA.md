@@ -530,6 +530,24 @@ o que parece coerente. *Adiado:* achado ao preparar dado de teste da Folha, não
 
 ---
 
+**LP-24 · Aprovação do PE não tem testemunha na assinatura — lacuna ou decisão? Desconhecido.**
+Achado no Passo 0 (inventário) de `docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md`, comparando os
+três documentos com escolha de canal ClickSign. O Contrato suporta testemunha 1/2 na assinatura
+(`_enviar_contrato_para_clicksign`, `main.py:1367-1374`, e colunas próprias no modelo). A
+Solicitação de medição não suporta — e isso **é decisão registrada**, de 17/08/2026 (comentário no
+código de `SolicitacaoMedicaoAssinatura`). A Aprovação do PE também não suporta
+(`_enviar_aprovacao_pe_para_clicksign` não recebe o parâmetro `testemunhas`), mas **não há decisão
+nenhuma registrada** para essa ausência — pode ser lacuna (nunca foi pedida) ou pode ter sido uma
+escolha implícita de quem escreveu o código na época.
+
+**Fora do escopo do ACHADO-69** por decisão de Marcelo (13/09): desconhecido não se resolve
+unificando por cima — unificar teria que ESCOLHER um comportamento pra Aprovação do PE sem saber
+se existe um motivo pro atual. Fica registrado aqui até alguém confirmar (perguntando a quem pediu
+a funcionalidade originalmente, ou observando se a falta de testemunha em Aprovação do PE já
+incomodou alguém em produção) se é lacuna a fechar ou decisão a documentar.
+
+---
+
 ## Fechados — não são adiamento, e por isso não estão na lista acima
 
 - **Aditivo criado manualmente entre a assinatura e o PE.** DECIDIDO em

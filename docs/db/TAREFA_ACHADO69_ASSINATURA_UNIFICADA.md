@@ -61,6 +61,108 @@ envelope e outro deixa órfão, um valida CPF em lugar diferente — então **pa
 divergência pode ser um achado próprio, e unificar por cima dela apagaria a evidência. Não
 "harmonize" silenciosamente escolhendo o comportamento que achar melhor.
 
+### Passo 0 — feito (13/09) — DIVERGÊNCIA CONFIRMADA, parando aqui
+
+Inventário completo abaixo. Achado central primeiro, porque muda o que vem depois: **os três NÃO
+são iguais a menos de nome.** Há uma divergência de comportamento real, confirmada por dois
+caminhos de investigação independentes (o dossiê do Contrato achou a função; o dossiê da
+Solicitação de medição, sem saber disso, grepou o codebase inteiro por `cancelar_envelope` e achou
+o mesmo único ponto de chamada) — exatamente o padrão que a instrução deste passo avisou pra não
+atropelar.
+
+#### Divergência 1 (a que manda parar): cancelamento de envelope só existe para o Contrato
+
+`cancelar_envelope` (`integracoes/clicksign_client.py:165`) tem **um único call site em todo o
+código**: `main.py:1067`, dentro de `_notificar_signatarios_clicksign_cancelamento(db, contrato,
+loja_id, status_final)` (`main.py:1024-1071`) — função cujo próprio parâmetro se chama `contrato`,
+chamada de dois pontos do fluxo de cancelamento de orçamento (`main.py:12451`, `12474`). Ela faz
+duas coisas: avisa por e-mail cada signatário pendente que o convite não vale mais, e tenta (best
+effort, nunca bloqueia o cancelamento) cancelar o envelope na ClickSign.
+
+**Aprovação do PE e Solicitação de medição não têm nada equivalente.** Confirmado por grep
+completo nos dois fluxos de "desfazer" que cada uma tem: a reprovação da AF2 (`/ciclo/11d/
+reprovar`) e a redecisão de conciliação de PE (ACHADO-55, `mod_conciliacao_pe`, subfase 11e) —
+zero menção a `clicksign`/`envelope` em qualquer um dos dois. Se uma Aprovação do PE ou uma
+Solicitação de medição foi enviada pra ClickSign e depois é reprovada/redecidida antes de ser
+assinada, **o envelope não é cancelado e o signatário não é avisado** — fica pendurado até alguém
+notar (não há expiração automática nenhuma, nos três documentos: um envelope nunca assinado só
+sai do limbo por reenvio manual).
+
+#### Divergência 2: testemunhas (signatários extras) só existem no Contrato
+
+`_enviar_contrato_para_clicksign` aceita uma lista opcional `testemunhas` (`main.py:1367-1374`) e
+o modelo tem os campos de testemunha 1/2. `_enviar_aprovacao_pe_para_clicksign` não recebe esse
+parâmetro. `SolicitacaoMedicaoAssinatura` não tem coluna de testemunha — e aqui há uma nota no
+código dizendo que é decisão de usuário de 2026-08-17, ou seja, **essa metade já é documentada
+como deliberada**; falta confirmar se a ausência em Aprovação do PE também foi uma decisão ou é
+só reflexo de nunca terem pedido testemunha ali.
+
+#### Diferença 3 (provavelmente NÃO é a divergência a investigar — já esperada pela Fronteira do pacote)
+
+O efeito ao completar a assinatura (ambas as partes) é diferente nos três, e o próprio pacote já
+avisa que isso é esperado ("o efeito contábil não muda, e é diferente por documento, de
+propósito"): Contrato dispara uma cascata grande (fecha etapa 7, materializa AF1, cronograma,
+segmentação, `_registrar_provisao_venda`, equipe, chat, e-mail — tudo fail-soft); Solicitação de
+medição fecha a etapa 9 automaticamente; **Aprovação do PE não dispara cascata nenhuma** — o
+docstring de `_registrar_assinatura_aprovacao_pe` diz explicitamente que fechar a subfase 11e
+continua sendo ação manual/gerencial. Listada aqui por completude do inventário, não como achado
+— mas registrando porque é o tipo exato de "comportamento diferente" que Passo 1 vai precisar
+preservar através do registro parametrizado (é justamente o "o que fazer quando completa" que o
+pacote já nomeia como o ponto de parametrização).
+
+Em TODAS as outras dimensões abaixo, os três batem em comportamento — só o nome muda.
+
+#### Tabela
+
+| dimensão | Contrato | Aprovação do PE | Solicitação de medição |
+|---|---|---|---|
+| **modelo** | `Contrato` (`database.py:1284-1345`), tabela `contratos`; assinaturas em `ContratoAssinatura` (`1348-1362`) — suporta `parte` loja/cliente/testemunhaN | `AprovacaoPE` (`1410-1439`); assinaturas em `AprovacaoPEAssinatura` (`1441-1454`) — só loja/cliente | `SolicitacaoMedicao` (`1460-1484`); assinaturas em `SolicitacaoMedicaoAssinatura` (`1487-1500`) — só loja/cliente, sem testemunha por decisão de usuário 2026-08-17 |
+| **colunas ClickSign** | `assinatura_canal`, `clicksign_envelope_id`, `clicksign_enviado_em`, `clicksign_signatarios_json` (`1323-1326`) | mesmas 4, mesmos tipos (`1430-1435`) | mesmas 4 (`1476-1479`) — alinhadas via migration 0006 (27/08); antes desta divergência já foi corrigida |
+| **rota enviar** | `POST /contrato/clicksign/enviar` (`main.py:14626`) | `POST /aprovacao-pe/clicksign/enviar` (`10038`) | `POST /medicao/solicitacao/clicksign/enviar` (`15145`) |
+| **ordem de validação em enviar** | auth → escopo → projeto → contrato → status/canal/assinatura-interna já existente → config → **testemunhas opcionais** → envia | auth → escopo → projeto → aprovação → status/canal/assinatura-interna → config → busca Contrato vinculado (erro se não houver) → envia | auth → escopo → projeto → solicitação → pdf existe/status/canal/assinatura-interna → config → exige Contrato existir → envia |
+| **rota verificar** | `/contrato/clicksign/verificar` (`14711`) | `/aprovacao-pe/clicksign/verificar` (`10104`) | `/medicao/solicitacao/clicksign/verificar` (`15212`) — todas exigem `assinatura_canal=="clicksign"`, todas re-chamam a API (nunca confiam em cache) |
+| **rota reenviar** | `/contrato/clicksign/reenviar` (`14750`) — `reenviar_notificacao`, notifica TODOS os signatários (limitação da API, não dá pra mirar só o pendente) | `/aprovacao-pe/clicksign/reenviar` (`10141`) — mesmo padrão | `/medicao/solicitacao/clicksign/reenviar` (`15249`) — mesmo padrão |
+| **`_enviar_*`** | `_enviar_contrato_para_clicksign` (`1338-1382`) — únicoo com testemunhas | `_enviar_aprovacao_pe_para_clicksign` (`1453-1482`) | `_enviar_solicitacao_medicao_para_clicksign` (`1543-1573`) |
+| **`_reconciliar_*`** | `_reconciliar_contrato_clicksign` (`1385-1423`) | `_reconciliar_aprovacao_pe_clicksign` (`1485-1509`) | `_reconciliar_solicitacao_medicao_clicksign` (`1576-1601`) — as três: `status=="closed"` é o único sinal confiável (ClickSign nunca popula `signed_at`, achado de 20/08); CPF inválido de um signatário não aborta os outros (log-and-continue) |
+| **validação de CPF (ACHADO-28/F2-6)** | dentro de `_registrar_assinatura_contrato` (`1174-1195`) — único ponto, os dois canais passam por ele | dentro de `_registrar_assinatura_aprovacao_pe` — mesmo padrão | dentro de `_registrar_assinatura_solicitacao_medicao` (`1512-1540`) — mesmo padrão. **Idêntico nos três**: nunca duplicado, nunca só num canal |
+| **efeito ao completar (loja+cliente assinam)** | cascata grande (ver Diferença 3) | **nenhuma cascata** — manual (ver Diferença 3) | fecha etapa 9 (ver Diferença 3) |
+| **webhook** | `POST /webhooks/clicksign` (`6760-6813`), handler ÚNICO pros três — resolve por `clicksign_envelope_id` tentando Contrato → AprovacaoPE → SolicitacaoMedicao nessa ordem, despacha pro `reconciliar` correspondente. HMAC contra segredo por loja; sempre 200 mesmo em erro/sem match | idêntico (mesmo handler) | idêntico (mesmo handler) |
+| **job `/internal/clicksign/reconciliar`** | bloco Contrato (`6827-6855`): canal clicksign + status em (para_assinatura/assinado_loja/assinado_cliente) + enviado há ≥10min | bloco idêntico em filtro e carência | bloco idêntico (`6878-6899`) — os três com exceção por linha isolada (uma falha não aborta o lote) |
+| **cancelamento de envelope** | **existe** — `_notificar_signatarios_clicksign_cancelamento` (Divergência 1) | **não existe** | **não existe** |
+| **ponto da tela** | `_renderSecaoAssinaturaContrato` (`24935`) + 3 funções de ação (`~25010-25070`) | `enviarAprovacaoPEParaClickSign`/`_confirmarEnvioClickSignPE`/`verificarClickSignPEAgora`/`reenviarConviteClickSignPE` (`22540-22604`) | `_confirmarEnvioClickSignMedicao`/`verificarClickSignMedicaoAgora`/`reenviarConviteClickSignMedicao` (`~24747-24800`) |
+
+**Nota de higiene do pacote:** as linhas do webhook citadas no cabeçalho deste documento
+(6642/6664/6686) estão desatualizadas — a posição real hoje é `6776-6783`. Não é achado, é só o
+código ter andado desde que o pacote foi escrito.
+
+#### Decidido por Marcelo (13/09) — as duas divergências, resolvidas
+
+**Divergência 1 (cancelamento de envelope) é defeito — ganhou número próprio: ACHADO-70**
+(`docs/db/ACHADOS_CONTABEIS.md`). Um envelope órfão é um link vivo do ClickSign pra assinar um
+documento que já não vale — PE reprovado, envelope antigo ainda na caixa do cliente, cliente
+assina, e a reconciliação (webhook ou job) varre por canal/status sem checar se a decisão que
+motivou o envio ainda é a atual, tratando essa assinatura tardia como boa.
+
+**Como entra no Passo 1/2, sem misturar refatoração com mudança de comportamento:** o mecanismo
+unificado ganha o cancelamento como **capacidade do registro** (todo documento pode declarar como
+cancelar seu envelope), mas cada documento existente migra no Passo 2 **preservando o
+comportamento de hoje** — Contrato continua cancelando, Aprovação do PE e Solicitação de medição
+continuam SEM cancelar automaticamente, exatamente como estão em produção agora. Ligar o
+cancelamento nesses dois é **mudança de comportamento**, não extração de mecanismo, e por isso não
+entra de carona: vai em **commit separado, com teste próprio, depois que a migração de cada
+documento já estiver com a suíte verde** — pra que o histórico deixe legível qual commit mudou o
+quê, sem confundir "extrair sem mudar nada" com "mudar o que o sistema faz". Isso é trabalho do
+Passo 2 e seguintes, não deste Passo 0.
+
+**Divergência 2 (testemunha) fica FORA do escopo do ACHADO-69.** A ausência na Solicitação de
+medição é decisão registrada de 17/08 — não mexer. A ausência na Aprovação do PE é **desconhecida**
+(lacuna ou decisão nunca documentada), e desconhecido não se resolve unificando por cima. Registrada
+como pergunta em aberto em `docs/db/LISTA_PARALELA.md`, citando a data da decisão da Solicitação de
+medição para contraste. Este pacote não toca nisso.
+
+Com as duas resolvidas (uma virou achado próprio e entra faseada; a outra saiu do escopo), o Passo
+0 está fechado e o pacote segue para o Passo 1.
+
 ### Passo 1 — extrair o mecanismo, sem mudar comportamento
 
 Um módulo (sugestão: `mod_assinatura.py`) com o ciclo de vida do envelope parametrizado por

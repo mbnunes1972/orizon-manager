@@ -1601,6 +1601,22 @@ def _reconciliar_solicitacao_medicao_clicksign(db, sol, cfg):
     return sol.status
 
 
+# ACHADO-69 Passo 1 (docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md) — registro único dos
+# documentos ClickSign, consumido pelo webhook e pelo job `/internal/clicksign/reconciliar`
+# (main.py, adiante) em vez de três blocos quase idênticos por classe. Só referencia as funções
+# acima, intocadas — nenhum comportamento muda. `cancelar` só existe para o Contrato (ACHADO-70):
+# ver mod_assinatura.py para o porquê de não ligar isso nos outros dois aqui.
+import mod_assinatura
+mod_assinatura.registrar("contrato", Contrato,
+                          _enviar_contrato_para_clicksign, _reconciliar_contrato_clicksign,
+                          cancelar=_notificar_signatarios_clicksign_cancelamento)
+mod_assinatura.registrar("aprovacao_pe", AprovacaoPE,
+                          _enviar_aprovacao_pe_para_clicksign, _reconciliar_aprovacao_pe_clicksign)
+mod_assinatura.registrar("solicitacao_medicao", SolicitacaoMedicao,
+                          _enviar_solicitacao_medicao_para_clicksign,
+                          _reconciliar_solicitacao_medicao_clicksign)
+
+
 def _congelar_segmentacao_no_projeto(db, loja_id, projeto_nome):
     """FASE B2 (A6): congela a segmentação Mercadoria × Serviço EFETIVA (override do projeto vence o
     default da loja) no `parametros_json` do projeto — chamado na assinatura (e, de reparo, na
@@ -6770,20 +6786,14 @@ class Handler(BaseHTTPRequestHandler):
                               or payload.get("envelope_id") or payload.get("id") or "").strip()
                 if not envelope_id:
                     self.send_json({"ok": True}, code=200); return
-                # Documento pode ser um Contrato, uma AprovacaoPE OU uma SolicitacaoMedicao
-                # (mesmo webhook de conta cobre os três tipos) — identifica por qual tabela tem
-                # esse envelope_id.
-                doc = db.query(Contrato).filter_by(clicksign_envelope_id=envelope_id).first()
-                reconciliar = _reconciliar_contrato_clicksign
-                if doc is None:
-                    doc = db.query(AprovacaoPE).filter_by(clicksign_envelope_id=envelope_id).first()
-                    reconciliar = _reconciliar_aprovacao_pe_clicksign
-                if doc is None:
-                    doc = db.query(SolicitacaoMedicao).filter_by(clicksign_envelope_id=envelope_id).first()
-                    reconciliar = _reconciliar_solicitacao_medicao_clicksign
+                # Documento pode ser um Contrato, uma AprovacaoPE OU uma SolicitacaoMedicao (mesmo
+                # webhook de conta cobre os três tipos) — ACHADO-69 Passo 1: identifica pelo
+                # registro único (mod_assinatura.py) em vez de repetir a consulta por classe.
+                doc, reg = mod_assinatura.achar_por_envelope(db, envelope_id)
                 if doc is None:
                     # Documento de outro sistema apontando pra essa URL por engano — ack sem processar.
                     self.send_json({"ok": True}, code=200); return
+                reconciliar = reg.reconciliar
                 loja_obj = db.get(Loja, doc.loja_id) if doc.loja_id else None
                 import mod_clicksign
                 cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
@@ -6831,72 +6841,27 @@ class Handler(BaseHTTPRequestHandler):
             contratos_atualizados = 0
             db = get_session()
             try:
-                pendentes = (db.query(Contrato)
-                             .filter(Contrato.assinatura_canal == "clicksign",
-                                     Contrato.status.in_(("para_assinatura", "assinado_loja", "assinado_cliente")),
-                                     Contrato.clicksign_enviado_em.isnot(None),
-                                     Contrato.clicksign_enviado_em <= limite)
-                             .all())
-                for contrato in pendentes:
-                    contratos_verificados += 1
-                    loja_obj = db.get(Loja, contrato.loja_id) if contrato.loja_id else None
-                    cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
-                    if cfg is None:
-                        continue
-                    status_antes = contrato.status
-                    try:
-                        _reconciliar_contrato_clicksign(db, contrato, cfg)
-                        db.commit()
-                    except Exception as _erc:
-                        db.rollback()
-                        print("[CLICKSIGN] job: reconciliar contrato %s falhou: %s" % (contrato.id, _erc))
-                        continue
-                    if contrato.status != status_antes:
-                        contratos_atualizados += 1
-                pendentes_pe = (db.query(AprovacaoPE)
-                                 .filter(AprovacaoPE.assinatura_canal == "clicksign",
-                                         AprovacaoPE.status.in_(("para_assinatura", "assinado_loja", "assinado_cliente")),
-                                         AprovacaoPE.clicksign_enviado_em.isnot(None),
-                                         AprovacaoPE.clicksign_enviado_em <= limite)
-                                 .all())
-                for aprov in pendentes_pe:
-                    contratos_verificados += 1
-                    loja_obj = db.get(Loja, aprov.loja_id) if aprov.loja_id else None
-                    cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
-                    if cfg is None:
-                        continue
-                    status_antes = aprov.status
-                    try:
-                        _reconciliar_aprovacao_pe_clicksign(db, aprov, cfg)
-                        db.commit()
-                    except Exception as _erp:
-                        db.rollback()
-                        print("[CLICKSIGN] job: reconciliar aprovação PE %s falhou: %s" % (aprov.id, _erp))
-                        continue
-                    if aprov.status != status_antes:
-                        contratos_atualizados += 1
-                pendentes_sm = (db.query(SolicitacaoMedicao)
-                                 .filter(SolicitacaoMedicao.assinatura_canal == "clicksign",
-                                         SolicitacaoMedicao.status.in_(("para_assinatura", "assinado_loja", "assinado_cliente")),
-                                         SolicitacaoMedicao.clicksign_enviado_em.isnot(None),
-                                         SolicitacaoMedicao.clicksign_enviado_em <= limite)
-                                 .all())
-                for sol in pendentes_sm:
-                    contratos_verificados += 1
-                    loja_obj = db.get(Loja, sol.loja_id) if sol.loja_id else None
-                    cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
-                    if cfg is None:
-                        continue
-                    status_antes = sol.status
-                    try:
-                        _reconciliar_solicitacao_medicao_clicksign(db, sol, cfg)
-                        db.commit()
-                    except Exception as _esm:
-                        db.rollback()
-                        print("[CLICKSIGN] job: reconciliar solicitação de medição %s falhou: %s" % (sol.id, _esm))
-                        continue
-                    if sol.status != status_antes:
-                        contratos_atualizados += 1
+                # ACHADO-69 Passo 1: itera o registro (mod_assinatura.py) em vez de repetir o
+                # mesmo bloco de consulta+reconciliação três vezes, uma por classe. Filtro e
+                # carência idênticos aos três blocos originais — nenhum comportamento muda.
+                for reg in mod_assinatura.documentos():
+                    for doc in mod_assinatura.pendentes_para_reconciliar(db, reg, limite):
+                        contratos_verificados += 1
+                        loja_obj = db.get(Loja, doc.loja_id) if doc.loja_id else None
+                        cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
+                        if cfg is None:
+                            continue
+                        status_antes = doc.status
+                        try:
+                            reg.reconciliar(db, doc, cfg)
+                            db.commit()
+                        except Exception as _erc:
+                            db.rollback()
+                            print("[CLICKSIGN] job: reconciliar %s %s falhou: %s"
+                                  % (reg.nome, doc.id, _erc))
+                            continue
+                        if doc.status != status_antes:
+                            contratos_atualizados += 1
                 self.send_json({"ok": True, "contratos_verificados": contratos_verificados,
                                 "contratos_atualizados": contratos_atualizados})
             finally:

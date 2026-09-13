@@ -191,8 +191,37 @@ errada. Ficam dois requisitos, não três: nome do teste legível no que for imp
 processo termina sozinho em ~5,3-5,4s (exit code 1) nas três — nunca mais os 12h/45min medidos
 antes. Apagado depois de confirmado, mesmo papel do `time.sleep(600)` da Rodada 1.
 
-**Pergunta que fica aberta, e importa mais que este item:** por que um teste passa de 300s? Um
-teste de 5 minutos não é lento — é outra coisa, e é candidato a ser a MESMA causa que aparece como
-flake desde o LP-16. Com o nome do teste agora sempre visível no relatório, a próxima ocorrência
-dá pra isolar e medir isoladamente — se isso se resolver, a ideia do supervisor (recusada acima)
-nunca precisa voltar à mesa.
+**A pergunta em aberto tem resposta — commit `93926cf`, verificado com 3 execuções completas
+durante a noite de 12/09→13/09 (17m47, 17m37, 17m50, nenhuma pendurada, nenhum kill precisou):
+`grep -c "+++ Timeout"` deu **zero** nas três. Nenhum teste passa dos 300s.** Não existia teste
+lento — existia o laço greenlet corrompido (Achado 2, acima) sendo CONTADO como duração de teste.
+O conserto eliminou a **categoria** inteira do sintoma "teste de 5 minutos", não só o travamento
+de 12h que a expôs — os dois eram a mesma causa, o `+++ Timeout +++` sendo o mascaramento: cada
+"teste lento" media não o teste, mas quanto tempo o laço corrompido girou até o `--timeout` global
+(300s) ou o fim da suíte alcançá-lo. Primeira vez em quatro dias sem pendurar. A ideia do
+supervisor (recusada acima) não precisa voltar à mesa.
+
+**O que sobrou depois do (b), medido nas mesmas 3 execuções:** 2776 no total nas três (mesma
+contagem — nenhuma diferença de coleta); conjuntos de falha de tamanho 4, 2 e 5, **inteiramente
+em E2E de navegador — o backend passa limpo nas três**. Onze arquivos de E2E aparecem entre as
+três. `tests/test_e2e_browser_remover_ciclo.py::test_remover_etapa12_funciona_no_clique_real`
+falhou nas três primeiras execuções, sempre no mesmo ponto —
+`_criar_projeto_e_assinar_contrato` → `page.wait_for_selector("#neg-subtotal:has-text
+('140.000,00')", timeout=10000)` — mas **uma quarta execução completa (13/09) passou limpo, ele
+incluído.** Correção de leitura registrada aqui porque a primeira versão deste documento chamou
+esse teste de "falha nas três" como se fosse determinístico: com a quarta rodada, ele é
+**intermitente como os outros dez**, não um caso à parte. Os onze ficam registrados como flakes
+de E2E **não explicados** — não "provavelmente carga", não "provavelmente timing": não sabemos, e
+escrever um palpite aqui teria o efeito de fazer alguém no futuro parar de procurar a causa real.
+
+**Hipótese testada e DERRUBADA (13/09), com a mesma força de um conserto:** a suspeita era que os
+tempos de espera do Playwright (valores fixos, nunca revisitados) estivessem dimensionados para
+máquina ociosa, e a margem sumisse sob a carga real da suíte — mesma família de pergunta da
+Rodada 1 (que testou isso no cliente HTTP, p50 5ms, e derrubou a hipótese lá; os tempos do
+Playwright são um conjunto de números diferente, nunca medido até agora). Medido diretamente:
+`_criar_projeto_e_assinar_contrato` instrumentado no `#neg-subtotal` — isolado, **783,0ms**; em 7
+execuções desse mesmo trecho dentro de uma suíte completa (arquivos diferentes que reusam o
+helper), **780,9 a 784,8ms**. É o mesmo número. Não existe perda de margem sob carga — alargar
+esse timeout teria escondido o defeito real atrás de um número maior, sem consertar nada.
+Instrumentação mantida (silenciosa no caminho verde, único apontamento que temos hoje pra dentro
+desses testes) — ver `docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md`.

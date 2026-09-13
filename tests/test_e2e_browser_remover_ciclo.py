@@ -141,7 +141,13 @@ def _criar_projeto_e_assinar_contrato(page, base, nome_exibicao):
     with open(xml_path, "w", encoding="utf-8") as f:
         f.write(XML_ONE_AMBIENTE)
     page.set_input_files("#xml-input-amb", xml_path)
+    # MEDIÇÃO TEMPORÁRIA (docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md, pré-Passo 1) — quanto
+    # tempo o #neg-subtotal realmente leva pra chegar no valor, isolado vs. dentro da suíte cheia.
+    # Remover depois de medido (mesmo papel do time.sleep(600) descartável da Rodada 1).
+    _t0_subtotal = time.perf_counter()
     page.wait_for_selector("#neg-subtotal:has-text('140.000,00')", timeout=10000)
+    print("MEDICAO neg-subtotal: %.1fms" % ((time.perf_counter() - _t0_subtotal) * 1000),
+          file=sys.stderr, flush=True)
 
     page.click("#btn-aprovar-orcamento")
     page.wait_for_selector("#modal-aprovacao-overlay")

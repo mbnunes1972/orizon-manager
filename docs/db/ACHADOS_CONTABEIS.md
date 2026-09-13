@@ -5534,3 +5534,48 @@ de quando/se fechar (reordenar as 11, uma a uma, mesmo molde do item 3) é do Ma
 Pacotes: `docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md`, `docs/db/TAREFA_ACHADO68_VERIFICACAO.md`.
 
 ---
+
+## ACHADO-70 — envelope ClickSign órfão sobrevive à reprovação/redecisão em dois dos três documentos
+
+Encontrado no Passo 0 (inventário) de `docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md`, que já
+avisava exatamente para este tipo de achado: *"se divergirem em comportamento — um reenvia e
+outro não, um cancela envelope e outro deixa órfão... pare e relate"*. Confirmado por dois
+caminhos de investigação independentes que convergiram no mesmo ponto sem saber um do outro: a
+pesquisa do Contrato achou a função; a pesquisa da Solicitação de medição, sem contexto sobre a
+primeira, grepou o codebase inteiro por `cancelar_envelope` e achou exatamente o mesmo (e único)
+call site.
+
+**O que existe, e só para o Contrato:** `cancelar_envelope` (`integracoes/clicksign_client.py:165`)
+tem **um único ponto de chamada em todo o código** — `main.py:1067`, dentro de
+`_notificar_signatarios_clicksign_cancelamento(db, contrato, loja_id, status_final)`
+(`main.py:1024-1071`, parâmetro literalmente chamado `contrato`), acionada de dois pontos do fluxo
+de cancelamento de orçamento (`main.py:12451`, `12474`). Ela avisa por e-mail cada signatário
+pendente que o convite não vale mais, e tenta (best effort, nunca bloqueia o cancelamento)
+cancelar o envelope na ClickSign.
+
+**O que falta, confirmado por grep nos dois fluxos de "desfazer" correspondentes:** a reprovação
+da AF2 (`/ciclo/11d/reprovar`) e a redecisão de conciliação de PE (ACHADO-55, subfase 11e) — zero
+menção a `clicksign`/`envelope` nos dois. O mesmo vale, por construção (nunca houve o call site),
+para a Solicitação de medição.
+
+**Por que importa — não é só "falta simetria":** um envelope ClickSign é um link vivo, fora do
+controle do sistema, que convida a assinar um documento. Se uma Aprovação do PE é reprovada (ou
+redecidida) depois de enviada pra ClickSign mas antes de ser assinada, o envelope **continua
+ativo** na caixa de entrada do cliente — que pode assiná-lo mesmo assim. O job `/internal/
+clicksign/reconciliar` e o webhook varrem por `assinatura_canal=="clicksign"` sem checar se a
+decisão que motivou o envio ainda vale; uma assinatura tardia nesse envelope órfão seria
+reconciliada como se fosse válida. Não é falta de limpeza — é uma janela onde o sistema pode
+registrar como "assinado" uma decisão que já foi revertida.
+
+**Decisão de Marcelo (13/09):** o cancelamento entra como capacidade do registro do mecanismo
+unificado (`docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md`, Passo 1), mas ligá-lo para
+Aprovação do PE e Solicitação de medição é **mudança de comportamento em dois documentos que já
+rodam em produção** — não entra de carona na extração do mecanismo. Cada documento migra no Passo
+2 preservando o comportamento atual (sem cancelamento automático); ligar o cancelamento é um
+commit separado, com teste próprio, depois que a migração de cada um estiver verde — para que o
+histórico deixe claro qual commit mudou o que o sistema faz, e não misture "extrair sem mudar
+comportamento" com "mudar comportamento".
+
+Pacote: `docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md`.
+
+---

@@ -75,7 +75,8 @@ MODULOS = {
                                  "mod_medicao.py", "mod_qualidade_xml.py",
                                  "mod_comercial_dash.py",   # dashboard Comercial (view derivada)
                                  "mod_equipe.py",            # Equipe do Projeto (roster papel→responsável)
-                                 "mod_clicksign.py"],        # Assinatura eletrônica ClickSign (2026-08-11)
+                                 "mod_clicksign.py",
+                                 "mod_assinatura.py"],       # Registro unificado ClickSign (ACHADO-69, 2026-09-13)
                     "tabelas": ["projetos_meta", "briefings", "pool_ambientes", "orcamentos",
                                 "orcamento_ambientes", "contratos", "contratos_assinaturas",
                                 "aditivos", "aditivos_assinaturas",   # Termo Aditivo (Fatia 3 PE)
