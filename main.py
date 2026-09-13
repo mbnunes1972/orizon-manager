@@ -1542,63 +1542,31 @@ def _registrar_assinatura_solicitacao_medicao(db, sol, parte, nome, cpf, ip_orig
 
 def _enviar_solicitacao_medicao_para_clicksign(db, sol, cfg, email_loja, nome_loja, email_cliente,
                                                nome_cliente, cpf_cliente):
-    """Envia o PDF da Solicitação de Medição pra ClickSign — mesmo fluxo de
-    _enviar_contrato_para_clicksign/_enviar_aprovacao_pe_para_clicksign (envelope -> documento ->
-    2 signatários -> requisitos -> ativação), só loja+cliente (sem testemunhas, decisão do
-    usuário 2026-08-17). NÃO commita — o chamador decide."""
-    if not email_loja or not email_cliente:
-        raise ValueError("E-mail da loja e do cliente são obrigatórios para assinatura eletrônica (ClickSign).")
-    if not sol.pdf_path or not os.path.exists(sol.pdf_path):
-        raise ValueError("PDF da solicitação de medição não encontrado — gere o documento antes de enviar ao ClickSign.")
-    import mod_clicksign
-    cli = mod_clicksign.client_de(cfg)
-    with open(sol.pdf_path, "rb") as f:
-        pdf_bytes = f.read()
-    nome_arquivo = "solicitacao_medicao_%s.pdf" % sol.id
-    envelope_id = cli.criar_envelope("Solicitação de Medição %s" % sol.id)
-    doc_id = cli.adicionar_documento(envelope_id, pdf_bytes, nome_arquivo)
-    sig_loja_id    = cli.adicionar_signatario(envelope_id, email_loja, nome_loja)
-    sig_cliente_id = cli.adicionar_signatario(envelope_id, email_cliente, nome_cliente, cpf=cpf_cliente)
-    for signer_id in (sig_loja_id, sig_cliente_id):
-        cli.adicionar_requisito_assinatura(envelope_id, doc_id, signer_id)
-        cli.adicionar_requisito_autenticacao(envelope_id, doc_id, signer_id)
-    cli.ativar_envelope(envelope_id)
-    sol.clicksign_envelope_id = envelope_id
-    sol.clicksign_signatarios_json = json.dumps({
-        "loja":    {"signer_id": sig_loja_id,    "email": email_loja,    "nome": nome_loja},
-        "cliente": {"signer_id": sig_cliente_id, "email": email_cliente, "nome": nome_cliente,
-                    "cpf": cpf_cliente},
-    }, ensure_ascii=False)
-    sol.assinatura_canal     = "clicksign"
-    sol.clicksign_enviado_em = datetime.utcnow()
+    """ACHADO-69 Passo 2 (13/09) — wrapper fino sobre `mod_assinatura.enviar_para_clicksign`: a
+    lógica (envelope -> documento -> 2 signatários -> requisitos -> ativação) migrou pra lá,
+    compartilhada; aqui só os textos que são desta classe (sem testemunhas — decisão do usuário
+    2026-08-17). Mesmo comportamento de antes, provado pela suíte que já existia
+    (`tests/test_solicitacao_medicao_e2e.py`), sem nenhuma asserção alterada. NÃO commita — o
+    chamador decide."""
+    mod_assinatura.enviar_para_clicksign(
+        sol, cfg,
+        titulo="Solicitação de Medição %s" % sol.id,
+        nome_arquivo="solicitacao_medicao_%s.pdf" % sol.id,
+        pdf_path=sol.pdf_path,
+        erro_pdf_ausente="PDF da solicitação de medição não encontrado — gere o documento antes "
+                         "de enviar ao ClickSign.",
+        email_loja=email_loja, nome_loja=nome_loja,
+        email_cliente=email_cliente, nome_cliente=nome_cliente, cpf_cliente=cpf_cliente)
 
 
 def _reconciliar_solicitacao_medicao_clicksign(db, sol, cfg):
-    """Espelho de _reconciliar_contrato_clicksign/_reconciliar_aprovacao_pe_clicksign (ver lá o
-    achado do usuário 2026-08-20 sobre `signed_at` nunca vir preenchido — usa `envelope fechado`
-    como sinal de conclusão), pra Solicitação de Medição. Chamada pelo webhook E pelo job de
-    polling."""
-    import mod_clicksign
-    cli = mod_clicksign.client_de(cfg)
-    dados = cli.consultar_envelope(sol.clicksign_envelope_id)
-    envelope_fechado = (dados.get("data") or {}).get("attributes", {}).get("status") == "closed"
-    incluidos = dados.get("included") or []
-    signers = {s.get("id"): s.get("attributes", {}) for s in incluidos if s.get("type") == "signers"}
-    signatarios = json.loads(sol.clicksign_signatarios_json or "{}")
-    for parte, info in signatarios.items():
-        attrs = signers.get(info.get("signer_id")) or {}
-        if not (attrs.get("signed_at") or envelope_fechado):
-            continue
-        # ACHADO-28: mesma guarda de _reconciliar_contrato_clicksign — loga e segue os outros
-        # signatários em vez de travar a reconciliação inteira por um CPF ruim vindo de fora.
-        try:
-            _registrar_assinatura_solicitacao_medicao(
-                db, sol, parte, info.get("nome") or "", info.get("cpf") or "",
-                attrs.get("last_seen_ip") or "", usuario_id=None)
-        except ValueError as e:
-            logging.getLogger(__name__).warning(
-                "ClickSign solicitacao-medicao %s, parte %r: %s", sol.id, parte, e)
-    return sol.status
+    """ACHADO-69 Passo 2 (13/09) — wrapper fino sobre `mod_assinatura.reconciliar_clicksign`.
+    Texto de log preservado (`"solicitacao-medicao"`, com hífen, igual ao original) — não muda
+    nada que algum log/alerta externo já dependesse. Chamada pelo webhook E pelo job de polling."""
+    return mod_assinatura.reconciliar_clicksign(
+        db, sol, cfg, nome_doc="solicitacao-medicao",
+        registrar_assinatura=lambda db_, doc_, parte, nome, cpf, ip:
+            _registrar_assinatura_solicitacao_medicao(db_, doc_, parte, nome, cpf, ip, usuario_id=None))
 
 
 # ACHADO-69 Passo 1 (docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md) — registro único dos

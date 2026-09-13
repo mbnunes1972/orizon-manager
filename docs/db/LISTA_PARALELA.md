@@ -481,6 +481,25 @@ necessariamente um deadlock de DDL puro toda vez). Encerrei os dois processos (e
 inequívoco. **Confirma o enunciado da Rodada 2**: duas invocações simultâneas não são seguras, e
 o guard (item (c) da Rodada 2) é o próximo passo — ainda não implementado.
 
+**Atualização 13/09 (Claude Code) — RODADA3 (b) fechou o travamento de 12h (Achado 2,
+`docs/db/TAREFA_ESTABILIDADE_RODADA3.md`: corrupção de laço greenlet/asyncio quando o sinal do
+pytest-timeout interrompe o Playwright — método trocado pra `'thread'`), mas o que sobrou depois
+é maior do que parecia.** Uma execução completa (13/09, durante o Passo 0/1 do ACHADO-69) falhou
+em **10 arquivos de E2E de navegador diferentes**, nenhum backend — total de coleta idêntico ao
+de uma execução limpa no mesmo dia (2780), então não é diferença de coleta, é intermitência de
+verdade. Nenhum arquivo se repete entre esta lista e a de execuções anteriores do mesmo dia (nem
+`test_remover_ciclo.py` falhou no mesmo teste das vezes anteriores — falhou num teste DIFERENTE
+do arquivo). **Registro deliberadamente sem causa:** não escrevo aqui "provavelmente carga" nem
+"provavelmente timing" — foi cogitado e MEDIDO que não é isso (ver RODADA3, hipótese dos tempos
+de espera do Playwright derrubada com `#neg-subtotal` idêntico isolado e em suíte, 783ms vs.
+780-785ms). Não sabemos a causa, e escrever um palpite aqui teria o efeito de fazer alguém no
+futuro parar de procurar.
+
+**Decisão de Marcelo (13/09): rodada própria, depois que o ACHADO-69 fechar — não agora, pra não
+misturar duas investigações.** Isto NÃO é bloqueio para o ACHADO-69: o portão de aceite de cada
+migração do Passo 2 é a suíte específica de ClickSign (hoje 64 testes) mais a contagem total de
+coleta — não a suíte E2E inteira, que não distingue "quebrei algo" de "é o flake de sempre".
+
 
 
 **LP-23 · Montador é pago por volume MONTADO, e a tela só sabe falar de venda.**
