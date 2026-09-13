@@ -1337,90 +1337,32 @@ def _registrar_assinatura_contrato(db, contrato, parte, nome, cpf, ip_origem, lo
 
 def _enviar_contrato_para_clicksign(db, contrato, cfg, email_loja, nome_loja, email_cliente,
                                     nome_cliente, cpf_cliente, testemunhas=None):
-    """Envia o PDF já gerado do `contrato` pra ClickSign: cria envelope -> sobe o documento ->
-    cadastra os signatários (loja/cliente + testemunhas com e-mail, achado do usuário
-    2026-08-17) -> liga cada um ao documento (requisito de assinatura + de autenticação) ->
-    ativa o envelope (dispara os convites por e-mail). Grava clicksign_envelope_id/
-    assinatura_canal/clicksign_enviado_em/clicksign_signatarios_json no `contrato` (NÃO commita
-    — o chamador decide). ValueError com mensagem clara se faltar e-mail/PDF.
-    `testemunhas`: lista opcional de {nome, cpf, email} — item sem e-mail é ignorado (a
-    testemunha simplesmente não entra como signatária digital, sem erro)."""
-    if not email_loja or not email_cliente:
-        raise ValueError("E-mail da loja e do cliente são obrigatórios para assinatura eletrônica (ClickSign).")
-    if not contrato.pdf_path or not os.path.exists(contrato.pdf_path):
-        raise ValueError("PDF do contrato não encontrado — gere o contrato antes de enviar ao ClickSign.")
-    import mod_clicksign
-    cli = mod_clicksign.client_de(cfg)
-    with open(contrato.pdf_path, "rb") as f:
-        pdf_bytes = f.read()
-    nome_arquivo = "contrato_%s.pdf" % (contrato.num_contrato or contrato.id)
-    envelope_id = cli.criar_envelope("Contrato %s" % (contrato.num_contrato or contrato.id))
-    doc_id = cli.adicionar_documento(envelope_id, pdf_bytes, nome_arquivo)
-    sig_loja_id    = cli.adicionar_signatario(envelope_id, email_loja, nome_loja)
-    sig_cliente_id = cli.adicionar_signatario(envelope_id, email_cliente, nome_cliente, cpf=cpf_cliente)
-    signatarios = {
-        "loja":    {"signer_id": sig_loja_id,    "email": email_loja,    "nome": nome_loja},
-        "cliente": {"signer_id": sig_cliente_id, "email": email_cliente, "nome": nome_cliente,
-                    "cpf": cpf_cliente},
-    }
-    signer_ids = [sig_loja_id, sig_cliente_id]
-    for i, t in enumerate(testemunhas or [], start=1):
-        email_t = (t.get("email") or "").strip()
-        if not email_t:
-            continue
-        sid = cli.adicionar_signatario(envelope_id, email_t, t.get("nome") or "", cpf=t.get("cpf") or None)
-        signer_ids.append(sid)
-        signatarios["testemunha%d" % i] = {"signer_id": sid, "email": email_t,
-                                           "nome": t.get("nome") or "", "cpf": t.get("cpf") or ""}
-    for signer_id in signer_ids:
-        cli.adicionar_requisito_assinatura(envelope_id, doc_id, signer_id)
-        cli.adicionar_requisito_autenticacao(envelope_id, doc_id, signer_id)
-    cli.ativar_envelope(envelope_id)
-    contrato.clicksign_envelope_id = envelope_id
-    contrato.clicksign_signatarios_json = json.dumps(signatarios, ensure_ascii=False)
-    contrato.assinatura_canal     = "clicksign"
-    contrato.clicksign_enviado_em = datetime.utcnow()
+    """ACHADO-69 Passo 2 (13/09) — wrapper fino sobre `mod_assinatura.enviar_para_clicksign`: a
+    lógica migrou pra lá, compartilhada com Aprovação do PE e Solicitação de medição; aqui só os
+    textos desta classe e a passagem de `testemunhas` (só o Contrato tem — achado do usuário
+    2026-08-17, item sem e-mail é ignorado, sem erro). Mesmo comportamento de antes, provado pela
+    suíte que já existia (`tests/test_contrato_assinatura_clicksign_e2e.py`), sem asserção
+    alterada. NÃO commita — o chamador decide."""
+    mod_assinatura.enviar_para_clicksign(
+        contrato, cfg,
+        titulo="Contrato %s" % (contrato.num_contrato or contrato.id),
+        nome_arquivo="contrato_%s.pdf" % (contrato.num_contrato or contrato.id),
+        pdf_path=contrato.pdf_path,
+        erro_pdf_ausente="PDF do contrato não encontrado — gere o contrato antes de enviar ao ClickSign.",
+        email_loja=email_loja, nome_loja=nome_loja,
+        email_cliente=email_cliente, nome_cliente=nome_cliente, cpf_cliente=cpf_cliente,
+        testemunhas=testemunhas)
 
 
 def _reconciliar_contrato_clicksign(db, contrato, cfg):
-    """Reconsulta a ClickSign com credenciais PRÓPRIAS (nunca confia no payload do webhook — o
-    evento só avisa QUE algo mudou; o que mudou vem sempre de uma consulta fresca a
-    `consultar_envelope`). Casa os signatários pelo `signer_id` gravado em
-    clicksign_signatarios_json e registra, via _registrar_assinatura_contrato (idempotente), a
-    assinatura de quem já assinou e ainda não está registrada localmente.
-    Achado do usuário 2026-08-20, confirmado ao vivo contra o sandbox real: o signer NUNCA expõe
-    `signed_at` (o campo simplesmente não existe nessa versão da API, apesar de documentado em
-    outro contexto) — mesmo depois de assinado de verdade (e-mail de confirmação da ClickSign
-    recebido), o signer segue com `signed_at: null` pra sempre; só o `modified` muda. Sem esse
-    campo, o único sinal confiável de conclusão é o ENVELOPE fechar (`status: "closed"` — o
-    envelope foi criado com `auto_close: true`, só fecha quando TODOS os requisitos de todos os
-    signatários são cumpridos). Então: envelope fechado = todo mundo assinou, registra todas as
-    partes de uma vez (não dá pra saber o instante exato de cada uma nem o IP individual sem uma
-    trilha de eventos separada — fora de escopo aqui). Chamada pelo webhook E pelo job de
-    polling. Retorna o status final do contrato."""
-    import mod_clicksign
-    cli = mod_clicksign.client_de(cfg)
-    dados = cli.consultar_envelope(contrato.clicksign_envelope_id)
-    envelope_fechado = (dados.get("data") or {}).get("attributes", {}).get("status") == "closed"
-    incluidos = dados.get("included") or []
-    signers = {s.get("id"): s.get("attributes", {}) for s in incluidos if s.get("type") == "signers"}
-    signatarios = json.loads(contrato.clicksign_signatarios_json or "{}")
-    for parte, info in signatarios.items():
-        attrs = signers.get(info.get("signer_id")) or {}
-        if not (attrs.get("signed_at") or envelope_fechado):
-            continue
-        # ACHADO-28: CPF vem de FORA (da própria ClickSign) — _registrar_assinatura_contrato
-        # recusa com ValueError se o dígito não confere. Webhook não tem pra quem mostrar um
-        # popup: loga e segue pros OUTROS signatários (um CPF ruim não pode travar o contrato
-        # inteiro nem impedir a reconciliação de quem assinou certo).
-        try:
-            _registrar_assinatura_contrato(
-                db, contrato, parte, info.get("nome") or "", info.get("cpf") or "",
-                attrs.get("last_seen_ip") or "", contrato.loja_id, usuario_id=None)
-        except ValueError as e:
-            logging.getLogger(__name__).warning(
-                "ClickSign contrato %s, parte %r: %s", contrato.id, parte, e)
-    return contrato.status
+    """ACHADO-69 Passo 2 (13/09) — wrapper fino sobre `mod_assinatura.reconciliar_clicksign`.
+    Texto de log preservado (`"contrato"`, igual ao original). `_registrar_assinatura_contrato`
+    exige `loja_id` (os irmãos não) — fechado aqui via lambda, o módulo comum nunca precisa saber
+    disso. Chamada pelo webhook E pelo job de polling."""
+    return mod_assinatura.reconciliar_clicksign(
+        db, contrato, cfg, nome_doc="contrato",
+        registrar_assinatura=lambda db_, doc_, parte, nome, cpf, ip:
+            _registrar_assinatura_contrato(db_, doc_, parte, nome, cpf, ip, doc_.loja_id, usuario_id=None))
 
 
 def _registrar_assinatura_aprovacao_pe(db, aprov, parte, nome, cpf, ip_origem, usuario_id=None):
@@ -12355,7 +12297,9 @@ class Handler(BaseHTTPRequestHandler):
                         pm.cancelado_definitivo = 1
                         db.commit()
                     if contrato_atual is not None and contrato_atual.assinatura_canal == "clicksign":
-                        _notificar_signatarios_clicksign_cancelamento(
+                        # ACHADO-69 Passo 2: cancelamento roteado pelo registro comum (mesma
+                        # função de sempre — só o Contrato tem `cancelar` hoje, ACHADO-70).
+                        mod_assinatura.registro_de(Contrato).cancelar(
                             db, contrato_atual, loja_id, status_final)
                 elif contrato_atual is not None:
                     if partes_assinadas:
@@ -12378,7 +12322,7 @@ class Handler(BaseHTTPRequestHandler):
                         # bloqueava com "já enviado pra assinatura eletrônica" (o canal ficava preso
                         # em "clicksign" pra sempre). Notifica quem recebeu o convite e, se voltou
                         # pra revisão (não morreu de vez), libera o canal pra escolher de novo.
-                        _notificar_signatarios_clicksign_cancelamento(
+                        mod_assinatura.registro_de(Contrato).cancelar(
                             db, contrato_atual, loja_id, status_final)
                         if status_final == "em_revisao":
                             contrato_atual.assinatura_canal = "interno"

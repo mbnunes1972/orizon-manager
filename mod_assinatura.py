@@ -50,6 +50,16 @@ def documentos():
     return list(_registro)
 
 
+def registro_de(modelo):
+    """RegistroDocumento cujo `modelo` é exatamente esta classe (ex.: `Contrato`), ou `None` se
+    nenhuma classe registrada bater — usado por quem precisa da capacidade de um documento
+    específico (ex.: cancelamento) sem repetir a referência direta à função concreta."""
+    for reg in _registro:
+        if reg.modelo is modelo:
+            return reg
+    return None
+
+
 def achar_por_envelope(db, envelope_id):
     """(doc, registro) do primeiro documento conhecido com este `clicksign_envelope_id`, na
     ordem de registro (hoje: Contrato, Aprovação do PE, Solicitação de medição — mesma ordem que
