@@ -163,6 +163,16 @@ medição para contraste. Este pacote não toca nisso.
 Com as duas resolvidas (uma virou achado próprio e entra faseada; a outra saiu do escopo), o Passo
 0 está fechado e o pacote segue para o Passo 1.
 
+### ACHADO-70 — fechado (13/09), depois das três migrações do Passo 2
+
+Cancelamento de envelope ligado para Aprovação do PE (`/ciclo/11d/reprovar` E `/aprovacao-pe/
+gerar` — a regeração era um SEGUNDO ponto de órfão, independente da reprovação, achado ao medir)
+e Solicitação de Medição (só `/medicao/solicitacao/gerar`, sem verbo de reprovação próprio).
+Commit e teste próprios (`tests/test_achado70_cancelamento_envelope.py`, 8 testes, as três
+propriedades pedidas: cancela no evento, não explode em chamada repetida/documento nunca
+enviado, ClickSign fora do ar não trava o evento de negócio). Detalhe completo, inclusive as
+respostas às três perguntas de medição, em `docs/db/ACHADOS_CONTABEIS.md` § ACHADO-70.
+
 ### Passo 1 — extrair o mecanismo, sem mudar comportamento
 
 Um módulo (sugestão: `mod_assinatura.py`) com o ciclo de vida do envelope parametrizado por

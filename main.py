@@ -1022,53 +1022,59 @@ def _fin_provisoes_venda_seguro(orc, projeto_id, ref_base):
 
 
 def _notificar_signatarios_clicksign_cancelamento(db, contrato, loja_id, status_final):
-    """E-mail (fail-soft) pra quem já tinha recebido este contrato pra assinatura eletrônica
-    (ClickSign) quando ele é cancelado ou devolvido pra revisão ANTES de ser assinado — achado
-    do usuário 2026-08-17: sem isso, o signatário fica com um convite de assinatura pendente sem
-    saber que o contrato mudou (testou exatamente esse cenário: enviou pro ClickSign, cancelou/
-    voltou pro orçamento, e nada avisava quem já tinha recebido o convite).
-    `status_final`: "cancelado" ou "em_revisao" — muda só o texto do e-mail.
-    Também tenta cancelar o envelope na própria ClickSign (best-effort — o nome exato do valor de
-    status pra cancelar ainda não foi confirmado contra o sandbox real, mesmo caveat documentado
-    no resto do client — se falhar, só loga, não trava o cancelamento do contrato)."""
-    import mod_chat_externo as _mce
-    try:
-        signatarios = json.loads(contrato.clicksign_signatarios_json or "{}")
-    except Exception:
-        signatarios = {}
-    if signatarios:
-        if status_final == "cancelado":
-            assunto = "[Orizon] Contrato cancelado — assinatura não é mais necessária"
-            corpo = ("O contrato do projeto \"%s\" foi CANCELADO. Se você recebeu um convite da "
-                     "ClickSign para assiná-lo eletronicamente, desconsidere — a assinatura não "
-                     "é mais necessária." % contrato.projeto_nome)
-        else:
-            assunto = "[Orizon] Contrato em revisão — aguarde uma nova versão"
-            corpo = ("O contrato do projeto \"%s\" voltou para revisão antes de ser assinado. Se "
-                     "você recebeu um convite da ClickSign para assiná-lo eletronicamente, "
-                     "desconsidere esse convite — enviaremos uma nova versão para assinatura em "
-                     "breve." % contrato.projeto_nome)
-        for parte, info in signatarios.items():
-            email = (info.get("email") or "").strip()
-            if not email:
-                continue
-            try:
-                _mce.enviar_email_simples(email, assunto, corpo)
-            except Exception as _e:
-                logging.getLogger(__name__).warning(
-                    "e-mail de %s (ClickSign) p/ %s <%s> (contrato=%s) falhou: %s",
-                    status_final, parte, email, contrato.id, _e)
-    if contrato.clicksign_envelope_id:
-        try:
-            import mod_clicksign
-            loja_obj = db.get(Loja, loja_id)
-            cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
-            if cfg is not None:
-                mod_clicksign.client_de(cfg).cancelar_envelope(contrato.clicksign_envelope_id)
-        except Exception as _e:
-            logging.getLogger(__name__).warning(
-                "cancelamento do envelope ClickSign (contrato=%s, envelope=%s) falhou: %s",
-                contrato.id, contrato.clicksign_envelope_id, _e)
+    """ACHADO-70 (13/09) — wrapper fino sobre `mod_assinatura.cancelar_e_notificar_clicksign`: a
+    lógica migrou pra lá, compartilhada com Aprovação do PE e Solicitação de medição; aqui só o
+    texto do e-mail desta classe, preservado exatamente (achado do usuário 2026-08-17: sem isso,
+    o signatário fica com um convite pendente sem saber que o contrato mudou). `status_final`:
+    "cancelado" ou "em_revisao" — muda só o texto do e-mail."""
+    mod_assinatura.cancelar_e_notificar_clicksign(
+        db, contrato, loja_id, status_final,
+        assunto_cancelado="[Orizon] Contrato cancelado — assinatura não é mais necessária",
+        corpo_cancelado=("O contrato do projeto \"%s\" foi CANCELADO. Se você recebeu um convite da "
+                         "ClickSign para assiná-lo eletronicamente, desconsidere — a assinatura não "
+                         "é mais necessária."),
+        assunto_revisao="[Orizon] Contrato em revisão — aguarde uma nova versão",
+        corpo_revisao=("O contrato do projeto \"%s\" voltou para revisão antes de ser assinado. Se "
+                       "você recebeu um convite da ClickSign para assiná-lo eletronicamente, "
+                       "desconsidere esse convite — enviaremos uma nova versão para assinatura em "
+                       "breve."))
+
+
+def _notificar_signatarios_clicksign_cancelamento_aprovacao_pe(db, aprov, loja_id, status_final):
+    """ACHADO-70 (13/09) — equivalente do Contrato para Aprovação do PE. Ligada em dois pontos
+    que hoje deixam o envelope órfão (nenhum dos dois tocava `AprovacaoPE.assinatura_canal`
+    antes desta entrega): a reprovação da AF2 (`/ciclo/11d/reprovar`, que só mexia em
+    `CicloEtapa` — nunca olhava a linha de `AprovacaoPE`) e a regeração do documento
+    (`/aprovacao-pe/gerar`, que já reseta `status` pra "para_assinatura" mas deixava o canal e o
+    envelope antigos intactos, mesmo sendo um PDF novo)."""
+    mod_assinatura.cancelar_e_notificar_clicksign(
+        db, aprov, loja_id, status_final,
+        assunto_cancelado="[Orizon] Aprovação do PE cancelada — assinatura não é mais necessária",
+        corpo_cancelado=("A Aprovação do PE do projeto \"%s\" foi CANCELADA. Se você recebeu um "
+                         "convite da ClickSign para assiná-la eletronicamente, desconsidere — a "
+                         "assinatura não é mais necessária."),
+        assunto_revisao="[Orizon] Aprovação do PE em revisão — aguarde uma nova versão",
+        corpo_revisao=("A Aprovação do PE do projeto \"%s\" voltou para revisão antes de ser "
+                       "assinada. Se você recebeu um convite da ClickSign para assiná-la "
+                       "eletronicamente, desconsidere esse convite — enviaremos uma nova versão "
+                       "para assinatura em breve."))
+
+
+def _notificar_signatarios_clicksign_cancelamento_solicitacao_medicao(db, sol, loja_id, status_final):
+    """ACHADO-70 (13/09) — equivalente do Contrato para Solicitação de Medição. Sem verbo de
+    reprovação próprio (não existe rota de reprovar); ligada só na regeração do documento
+    (`/medicao/solicitacao/gerar`), mesmo ponto e mesma razão da Aprovação do PE."""
+    mod_assinatura.cancelar_e_notificar_clicksign(
+        db, sol, loja_id, status_final,
+        assunto_cancelado="[Orizon] Solicitação de Medição cancelada — assinatura não é mais necessária",
+        corpo_cancelado=("A Solicitação de Medição do projeto \"%s\" foi CANCELADA. Se você "
+                         "recebeu um convite da ClickSign para assiná-la eletronicamente, "
+                         "desconsidere — a assinatura não é mais necessária."),
+        assunto_revisao="[Orizon] Solicitação de Medição em revisão — aguarde uma nova versão",
+        corpo_revisao=("A Solicitação de Medição do projeto \"%s\" voltou para revisão antes de "
+                       "ser assinada. Se você recebeu um convite da ClickSign para assiná-la "
+                       "eletronicamente, desconsidere esse convite — enviaremos uma nova versão "
+                       "para assinatura em breve."))
 
 
 def _notificar_masters_cancelamento(nome_safe, loja_id):
@@ -1488,17 +1494,21 @@ def _reconciliar_solicitacao_medicao_clicksign(db, sol, cfg):
 # ACHADO-69 Passo 1 (docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md) — registro único dos
 # documentos ClickSign, consumido pelo webhook e pelo job `/internal/clicksign/reconciliar`
 # (main.py, adiante) em vez de três blocos quase idênticos por classe. Só referencia as funções
-# acima, intocadas — nenhum comportamento muda. `cancelar` só existe para o Contrato (ACHADO-70):
-# ver mod_assinatura.py para o porquê de não ligar isso nos outros dois aqui.
+# acima, intocadas — nenhum comportamento muda. `cancelar` agora existe pros três (ACHADO-70,
+# 13/09) — ver os call sites de cada `_notificar_signatarios_clicksign_cancelamento*` pra saber
+# QUANDO cada um dispara (Contrato: /cancelamento; Aprovação do PE: /ciclo/11d/reprovar e
+# /aprovacao-pe/gerar; Solicitação de medição: /medicao/solicitacao/gerar).
 import mod_assinatura
 mod_assinatura.registrar("contrato", Contrato,
                           _enviar_contrato_para_clicksign, _reconciliar_contrato_clicksign,
                           cancelar=_notificar_signatarios_clicksign_cancelamento)
 mod_assinatura.registrar("aprovacao_pe", AprovacaoPE,
-                          _enviar_aprovacao_pe_para_clicksign, _reconciliar_aprovacao_pe_clicksign)
+                          _enviar_aprovacao_pe_para_clicksign, _reconciliar_aprovacao_pe_clicksign,
+                          cancelar=_notificar_signatarios_clicksign_cancelamento_aprovacao_pe)
 mod_assinatura.registrar("solicitacao_medicao", SolicitacaoMedicao,
                           _enviar_solicitacao_medicao_para_clicksign,
-                          _reconciliar_solicitacao_medicao_clicksign)
+                          _reconciliar_solicitacao_medicao_clicksign,
+                          cancelar=_notificar_signatarios_clicksign_cancelamento_solicitacao_medicao)
 
 
 def _congelar_segmentacao_no_projeto(db, loja_id, projeto_nome):
@@ -8339,6 +8349,29 @@ class Handler(BaseHTTPRequestHandler):
                     % (aprovador.nome or aprovador.login, motivo),
                     "pe_af2_reprovada", aprovador.id)
                 db.commit()
+                # ACHADO-70 (13/09): reprovar a AF2 não pode deixar um envelope ClickSign
+                # pendente, órfão, esperando uma assinatura que já não vale mais — mesmo achado
+                # do usuário 2026-08-17 no Contrato, agora na Aprovação do PE (que até aqui nunca
+                # olhava a linha de `AprovacaoPE` na reprovação). DEPOIS do commit acima, e num
+                # try/except PRÓPRIO: a reprovação já é fato e tem que responder "ok" mesmo que
+                # isto falhe — fail-soft não é só dentro de `cancelar_e_notificar_clicksign`
+                # (que já é), é também não deixar esta chamada quebrar a resposta.
+                try:
+                    aprov_atual = (db.query(AprovacaoPE).filter_by(projeto_nome=nome)
+                                     .order_by(AprovacaoPE.id.desc()).first())
+                    if aprov_atual is not None and aprov_atual.assinatura_canal == "clicksign":
+                        mod_assinatura.registro_de(AprovacaoPE).cancelar(
+                            db, aprov_atual, loja_id, "em_revisao")
+                        aprov_atual.assinatura_canal = "interno"
+                        aprov_atual.clicksign_envelope_id = None
+                        aprov_atual.clicksign_signatarios_json = None
+                        aprov_atual.clicksign_enviado_em = None
+                        db.commit()
+                except Exception as _e70:
+                    db.rollback()
+                    logging.getLogger(__name__).warning(
+                        "ACHADO-70: cancelar envelope ClickSign da Aprovação do PE (projeto=%s) "
+                        "na reprovação falhou: %s", nome, _e70)
                 self.send_json(_resposta_pos_aprovacao_financeira(aprovador, {"ok": True}))
             finally:
                 _encerrar_sessao_emprestada_se_necessario(aprovador)
@@ -9777,6 +9810,27 @@ class Handler(BaseHTTPRequestHandler):
                 if aprov is None:
                     aprov = AprovacaoPE(projeto_nome=nome, contrato_id=contrato.id, loja_id=loja_id)
                     db.add(aprov); db.flush()
+                elif aprov.assinatura_canal == "clicksign":
+                    # ACHADO-70 (13/09): regerar o documento com um envelope ClickSign ainda
+                    # pendente deixaria esse envelope órfão, apontando pra um PDF que está
+                    # prestes a ficar desatualizado (o guard de `status == "assinado"` acima só
+                    # bloqueia regerar um JÁ ASSINADO — "para_assinatura"/"assinado_loja"/
+                    # "assinado_cliente" com envelope vivo passavam batido até esta entrega).
+                    # try/except PRÓPRIO: a regeração tem que acontecer mesmo que isto falhe —
+                    # `cancelar_e_notificar_clicksign` já é fail-soft por dentro, mas sem isto
+                    # aqui uma exceção inesperada dela ainda cairia no `except` GERAL da rota
+                    # (mais abaixo) e desfaria a regeração inteira via `db.rollback()`.
+                    try:
+                        mod_assinatura.registro_de(AprovacaoPE).cancelar(
+                            db, aprov, loja_id, "em_revisao")
+                    except Exception as _e70:
+                        logging.getLogger(__name__).warning(
+                            "ACHADO-70: cancelar envelope ClickSign da Aprovação do PE "
+                            "(projeto=%s) na regeração falhou: %s", nome, _e70)
+                    aprov.assinatura_canal = "interno"
+                    aprov.clicksign_envelope_id = None
+                    aprov.clicksign_signatarios_json = None
+                    aprov.clicksign_enviado_em = None
                 if aprov.modelo_versao_id is None:      # congela o modelo na 1ª geração
                     mv = _mdoc.ativo_de(db, loja_id, "aprovacao_pe")
                     if mv is None:
@@ -14900,6 +14954,22 @@ class Handler(BaseHTTPRequestHandler):
                     if sol is None:
                         sol = SolicitacaoMedicao(projeto_nome=nome_safe, loja_id=loja_id)
                         db.add(sol); db.flush()
+                    elif sol.assinatura_canal == "clicksign":
+                        # ACHADO-70 (13/09): mesma razão da Aprovação do PE — regerar com um
+                        # envelope pendente deixaria esse envelope órfão, apontando pra um PDF
+                        # que está prestes a ficar desatualizado. try/except próprio: a regeração
+                        # tem que acontecer mesmo que isto falhe.
+                        try:
+                            mod_assinatura.registro_de(SolicitacaoMedicao).cancelar(
+                                db, sol, loja_id, "em_revisao")
+                        except Exception as _e70:
+                            logging.getLogger(__name__).warning(
+                                "ACHADO-70: cancelar envelope ClickSign da Solicitação de "
+                                "Medição (projeto=%s) na regeração falhou: %s", nome_safe, _e70)
+                        sol.assinatura_canal = "interno"
+                        sol.clicksign_envelope_id = None
+                        sol.clicksign_signatarios_json = None
+                        sol.clicksign_enviado_em = None
                     if sol.modelo_versao_id is None:      # congela o modelo na 1ª geração
                         mv = _mdocm.ativo_de(db, loja_id, "solicitacao_medicao")
                         if mv is None:

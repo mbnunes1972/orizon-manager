@@ -13,18 +13,21 @@ job), nunca a lógica de enviar/reconciliar em si. `main.py` popula o registro (
 — `mod_assinatura` não importa `main`, pra não criar import circular); só ele conhece as funções
 concretas de cada documento.
 
-Cancelamento de envelope (ACHADO-70, `docs/db/ACHADOS_CONTABEIS.md`): só o Contrato tem hoje.
-`cancelar=None` em Aprovação do PE e Solicitação de medição é DELIBERADO — ligar isso nelas é
-mudança de comportamento em produção, não extração de mecanismo; entra em commit próprio, depois
-que o Passo 2 tiver migrado cada documento com a suíte verde. O campo existe no registro desde já
-(é uma das cinco capacidades que o pacote pede: envio, verificação, reenvio, cancelamento,
-reconciliação) mas nenhum chamador deste módulo o consome ainda."""
+Cancelamento de envelope (ACHADO-70, `docs/db/ACHADOS_CONTABEIS.md`): até 13/09, só o Contrato
+tinha. Ligado nos outros dois em commit PRÓPRIO (depois das três migrações do Passo 2, suíte
+verde em cada uma) — é a primeira mudança de COMPORTAMENTO deste trabalho, deliberadamente
+separada da extração de mecanismo. Ver `cancelar_e_notificar_clicksign` abaixo (o núcleo comum,
+generalizado a partir de `_notificar_signatarios_clicksign_cancelamento`, que só existia pro
+Contrato e tinha o texto do e-mail hardcoded) e os três wrappers em `main.py`
+(`_notificar_signatarios_clicksign_cancelamento*`) para saber QUANDO cada documento dispara."""
 
 import json
 import logging
 import os
 from collections import namedtuple
 from datetime import datetime
+
+from database import Loja
 
 RegistroDocumento = namedtuple("RegistroDocumento", [
     "nome",          # rótulo curto (logs/erros) — "contrato", "aprovacao_pe", "solicitacao_medicao"
@@ -167,3 +170,61 @@ def reconciliar_clicksign(db, doc, cfg, *, nome_doc, registrar_assinatura):
             logging.getLogger(__name__).warning(
                 "ClickSign %s %s, parte %r: %s", nome_doc, doc.id, parte, e)
     return doc.status
+
+
+# ── ACHADO-70 (docs/db/ACHADOS_CONTABEIS.md) — cancelamento de envelope, extraído de
+# `_notificar_signatarios_clicksign_cancelamento` (main.py), que só existia pro Contrato ────────
+# Medido antes de generalizar (13/09): a função original tinha o texto do e-mail HARDCODED
+# ("O contrato do projeto...") — reusar verbatim pra Aprovação do PE/Solicitação de medição
+# mandaria e-mail ERRADO ("contrato" quando o documento é outro). Por isso os textos viram
+# parâmetro — mesmo padrão de `enviar_para_clicksign` (`titulo`/`nome_arquivo`/`erro_pdf_ausente`
+# já eram parâmetro por razão idêntica).
+
+def cancelar_e_notificar_clicksign(db, doc, loja_id, status_final, *,
+                                   assunto_cancelado, corpo_cancelado,
+                                   assunto_revisao, corpo_revisao):
+    """Avisa (e-mail) quem já tinha recebido `doc` pra assinatura eletrônica quando ele é
+    cancelado ou devolvido pra revisão ANTES de assinar, e tenta (best-effort) cancelar o
+    envelope na própria ClickSign. `corpo_cancelado`/`corpo_revisao`: template com UM `%s`
+    (recebe `doc.projeto_nome`).
+
+    FAIL-SOFT por construção, medido no Contrato antes de generalizar: e-mail de cada
+    signatário e a tentativa de cancelar o envelope são cada um seu PRÓPRIO try/except — nenhuma
+    falha aqui pode impedir o evento de negócio que motivou a chamada (reprovação, regeração,
+    cancelamento) — que por isso precisa já estar committado ANTES desta função rodar, nunca
+    depois. "Não pode explodir" (não é o mesmo que "livre de efeito colateral duplicado"):
+    chamar sobre um documento nunca enviado (`clicksign_signatarios_json`/`clicksign_envelope_id`
+    vazios) é no-op silencioso nos blocos correspondentes; chamar duas vezes sobre o MESMO
+    envelope já avisado reenviaria os e-mails (mesma característica que o Contrato já tinha,
+    preservada aqui — o Contrato nunca dependeu de dedupe, os chamadores é que evitam repetir)."""
+    import mod_chat_externo as _mce
+    try:
+        signatarios = json.loads(doc.clicksign_signatarios_json or "{}")
+    except Exception:
+        signatarios = {}
+    if signatarios:
+        if status_final == "cancelado":
+            assunto, corpo = assunto_cancelado, corpo_cancelado % doc.projeto_nome
+        else:
+            assunto, corpo = assunto_revisao, corpo_revisao % doc.projeto_nome
+        for parte, info in signatarios.items():
+            email = (info.get("email") or "").strip()
+            if not email:
+                continue
+            try:
+                _mce.enviar_email_simples(email, assunto, corpo)
+            except Exception as _e:
+                logging.getLogger(__name__).warning(
+                    "e-mail de %s (ClickSign) p/ %s <%s> (doc=%s) falhou: %s",
+                    status_final, parte, email, doc.id, _e)
+    if doc.clicksign_envelope_id:
+        try:
+            import mod_clicksign
+            loja_obj = db.get(Loja, loja_id)
+            cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
+            if cfg is not None:
+                mod_clicksign.client_de(cfg).cancelar_envelope(doc.clicksign_envelope_id)
+        except Exception as _e:
+            logging.getLogger(__name__).warning(
+                "cancelamento do envelope ClickSign (doc=%s, envelope=%s) falhou: %s",
+                doc.id, doc.clicksign_envelope_id, _e)

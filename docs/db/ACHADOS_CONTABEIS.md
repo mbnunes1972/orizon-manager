@@ -5535,7 +5535,7 @@ Pacotes: `docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md`, `docs/db/TAREFA_ACHADO68_V
 
 ---
 
-## ACHADO-70 — envelope ClickSign órfão sobrevive à reprovação/redecisão em dois dos três documentos
+## ACHADO-70 — envelope ClickSign órfão sobrevive à reprovação/redecisão em dois dos três documentos · RESOLVIDO 13/09/2026
 
 Encontrado no Passo 0 (inventário) de `docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md`, que já
 avisava exatamente para este tipo de achado: *"se divergirem em comportamento — um reenvia e
@@ -5575,6 +5575,38 @@ rodam em produção** — não entra de carona na extração do mecanismo. Cada 
 commit separado, com teste próprio, depois que a migração de cada um estiver verde — para que o
 histórico deixe claro qual commit mudou o que o sistema faz, e não misture "extrair sem mudar
 comportamento" com "mudar comportamento".
+
+### Medido antes de ligar (13/09) — as três perguntas do Marcelo
+
+**Qual evento, em cada documento?** Não era óbvio, e a resposta exigiu ler as duas rotas de
+"desfazer" de cada documento, não supor. `/ciclo/11d/reprovar` **nunca olhava a linha de
+`AprovacaoPE`** — só mexia em `CicloEtapa`. Achado à parte, medido no caminho: a regeração do
+documento (`/aprovacao-pe/gerar`, `/medicao/solicitacao/gerar`) já reseta `status` pra
+"para_assinatura" mas **também** deixava `assinatura_canal`/`clicksign_envelope_id` intactos —
+um SEGUNDO ponto, independente da reprovação (reprovar não toca `AprovacaoPE.status`; regerar não
+passa por reprovar), onde o mesmo envelope órfão acontece. Os dois foram ligados: Aprovação do PE
+em `/ciclo/11d/reprovar` E `/aprovacao-pe/gerar`; Solicitação de Medição (sem verbo de reprovação
+próprio) só em `/medicao/solicitacao/gerar`.
+
+**É idempotente?** `_notificar_signatarios_clicksign_cancelamento` (agora `mod_assinatura.
+cancelar_e_notificar_clicksign`, generalizado — o original tinha o texto do e-mail hardcoded
+"contrato", reusar verbatim mandaria e-mail errado pros outros dois) nunca EXPLODE: sinatarios/
+envelope vazios são no-op silencioso nos blocos correspondentes, e cada chamada externa (e-mail,
+API ClickSign) tem seu próprio try/except. Não é livre de efeito colateral duplicado (chamar duas
+vezes sobre o MESMO envelope reenviaria os e-mails de aviso) — o Contrato nunca teve essa garantia
+tampouco; os call sites novos evitam repetir resetando o canal pra "interno" logo depois.
+
+**É fail-soft?** Sim, medido e preservado: a função é chamada DEPOIS do commit do evento de
+negócio (reprovação já gravada; regeração já quase pronta), e cada novo call site tem seu PRÓPRIO
+try/except em volta da chamada — uma ClickSign fora do ar nunca impede a reprovação nem a
+regeração de acontecer (provado por teste, não suposto).
+
+**Testes** (`tests/test_achado70_cancelamento_envelope.py`, 8): pra cada evento ligado, as três
+propriedades — cancela quando o evento acontece (com aviso por e-mail aos dois signatários),
+chamar duas vezes (ou sobre documento nunca enviado) não explode, ClickSign fora do ar não trava
+o evento de negócio. Suíte de ClickSign (64) + cancelamento (9) + achado-70 (8) + conciliação de
+PE (25, cobre as rotas de reprovar já existentes — nenhuma asserção mudou) = 106 verdes;
+arquitetura verde; coleta 2788 (2780 + 8 dos testes novos).
 
 Pacote: `docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md`.
 
