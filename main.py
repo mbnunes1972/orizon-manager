@@ -1452,61 +1452,35 @@ def _registrar_assinatura_aprovacao_pe(db, aprov, parte, nome, cpf, ip_origem, u
 
 def _enviar_aprovacao_pe_para_clicksign(db, aprov, cfg, email_loja, nome_loja, email_cliente,
                                         nome_cliente, cpf_cliente):
-    """Envia o PDF da Aprovação do PE pra ClickSign — mesmo fluxo de
-    _enviar_contrato_para_clicksign (envelope -> documento -> 2 signatários -> requisitos ->
-    ativação). NÃO commita — o chamador decide."""
-    if not email_loja or not email_cliente:
-        raise ValueError("E-mail da loja e do cliente são obrigatórios para assinatura eletrônica (ClickSign).")
-    if not aprov.pdf_path or not os.path.exists(aprov.pdf_path):
-        raise ValueError("PDF da aprovação não encontrado — gere a aprovação antes de enviar ao ClickSign.")
-    import mod_clicksign
-    cli = mod_clicksign.client_de(cfg)
-    with open(aprov.pdf_path, "rb") as f:
-        pdf_bytes = f.read()
-    nome_arquivo = "aprovacao_pe_%s.pdf" % (aprov.num_aprovacao or aprov.id)
-    envelope_id = cli.criar_envelope("Aprovação do PE %s" % (aprov.num_aprovacao or aprov.id))
-    doc_id = cli.adicionar_documento(envelope_id, pdf_bytes, nome_arquivo)
-    sig_loja_id    = cli.adicionar_signatario(envelope_id, email_loja, nome_loja)
-    sig_cliente_id = cli.adicionar_signatario(envelope_id, email_cliente, nome_cliente, cpf=cpf_cliente)
-    for signer_id in (sig_loja_id, sig_cliente_id):
-        cli.adicionar_requisito_assinatura(envelope_id, doc_id, signer_id)
-        cli.adicionar_requisito_autenticacao(envelope_id, doc_id, signer_id)
-    cli.ativar_envelope(envelope_id)
-    aprov.clicksign_envelope_id = envelope_id
-    aprov.clicksign_signatarios_json = json.dumps({
-        "loja":    {"signer_id": sig_loja_id,    "email": email_loja,    "nome": nome_loja},
-        "cliente": {"signer_id": sig_cliente_id, "email": email_cliente, "nome": nome_cliente,
-                    "cpf": cpf_cliente},
-    }, ensure_ascii=False)
-    aprov.assinatura_canal     = "clicksign"
-    aprov.clicksign_enviado_em = datetime.utcnow()
+    """ACHADO-69 Passo 2 (13/09) — wrapper fino sobre `mod_assinatura.enviar_para_clicksign`: a
+    lógica migrou pra lá, compartilhada com Solicitação de medição; aqui só os textos desta
+    classe (sem testemunhas — só o Contrato tem). Mesmo comportamento de antes, provado pela
+    suíte que já existia (`tests/test_aprovacao_pe_clicksign_e2e.py`), sem asserção alterada.
+    NÃO commita — o chamador decide.
+
+    Cancelamento de envelope (ACHADO-70): esta migração NÃO liga cancelamento nenhum — Aprovação
+    do PE reprovada/redecidida continua deixando o envelope órfão, exatamente como hoje. O
+    mecanismo comum já TEM a capacidade (`RegistroDocumento.cancelar`), mas ligá-la aqui seria
+    mudança de comportamento disfarçada de refatoração; é commit próprio, com teste próprio,
+    depois que as três migrações estiverem verdes."""
+    mod_assinatura.enviar_para_clicksign(
+        aprov, cfg,
+        titulo="Aprovação do PE %s" % (aprov.num_aprovacao or aprov.id),
+        nome_arquivo="aprovacao_pe_%s.pdf" % (aprov.num_aprovacao or aprov.id),
+        pdf_path=aprov.pdf_path,
+        erro_pdf_ausente="PDF da aprovação não encontrado — gere a aprovação antes de enviar ao ClickSign.",
+        email_loja=email_loja, nome_loja=nome_loja,
+        email_cliente=email_cliente, nome_cliente=nome_cliente, cpf_cliente=cpf_cliente)
 
 
 def _reconciliar_aprovacao_pe_clicksign(db, aprov, cfg):
-    """Espelho de _reconciliar_contrato_clicksign (ver lá o achado do usuário 2026-08-20 sobre
-    `signed_at` nunca vir preenchido — usa `envelope fechado` como sinal de conclusão). Chamada
-    pelo webhook E pelo job de polling. Retorna o status final."""
-    import mod_clicksign
-    cli = mod_clicksign.client_de(cfg)
-    dados = cli.consultar_envelope(aprov.clicksign_envelope_id)
-    envelope_fechado = (dados.get("data") or {}).get("attributes", {}).get("status") == "closed"
-    incluidos = dados.get("included") or []
-    signers = {s.get("id"): s.get("attributes", {}) for s in incluidos if s.get("type") == "signers"}
-    signatarios = json.loads(aprov.clicksign_signatarios_json or "{}")
-    for parte, info in signatarios.items():
-        attrs = signers.get(info.get("signer_id")) or {}
-        if not (attrs.get("signed_at") or envelope_fechado):
-            continue
-        # ACHADO-28: mesma guarda de _reconciliar_contrato_clicksign — loga e segue os outros
-        # signatários em vez de travar a reconciliação inteira por um CPF ruim vindo de fora.
-        try:
-            _registrar_assinatura_aprovacao_pe(
-                db, aprov, parte, info.get("nome") or "", info.get("cpf") or "",
-                attrs.get("last_seen_ip") or "", usuario_id=None)
-        except ValueError as e:
-            logging.getLogger(__name__).warning(
-                "ClickSign aprovacao-pe %s, parte %r: %s", aprov.id, parte, e)
-    return aprov.status
+    """ACHADO-69 Passo 2 (13/09) — wrapper fino sobre `mod_assinatura.reconciliar_clicksign`.
+    Texto de log preservado (`"aprovacao-pe"`, com hífen, igual ao original). Chamada pelo
+    webhook E pelo job de polling."""
+    return mod_assinatura.reconciliar_clicksign(
+        db, aprov, cfg, nome_doc="aprovacao-pe",
+        registrar_assinatura=lambda db_, doc_, parte, nome, cpf, ip:
+            _registrar_assinatura_aprovacao_pe(db_, doc_, parte, nome, cpf, ip, usuario_id=None))
 
 
 def _registrar_assinatura_solicitacao_medicao(db, sol, parte, nome, cpf, ip_origem, usuario_id=None):
