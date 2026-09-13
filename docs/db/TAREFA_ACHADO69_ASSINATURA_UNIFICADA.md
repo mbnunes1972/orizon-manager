@@ -197,7 +197,24 @@ Contrato**. Do menos exposto para o mais exposto. Suíte verde entre cada um.
 O Contrato por último de propósito: é o que mais dói se quebrar, e chega quando o mecanismo já
 sobreviveu a duas migrações.
 
-### Passo 3 — o Aditivo entra como quarto caso
+### Passo 3 — fechado (13/09) — o Aditivo como quarto caso
+
+Feito: migration `5325ac7badfa` (4 colunas, `server_default='interno'`, `schema.sql` no mesmo
+commit — `ERD.mmd` conferido e não precisou mudar, é só FK); entrada no registro +
+`/aditivo/clicksign/{enviar,verificar,reenviar}` espelhando os irmãos; cancelamento de envelope
+já ligado desde o primeiro commit (sem comportamento anterior pra preservar, ao contrário dos
+três irmãos); CPF (ACHADO-28) e a checagem de recebível (ACHADO-24) cobrindo o canal ClickSign;
+ACHADO-21 6-c resolvido exigindo `forma_pagamento` no ENVIO (não há instante síncrono na
+conclusão remota); igualdade contábil provada por teste que compara `Lancamento` reais das duas
+rodadas (aceite 6). Tela da 11e oferece a escolha, "Baixar PDF" manteve o nome. Detalhe completo
+em `docs/db/ACHADOS_CONTABEIS.md` § ACHADO-69.
+
+Aceite 10 fechado: `pytest -q` completo, 2793 passed / 4 xfailed / 0 failed, 604,5s, zero `+++
+Timeout`. **Não fechado:** aceite 9 (E2E de navegador) — deliberadamente adiado pra não somar
+mais um arquivo à rodada de flakes de E2E ainda não investigada (RODADA3) — e o percurso manual
+(`docs/db/PERCURSO_HOMOLOGACAO.md`, "testamos em sequência"), que é item do Marcelo.
+
+### Passo 3 — especificação original (arquivada, já executada acima)
 
 **O dado.** `Aditivo` (`database.py:1365`) ganha `assinatura_canal` e os campos de ClickSign que os
 irmãos têm (o inventário do Passo 0 diz quais).

@@ -168,7 +168,11 @@ CREATE TABLE public.aditivos (
     gerado_em timestamp without time zone,
     gerado_por_id integer,
     loja_id integer,
-    modelo_versao_id integer
+    modelo_versao_id integer,
+    assinatura_canal character varying(16) DEFAULT 'interno'::character varying,
+    clicksign_envelope_id text,
+    clicksign_enviado_em timestamp without time zone,
+    clicksign_signatarios_json text
 );
 
 

@@ -1492,12 +1492,117 @@ def _reconciliar_solicitacao_medicao_clicksign(db, sol, cfg):
 
 
 # ACHADO-69 Passo 1 (docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md) — registro único dos
+def _registrar_assinatura_aditivo(db, aditivo, parte, nome, cpf, ip_origem, loja_id, usuario_id=None):
+    """Aplica a assinatura de `parte` no `aditivo`: grava AditivoAssinatura, atualiza status, e —
+    se ambas as partes já assinaram — constitui as provisões contábeis da diferença negociada
+    (mesmo mecanismo do fechamento da venda original, achado Vera 2026-08-12). ACHADO-69 (13/09):
+    extraída do endpoint `/aditivo/assinar` (que tinha tudo isto inline, ao contrário dos três
+    irmãos) pra ficar COMPARTILHADA com o gatilho ClickSign, mesmo padrão de
+    `_registrar_assinatura_contrato`. Idempotente: `parte` já assinada é no-op.
+
+    ACHADO-28 (achado ao extrair, não comportamento a preservar): até esta entrega, a assinatura
+    do Aditivo NUNCA validava o CPF — os três irmãos sempre validaram, o Aditivo não. Valida
+    agora, mesmo padrão dos irmãos (só dígito verificador, `validacao_doc.erro_doc`), cobrindo os
+    dois gatilhos de graça por estar aqui.
+
+    ACHADO-21 6-c: quem TERMINA de assinar precisa de uma forma de pagamento já gravada em
+    `orc_aj.forma_pagamento` — sem ela não dá pra materializar os recebíveis. Esta função só LÊ
+    esse campo; quem chama é quem garante que já foi gravado ANTES de chamar (o endpoint interno
+    grava a partir do corpo da requisição que completa a assinatura; o envio pro ClickSign grava
+    no momento do ENVIO — não há outro instante síncrono pra perguntar isso numa conclusão
+    remota). Se faltar na hora de completar, `ValueError` — mesmo contrato dos irmãos."""
+    if any(a.parte == parte for a in aditivo.assinaturas):
+        return aditivo.status
+    import validacao_doc
+    _erro_cpf = validacao_doc.erro_doc(cpf, "CPF de %s" % parte, "cpf")
+    if _erro_cpf:
+        raise ValueError(_erro_cpf)
+    orc_aj = db.get(Orcamento, aditivo.orcamento_complemento_id)
+    partes_antes = {a.parte for a in aditivo.assinaturas}
+    completa_agora = {"loja", "cliente"}.issubset(partes_antes | {parte})
+    if completa_agora:
+        if orc_aj is None or not orc_aj.forma_pagamento:
+            raise ValueError("Informe a forma de pagamento do aditivo antes de concluir a assinatura.")
+        try:
+            _recalcular_orcamento(orc_aj, db)
+        except Exception as _e:
+            print("[ADITIVO-ASSINAR] recálculo com forma_pagamento falhou:", _e)
+        db.commit()
+        if float(orc_aj.valor_total or 0) > 0:
+            import mod_recebiveis as _mrec
+            import mod_contabil
+            if not _mrec.materializar(orc_aj.forma_pagamento, orc_aj.valor_total,
+                                      mod_contabil.hoje_no_fuso(db, "loja", loja_id), "check"):
+                raise ValueError("O plano de pagamento do aditivo não gera nenhum recebível — "
+                                 "informe entrada e/ou parcelas antes de concluir a assinatura.")
+    from mod_contrato import calcular_hash_assinatura as _cha4
+    ts = datetime.utcnow().isoformat()
+    aditivo.assinaturas.append(AditivoAssinatura(
+        parte=parte, nome=nome, cpf=cpf, ip_origem=ip_origem,
+        hash_sha256=_cha4(nome, cpf, aditivo.id, ts)))
+    db.flush()
+    partes = {a.parte for a in aditivo.assinaturas}
+    aditivo.status = "assinado" if {"loja", "cliente"}.issubset(partes) else "assinado_" + parte
+    db.commit()
+    if aditivo.status == "assinado" and orc_aj is not None:
+        _fin_provisoes_venda_seguro(orc_aj, aditivo.projeto_nome, "prov:aditivo:" + str(aditivo.id))
+        import mod_contabil
+        _materializar_recebiveis_venda_seguro(
+            orc_aj, aditivo.projeto_nome, loja_id, mod_contabil.agora_no_fuso(db, "loja", loja_id),
+            "receb:aditivo:" + str(aditivo.id), pagamento_json_str=orc_aj.forma_pagamento)
+    return aditivo.status
+
+
+def _enviar_aditivo_para_clicksign(db, aditivo, cfg, email_loja, nome_loja, email_cliente,
+                                   nome_cliente, cpf_cliente):
+    """ACHADO-69 Passo 3 (13/09) — quarto caso do mecanismo comum (mod_assinatura.py), wrapper
+    fino sobre `enviar_para_clicksign` como os três irmãos. Sem testemunhas (só o Contrato tem).
+    NÃO commita — o chamador decide."""
+    mod_assinatura.enviar_para_clicksign(
+        aditivo, cfg,
+        titulo="Termo Aditivo %s" % (aditivo.num_aditivo or aditivo.id),
+        nome_arquivo="aditivo_%s.pdf" % (aditivo.num_aditivo or aditivo.id),
+        pdf_path=aditivo.pdf_path,
+        erro_pdf_ausente="PDF do termo aditivo não encontrado — gere o aditivo antes de enviar ao ClickSign.",
+        email_loja=email_loja, nome_loja=nome_loja,
+        email_cliente=email_cliente, nome_cliente=nome_cliente, cpf_cliente=cpf_cliente)
+
+
+def _reconciliar_aditivo_clicksign(db, aditivo, cfg):
+    """ACHADO-69 Passo 3 (13/09) — wrapper fino sobre `mod_assinatura.reconciliar_clicksign`.
+    `_registrar_assinatura_aditivo` exige `orc_aj.forma_pagamento` já gravado pra completar (ver
+    lá) — a rota de envio (`/aditivo/clicksign/enviar`) é quem garante isso ANTES de mandar pro
+    ClickSign, porque não há outro instante síncrono pra perguntar isso na conclusão remota."""
+    return mod_assinatura.reconciliar_clicksign(
+        db, aditivo, cfg, nome_doc="aditivo",
+        registrar_assinatura=lambda db_, doc_, parte, nome, cpf, ip:
+            _registrar_assinatura_aditivo(db_, doc_, parte, nome, cpf, ip, doc_.loja_id, usuario_id=None))
+
+
+def _notificar_signatarios_clicksign_cancelamento_aditivo(db, aditivo, loja_id, status_final):
+    """ACHADO-69/70 (13/09) — equivalente do Contrato para o Termo Aditivo. Ligada na regeração
+    do documento (mesmo ponto/razão da Aprovação do PE e da Solicitação de Medição: regerar com
+    um envelope ainda pendente deixaria esse envelope órfão)."""
+    mod_assinatura.cancelar_e_notificar_clicksign(
+        db, aditivo, loja_id, status_final,
+        assunto_cancelado="[Orizon] Termo Aditivo cancelado — assinatura não é mais necessária",
+        corpo_cancelado=("O Termo Aditivo do projeto \"%s\" foi CANCELADO. Se você recebeu um "
+                         "convite da ClickSign para assiná-lo eletronicamente, desconsidere — a "
+                         "assinatura não é mais necessária."),
+        assunto_revisao="[Orizon] Termo Aditivo em revisão — aguarde uma nova versão",
+        corpo_revisao=("O Termo Aditivo do projeto \"%s\" voltou para revisão antes de ser "
+                       "assinado. Se você recebeu um convite da ClickSign para assiná-lo "
+                       "eletronicamente, desconsidere esse convite — enviaremos uma nova versão "
+                       "para assinatura em breve."))
+
+
 # documentos ClickSign, consumido pelo webhook e pelo job `/internal/clicksign/reconciliar`
 # (main.py, adiante) em vez de três blocos quase idênticos por classe. Só referencia as funções
-# acima, intocadas — nenhum comportamento muda. `cancelar` agora existe pros três (ACHADO-70,
+# acima, intocadas — nenhum comportamento muda. `cancelar` agora existe pros quatro (ACHADO-70,
 # 13/09) — ver os call sites de cada `_notificar_signatarios_clicksign_cancelamento*` pra saber
 # QUANDO cada um dispara (Contrato: /cancelamento; Aprovação do PE: /ciclo/11d/reprovar e
-# /aprovacao-pe/gerar; Solicitação de medição: /medicao/solicitacao/gerar).
+# /aprovacao-pe/gerar; Solicitação de medição: /medicao/solicitacao/gerar; Termo Aditivo:
+# regeração, mesma razão dos outros dois — ver a função acima).
 import mod_assinatura
 mod_assinatura.registrar("contrato", Contrato,
                           _enviar_contrato_para_clicksign, _reconciliar_contrato_clicksign,
@@ -1509,6 +1614,9 @@ mod_assinatura.registrar("solicitacao_medicao", SolicitacaoMedicao,
                           _enviar_solicitacao_medicao_para_clicksign,
                           _reconciliar_solicitacao_medicao_clicksign,
                           cancelar=_notificar_signatarios_clicksign_cancelamento_solicitacao_medicao)
+mod_assinatura.registrar("aditivo", Aditivo,
+                          _enviar_aditivo_para_clicksign, _reconciliar_aditivo_clicksign,
+                          cancelar=_notificar_signatarios_clicksign_cancelamento_aditivo)
 
 
 def _congelar_segmentacao_no_projeto(db, loja_id, projeto_nome):
@@ -5872,7 +5980,23 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                     a = (db.query(Aditivo).filter_by(projeto_nome=nome_safe)
                            .order_by(Aditivo.id.desc()).first())
-                    self.send_json({"ok": True, "aditivo": _aditivo_dict(a) if a else None})
+                    resp_ad_get = {"ok": True, "aditivo": _aditivo_dict(a) if a else None}
+                    if a is not None:
+                        # ACHADO-69, Passo 3 (13/09): mesmos defaults que Contrato/Aprovação do
+                        # PE/Solicitação de Medição já expõem, pré-preenchendo o modal de
+                        # confirmação de e-mails quando a tela oferecer o canal ClickSign.
+                        _contrato_ad = db.get(Contrato, a.contrato_id)
+                        if _contrato_ad is not None:
+                            _proj_ad2, _cliente_ad2, _od_ad2 = _montar_dados_projeto_para_contrato(
+                                nome_safe, _contrato_ad.orcamento_id, db)
+                            _usu_email_ad = db.get(Usuario, usuario["id"])
+                            resp_ad_get["clicksign_defaults"] = {
+                                "email_loja": (_usu_email_ad.email if _usu_email_ad else "") or "",
+                                "nome_loja": usuario.get("nome", ""),
+                                "email_cliente": _cliente_ad2.get("email") or "",
+                                "nome_cliente": _cliente_ad2.get("nome") or "",
+                            }
+                    self.send_json(resp_ad_get)
                 finally:
                     db.close()
                 return
@@ -9540,6 +9664,22 @@ class Handler(BaseHTTPRequestHandler):
                     else:
                         self.send_json({"ok": False, "erro": "Termo aditivo já assinado — não pode "
                                         "ser regerado."}, code=403); return
+                elif aditivo is not None and not preview and aditivo.assinatura_canal == "clicksign":
+                    # ACHADO-70 (13/09): mesma razão da Aprovação do PE/Solicitação de Medição —
+                    # regerar o documento com um envelope ClickSign ainda pendente deixaria esse
+                    # envelope órfão, apontando pra um PDF prestes a ficar desatualizado. try/
+                    # except PRÓPRIO: a regeração acontece mesmo que isto falhe.
+                    try:
+                        mod_assinatura.registro_de(Aditivo).cancelar(
+                            db, aditivo, loja_id, "em_revisao")
+                    except Exception as _e70:
+                        logging.getLogger(__name__).warning(
+                            "ACHADO-70: cancelar envelope ClickSign do Termo Aditivo "
+                            "(projeto=%s) na regeração falhou: %s", nome, _e70)
+                    aditivo.assinatura_canal = "interno"
+                    aditivo.clicksign_envelope_id = None
+                    aditivo.clicksign_signatarios_json = None
+                    aditivo.clicksign_enviado_em = None
                 import mod_documentos as _mdoc
                 import mod_contrato as _mc
                 # corpo do modelo: versão CONGELADA do aditivo aberto; senão o ativo da loja;
@@ -9709,71 +9849,187 @@ class Handler(BaseHTTPRequestHandler):
                 # (as duas partes) precisa da forma de pagamento — sem ela não dá pra materializar
                 # os recebíveis, e o aditivo ficaria constituído (2.1.06) sem nunca ser cobrado do
                 # cliente, o mesmo defeito que o ACHADO-12 media. Não inventa default: se a tela
-                # não coletou, recusa aqui, com mensagem clara.
+                # não coletou, recusa aqui, com mensagem clara. (Preservado aqui — ver também
+                # `_registrar_assinatura_aditivo`, ACHADO-69: o gatilho ClickSign não tem corpo de
+                # requisição nenhum na conclusão remota, então depende só de lá; aqui é redundante
+                # e inofensivo, e mantém a mensagem/timing exatos de antes desta extração.)
                 if completa_agora and not forma_pagamento_str:
                     self.send_json({"ok": False, "erro": "Informe a forma de pagamento do "
                                     "aditivo antes de concluir a assinatura."}, code=400); return
                 orc_aj = db.get(Orcamento, aditivo.orcamento_complemento_id)
-                if completa_agora and orc_aj is not None:
-                    # ACHADO-21, 6-c: a forma de pagamento só chega agora — recalcula ANTES de
-                    # marcar o aditivo como assinado, pra Cust_Fin (se a forma escolhida for
-                    # financiada) entrar no valor constituído, igual ao contrato principal (que
-                    # também só sabe a forma de pagamento na assinatura). A diferença NEGOCIADA
-                    # (VAVA) não muda — só o que se soma a ela por causa de COMO o cliente decide
-                    # pagar. Tem que rodar ANTES de `aditivo.status` virar "assinado": depois
-                    # disso, `_pe_fator_contexto` passaria a contar ESTE PRÓPRIO aditivo na soma
-                    # de "já contratado" ao recalcular o mesmo orçamento — subtrairia ele de si
-                    # mesmo e zeraria a diferença (achado ao testar).
+                if completa_agora and forma_pagamento_str and orc_aj is not None:
                     orc_aj.forma_pagamento = forma_pagamento_str
-                    try:
-                        _recalcular_orcamento(orc_aj, db)
-                    except Exception as _e:
-                        print("[ADITIVO-ASSINAR] recálculo com forma_pagamento falhou:", _e)
-                    db.commit()
-                    # ACHADO-24 (docs/db/TAREFA_ACHADO24.md, F2-1): a forma de pagamento PRESENTE
-                    # não é a mesma pergunta que a forma de pagamento PRODUZIR recebível — um
-                    # plano sem parcelas/entrada_valor passa pela guarda acima e materializa
-                    # zero Recebivel em silêncio (`_materializar_recebiveis_venda_seguro` só
-                    # loga um warning). Recusa aqui, ANTES de registrar a assinatura: nenhum
-                    # default inventado, mesma regra de valor > 0 exige cobrança do ACHADO-18.
-                    if float(orc_aj.valor_total or 0) > 0:
-                        import mod_recebiveis as _mrec
-                        import mod_contabil
-                        if not _mrec.materializar(forma_pagamento_str, orc_aj.valor_total,
-                                                  mod_contabil.hoje_no_fuso(db, "loja", loja_id), "check"):
-                            self.send_json({"ok": False, "erro": "O plano de pagamento do "
-                                            "aditivo não gera nenhum recebível — informe "
-                                            "entrada e/ou parcelas antes de concluir a "
-                                            "assinatura."}, code=400); return
-                # ALIAS obrigatório: import não-aliased tornaria calcular_hash_assinatura local
-                # ao do_POST inteiro e quebraria o handler de assinatura do CONTRATO acima
-                from mod_contrato import calcular_hash_assinatura as _cha
-                ts = datetime.utcnow().isoformat()
-                # append na RELAÇÃO (não db.add solto): a coleção já carregada precisa enxergar
-                # a assinatura nova para o cálculo de "ambas as partes" logo abaixo
-                aditivo.assinaturas.append(AditivoAssinatura(
-                    parte=parte, nome=nome_ass, cpf=cpf, ip_origem=self.client_address[0],
-                    hash_sha256=_cha(nome_ass, cpf, aditivo.id, ts)))
-                db.flush()
-                partes = {a.parte for a in aditivo.assinaturas}
-                aditivo.status = ("assinado" if {"loja", "cliente"}.issubset(partes)
-                                  else "assinado_" + parte)
+                ip = self.client_address[0] if self.client_address else ""
+                status_final = _registrar_assinatura_aditivo(
+                    db, aditivo, parte, nome_ass, cpf, ip, loja_id, usuario_id=usuario.get("id"))
+                self.send_json({"ok": True, "status": status_final})
+            except ValueError as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            finally:
+                db.close()
+            return
+
+        # POST /api/projetos/<nome>/aditivo/clicksign/enviar — ACHADO-69 (13/09), espelho da
+        # Aprovação do PE. ACHADO-21 6-c: a forma de pagamento não tem outro instante síncrono
+        # pra ser perguntada na conclusão remota — coletada e validada AQUI, no envio (mesma
+        # regra do canal interno, ACHADO-24: recusa se o plano não gera recebível nenhum).
+        m_adenv = re.match(r'^/api/projetos/([^/]+)/aditivo/clicksign/enviar$', path)
+        if m_adenv:
+            nome = unquote(m_adenv.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                aditivo = (db.query(Aditivo).filter_by(projeto_nome=nome)
+                             .order_by(Aditivo.id.desc()).first())
+                if aditivo is None or not aditivo.pdf_path:
+                    self.send_json({"ok": False, "erro": "Gere o termo aditivo antes de enviar."},
+                                   code=400); return
+                if aditivo.status == "assinado":
+                    self.send_json({"ok": False, "erro": "Termo aditivo já assinado."}, code=400); return
+                if (aditivo.assinatura_canal or "interno") == "clicksign":
+                    self.send_json({"ok": False,
+                        "erro": "Este termo aditivo já foi enviado para assinatura eletrônica."}, code=400); return
+                if any(a.parte for a in aditivo.assinaturas):
+                    self.send_json({"ok": False,
+                        "erro": "Este termo aditivo já tem assinatura interna registrada — não "
+                                "é possível mudar de canal."}, code=400); return
+                _req = json.loads(body) if body else {}
+                forma_pagamento_str = _req.get("forma_pagamento")
+                if not forma_pagamento_str:
+                    self.send_json({"ok": False, "erro": "Informe a forma de pagamento do "
+                                    "aditivo antes de enviar para assinatura eletrônica."}, code=400); return
+                orc_aj = db.get(Orcamento, aditivo.orcamento_complemento_id)
+                if orc_aj is None:
+                    self.send_json({"ok": False, "erro": "Orçamento de complemento não encontrado."},
+                                   code=400); return
+                if float(orc_aj.valor_total or 0) > 0:
+                    import mod_recebiveis as _mrec2
+                    import mod_contabil as _mcab2
+                    if not _mrec2.materializar(forma_pagamento_str, orc_aj.valor_total,
+                                               _mcab2.hoje_no_fuso(db, "loja", loja_id), "check"):
+                        self.send_json({"ok": False, "erro": "O plano de pagamento do aditivo não "
+                                        "gera nenhum recebível — informe entrada e/ou parcelas "
+                                        "antes de enviar para assinatura."}, code=400); return
+                orc_aj.forma_pagamento = forma_pagamento_str
+                try:
+                    _recalcular_orcamento(orc_aj, db)
+                except Exception as _e:
+                    print("[ADITIVO-CLICKSIGN-ENVIAR] recálculo com forma_pagamento falhou:", _e)
+                import mod_clicksign
+                from integracoes.clicksign_client import ClickSignError
+                loja_obj = db.get(Loja, loja_id)
+                cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
+                if cfg is None:
+                    self.send_json({"ok": False,
+                        "erro": "Integração ClickSign não configurada para esta loja. Configure "
+                                "em Admin → Dados da empresa."}, code=400); return
+                contrato = db.get(Contrato, aditivo.contrato_id)
+                if contrato is None:
+                    self.send_json({"ok": False, "erro": "Projeto sem contrato."}, code=400); return
+                _proj_ad, cliente_dict, _od_ad = _montar_dados_projeto_para_contrato(
+                    nome, contrato.orcamento_id, db)
+                _email_loja = (_req.get("email_loja") or "").strip() \
+                    or (db.get(Usuario, usuario["id"]).email or "")
+                _email_cliente = (_req.get("email_cliente") or "").strip() \
+                    or (cliente_dict.get("email") or "")
+                _enviar_aditivo_para_clicksign(
+                    db, aditivo, cfg,
+                    email_loja=_email_loja, nome_loja=usuario.get("nome", ""),
+                    email_cliente=_email_cliente,
+                    nome_cliente=cliente_dict.get("nome") or "",
+                    cpf_cliente=cliente_dict.get("cpf") or cliente_dict.get("cnpj") or "")
                 db.commit()
-                # Provisões contábeis do ADITIVO (achado Vera 2026-08-12: assinatura completa não
-                # gerava nenhum lançamento — a diferença de valor negociada ficava sem rastro no
-                # razão). Mesmo mecanismo/contas do fechamento da venda original (2026-08-12), na
-                # 2ª assinatura completa: sem gate de Aprovação Financeira própria (AF1/AF2 já
-                # correram antes da 11e) — decisão do usuário, mesmo padrão do contrato principal.
-                if aditivo.status == "assinado" and orc_aj is not None:
-                    _fin_provisoes_venda_seguro(orc_aj, nome, "prov:aditivo:" + str(aditivo.id))
-                    # Recebíveis PRÓPRIOS do aditivo — guarda de idempotência já é por
-                    # orcamento_id, então nada toca nos recebíveis do contrato.
-                    import mod_contabil
-                    _materializar_recebiveis_venda_seguro(
-                        orc_aj, nome, loja_id, mod_contabil.agora_no_fuso(db, "loja", loja_id),   # ACHADO-48
-                        "receb:aditivo:" + str(aditivo.id),
-                        pagamento_json_str=forma_pagamento_str)
+                self.send_json({"ok": True, "assinatura_canal": aditivo.assinatura_canal})
+            except (ValueError, ClickSignError) as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        # POST /api/projetos/<nome>/aditivo/clicksign/verificar — reconsulta sob demanda, espelho
+        # de .../aprovacao-pe/clicksign/verificar.
+        m_adver = re.match(r'^/api/projetos/([^/]+)/aditivo/clicksign/verificar$', path)
+        if m_adver:
+            nome = unquote(m_adver.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                aditivo = (db.query(Aditivo).filter_by(projeto_nome=nome)
+                             .order_by(Aditivo.id.desc()).first())
+                if not aditivo or (aditivo.assinatura_canal or "interno") != "clicksign":
+                    self.send_json({"ok": False,
+                        "erro": "Este termo aditivo não está no canal ClickSign."}, code=400); return
+                import mod_clicksign
+                loja_obj = db.get(Loja, loja_id)
+                cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
+                if cfg is None:
+                    self.send_json({"ok": False,
+                        "erro": "Integração ClickSign não configurada para esta loja."}, code=400); return
+                _reconciliar_aditivo_clicksign(db, aditivo, cfg)
+                db.commit()
                 self.send_json({"ok": True, "status": aditivo.status})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
+        # POST /api/projetos/<nome>/aditivo/clicksign/reenviar — reenvia o convite, espelho de
+        # .../aprovacao-pe/clicksign/reenviar.
+        m_adreenv = re.match(r'^/api/projetos/([^/]+)/aditivo/clicksign/reenviar$', path)
+        if m_adreenv:
+            nome = unquote(m_adreenv.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                if _projeto_da_loja(db, nome, loja_id) is None:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                aditivo = (db.query(Aditivo).filter_by(projeto_nome=nome)
+                             .order_by(Aditivo.id.desc()).first())
+                if not aditivo or (aditivo.assinatura_canal or "interno") != "clicksign":
+                    self.send_json({"ok": False,
+                        "erro": "Este termo aditivo não está no canal ClickSign."}, code=400); return
+                import mod_clicksign
+                from integracoes.clicksign_client import ClickSignError
+                loja_obj = db.get(Loja, loja_id)
+                cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
+                if cfg is None:
+                    self.send_json({"ok": False,
+                        "erro": "Integração ClickSign não configurada para esta loja."}, code=400); return
+                mod_clicksign.client_de(cfg).reenviar_notificacao(aditivo.clicksign_envelope_id)
+                self.send_json({"ok": True})
+            except ClickSignError as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=400)
+            except Exception as e:
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
             finally:
                 db.close()
             return
@@ -18636,6 +18892,10 @@ def _aditivo_dict(a) -> dict:
         "tem_pdf": bool(a.pdf_path and os.path.exists(a.pdf_path)),
         "gerado_em": a.gerado_em.strftime("%Y-%m-%d %H:%M") if a.gerado_em else "",
         "dados": dados,
+        # ACHADO-69, Passo 3 (13/09): mesmos dois campos que os três irmãos já expõem, pro
+        # frontend saber se está no canal ClickSign e há quanto tempo foi enviado.
+        "assinatura_canal": a.assinatura_canal or "interno",
+        "clicksign_enviado_em": a.clicksign_enviado_em.isoformat() if a.clicksign_enviado_em else None,
         "assinaturas": [{"parte": s.parte, "nome": s.nome,
                          "assinado_em": s.assinado_em.strftime("%Y-%m-%d %H:%M") if s.assinado_em else ""}
                         for s in a.assinaturas],

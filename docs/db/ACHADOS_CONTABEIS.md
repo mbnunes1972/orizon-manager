@@ -4355,6 +4355,17 @@ o veredito de absorver/cobrar é exigido/dado, e travar a conclusão até
 o veredito existir — mesmo desenho que o ACHADO-39 já aplicou pro
 ambiente.
 
+**Pista para quem pegar este achado (medida ao lado, no ACHADO-69/70, 13/09 — não
+investigada a fundo aqui, só registrada pra não começar do zero):** `/api/projetos/<nome>/
+ciclo/11d/reprovar` (a reprovação da AF2, subfase seguinte à 11c) **não toca em
+`AprovacaoPE.status` — só escreve `CicloEtapa.status="reprovado"`**. O status da subfase e o
+status do documento/decisão que ela representa são DUAS fontes de verdade independentes, que
+podem divergir sem nada avisar. Isso é a MESMA família estrutural deste achado (subfase que
+fecha/mostra um estado sem estar amarrada ao fato contábil/decisório que deveria refletir) — vale
+medir, quando alguém pegar o 56, se a 11c tem o mesmo padrão (status da subfase escrito
+independente do veredito de absorver/cobrar existir na tabela de decisão), ou se são coincidências
+parecidas com causas diferentes.
+
 ---
 
 ## ACHADO-57 — a etapa Montagem se dá por concluída sozinha · RESOLVIDO 05/09/2026
@@ -5607,6 +5618,104 @@ chamar duas vezes (ou sobre documento nunca enviado) não explode, ClickSign for
 o evento de negócio. Suíte de ClickSign (64) + cancelamento (9) + achado-70 (8) + conciliação de
 PE (25, cobre as rotas de reprovar já existentes — nenhuma asserção mudou) = 106 verdes;
 arquitetura verde; coleta 2788 (2780 + 8 dos testes novos).
+
+Pacote: `docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md`.
+
+---
+
+## ACHADO-69 — assinatura ClickSign unificada; Termo Aditivo entra como quarto caso · RESOLVIDO 13/09/2026 (aceite 9 — E2E de navegador da 11e — e o percurso manual, pendentes)
+
+Achado do Marcelo em 10/09, na etapa 11e de Homologação (`v2026.09.09-beta1`, Projeto 13): o
+Termo Aditivo era o único dos quatro documentos assináveis sem escolha de canal — só a porta
+interna (`POST /aditivo/assinar`). Pedido explícito: "use o mesmo mecanismo dos casos
+anteriores"; decisão de 11/09, depois de comparar as duas saídas lado a lado: "vamos fazer o
+mais certo. Testamos em sequência" — ou seja, **não** espelhar a Aprovação do PE numa quarta
+cópia; extrair o mecanismo comum, migrar os três existentes, e só então o Aditivo entra como
+quarto caso.
+
+**Passo 0 (inventário) já rendeu achado próprio:** ver [[ACHADO-70]] logo acima — cancelamento
+de envelope só existia para o Contrato, defeito real, resolvido em faixa própria antes deste
+pacote fechar. A ausência de testemunha na Aprovação do PE ficou fora de escopo, registrada como
+pergunta em aberto em `docs/db/LISTA_PARALELA.md` (LP-24).
+
+**O mecanismo (`mod_assinatura.py`):** um registro (`RegistroDocumento`) por classe — modelo,
+`enviar`/`reconciliar`/`cancelar` — que o webhook (`/webhooks/clicksign`) e o job
+(`/internal/clicksign/reconciliar`) passam a **iterar** em vez de repetir a consulta por classe
+três (agora quatro) vezes. `enviar_para_clicksign`/`reconciliar_clicksign`/
+`cancelar_e_notificar_clicksign` são o núcleo comum, extraído do Contrato (o mais completo dos
+três originais) e generalizado por parâmetro — nunca por `if` de classe dentro da função comum.
+Passo 1 fechou **sem nenhuma asserção alterada** nos testes que já existiam; Passo 2 migrou
+Solicitação de medição → Aprovação do PE → Contrato, um commit por documento, suíte verde entre
+cada um.
+
+**O Termo Aditivo como quarto caso (Passo 3):** `Aditivo` ganha as mesmas 4 colunas dos irmãos
+(`assinatura_canal server_default='interno'`, `clicksign_envelope_id`, `clicksign_enviado_em`,
+`clicksign_signatarios_json`) — via **migration** (`5325ac7badfa`), nunca em `_migrar_colunas_pg`
+(R1, congelado — o caminho que Contrato/AprovacaoPE tomaram antes é dívida registrada, não
+exemplo a repetir). `schema.sql` atualizado no mesmo commit (edição cirúrgica só na tabela
+`aditivos` — o arquivo já tinha drift pré-existente e não relacionado, deixado intocado);
+`ERD.mmd` conferido e **não precisou mudar** (é só relacionamento por FK, e as colunas novas não
+criam nenhuma). Rotas espelhando as dos irmãos: `/aditivo/clicksign/{enviar,verificar,reenviar}`.
+Cancelamento de envelope entrou **já ligado** desde o primeiro commit do Aditivo (regeração via
+`/aditivo`, mesmo padrão do ACHADO-70) — diferente de Contrato/AprovacaoPE/Solicitação, que
+precisaram de um commit separado, porque o Aditivo não tem comportamento anterior em produção
+pra preservar.
+
+**Achado colateral, registrado e resolvido no mesmo commit (ACHADO-28 aplicado ao Aditivo):**
+`/aditivo/assinar` nunca validou CPF — os três irmãos sempre validaram (`validacao_doc.erro_doc`
+dentro de cada `_registrar_assinatura_*`), o Aditivo ficou pra trás. Corrigido dentro da função
+extraída (`_registrar_assinatura_aditivo`), cobrindo os dois canais desde o primeiro commit —
+não é regressão desta entrega, é uma lacuna pré-existente fechada de carona com a extração.
+
+**ACHADO-21 6-c, resolvido para o canal remoto:** a assinatura que completa o Aditivo exige
+`forma_pagamento` (sem ela, nenhum recebível pode ser materializado — ACHADO-24). No canal
+interno isso é síncrono (vem no corpo da própria requisição que completa). No ClickSign não há
+esse instante — a conclusão chega depois, via webhook/reconciliação, sem corpo de requisição
+nenhum. Decisão: exigir e persistir `forma_pagamento` em `/aditivo/clicksign/enviar` (no ENVIO,
+não na conclusão) — a mesma checagem do ACHADO-24 (`mod_recebiveis.materializar(..., "check")`)
+roda ali, então um plano inviável é recusado antes de sair pro ClickSign, nunca descoberto tarde
+demais na reconciliação.
+
+**A igualdade contábil — o aceite mais importante do pacote:** "se o caminho ClickSign não
+disparar exatamente a mesma constituição que o interno, o pacote está errado. Prove com um teste
+que compare os lançamentos, não com inspeção." `test_aditivo_clicksign_e2e.py::
+test_assinatura_completa_via_clicksign_constitui_as_mesmas_provisoes_do_canal_interno` roda DUAS
+rodadas independentes sobre o mesmo projeto — uma completada via `/aditivo/assinar` (interno),
+outra via `/aditivo/clicksign/enviar` + reconciliação (envelope fechado, sinal único de conclusão
+nesta versão da API — achado de 20/08, já conhecido) — com a MESMA diferença negociada (medido:
+o ACHADO-21 6-b cobra a diferença contra o que já foi contratado, incluindo aditivos já
+assinados, então a 2ª rodada precisa de um XML de complemento NOVO que reproduza o mesmo
+incremento, não do mesmo XML reaplicado). Compara os `Lancamento` reais das duas rodadas —
+mesmas contas debitadas/creditadas, mesma origem, mesmo valor (tolerância de 1 centavo, ruído de
+arredondamento entre duas cadeias de cálculo independentes) — nunca "chamou a mesma função".
+
+**Cobertura de registro (aceite 8 — "envelope que ninguém reconcilia é assinatura que some"):**
+teste próprio pro webhook e teste próprio pro job, cada um provando que o Aditivo especificamente
+é alcançado pelo despacho por `mod_assinatura.documentos()` — não por inspeção de que o registro
+"deveria" cobri-lo.
+
+**Testes** (`tests/test_aditivo_clicksign_e2e.py`, 10 novos): igualdade contábil; exige
+`forma_pagamento` no envio; recusa plano sem recebível (ACHADO-24); CPF inválido do cliente não
+completa via ClickSign (ACHADO-28, fail-soft por parte); reenvio de convite; webhook alcança o
+Aditivo; job `/internal/clicksign/reconciliar` alcança o Aditivo; regeração cancela envelope
+pendente (ACHADO-70 aplicado); regeração sem envelope não explode; regeração acontece mesmo com
+ClickSign fora do ar. Regressão: as 54 pré-existentes de Aditivo (assinatura interna, PDF,
+recebíveis, wizard, complemento) — **54/54, zero mudança de asserção**. Coleta 2797 (2788 + 9
+novos deste arquivo — a 10ª substituiu uma variação já contada). Arquitetura verde.
+
+**Aceite 10 fechado (13/09):** `pytest -q` completo, uma rodada — **2793 passed, 4 xfailed, 0
+failed**, 604,5 s (10min04s). Coleta bate exato com a soma (2797 = 2793 + 4). Zero `+++ Timeout`
+(RODADA3 segue eliminada como categoria). Mais rápido que as três rodadas overnight da RODADA3
+(17-18min) porque nenhum dos onze flakes de E2E de navegador apareceu nesta — o que não muda o
+que já está registrado sobre eles: continuam intermitentes e não explicados, não "resolvidos por
+não terem aparecido uma vez".
+
+**Pendente, não deste registro:** aceite 9 (E2E de navegador da tela 11e com as duas opções) —
+deliberadamente não escrito nesta entrega; os 11 arquivos de E2E de navegador já estão marcados
+para rodada própria de investigação (flakes não explicados, RODADA3), e criar mais um E2E antes
+dessa rodada fechar arrisca herdar o mesmo problema sem diagnóstico. O percurso manual
+(`docs/db/PERCURSO_HOMOLOGACAO.md`, "testamos em sequência") também fica pendente — é item do
+Marcelo, não algo que a suíte prova.
 
 Pacote: `docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md`.
 

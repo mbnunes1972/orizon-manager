@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""mod_assinatura.py — ACHADO-69 (docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md), Passo 1.
+"""mod_assinatura.py — ACHADO-69 (docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md), Passos 1-3.
 
-Registro único dos documentos que oferecem assinatura por ClickSign — hoje: Contrato, Aprovação
-do PE e Solicitação de medição. `main.py` tinha essa lista repetida em dois lugares (o webhook e
-o job `/internal/clicksign/reconciliar`), cada um com um bloco quase idêntico por classe — a
+Registro único dos documentos que oferecem assinatura por ClickSign: Contrato, Aprovação do PE,
+Solicitação de medição e, desde 13/09 (Passo 3), Termo Aditivo — o motivo original do pacote
+(etapa 11e do percurso). `main.py` tinha essa lista repetida em dois lugares (o webhook e o job
+`/internal/clicksign/reconciliar`), cada um com um bloco quase idêntico por classe — a
 duplicação que o pacote nomeou pra unificar.
 
 Passo 1 NÃO muda comportamento nenhum: cada entrada aqui só referencia as funções
@@ -14,11 +15,13 @@ job), nunca a lógica de enviar/reconciliar em si. `main.py` popula o registro (
 concretas de cada documento.
 
 Cancelamento de envelope (ACHADO-70, `docs/db/ACHADOS_CONTABEIS.md`): até 13/09, só o Contrato
-tinha. Ligado nos outros dois em commit PRÓPRIO (depois das três migrações do Passo 2, suíte
-verde em cada uma) — é a primeira mudança de COMPORTAMENTO deste trabalho, deliberadamente
-separada da extração de mecanismo. Ver `cancelar_e_notificar_clicksign` abaixo (o núcleo comum,
-generalizado a partir de `_notificar_signatarios_clicksign_cancelamento`, que só existia pro
-Contrato e tinha o texto do e-mail hardcoded) e os três wrappers em `main.py`
+tinha. Ligado na Aprovação do PE e na Solicitação de medição em commit PRÓPRIO (depois das três
+migrações do Passo 2, suíte verde em cada uma) — foi a primeira mudança de COMPORTAMENTO deste
+trabalho, deliberadamente separada da extração de mecanismo. O Termo Aditivo (Passo 3) já nasceu
+com cancelamento registrado desde o primeiro commit — não há comportamento anterior pra preservar
+nele, então não se aplica a mesma separação. Ver `cancelar_e_notificar_clicksign` abaixo (o núcleo
+comum, generalizado a partir de `_notificar_signatarios_clicksign_cancelamento`, que só existia
+pro Contrato e tinha o texto do e-mail hardcoded) e os quatro wrappers em `main.py`
 (`_notificar_signatarios_clicksign_cancelamento*`) para saber QUANDO cada documento dispara."""
 
 import json

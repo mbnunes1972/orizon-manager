@@ -1386,6 +1386,15 @@ class Aditivo(Base):
     gerado_por_id      = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     loja_id            = Column(Integer,  ForeignKey("lojas.id"), nullable=True, index=True)
     modelo_versao_id   = Column(Integer,  ForeignKey("documento_modelos.id"), nullable=True, index=True)
+    # Assinatura eletrônica ClickSign (ACHADO-69, 13/09/2026) — quarto caso do mecanismo comum
+    # (mod_assinatura.py); mesmos 4 campos que Contrato/AprovacaoPE/SolicitacaoMedicao já têm,
+    # nomes idênticos de propósito. `server_default="interno"` declarado aqui E na migration (R1:
+    # vai em migration — NUNCA em `_migrar_colunas_pg`, congelado; ver a nota C1 em
+    # Contrato.assinatura_canal sobre o caminho errado que NÃO foi repetido desta vez).
+    assinatura_canal              = Column(String(16), nullable=True, server_default="interno")
+    clicksign_envelope_id         = Column(Text,     nullable=True)
+    clicksign_enviado_em          = Column(DateTime, nullable=True)
+    clicksign_signatarios_json    = Column(Text,     nullable=True)
 
     assinaturas = relationship("AditivoAssinatura", back_populates="aditivo",
                                cascade="all, delete-orphan")
