@@ -220,7 +220,11 @@ def test_termo_aditivo_11e_oferece_as_duas_opcoes_de_canal(page, servidor_e2e, c
     # ── 2. Criar projeto + briefing ──────────────────────────────────────────────────────────
     page.click('button:has-text("Novo Projeto")')
     page.fill("#novo-proj-nome", nome_exibicao)
-    page.fill("#novo-proj-cli", "Cliente E2E")
+    # Achado do MAPA_MODULOS/#np-cli-dropdown (14/09/2026): a busca debounça 300ms antes de
+    # disparar o fetch — esperar só pelo <div> do dropdown corre contra esse timer implícito e
+    # flakava mesmo com backend rápido e máquina ociosa. Espera a RESPOSTA de verdade primeiro.
+    with page.expect_response(lambda r: "/api/clientes" in r.url and "q=" in r.url):
+        page.fill("#novo-proj-cli", "Cliente E2E")
     page.wait_for_selector("#np-cli-dropdown div")
     page.click("#np-cli-dropdown div")
     page.click('button:has-text("Criar Projeto")')

@@ -108,7 +108,11 @@ def test_tabela_de_provisoes_respeita_os_tres_estados_do_backend(page, servidor_
 
     page.click('button:has-text("Novo Projeto")')
     page.fill("#novo-proj-nome", "Conciliacao UI E2E")
-    page.fill("#novo-proj-cli", "Cliente E2E")
+    # Achado do MAPA_MODULOS/#np-cli-dropdown (14/09/2026): a busca debounça 300ms antes de
+    # disparar o fetch — esperar só pelo <div> do dropdown corre contra esse timer implícito e
+    # flakava mesmo com backend rápido e máquina ociosa. Espera a RESPOSTA de verdade primeiro.
+    with page.expect_response(lambda r: "/api/clientes" in r.url and "q=" in r.url):
+        page.fill("#novo-proj-cli", "Cliente E2E")
     page.wait_for_selector("#np-cli-dropdown div")
     page.click("#np-cli-dropdown div")
     page.click('button:has-text("Criar Projeto")')

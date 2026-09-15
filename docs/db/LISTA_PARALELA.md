@@ -679,6 +679,25 @@ misturar duas investigações.** Isto NÃO é bloqueio para o ACHADO-69: o port�
 migração do Passo 2 é a suíte específica de ClickSign (hoje 64 testes) mais a contagem total de
 coleta — não a suíte E2E inteira, que não distingue "quebrei algo" de "é o flake de sempre".
 
+**Atualização 14/09 (Claude Code) — a "rodada própria" prometida acima aconteceu**
+(`docs/db/TAREFA_FLAKES_E2E.md`, 8 rodadas completas + isolamento de cada um dos 15 testes que
+falham): 41 falhas/15 testes/9 arquivos, TODOS os 15 também falham isolados (1/10 a 10/10) — a
+contaminação cruzada pura já foi descartada como causa ÚNICA por essa mesma medição. O ponto de
+falha mais comum, por contagem bruta nos 47 logs isolados, é `#np-cli-dropdown` (27 ocorrências,
+à frente do `#neg-subtotal` que a RODADA3 investigou, 20 ocorrências) — família DIFERENTE da
+corrupção de boot/DDL que este LP-22 rastreia, mas do mesmo gênero (E2E de navegador, timeout de
+10s). **Esse sub-caso está resolvido agora** (item 1 da fila de beta, PLANO_SEMANA_1.md): causa
+nomeada — os 11 arquivos afetados esperavam o `<div>` do dropdown correndo contra um debounce de
+300ms IMPLÍCITO no `npBuscarCliente()`, sem esperar a resposta de rede de verdade; corrigido
+trocando por `page.expect_response(...)` antes do fill, nos 11 arquivos (ver
+`TAREFA_FLAKES_E2E.md` pela medição completa e o commit desta correção pelo diff). **A família de
+47 falhas isoladas encolhe para os 20 do `#neg-subtotal`** (já investigado pela RODADA3, sem causa
+raiz encontrada — sobrevivências dos tempos de espera do Playwright, hipótese de timing já
+derrubada) **mais o que sobrar do restante** (`#np-cli-dropdown` era o mais comum, mas não o
+único ponto de falha dos 15 testes — a tabela completa está em `TAREFA_FLAKES_E2E.md`). Não
+resolve o LP-22 em si (boot/DDL é mecanismo diferente) — é o primeiro corte real dentro da família
+mais ampla de flakes de E2E que este item vem acumulando desde 09/09.
+
 ---
 
 ## Fechados — não são adiamento, e por isso não estão na lista acima

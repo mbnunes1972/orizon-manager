@@ -100,7 +100,11 @@ def test_item_especial_botao_soma_no_bruto_e_no_total_e_campo_do_modal_vira_leit
 
     page.click('button:has-text("Novo Projeto")')
     page.fill("#novo-proj-nome", "Achado65 E2E")
-    page.fill("#novo-proj-cli", "Cliente E2E")
+    # Achado do MAPA_MODULOS/#np-cli-dropdown (14/09/2026): a busca debounça 300ms antes de
+    # disparar o fetch — esperar só pelo <div> do dropdown corre contra esse timer implícito e
+    # flakava mesmo com backend rápido e máquina ociosa. Espera a RESPOSTA de verdade primeiro.
+    with page.expect_response(lambda r: "/api/clientes" in r.url and "q=" in r.url):
+        page.fill("#novo-proj-cli", "Cliente E2E")
     page.wait_for_selector("#np-cli-dropdown div")
     page.click("#np-cli-dropdown div")
     page.click('button:has-text("Criar Projeto")')

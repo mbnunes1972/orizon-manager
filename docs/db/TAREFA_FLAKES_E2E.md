@@ -200,6 +200,29 @@ ocasionalmente estoura 10s (seria consertar, não medir); fica registrado como o
 mais provável para quem pegar a causa raiz, na frente do `#neg-subtotal` que a RODADA3 já tinha
 olhado.
 
+**Atualização — 14/09/2026 (PLANO_SEMANA_1.md, item 1 da fila de beta): causa confirmada e
+corrigida.** Medi a latência do backend direto (`GET /api/clientes?q=Cliente`, curl autenticado,
+processo `main.py` novo em porta descartável): 4-10ms, incluindo a PRIMEIRA requisição (fria) —
+descarta backend lento. Rodei os testes afetados isolados, várias vezes, máquina ociosa, banco
+recriado — reproduzi a falha (ex.: `test_e2e_browser_ciclo_overlay.py`, 1/8). **Veredicto: defeito
+de teste, não de produto.** A causa não é o backend estourar 10s — é o padrão dos 11 arquivos
+afetados (`page.fill("#novo-proj-cli", ...)` seguido direto de
+`page.wait_for_selector("#np-cli-dropdown div")`) correr contra o debounce de 300ms como uma
+corrida IMPLÍCITA: `page.fill()` volta assim que o evento `oninput` dispara, MAS o fetch só
+começa 300ms depois (dentro do `setTimeout` de `npBuscarCliente`) — o teste está torcendo pra
+essa janela nunca coincidir com uma pausa do event loop do Chromium sob carga, em vez de esperar
+o sinal de verdade. **Conserto:** os 11 arquivos passam a envolver o `page.fill()` num
+`page.expect_response(lambda r: "/api/clientes" in r.url and "q=" in r.url)` — espera a RESPOSTA
+da rede antes de seguir pro dropdown, não mais um cronômetro implícito. 10/10 rodadas limpas em
+`test_e2e_browser_ciclo_overlay.py` depois do conserto (vs. 1 falha em 8 antes). A família de 47
+falhas isoladas encolhe: os 27 do `#np-cli-dropdown` saem com causa nomeada e resolvida: sobram os
+20 do `#neg-subtotal` (já investigado pela RODADA3) mais o que outras rodadas ainda encontrarem —
+ver o LP correspondente em `LISTA_PARALELA.md` § INFRA. Achado colateral, NÃO relacionado a este
+flake (o backend local é rápido demais pra exercitar este caminho): `npBuscarCliente()` tem
+`catch(e){}` vazio — um erro de rede de verdade (produção, contra um backend lento ou fora do ar)
+falharia em silêncio, sem aviso nenhum ao usuário. Genuíno, mas separado; não registrado como
+achado de produto aqui porque não é o que causa ESTE flake.
+
 ---
 
 ## Ordem — pares predecessor/sucessor

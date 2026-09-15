@@ -105,7 +105,11 @@ def test_avista_concorda_com_neg_avista_apos_preview_mesmo_envenenada(page, serv
 
     page.click('button:has-text("Novo Projeto")')
     page.fill("#novo-proj-nome", "F2-43 Avista Concorda")
-    page.fill("#novo-proj-cli", "Cliente E2E")
+    # Achado do MAPA_MODULOS/#np-cli-dropdown (14/09/2026): a busca debounça 300ms antes de
+    # disparar o fetch — esperar só pelo <div> do dropdown corre contra esse timer implícito e
+    # flakava mesmo com backend rápido e máquina ociosa. Espera a RESPOSTA de verdade primeiro.
+    with page.expect_response(lambda r: "/api/clientes" in r.url and "q=" in r.url):
+        page.fill("#novo-proj-cli", "Cliente E2E")
     page.wait_for_selector("#np-cli-dropdown div")
     page.click("#np-cli-dropdown div")
     page.click('button:has-text("Criar Projeto")')
