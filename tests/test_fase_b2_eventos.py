@@ -16,7 +16,9 @@ _EVENTOS_B2 = {
     "faturamento_mercadoria_a_receber": ("1.1.02", "4.1.01"),
     "faturamento_servico_adiantado":    ("2.1.06", "4.2.01"),
     "faturamento_servico_a_receber":    ("1.1.02", "4.2.01"),
-    "pagamento_fabrica":                ("2.1.04.06", "1.1.01"),
+    # "pagamento_fabrica" removido do dict (LP-11, 15/09/2026, DECIDIDO): nunca disparava fora
+    # de teste — efetivar_provisao (o "Efetivar" genérico) já cobre o caso, com as duas pernas
+    # certas. Ver test_fluxo_completo_balanco_fecha_e_dre, abaixo, atualizado pra usá-lo.
 }
 
 
@@ -106,7 +108,8 @@ def test_fluxo_completo_balanco_fecha_e_dre(app_db):
     mc.faturar_segmento(db, ot, oid, "P", "servico", 35000.0, ref_base="fat:NFSE-P-1")
     mc.reconhecer_despesa_efetivacao(db, ot, oid, "P", "2.1.04.06", 40000.0, ref="ef:P")
     mc.registrar_evento(db, ot, oid, "recebimento_venda", 100000.0, projeto_id="P", ref="rcb:P:1")
-    mc.registrar_evento(db, ot, oid, "pagamento_fabrica", 40000.0, projeto_id="P", ref="pgf:P:1")
+    mc.efetivar_provisao(db, ot, oid, "P", "2.1.04.06", 40000.0, ref="pgf:P:1",
+                         forma_pagamento="direto")
     assert mc.balanco(db, ot, oid)["confere"] is True
     assert _saldo(db, ot, oid, "1.1.01") == 60000.0       # 100k recebido − 40k fábrica
     assert _saldo(db, ot, oid, "1.1.02") == 0.0           # Contas a Receber quitado

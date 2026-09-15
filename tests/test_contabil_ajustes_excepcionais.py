@@ -104,8 +104,12 @@ def test_exemplo_loja3_ciclo_completo_sem_sobra_falta(http_client_factory, seed,
 
     mc.reconhecer_despesa_efetivacao(db, ot, oid, nome, "2.1.04.06", 104500.0, ref="ef:" + nome)
     assert _s(db, ot, oid, "5.1.01") == 104500.0
-    mc.registrar_evento(db, ot, oid, "pagamento_fabrica", 104500.0, projeto_id=nome,
-                        ref="pag:" + nome)
+    # LP-11 (15/09/2026, DECIDIDO — REMOVER): o evento "pagamento_fabrica" nunca disparava fora
+    # de teste e fazia só a perna da provisão — efetivar_provisao (o "Efetivar" genérico) já
+    # cobre o mesmo caso com as duas pernas certas; mesmo débito/crédito (2.1.04.06 × 1.1.01)
+    # que o evento morto tinha, via forma_pagamento="direto".
+    mc.efetivar_provisao(db, ot, oid, nome, "2.1.04.06", 104500.0, ref="pag:" + nome,
+                         forma_pagamento="direto")
     out = mc.conciliar_final(db, ot, oid, nome, ref_base="cf:" + nome, vereditos={})
     assert "2.1.04.06" not in out, out
     assert _s(db, ot, oid, "2.1.04.06") == 0.0

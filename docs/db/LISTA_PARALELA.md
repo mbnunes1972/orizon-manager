@@ -43,11 +43,11 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | ↳ 6.4 (Montagem como domínio) | 1 | Ainda não construída — fora do escopo desta Semana 2. |
 | ↳ 6.7 (Captação como domínio, nova) | 1 | Ainda não construída — pós-1.0; o `Lead` provisório (`PLANO_SEMANA_1.md`) segura a demanda até lá. |
 | ↳ 6.8 (extração do JS de index.html, nova) | 1 | Ainda não construída — os ratchets de linha/contagem sobre `static/index.html` precisam ser repensados quando a Semana 2 chegar lá. |
-| **HIGIENE** | 4 | Lote único, quando alguém tiver uma tarde livre. |
+| **HIGIENE** | 3 | LP-11 implementado em 15/09 — sai da contagem, fica como registro. Lote único, quando alguém tiver uma tarde livre. |
 | **DECIDIDO — fila da 1.0** | 3 | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. |
 | **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **25** | 26 da rodada anterior, menos LP-02 (implementado em 15/09 — sai da contagem de aberto, fica como registro no lugar). |
+| **Total aberto** | **24** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar). |
 
 ---
 
@@ -374,8 +374,18 @@ do Arquiteto', ...]`) é uma cópia manual de `mod_retido.MOTIVOS_RETENCAO` — 
 (que já divergiu uma vez, achado da Vera em 26/08) — uma segunda instância confirmada do mesmo
 hábito. (Achado do `MAPA_MODULOS.md`, § 3.7, 15/09.)
 
-**LP-11 · Dois lançamentos financeiros automáticos que nunca ligam — decidido em 15/09: REMOVER.**
+**LP-11 · Dois lançamentos financeiros automáticos que nunca ligam — decidido em 15/09: REMOVER.
+REMOVIDO em 15/09.**
 *Destino: HIGIENE — é limpeza de código morto, não decisão de arquitetura nem de produto.*
+
+**Implementado:** `execucao_montagem` e `pagamento_fabrica` saíram de `mod_contabil.EVENTOS`.
+Os três chamadores que só existiam em teste (`test_eventos.py`, `test_fase_b2_eventos.py`,
+`test_contabil_ajustes_excepcionais.py`) passaram a usar `efetivar_provisao(...,
+forma_pagamento="direto")` — o mesmo débito/crédito que os eventos mortos tinham
+(`2.1.04.02`/`2.1.04.06` × `1.1.01`), agora pelo caminho que já lança as duas pernas certas.
+`test_eventos_mortos_removidos_por_decisao` (já existia, mesmo padrão do ACHADO-04/05) ganhou os
+dois novos `assert ... not in mc.EVENTOS`. Suíte contábil/folha/provisão (80+41 testes) sem
+regressão.
 
 **A regra:** os eventos `execucao_montagem` e `pagamento_fabrica` saem da tabela `EVENTOS`. O
 "Efetivar" genérico (restaurado pelo item 6 do ACHADO-33) já cobre os dois casos com a

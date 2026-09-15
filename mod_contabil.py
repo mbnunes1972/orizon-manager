@@ -1478,7 +1478,10 @@ EVENTOS = {
     # mod_folha.py:6-13). A conta 2.1.04.01 fica no catálogo (PLANO_PADRAO), pelo mesmo motivo do
     # 2.1.05 acima.
     # Execução — reverte a provisão respectiva: Provisão (2.1.04.x) × Caixa/Fornecedor
-    "execucao_montagem":            ("2.1.04.02", "1.1.01",  "Execução da montagem (baixa da provisão)"),
+    # "execucao_montagem" (2.1.04.02×1.1.01) removido (LP-11, 15/09/2026, DECIDIDO): nunca
+    # disparava fora de teste, e faria só a perna da provisão se ligado como estava — o
+    # "Efetivar" genérico (`efetivar_provisao`, restaurado pelo item 6 do ACHADO-33) já cobre o
+    # caso com as duas pernas certas.
     "execucao_assistencia":         ("2.1.04.05", "1.1.01",  "Execução de assistência técnica (baixa da provisão)"),
     "execucao_reparo_garantia":     ("2.1.04.03", "1.1.01",  "Execução de reparo em garantia (baixa da provisão)"),
     # Caso de Assistência — tipo de custo Paga: nova venda ao cliente, sem tocar provisão (v7 §6)
@@ -1508,8 +1511,10 @@ EVENTOS = {
     # FASE D2: o CMV da fábrica deixou de ser um evento próprio no faturamento (faturamento_cmv, retirado).
     # Agora o passivo 2.1.04.06 nasce no CONTRATO (fechamento_venda_custo_fabrica) e o CMV é reconhecido na
     # NF-e via matching pleno (reconhecimento_despesa_custo_fabrica: 5.1.01 × baixa do ativo 1.1.06.06).
-    # Baixa do passivo com a fábrica ao pagar: passivo × ativo, não toca o resultado.
-    "pagamento_fabrica":            ("2.1.04.06", "1.1.01", "Pagamento à fábrica (baixa da Provisão de Custo de Fábrica)"),
+    # "pagamento_fabrica" (2.1.04.06×1.1.01, baixa do passivo ao pagar) removido (LP-11,
+    # 15/09/2026, DECIDIDO): nunca disparava fora de teste, e faria só a perna da provisão se
+    # ligado como estava. `efetivar_provisao(..., forma_pagamento="direto")` já cobre o mesmo
+    # débito/crédito, com as duas pernas certas.
     # ── Ajustes Excepcionais de Fábrica (spec 2026-07-21) ─────────────────────────────────────
     # Implantação de saldos: eventos PASSADOS entram pelo PL (CPC 23), nunca pela DRE corrente.
     "implantacao_credito_fabrica":  ("1.1.08", "3.5",       "Implantação de crédito com a fábrica (ajuste de exercícios anteriores)"),
