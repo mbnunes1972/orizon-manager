@@ -171,6 +171,50 @@ def test_set_etapa_status_dispara_comissao(seed, app_db):
     db.close()
 
 
+def test_patch_generico_conclui_etapa_17_e_dispara_comissao(http_client_factory, seed, app_db):
+    """MAPA_MODULOS.md § 2.8 (achado 14/09/2026): a rota PATCH /ciclo/<codigo> reimplementava a
+    conclusão inline, sem passar por `_set_etapa_status` — a 17 (Montagem) é a ÚNICA etapa com
+    papel de comissão sem rota dedicada própria, então concluí-la pelo fluxo REAL da UI nunca
+    disparava `preparar_comissao_etapa`. `test_set_etapa_status_dispara_comissao` (acima) só prova
+    que a função interna funciona — nunca exercitou o endpoint de verdade, por isso o bug passou
+    despercebido. Este teste conclui pelo PATCH genérico, não pela função direto."""
+    db = app_db.get_session()
+    loja = seed["loja1_id"]
+    fn = app_db.Funcao(loja_id=loja, nome="Montador PATCH", usa_comissao_vendas=0,
+                       comissao_json=json.dumps({"por_meta": False, "pct": 2.0}), status="ativo")
+    db.add(fn); db.flush()
+    f = app_db.Funcionario(loja_id=loja, nome="Mnt PATCH", funcao_id=fn.id, status="ativo")
+    db.add(f); db.flush()
+    db.add(app_db.Projeto(nome_safe="PPatch17", loja_id=loja, status="fechado"))
+    p = app_db.PoolAmbiente(projeto_id="PPatch17", nome="a", nome_exibicao="Sala",
+                            xml_path="x", ambientes_json="[]", order_total=2000.0, budget_total=5000.0)
+    db.add(p); db.flush()
+    orc = app_db.Orcamento(projeto_id="PPatch17", nome="O", ordem=1, loja_id=loja)
+    db.add(orc); db.flush()
+    db.add(app_db.OrcamentoAmbiente(orcamento_id=orc.id, pool_ambiente_id=p.id))
+    db.add(app_db.AtribuicaoAmbiente(loja_id=loja, projeto_nome="PPatch17", papel="montagem",
+                                     funcionario_id=f.id, pool_ambiente_id=None))
+    db.add(app_db.CicloEtapa(projeto_nome="PPatch17", etapa_codigo="16", status="concluido"))
+    db.add(app_db.CicloEtapa(projeto_nome="PPatch17", etapa_codigo="17", status="em_andamento",
+                             funcao_responsavel_id=fn.id, responsavel_funcionario_id=f.id))
+    db.commit()
+    db.close()
+
+    c = http_client_factory()
+    st, b = c.login("dir_l1", "senha123")
+    assert st == 200 and b["ok"], b
+    st, b = c.patch("/api/projetos/PPatch17/ciclo/17", {"status": "concluido"})
+    assert st == 200 and b["ok"], b
+
+    db = app_db.get_session()
+    etapa = db.query(app_db.CicloEtapa).filter_by(projeto_nome="PPatch17", etapa_codigo="17").first()
+    assert etapa.status == "concluido"
+    item = db.query(app_db.ComissaoFolha).filter_by(projeto_nome="PPatch17", etapa_codigo="17").first()
+    assert item is not None, "comissão não foi preparada — PATCH genérico voltou a ignorar _set_etapa_status"
+    assert item.valor == 100.0   # 5000 × 2%
+    db.close()
+
+
 def test_gerar_folha_soma_itens_de_comissao(seed, app_db):
     import mod_folha, mod_provisoes
     db = app_db.get_session()

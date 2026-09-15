@@ -17806,14 +17806,20 @@ class Handler(BaseHTTPRequestHandler):
                                     "faltam": _faltam}, code=400)
                                 return
                     if novo_status:
-                        import mod_contabil
-                        _agora_pge = mod_contabil.agora_no_fuso(db, "loja", loja_id)   # ACHADO-48
-                        if etapa.status == "pendente" and novo_status != "pendente":
-                            etapa.iniciado_em = _agora_pge
-                        etapa.status = novo_status
-                        if novo_status in mod_ciclo.STATUS_CONCLUSIVOS:
-                            etapa.concluido_em  = _agora_pge
-                            etapa.responsavel_id = aprovador.id if aprovador else usuario["id"]
+                        # ACHADO (MAPA_MODULOS.md § 2.8, 14/09/2026): esta rota reimplementava a
+                        # escrita de conclusão inline — era a ÚNICA etapa com papel de comissão
+                        # (mod_comissao.PAPEL_POR_ETAPA: 10/11-família/17) sem rota dedicada
+                        # própria (10 vai pro fluxo de Medição, a família 11 pro
+                        # /ciclo/<codigo>/concluir), então a 17 (Montagem) concluía pela rota
+                        # genérica SEM NUNCA disparar mod_comissao.preparar_comissao_etapa — o
+                        # montador executava e a comissão não nascia, em silêncio. Delegar pra
+                        # _set_etapa_status (mesma função usada pelas rotas dedicadas) fecha o
+                        # buraco sem duplicar a lógica de novo — todos os gates acima (sequência,
+                        # bloqueador, retenção, aprovação financeira, PE/AF2 etc.) continuam
+                        # rodando antes, inalterados; só o EFEITO final passa a ser o mesmo das
+                        # outras rotas.
+                        etapa = _set_etapa_status(db, nome_safe, etapa_cod, novo_status,
+                                                  aprovador.id if aprovador else usuario["id"])
                     if obs is not None:
                         etapa.observacoes = obs
                     if aprovador is not None:
@@ -18369,27 +18375,6 @@ def _briefing_locked(cliente_id: int, briefing_completo: bool, db) -> bool:
         if etapa4:
             return True
     return False
-
-
-def _marcar_etapa_cliente(cliente_id: int, etapa_codigo: str, db, usuario):
-    """Marca uma etapa do ciclo como concluída em todos os projetos vinculados ao cliente."""
-    import mod_contabil
-    projetos = db.query(Projeto).filter_by(cliente_id=cliente_id).all()
-    uid = usuario["id"] if usuario else None
-    for p in projetos:
-        etapa = db.query(CicloEtapa).filter_by(
-            projeto_nome=p.nome_safe, etapa_codigo=etapa_codigo
-        ).first()
-        if not etapa:
-            etapa = CicloEtapa(projeto_nome=p.nome_safe, etapa_codigo=etapa_codigo)
-            db.add(etapa)
-        if etapa.status != "concluido":
-            # ACHADO-48 (02/09): cada projeto pode ser de uma loja diferente — fuso resolvido
-            # POR PROJETO, nunca um "agora" único compartilhado entre lojas.
-            etapa.status         = "concluido"
-            etapa.concluido_em   = mod_contabil.agora_no_fuso(db, "loja", p.loja_id)
-            etapa.responsavel_id = uid
-    db.commit()
 
 
 def _projeto_esta_bloqueado(nome_safe) -> bool:
