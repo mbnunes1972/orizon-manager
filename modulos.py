@@ -57,7 +57,11 @@ MODULOS = {
                     "rotas": []},
     # ── DOMÍNIOS ───────────────────────────────────────────────────────────
     "captacao":    {"camada": "dominio", "depende_de": [], "rotulo": "Captação", "faixa": "vendas",
-                    "arquivos": [], "tabelas": [], "rotas": []},
+                    # Captação provisória (14/09/2026, PLANO_SEMANA_1.md): `Lead` nasceu SEM
+                    # arquivo próprio — rotas em main.py, helper de conversa em chat/core.py
+                    # (nenhum dos dois é "dono" exclusivo do domínio). NÃO é o módulo definitivo
+                    # (ver LISTA_PARALELA.md § FRONTEIRA / 6.7) — por isso `arquivos` segue vazio.
+                    "arquivos": [], "tabelas": ["leads"], "rotas": ["/api/leads"]},
     "cadastro":    {"camada": "dominio", "depende_de": [], "rotulo": "Cadastro", "faixa": "vendas",
                     "arquivos": ["validacao_doc.py", "mod_cadastro.py"],
                     "tabelas": ["clientes", "parceiros", "funcionarios", "fornecedores", "terceiros", "funcoes"],

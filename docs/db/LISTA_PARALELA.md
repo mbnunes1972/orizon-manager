@@ -32,16 +32,17 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | Destino | Itens | Observação |
 |---|---|---|
 | **BETA** | 0 | Nenhum item aberto aqui hoje quebra dinheiro ou trava loja — o que é urgente já está na fila ativa, não nesta lista. |
-| **FRONTEIRA** | 8 | Agrupados por fronteira — ver detalhamento abaixo. |
+| **FRONTEIRA** | 9 | Agrupados por fronteira — ver detalhamento abaixo. |
 | ↳ 6.1 (regra única de transição) | 2 | Ainda não construída — Marcelo quer desenhar com calma. |
 | ↳ 6.2 (Tela Única de Provisões) | 3 | **Em construção nesta Semana 2** — `docs/db/TAREFA_TELA_UNICA_PROVISOES.md`. |
 | ↳ 6.3 (Estoque como domínio) | 1 | Ainda não construída — fora do escopo desta Semana 2. |
 | ↳ 6.4 (Montagem como domínio) | 1 | Ainda não construída — fora do escopo desta Semana 2. |
 | ↳ 6.7 (Captação como domínio, nova) | 1 | Ainda não construída — pós-1.0; o `Lead` provisório (`PLANO_SEMANA_1.md`) segura a demanda até lá. |
+| ↳ 6.8 (extração do JS de index.html, nova) | 1 | Ainda não construída — os ratchets de linha/contagem sobre `static/index.html` precisam ser repensados quando a Semana 2 chegar lá. |
 | **HIGIENE** | 3 | Lote único, quando alguém tiver uma tarde livre. |
 | **PRODUTO** | 8 | Esperando decisão do Marcelo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **27** | 22 da lista original (após fechar LP-17 e mover LP-20 para "Fechados") + 4 candidatos novos do `MAPA_MODULOS.md` + LP-29 (Captação, `Lead` provisório). |
+| **Total aberto** | **28** | 22 da lista original (após fechar LP-17 e mover LP-20 para "Fechados") + 4 candidatos novos do `MAPA_MODULOS.md` + LP-29 (Captação) + LP-30 (ratchets de linha vs. Semana 2). |
 
 ---
 
@@ -245,12 +246,41 @@ comercial parada — hoje um contato comercial só virava registro no sistema qu
 promovido a `Cliente`, sem estágio de qualificação antes disso — mas nasceu deliberadamente
 simples: núcleo fixo de campos + `dados_json`/`template` para o que varia por formulário de
 captação, sem fila, sem funil, sem atribuição automática, sem os relatórios que uma Captação de
-verdade exigiria.* Consumidor previsto (commit separado, ainda não feito nesta rodada):
-`chat/triagem.py::triagem_materializar` passa a criar `Lead` em vez de `Cliente` para contato
-inbound não identificado — reversão deliberada da "decisão 12" original (contato inbound virava
-`Cliente` direto, sem estágio de qualificação), datada e justificada no commit que a fizer. Esse
-será o primeiro consumidor real deste módulo provisório, e um segundo lugar que a Captação
-definitiva precisará revisitar.
+verdade exigiria.* Consumidor real (14/09/2026, commit separado do nascimento do `Lead`):
+`chat/triagem.py::triagem_materializar` passou a criar `Lead` em vez de `Cliente` para contato
+inbound sem match — reversão deliberada da "decisão 12" original (contato inbound sem match virava
+`Cliente` direto, sem estágio de qualificação; motivo: leads de Google/Instagram/Facebook chegam
+por WhatsApp e a triagem os promovia a Cliente antes de qualquer briefing). Este é o primeiro
+consumidor real do módulo provisório, e um segundo lugar que a Captação definitiva precisará
+revisitar.
+
+---
+
+### 6.8 — Extração do JS de `static/index.html` (Semana 2) — ainda não construída, 1 item
+
+Não corresponde a nenhuma das seis fronteiras do `MAPA_MODULOS.md` § 6 (mesma situação da 6.7,
+acima) — mas o próprio mapa já cita a extração de JS como plano real da Semana 2 (§ 4, linha sobre
+"ordem de extração de arquivos JS"), não uma ideia solta.
+
+**LP-30 · Testes que travam contagem/faixa de LINHA ABSOLUTA de `static/index.html` quebram por
+inteiro quando o JS sair do arquivo — não é um ratchet a reajustar, é um ratchet que perde o
+sentido.**
+*Destino: FRONTEIRA / 6.8 (nova) — a causa é estrutural: `static/index.html` hoje é HTML+CSS+JS
+num arquivo só (ADR-003, 26.551 linhas), então "linha 14754 até 16799" e "conte quantos
+`showToast(..., true)` tem no arquivo" são proxies válidos SÓ enquanto o arquivo continuar
+monolítico.* Achado ao consertar `tests/test_aceite_achado36.py` (14/09/2026, PLANO_SEMANA_1.md):
+inserir a entidade `Lead` deslocou `FAIXA_INICIO`/`FAIXA_FIM` (constantes hardcoded, "linha X até
+linha Y") em +99 linhas, quebrando os dois testes de aceite do ACHADO-36 sem NENHUMA mudança na
+lógica que eles supostamente guardam — o teste mediu a inserção de código, não uma regressão real.
+Ajustei o range desta vez (medindo o deslocamento por âncora, não de cabeça) porque ainda faz
+sentido hoje; **na Semana 2, quando o JS for extraído para arquivo(s) próprio(s), esse tipo de
+teste para de fazer sentido NENHUM** — não existirá mais "a linha 14754 do index.html" pra
+apontar, e mesmo se existisse, um arquivo cada vez mais vazio não é mais o universo que o teste
+pretendia cobrir ("nenhum `showToast(erro)` sobra no módulo financeiro"). *O que precisa acontecer
+na Semana 2, não antes:* re-desenhar esses testes para apontarem para o(s) arquivo(s) JS que
+herdarem o código financeiro/provisões (por nome de arquivo ou de função, não por número de linha)
+— repensar, não só reajustar mais uma vez. Registrado agora, achado incidental durante o conserto
+de uma regressão, não investigado a fundo (fora do escopo desta rodada).
 
 ---
 

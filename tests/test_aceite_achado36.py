@@ -21,7 +21,11 @@ INDEX_HTML = os.path.join(REPO, "static", "index.html")
 
 # Faixa do módulo financeiro/provisões levantada para o B2 (funções recon*/filaProv*/efetivar*/
 # resolver*/folha*/contasPagar*/pagarFornecedor*/provisao*/lancamento*/rateio*/periodo*).
-FAIXA_INICIO, FAIXA_FIM = 14655, 16700
+# Range absoluto — desloca com qualquer inserção ACIMA dele. Reajustado em 14/09/2026 (+99
+# linhas: entidade Lead/Captação provisória, PLANO_SEMANA_1.md, inserida antes deste trecho) —
+# deslocamento medido via `git show HEAD~1:static/index.html`, comparando a linha de uma âncora
+# estável nas duas pontas do range antes/depois do commit, não estimado de cabeça.
+FAIXA_INICIO, FAIXA_FIM = 14754, 16799
 
 
 def _texto_do_modulo():
@@ -48,11 +52,13 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
     etapa/PE/Medição, ver `FAIXAS_CICLO` abaixo); 133 seguiam no resto do sistema — higiene, fica
     pra depois; +2 novos no F2-35 (ACHADO-65, 07/09): `mpSalvarOutForn` (falha de rede/servidor
     do PUT out-forn) e `abrirItemEspecial` (valor inválido digitado na caixa) — sites NOVOS, não
-    conversão de nenhum toast existente, então o total sobe pra 135."""
+    conversão de nenhum toast existente, então o total sobe pra 135; +8 novos na Captação
+    provisória (14/09/2026, PLANO_SEMANA_1.md — entidade `Lead`): `leadSalvar`, `leadConverterConfirmar`
+    e `abrirConversaLead`, tela nova sem toast anterior pra converter — total sobe pra 143."""
     with open(INDEX_HTML, encoding="utf-8") as f:
         conteudo = f.read()
     total = len(re.findall(r"showToast\([^;]*,\s*true\)", conteudo))
-    assert total == 135, "a contagem mudou — reveja o número reportado (%d)" % total
+    assert total == 143, "a contagem mudou — reveja o número reportado (%d)" % total
 
 
 # ── F2-23 (04/09) — faixa do ciclo (Projeto/Transferência de etapa/PE/Medição) ───────────────────
