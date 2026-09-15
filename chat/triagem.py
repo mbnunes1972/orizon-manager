@@ -9,7 +9,7 @@ distribuir — SAC transfere pra quem deve atender, e a transferência resolve."
 import json
 from datetime import datetime, timedelta
 
-from database import EnvioExterno, Cliente, Conversa, Funcionario, TriagemEntrada
+from database import EnvioExterno, Conversa, Funcionario, Lead, TriagemEntrada
 
 from .externo import (_canal_do_thread, _cliente_por_telefone, _cliente_por_email,
                       registrar_envio)  # noqa: F401  (canal do fio externo)
@@ -72,30 +72,46 @@ def _sac_usuario_id(db, loja_id):
 
 
 def triagem_materializar(db, entrada, segmento):
-    """Resolução ÚNICA e sempre automática: cria o Cliente (se o telefone/e-mail não bate com
-    nenhum já cadastrado — decisão 12, contato vira cadastro) + uma conversa de grupo com o
-    SAC como responsável inicial + o contato como participante externo. `segmento` é o
-    escolhido pelo cliente no menu (já validado em interpretar_resposta_triagem) OU
-    SEGMENTO_TRIAGEM quando ninguém respondeu a tempo. Nome do lead: cadastro > perfil do
-    WhatsApp (Meta) > o próprio remetente, nessa ordem (pedido 2026-08-05). Não commita."""
+    """Resolução ÚNICA e sempre automática: se o telefone/e-mail bate com um Cliente já
+    cadastrado, a conversa segue para ele normalmente. Contato NOVO cria um `Lead` (Captação
+    provisória) — NUNCA mais um `Cliente` direto. + uma conversa de grupo, ancorada nesse Lead
+    (`conv.lead_id`), com o SAC como responsável inicial + o contato como participante externo.
+    `segmento` é o escolhido pelo cliente no menu (já validado em interpretar_resposta_triagem)
+    OU SEGMENTO_TRIAGEM quando ninguém respondeu a tempo. Nome do lead: cadastro > perfil do
+    WhatsApp (Meta) > o próprio remetente, nessa ordem (pedido 2026-08-05). Não commita.
+
+    REVERSÃO DA "DECISÃO 12" (14/09/2026, PLANO_SEMANA_1.md — reversão deliberada, registrada
+    com data e motivo por pedido do Marcelo): a decisão original ("contato vira cadastro") fazia
+    todo contato inbound sem match virar `Cliente` direto, sem estágio de qualificação. Na
+    prática, os leads de Google/Instagram/Facebook chegam por WhatsApp e a triagem os promovia a
+    Cliente antes de qualquer briefing — o motivo de existir do `Lead` (Captação provisória,
+    commit anterior) evaporava se o principal ponto de entrada continuasse criando Cliente direto.
+    Dedup de contato repetido não muda: `_rotear_com_candidatos` (chat/externo.py) já resolve
+    mensagens subsequentes do mesmo número/e-mail pela conversa existente (via
+    ConversaParticipanteExterno), independente de ela estar ancorada em Cliente ou em Lead — este
+    caminho só roda na PRIMEIRA mensagem de um contato sem conversa nenhuma."""
     if entrada.status != "pendente":
         raise ValueError("Esta entrada já foi resolvida.")
     from . import core as _mc
     cli = (_cliente_por_telefone(db, entrada.remetente) if entrada.meio == "whatsapp"
            else _cliente_por_email(db, entrada.remetente))
     nome = (cli.nome if cli else None) or entrada.nome_whatsapp or entrada.remetente
-    if cli is None:
-        cli = Cliente(nome=nome, loja_id=entrada.loja_id,
-                      whatsapp=(entrada.remetente if entrada.meio == "whatsapp" else None),
-                      email=(entrada.remetente if entrada.meio == "email" else None))
-        db.add(cli); db.flush()
     sac_uid = _sac_usuario_id(db, entrada.loja_id)
+    lead = None
+    if cli is None:
+        lead = Lead(nome=nome, loja_id=entrada.loja_id, canal=entrada.meio,
+                   whatsapp=(entrada.remetente if entrada.meio == "whatsapp" else None),
+                   email=(entrada.remetente if entrada.meio == "email" else None),
+                   responsavel_usuario_id=sac_uid)
+        db.add(lead); db.flush()
     if sac_uid:
         conv = _mc.criar_grupo(db, entrada.loja_id, sac_uid, "Lead — %s" % nome, [sac_uid],
                                exige_dois=False)
     else:
         conv = Conversa(loja_id=entrada.loja_id, tipo="grupo", titulo="Lead — %s" % nome)
         db.add(conv); db.flush()
+    if lead is not None:
+        conv.lead_id = lead.id
     _mc.adicionar_externo(db, conv, nome,
                           telefone=(entrada.remetente if entrada.meio == "whatsapp" else None),
                           email=(entrada.remetente if entrada.meio == "email" else None),

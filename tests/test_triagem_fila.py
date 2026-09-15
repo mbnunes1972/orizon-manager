@@ -219,9 +219,18 @@ def test_segmento_reconhecido_materializa_com_sac_responsavel(app_db, seed):
     assert conv.segmento == "comercial"
     assert conv.responsavel_usuario_id == sac.usuario_id
     assert conv.origem_entrada == "triagem"
+    # Reversão da "decisão 12" (14/09/2026, PLANO_SEMANA_1.md): contato sem match vira Lead
+    # (Captação provisória), NUNCA mais Cliente direto — motivo: leads de Google/Instagram/
+    # Facebook chegam por WhatsApp e estavam sendo promovidos a Cliente sem qualificação.
     cli = db.query(app_db.Cliente).filter_by(loja_id=seed["loja1_id"]).filter(
         app_db.Cliente.whatsapp.contains("955550001")).first()
-    assert cli is not None                            # lead virou Cliente (decisão 12)
+    assert cli is None
+    lead = db.query(app_db.Lead).filter_by(loja_id=seed["loja1_id"]).filter(
+        app_db.Lead.whatsapp.contains("955550001")).first()
+    assert lead is not None
+    assert lead.canal == "whatsapp"
+    assert lead.responsavel_usuario_id == sac.usuario_id
+    assert conv.lead_id == lead.id
     ext_part = (db.query(app_db.ConversaParticipanteExterno)
                   .filter_by(conversa_id=conv.id).first())
     assert ext_part is not None                        # contato espelha por WhatsApp
