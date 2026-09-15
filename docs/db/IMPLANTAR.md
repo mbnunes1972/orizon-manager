@@ -354,6 +354,59 @@ regressão deste procedimento, não intenção.
 - Renovação do certificado é automática (`certbot` instala o próprio timer/cron) — conferir uma
   vez com `certbot renew --dry-run` depois do primeiro `certbot --nginx` de cada subdomínio.
 
+## Backup externo — pré-requisito antes de tráfego real de Captação/Chat
+
+Escrito em 14/09/2026 (script), reclassificado em 15/09/2026: **pré-requisito para ir ao ar com
+lead/cliente real, não pendência de fundo de fila.** `scripts/backup_externo.sh` já existe e já
+foi commitado — o que faltava era isto aqui: um passo NOMEADO no runbook, não um script solto
+que só quem já sabia que ele existe lembra de rodar. O motivo da promoção: até o Lead nascer
+(Captação provisória, mesmo commit), o pior caso de perda do backup local era perder cadastro e
+histórico financeiro — grave, mas recuperável de outra fonte (contrato assinado, nota fiscal). A
+partir de agora o banco local também é o único lugar onde vive a CONVERSA do WhatsApp de um lead
+— sem backup fora da VPS, um disco morto apaga a única cópia do histórico de conversa com um
+cliente em potencial, sem chance de reconstrução por fora.
+
+O script **não faz dump nenhum** — sincroniza pro Backblaze B2 os dumps que o cron local já
+produz (`/root/backup_orizon.sh`, `DEV_RULES.md`). Falha em voz alta (`set -euo pipefail`) e
+confirma cada arquivo no bucket antes de considerar sucesso — nunca sai "verde" achando que
+funcionou.
+
+### Configuração (uma vez, antes do primeiro lead real)
+
+1. No painel do Backblaze B2: bucket **privado** dedicado (ex.: `orizon-backups-producao`) e uma
+   Application Key restrita a ESSE bucket só — nunca a chave mestra da conta.
+2. `apt install -y rclone` (binário único — sem a fricção de pip/PEP668 do resto da VPS).
+3. `/root/orizon-backup.env`, modo 600 (mesma disciplina de `/root/orizon-A.env`):
+   ```
+   ORIZON_BACKUP_B2_KEY_ID=<id da application key>
+   ORIZON_BACKUP_B2_APP_KEY=<a application key>
+   ORIZON_BACKUP_B2_BUCKET=orizon-backups-producao
+   # opcionais, com default sensato se omitidos:
+   # ORIZON_BACKUP_DIR_LOCAL=/root/backups
+   # ORIZON_BACKUP_PADRAO=*.sql.gz
+   # ORIZON_BACKUP_RETENCAO_DIAS=30
+   ```
+   `chmod 600 /root/orizon-backup.env`
+4. Cron, alguns minutos depois do backup local (que roda às 3h):
+   ```
+   15 3 * * * bash /root/orizon-manager/scripts/backup_externo.sh >> /root/backups/externo.log 2>&1
+   ```
+
+### Prova antes de confiar no cron
+
+```bash
+bash /root/orizon-manager/scripts/backup_externo.sh
+```
+Confira no painel do B2 que o(s) arquivo(s) apareceram, e rode de novo — a segunda vez não deve
+reenviar nada (`rclone copy` só manda o que é novo/mudou). Sem essa prova manual rodada pelo
+menos uma vez, o cron pode estar silenciosamente quebrado (env file errado, bucket errado,
+credencial sem permissão) até o dia em que o backup local falhar também e não sobrar nenhuma
+cópia — o pior momento possível para descobrir.
+
+**Gate**: não habilitar tráfego de loja-piloto (WhatsApp real de lead, Captação em produção) sem
+essa prova manual já feita nesta rodada de deploy. Mesma lógica da exposição segura acima —
+registrado aqui pra não virar "assumi que já tava configurado".
+
 ## Producao — reconstruida (rebuild de schema resolvido, ver `## Executado`)
 Esta secao descrevia o rebuild de schema, ainda nao feito quando foi
 escrita. Ja aconteceu (ver `## Executado`) e a pergunta do usuario admin
