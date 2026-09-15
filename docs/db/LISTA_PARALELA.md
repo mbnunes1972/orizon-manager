@@ -5,16 +5,20 @@ de "duas filas" desta lista (criada em 31/08) por um sistema de **destino**: tod
 recebe exatamente um dos cinco valores abaixo, e é isso que faz a lista parar de crescer sem
 controle — cada destino diz claramente quando e como o item sai daqui.
 
-## Os cinco destinos
+## Os seis destinos
 
 - **BETA** — quebra dinheiro ou impede uma loja de operar. Conserto individual, na semana em que
   for encontrado.
 - **FRONTEIRA** — tem causa estrutural (`docs/db/MAPA_MODULOS.md`, Seção 5). Não se conserta
   sozinho: morre quando a fronteira correspondente (Seção 6 do mapa) for construída. Todo item
-  aqui aponta qual das seis fronteiras o mata.
+  aqui aponta qual fronteira o mata.
 - **HIGIENE** — nome, rótulo, elemento morto. Lote único, uma passada, sem decisão de arquitetura
   nem de produto envolvida.
-- **PRODUTO** — decisão do Marcelo, não defeito. Sai da fila quando ele decidir.
+- **DECIDIDO — fila da 1.0** — a decisão JÁ foi tomada; falta só implementar, e isso está agendado
+  para depois de 01/10/2026 de propósito (não cabe num ciclo de estabilização). Diferente de
+  PRODUTO (decisão pendente): aqui não há mais nada para o Marcelo decidir, só trabalho para
+  alguém fazer quando a janela abrir.
+- **PRODUTO** — decisão do Marcelo ainda pendente, não defeito. Sai da fila quando ele decidir.
 - **INFRA** — teste e infraestrutura. Congelados até depois da 1.0 (produção, 01/10/2026).
 
 **`ACHADOS_CONTABEIS.md` não é mais fila — é registro histórico.** O que está sendo corrigido
@@ -31,27 +35,44 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 
 | Destino | Itens | Observação |
 |---|---|---|
-| **BETA** | 0 | Nenhum item aberto aqui hoje quebra dinheiro ou trava loja — o que é urgente já está na fila ativa, não nesta lista. |
-| **FRONTEIRA** | 9 | Agrupados por fronteira — ver detalhamento abaixo. |
+| **BETA** | 1 | LP-02, decidido em 15/09 — pronto para a Sessão A implementar esta semana. |
+| **FRONTEIRA** | 10 | Agrupados por fronteira — ver detalhamento abaixo. |
 | ↳ 6.1 (regra única de transição) | 2 | Ainda não construída — Marcelo quer desenhar com calma. |
 | ↳ 6.2 (Tela Única de Provisões) | 3 | **Em construção nesta Semana 2** — `docs/db/TAREFA_TELA_UNICA_PROVISOES.md`. |
-| ↳ 6.3 (Estoque como domínio) | 1 | Ainda não construída — fora do escopo desta Semana 2. |
+| ↳ 6.3 (Estoque como domínio) | 2 | LP-15 + LP-18 (decidido em 15/09, medição confirmou que não é barato). Ainda não construída — fora do escopo desta Semana 2. |
 | ↳ 6.4 (Montagem como domínio) | 1 | Ainda não construída — fora do escopo desta Semana 2. |
 | ↳ 6.7 (Captação como domínio, nova) | 1 | Ainda não construída — pós-1.0; o `Lead` provisório (`PLANO_SEMANA_1.md`) segura a demanda até lá. |
 | ↳ 6.8 (extração do JS de index.html, nova) | 1 | Ainda não construída — os ratchets de linha/contagem sobre `static/index.html` precisam ser repensados quando a Semana 2 chegar lá. |
-| **HIGIENE** | 3 | Lote único, quando alguém tiver uma tarde livre. |
-| **PRODUTO** | 8 | Esperando decisão do Marcelo. |
+| **HIGIENE** | 4 | Lote único, quando alguém tiver uma tarde livre. |
+| **DECIDIDO — fila da 1.0** | 3 | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. |
+| **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **28** | 22 da lista original (após fechar LP-17 e mover LP-20 para "Fechados") + 4 candidatos novos do `MAPA_MODULOS.md` + LP-29 (Captação) + LP-30 (ratchets de linha vs. Semana 2). |
+| **Total aberto** | **26** | 28 da rodada anterior, menos LP-09 e LP-24 (decididos em 15/09, movidos para "Fechados" — recusa decidida, não achado). Os outros seis itens PRODUTO de 15/09 continuam contados, só redistribuídos: LP-02→BETA, LP-11→HIGIENE, LP-01/12/14→DECIDIDO, LP-18→FRONTEIRA/6.3. |
 
 ---
 
 ## BETA
 
-Nenhum item aberto. O que quebra dinheiro ou impede uma loja de operar está sendo corrigido na
-hora — o achado da comissão de Montagem (etapa 17 não preparando `preparar_comissao_etapa` pelo
-fluxo padrão do PATCH genérico, `docs/db/MAPA_MODULOS.md` § 2.8/Candidato 5) é o exemplo mais
-recente: entrou direto na correção da beta desta semana, nunca passou por aqui.
+**LP-02 · CPF de quem assina — decidido em 15/09: AVISAR, NÃO BLOQUEAR.**
+*Destino: BETA — decisão fechada, pronta para implementar esta semana.*
+
+**A regra, para quem ler isto sem contexto:** hoje o sistema confere só se o CPF digitado na
+assinatura é um CPF matematicamente válido — não se é o CPF da pessoa certa (o cliente daquele
+projeto, ou o gerente da loja). A partir de 15/09: quando o CPF digitado não bater com o do
+cliente cadastrado, a tela **avisa** e **exige confirmação do gerente** antes de deixar prosseguir.
+Não é bloqueio automático.
+
+**Por que não bloquear:** bloquear destrataria os dois casos legítimos mais comuns — procuração e
+cônjuge assinando em nome do titular — obrigando um fluxo de exceção só para eles. Avisar +
+confirmação do gerente resolve o problema real (alguém assinando sem que ninguém perceba) sem
+travar quem tem motivo legítimo para divergir.
+
+**O que a implementação precisa garantir** (para o registro ficar completo, não só o aviso):
+o sistema **grava quem autorizou a exceção** — login do gerente, quando, e para qual assinatura.
+Sem esse rastro, "avisar" vira "ignorar com um clique" e a regra perde o sentido.
+
+**Histórico:** o ACHADO-28 (validação de dígito) já está no beta2; isto é a camada de conferência
+contra o cadastro que ficou pendente dele, decidida agora.
 
 ---
 
@@ -151,7 +172,7 @@ desalinhados na mesma tela).
 
 ---
 
-### 6.3 — Estoque como domínio real — ainda não construída, 1 item
+### 6.3 — Estoque como domínio real — ainda não construída, 2 itens
 
 Fora do escopo desta Semana 2 (Marcelo: "as outras duas ficam para depois da 1.0").
 
@@ -181,6 +202,39 @@ ramo "com NF-e de origem". No ramo "Estoque" não há valor de fábrica para mul
 digita o PREÇO DE VENDA direto, e nenhum multiplicador se aplica. Isso não resolve a LP-15 —
 delimita onde ela vale, e impede o erro de leitura oposto (registrado porque foi cometido nesta
 conversa: ler o Estoque como o destino do markup, quando é o contrário).
+
+**LP-18 · Fases independentes, recebimento na Logística e entrada fiscal — decidido em 15/09: o
+desenho de tela fechou, a medição de custo confirma que fica na 6.3.**
+*Destino: FRONTEIRA / 6.3 — o Marcelo condicionou explicitamente ("a menos que a medição mostre
+que é barato"); a medição abaixo mostra que não é.*
+
+**O desenho de tela, fechado:** a divisão em fases abre trilhas que seguem aparecendo ao longo das
+etapas, cada uma com etiqueta indicando em que etapa está. No topo, uma tabela das fases com seus
+ambientes e sua etapa corrente; ao selecionar uma linha, abre abaixo o painel da etapa corrente
+daquela fase.
+
+**A medição pedida, feita em 15/09 — lendo `database.py`, não estimando de memória:**
+- **"Fase" já existe como conceito maduro, não é preciso inventar.** `ParcelaProjeto` (tabela
+  `parcela_projeto`) já é "grupo de ambientes que percorre o ciclo de forma independente", em uso
+  desde a Fatia 2 (aprovação, retenção, cronograma). `ParcelaAmbiente` (`parcela_ambiente`) já é a
+  associação N:N fase↔ambiente, com o valor de contrato do ambiente já rateado e gravado
+  (`valor_ambiente`). **Não é preciso desenhar "fase = conjunto de ambientes" do zero — já existe e
+  já roda em produção.**
+- **`CicloLogistico` (Expedição/recebimento) já tem `parcela_id`** — a tabela já aceita operar por
+  fase (`NULL` = projeto inteiro, modo legado). Mas hoje é **uma linha agregada por fase** (um
+  status, uma data, uma NF-e) — não tem granularidade de item/ambiente dentro da fase. Sem isso,
+  não dá para "conferir volumes" (o que a nota diz × o que chegou item a item).
+- **`DocumentoFiscal` (a NF-e) NÃO tem `parcela_id` nem ligação a ambiente** — hoje é só por
+  projeto inteiro. Emitir nota por fase exige adicionar essa referência, do mesmo jeito que
+  `CicloLogistico` e `ConciliacaoPeFase` já fazem (há precedente direto: `ConciliacaoPeFase` já
+  liga `parcela_id` + `pool_ambiente_id` juntos, para a decisão de conciliação da AF2 — a mesma
+  forma que a Conferência de Volumes precisaria, só que para outro propósito).
+- **Conclusão da medição:** nem "de graça", nem "do zero". A CAMADA de fase já existe e é madura;
+  ligar `DocumentoFiscal` a ela é trabalho incremental (mesmo padrão já usado duas vezes no
+  sistema); a parte cara de verdade é a Conferência de Volumes item a item — não existe hoje
+  **nenhuma tabela** de itens/linhas recebidas para comparar contra a nota, nem em
+  `CicloLogistico` nem em `DocumentoFiscal`. É essa peça, não a estrutura de fase, que sustenta a
+  classificação como FRONTEIRA em vez de conserto pontual.
 
 ---
 
@@ -309,6 +363,18 @@ do Arquiteto', ...]`) é uma cópia manual de `mod_retido.MOTIVOS_RETENCAO` — 
 (que já divergiu uma vez, achado da Vera em 26/08) — uma segunda instância confirmada do mesmo
 hábito. (Achado do `MAPA_MODULOS.md`, § 3.7, 15/09.)
 
+**LP-11 · Dois lançamentos financeiros automáticos que nunca ligam — decidido em 15/09: REMOVER.**
+*Destino: HIGIENE — é limpeza de código morto, não decisão de arquitetura nem de produto.*
+
+**A regra:** os eventos `execucao_montagem` e `pagamento_fabrica` saem da tabela `EVENTOS`. O
+"Efetivar" genérico (restaurado pelo item 6 do ACHADO-33) já cobre os dois casos com a
+contabilização CORRETA (as duas pernas — despesa e caixa — não só uma). Manter os dois eventos
+mortos ao lado de um caminho que já funciona é risco sem benefício: algum dia alguém liga um dos
+dois sem saber que fazem só metade do lançamento certo, e o erro contábil que toda a auditoria
+tentou evitar volta pela porta dos fundos.
+*Decisão anterior (01/09, medição):* os dois só disparavam em teste, cada um faria um lançamento
+incompleto se ligado como estava — a decisão de 15/09 fecha o que ficou em aberto ali.
+
 **LP-28 · Rótulo interno de Montagem no manifesto ainda é `"Operacional"`.**
 *Destino: HIGIENE — rename simples num dicionário Python; nenhuma decisão de produto nem de
 arquitetura envolvida.*
@@ -324,141 +390,70 @@ acessar. Um admin configurando permissões hoje vê um checkbox rotulado "Operac
 
 ## PRODUTO
 
-Esperando decisão do Marcelo. Nenhum destes é defeito.
+**Nenhum item aberto.** Os oito itens que estavam aqui (LP-01, 02, 09, 11, 12, 14, 18, 24) foram
+todos decididos pelo Marcelo em 15/09 — ver `docs/db/DECISOES_PENDENTES.md` para o histórico da
+folha de decisão que levou a cada uma. Nenhum voltou pra PRODUTO: LP-02 → BETA; LP-11 → HIGIENE;
+LP-01, LP-12, LP-14 → DECIDIDO/fila da 1.0 (abaixo); LP-18 → FRONTEIRA/6.3; LP-09 e LP-24 → recusa
+decidida, foram para "Fechados".
 
-**LP-01 · Data acordada da medição.**
-*Destino: PRODUTO — precisa de decisão de desenho (substitui/corrige/complementa a previsão) antes
-de virar coluna/migration/tela.*
-`SolicitacaoMedicao` não tem campo de data; a única data é `Contrato.previsao_medicao`, que é
-previsão dada no fechamento da venda. O modal de "Solicitar Medição" deve capturar a **data
-acordada**, e ela entra no documento que o cliente assina. Decidir se substitui, corrige ou
-complementa a previsão — guardar as duas dá variância previsto × acordado.
-*Adiado:* é coluna nova, migration, tela e decisão de desenho — não cabe num ciclo de
-estabilização. (Marcelo, 31/08, clicando em Homologação.)
-*Pedido de novo em 02/09*, com dois requisitos que o item ainda não tinha: **uma data por fase**
-quando o projeto está desmembrado (liga no LP-12), e o registro **alterando a programação
-automática** que o cronograma padrão montou na assinatura — não é campo, é entrada que substitui
-previsão do sistema. Medir onde essa programação vive e quem mais a lê antes de escrever nela.
-Dois pedidos independentes do mesmo usuário: o adiamento estava certo, a necessidade está
-confirmada.
+---
 
-**LP-02 · CPF do signatário conferido contra o cadastro.**
-*Destino: PRODUTO — política de negócio, não bug.*
-O ACHADO-28 entra no beta2 só com validação de dígito. Conferir se o CPF **bate com a pessoa** que
-deveria assinar (o cliente do projeto, o gerente da loja) é guarda diferente e mais forte.
-*Adiado:* é política de negócio, decisão do Marcelo, e não travar o beta esperando por ela.
+## DECIDIDO — fila da 1.0
 
-**LP-09 · Alternativas de revisão de PE.**
-*Destino: PRODUTO — funcionalidade nova, Marcelo registrou insegurança sobre a escolha atual sem
-decidir mudá-la.*
-Hoje existe só painel de comparação. O cliente às vezes faz várias alternativas — inclusão,
-remoção, mudança de item — e aquilo vira uma negociação nova. O paralelo natural é o que já existe
-na venda: vários orçamentos, um vence.
-*Adiado:* funcionalidade grande, e o Marcelo registrou insegurança sobre a escolha atual sem ter
-decidido mudá-la. Não confundir com o ACHADO-21, que trata de revisão depois da assinatura e é
-defeito, não ausência.
+Decisão já tomada em 15/09; falta só implementar, de propósito depois de 01/10/2026 — não cabe num
+ciclo de estabilização, e ninguém precisa decidir mais nada aqui, só agendar.
 
-**LP-11 · `execucao_montagem`/`pagamento_fabrica` — ligar ou remover (ACHADO-33, item 7 de
-`TAREFA_CONCILIACAO_UI.md`).**
-*Destino: PRODUTO — decisão explícita pendente: ligar (com a perna de despesa corrigida) ou
-remover.*
-Medido em 01/09, sem mexer: os dois estão em `EVENTOS` e só são disparados por teste. Se ligados
-hoje, do jeito que estão definidos, cada um faria **um lançamento só** — provisão
-(2.1.04.02/2.1.04.06) × Caixa/Bancos (1.1.01), sem a perna de despesa formal que
-`efetivar_provisao` já faz (`reconhecer_despesa_efetivacao`, débito na despesa × crédito no ativo
-diferido). Ligar assim, sem essa perna, moveria dinheiro da provisão pro caixa sem NUNCA reconhecer
-a despesa real na DRE — o oposto do que a auditoria inteira defendeu. Gatilho natural, se ligados:
-`execucao_montagem` na conclusão da etapa "17" (Montagem) — hoje sem NENHUM campo de valor nesse
-ponto, precisaria de um novo, tipo o "informe o valor efetivamente gasto" do Efetivar;
-`pagamento_fabrica` não tem gatilho natural nenhum na aplicação — o pagamento a fornecedor que
-existe (`/api/financeiro/pagar-fornecedor`, evento `pagamento_fornecedor`, DIFERENTE deste) baixa a
-conta genérica 2.1.01 (Fornecedores a Pagar), não a provisão 2.1.04.06 diretamente. Como o item 6
-(ACHADO-33) restaurou o Efetivar genérico pra Montagem e pra Fábrica — que já faz as duas pernas
-certas, com `forma_pagamento` à escolha (direto ou a_prazo) — os dois eventos mortos podem já ser
-puramente redundantes com o mecanismo genérico.
-*Adiado:* decisão do Marcelo — ligar (com a perna de despesa corrigida) ou remover da tabela
-`EVENTOS` os dois.
+**LP-01 · Data combinada da medição — decidido em 15/09: GUARDAR AS DUAS.**
+*Destino: DECIDIDO/fila da 1.0.*
 
-**LP-12 · Desmembramento em fases nas etapas futuras.**
-*Destino: PRODUTO — é produto, não defeito; toca todas as etapas pós-venda; falta decidir a
-proporcionalidade.*
-O desmembramento abre dois braços na venda e para por ali: as etapas seguintes continuam tratando
-o projeto como um só. A aprovação financeira passa a ser por fase, e as liberações também, com
-valor **proporcional à fase**.
-*Delimitação já dada pelo Marcelo, e é ela que torna o item viável:* **as contas de provisão NÃO
-se desmembram** — a contabilidade continua consolidada por projeto. O que ganha fase é a camada de
-acionamento. Sem migration de plano de contas, sem rateio contábil.
-*Falta decidir:* proporcional a quê — valor de contrato da fase, CFO da fase, ou número de
-ambientes.
-*Adiado:* é produto, não defeito; toca todas as etapas pós-venda. (Marcelo, 02/09, percurso do
-`v2026.09.02-beta1`.)
+**A regra:** a data PREVISTA (dada na venda) e a data COMBINADA (acertada de fato com o cliente,
+no momento de Solicitar Medição) coexistem — nenhuma substitui a outra. A combinada é a que entra
+no documento que o cliente assina.
 
-**LP-14 · Evento de término por etapa, com oferta de transferência.**
-*Destino: PRODUTO — depende do ACHADO-46/47 (papéis declarados) antes de existir.*
-Pedido do Marcelo (02/09): *toda etapa precisa ter um evento que caracterize seu término, e sempre
-que terminar deve aparecer um popup informando o término e oferecendo a transferência de
-responsabilidade.* Hoje a transferência é um ato avulso, procurado pelo usuário quando ele lembra
-— foi tentando fazê-la fora de hora que o ACHADO-46 apareceu.
-*O que o item exige antes de existir:* um levantamento de quais das 21 etapas têm hoje um evento
-de término identificável e quais terminam por inferência (status mudou, alguém clicou). Sem esse
-mapa, "toda etapa" não tem alcance definido.
-*Adiado:* é fluxo novo em todas as etapas do ciclo, não conserto. Depende do ACHADO-46/47 estarem
-prontos — sem papéis declarados, a oferta de transferência não teria a quem oferecer. (Marcelo,
-02/09, testando o Ciclo.)
+**Por quê:** a diferença entre "prometido" (previsto na venda) e "combinado" (a data real
+acertada) é um indicador de operação — mede o quanto a operação desvia da promessa comercial — e
+esse indicador só existe se as duas datas forem guardadas desde o início. Guardar só uma das duas
+descarta essa informação de forma irrecuperável (não dá pra reconstruir depois).
 
-**LP-18 · Fases independentes, recebimento na Logística e entrada fiscal.**
-*Destino: PRODUTO — frente grande com tarefa própria (`TAREFA_FASES_E_RECEBIMENTO.md`); não morre
-sozinha quando uma fronteira for construída, precisa do próprio ciclo de desenho. Correlação: a
-parte de "Conferência de Volumes" toca a mesma lacuna estrutural da 6.3 (Estoque) — quem pegar
-esta frente se beneficia de olhar a 6.3 primeiro, mas a 6.3 sozinha não resolve isto.*
-Levantada pelo Marcelo percorrendo o `v2026.09.04-beta1` em Homologação, junto com o ACHADO-49.
-Não é achado: nada disso está errado — nada disso existe. É ausência, e o desenho está em
-`docs/db/TAREFA_FASES_E_RECEBIMENTO.md`.
-**Por que aqui e não na fila ativa**, contra a regra 2 do sistema antigo desta lista: a regra
-mandava o *correlacionado* para a fila ativa, e esta frente não era correlacionada ao bloco fiscal
-— é outro assunto, que só encosta nele no fim. E é grande o bastante para engolir o que resta do
-bloco fiscal se for misturada. O ACHADO-49, que nasceu no mesmo percurso, esse **era**
-correlacionado (defeito do F2-15) e foi para a fila ativa como F2-20 — os dois caminhos, lado a
-lado, no mesmo dia.
-**O que a frente cobre** (uma linha cada; o desenho fica na TAREFA):
-- carregar e implantar pedidos POR FASE, cada fase concluindo sozinha — hoje um arquivo só dá a
-  etapa inteira por concluída
-- indicador no painel do ciclo quando uma fase seguiu e a outra ficou para trás — caso real: a
-  obra exigiu tocar a Fase 2 e a Fase 1 ficou sem finalizar
-- Logística e Expedição: o recebimento não tem ação de concluir; precisa de carga de NF-e e de
-  pedidos em relação N:N, conferência de volumes (os da nota × os efetivamente recebidos), campo
-  de observações, tudo persistido; a Visão Geral deixa de listar número de pedido e passa a ser
-  resumo da fase
-- emissão da NF-e POR FASE, perguntando NF-e de Origem (lista das carregadas no recebimento) ou
-  "Estoque" (preço de venda digitado, sem markup — ver a fronteira na LP-15)
-- os botões de carregar e de emitir precisam morar DENTRO da tabela de fases, associados a cada
-  fase — hoje ficam soltos na etapa inteira, sem dizer a qual fase pertencem; e as notas se
-  associam aos AMBIENTES do projeto, não à etapa como um todo (achado do Marcelo, 04/09, percurso
-  do `v2026.09.04-beta1` — mesmo dia do ACHADO-49/50/51, classificado por ele mesmo como LP, não
-  achado de bloco fiscal)
-- a carga das NF-e da fábrica deve ocorrer na subfase de RECEBIMENTO — confirmado pelo Marcelo no
-  percurso de 05/09 (`v2026.09.05-beta1`); é literalmente o item 2 de
-  `TAREFA_FASES_E_RECEBIMENTO.md` ("item 2, recebimento — cria o dado que o item 3 consome"), não
-  um ponto novo — registrado aqui pra não depender de só estar na TAREFA
-**Consequência imediata na fila ativa (histórico):** o item 5 do bloco fiscal (NF-e H/P) ficou
-suspenso até esta frente ter decisão — `ROTEIRO.md`, F2-21.
+**O que ainda falta resolver na implementação** (não é decisão nova, é escopo já registrado):
+quando o projeto está desmembrado em fases, cada fase tem sua própria data combinada — não é um
+campo único no projeto. E a data combinada, ao ser gravada, precisa **atualizar a programação
+automática** que o cronograma padrão já montou na assinatura do contrato — não é só um campo
+solto; é uma entrada que substitui uma previsão que o sistema já calculou sozinho. Medir onde essa
+programação vive e quem mais a lê antes de escrever nela é o primeiro passo de quem pegar isto.
 
-**LP-24 · Aprovação do PE não tem testemunha na assinatura — lacuna ou decisão? Desconhecido.**
-*Destino: PRODUTO — a própria natureza do item é "decidir se é lacuna ou decisão", não há como
-classificar diferente até isso ser resolvido.*
-Achado no Passo 0 (inventário) de `docs/db/TAREFA_ACHADO69_ASSINATURA_UNIFICADA.md`, comparando os
-três documentos com escolha de canal ClickSign. O Contrato suporta testemunha 1/2 na assinatura
-(`_enviar_contrato_para_clicksign`, e colunas próprias no modelo). A Solicitação de medição não
-suporta — e isso é decisão registrada, de 17/08/2026 (comentário no código de
-`SolicitacaoMedicaoAssinatura`). A Aprovação do PE também não suporta
-(`_enviar_aprovacao_pe_para_clicksign` não recebe o parâmetro `testemunhas`), mas não há decisão
-nenhuma registrada para essa ausência — pode ser lacuna (nunca foi pedida) ou pode ter sido uma
-escolha implícita de quem escreveu o código na época.
-**Fora do escopo do ACHADO-69** por decisão de Marcelo (13/09): desconhecido não se resolve
-unificando por cima — unificar teria que ESCOLHER um comportamento pra Aprovação do PE sem saber
-se existe um motivo pro atual. Fica registrado aqui até alguém confirmar (perguntando a quem pediu
-a funcionalidade originalmente, ou observando se a falta de testemunha em Aprovação do PE já
-incomodou alguém em produção) se é lacuna a fechar ou decisão a documentar.
+---
+
+**LP-12 · Liberação financeira por fase — decidido em 15/09: DOIS CRITÉRIOS, um por gate.**
+*Destino: DECIDIDO/fila da 1.0.*
+
+**A regra:** a liberação por fase usa critérios DIFERENTES em cada um dos dois gates — não um
+critério único para os dois:
+- **Na aprovação do PE junto ao cliente:** valor de contrato da fase.
+- **Na aprovação financeira (AF1/AF2):** mantém o padrão atual — comparação contra o CFO (Custo
+  Fábrica/Obra), sem mudar.
+
+**Por quê:** a divisão em fases reparte o TRABALHO (o que é aprovado e liberado em cada momento),
+mas não muda o padrão de CONTROLE financeiro, que continua baseado nos valores dos ambientes —
+mudar o critério do gate financeiro só porque o projeto virou multi-fase misturaria uma decisão de
+processo comercial (como apresentar a fase ao cliente) com uma decisão de risco financeiro (como o
+Financeiro decide liberar dinheiro), que são perguntas diferentes.
+
+**O que já estava decidido antes, e continua valendo:** as contas de provisão NÃO se desmembram
+por fase — a contabilidade segue consolidada por projeto. Só a camada de acionamento (quando cada
+gate libera) passa a operar por fase.
+
+---
+
+**LP-14 · Aviso de etapa concluída, com responsável — decidido em 15/09, com desenho.**
+*Destino: DECIDIDO/fila da 1.0 — pacote de execução em
+`docs/db/TAREFA_RESPONSAVEIS_POR_ETAPA.md`.*
+
+Decisão fechada: um Configurador de Responsabilidades (aba nova em Config), amarrando etapa→papel,
+com exceção por pessoa específica onde precisar, notificando por tela e chat ao concluir (sem
+WhatsApp por ora). O pacote completo — incluindo a medição de que metade do mecanismo já existe
+(`_ETAPA_PAPEL`, a mesma tabela que já dispara comissão) — está no arquivo dedicado, porque o
+desenho tem peças demais para caber numa entrada desta lista.
 
 ---
 
@@ -712,6 +707,22 @@ mais ampla de flakes de E2E que este item vem acumulando desde 09/09.
   LP — todos usam margens de DIAS (imunes a um desvio de fuso de 3h) ou comparam `utcnow()` contra
   `utcnow()` do próprio código de produção sendo testado. Fechado — nada a consertar. (Movido para
   "Fechados" em 15/09 — estava listado como item numerado, mas já resolvido desde 04/09.)
+- **LP-09 · Várias versões do Projeto Executivo — RECUSADO, decidido em 15/09.** Não é esquecimento
+  nem falta de tempo: é recusa deliberada. **A regra:** o Projeto Executivo aprovado não tem
+  versões concorrentes. Tem REVISÕES — e no fim existe uma versão final assinada, que é a que se
+  executa. O modelo "vários orçamentos, um vence" que já existe na venda não é trazido para cá.
+  **Por quê:** revisão pós-aprovação tem regras próprias que o modelo da venda não precisa
+  considerar (o que fazer com material já comprado da fábrica, por exemplo) — importar um
+  mecanismo pensado para outro momento do processo criaria mais problema do que resolveria. Quem
+  reabrir isto no futuro precisa de um motivo novo, não só "seria bom ter as duas opções" — a
+  pergunta já foi feita e respondida.
+- **LP-24 · Testemunha na Aprovação do Projeto Executivo — NÃO PRECISA, decidido em 15/09.** Não é
+  esquecimento de quem programou a funcionalidade em 2026: é recusa deliberada, agora confirmada.
+  **A regra:** o Contrato pede testemunha porque CRIA uma obrigação (compromisso financeiro/legal
+  entre as partes). A Aprovação do Projeto Executivo é ACEITE TÉCNICO — o cliente confirma que o
+  projeto está como deveria estar, não assume uma obrigação nova. Não gerar obrigação é a diferença
+  que justifica não pedir testemunha ali. A ausência, que soava como lacuna quando descoberta
+  (Passo 0 do ACHADO-69), estava correta desde o início.
 - **LP-20 · Rótulos do veredito (Absorver/Receber/Encerrar/Adiar).** DECIDIDO em 05/09, depois de
   `docs/db/MODELO_CONTABIL.md` fechar o modelo (F2-26): o que travava o mapeamento era não saber
   se "Receber" precisava de um lançamento de receita novo — agora sabe-se que sim, e o modelo já

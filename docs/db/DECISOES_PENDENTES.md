@@ -1,5 +1,14 @@
 # Decisões Pendentes — os 8 itens PRODUTO da Lista Paralela
 
+> **RESOLVIDO em 15/09/2026 — os oito itens abaixo foram todos decididos pelo Marcelo no mesmo dia
+> em que este documento foi escrito.** Este arquivo fica como registro histórico de COMO cada
+> decisão foi enquadrada (opções, custo, o que cada uma impedia) — a decisão em si, a regra
+> resultante e o novo destino de cada item estão em `docs/db/LISTA_PARALELA.md` (LP-01 → DECIDIDO/
+> fila da 1.0; LP-02 → BETA; LP-09 → Fechados, recusa decidida; LP-11 → HIGIENE; LP-12 → DECIDIDO/
+> fila da 1.0; LP-14 → DECIDIDO/fila da 1.0, pacote em `docs/db/TAREFA_RESPONSAVEIS_POR_ETAPA.md`;
+> LP-18 → FRONTEIRA/6.3; LP-24 → Fechados, recusa decidida). Não use este documento para saber o
+> que foi decidido — use `LISTA_PARALELA.md`.
+
 **Escrito em 15/09/2026, a partir de `docs/db/LISTA_PARALELA.md` (destino PRODUTO).** Nenhum destes
 oito depende de código — depende só de uma escolha do Marcelo. Cada bloco cabe numa leitura de
 minuto; o objetivo é decidir os oito numa sentada só, sem precisar abrir mais nenhum documento.
