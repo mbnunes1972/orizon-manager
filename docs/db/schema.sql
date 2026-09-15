@@ -955,7 +955,8 @@ CREATE TABLE public.clientes (
     inst_uf character varying(2),
     criado_em timestamp without time zone,
     atualizado_em timestamp without time zone,
-    loja_id integer
+    loja_id integer,
+    origem character varying(40)
 );
 
 
@@ -1411,7 +1412,8 @@ CREATE TABLE public.conversas (
     status character varying(12) DEFAULT 'aberta'::character varying,
     concluido_por_id integer,
     concluido_em timestamp without time zone,
-    conclusao_obs text
+    conclusao_obs text,
+    lead_id integer
 );
 
 
@@ -1973,6 +1975,47 @@ CREATE SEQUENCE public.lancamento_id_seq
 --
 
 ALTER SEQUENCE public.lancamento_id_seq OWNED BY public.lancamento.id;
+
+
+--
+-- Name: leads; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.leads (
+    id integer NOT NULL,
+    nome character varying(150) NOT NULL,
+    telefone character varying(20),
+    whatsapp character varying(20),
+    email character varying(120),
+    canal character varying(40),
+    loja_id integer NOT NULL,
+    responsavel_usuario_id integer,
+    situacao character varying(15) DEFAULT 'novo'::character varying NOT NULL,
+    template character varying(40),
+    dados_json text,
+    cliente_id integer,
+    criado_em timestamp without time zone
+);
+
+
+--
+-- Name: leads_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.leads_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: leads_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.leads_id_seq OWNED BY public.leads.id;
 
 
 --
@@ -3665,6 +3708,13 @@ ALTER TABLE ONLY public.lancamento ALTER COLUMN id SET DEFAULT nextval('public.l
 
 
 --
+-- Name: leads id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.leads ALTER COLUMN id SET DEFAULT nextval('public.leads_id_seq'::regclass);
+
+
+--
 -- Name: log_acesso_delegado id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -4285,6 +4335,14 @@ ALTER TABLE ONLY public.integracoes_d4sign
 
 ALTER TABLE ONLY public.lancamento
     ADD CONSTRAINT lancamento_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: leads leads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.leads
+    ADD CONSTRAINT leads_pkey PRIMARY KEY (id);
 
 
 --
@@ -5248,6 +5306,13 @@ CREATE INDEX ix_conversas_criado_por_id ON public.conversas USING btree (criado_
 
 
 --
+-- Name: ix_conversas_lead_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_conversas_lead_id ON public.conversas USING btree (lead_id);
+
+
+--
 -- Name: ix_conversas_loja_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5448,6 +5513,27 @@ CREATE INDEX ix_lancamento_conta_debito_id ON public.lancamento USING btree (con
 --
 
 CREATE INDEX ix_lancamento_owner ON public.lancamento USING btree (owner_tipo, owner_id);
+
+
+--
+-- Name: ix_leads_cliente_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_leads_cliente_id ON public.leads USING btree (cliente_id);
+
+
+--
+-- Name: ix_leads_loja_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_leads_loja_id ON public.leads USING btree (loja_id);
+
+
+--
+-- Name: ix_leads_responsavel_usuario_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_leads_responsavel_usuario_id ON public.leads USING btree (responsavel_usuario_id);
 
 
 --
@@ -6571,6 +6657,14 @@ ALTER TABLE ONLY public.conversas
 
 
 --
+-- Name: conversas fk_conversas_lead_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.conversas
+    ADD CONSTRAINT fk_conversas_lead_id FOREIGN KEY (lead_id) REFERENCES public.leads(id);
+
+
+--
 -- Name: conversas fk_conversas_rede_id; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6736,6 +6830,30 @@ ALTER TABLE ONLY public.lancamento
 
 ALTER TABLE ONLY public.lancamento
     ADD CONSTRAINT lancamento_conta_debito_id_fkey FOREIGN KEY (conta_debito_id) REFERENCES public.conta(id);
+
+
+--
+-- Name: leads leads_cliente_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.leads
+    ADD CONSTRAINT leads_cliente_id_fkey FOREIGN KEY (cliente_id) REFERENCES public.clientes(id);
+
+
+--
+-- Name: leads leads_loja_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.leads
+    ADD CONSTRAINT leads_loja_id_fkey FOREIGN KEY (loja_id) REFERENCES public.lojas(id);
+
+
+--
+-- Name: leads leads_responsavel_usuario_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.leads
+    ADD CONSTRAINT leads_responsavel_usuario_id_fkey FOREIGN KEY (responsavel_usuario_id) REFERENCES public.usuarios(id);
 
 
 --

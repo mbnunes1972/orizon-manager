@@ -4366,6 +4366,31 @@ medir, quando alguém pegar o 56, se a 11c tem o mesmo padrão (status da subfas
 independente do veredito de absorver/cobrar existir na tabela de decisão), ou se são coincidências
 parecidas com causas diferentes.
 
+**A pergunta acima, respondida (13/09, só leitura — nada tocado):** a 11c tem, de fato, o MESMO
+padrão — mas não é a MESMA causa. O gate de conclusão de "11c" é `mod_ciclo.guarda_conclusao`
+(chamado do único lugar que conclui subfases de PE, `main.py:15979`), e ele confere exatamente
+duas coisas para `PE_REVISAO`: (1) todo ambiente do universo (orçamento do contrato, menos os
+retidos) tem PE carregado (`pe_ambientes=(total, com_pe)`, montado em `main.py:15943-15971`); (2)
+as subfases anteriores (11a/11b) já concluíram (`subfases_pe_pendentes`). **Em nenhum ponto ele
+consulta `ConciliacaoPeFase` ou algo equivalente a `_pe_ambientes_pendentes_decisao`** (a função
+que o 11d usa, `main.py:18443`, para a MESMA pergunta — "existe ambiente com Δ a cobrar/estornar
+ou Δ custo ainda sem decisão?"). A 11c pode fechar "concluída" com todo ambiente carregado e
+zero decisões de absorver/cobrar dadas — reproduzível olhando só o código, e já reproduzido ao
+vivo por Marcelo em Homologação (`docs/db/PERCURSO_HOMOLOGACAO.md`, 8.2.4).
+
+**Por que não é a mesma raiz, mesmo sendo a mesma família:** o defeito do 11d/`AprovacaoPE` é de
+CAMINHO DE ESCRITA — uma ação (`reprovar`) atualiza uma das duas fontes de verdade e esquece a
+outra. O defeito da 11c é de PORTÃO DE CONCLUSÃO — a função que decide "pode fechar?" nunca
+pergunta pela tabela de decisão, porque ninguém a ensinou a perguntar (ao contrário do 11d, cujo
+`fase_completa` foi desenhado desde o início, no F2-24/ACHADO-55, para consultar essa tabela).
+Consertar um não conserta o outro: dar ao `guarda_conclusao` da 11c uma checagem equivalente a
+`_pe_ambientes_pendentes_decisao` não muda nada em `/ciclo/11d/reprovar`, e fazer o `/reprovar`
+escrever em `AprovacaoPE.status` não muda nada no gate da 11c. São duas instâncias independentes
+do mesmo princípio ausente ("todo fechamento de subfase de PE que representa uma decisão
+contábil tem que confirmar que a decisão existe, não só que o documento foi carregado ou que o
+CicloEtapa foi escrito") — vale nomear esse princípio se um consertar-os-dois for feito um dia,
+mas são dois commits, dois testes, não um.
+
 ---
 
 ## ACHADO-57 — a etapa Montagem se dá por concluída sozinha · RESOLVIDO 05/09/2026

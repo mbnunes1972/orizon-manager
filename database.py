@@ -259,6 +259,50 @@ class Cliente(Base):
     criado_em     = Column(DateTime,    default=datetime.utcnow)
     atualizado_em = Column(DateTime,    onupdate=datetime.utcnow)
     loja_id       = Column(Integer,     ForeignKey("lojas.id"), nullable=True, index=True)
+    # Captação provisória (14/09/2026, PLANO_SEMANA_1.md): COMO o cliente chegou — texto livre,
+    # sem CHECK (mesmo padrão de Parceiro.tipo: valores conhecidos documentados aqui, não
+    # travados em enum). Direto: "porta", "arquiteto", "indicação". Vindo de um Lead convertido:
+    # "lead/" + Lead.canal (ex.: "lead/google", "lead/instagram") — na conversão, nunca digitado
+    # à mão. DELIBERADAMENTE um campo diferente de Lead.canal (abaixo): Lead.canal é DE ONDE o
+    # lead veio (a campanha/plataforma); Cliente.origem é COMO o cliente chegou (a via de
+    # entrada) — um campo só pras duas perguntas seria mais uma instância da Causa B do
+    # MAPA_MODULOS.md ("um campo, dois significados"), a mesma família do LP-23.
+    origem        = Column(String(40),  nullable=True)
+
+
+class Lead(Base):
+    """Captação provisória (14/09/2026, PLANO_SEMANA_1.md) — NÃO é o módulo de Captação
+    definitivo (esse nasce depois da 1.0, ver LISTA_PARALELA.md § FRONTEIRA). Existe pra
+    desafogar uma demanda comercial parada: hoje um contato comercial (ligação, formulário,
+    balcão) só ganha registro no sistema quando já vira Cliente — sem estágio de qualificação
+    antes disso. `Lead` é esse estágio: nasce antes do Cliente e do Projeto, entidade própria,
+    sem write que dependa de nenhum dos dois.
+
+    Núcleo fixo abaixo. `dados_json` + `template` cobrem o que VARIA por formulário de captação
+    (expectativa de orçamento hoje; o que vier depois) sem migration a cada campo novo — mesmo
+    espírito de `Funcao.beneficios_json`/`Loja.config_financeira_json`, com um adicional: aqueles
+    dois têm forma FIXA (comentário no próprio campo já basta); aqui a forma varia por template,
+    por isso o nome do template é campo próprio — sem ele o JSON não é interpretável.
+
+    `canal`: DE ONDE o lead veio (google, instagram, facebook, site...) — ver a distinção de
+    `Cliente.origem`, acima, sobre por que os dois campos NUNCA se fundem num só."""
+    __tablename__ = "leads"
+
+    id                     = Column(Integer,  primary_key=True, autoincrement=True)
+    nome                   = Column(String(150), nullable=False)
+    telefone               = Column(String(20),  nullable=True)
+    whatsapp               = Column(String(20),  nullable=True)
+    email                  = Column(String(120), nullable=True)
+    canal                  = Column(String(40),  nullable=True)   # texto livre — ver docstring
+    loja_id                = Column(Integer,  ForeignKey("lojas.id"), nullable=False, index=True)
+    responsavel_usuario_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True, index=True)
+    situacao               = Column(String(15), nullable=False, default="novo", server_default="novo")
+    # novo | em_atendimento | convertido | perdido
+    template               = Column(String(40),  nullable=True)   # nomeia a forma de dados_json
+    dados_json             = Column(Text,      nullable=True)
+    cliente_id             = Column(Integer,  ForeignKey("clientes.id"), nullable=True, index=True)
+    # preenchido só na conversão (histórico de pra onde este lead foi) — nunca na criação
+    criado_em              = Column(DateTime,  default=datetime.utcnow)
 
 
 class Parceiro(Base):
@@ -1537,13 +1581,18 @@ class Conversa(Base):
     em andamento; cliente sem projeto; ou os dois em branco = reclamação institucional sem
     vínculo). `loja_id` é sempre presente: mesmo a reclamação institucional pertence à loja
     que a registrou (tenancy). Natureza/transferência, bloqueador, modo privado e EnvioExterno
-    são FATIAS FUTURAS (2-7) — não adicionar campos aqui fora da spec."""
+    são FATIAS FUTURAS (2-7) — não adicionar campos aqui fora da spec, EXCETO `lead_id`
+    (14/09/2026, PLANO_SEMANA_1.md — Captação provisória, fora da numeração de fatias do Chat,
+    autorizado por fora da spec de propósito): mesma âncora flexível, um terceiro opcional.
+    `lead_id` nasce com o lead e SOBREVIVE à conversão (proveniência — nunca é limpo);
+    `cliente_id` é ADICIONADO no momento da conversão, os dois passam a coexistir."""
     __tablename__ = "conversas"
 
     id           = Column(Integer,  primary_key=True, autoincrement=True)
     loja_id      = Column(Integer,  ForeignKey("lojas.id"), nullable=False, index=True)
     projeto_nome = Column(Text,     nullable=True, index=True)
     cliente_id   = Column(Integer,  ForeignKey("clientes.id"), nullable=True, index=True)
+    lead_id      = Column(Integer,  ForeignKey("leads.id"),    nullable=True, index=True)
     # Central de Comunicação (spec 2026-07-27, Fatia 1): a Conversa deixa de ser só "do projeto".
     # tipo: projeto (a de sempre) | direct (1:1) | grupo (N) | publico (mural da loja, Fatia 2).
     # `titulo` é o nome do grupo. `criado_por_id` = quem abriu. Registros antigos = 'projeto'

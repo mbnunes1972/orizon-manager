@@ -21,7 +21,11 @@ systemctl stop orizon-a
 cd /root/orizon-manager || exit 1
 git fetch origin --tags && git reset --hard origin/main
 apt-get install -y -qq python3-docx python3-openpyxl python3-requests python3-sqlalchemy python3-psycopg2 >/dev/null
-ufw allow 8765/tcp >/dev/null 2>&1
+# NENHUM "ufw allow 8765/tcp" aqui de propósito (removido — IMPLANTAR.md, "Exposição segura de
+# Integração/Homologação"): depois desse procedimento rodar neste host, main.py escuta só em
+# 127.0.0.1 e nginx é quem fala com a internet, em 80/443. Reabrir 8765 a cada deploy desfaria o
+# fechamento manual daquele procedimento. Enquanto o procedimento não rodou, a porta já está
+# liberada pelo `ufw allow` feito uma vez, à mão (Semana 1, 14/09) — não precisa ser repetido aqui.
 systemctl start orizon-a
 wait_http 8765
 tail -5 /root/orizon-manager/app.log
@@ -30,7 +34,7 @@ echo "=== INSTÂNCIA B (pré-homolog, :8766, tag $TAG) ==="
 systemctl stop orizon-b
 cd /root/orizon-homolog || exit 1
 git fetch --tags origin && git checkout -f "$TAG"
-ufw allow 8766/tcp >/dev/null 2>&1
+# Mesmo motivo do "ufw allow 8765/tcp" acima — ver IMPLANTAR.md.
 systemctl start orizon-b
 wait_http 8766
 tail -5 /root/orizon-homolog/app.log

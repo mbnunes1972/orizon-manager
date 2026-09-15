@@ -854,6 +854,7 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
       <div class="nav-item" id="nav-00" onclick="goPage(0)"><i class="ti ti-diamond"></i>Projetos</div>
       <div class="nav-item" id="nav-16" onclick="goPage(16)" title="Agenda da Loja"><i class="ti ti-calendar"></i>Agenda</div>
       <div class="nav-item" id="nav-central-com" onclick="ocAbrirPagina('atend')" title="Orizon Chat"><i class="ti ti-messages"></i>Orizon Chat</div>
+      <div class="nav-item" id="nav-leads" onclick="goPageLeads()" title="Captação (provisório, PLANO_SEMANA_1.md)"><i class="ti ti-user-plus"></i>Captação</div>
       <div class="nav-item" id="nav-estrategico" onclick="goPageEstrategico()" style="display:none" title="Painel Estratégico"><i class="ti ti-chart-infographic"></i>Painel Estratégico</div>
     </div>
 
@@ -2397,6 +2398,99 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
     <div class="page-title" style="margin:0">Agenda da Loja</div>
     <div class="page-sub">Marcos e volumes de todos os cronogramas, por Setor.</div>
     <div id="agenda-ui"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
+  </div>
+
+  <!-- PAGE LEADS: Captação provisória (14/09/2026, PLANO_SEMANA_1.md) — NÃO é o módulo de
+       Captação definitivo (LISTA_PARALELA.md § FRONTEIRA / 6.7). Lista de leads + criação +
+       conversão em cliente; a conversa reaproveita o Orizon Chat que já existe. -->
+  <div class="page" id="page-leads">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px">
+      <div>
+        <div class="page-title" style="margin:0">Captação</div>
+        <div class="page-sub">Leads antes de virarem cliente — cadastro provisório, desafogando a demanda comercial parada.</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="leadAbrirModalNovo()">+ Novo Lead</button>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <select id="lead-filtro-situacao" onchange="leadsCarregar()" class="sb-input-sm" style="width:auto;padding:8px 10px;font-size:12px">
+        <option value="">Todas as situações</option>
+        <option value="novo">Novo</option>
+        <option value="em_atendimento">Em atendimento</option>
+        <option value="convertido">Convertido</option>
+        <option value="perdido">Perdido</option>
+      </select>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="cli-table">
+        <thead>
+          <tr><th>Nome</th><th>Canal</th><th>Contato</th><th>Situação</th><th>Responsável</th><th style="width:190px"></th></tr>
+        </thead>
+        <tbody id="lead-tbody">
+          <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Carregando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal: novo Lead -->
+  <div id="modal-lead" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:480px;width:92%;animation:mIn .18s ease;max-height:90vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div style="font-family:var(--font-display);font-weight:900;font-size:16px">Novo Lead</div>
+        <span onclick="leadFecharModal()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
+      </div>
+      <div class="grid2" style="gap:14px;margin-bottom:14px">
+        <div style="grid-column:1/-1">
+          <label class="field-label">Nome *</label>
+          <input type="text" id="lead-nome" placeholder="Nome do lead">
+        </div>
+        <div>
+          <label class="field-label">Telefone</label>
+          <input type="text" id="lead-telefone" placeholder="(00) 00000-0000">
+        </div>
+        <div>
+          <label class="field-label">WhatsApp</label>
+          <input type="text" id="lead-whatsapp" placeholder="(00) 00000-0000">
+        </div>
+        <div>
+          <label class="field-label">E-mail</label>
+          <input type="text" id="lead-email" placeholder="email@exemplo.com">
+        </div>
+        <div>
+          <label class="field-label">Canal</label>
+          <input type="text" id="lead-canal" placeholder="google, instagram, facebook, site...">
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn btn-ghost btn-sm" onclick="leadFecharModal()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" id="lead-salvar-btn" onclick="leadSalvar()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: converter Lead em Cliente -->
+  <div id="modal-lead-converter" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+    <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:420px;width:92%;animation:mIn .18s ease">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div style="font-family:var(--font-display);font-weight:900;font-size:16px">Converter em Cliente</div>
+        <span onclick="leadFecharModalConverter()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
+      </div>
+      <input type="hidden" id="lead-conv-id">
+      <div style="margin-bottom:14px">
+        <label class="field-label">Consultor responsável pelo briefing *</label>
+        <select id="lead-conv-consultor"><option value="">Carregando...</option></select>
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="field-label">CPF (opcional)</label>
+        <input type="text" id="lead-conv-cpf" placeholder="000.000.000-00">
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px">
+        <button class="btn btn-ghost btn-sm" onclick="leadFecharModalConverter()">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="leadConverterConfirmar()">Converter</button>
+      </div>
+    </div>
   </div>
 
   <!-- PAGE 09: Config — parâmetros de negócio (Modulos_Orizon_v8: Núcleo, distinto de Admin) -->
@@ -13278,6 +13372,11 @@ function atendRender(){
 // seguro que abrir a 1ª sozinho — não marca like/lido em nome do usuário sem ele pedir).
 function _ocFecharSeForaDoFiltro(visiveis, scr){
   if(_ocScrAtual !== scr || !_ocConvAtiva) return;
+  // Captação provisória (14/09/2026): conversa de Lead (tipo='lead') é aberta por link direto da
+  // tela de Captação, não pela lista de Atendimentos — nunca vai aparecer em `visiveis` (a inbox
+  // só lista direct/grupo/projeto). Sem esta guarda, o refresh em background da lista (disparado
+  // por `ochatIr('atend')` a cada troca de tela) fechava a conversa 1 tick depois de abri-la.
+  if(_ocConvTipo === 'lead') return;
   if(!(visiveis||[]).some(c=>c.id===_ocConvAtiva)){
     _ocConvAtiva = null;
     document.querySelectorAll('.oc-list-col .atd-item.selected').forEach(el=>el.classList.remove('selected'));
@@ -18160,6 +18259,123 @@ async function abrirConversaProjeto(){
   _ocSetArquivarBtn(it || {tipo:'projeto', arquivada:false});
   _ocSetSegSel(it || {tipo:'projeto', segmento:''});
   _ocSetHeaderExtras(it || {tipo:'projeto'});
+}
+
+// ── Captação provisória (Lead) — 14/09/2026, PLANO_SEMANA_1.md. NÃO é o módulo definitivo
+// (LISTA_PARALELA.md § FRONTEIRA / 6.7) — lista + criação + conversão, e a conversa reaproveita
+// o Orizon Chat pelos endpoints GENÉRICOS (/api/comunicacao/conversas/<id>/...), por isso
+// `ocAbrirConversaPorId` é chamada com projetoNome=null (mesmo caminho de direct/grupo).
+let _leads = [];
+let _leadUsuariosCache = null;
+async function _leadUsuarios(){
+  if(_leadUsuariosCache) return _leadUsuariosCache;
+  try {
+    const d = await fetch('/api/comunicacao/usuarios',{credentials:'same-origin'}).then(r=>r.json());
+    _leadUsuariosCache = (d && d.ok) ? (d.usuarios||[]) : [];
+  } catch(e){ _leadUsuariosCache = []; }
+  return _leadUsuariosCache;
+}
+function goPageLeads(){
+  const nav = document.getElementById('nav-leads');
+  if(nav && nav.classList.contains('locked')) return;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  const pg = document.getElementById('page-leads'); if(pg) pg.classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('active'));
+  if(nav) nav.classList.add('active');
+  const sbParams = document.getElementById('sb-params'); if(sbParams) sbParams.style.display='none';
+  leadsCarregar();
+}
+async function leadsCarregar(){
+  const tb = document.getElementById('lead-tbody');
+  tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Carregando...</td></tr>';
+  const sit = document.getElementById('lead-filtro-situacao').value;
+  let d;
+  try { d = await fetch('/api/leads'+(sit?('?situacao='+encodeURIComponent(sit)):''),{credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--err)">Erro de rede.</td></tr>'; return; }
+  if(!d.ok){ tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--err)">'+esc(d.erro||'Erro.')+'</td></tr>'; return; }
+  _leads = d.leads || [];
+  if(!_leads.length){ tb.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted)">Nenhum lead.</td></tr>'; return; }
+  const usuarios = await _leadUsuarios();
+  const nomeDe = (uid) => { const u = usuarios.find(x=>x.id===uid); return u ? u.nome : null; };
+  const SIT = {novo:'Novo', em_atendimento:'Em atendimento', convertido:'Convertido', perdido:'Perdido'};
+  tb.innerHTML = _leads.map(l => {
+    const contato = [l.telefone, l.whatsapp, l.email].filter(Boolean).join(' · ');
+    let acoes = '<button class="btn btn-ghost btn-sm" onclick="abrirConversaLead('+l.id+')">Conversa</button>';
+    if(l.situacao !== 'convertido')
+      acoes += ' <button class="btn btn-primary btn-sm" onclick="leadAbrirModalConverter('+l.id+')">Converter</button>';
+    return '<tr><td>'+esc(l.nome)+'</td><td>'+esc(l.canal||'—')+'</td><td>'+esc(contato||'—')+'</td>'
+      + '<td>'+esc(SIT[l.situacao]||l.situacao)+'</td><td>'+esc(nomeDe(l.responsavel_usuario_id)||'—')+'</td>'
+      + '<td style="text-align:right">'+acoes+'</td></tr>';
+  }).join('');
+}
+function leadAbrirModalNovo(){
+  ['lead-nome','lead-telefone','lead-whatsapp','lead-email','lead-canal'].forEach(id=>{
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('modal-lead').style.display = 'flex';
+}
+function leadFecharModal(){ document.getElementById('modal-lead').style.display = 'none'; }
+async function leadSalvar(){
+  const nome = document.getElementById('lead-nome').value.trim();
+  if(!nome){ showToast('Informe o nome do lead.', true); return; }
+  const payload = {
+    nome,
+    telefone: document.getElementById('lead-telefone').value.trim(),
+    whatsapp: document.getElementById('lead-whatsapp').value.trim(),
+    email: document.getElementById('lead-email').value.trim(),
+    canal: document.getElementById('lead-canal').value.trim(),
+  };
+  const btn = document.getElementById('lead-salvar-btn'); btn.disabled = true;
+  try {
+    const d = await fetch('/api/leads', {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)}).then(r=>r.json());
+    if(!d.ok){ showToast(d.erro||'Erro ao criar lead.', true); return; }
+    leadFecharModal();
+    showToast('Lead criado.');
+    leadsCarregar();
+  } catch(e){ showToast('Erro de rede.', true); }
+  finally { btn.disabled = false; }
+}
+async function leadAbrirModalConverter(id){
+  document.getElementById('lead-conv-id').value = id;
+  document.getElementById('lead-conv-cpf').value = '';
+  const sel = document.getElementById('lead-conv-consultor');
+  sel.innerHTML = '<option value="">Carregando...</option>';
+  document.getElementById('modal-lead-converter').style.display = 'flex';
+  const usuarios = await _leadUsuarios();
+  sel.innerHTML = '<option value="">Selecione...</option>'
+    + usuarios.map(u=>'<option value="'+u.id+'">'+esc(u.nome)+'</option>').join('');
+}
+function leadFecharModalConverter(){ document.getElementById('modal-lead-converter').style.display = 'none'; }
+async function leadConverterConfirmar(){
+  const id = document.getElementById('lead-conv-id').value;
+  const consultor_id = document.getElementById('lead-conv-consultor').value;
+  if(!consultor_id){ showToast('Escolha o consultor responsável.', true); return; }
+  const cpf = document.getElementById('lead-conv-cpf').value.trim();
+  try {
+    const d = await fetch('/api/leads/'+id+'/converter', {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({consultor_id: parseInt(consultor_id,10), cpf})}).then(r=>r.json());
+    if(!d.ok){ showToast(d.erro||'Erro ao converter.', true); return; }
+    leadFecharModalConverter();
+    showToast('Lead convertido em cliente.');
+    leadsCarregar();
+  } catch(e){ showToast('Erro de rede.', true); }
+}
+async function abrirConversaLead(leadId){
+  ocAbrirPagina('atend');
+  let d;
+  try { d = await fetch('/api/leads/'+leadId+'/conversa',{credentials:'same-origin'}).then(r=>r.json()); }
+  catch(e){ showToast('Erro ao abrir a conversa do lead.', true); return; }
+  if(!d.ok){ showToast(d.erro||'Erro ao abrir a conversa do lead.', true); return; }
+  const lead = (_leads||[]).find(l=>l.id===leadId);
+  const tit = '🧲 ' + (lead ? lead.nome : ('Lead #'+leadId));
+  // projetoNome=null (deliberado): a conversa do lead usa os endpoints GENÉRICOS do chat, não
+  // o caminho especial de projeto (_ocConvProjeto precisa ficar null pra isso).
+  await ocAbrirConversaPorId(d.conversa.id, tit, true, 'lead', null);
+  _ocSetArquivarBtn({tipo:'lead', arquivada:false});
+  _ocSetSegSel({tipo:'lead', segmento:''});
+  _ocSetHeaderExtras({tipo:'lead'});
 }
 
 // ── estado do painel de conversa ──────────────────────────────────────────────

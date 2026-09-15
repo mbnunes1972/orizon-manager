@@ -26,7 +26,7 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        SolicitacaoMedicao, SolicitacaoMedicaoAssinatura,
                        AcordoFabrica, AjusteFabrica, AjusteFabricaAplicacao, AcordoMovimento,
                        ContraparteFinanceira, Recebivel, ProvisaoDataPrevista, LogAutorizacao,
-                       IntegracaoClickSign, ConciliacaoPeFase)
+                       IntegracaoClickSign, ConciliacaoPeFase, Lead)
 import mod_expedicao
 import mod_assistencias
 import mod_cadastro
@@ -3902,6 +3902,83 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, "clientes": clientes})
             except Exception as e:
                 self.send_json({"ok": False, "erro": str(e), "clientes": []})
+            finally:
+                db.close()
+
+        # GET /api/leads[?situacao=novo] — Captação provisória (14/09/2026,
+        # PLANO_SEMANA_1.md): lista os leads da loja, mais recentes primeiro.
+        elif path == "/api/leads":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                from urllib.parse import parse_qs
+                situacao = (parse_qs(urlparse(self.path).query).get('situacao') or [''])[0].strip()
+                q = db.query(Lead).filter_by(loja_id=loja_id)
+                if situacao:
+                    q = q.filter_by(situacao=situacao)
+                leads = q.order_by(Lead.criado_em.desc()).all()
+                self.send_json({"ok": True, "leads": [_lead_dict(l) for l in leads]})
+            finally:
+                db.close()
+
+        # GET /api/leads/<id> — detalhe de um lead.
+        elif re.match(r'^/api/leads/(\d+)$', path):
+            m = re.match(r'^/api/leads/(\d+)$', path)
+            lead_id = int(m.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                lead = db.get(Lead, lead_id)
+                if lead is None or lead.loja_id != loja_id:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                    return
+                self.send_json({"ok": True, "lead": _lead_dict(lead)})
+            finally:
+                db.close()
+
+        # GET /api/leads/<id>/conversa — get-or-create da conversa do lead (mesmo molde de
+        # GET /api/projetos/<nome>/conversa) + histórico cronológico de mensagens.
+        elif re.match(r'^/api/leads/(\d+)/conversa$', path):
+            m = re.match(r'^/api/leads/(\d+)/conversa$', path)
+            lead_id = int(m.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
+                return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403)
+                    return
+                lead = db.get(Lead, lead_id)
+                if lead is None or lead.loja_id != loja_id:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
+                    return
+                import mod_chat
+                conv = mod_chat.get_or_create_conversa_lead(db, loja_id, lead_id)
+                db.commit()
+                self.send_json({"ok": True,
+                                "conversa": {"id": conv.id, "lead_id": conv.lead_id,
+                                             "cliente_id": conv.cliente_id},
+                                "mensagens": mod_chat.listar_mensagens(db, conv.id)})
             finally:
                 db.close()
 
@@ -11534,6 +11611,139 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 db.close()
 
+        # POST /api/leads — Captação provisória (14/09/2026, PLANO_SEMANA_1.md): cria um lead.
+        # Núcleo fixo (nome/telefone/whatsapp/email/canal/loja/responsável/situação) + o par
+        # template/dados que varia por formulário de captação (mesmo espírito de
+        # funcoes.beneficios_json/lojas.config_financeira_json — sem migration a cada campo
+        # novo). `situacao` sempre nasce "novo" (server_default) — não é campo de entrada.
+        elif path == "/api/leads":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            req = json.loads(body) if body else {}
+            nome = (req.get("nome") or "").strip()
+            if not nome:
+                self.send_json({"ok": False, "erro": "Informe o nome do lead."}, code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                dados = req.get("dados")
+                lead = Lead(
+                    nome=nome,
+                    telefone=(req.get("telefone") or "").strip() or None,
+                    whatsapp=(req.get("whatsapp") or "").strip() or None,
+                    email=(req.get("email") or "").strip() or None,
+                    canal=(req.get("canal") or "").strip() or None,
+                    loja_id=loja_id,
+                    responsavel_usuario_id=(req.get("responsavel_usuario_id") or usuario.get("id")),
+                    template=(req.get("template") or "").strip() or None,
+                    dados_json=(json.dumps(dados, ensure_ascii=False) if dados is not None else None),
+                )
+                db.add(lead)
+                db.commit()
+                db.refresh(lead)
+                self.send_json({"ok": True, "lead": _lead_dict(lead)})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+
+        # POST /api/leads/<id>/conversa/mensagens — nova mensagem interna na conversa do lead
+        # (mesmo molde de POST /api/projetos/<nome>/conversa/mensagens).
+        m_ldmsg = re.match(r'^/api/leads/(\d+)/conversa/mensagens$', path)
+        if m_ldmsg:
+            lead_id = int(m_ldmsg.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                lead = db.get(Lead, lead_id)
+                if lead is None or lead.loja_id != loja_id:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                import mod_chat
+                dd = json.loads(body or b'{}')
+                try:
+                    conv = mod_chat.get_or_create_conversa_lead(db, loja_id, lead_id)
+                    msg = mod_chat.enviar_mensagem(db, conv, usuario.get("id"), dd.get("corpo"))
+                except ValueError as ve:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(ve)}, code=400); return
+                db.commit()
+                self.send_json({"ok": True, "mensagem": msg.id})
+            finally:
+                db.close()
+            return
+
+        # POST /api/leads/<id>/converter — Captação provisória: lead vira Cliente, a conversa
+        # segue com o histórico (nunca fica órfã) e o responsável passa a ser o consultor que
+        # fará o briefing. `Cliente.origem` = "lead/" + `Lead.canal` — DELIBERADAMENTE derivado,
+        # nunca digitado (ver a distinção canal×origem no docstring do modelo `Lead`).
+        m_ldconv = re.match(r'^/api/leads/(\d+)/converter$', path)
+        if m_ldconv:
+            lead_id = int(m_ldconv.group(1))
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            req = json.loads(body) if body else {}
+            consultor_id = req.get("consultor_id")
+            if not consultor_id:
+                self.send_json({"ok": False, "erro": "Escolha o consultor responsável pelo briefing."},
+                               code=400); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                lead = db.get(Lead, lead_id)
+                if lead is None or lead.loja_id != loja_id:
+                    self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
+                if lead.situacao == "convertido":
+                    self.send_json({"ok": False, "erro": "Este lead já foi convertido."}, code=400); return
+                import validacao_doc
+                cpf = (req.get("cpf") or "").strip() or None
+                _e = validacao_doc.erro_doc(cpf, "CPF", "cpf")
+                if _e:
+                    self.send_json({"ok": False, "erro": _e}, code=400); return
+                cliente = Cliente(
+                    nome=lead.nome,
+                    telefone=lead.telefone, whatsapp=lead.whatsapp, email=lead.email,
+                    cpf=cpf, loja_id=loja_id,
+                    origem="lead/" + lead.canal if lead.canal else "lead",
+                )
+                db.add(cliente)
+                db.flush()
+                lead.situacao = "convertido"
+                lead.cliente_id = cliente.id
+                lead.responsavel_usuario_id = consultor_id
+                import mod_chat
+                conv = mod_chat.get_or_create_conversa_lead(db, loja_id, lead_id)
+                conv.cliente_id = cliente.id   # ADICIONADO, nunca substitui lead_id — os dois coexistem
+                try:
+                    mod_chat.transferir_responsavel(db, conv, usuario.get("id"), consultor_id)
+                except ValueError as ve:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(ve)}, code=400); return
+                db.commit()
+                db.refresh(cliente)
+                self.send_json({"ok": True, "cliente": _cliente_dict(cliente),
+                                "lead": _lead_dict(lead)})
+            except Exception as e:
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=500)
+            finally:
+                db.close()
+            return
+
         m_bp = re.match(r"^/api/projetos/([^/]+)/briefing$", path)
         if m_bp:
             nome_safe = unquote(m_bp.group(1))
@@ -18063,6 +18273,24 @@ def _cliente_dict(c) -> dict:
         "inst_cep":         c.inst_cep         or "",
         "inst_uf":          c.inst_uf          or "",
         "criado_em":   c.criado_em.strftime("%Y-%m-%d") if c.criado_em else "",
+        "origem":      c.origem      or "",
+    }
+
+
+def _lead_dict(l) -> dict:
+    """Serialização do Lead (Captação provisória, 14/09/2026) para o frontend."""
+    try:
+        dados = json.loads(l.dados_json) if l.dados_json else None
+    except Exception:
+        dados = None
+    return {
+        "id": l.id, "nome": l.nome,
+        "telefone": l.telefone or "", "whatsapp": l.whatsapp or "", "email": l.email or "",
+        "canal": l.canal or "", "loja_id": l.loja_id,
+        "responsavel_usuario_id": l.responsavel_usuario_id,
+        "situacao": l.situacao, "template": l.template or "", "dados": dados,
+        "cliente_id": l.cliente_id,
+        "criado_em": l.criado_em.strftime("%Y-%m-%d %H:%M") if l.criado_em else "",
     }
 
 

@@ -224,6 +224,136 @@ test_schema_boot_estavel prova que ele nao altera o schema — mas leia o log
 mesmo assim, e refaca a conferencia do 3.7 depois de subir. Se algum numero
 mudou, o boot mexeu em dado e precisamos saber.
 
+## Exposição segura de Integração/Homologação — nginx + TLS + bind interno
+
+Escrito em 14/09/2026 (PLANO_SEMANA_1.md, pendência operacional #1). **Pré-requisito para dado
+real de loja-piloto, não melhoria** — a senha das lojas atravessando a internet em texto claro
+(HTTP puro, sem TLS) é mais grave do que a porta aberta que o `ufw` do mesmo dia já fechou pra
+tudo que não é SSH/80/443/8765/8766. Este procedimento fecha o resto: `main.py` passa a escutar
+só em `127.0.0.1` (a mesma regra que Produção já segue — `DEV_RULES.md`, Passo 2: `Environment=
+ORIZON_HOST=127.0.0.1` — e que Integração/Homologação nunca seguiram, por terem nascido antes da
+esteira existir), nginx assume a porta 80/443 na frente com certificado Let's Encrypt, e as
+portas 8765/8766 somem do firewall.
+
+**Subdomínios sugeridos**: `integracao.orizonone.com.br` (:8765) e
+`homologacao.orizonone.com.br` (:8766) — nomes por extenso, em português, batendo exato com o
+vocabulário que `ESTEIRA.md`/`IMPLANTAR.md` já usam em toda parte (nunca "int"/"homolog"
+abreviado) — quem ler o nome no navegador ou no `certbot --nginx -d ...` reconhece na hora, sem
+precisar traduzir uma abreviação. Sob o domínio de Produção já pago/gerenciado (`orizonone.com.br`)
+— criar um domínio separado só para dois ambientes de teste de vida curta (o piloto trata os
+dados como descartáveis) seria custo/operação sem benefício correspondente.
+
+### O que precisa estar pronto antes de rodar isto
+
+1. **Registros DNS tipo A**: `integracao.orizonone.com.br` → `167.88.33.121` e
+   `homologacao.orizonone.com.br` → `167.88.33.121` (mesmo IP — é o mesmo host, nginx roteia por
+   `server_name`). Se os nomes escolhidos forem outros, troque nos comandos abaixo — é
+   substituição mecânica, nada mais muda.
+2. **Propagação confirmada** antes do `certbot`: `getent hosts integracao.orizonone.com.br` (e o
+   outro) devolvendo `167.88.33.121` — o `certbot` usa desafio HTTP-01, que só funciona depois
+   que o DNS aponta pro host certo (mesma ressalva já registrada no runbook de troca de domínio
+   de Produção, mais acima neste arquivo).
+3. **Portas 80 e 443 já liberadas no `ufw`** — cobertas pela sequência de hoje (14/09) que já
+   incluiu as duas junto com SSH/8765/8766, então isto já deve estar pronto quando chegar aqui.
+4. Nada mais precisa estar instalado antes — o Passo 1 abaixo instala o `nginx`/`certbot` que
+   faltam neste host (diferente de Produção, este nunca teve os dois).
+
+### Passo 1 — nginx + certificado, apontando pro que já funciona
+
+Roda ANTES de tocar em `ORIZON_HOST` — o objetivo é confirmar HTTPS de ponta a ponta enquanto o
+acesso direto por porta ainda existe como rede de segurança. Nesta ordem, para os dois
+subdomínios:
+
+```bash
+ssh root@167.88.33.121
+apt update && apt install -y nginx certbot python3-certbot-nginx
+
+cat > /etc/nginx/sites-available/integracao <<'EOF'
+server {
+    listen 80;
+    server_name integracao.orizonone.com.br;
+    client_max_body_size 64M;   # mesma lição de Produção — upload de XML > 1MB, default do nginx é 1M
+    location / {
+        proxy_pass http://127.0.0.1:8765;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+cat > /etc/nginx/sites-available/homologacao <<'EOF'
+server {
+    listen 80;
+    server_name homologacao.orizonone.com.br;
+    client_max_body_size 64M;
+    location / {
+        proxy_pass http://127.0.0.1:8766;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+ln -sf /etc/nginx/sites-available/integracao /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/homologacao /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+
+certbot --nginx -d integracao.orizonone.com.br
+certbot --nginx -d homologacao.orizonone.com.br
+# conferir client_max_body_size 64M presente TAMBÉM nos blocos 443 que o certbot cria (mesma
+# armadilha já documentada no runbook de Produção — o certbot cria um 2º server{} e não copia
+# diretivas do bloco 80)
+grep -n 'client_max_body_size' /etc/nginx/sites-available/integracao /etc/nginx/sites-available/homologacao
+```
+
+**Prova antes de seguir**: `curl -s -o /dev/null -w '%{http_code}\n' https://integracao.orizonone.com.br/`
+e o mesmo para `homologacao` — **302** nos dois (redireciona pro login sem sessão, igual ao smoke
+do deploy rotineiro). Neste ponto o acesso direto por `:8765`/`:8766` continua funcionando
+também — os dois caminhos coexistem até o Passo 2.
+
+### Passo 2 — bind interno (o app para de escutar a internet direto)
+
+Só depois do Passo 1 confirmado. Editar `/root/orizon-A.env` e `/root/orizon-B.env`
+(`ORIZON_HOST=0.0.0.0` → `ORIZON_HOST=127.0.0.1` nos dois), depois:
+
+```bash
+systemctl restart orizon-a && sleep 2 && curl -s -o /dev/null -w 'local: %{http_code}\n' http://127.0.0.1:8765/
+systemctl restart orizon-b && sleep 2 && curl -s -o /dev/null -w 'local: %{http_code}\n' http://127.0.0.1:8766/
+curl -s -o /dev/null -w 'https integracao: %{http_code}\n'   https://integracao.orizonone.com.br/
+curl -s -o /dev/null -w 'https homologacao: %{http_code}\n'  https://homologacao.orizonone.com.br/
+```
+
+Todos os quatro **302**. Se os dois primeiros (`127.0.0.1`) responderem mas o HTTPS não, o nginx
+está mal configurado — não avance pro Passo 3 (fechar o firewall deixaria os dois ambientes
+inteiramente inacessíveis, de fora e por porta direta).
+
+### Passo 3 — fecha a porta direta
+
+Só depois do Passo 2 confirmado pelos quatro `302`:
+
+```bash
+ufw delete allow 8765/tcp
+ufw delete allow 8766/tcp
+ufw status verbose   # confirma: só OpenSSH, 80, 443 — nada de 8765/8766
+curl -s -o /dev/null -w '%{http_code}\n' http://167.88.33.121:8765/   # de outra máquina, se possível — espera falha de conexão, não resposta
+```
+
+`scripts/deploy_ab.sh` já não reabre 8765/8766 a cada deploy (linhas removidas em 14/09, ver
+comentário no próprio script) — se algum dia esses `ufw allow` voltarem a aparecer ali, é
+regressão deste procedimento, não intenção.
+
+### Depois disto — o que muda no dia a dia
+
+- Acessar Integração/Homologação passa a ser pelas URLs `https://integracao.orizonone.com.br` /
+  `https://homologacao.orizonone.com.br` — os endereços `http://167.88.33.121:8765`/`:8766`
+  deixam de responder (Passo 3).
+- `wait_http` em `scripts/deploy_ab.sh` continua testando `127.0.0.1:<porta>` — isso não muda,
+  é checagem local, nunca dependeu de exposição externa.
+- Renovação do certificado é automática (`certbot` instala o próprio timer/cron) — conferir uma
+  vez com `certbot renew --dry-run` depois do primeiro `certbot --nginx` de cada subdomínio.
+
 ## Producao — reconstruida (rebuild de schema resolvido, ver `## Executado`)
 Esta secao descrevia o rebuild de schema, ainda nao feito quando foi
 escrita. Ja aconteceu (ver `## Executado`) e a pergunta do usuario admin

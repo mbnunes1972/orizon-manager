@@ -153,6 +153,37 @@ def get_or_create_conversa_projeto(db, loja_id, projeto_nome, cliente_id=None):
     return c
 
 
+def get_or_create_conversa_lead(db, loja_id, lead_id):
+    """Conversa ÚNICA do lead na loja (get-or-create; a primeira criada é a canônica) — Captação
+    provisória (14/09/2026, PLANO_SEMANA_1.md), mesmo molde de `get_or_create_conversa_projeto`
+    (âncora nasce e não se limpa; `lead_id` sobrevive à conversão do lead em Cliente — é o
+    registro de proveniência). Responsável nasce com o `Lead.responsavel_usuario_id` ATUAL
+    (mesma regra de "toda conversa tem sempre um responsável" — nunca nasce sem ninguém); a
+    transferência (na conversão, ou manual) segue atualizando o campo normalmente dali pra
+    frente, via `transferir_responsavel`. `tipo="lead"` (valor novo, distinto de "projeto" — o
+    default da coluna) porque a serialização de tipo="projeto" espera `projeto_nome` preenchido;
+    `pode_ler_conversa`/`pode_escrever_conversa` não têm caso especial para "lead", caem no
+    default (participante) — por isso o responsável é adicionado como participante aqui, na
+    criação, e não só na transferência (sem isso ele mesmo não conseguiria ler nem postar pelos
+    endpoints genéricos de conversa)."""
+    c = (db.query(Conversa)
+           .filter_by(loja_id=loja_id, lead_id=lead_id)
+           .order_by(Conversa.id.asc())
+           .first())
+    if c is None:
+        from database import Lead, ConversaParticipante as _CP_lead
+        l = db.get(Lead, lead_id)
+        resp_id = l.responsavel_usuario_id if l else None
+        c = Conversa(loja_id=loja_id, lead_id=lead_id, tipo="lead",
+                     responsavel_usuario_id=resp_id)
+        db.add(c)
+        db.flush()
+        if resp_id:
+            db.add(_CP_lead(conversa_id=c.id, usuario_id=resp_id))
+            db.flush()
+    return c
+
+
 def enviar_mensagem(db, conversa, autor_usuario_id, corpo, canal="interno",
                     natureza="interacao", etapa_codigo=None,
                     transferido_para_funcionario_id=None, documento_ref_id=None,

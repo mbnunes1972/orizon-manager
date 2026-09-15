@@ -299,8 +299,15 @@ chmod +x /root/backup_orizon.sh
 (crontab -l 2>/dev/null; echo "0 3 * * * /root/backup_orizon.sh") | crontab -
 ```
 ⚠️ Isso é backup **local** (mesmo disco da VPS) — protege contra erro de aplicação/banco, mas não
-contra falha da própria VPS. Ainda falta sincronizar pra fora (ex.: S3/Backblaze) — pendente, não
-bloqueia o go-live.
+contra falha da própria VPS.
+
+**Sincronização externa — `scripts/backup_externo.sh`** (Semana 1, PLANO_SEMANA_1.md): copia os
+dumps que o cron acima já produz para um bucket privado no Backblaze B2 (armazenamento ~4x mais
+barato que S3 padrão, egress gratuito via Cloudflare Bandwidth Alliance, API compatível com S3).
+Não faz dump — só sincroniza o que já existe em `/root/backups/`, via `rclone` (config 100% por
+env var, nenhuma credencial extra em disco). Setup e cron documentados no fim do próprio script.
+**Pendência agora é só operacional**: criar o bucket + Application Key no B2, preencher
+`/root/orizon-backup.env` (modo 600) e `apt install -y rclone` na VPS.
 
 ### Banco de dados
 - **Servidor de DEV:** SQLite: `orizon.db` na raiz — **NÃO versionado** (está no `.gitignore`); cada
