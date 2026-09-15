@@ -16,6 +16,7 @@ PERFIS = {
         "aprovar_medicao_reprovada": True, "gerir_usuarios": True, "gerir_perfis": True,
         "editar_dados_loja": True, "gerir_documentos": True,
         "executar_pe": True, "revisar_pe": True, "registrar_medicao": True,
+        "confirmar_excecao_cpf": True,   # LP-02 (15/09/2026): confirmar CPF divergente na assinatura
         "ver_todas_conversas": True,     # Orizon Chat Fatia 2 (Gerente/Diretor veem tudo + admin)
         # Painel Estratégico (2026-08-09): exclusivo do Master por ora — "acesso precisará ser
         # revisto no futuro" (decisão do usuário), por isso é uma CAPACIDADE normal (editável por
@@ -28,6 +29,7 @@ PERFIS = {
         "aprovar_medicao_reprovada": True, "gerir_usuarios": False, "gerir_perfis": False,
         "editar_dados_loja": False, "gerir_documentos": False,
         "executar_pe": True, "revisar_pe": True, "registrar_medicao": True,
+        "confirmar_excecao_cpf": True,   # LP-02 (15/09/2026): confirmar CPF divergente na assinatura
         "ver_todas_conversas": True},    # Orizon Chat Fatia 2 (Gerente/Diretor veem tudo + admin)
     "operador": {"rotulo": "Operador", "desconto_max": 10.0,
         # 2026-07-24 (decisão do usuário): operador também SEM Fiscal (era True)
@@ -37,6 +39,7 @@ PERFIS = {
         "aprovar_medicao_reprovada": False, "gerir_usuarios": False, "gerir_perfis": False,
         "editar_dados_loja": False, "gerir_documentos": False,
         "executar_pe": True, "revisar_pe": False, "registrar_medicao": True,
+        "confirmar_excecao_cpf": False,   # LP-02 (15/09/2026): não é "gerência" (desconto_max 10%)
         "ver_todas_conversas": False},
     # ── Plataforma/Rede (fora dos perfis de loja; NÃO entram na tabela perfil_acesso) ──
     "super_admin": {"rotulo": "Administrador da Plataforma", "desconto_max": 0.0,
@@ -60,7 +63,7 @@ _ALIAS_BASE = {"diretoria": "master", "consultor": "operador", "suporte": "opera
 
 _DEFAULT = {"rotulo": "—", "desconto_max": 0.0, "ver_parametros": False,
             "autorizar": False, "gerir_usuarios": False, "gerir_perfis": False,
-            "aprovar_financeiro": False,
+            "aprovar_financeiro": False, "confirmar_excecao_cpf": False,
             "registrar_medicao": False, "aprovar_medicao_reprovada": False,
             "gerir_redes": False, "gerir_lojas": False, "editar_dados_loja": False,
             "gerir_documentos": False,
@@ -256,6 +259,9 @@ CAPACIDADES = {
         "descricao": "Ver TODAS as conversas da loja (direct/grupo) e o painel de administração com filtro por assunto/participante."},
     "aprovar_financeiro":        {"rotulo": "Aprovar financeiro",         "grupo": "Financeiro",
         "descricao": "Aprovar os gates financeiros e liberar impostos."},
+    "confirmar_excecao_cpf":     {"rotulo": "Confirmar CPF divergente",   "grupo": "Comercial",
+        "descricao": "Confirmar a assinatura quando o CPF digitado não bate com o do cadastro "
+                     "(procuração, cônjuge) — LP-02, 15/09/2026."},
     "gerir_usuarios":            {"rotulo": "Gerir usuários",             "grupo": "Administração",
         "descricao": "Criar/editar contas de usuário da loja."},
     "gerir_perfis":              {"rotulo": "Gerir perfis de acesso", "grupo": "Administração",
@@ -351,7 +357,7 @@ def opcoes_da_loja(loja_id):
 
 # Capacidades finas booleanas SELECIONÁVEIS no modal (exclui os acesso_* de módulo/painel e as de plataforma).
 CAPS_SELECIONAVEIS = ["ver_parametros", "autorizar",
-                      "aprovar_financeiro", "gerir_usuarios",
+                      "aprovar_financeiro", "confirmar_excecao_cpf", "gerir_usuarios",
                       "gerir_perfis", "editar_dados_loja", "gerir_documentos",
                       "registrar_medicao", "aprovar_medicao_reprovada", "executar_pe", "revisar_pe"]
 

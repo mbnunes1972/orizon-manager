@@ -442,6 +442,55 @@ def _usuario_com_capacidade(db, login, senha, capacidade, sessao=None):
     return u
 
 
+def _cpf_diverge_do_cadastro(db, projeto_nome, parte, cpf_digitado, usuario_id):
+    """LP-02 (15/09/2026, DECIDIDO — AVISAR, NÃO BLOQUEAR): True quando o CPF digitado na
+    assinatura não bate com o do cadastro — `parte='cliente'` compara contra `Cliente.cpf` (via
+    `Projeto.cliente_id`); `parte='loja'` compara contra o `Usuario.cpf` de quem está logado
+    assinando pela loja (não existe "CPF da loja" — quem assina em nome dela é uma pessoa).
+    Cadastro sem CPF (None/vazio) não é divergência: nada para comparar contra, e inventar uma
+    exigência que o cadastro nunca teve seria o bloqueio disfarçado que a decisão rejeitou.
+    Usado só no caminho INTERNO (sessão viva, "tela" que pode perguntar) — o gatilho ClickSign
+    (usuario_id=None, assinatura já aconteceu fora, na plataforma deles) não tem onde perguntar
+    nada; ClickSign tem seu próprio mecanismo de verificação de identidade."""
+    import validacao_doc
+    digitado = validacao_doc._digitos(cpf_digitado)
+    if not digitado or usuario_id is None:
+        return False
+    esperado = None
+    if parte == "cliente":
+        proj = db.query(Projeto).filter_by(nome_safe=projeto_nome).first()
+        cli = db.get(Cliente, proj.cliente_id) if (proj and proj.cliente_id) else None
+        esperado = cli.cpf if cli else None
+    elif parte == "loja":
+        u = db.get(Usuario, usuario_id)
+        esperado = u.cpf if u else None
+    if not esperado:
+        return False
+    return validacao_doc._digitos(esperado) != digitado
+
+
+def _confirmar_excecao_cpf_ou_pedir(self, db, req, usuario, projeto_nome, parte, cpf,
+                                    documento_rotulo):
+    """Roda o gate do LP-02 para um endpoint de assinatura INTERNO. Retorna True se pode
+    prosseguir (CPF bate, ou um gerente confirmou a exceção agora); já respondeu `self.send_json`
+    e retornou False se precisa parar aqui (falta a confirmação). Loga a exceção confirmada em
+    LogAcaoGerencial — sem isso, "avisar" vira "ignorar com um clique" (exigência explícita da
+    decisão)."""
+    if not _cpf_diverge_do_cadastro(db, projeto_nome, parte, cpf, usuario.get("id")):
+        return True
+    gerente = _usuario_com_capacidade(db, req.get("login_gerente", ""), req.get("senha_gerente", ""),
+                                      "confirmar_excecao_cpf", sessao=usuario)
+    if not gerente:
+        self.send_json({"ok": False, "precisa_confirmar_cpf": True,
+            "erro": "O CPF digitado não confere com o cadastro. Confirme com login e senha de um "
+                    "gerente para prosseguir mesmo assim (procuração, cônjuge etc.)."}, code=409)
+        return False
+    db.add(LogAcaoGerencial(solicitante_id=usuario["id"], autorizador_id=gerente.id,
+            acao="confirmar_cpf_divergente", projeto_nome=projeto_nome,
+            contexto=json.dumps({"parte": parte, "documento": documento_rotulo})))
+    return True
+
+
 def _usuario_autoriza_desconto(db, login, senha, desconto_pct, sessao=None):
     """Usuario ativo cujo limite_desconto cobre `desconto_pct`, ou None — mesmo padrão
     sessão-primeiro de `_usuario_com_capacidade`, mas comparando o limite numérico do
@@ -1189,10 +1238,14 @@ def _registrar_assinatura_contrato(db, contrato, parte, nome, cpf, ip_origem, lo
     Idempotente: `parte` já assinada é no-op (cobre reentrega de webhook de graça).
     Retorna o status final do contrato (não commita a query de leitura, só os writes).
 
-    ACHADO-28: valida SÓ o dígito verificador do CPF (`validacao_doc.erro_doc`) — conferir
-    contra o cadastro é decisão do Marcelo, fica pro próximo ciclo. Por estar AQUI (não em cada
-    chamador) cobre os dois gatilhos de graça, inclusive o webhook ClickSign — ali o CPF vem de
-    fora (da própria ClickSign), a mesma razão de "enumerar os irmãos" (ACHADO-19/03/24/26)."""
+    ACHADO-28: valida SÓ o dígito verificador do CPF (`validacao_doc.erro_doc`) — por estar AQUI
+    (não em cada chamador) cobre os dois gatilhos de graça, inclusive o webhook ClickSign — ali o
+    CPF vem de fora (da própria ClickSign), a mesma razão de "enumerar os irmãos"
+    (ACHADO-19/03/24/26). LP-02 (15/09/2026, DECIDIDO): a conferência contra o cadastro
+    (`_cpf_diverge_do_cadastro`/`_confirmar_excecao_cpf_ou_pedir`) roda no CHAMADOR do endpoint
+    interno, não aqui — precisa de uma sessão viva pra perguntar a confirmação do gerente, e o
+    gatilho ClickSign (`usuario_id=None`) não tem onde perguntar nada (a assinatura já aconteceu
+    fora, na plataforma deles)."""
     if any(a.parte == parte for a in contrato.assinaturas):
         return contrato.status
     import validacao_doc
@@ -1379,7 +1432,9 @@ def _registrar_assinatura_aprovacao_pe(db, aprov, parte, nome, cpf, ip_origem, u
     Idempotente: `parte` já assinada é no-op. Retorna o status final da aprovação.
 
     ACHADO-28: mesma guarda de _registrar_assinatura_contrato — só dígito verificador, cobre
-    os dois gatilhos (interno e webhook ClickSign) por estar aqui, não em cada chamador."""
+    os dois gatilhos (interno e webhook ClickSign) por estar aqui, não em cada chamador. LP-02
+    (15/09/2026): a conferência contra o cadastro roda no chamador do endpoint interno, mesma
+    razão de _registrar_assinatura_contrato (acima) — precisa de sessão viva pra perguntar."""
     if any(a.parte == parte for a in aprov.assinaturas):
         return aprov.status
     import validacao_doc
@@ -1439,7 +1494,9 @@ def _registrar_assinatura_solicitacao_medicao(db, sol, parte, nome, cpf, ip_orig
     sistema, mesmo padrão da etapa 7/Contrato). Idempotente: `parte` já assinada é no-op.
 
     ACHADO-28: mesma guarda de _registrar_assinatura_contrato — só dígito verificador, cobre
-    os dois gatilhos (interno e webhook ClickSign) por estar aqui, não em cada chamador."""
+    os dois gatilhos (interno e webhook ClickSign) por estar aqui, não em cada chamador. LP-02
+    (15/09/2026): a conferência contra o cadastro roda no chamador do endpoint interno, mesma
+    razão de _registrar_assinatura_contrato (acima) — precisa de sessão viva pra perguntar."""
     if any(a.parte == parte for a in sol.assinaturas):
         return sol.status
     import validacao_doc
@@ -1503,7 +1560,8 @@ def _registrar_assinatura_aditivo(db, aditivo, parte, nome, cpf, ip_origem, loja
     ACHADO-28 (achado ao extrair, não comportamento a preservar): até esta entrega, a assinatura
     do Aditivo NUNCA validava o CPF — os três irmãos sempre validaram, o Aditivo não. Valida
     agora, mesmo padrão dos irmãos (só dígito verificador, `validacao_doc.erro_doc`), cobrindo os
-    dois gatilhos de graça por estar aqui.
+    dois gatilhos de graça por estar aqui. LP-02 (15/09/2026): a conferência contra o cadastro
+    roda no chamador do endpoint interno, mesma razão dos outros três — precisa de sessão viva.
 
     ACHADO-21 6-c: quem TERMINA de assinar precisa de uma forma de pagamento já gravada em
     `orc_aj.forma_pagamento` — sem ela não dá pra materializar os recebíveis. Esta função só LÊ
@@ -9936,6 +9994,9 @@ class Handler(BaseHTTPRequestHandler):
                 orc_aj = db.get(Orcamento, aditivo.orcamento_complemento_id)
                 if completa_agora and forma_pagamento_str and orc_aj is not None:
                     orc_aj.forma_pagamento = forma_pagamento_str
+                if not _confirmar_excecao_cpf_ou_pedir(self, db, req, usuario, nome, parte, cpf,
+                                                       "termo_aditivo"):
+                    return
                 ip = self.client_address[0] if self.client_address else ""
                 status_final = _registrar_assinatura_aditivo(
                     db, aditivo, parte, nome_ass, cpf, ip, loja_id, usuario_id=usuario.get("id"))
@@ -10254,6 +10315,9 @@ class Handler(BaseHTTPRequestHandler):
                                 "(ClickSign) — assine por lá, não pela tela interna."}, code=400); return
                 if any(a.parte == parte for a in aprov.assinaturas):
                     self.send_json({"ok": False, "erro": "Esta parte já assinou."}, code=400); return
+                if not _confirmar_excecao_cpf_ou_pedir(self, db, req, usuario, nome, parte, cpf,
+                                                       "aprovacao_pe"):
+                    return
                 ip = self.client_address[0] if self.client_address else ""
                 status_final = _registrar_assinatura_aprovacao_pe(
                     db, aprov, parte, nome_ass, cpf, ip, usuario_id=usuario["id"])
@@ -14899,6 +14963,9 @@ class Handler(BaseHTTPRequestHandler):
                             "erro": "A data de entrega não cabe no cronograma (folga negativa) e não foi autorizada. "
                                     "Ajuste a data ou registre com autorização gerencial antes de assinar."}, code=400)
                         return
+                    if not _confirmar_excecao_cpf_ou_pedir(self, db, req, usuario, nome_safe, parte,
+                                                           cpf, "contrato"):
+                        return
                     ip = self.client_address[0] if self.client_address else ""
                     status_final = _registrar_assinatura_contrato(
                         db, contrato, parte, nome, cpf, ip, loja_id, usuario_id=usuario["id"])
@@ -15512,6 +15579,9 @@ class Handler(BaseHTTPRequestHandler):
                                     "(ClickSign) — assine por lá, não pela tela interna."}, code=400); return
                     if any(a.parte == parte for a in sol.assinaturas):
                         self.send_json({"ok": False, "erro": f"Parte '{parte}' já assinou"}, code=400); return
+                    if not _confirmar_excecao_cpf_ou_pedir(self, db, req, usuario, nome_safe, parte,
+                                                           cpf, "solicitacao_medicao"):
+                        return
                     ip = self.client_address[0] if self.client_address else ""
                     status_final = _registrar_assinatura_solicitacao_medicao(
                         db, sol, parte, nome_ass, cpf, ip, usuario_id=usuario["id"])

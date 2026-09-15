@@ -35,7 +35,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 
 | Destino | Itens | Observação |
 |---|---|---|
-| **BETA** | 1 | LP-02, decidido em 15/09 — pronto para a Sessão A implementar esta semana. |
+| **BETA** | 0 | LP-02 implementado em 15/09 — ver o item, abaixo, mantido como registro. |
 | **FRONTEIRA** | 10 | Agrupados por fronteira — ver detalhamento abaixo. |
 | ↳ 6.1 (regra única de transição) | 2 | Ainda não construída — Marcelo quer desenhar com calma. |
 | ↳ 6.2 (Tela Única de Provisões) | 3 | **Em construção nesta Semana 2** — `docs/db/TAREFA_TELA_UNICA_PROVISOES.md`. |
@@ -47,14 +47,25 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | **DECIDIDO — fila da 1.0** | 3 | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. |
 | **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **26** | 28 da rodada anterior, menos LP-09 e LP-24 (decididos em 15/09, movidos para "Fechados" — recusa decidida, não achado). Os outros seis itens PRODUTO de 15/09 continuam contados, só redistribuídos: LP-02→BETA, LP-11→HIGIENE, LP-01/12/14→DECIDIDO, LP-18→FRONTEIRA/6.3. |
+| **Total aberto** | **25** | 26 da rodada anterior, menos LP-02 (implementado em 15/09 — sai da contagem de aberto, fica como registro no lugar). |
 
 ---
 
 ## BETA
 
-**LP-02 · CPF de quem assina — decidido em 15/09: AVISAR, NÃO BLOQUEAR.**
-*Destino: BETA — decisão fechada, pronta para implementar esta semana.*
+**LP-02 · CPF de quem assina — decidido em 15/09: AVISAR, NÃO BLOQUEAR. IMPLEMENTADO em 15/09.**
+*Destino: BETA — decisão fechada, implementada no mesmo dia.*
+
+**Implementado:** `_cpf_diverge_do_cadastro`/`_confirmar_excecao_cpf_ou_pedir` (main.py), rodando
+nos quatro endpoints internos de assinatura (Contrato, Aditivo, Aprovação do PE, Solicitação de
+Medição) — o gatilho ClickSign fica de fora de propósito (a assinatura já aconteceu fora, sem
+sessão viva pra perguntar nada). `parte='cliente'` compara contra `Cliente.cpf`; `parte='loja'`
+compara contra o `Usuario.cpf` de quem está logado assinando. Nova capacidade
+`confirmar_excecao_cpf` (auth/perfis.py, concedida a master/gerencial, configurável por loja como
+qualquer outra) reusa o mecanismo genérico já existente na tela (`pedirCredenciaisGerente`) — sem
+componente novo de UI. Confirmação vira `LogAcaoGerencial` (`acao=confirmar_cpf_divergente`).
+Testes: `tests/test_lp02_cpf_divergente.py` (7 casos, os quatro documentos) +
+`tests/test_aceite_achado28.py` (6, sem regressão).
 
 **A regra, para quem ler isto sem contexto:** hoje o sistema confere só se o CPF digitado na
 assinatura é um CPF matematicamente válido — não se é o CPF da pessoa certa (o cliente daquele

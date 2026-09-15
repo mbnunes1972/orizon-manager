@@ -22986,9 +22986,22 @@ async function peAditivoAssinar(parte){
     corpo.forma_pagamento = JSON.stringify(plano);
   }
   try {
-    const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo/assinar`,
-      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
-       body: JSON.stringify(corpo)}).then(r=>r.json());
+    const url = `/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/aditivo/assinar`;
+    let j = await fetch(url, {method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo)}).then(r=>r.json());
+    // LP-02 (15/09/2026, DECIDIDO): CPF divergente do cadastro pede confirmação de gerente,
+    // não bloqueia — mesmo mecanismo dos três irmãos (_confirmarAssinaturaUnificada).
+    if(!j.ok && j.precisa_confirmar_cpf){
+      const cred = await pedirCredenciaisGerente({capacidade: 'confirmar_excecao_cpf',
+        titulo: 'CPF divergente do cadastro',
+        mensagem: (j.erro || 'O CPF digitado não confere com o cadastro.') +
+          '\n\nCasos legítimos (procuração, cônjuge) precisam da confirmação de um gerente.'});
+      if(!cred){ showToast('Assinatura não confirmada — CPF divergente sem autorização.', true); return; }
+      corpo.login_gerente = cred.auto ? '' : cred.login;
+      corpo.senha_gerente = cred.auto ? '' : cred.senha;
+      j = await fetch(url, {method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo)}).then(r=>r.json());
+    }
     if(!j.ok){ await avisoPopup(j.erro||'Erro',{titulo:'Assinar aditivo'}); return; }
     showToast('Assinatura registrada (' + parte + ').');
     peComplementoRender();
@@ -25258,12 +25271,30 @@ function _renderBoxConfirmacaoInterna(cfg) {
 
 async function _confirmarAssinaturaUnificada(caminhoAssinar, parte, nome, cpf) {
   if (!nome || !cpf) { showToast(`Informe nome e CPF (${parte}).`, true); return false; }
+  const corpo = { parte, nome, cpf };
   try {
-    const r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/${caminhoAssinar}`, {
+    let r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/${caminhoAssinar}`, {
       method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ parte, nome, cpf }),
+      body: JSON.stringify(corpo),
     });
-    const d = await r.json();
+    let d = await r.json();
+    // LP-02 (15/09/2026, DECIDIDO): CPF digitado não bate com o cadastro — não é bloqueio, é
+    // pedir confirmação de um gerente (mesmo mecanismo de aprovar_financeiro/registrar_medicao)
+    // e refazer a MESMA chamada com as credenciais anexadas.
+    if (!d.ok && d.precisa_confirmar_cpf) {
+      const cred = await pedirCredenciaisGerente({capacidade: 'confirmar_excecao_cpf',
+        titulo: 'CPF divergente do cadastro',
+        mensagem: (d.erro || 'O CPF digitado não confere com o cadastro.') +
+          '\n\nCasos legítimos (procuração, cônjuge) precisam da confirmação de um gerente.'});
+      if (!cred) { showToast('Assinatura não confirmada — CPF divergente sem autorização.', true); return false; }
+      corpo.login_gerente = cred.auto ? '' : cred.login;
+      corpo.senha_gerente = cred.auto ? '' : cred.senha;
+      r = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/${caminhoAssinar}`, {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(corpo),
+      });
+      d = await r.json();
+    }
     if (!d.ok) { showToast('Erro: ' + d.erro, true); return false; }
     return true;
   } catch(e) { showToast('Erro de rede: ' + _detalheErroRede(e), true); return false; }
