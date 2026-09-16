@@ -216,3 +216,52 @@ def test_margens_recusa_dura_quando_desconto_deixa_margem_negativa(http_client_f
     orc = db.get(app_db.Orcamento, oid)
     assert (orc.desconto_pct or 0) != 40
     db.close()
+
+
+# ── Conserto 2026-09-16 (Homologação, achado do cantunes15): o portão só reabre quando ─────────
+# comissão/fidelidade MUDAM DE VALOR — não quando o autossalvamento reenvia o objeto de
+# parâmetros inteiro (o frontend sempre manda todos os campos, então "está no pedido" era sempre
+# verdadeiro e qualquer campo tocado — ex.: viagem, incluir_custos — reabria o portão do
+# ACHADO-42 usando a comissão/fidelidade JÁ salva, mesmo sem ninguém ter mexido nelas).
+
+def test_autosave_de_viagem_nao_reabre_portao_de_comissao_ja_salva(http_client_factory, seed, app_db):
+    """Composto já salvo (desconto 30% + comissão 30% = 51%, acima do limite de 50% do master)
+    — se o portão rodasse de novo aqui, recusaria. O autossalvamento só mexeu em viagem/
+    incluir_custos, então tem que passar batido: sucesso, sem `requer_autorizacao`."""
+    oid = _preparar_projeto(app_db, seed)
+    nome = seed["projeto_l1"]
+    db = app_db.get_session()
+    orc = db.get(app_db.Orcamento, oid)
+    orc.desconto_pct = 30.0
+    proj = db.get(app_db.Projeto, nome)
+    proj.parametros_json = json.dumps({"comissao_arq_ativa": True, "comissao_arq_pct": 30.0})
+    db.commit()
+    db.close()
+
+    c = _login(http_client_factory, "dir_l1")   # master, limite 50%
+    st, body = c.post(f"/api/projetos/{nome}/parametros", {
+        "comissao_arq_ativa": True, "comissao_arq_pct": 30.0,   # idênticos ao já salvo
+        "fidelidade_ativa": False, "fidelidade_pct": 0.0,
+        "incluir_custos": True, "fora_da_sede": True, "custo_viagem": 500.0,
+    })
+    assert st == 200 and body["ok"] is True, body
+    assert not body.get("requer_autorizacao")
+    assert _parametros(app_db, nome)["custo_viagem"] == 500.0   # o campo tocado foi salvo
+
+
+def test_autosave_muda_comissao_de_verdade_ainda_reabre_portao(http_client_factory, seed, app_db):
+    """Controle do teste acima: se a comissão MUDA de valor (não só reenviada igual), o portão
+    do ACHADO-42 continua valendo — o conserto não pode virar 'nunca mais checa'."""
+    oid = _preparar_projeto(app_db, seed)
+    nome = seed["projeto_l1"]
+    db = app_db.get_session()
+    orc = db.get(app_db.Orcamento, oid)
+    orc.desconto_pct = 30.0
+    db.commit()
+    db.close()
+
+    c = _login(http_client_factory, "dir_l1")   # master, limite 50%
+    st, body = c.post(f"/api/projetos/{nome}/parametros",
+                      {"comissao_arq_ativa": True, "comissao_arq_pct": 30.0})   # 30+30=60% > 50%
+    assert st == 403, body
+    assert body["requer_autorizacao"] is True

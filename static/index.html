@@ -4315,9 +4315,18 @@ let _removerAmbPending  = null; // { pid } aguardando confirmação
 let _orcSombra         = null; // derivados sombra do orçamento ativo (Task 7 — modo sombra)
 
 // ---- Limite de desconto total (35%) ----------------------------------------
+// PORTÃO (16/09): lê Desc_Tot_Portao, não Desc_Tot — com "Incluir custos adicionais" ligado,
+// viagem/brinde/custo especial deixam uma perda real no Val_Liq ((custo)×desconto, ACHADO-63)
+// que é dinheiro da loja, não desconto a mais pro cliente; o Desc_Tot cru inflava o teto de 35%
+// só por existir uma viagem. Desc_Tot (contábil) segue sendo o que a tela EXIBE. Mesmo conserto
+// de main._maior_composto_com_parametros_pct (regra dos irmãos).
+function _descTotPortaoPct(s){
+  const v = (s && s.Desc_Tot_Portao != null) ? s.Desc_Tot_Portao : (s ? s.Desc_Tot : 0);
+  return (Number(v) || 0) * 100;
+}
 async function _verificarLimiteDescTotal(){
-  await negPreview();   // garante o %Desc_Tot FRESCO do motor (não o legado)
-  const margem = _previewNeg ? (Number(_previewNeg.Desc_Tot) || 0) * 100 : _margemAtual;
+  await negPreview();   // garante o %Desc_Tot_Portao FRESCO do motor (não o legado)
+  const margem = _previewNeg ? _descTotPortaoPct(_previewNeg) : _margemAtual;
   if(margem > _LIMITE_DESC_TOTAL){
     showToast('Desconto total excede o limite máximo de descontos.', true);
     return false;
@@ -4372,11 +4381,11 @@ async function _onDescIndBlur(el, key, isEP07){
     negAtualizarDescontoEfetivo();
   }
   mpAtualizarApoio();
-  await negPreview();   // %Desc_Tot fresco do motor
+  await negPreview();   // %Desc_Tot_Portao fresco do motor (PORTÃO 16/09)
   // Se o usuário trocou de orçamento durante o await, ativarOrcamento já salvou os descontos
   // deste orçamento — abortar para não gravar _descIndividual já do OUTRO orçamento aqui.
   if(_orcamentoAtivoId !== _orcNoBlur) return;
-  const _margem = _previewNeg ? (Number(_previewNeg.Desc_Tot) || 0) * 100 : _margemAtual;
+  const _margem = _previewNeg ? _descTotPortaoPct(_previewNeg) : _margemAtual;
   if(_margem > _LIMITE_DESC_TOTAL){
     const prev = parseFloat(el._prev) || 0;
     _descIndividual[key] = prev;
@@ -11800,8 +11809,8 @@ function _aplicarPreviewNaTela(s) {
   const _pctCA = (Number(s.VAVO) > 0) ? (Number(s.Cust_Ad) || 0) / Number(s.VAVO) * 100 : 0;
   if (id('mp-a-pct-ca')) id('mp-a-pct-ca').textContent =
     _pctCA.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
-  const margem = (Number(s.Desc_Tot) || 0) * 100;
-  _margemAtual = margem;   // usado pelo limite de 35%
+  const margem = (Number(s.Desc_Tot) || 0) * 100;   // exibição: contábil, perda real incluída
+  _margemAtual = _descTotPortaoPct(s);   // fallback do limite de 35% — PORTÃO (16/09), sem vazamento
   if (id('mp-a-margem')) id('mp-a-margem').textContent =
     margem.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) + '%';
   // 3 margens (NOMENCLATURA §3c): mesma margem R$ sobre bases crescentes. marg_cont (s.Marg_Cont) já é
@@ -12105,15 +12114,16 @@ async function fecharModalParams(salvar){
       });
       const dp = await rp.json();
       if(!dp.ok){ showToast('Erro ao salvar parametros: '+(dp.erro||''), true); return; }
-      const dmg = await (await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/margens',{
-        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({desconto_pct: desconto}),
-      })).json();
-      // breakdown do motor (fonte única): captura e EXIBE
-      if (dmg.sombra) {
-        _orcSombra = dmg.sombra;
+      // Conserto 2026-09-16: mp-desconto é readonly neste modal (fonte única é outro fluxo) —
+      // reenviar /margens aqui era sempre um no-op no valor de desconto_pct, mas re-disparava o
+      // portão de limite de desconto (_maior_composto_com_parametros_pct) com os parâmetros
+      // recém-salvos (ex.: viagem), pedindo autorização gerencial por um desconto que ninguém
+      // pediu. /parametros já devolve o breakdown fresco em dp.sombra — sem chamada extra.
+      if (dp.sombra) {
+        _orcSombra = dp.sombra;
         const _orcAtualizado = _orcamentos.find(o => o.id === _orcamentoAtivoId);
-        if (_orcAtualizado) _orcAtualizado.sombra = dmg.sombra;
-        aplicarBreakdownResposta(dmg);
+        if (_orcAtualizado) _orcAtualizado.sombra = dp.sombra;
+        aplicarBreakdownResposta(dp);
       }
       // Atualiza a memória com os estruturais recém-salvos + o desconto deste orçamento,
       // para refletir imediatamente ao reabrir o modal (sem precisar trocar de orçamento).

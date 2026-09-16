@@ -566,7 +566,16 @@ def _maior_composto_com_parametros_pct(db, projeto_nome, orc_id_alvo=None,
     Por AMBIENTE, nunca a média do orçamento — uma média diluiria o pior caso exatamente como a
     checagem campo-a-campo do achado de 12/08 escondia o composto: `Desc_Tot` é uma média
     ponderada entre ambientes, e um ambiente sozinho pode estourar o limite enquanto a média do
-    orçamento ainda parece dentro. Desc_Tot_ambiente = (VBVA − Val_Liq_ambiente) / VBVA.
+    orçamento ainda parece dentro. Desc_Tot_ambiente = (VBVA − Val_Liq_Portao_ambiente) / VBVA.
+
+    PORTÃO (16/09): lê `Val_Liq_Portao`, não `Val_Liq`. Com "Incluir custos adicionais" LIGADO
+    (repassa), viagem/brinde entram em VAVA já × fator_desc (ACHADO-63) e saem de Val_Liq pelo
+    valor cheio — a diferença é perda REAL da loja (fica no Val_Liq contábil, no `menor_val_liq`
+    abaixo e no corte de margem negativa), mas NÃO é desconto a mais pro cliente. Lida como
+    desconto, inflava o percentual e pedia senha de gerente só por existir uma viagem (1.000 de
+    viagem com d=30% dava 33%). `Val_Liq_Portao` é o Val_Liq que existiria SEM viagem/brinde —
+    comissão/fidelidade continuam contando do mesmo jeito (com ou sem gross-up), e no absorve
+    (toggle desligado) os dois campos são idênticos, zero mudança. Ver mod_negociacao.py.
 
     `orc_id_alvo`: só esse orçamento recebe `desconto_pct_override`/`individuais_override` (os
     demais orçamentos do projeto usam o que já está salvo) — `desconto_pct`/individual moram no
@@ -597,7 +606,12 @@ def _maior_composto_com_parametros_pct(db, projeto_nome, orc_id_alvo=None,
             # round: mesmo cuidado de ponto flutuante do achado de 2026-08-13 (ver
             # _maior_desconto_efetivo_pct) — composições matematicamente iguais não podem cair de
             # lados opostos da trava por erro de arredondamento.
-            pct = round((1 - float(amb.get("Val_Liq") or 0.0) / vbva) * 100.0, 2)
+            # PORTÃO (16/09): Val_Liq_Portao, não Val_Liq — ver docstring. Cai pro Val_Liq só
+            # se um motor antigo não devolver o campo (nunca deve acontecer; evita KeyError).
+            liq_portao = amb.get("Val_Liq_Portao")
+            if liq_portao is None:
+                liq_portao = amb.get("Val_Liq")
+            pct = round((1 - float(liq_portao or 0.0) / vbva) * 100.0, 2)
             if pct > maior_pct:
                 maior_pct = pct
     return maior_pct, menor_val_liq
@@ -12153,10 +12167,15 @@ class Handler(BaseHTTPRequestHandler):
                     elif _k in atual:  novos[_k] = atual[_k]
                 # ACHADO-42 (docs/db/ACHADOS_CONTABEIS.md, DECIDIDO 02/09): comissão de arquiteto e
                 # fidelidade passam pelo MESMO portão do desconto — mesma margem, mesmo teto. Só
-                # roda quando um desses quatro campos está no pedido (mesmo escopo de
-                # `if "desconto_pct" in req` no /margens, abaixo).
-                if any(k in req for k in ("comissao_arq_pct", "fidelidade_pct",
-                                          "comissao_arq_ativa", "fidelidade_ativa")):
+                # roda quando um desses quatro campos MUDA DE VALOR (não apenas "está no pedido"
+                # — Conserto 2026-09-16: o frontend sempre reenvia o objeto de parâmetros
+                # inteiro, então "está no pedido" era sempre verdadeiro e o portão reabria a cada
+                # autossalvamento de QUALQUER campo do modal — inclusive viagem/incluir_custos,
+                # que não têm nada a ver com comissão/fidelidade).
+                _gate_default = {"comissao_arq_pct": 0.0, "fidelidade_pct": 0.0,
+                                  "comissao_arq_ativa": False, "fidelidade_ativa": False}
+                if any(novos.get(k, _gate_default[k]) != atual.get(k, _gate_default[k])
+                       for k in _gate_default):
                     maior_pct, menor_val_liq = _maior_composto_com_parametros_pct(
                         db, nome_safe, params_override=novos)
                     # Regra 3: margem negativa é recusa dura — nenhuma credencial a levanta.

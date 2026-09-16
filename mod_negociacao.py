@@ -71,6 +71,7 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
     com_arq = pro_fid = 0.0
     total_via = total_bri = 0.0
     recup_via = recup_bri = 0.0
+    vazamento_tot = 0.0   # PORTÃO (16/09): Σ (viagem+brinde) × (1 − fator_desc) dos repassados
     for a in ambs:
         vbva, d_amb = a["VBVA"], a["d_amb"]
         fator_desc = (1 - d_orc) * (1 - d_amb)
@@ -121,11 +122,25 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
         VBNO += vbna
         VAVO += vava
         liq_amb = vava - com_amb - pro_amb - num_via - num_bri
+        # PORTÃO (16/09, regra dos irmãos com main._maior_composto_com_parametros_pct): no
+        # REPASSA, viagem/brinde entram em VAVA já × fator_desc (ACHADO-63) e saem de Val_Liq
+        # pelo valor CHEIO — a diferença, (viagem+brinde) × (1 − fator_desc), é a perda real da
+        # loja (dinheiro, fica no Val_Liq contábil) mas NÃO é desconto a mais pro cliente. O
+        # portão de autorização gerencial mede "desconto equivalente" (1 − líquido/VBVA); ler o
+        # Val_Liq cru ali inflava o percentual só por existir custo repassado (viagem de 1.000
+        # com d=30% virava 33% no portão). `Val_Liq_Portao` devolve esse vazamento: é
+        # EXATAMENTE o Val_Liq que existiria sem viagem/brinde (mesma mercadoria, mesma
+        # comissão/fidelidade — `com_amb`/`pro_amb` não dependem deles, a base os exclui).
+        # ABSORVE: nada muda (`Val_Liq_Portao == Val_Liq`) — o custo é 100% da loja e o portão
+        # continua contando como sempre contou. `cust_esp` não passa aqui (só no agregado).
+        vazamento_amb = ((num_via + num_bri) * (1 - fator_desc)) if tog_cadi else 0.0
+        vazamento_tot += vazamento_amb
         out_ambs.append({"VBVA": round(vbva, 2), "CFA": round(a["CFA"], 2),
                          "VBNA": round(vbna, 2), "VAVA": round(vava, 2),
                          "Com_Arq": round(com_amb, 2), "Pro_Fid": round(pro_amb, 2),
                          "Cust_Via": round(num_via, 2), "Bri": round(num_bri, 2),
-                         "Val_Liq": round(liq_amb, 2)})
+                         "Val_Liq": round(liq_amb, 2),
+                         "Val_Liq_Portao": round(liq_amb + vazamento_amb, 2)})
 
     # Custo Especial: linha do ORÇAMENTO, não rateada nos ambientes (sai ambiente, ele fica integral —
     # ≠ viagem/brinde, que se distribuem pelo pool do projeto). Repassado (tog_cadi), soma em VBNO
@@ -139,6 +154,9 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
         # enquanto VBNO também recebia o valor cheio — a identidade VAVO == VBNO*(1−d) quebrava
         # exatamente em `cust_esp * d_orc`.
         VAVO += cust_esp * (1 - d_orc)
+        # PORTÃO (16/09): mesmo vazamento de viagem/brinde, só que pelo desconto DO ORÇAMENTO
+        # (entra em VAVO × (1−d_orc), sai de cust_ad cheio → perde `cust_esp × d_orc`).
+        vazamento_tot += cust_esp * d_orc
 
     # ACHADO-65/66 (07/09): Item Especial ("markup 1") — mesmo valor cheio nos três, fora do loop
     # por ambiente (não é ambiente, não gera comissão). Ver nota no topo do arquivo.
@@ -151,6 +169,12 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
                + (total_bri if tog_bri else 0.0) + cust_esp)
     val_liq = VAVO - cust_ad
     desc_tot = ((VBVO - val_liq) / VBVO) if VBVO > 0 else 0.0
+    # PORTÃO (16/09): agregado do `Val_Liq_Portao` por ambiente (+ o vazamento do custo especial,
+    # que só existe no agregado). Igual a Val_Liq/Desc_Tot no absorve (vazamento_tot == 0). É o
+    # que o teto de 35% da tela (`_verificarLimiteDescTotal`) tem que ler — `Desc_Tot` cru
+    # continua sendo o indicador contábil exibido/persistido (perda real incluída).
+    val_liq_portao = val_liq + vazamento_tot
+    desc_tot_portao = ((VBVO - val_liq_portao) / VBVO) if VBVO > 0 else 0.0
     # ACHADO-65: indicador EXIBIDO dilui por mercadoria de terceiro (as duas parcelas compõem
     # mercadoria) — a conciliação de PE usa outro cálculo, ver `_markup_merc_puro` em main.py.
     markup = (val_liq / (CFO + item_especial)) if (CFO + item_especial) > 0 else 0.0
@@ -166,6 +190,9 @@ def calcular_orcamento(ambientes, params, desc_orc_pct, cust_fin=0.0, n_total_pr
         "Cust_Esp": round(cust_esp, 2),
         "Cust_Ad": round(cust_ad, 2),
         "Val_Liq": round(val_liq, 2), "Desc_Tot": round(desc_tot, 4), "Markup": round(markup, 3),
+        # PORTÃO (16/09): líquido/desconto-equivalente SEM o vazamento dos custos repassados —
+        # só pra portão de autorização/teto; nunca pra razão, provisão ou exibição contábil.
+        "Val_Liq_Portao": round(val_liq_portao, 2), "Desc_Tot_Portao": round(desc_tot_portao, 4),
         "Cust_Fin": round(_f(cust_fin), 2), "Val_Cont": round(val_cont, 2), "Prov_Imp": round(prov_imp, 2),
         # ACHADO-63: fonte única do recuperado real por rubrica — a tela não pode recalcular
         # (com desconto por ambiente, o recuperado é a soma dos fatores por ambiente, não o
