@@ -650,3 +650,59 @@ diferença que justifica não pedir testemunha ali.
 precise ser refeita.
 
 **Fonte:** `docs/db/LISTA_PARALELA.md`, "Fechados"; `docs/db/DECISOES_PENDENTES.md`.
+
+---
+
+## ADR-028 — Compartilha-se o cadastro do cliente, nunca o histórico comercial
+**Data:** 2026-09-16
+**Status:** Ativo
+
+**Decisão (de negócio, do Marcelo):** um cliente pode comprar em duas lojas distintas. Quando as
+lojas pertencem à **mesma rede**, a segunda loja **puxa o cadastro existente** (nome, CPF,
+contato, endereço) e confirma os dados com o cliente, em vez de ser bloqueada por "CPF já
+cadastrado". Quando a loja é **avulsa** (sem rede), o cadastro é **duplicado** — nada atravessa.
+O que se compartilha é **só o cadastro**: projetos, negociações e briefing nunca atravessam a
+fronteira da loja, nem dentro da mesma rede.
+
+**Contexto:** até 16/09 a unicidade de CPF era global e o segundo cadastro era recusado — o
+Marcelo tropeçou nisso testando em Homologação. A recusa global era ao mesmo tempo restritiva
+demais (impedia a venda legítima) e frouxa demais (não dizia nada sobre quem podia *ver* o
+cadastro). As duas coisas foram separadas: a unicidade virou **por rede**
+(`uq_clientes_cpf_rede`) ou **por loja quando não há rede** (`uq_clientes_cpf_loja_avulsa`), e o
+alcance de leitura virou uma função própria, `_cliente_acessivel` (`main.py`), que aceita o
+cliente da própria loja **ou** o de outra loja da mesma rede. Deliberadamente **não** é
+`mod_tenancy.pode_ver_loja` — aquilo decide quem vê *lojas* (admin_rede/super_admin); este alcance
+vale para qualquer usuário de loja, consultor e operador inclusive, que é o próprio ponto da regra.
+
+**Consequência:** sete pontos de `Cliente` foram revisados um a um. Cinco passaram a
+`_cliente_acessivel` (consulta do cadastro, lista de projetos do cliente, e mais três). **Dois
+continuaram em `_obj_da_loja` de propósito**: `GET`/`POST /api/clientes/<id>/briefing` — o
+briefing é qualificação comercial, não cadastro, e fica loja a loja. `GET
+/api/clientes/<id>/projetos` usa `_cliente_acessivel` para **achar** o cliente mas filtra os
+projetos pela loja que pergunta, nos dois sentidos.
+
+**Ressalva que dá o custo da regra (vale mais que o texto acima):** durante a implementação, a
+troca mecânica de `_obj_da_loja` por `_cliente_acessivel` nesses sete pontos **abriu o histórico
+comercial entre lojas da mesma rede** em dois deles. Foi pego e revertido antes do commit, mas o
+episódio é a demonstração mais nítida possível de que "compartilhar cadastro" e "compartilhar
+histórico" estão a **uma substituição de descuido** de distância: os nomes são parecidos, o erro
+não quebra teste nenhum, e o sintoma é vazamento silencioso. Por isso a regra operacional:
+**ao tocar qualquer endpoint de `Cliente`, decidir explicitamente se aquele endpoint serve
+cadastro ou histórico, e só então escolher a função.** Substituição por semelhança de nome é
+proibida aqui.
+
+**Inventário dos caminhos que criam `Cliente` (regra dos irmãos — ACHADO-26):** são **três**, e
+os três usam a mesma fonte de `rede_id`, `mod_chat._rede_da_loja(db, loja_id)`:
+
+1. `main.py` — `POST /api/clientes` (cadastro direto)
+2. `main.py` — conversão de `Lead` em cliente (`POST /api/leads/<id>/converter`)
+3. `chat/core.py::_cadastrar_contato` — cadastro de contato pelo chat
+
+O terceiro só apareceu porque alguém foi procurar: criava `Cliente` sem `rede_id`, o que o
+deixaria fora da constraint e invisível ao compartilhamento. O número **três** está escrito aqui
+justamente para que o quarto se denuncie sozinho quando aparecer — quem acrescentar um caminho de
+criação de `Cliente` atualiza esta lista no mesmo commit.
+
+**Fonte:** commit `69a9b88`; `tests/test_cliente_unicidade_por_rede.py` (7 testes, incluindo
+isolamento de histórico nos dois sentidos); migrações de `uq_clientes_cpf_rede` /
+`uq_clientes_cpf_loja_avulsa`; `docs/db/LISTA_PARALELA.md`.
