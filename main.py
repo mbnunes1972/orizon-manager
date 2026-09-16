@@ -3882,7 +3882,7 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
-                c = _obj_da_loja(db, Cliente, int(m.group(1)), loja_id)
+                c = _cliente_acessivel(db, int(m.group(1)), loja_id)
                 if c is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
@@ -4951,7 +4951,7 @@ class Handler(BaseHTTPRequestHandler):
                     if _err:
                         self.send_json({"ok": False, "erro": _err}, code=403)
                         return
-                    c = _obj_da_loja(db, Cliente, int(m.group(1)), loja_id)
+                    c = _cliente_acessivel(db, int(m.group(1)), loja_id)
                     if c:
                         self.send_json({"ok": True, "cliente": _cliente_dict(c)})
                     else:
@@ -4999,7 +4999,7 @@ class Handler(BaseHTTPRequestHandler):
                     if _err:
                         self.send_json({"ok": False, "erro": _err}, code=403)
                         return
-                    c = _obj_da_loja(db, Cliente, int(m.group(1)), loja_id)
+                    c = _cliente_acessivel(db, int(m.group(1)), loja_id)
                     if not c:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
@@ -11519,7 +11519,7 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
-                c = _obj_da_loja(db, Cliente, int(cliente_id), loja_id)
+                c = _cliente_acessivel(db, int(cliente_id), loja_id)
                 if not c:
                     self.send_json({'ok': False, 'erro': 'Cliente não encontrado'}, code=404)
                     return
@@ -11918,7 +11918,7 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
-                c = _obj_da_loja(db, Cliente, cliente_id, loja_id)
+                c = _cliente_acessivel(db, cliente_id, loja_id)
                 if c is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
@@ -11982,7 +11982,7 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
-                c = _obj_da_loja(db, Cliente, int(m_cli.group(1)), loja_id)
+                c = _cliente_acessivel(db, int(m_cli.group(1)), loja_id)
                 if not c:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
@@ -14889,7 +14889,7 @@ class Handler(BaseHTTPRequestHandler):
                             return
                         cid = req.get("cliente_id")
                         if cid:
-                            c = _obj_da_loja(db, Cliente, int(cid), loja_id)
+                            c = _cliente_acessivel(db, int(cid), loja_id)
                             if not c:
                                 self.send_json({"ok": False, "erro": "Cliente fora da loja"}, code=400)
                                 return
@@ -20035,6 +20035,28 @@ def _obj_da_loja(db, Model, pk, loja_id):
     if obj is None or getattr(obj, "loja_id", None) != loja_id:
         return None
     return obj
+
+
+def _cliente_acessivel(db, pk, loja_id):
+    """Decisão 2026-09-16 (unicidade de cliente por rede): `Cliente` é acessível à loja quando é
+    DELA (`_obj_da_loja` de sempre) OU quando pertence à MESMA REDE dela — cadastro compartilhado
+    entre lojas de uma rede, nunca através de rede diferente nem de loja avulsa de outra loja.
+    NÃO é `mod_tenancy.pode_ver_loja` (isso é sobre LOJAS, admin_rede/super_admin); isto é sobre
+    um CLIENTE especificamente, alcançável por QUALQUER usuário de loja cuja loja compartilhe a
+    rede do cliente — mesmo consultor/operador, é o próprio ponto da regra ("compartilha-se o
+    cadastro"). None cobre 'sem id', 'não existe', 'fora de loja e de rede'."""
+    if not pk or loja_id is None:
+        return None
+    obj = db.get(Cliente, pk)
+    if obj is None:
+        return None
+    if obj.loja_id == loja_id:
+        return obj
+    if obj.rede_id is not None:
+        loja = db.get(Loja, loja_id)
+        if loja is not None and loja.rede_id == obj.rede_id:
+            return obj
+    return None
 
 
 def _projeto_da_loja(db, nome_safe, loja_id):

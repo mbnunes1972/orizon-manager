@@ -579,6 +579,59 @@ DDL no boot do E2E, estado vazando entre módulos de teste). Registrado aqui só
 fora da contagem total de itens abertos, e para deixar explícito que esta classe **não morre**
 com nenhuma das fronteiras propostas na Seção 6.
 
+### Causa J — Especificação escrita e implementada pela metade (o documento afirma que está certo)
+**Achado (primeiro exemplo desta causa, 16/09):** parceiro com abrangência `'rede'`
+(`_aplicar_abrangencia_parceiro`, `main.py`) — a spec `docs/superpowers/specs/multitenant/
+2026-06-21-multitenant-f2-tenancy-design.md:200` registra, desde 21/06, o critério de aceite
+"diretor pode 'rede'": `super_admin`/`admin_rede` por política pura, MAIS o diretor (master) da
+própria loja — excluindo, por omissão deliberada do texto, gerencial e operador. A implementação
+(commit `bcefacf`, mesmo dia da spec) só checou "o ator tem `loja_id`", sem checar nível nenhum —
+qualquer perfil de loja (inclusive operador) passava. Achado e corrigido durante a investigação
+do vazamento de tenancy em Homologação (ver `LISTA_PARALELA.md`, LP-31, e o registro do Fórum
+Orizon em `TAREFA_LOJA_TESTE.md`).
+**Por que é pior que as Causas A-I:** nelas, o sintoma é a única fonte — não existe documento
+dizendo "isto está certo assim". Aqui existe: a spec registra a regra CORRETA, e essa própria
+existência desarma a suspeita de quem lê o código depois ("já tem spec, deve estar implementado
+como ela manda"). A lacuna fica invisível justamente pelo documento que deveria ter prevenido.
+**Fronteira que fecharia a classe:** não é fronteira de módulo — é hábito de fechamento. Toda spec
+com critério de aceite explícito (a seção "Verificação"/"pytest" que várias specs de
+`docs/superpowers/specs/` já têm) devia virar um teste NOMEADO pelo próprio critério — aqui,
+"diretor pode 'rede', consultor não" — não um teste batizado só pelo caminho feliz ("X pode Y"),
+que é exatamente o que produziu a Causa K, logo abaixo (mesmo achado, a outra face). Sem essa
+disciplina, ninguém audita depois "o código ainda faz o que a spec de tal data mandou?" uma vez
+que a feature já "funciona" na prática.
+**O que ainda não sabemos:** este é o único exemplo catalogado até agora — não foi feita (nem foi
+pedida) uma varredura das demais specs de `docs/superpowers/specs/` contra o código
+correspondente. Fica registrada a classe, para reconhecer o segundo caso quando aparecer, não uma
+tarefa de varredura em aberto.
+
+### Causa K — Teste que nomeia e defende o comportamento errado (o teste vira obstáculo do conserto, não garantia dele)
+**Achado (mesmo evento da Causa J, a outra face, 16/09):**
+`test_consultor_pode_cadastrar_parceiro_de_rede_da_propria_loja`
+(`tests/test_parceiro_vinculo_loja.py`) — o PRÓPRIO NOME do teste afirmava, com um consultor
+(operador) como sujeito, exatamente o que a spec de 21/06 já proibia. Não documentava uma decisão
+tomada; documentava o sintoma do gate frouxo da Causa J, com nome afirmativo e tom de intenção.
+Corrigido junto (o teste passou a usar o diretor, e ganhou um irmão negativo provando que o
+consultor é recusado).
+**Por que importa como padrão, não só como caso:** um teste verde com nome afirmativo ("X pode
+Y") convence tanto quanto uma spec escrita — quem for consertar o código por trás dele vê
+vermelho ao tentar, e o instinto natural é recuar ("deve haver um motivo, tem teste cobrindo").
+Isso inverte a proteção: o teste passa a proteger o DEFEITO, não o comportamento correto.
+**A pergunta certa, para quem chegar aqui depois:** quando um teste existente barra um conserto
+que a medição (spec, achado, ou decisão registrada) diz que é certo, a primeira pergunta é **se o
+teste está certo** — não se o conserto está. Nome afirmativo + sujeito de nível/escopo errado
+("consultor pode" quando a regra escrita é "diretor pode") é o sinal mais barato de checar
+primeiro, antes de recuar do conserto.
+**Fronteira que fecharia a classe:** não é fronteira de módulo — é hábito de revisão, irmão do
+hábito que fecharia a Causa J (nomear o teste pelo critério da spec, não pelo caminho que o
+código hoje aceita). **Não é pedido varrer os ~2830 testes da suíte atrás de outras instâncias**
+(custo alto, nenhum indício concreto de mais casos) — fica só o padrão registrado, para reconhecer
+o segundo caso quando ele aparecer.
+
+*(Causas J e K nasceram de um único achado, fora da varredura original de ~52 itens que produziu
+a Contagem abaixo — não recontada ali por serem descoberta posterior, 16/09, não parte do
+levantamento que gerou aqueles números.)*
+
 ### Itens sem causa estrutural (decisão de produto pendente, não achado)
 LP-01 (data acordada da medição — falta campo, não é defeito), LP-02 (validar CPF contra cadastro
 — política, não bug), LP-09 (alternativas de revisão de PE — funcionalidade nova), LP-12

@@ -228,11 +228,20 @@ class Medicao(Base):
 
 
 class Cliente(Base):
+    """Unicidade do CPF por REDE, não global (decisão 2026-09-16, achado do vazamento de
+    tenancy em Homologação — ver `docs/db/TAREFA_LOJA_TESTE.md`, "O que 'pertencer a uma rede'
+    implica"): loja de rede que encontra o CPF já cadastrado em OUTRA loja da MESMA rede
+    compartilha o cadastro (nome/CPF/contato/endereço) — nunca o histórico comercial
+    (`Projeto`/`Orcamento` têm `loja_id` PRÓPRIO, independente de `Cliente.loja_id`, então o
+    isolamento de projeto/valor não depende de nada aqui). Loja avulsa (`rede_id IS NULL`) segue
+    duplicando por loja, como sempre. `rede_id` é DENORMALIZADO de `Loja.rede_id` (não dá pra
+    fazer índice único parcial via join) — mantido em sincronia na criação do cliente e sempre
+    que uma loja muda de rede (`_eh_admin_rede`/troca de rede em `/api/admin/lojas`)."""
     __tablename__ = "clientes"
 
     id            = Column(Integer,     primary_key=True, autoincrement=True)
     nome          = Column(String(150), nullable=False)
-    cpf           = Column(String(14),  nullable=True, unique=True)
+    cpf           = Column(String(14),  nullable=True)
     tipo_dest          = Column(Text, default="nao_contribuinte")  # contribuinte|isento|nao_contribuinte
     cnpj               = Column(String(18), nullable=True)
     inscricao_estadual = Column(Text, nullable=True)
@@ -259,6 +268,8 @@ class Cliente(Base):
     criado_em     = Column(DateTime,    default=datetime.utcnow)
     atualizado_em = Column(DateTime,    onupdate=datetime.utcnow)
     loja_id       = Column(Integer,     ForeignKey("lojas.id"), nullable=True, index=True)
+    # Denormalizado de Loja.rede_id — ver docstring da classe. NULL = loja avulsa.
+    rede_id       = Column(Integer,     ForeignKey("redes.id"), nullable=True, index=True)
     # Captação provisória (14/09/2026, PLANO_SEMANA_1.md): COMO o cliente chegou — texto livre,
     # sem CHECK (mesmo padrão de Parceiro.tipo: valores conhecidos documentados aqui, não
     # travados em enum). Direto: "porta", "arquiteto", "indicação". Vindo de um Lead convertido:
@@ -268,6 +279,17 @@ class Cliente(Base):
     # entrada) — um campo só pras duas perguntas seria mais uma instância da Causa B do
     # MAPA_MODULOS.md ("um campo, dois significados"), a mesma família do LP-23.
     origem        = Column(String(40),  nullable=True)
+
+    __table_args__ = (
+        # Unicidade composta (decisão 2026-09-16): por REDE quando a loja pertence a uma
+        # (índice parcial — Postgres já trata NULL de `cpf` como distinto entre si, sem
+        # cláusula extra); por LOJA quando é avulsa. Mesmo padrão de índice único parcial já
+        # usado em `AtribuicaoAmbiente.uq_atribuicao_papel_ambiente`.
+        Index("uq_clientes_cpf_rede", "rede_id", "cpf",
+              unique=True, postgresql_where=text("rede_id IS NOT NULL")),
+        Index("uq_clientes_cpf_loja_avulsa", "loja_id", "cpf",
+              unique=True, postgresql_where=text("rede_id IS NULL")),
+    )
 
 
 class Lead(Base):

@@ -2331,7 +2331,7 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
   <div id="modal-cli-encontrado" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
     <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;max-width:480px;width:92%;max-height:90vh;overflow-y:auto;animation:mIn .18s ease">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-        <div style="font-family:var(--font-display);font-weight:900;font-size:15px">Cliente encontrado</div>
+        <div style="font-family:var(--font-display);font-weight:900;font-size:15px" id="mce-titulo">Cliente encontrado</div>
         <span onclick="mceFechar()" style="cursor:pointer;color:var(--muted);font-size:20px;line-height:1">&#x2715;</span>
       </div>
       <!-- Info do cliente -->
@@ -2340,14 +2340,14 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
         <div style="font-size:11px;color:var(--muted)" id="mce-detalhe"></div>
       </div>
       <!-- Projetos -->
-      <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-family:var(--font-sans)">Projetos deste cliente</div>
+      <div style="font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;font-family:var(--font-sans)" id="mce-projetos-label">Projetos deste cliente</div>
       <div id="mce-projetos" style="margin-bottom:18px;max-height:240px;overflow-y:auto">
         <div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Carregando...</div>
       </div>
       <!-- Ações -->
       <div style="display:flex;gap:10px">
         <button class="btn btn-ghost btn-sm" onclick="mceFechar()" style="flex:1;justify-content:center">Cancelar</button>
-        <button class="btn btn-primary btn-sm" onclick="mceCriarProjeto()" style="flex:1;justify-content:center">+ Novo projeto</button>
+        <button class="btn btn-primary btn-sm" onclick="mceCriarProjeto()" style="flex:1;justify-content:center" id="mce-btn-criar">+ Novo projeto</button>
       </div>
     </div>
   </div>
@@ -12449,7 +12449,7 @@ function cliHomonimoNao(){
 
 // ── Modal: Cliente encontrado ────────────────────────────────────────────────
 
-async function cliMostrarEncontrado(cliente){
+async function cliMostrarEncontrado(cliente, compartilhadoRede){
   _cliEncontrado = cliente;
   document.getElementById('mce-nome').textContent = cliente.nome;
   const partes = [];
@@ -12457,9 +12457,26 @@ async function cliMostrarEncontrado(cliente){
   if(cliente.cidade)  partes.push(cliente.cidade + (cliente.estado ? '/' + cliente.estado : ''));
   if(cliente.telefone) partes.push(cliente.telefone);
   document.getElementById('mce-detalhe').textContent = partes.join(' · ');
+  document.getElementById('modal-cli-encontrado').style.display = 'flex';
+  // Decisão 16/09 (unicidade de cliente por rede): "compartilha-se o cadastro, nunca o
+  // histórico comercial" — nome/CPF/contato/endereço acima podem vir de outra loja da mesma
+  // rede; projetos/orçamentos/valores dela NUNCA aparecem aqui (nem a lista é buscada).
+  if(compartilhadoRede){
+    document.getElementById('mce-titulo').textContent = 'Cadastro encontrado na rede';
+    document.getElementById('mce-projetos-label').textContent = '';
+    document.getElementById('mce-projetos').innerHTML =
+      '<div style="font-size:12px;color:var(--muted);padding:6px 0">' +
+      'Este cliente já é cadastrado em outra loja da rede. O cadastro (nome, CPF, contato e ' +
+      'endereço) é compartilhado — o histórico de projetos dessa outra loja não é exibido aqui ' +
+      'e continua isolado.</div>';
+    document.getElementById('mce-btn-criar').textContent = 'Usar este cadastro';
+    return;
+  }
+  document.getElementById('mce-titulo').textContent = 'Cliente encontrado';
+  document.getElementById('mce-projetos-label').textContent = 'Projetos deste cliente';
+  document.getElementById('mce-btn-criar').textContent = '+ Novo projeto';
   document.getElementById('mce-projetos').innerHTML =
     '<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Carregando projetos...</div>';
-  document.getElementById('modal-cli-encontrado').style.display = 'flex';
   try {
     const r = await fetch('/api/clientes/' + cliente.id + '/projetos');
     const d = await r.json();
@@ -12608,12 +12625,19 @@ async function cliSalvar(){
         const c = d.cliente;
         npSelecionarCliente(c.id, c.nome, c.cpf || '', c.email || '', c.telefone || c.whatsapp || '');
       }
-    } else if(d.cliente){
-      // CPF já cadastrado — mostrar fluxo "cliente encontrado"
+    } else if(d.ok && d.cliente_existente && d.cliente){
+      // Decisão 16/09: CPF já cadastrado em OUTRA LOJA DA MESMA REDE — não é bloqueio, é
+      // convite (puxa o cadastro e confirma com o consultor, sem mostrar histórico comercial).
       const wasNp = _npCadastrandoCliente;
       cliFecharModal();
       _mceFromNovoProjeto = wasNp;
-      cliMostrarEncontrado(d.cliente);
+      cliMostrarEncontrado(d.cliente, true);
+    } else if(d.cliente){
+      // CPF já cadastrado na MESMA loja — mostrar fluxo "cliente encontrado" (bloqueio)
+      const wasNp = _npCadastrandoCliente;
+      cliFecharModal();
+      _mceFromNovoProjeto = wasNp;
+      cliMostrarEncontrado(d.cliente, false);
     } else {
       erro.textContent = d.erro || 'Erro ao salvar.';
     }

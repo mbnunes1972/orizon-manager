@@ -956,7 +956,8 @@ CREATE TABLE public.clientes (
     criado_em timestamp without time zone,
     atualizado_em timestamp without time zone,
     loja_id integer,
-    origem character varying(40)
+    origem character varying(40),
+    rede_id integer
 );
 
 
@@ -4130,14 +4131,6 @@ ALTER TABLE ONLY public.ciclo_revisoes
 
 
 --
--- Name: clientes clientes_cpf_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.clientes
-    ADD CONSTRAINT clientes_cpf_key UNIQUE (cpf);
-
-
---
 -- Name: clientes clientes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5135,6 +5128,27 @@ CREATE INDEX ix_ciclo_revisoes_relatorio_doc_id ON public.ciclo_revisoes USING b
 --
 
 CREATE INDEX ix_clientes_loja_id ON public.clientes USING btree (loja_id);
+
+
+--
+-- Name: ix_clientes_rede_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_clientes_rede_id ON public.clientes USING btree (rede_id);
+
+
+--
+-- Name: uq_clientes_cpf_loja_avulsa; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_clientes_cpf_loja_avulsa ON public.clientes USING btree (loja_id, cpf) WHERE (rede_id IS NULL);
+
+
+--
+-- Name: uq_clientes_cpf_rede; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_clientes_cpf_rede ON public.clientes USING btree (rede_id, cpf) WHERE (rede_id IS NOT NULL);
 
 
 --
@@ -6294,6 +6308,14 @@ ALTER TABLE ONLY public.ciclo_revisoes
 
 ALTER TABLE ONLY public.clientes
     ADD CONSTRAINT clientes_loja_id_fkey FOREIGN KEY (loja_id) REFERENCES public.lojas(id);
+
+
+--
+-- Name: clientes fk_clientes_rede_id; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.clientes
+    ADD CONSTRAINT fk_clientes_rede_id FOREIGN KEY (rede_id) REFERENCES public.redes(id);
 
 
 --
