@@ -1,5 +1,8 @@
 # SPEC — Versionamento de Orçamentos
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07 (anterior ao Módulos
+> v12, `docs/especificacoes/Modulos_Orizon_v12.docx`) — não mantido. Ver `docs/README.md`.
+
 > Status: `[PLANEJADO]` — implementar na v0.2.0  
 > Módulo: Negociação  
 > Histórias: US-20 a US-26  

@@ -1,5 +1,8 @@
 # DEV_LOG — Secretária Orizon
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07 (anterior ao Módulos
+> v12, `docs/especificacoes/Modulos_Orizon_v12.docx`) — não mantido. Ver `docs/README.md`.
+
 **Repositório:** github.com/mbnunes1972/secretaria_orizon  
 **VPS:** 167.88.33.121 — porta 8766  
 **Stack:** Python 3.12 · Claude API · SQLite · Evolution API (WhatsApp) · Web Speech API

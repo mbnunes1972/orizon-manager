@@ -36,10 +36,16 @@ def _login(factory, who):
     return c
 
 
-def test_cliente_de_outra_loja_da_404(http_client_factory, seed):
+def test_cliente_de_outra_loja_MESMA_REDE_abre_cadastro_compartilhado(http_client_factory, seed):
+    """Decisão 2026-09-16 (unicidade de cliente por rede) SUPERA o isolamento estrito original
+    desta suíte: l1/l2 estão na MESMA rede (ver conftest.seed), então o CADASTRO (nome/CPF/
+    contato/endereço) passa a ser acessível entre as duas — "compartilha-se o cadastro". O que
+    continua isolado é o HISTÓRICO COMERCIAL (projetos/orçamentos/valores) — ver
+    `test_projeto_de_outra_loja_da_404` logo abaixo, que continua 404."""
     c = _login(http_client_factory, "dir_l2")
-    status, _ = c.get(f"/api/clientes/{seed['cliente_l1_id']}")
-    assert status == 404
+    status, body = c.get(f"/api/clientes/{seed['cliente_l1_id']}")
+    assert status == 200 and body.get("ok") is True
+    assert body["cliente"]["id"] == seed["cliente_l1_id"]
 
 
 def test_projeto_de_outra_loja_da_404(http_client_factory, seed):
@@ -200,35 +206,66 @@ def test_diretor_l1_opera_normalmente(http_client_factory, seed, projetos_dir):
     assert s1 == 200 and s2 == 200
 
 
-def test_colisao_cpf_nao_vaza_cliente_de_outra_loja(http_client_factory, seed, app_db):
+def test_colisao_cpf_mesma_rede_e_convite_nao_bloqueio(http_client_factory, seed, app_db):
+    """Decisão 2026-09-16 (unicidade de cliente por rede) SUBSTITUI o contrato anterior desta
+    suíte: l1/l2 estão na MESMA rede, então achar o CPF de `cliente_l1` ao cadastrar em l2 não é
+    mais bloqueio (409) — é CONVITE: `ok:true` + `cliente_existente:true` + o cadastro
+    compartilhado (nome/CPF/contato/endereço), pra o consultor confirmar e reusar. O controle
+    negativo (rede DIFERENTE continua bloqueando) está em
+    `test_colisao_cpf_redes_diferentes_continua_bloqueada`, logo abaixo."""
     c = _login(http_client_factory, "dir_l2")
-    # CPF "111.444.777-35" belongs to cliente_l1 (Loja 1). CPF válido (passa na
-    # validação de DV) para exercitar a checagem de unicidade cross-loja, não a validação.
-    # Handler contract (F4 fix): cross-loja CPF collision → 409 with
-    # {"ok": False, "erro": "CPF já cadastrado em outra unidade."} — no cliente data.
+    # CPF "111.444.777-35" pertence a cliente_l1 (Loja 1, mesma rede de l2). CPF válido (passa
+    # na validação de DV) para exercitar a checagem de unicidade, não a validação de dígito.
     status, body = c.post("/api/clientes",
                           {"nome": "Homonimo", "cpf": "111.444.777-35",
                            "email": "homonimo@example.com", "telefone": "(11) 90000-0000"})
-    # Must be a rejection (409); NEVER a success that leaks Loja-1 data
-    assert status == 409, (
-        f"SECURITY FINDING: CPF collision with another loja's cliente returned {status} "
-        f"instead of 409 — response: {body}"
-    )
-    # Body must NOT contain any cliente object (would expose Loja-1 data)
-    if isinstance(body, dict):
-        retornado_id = body.get("id") or (body.get("cliente") or {}).get("id")
-        assert retornado_id != seed["cliente_l1_id"], (
-            "SECURITY FINDING: cross-loja CPF collision returned the other loja's cliente id"
-        )
-        assert "cliente" not in body, (
-            "SECURITY FINDING: cross-loja CPF collision body contains 'cliente' key — data leak"
-        )
-    # Invariant: the Loja-1 cliente still belongs to Loja 1
+    assert status == 200 and body.get("ok") is True, body
+    assert body.get("cliente_existente") is True
+    assert body["cliente"]["id"] == seed["cliente_l1_id"]
+    # Não deve ter criado um cliente NOVO em l2 com o mesmo CPF (nome "Homonimo" seria a prova)
     db = app_db.get_session()
+    duplicado = db.query(app_db.Cliente).filter_by(nome="Homonimo").first()
     original = db.get(app_db.Cliente, seed["cliente_l1_id"])
     loja_orig = original.loja_id
     db.close()
+    assert duplicado is None, "convite não pode criar um segundo cadastro — tem que reusar o existente"
     assert loja_orig == seed["loja1_id"]
+
+
+def test_colisao_cpf_redes_diferentes_duplica_sem_convite(http_client_factory, seed, app_db):
+    """Controle: redes SEM relação nenhuma entre si são negócios independentes — o mesmo CPF em
+    duas redes diferentes não é convite (não faz sentido compartilhar cadastro entre negócios
+    que não têm nada a ver um com o outro) nem bloqueio (a constraint nova é por
+    `(rede_id, cpf)` — rede_id diferente nunca colide). Cada rede tem seu próprio cadastro
+    independente, mesmo padrão de "loja avulsa duplica", estendido a "rede diferente duplica"."""
+    db = app_db.get_session()
+    outra_rede = app_db.Rede(nome="Outra Rede")
+    db.add(outra_rede); db.flush()
+    l3 = app_db.Loja(nome="Loja 3", rede_id=outra_rede.id, codigo="LJ3")
+    db.add(l3); db.flush()
+    from auth import perfil_store, perfis as _perfis
+    perfil_store.seed_perfis_loja(db, l3.id)
+    _perfis.recarregar()
+    u3 = app_db.Usuario(nome="Diretor L3", login="dir_l3", nivel="master", loja_id=l3.id, ativo=1)
+    u3.set_senha("senha123")
+    db.add(u3); db.commit()
+    db.close()
+
+    c = _login(http_client_factory, "dir_l3")
+    status, body = c.post("/api/clientes",
+                          {"nome": "Homonimo L3", "cpf": "111.444.777-35",
+                           "email": "homonimol3@example.com", "telefone": "(11) 90000-0000"})
+    assert status == 200 and body.get("ok") is True, body
+    assert not body.get("cliente_existente")
+    novo_id = body["cliente"]["id"]
+    assert novo_id != seed["cliente_l1_id"], (
+        "SECURITY FINDING: rede sem relação nenhuma recebeu o MESMO id do cliente de outra rede"
+    )
+    db = app_db.get_session()
+    novo = db.get(app_db.Cliente, novo_id)
+    rede_l3, rede_l1 = novo.rede_id, db.get(app_db.Cliente, seed["cliente_l1_id"]).rede_id
+    db.close()
+    assert rede_l3 != rede_l1
 
 
 # ── Regressão: guard contra shadowing de `threading` em do_POST ───────────────

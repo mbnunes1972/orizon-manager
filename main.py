@@ -3882,7 +3882,11 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
-                c = _cliente_acessivel(db, int(m.group(1)), loja_id)
+                # Briefing NÃO é "cadastro" (nome/CPF/contato/endereço) — é qualificação
+                # comercial (budget, preferências) da família de "histórico comercial" que a
+                # decisão 2026-09-16 mantém isolada por loja, mesmo quando o cliente é
+                # compartilhado. `_obj_da_loja`, não `_cliente_acessivel`, de propósito.
+                c = _obj_da_loja(db, Cliente, int(m.group(1)), loja_id)
                 if c is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
@@ -3941,7 +3945,18 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
-                query = db.query(Cliente).filter(Cliente.loja_id == loja_id).order_by(Cliente.nome)
+                # Decisão 2026-09-16 (unicidade de cliente por rede): "puxar o cadastro" de
+                # outra loja da rede não pode fazer o cliente sumir da lista de quem o atende
+                # agora — inclui também clientes de FORA da loja que tenham algum projeto NESTA
+                # loja (Projeto.loja_id é próprio, independente de Cliente.loja_id — não vaza
+                # histórico comercial, só amplia QUAIS clientes aparecem).
+                from sqlalchemy import or_
+                _proj_cliente_ids = db.query(Projeto.cliente_id).filter(
+                    Projeto.loja_id == loja_id, Projeto.cliente_id.isnot(None))
+                query = (db.query(Cliente)
+                           .filter(or_(Cliente.loja_id == loja_id,
+                                       Cliente.id.in_(_proj_cliente_ids)))
+                           .order_by(Cliente.nome))
                 if q:
                     query = query.filter(
                         (Cliente.nome.ilike(f"%{q}%")) |
@@ -5004,11 +5019,25 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
                     nome_lower = c.nome.lower()
-                    projetos = [
+                    candidatos = [
                         p for p in _listar_projetos()
                         if p.get("cliente_id") == c.id
                         or p.get("cliente_nome", "").lower() == nome_lower
                     ]
+                    # Decisão 2026-09-16 (unicidade de cliente por rede): "compartilha-se o
+                    # cadastro, nunca o histórico comercial" — mesmo quando `c` é acessível
+                    # por vir de OUTRA loja da mesma rede (ou quando é o cadastro nativo desta
+                    # loja mas outra loja da rede já criou projeto usando o mesmo cadastro
+                    # compartilhado), esta lista só devolve projetos da loja QUE ESTÁ
+                    # PERGUNTANDO — nos dois sentidos. `_listar_projetos()` não carrega
+                    # `loja_id` (armazenamento em JSON, sem esse campo); resolve via
+                    # `Projeto.loja_id` na base, por `nome_safe`.
+                    _nomes = [p["nome_safe"] for p in candidatos if p.get("nome_safe")]
+                    _loja_do_projeto = dict(
+                        db.query(Projeto.nome_safe, Projeto.loja_id)
+                          .filter(Projeto.nome_safe.in_(_nomes)).all()) if _nomes else {}
+                    projetos = [p for p in candidatos
+                                if _loja_do_projeto.get(p.get("nome_safe")) == loja_id]
                     _enriquecer_projetos_com_pool(projetos)
                     self.send_json({"ok": True, "projetos": projetos, "cliente": _cliente_dict(c)})
                 except Exception as e:
@@ -11643,20 +11672,38 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
+                import mod_chat   # local: `mod_chat` vira nome LOCAL de do_POST por causa dos
+                                  # outros `import mod_chat` em outros ramos (mesma classe do
+                                  # guard de `threading`, achado 2026-09-16) — sem isto,
+                                  # UnboundLocalError neste ramo especificamente.
+                rede_atual = mod_chat._rede_da_loja(db, loja_id)   # fonte única (regra dos irmãos)
                 if cpf:
-                    existente = db.query(Cliente).filter_by(cpf=cpf).first()
+                    # Decisão 2026-09-16 (unicidade por rede): a busca de duplicidade espelha
+                    # exatamente o escopo da constraint nova (uq_clientes_cpf_rede/
+                    # uq_clientes_cpf_loja_avulsa) — por rede quando a loja pertence a uma, por
+                    # loja quando é avulsa.
+                    if rede_atual is not None:
+                        existente = db.query(Cliente).filter_by(cpf=cpf, rede_id=rede_atual).first()
+                    else:
+                        existente = db.query(Cliente).filter_by(cpf=cpf, loja_id=loja_id).first()
                     if existente:
                         if getattr(existente, "loja_id", None) == loja_id:
+                            # mesma loja: o cadastro já é dela — bloqueio de sempre, edite em vez
+                            # de duplicar.
                             self.send_json({"ok": False, "erro": "CPF já cadastrado",
                                             "cliente": _cliente_dict(existente)}, code=409)
-                        else:
-                            self.send_json({"ok": False,
-                                            "erro": "CPF já cadastrado em outra unidade."}, code=409)
+                            return
+                        # outra loja da MESMA rede: CONVITE, não bloqueio — "compartilha-se o
+                        # cadastro" (nome/CPF/contato/endereço), nunca o histórico comercial
+                        # (a resposta não inclui projetos; o frontend não busca a lista aqui).
+                        self.send_json({"ok": True, "cliente_existente": True,
+                                        "cliente": _cliente_dict(existente)})
                         return
                 tipo_dest = (req.get("tipo_dest") or "").strip() or "nao_contribuinte"
                 c = Cliente(
                     nome       =nome, cpf=cpf,
                     loja_id    =loja_id,
+                    rede_id    =rede_atual,
                     tipo_dest         =tipo_dest,
                     cnpj              =(req.get("cnpj")               or "").strip() or None,
                     inscricao_estadual=(req.get("inscricao_estadual") or "").strip() or None,
@@ -11792,10 +11839,12 @@ class Handler(BaseHTTPRequestHandler):
                 _e = validacao_doc.erro_doc(cpf, "CPF", "cpf")
                 if _e:
                     self.send_json({"ok": False, "erro": _e}, code=400); return
+                import mod_chat   # local, antes do uso — ver nota do POST /api/clientes
                 cliente = Cliente(
                     nome=lead.nome,
                     telefone=lead.telefone, whatsapp=lead.whatsapp, email=lead.email,
                     cpf=cpf, loja_id=loja_id,
+                    rede_id=mod_chat._rede_da_loja(db, loja_id),   # regra dos irmãos: mesma fonte
                     origem="lead/" + lead.canal if lead.canal else "lead",
                 )
                 db.add(cliente)
@@ -11918,7 +11967,8 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
-                c = _cliente_acessivel(db, cliente_id, loja_id)
+                # Briefing NÃO é "cadastro" — ver nota da rota GET, acima.
+                c = _obj_da_loja(db, Cliente, cliente_id, loja_id)
                 if c is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
@@ -11977,6 +12027,7 @@ class Handler(BaseHTTPRequestHandler):
             req   = json.loads(body) if body else {}
             db    = get_session()
             try:
+                from sqlalchemy.exc import IntegrityError
                 ator = _ator_dict(db, usuario)
                 loja_id, _err = mod_tenancy.escopo_operacional(ator)
                 if _err:
@@ -12014,6 +12065,11 @@ class Handler(BaseHTTPRequestHandler):
                 db.commit()
                 db.refresh(c)
                 self.send_json({"ok": True, "cliente": _cliente_dict(c)})
+            except IntegrityError:
+                # mesmo cuidado do cadastro (achado de auditoria 2026-08-13): mensagem de
+                # negócio limpa em vez do detalhe cru da constraint composta.
+                db.rollback()
+                self.send_json({"ok": False, "erro": "CPF já cadastrado."}, code=409)
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)})
@@ -18277,6 +18333,12 @@ class Handler(BaseHTTPRequestHandler):
                         if ("rede_id" in req and mod_tenancy._eh_super_admin(ator)
                                 and not l.loja_mae_id):
                             l.rede_id = req["rede_id"]
+                            # Decisão 2026-09-16 (unicidade de cliente por rede): rede_id do
+                            # Cliente é DENORMALIZADO de Loja.rede_id — sem isto, os clientes
+                            # cadastrados aqui ficariam com rede_id da rede ANTIGA, presos fora
+                            # de sincronia (e fora do escopo da constraint da rede nova).
+                            db.query(Cliente).filter_by(loja_id=l.id).update(
+                                {"rede_id": req["rede_id"]})
                         if isinstance(req.get("modulos"), list):
                             l.modulos_ativos = json.dumps([str(mo) for mo in req["modulos"]])
                     db.commit()

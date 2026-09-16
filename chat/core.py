@@ -1324,7 +1324,11 @@ def _cadastrar_contato(db, loja_id, tipo, nome, telefone, email):
     não polui as fontes de contato). Retorna o registro criado ou None (convidado)."""
     from database import ParceiroLoja
     if tipo == "cliente":
-        reg = Cliente(nome=nome, loja_id=loja_id, whatsapp=telefone, email=email)
+        # rede_id denormalizado (decisão 2026-09-16, unicidade de cliente por rede) — regra dos
+        # irmãos com o cadastro de `/api/clientes` (main.py) e a conversão de Lead: mesma fonte,
+        # `_rede_da_loja`, já definida logo acima neste arquivo.
+        reg = Cliente(nome=nome, loja_id=loja_id, rede_id=_rede_da_loja(db, loja_id),
+                      whatsapp=telefone, email=email)
         db.add(reg); db.flush()
         return reg
     if tipo == "parceiro":

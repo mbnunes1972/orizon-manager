@@ -74,10 +74,19 @@ def test_diretor_opera_dentro_do_pdv_via_loja_ativa(http_client_factory, seed, p
     assert st == 200 and d["ok"], (st, d)
     cid = d["cliente"]["id"]
 
-    # Diretor da mãe SEM header: não vê o cliente do PDV (escopo = mãe)
+    # Decisão 2026-09-16 (unicidade de cliente por rede): PDV herda o rede_id da mãe (spec
+    # 2026-07-22, "não editável") — logo mãe e PDV são a MESMA rede, e o CADASTRO do cliente
+    # (nome/CPF/contato/endereço) é compartilhado entre elas mesmo SEM trocar a loja ativa.
+    # Isto é ortogonal ao escopo OPERACIONAL (active_loja_id) que o resto deste arquivo testa —
+    # ver as duas asserções abaixo: cadastro sim, histórico de projetos não, sem o header.
     c = _login(http_client_factory, "dir_l1")
-    st, _ = c.get("/api/clientes/%d" % cid)
-    assert st == 404
+    st, d0 = c.get("/api/clientes/%d" % cid)
+    assert st == 200 and d0["cliente"]["nome"] == "Cliente do PDV"
+    # Histórico comercial continua isolado por loja mesmo com cadastro compartilhado — sem
+    # trocar pra loja ativa = PDV, a lista de projetos deste cliente não aparece (seria vazio,
+    # não 404, porque o cadastro em si é visível).
+    st, dp = c.get("/api/clientes/%d/projetos" % cid)
+    assert st == 200 and dp["projetos"] == []
 
     # com X-Loja-Ativa = PDV: enxerga e opera como se fosse a própria loja
     c.loja_ativa = pdv["id"]

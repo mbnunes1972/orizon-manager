@@ -264,8 +264,11 @@ def seed(app_db):
     mkuser("Super",      "super",  "super_admin")
     mkuser("Adm Rede",   "adm_rede", "admin_rede", rede_id=rede.id)
 
-    c1 = app_db.Cliente(nome="Cliente L1", cpf="111.444.777-35", loja_id=l1.id)
-    c2 = app_db.Cliente(nome="Cliente L2", cpf="222.222.222-22", loja_id=l2.id)
+    # rede_id denormalizado (decisão 2026-09-16, unicidade de cliente por rede) — l1/l2 são da
+    # MESMA rede (`rede.id` acima); sem isto o seed diverge de como o código de produção grava
+    # `Cliente.rede_id` hoje, mascarando a checagem de unicidade por rede nos testes.
+    c1 = app_db.Cliente(nome="Cliente L1", cpf="111.444.777-35", loja_id=l1.id, rede_id=rede.id)
+    c2 = app_db.Cliente(nome="Cliente L2", cpf="222.222.222-22", loja_id=l2.id, rede_id=rede.id)
     db.add_all([c1, c2]); db.flush()
 
     p1 = app_db.Projeto(nome_safe="Proj_L1", cliente_id=c1.id, status="quente", loja_id=l1.id)

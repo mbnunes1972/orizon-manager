@@ -1,5 +1,9 @@
 # Provisões e variáveis — config financeira por loja (referência do motor)
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07 (anterior ao Módulos
+> v12, `docs/especificacoes/Modulos_Orizon_v12.docx`) — não mantido. A fonte viva do modelo
+> financeiro é `docs/db/MODELO_CONTABIL.md` (Camada 4/5, mais recente). Ver `docs/README.md`.
+
 > Tabela canônica fornecida no desenvolvimento do motor. Define o que é **configurado por
 > loja**, as variáveis de **projeto**, **orçamento** e **ambiente**, e as fórmulas das provisões.
 > Fonte de verdade para o spec do painel de configurações financeiras da loja + margem real.
