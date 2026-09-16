@@ -1,5 +1,8 @@
 # Auditoria de Frontend — Orizon Manager / Dalmóbile
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-03 — não mantido. Ver
+> `docs/README.md`.
+
 **Escopo:** `static/index.html` (9.195 linhas, 500 KB — HTML+CSS+JS inline, sem build/framework) e `static/login.html`.
 **Data:** 2026-07-03
 **Estilo:** Florence (rigoroso, enterprise-grade, com evidências)

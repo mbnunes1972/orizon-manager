@@ -1,5 +1,8 @@
 # Auditoria de Arquitetura — Orizon Manager / Dalmóbile
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-03 — não mantido. Ver
+> `docs/README.md`.
+
 **Tipo:** Auditoria de arquitetura e estrutura, estilo Florence (rigorosa, enterprise-grade, baseada em evidências)
 **Escopo:** `main.py`, `database.py`, `storage.py`, `mod_tenancy.py`, camada de configuração, acoplamento entre módulos, separação de camadas.
 **Data:** 2026-07-03

@@ -1,5 +1,8 @@
 # Auditoria Florence — Orizon Manager
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-03 — não mantido. Ver
+> `docs/README.md`.
+
 Auditoria profunda, estilo Florence, do sistema Orizon Manager / Dalmóbile sob a ótica de **produção enterprise-grade**. Realizada em **2026-07-03** por 8 auditorias independentes em paralelo. Cada documento é autocontido, com evidências `arquivo:linha`, severidade (🔴 Crítico / 🟠 Alto / 🟡 Médio / 🔵 Baixo / ℹ️ Info) e recomendações concretas.
 
 ## 👉 Comece aqui

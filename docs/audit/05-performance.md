@@ -1,5 +1,8 @@
 # Auditoria de Performance e Escalabilidade — Orizon Manager / Dalmóbile
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-03 — não mantido. Ver
+> `docs/README.md`.
+
 **Escopo:** backend Python (`http.server`), SQLAlchemy + SQLite, frontend `static/index.html`.
 **Método:** análise estática de código (read-only, sem profiling em runtime).
 **Data:** 2026-07-03.

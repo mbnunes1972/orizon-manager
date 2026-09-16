@@ -40,15 +40,28 @@ def test_consultor_cadastra_parceiro_sem_abrangencia_nunca_orfao(http_client_fac
     assert pid in ids
 
 
-def test_consultor_pode_cadastrar_parceiro_de_rede_da_propria_loja(http_client_factory, seed):
-    """A loja do consultor pertence a uma rede; ele pode dar abrangência 'rede'
-    para a rede da própria loja."""
-    c = _login(http_client_factory, "cons_l1")
+def test_diretor_pode_cadastrar_parceiro_de_rede_da_propria_loja(http_client_factory, seed):
+    """A loja do diretor pertence a uma rede; ele pode dar abrangência 'rede'
+    para a rede da própria loja (spec `2026-06-21-multitenant-f2-tenancy-design.md`:
+    "diretor pode 'rede'")."""
+    c = _login(http_client_factory, "dir_l1")
     status, body = c.post("/api/parceiros",
                           {"nome": "Fornecedor Regional", "abrangencia": "rede",
                            "rede_id": seed["rede_id"]})
     assert status == 200 and body.get("ok") is True, body
     assert body["parceiro"].get("abrangencia") == "rede"
+
+
+def test_consultor_nao_cadastra_parceiro_de_rede_mesmo_da_propria_loja(http_client_factory, seed):
+    """Conserto 2026-09-16 (vazamento de tenancy, Homologação): antes bastava ter `loja_id`
+    (qualquer perfil de loja) para criar um parceiro de abrangência 'rede' — a spec só previa
+    isso para o diretor. Um consultor (operador) da mesma loja, mesma rede, deve ser barrado."""
+    c = _login(http_client_factory, "cons_l1")
+    status, body = c.post("/api/parceiros",
+                          {"nome": "Fornecedor Regional", "abrangencia": "rede",
+                           "rede_id": seed["rede_id"]})
+    assert body.get("ok") is False, body
+    assert "escopo" in (body.get("erro") or "").lower()
 
 
 def test_consultor_nao_cadastra_parceiro_de_outra_rede(http_client_factory, seed):

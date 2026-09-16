@@ -1,5 +1,8 @@
 # Módulo Kanban — SPEC
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07 (anterior ao Módulos
+> v12, `docs/especificacoes/Modulos_Orizon_v12.docx`) — não mantido. Ver `docs/README.md`.
+
 **Status:** `[TODO]`
 
 ---

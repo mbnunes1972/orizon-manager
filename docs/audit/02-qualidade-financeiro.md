@@ -1,5 +1,8 @@
 # Auditoria Florence — Domínio Financeiro / Negociação (Orizon Manager / Dalmóbile)
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-03 — não mantido. Ver
+> `docs/README.md`.
+
 **Escopo:** `mod_negociacao.py`, `mod_provisoes.py`, `mod_fin/*`, `mod_orcamento_params.py`,
 `mod_margens.py`, `mod_medicao.py`, `_ler_aymore.py`, `tabelas_financeiras/*`.
 **Ótica:** produção enterprise-grade; dinheiro errado = crítico.

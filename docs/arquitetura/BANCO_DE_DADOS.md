@@ -1,5 +1,9 @@
 # Banco de Dados — Orizon Manager
 
+> **Camada 3 · COMO SE TRABALHA.** Tem que ser verdade hoje. **Precisa de revisão** — ver
+> `docs/README.md`, Camada 2 (`docs/arquitetura/DECISOES.md`, ADR-001/ADR-010): o banco descrito
+> abaixo (SQLite) foi substituído por PostgreSQL em 2026-07-15.
+
 ## Visão geral
 
 O banco usa **SQLite** via **SQLAlchemy 2.0**. A migração para MySQL é possível trocando apenas a string de conexão em `database.py`.

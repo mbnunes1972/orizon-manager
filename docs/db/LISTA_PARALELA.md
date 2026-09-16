@@ -35,7 +35,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 
 | Destino | Itens | Observação |
 |---|---|---|
-| **BETA** | 0 | LP-02 implementado em 15/09 — ver o item, abaixo, mantido como registro. |
+| **BETA** | 1 | LP-31, novo (16/09) — clone de loja herda `rede_id` em silêncio. LP-02 implementado em 15/09 — ver o item, abaixo, mantido como registro. |
 | **FRONTEIRA** | 10 | Agrupados por fronteira — ver detalhamento abaixo. |
 | ↳ 6.1 (regra única de transição) | 2 | Ainda não construída — Marcelo quer desenhar com calma. |
 | ↳ 6.2 (Tela Única de Provisões) | 3 | **Em construção nesta Semana 2** — `docs/db/TAREFA_TELA_UNICA_PROVISOES.md`. |
@@ -47,7 +47,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | **DECIDIDO — fila da 1.0** | 3 | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. |
 | **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **24** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar). |
+| **Total aberto** | **25** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31 (achado em 16/09, vazamento de tenancy medido em Homologação). |
 
 ---
 
@@ -84,6 +84,38 @@ Sem esse rastro, "avisar" vira "ignorar com um clique" e a regra perde o sentido
 
 **Histórico:** o ACHADO-28 (validação de dígito) já está no beta2; isto é a camada de conferência
 contra o cadastro que ficou pendente dele, decidida agora.
+
+---
+
+**LP-31 · `clonar_loja.py` herda `rede_id` da loja de origem em silêncio — implantação real
+precisa que seja parâmetro explícito. Registrado em 16/09, achado durante a medição do
+vazamento de tenancy (Homologação, item abaixo). NÃO CORRIGIDO — só registrado, por pedido do
+Marcelo.**
+*Destino: BETA — as cinco lojas-piloto entram em outubro, e este mecanismo é exatamente o que
+vai ser reusado (ou uma variante dele) pra colocá-las de pé.*
+
+**O que foi medido:** `scripts/clonar_loja.py` já tem um argumento `--rede-id` explícito
+(`default=None`) e `mod_implantacao_loja.criar_loja_base` o usa corretamente — mas
+`aplicar_config_loja` (`mod_implantacao_loja.py:304-308`) reaplica por cima, sem condição
+nenhuma, TODOS os campos de `_LOJA_CONFIG` (linha 65-68) do artefato exportado da loja de
+ORIGEM — e `rede_id` está nessa lista, junto com `config_financeira_json`, telefone, endereço.
+Resultado: o `--rede-id` do CLI é sobrescrito e vira letra morta assim que `--aplicar` roda; a
+loja nova SEMPRE herda a rede da loja de origem, mesmo se alguém passar `--rede-id` diferente ou
+nenhum. Foi assim que a Loja Teste (`id=15`) nasceu com `rede_id=1`, igual à Inspirium — nesse
+caso, correto e documentado (`TAREFA_LOJA_TESTE.md` já listava `rede_id` como campo que "copia",
+decisão de 11/09, para o propósito de TESTE). Mas pertencer à mesma rede não é só um rótulo —
+implica compartilhar Fórum Orizon e Parceiros de abrangência `rede` com todo mundo daquela rede
+(medido no mesmo achado, ver `TAREFA_LOJA_TESTE.md` para o detalhe). Para uma loja-piloto REAL
+(Inspirium e Dalmóbile são negócios diferentes), herdar isso da loja usada como origem/template
+de configuração é um erro de isolamento, não um detalhe.
+
+**A regra, para quem pegar isto:** `rede_id` do destino tem que ser decisão deliberada de quem
+chama o clone/implantação — nunca herança do artefato de configuração. Mesmo padrão já usado
+para `cnpj`/`razao_social` (`_EMITENTE_IDENTIDADE`, gated por `permitir_identidade`) — `rede_id`
+precisa do mesmo tipo de gate explícito em `aplicar_config_loja`, em vez de viver dentro de
+`_LOJA_CONFIG` sem condição. Não implementado — decisão de desenho ainda não tomada (o comentário
+do código já registra `rede_id` ombro a ombro com "config financeira, contato, endereço", e não
+é disso que se trata).
 
 ---
 
@@ -718,6 +750,13 @@ mais ampla de flakes de E2E que este item vem acumulando desde 09/09.
 
 ## Fechados — não são adiamento, e por isso não estão na lista acima
 
+- **Fórum Orizon mostra o nome da loja de quem postou, cross-loja dentro da mesma rede.**
+  CONFIRMADO COMO DESENHO, não defeito — 16/09, investigação do vazamento de tenancy em
+  Homologação (`pdm2026` enxergando a Loja Teste). `chat/core.py::criar_debate`/`listar_debates`
+  resolvem `rede_id` pela loja ATIVA do ator (`mod_chat._rede_da_loja`), não pelo `rede_id` do
+  usuário — por isso qualquer usuário de qualquer loja de uma rede vê o Fórum Orizon inteiro,
+  `loja_nome` incluído, nos dois sentidos. Documentado no próprio código (`chat/core.py`,
+  docstring de `criar_debate`) e em `docs/db/TAREFA_LOJA_TESTE.md`. Não reabrir sem motivo novo.
 - **Aditivo criado manualmente entre a assinatura e o PE.** DECIDIDO em 31/08: **não entra**. O
   aditivo continua nascendo só do PE. Motivo e consequências em `DESENVOLVIMENTOS.md`. Reabre-se
   com número se o caso real aparecer com frequência.

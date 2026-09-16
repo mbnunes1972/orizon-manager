@@ -19913,10 +19913,14 @@ def _aplicar_abrangencia_parceiro(db, p, req, ator):
     if abr == "rede":
         rede_id = req.get("rede_id")
         p.rede_id = rede_id
-        # super_admin/admin_rede via política pura; diretor pode a rede da PRÓPRIA loja
-        # (spec: o diretor também cria parceiro de abrangência 'rede').
+        # super_admin/admin_rede via política pura; diretor (master) pode a rede da PRÓPRIA loja
+        # (spec `2026-06-21-multitenant-f2-tenancy-design.md`: "diretor pode 'rede'" — só
+        # diretor, não gerencial/operador). Conserto 2026-09-16 (vazamento de tenancy,
+        # Homologação): faltava a checagem de NÍVEL aqui — antes bastava ter `loja_id` (qualquer
+        # perfil de loja, inclusive operador, passava), sem checar se é diretor de verdade.
         permitido = mod_tenancy.pode_ver_rede(ator, rede_id)
-        if not permitido and ator.get("loja_id") is not None and rede_id is not None:
+        if (not permitido and ator.get("loja_id") is not None and rede_id is not None
+                and perfis.base(ator.get("nivel")) == "master"):
             loja_ator = db.get(Loja, ator.get("loja_id"))
             permitido = bool(loja_ator and loja_ator.rede_id == rede_id)
         if not permitido:

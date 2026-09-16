@@ -1,5 +1,8 @@
 # Auditoria 07 — Cadeia de Dependências & Suíte de Testes
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-03 — não mantido. Ver
+> `docs/README.md`.
+
 **Sistema:** Orizon Manager / Dalmóbile — backend Python puro (`http.server`), SQLAlchemy + SQLite (`orizon.db`).
 **Escopo:** dependências (`requirements.txt`, imports, supply-chain, CVEs por conhecimento) e suíte `pytest`.
 **Método:** análise estática (Read/Grep/Glob/PowerShell). Suíte **não** foi executada. READ-ONLY.

@@ -1,5 +1,8 @@
 # 06 — Inventário Exaustivo de Dívida Técnica (estilo Florence)
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-03 — não mantido. Ver
+> `docs/README.md`.
+
 **Projeto:** Orizon Manager / Dalmóbile — backend Python (`main.py` 4.758 linhas + `mod_*.py`), frontend `static/index.html` (~9.195 linhas de JS inline).
 **Raiz:** `E:\2026\ESTUDO_DE_IA\orizon-manager`
 **Data da auditoria:** 2026-07-03

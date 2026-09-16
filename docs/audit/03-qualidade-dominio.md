@@ -1,5 +1,8 @@
 # Auditoria de Qualidade — Domínio Contrato / Ciclo / Projeto / Integração Omie
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-03 — não mantido. Ver
+> `docs/README.md`.
+
 **Sistema:** Orizon Manager / Dalmóbile — vendas de móveis planejados (produção).
 **Escopo:** `mod_contrato.py`, `contrato_editar.py`, `mod_proposta.py`, `mod_ciclo.py`, `mod_arvore.py`, `mod_omie.py`, `promob_grupos.py`, `mod_qualidade_xml.py`, `scripts/`, mais os pontos de entrada HTTP relevantes em `main.py`/`storage.py`.
 **Data:** 2026-07-03  |  **Metodologia:** leitura integral de cada função/classe do escopo, rastreamento dos call-sites em `main.py`, revisão da suíte de testes. Read-only; nenhum arquivo de produção alterado.

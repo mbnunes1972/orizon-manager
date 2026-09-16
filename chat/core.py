@@ -1117,7 +1117,18 @@ def get_or_create_mural(db, loja_id):
 def criar_debate(db, escopo, loja_id, rede_id, criado_por_id, titulo,
                  assunto_tipo="livre", projeto_nome=None, assunto_id=None):
     """Cria um DEBATE (tópico) no Fórum da Loja (escopo='loja') ou no Fórum Orizon
-    (escopo='orizon', cross-loja pela rede). Título obrigatório + assunto (reusa Assunto)."""
+    (escopo='orizon', cross-loja pela rede). Título obrigatório + assunto (reusa Assunto).
+
+    COMPORTAMENTO CONHECIDO, NÃO REABRIR COMO ACHADO (confirmado 16/09, investigação de
+    vazamento de tenancy em Homologação): `rede_id` aqui SEMPRE vem de
+    `mod_chat._rede_da_loja(db, loja_id)` — a rede da LOJA ATIVA do ator, nunca de
+    `ator["rede_id"]` (que só admin_rede/super_admin têm). É a feature por desenho: qualquer
+    usuário de qualquer loja de uma rede lê/escreve no mesmo Fórum Orizon dessa rede, e
+    `listar_debates` devolve `loja_nome` de quem postou — ou seja, uma loja da rede SEMPRE
+    aparece pelo nome para as outras lojas da mesma rede aqui, e vale nos dois sentidos. Isso não
+    é escopo de dado comercial (projetos/clientes/valores continuam isolados por `loja_id`) —
+    é o canal de comunicação cross-loja que a Fatia 4 construiu de propósito. Ver
+    `docs/db/TAREFA_LOJA_TESTE.md`, seção "O que 'pertencer a uma rede' implica"."""
     titulo = (titulo or "").strip()
     if not titulo:
         raise ValueError("Dê um título ao debate.")

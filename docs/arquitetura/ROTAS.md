@@ -1,5 +1,9 @@
 # Rotas HTTP — Orizon Manager
 
+> **Camada 3 · COMO SE TRABALHA.** Tem que ser verdade hoje. **Precisa de revisão** — ver
+> `docs/README.md`, Camada 2 (`docs/arquitetura/DECISOES.md`): confira contra `main.py` antes de
+> confiar numa rota específica; este documento não é atualizado a cada rota nova.
+
 ## Convenções
 
 - Todas as rotas retornam JSON

@@ -1,5 +1,8 @@
 # Auditoria de Segurança (AppSec) — Orizon Manager / Dalmóbile
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-03 — não mantido. Ver
+> `docs/README.md`.
+
 **Tipo:** Auditoria estilo *Florence* (rigorosa, enterprise-grade, orientada a evidências)
 **Alvo:** Sistema de PRODUÇÃO real, multi-loja. Backend Python puro (`http.server`, SEM framework), SQLAlchemy + SQLite, frontend `static/index.html`.
 **Data:** 2026-07-03

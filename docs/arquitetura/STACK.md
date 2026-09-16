@@ -1,5 +1,9 @@
 # Stack Técnica — Orizon Manager
 
+> **Camada 3 · COMO SE TRABALHA.** Tem que ser verdade hoje. **Precisa de revisão** — ver
+> `docs/README.md`, Camada 2 (`docs/arquitetura/DECISOES.md`, ADR-010): confira o banco (Postgres,
+> não SQLite) e demais linhas da tabela abaixo contra `CLAUDE.md` antes de confiar nelas.
+
 ## Visão geral
 
 | Camada | Tecnologia | Observação |

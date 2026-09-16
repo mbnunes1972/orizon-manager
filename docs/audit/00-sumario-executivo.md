@@ -1,5 +1,8 @@
 # Auditoria Florence — Sumário Executivo
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-03 — não mantido. Ver
+> `docs/README.md`.
+
 **Sistema:** Orizon Manager / Dalmóbile — vendas de móveis planejados, multi-loja (tenancy), produção real.
 **Data:** 2026-07-03
 **Escopo:** Backend Python (`http.server` + SQLAlchemy/SQLite) e frontend SPA (`static/index.html`).

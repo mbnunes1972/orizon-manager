@@ -73,6 +73,14 @@ descartável.
 - **`Emitente`**: copiar — **decisão do Marcelo (11/09)**, com a justificativa de que hoje só há
   token de homologação da Focus em uso.
 
+**Nota (16/09, achado durante a medição do vazamento de tenancy em Homologação — ver seção
+própria mais abaixo): `rede_id` copiar aqui foi correto para a Loja Teste — mas só porque o
+propósito dela é TESTE, mirror deliberado da Inspirium. Ver "O que 'pertencer a uma rede'
+implica" e "Etapa 1b" abaixo: para implantação de loja REAL, `rede_id` não pode continuar
+herdado da loja de origem — vira parâmetro deliberado. Este mecanismo (`clonar_loja.py`/
+`mod_implantacao_loja.py`) é o que a Etapa 1b já prevê reusar para isso, então a regra muda ANTES
+de reusar, não depois.**
+
 ## O que NÃO copia
 
 - **Dado**: clientes, projetos, orçamentos, contratos, aditivos, lançamentos, provisões,
@@ -372,3 +380,32 @@ a tela não confirmar, a Inspirium é a única cópia boa da configuração.
 **Dívida de identidade, a não esquecer:** a Loja Teste carrega hoje o CNPJ e a razão social da
 Inspirium. Inofensivo em Homologação — o token da Focus é de homologação. Mas esta loja **não
 viaja para Produção** com a identidade herdada.
+
+---
+
+## O que "pertencer a uma rede" implica — não estava escrito em lugar nenhum (achado 16/09)
+
+Medido ao investigar por que `pdm2026` (master da Inspirium, `rede_id` do USUÁRIO = `None`)
+conseguia enxergar/alcançar a Loja Teste, mesma rede, sem ser `admin_rede` nem `super_admin`.
+Conclusão: **não é vazamento de dado comercial** (projetos/clientes/valores continuam isolados
+por `loja_id`, conferido rota a rota) — mas `rede_id` também não é só um rótulo administrativo.
+Duas superfícies REAIS, ambas por desenho, dependem só de "minha loja ativa pertence à rede X",
+nunca de o usuário ter papel de rede:
+
+1. **Fórum Orizon** (`chat/core.py`, Fatia 4) — canal de comunicação cross-loja deliberado: TODO
+   usuário de TODA loja de uma rede lê/escreve no mesmo fórum, e as listagens mostram o nome da
+   loja de quem postou (`listar_debates`, campo `loja_nome`). Simétrico: vale nos dois sentidos
+   entre quaisquer duas lojas da mesma rede.
+2. **Parceiro com `abrangencia="rede"`** — um fornecedor/parceiro cadastrado com essa abrangência
+   fica visível (nome, contato, comissão) em toda loja da rede. Corrigido em 16/09 o gate de
+   CRIAÇÃO (exigia só ter `loja_id`, sem checar nível — ver `LISTA_PARALELA.md`); a visibilidade
+   em si é a feature, não o bug.
+
+**Consequência prática:** colocar duas lojas na mesma `rede_id` — por clone, por cadastro manual,
+ou por decisão de negócio — as une nesses dois canais imediatamente, sem nenhuma tela avisando.
+Para a Loja Teste isso foi inofensivo (propósito é teste, mirror da Inspirium). Para as cinco
+lojas-piloto de outubro, ou para qualquer nova loja de negócio distinto (Dalmóbile ≠ Inspirium,
+como o Marcelo apontou), `rede_id` é a decisão que determina se elas vão compartilhar fórum e
+parceiros — e essa decisão precisa ser tomada de olhos abertos, loja por loja, nunca herdada
+silenciosamente de qual loja serviu de origem/template para a configuração. Ver `LISTA_PARALELA.md`,
+LP-31, para o achado de código que faz exatamente essa herança silenciosa hoje.
