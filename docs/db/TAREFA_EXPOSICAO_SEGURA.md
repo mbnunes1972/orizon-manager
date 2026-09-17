@@ -118,34 +118,60 @@ sai do caminho crítico de 20/09.
 nova no Traefik. O que sobra para Integração é o Passo 2 (bind interno), igual ao de Homologação,
 e o acesso passa a ser por túnel.
 
-### Passo 2 — bind interno: MEDIR ANTES, não aplicar direto
+### Passo 2 — bind interno: MEDIDO em 17/09, desenho decidido
 
-O objetivo continua certo: com `ORIZON_HOST=127.0.0.1` a aplicação **para de escutar a internet no
-nível do socket**, o que é melhor que qualquer regra de firewall — não há o que configurar errado
-nem o que esquecer de reaplicar.
+**O que a medição achou** (Sessão A, 17/09): o container `orizon-proxy_whatsapp-proxy` roda em
+**bridge**, não em rede de host (IPs próprios em duas overlays do Swarm). O `proxy_pass` real,
+lido de dentro do container vivo (`/etc/nginx/conf.d/default.conf`):
 
-**Mas há um risco concreto de derrubar `homolog.orizonone.com.br`, e ele precisa ser medido
-primeiro.** Quem faz o proxy hoje é um **container**. Dentro de um container, `127.0.0.1` é o
-loopback DO CONTAINER, não o do host — a menos que ele rode em `network_mode: host`. O
-`proxy_pass http://127.0.0.1:8766` que a Sessão A leu estava no arquivo **morto** do nginx
-bare-metal, não necessariamente na configuração do container vivo.
+```
+server_name dev.orizonone.com.br;      →  proxy_pass http://172.19.0.1:8765;   (Integração)
+server_name homolog.orizonone.com.br;  →  proxy_pass http://172.19.0.1:8766;   (Homologação)
+```
 
-Medir, e reportar antes de aplicar:
+`172.19.0.1` é o **`docker_gwbridge` deste host** (interface real, 172.19.0.0/16, gateway do
+Swarm), confirmado por `ip addr`. O container nunca fala com a aplicação por `127.0.0.1`.
 
-1. A configuração **de dentro do container vivo** (`orizon-proxy_whatsapp-proxy`): para onde o
-   `proxy_pass` aponta de verdade — `127.0.0.1`, o IP do gateway da bridge (`172.x.0.1`),
-   `host.docker.internal`, ou um nome de serviço?
-2. O modo de rede do container (host ou bridge).
+**Portanto o ramo previsto se confirmou: `ORIZON_HOST=127.0.0.1` derrubaria
+`homolog.orizonone.com.br`.** Nada foi aplicado.
 
-**Se o container usa rede de host e aponta para `127.0.0.1`** → o Passo 2 é seguro, aplicar nos
-dois ambientes com o teste de fumaça do runbook.
-**Se ele alcança a aplicação por IP de gateway da bridge** → `127.0.0.1` derruba o site. Nesse
-caso, **pare e reporte**: a saída é fazer o app escutar só na interface que o container alcança
-(não em `0.0.0.0`), ou mover a exposição para dentro do EasyPanel. É decisão de desenho, não de
-execução.
+**Desenho decidido: bind em `172.19.0.1`, não em `127.0.0.1`.** A aplicação passa a escutar só na
+interface que o proxy realmente usa. Sai de `0.0.0.0` — deixa de existir para a internet — e o
+`homolog` continua no ar.
 
-Isto é especialmente sério porque o site que seria derrubado é o que recebe lead real a partir de
-20/09.
+**O que isso NÃO resolve, dito com todas as letras:** `172.19.0.1` é alcançável por **qualquer
+container deste host**, inclusive os do `archdecorpoints-dev`. Não é isolamento, é redução de
+superfície: some a internet inteira, permanece o próprio host. É aceitável agora e deixa de ser
+necessário quando o Orizon virar app do EasyPanel de verdade — que é a resposta de longo prazo,
+fora do prazo de 20/09.
+
+**Fragilidade a cobrir antes de aplicar:** um bind em endereço de interface falha se a interface
+não existir no momento em que o serviço sobe. Conferir nas units de `orizon-a`/`orizon-b`:
+ordenação em relação ao Docker (`After=docker.service`) e política de `Restart`. Sem isso, um
+reboot em que o Docker suba depois deixa os dois ambientes fora do ar até alguém perceber.
+
+**Ordem de aplicação, e ela importa:** Integração (8765) **primeiro** — é o ambiente sem usuário,
+onde um erro não custa nada. Prova o mecanismo ali, e só então Homologação (8766). Depois de cada
+um: teste local, teste do domínio público, e — de outra máquina — confirmar que
+`http://167.88.33.121:<porta>` **não** responde mais. Reversão é trocar o env de volta e
+reiniciar; deixe o valor antigo anotado antes de mexer.
+
+**O túnel de Integração muda de alvo:** `ssh -L 8765:172.19.0.1:8765 root@167.88.33.121`.
+
+### Passo 2b — a rota latente de Integração (achado de 17/09, prioridade alta)
+
+A mesma medição encontrou que **`dev.orizonone.com.br` já resolve para este host** e que o
+container **já tem o server block** roteando esse nome para a 8765. Ou seja: é possível que
+Integração esteja **exposta à internet hoje**, com TLS do Traefik, com as mesmas senhas fracas —
+exatamente o que a decisão de 17/09 disse que não deveria existir.
+
+**Medir primeiro, antes de qualquer outra coisa deste lote:** `dev.orizonone.com.br` responde de
+fora? Serve a aplicação de Integração? Reportar.
+
+Se responder, **remover a rota** (o server block e, se houver, a rota correspondente no Traefik) —
+é a decisão já tomada, não precisa ser retomada. Se não responder, registrar que o server block
+existe mas está inerte, e remover mesmo assim, para não virar exposição por acidente no próximo
+reload do container.
 
 ### Passo 3 — `ufw` sai deste lote
 
