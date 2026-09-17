@@ -157,14 +157,20 @@ texto de apoio dizendo que atingir o valor leva à faixa seguinte, e a última l
 valor editável) se identifica como "acima da última meta". Nenhuma mudança em
 `resolver_comissao_venda`.
 
-**Regra dos irmãos (medido em 17/09) — são QUATRO pontos, não um.** O mesmo mecanismo de faixas
-existe duas vezes: comissão de vendas da loja (configurador `cvAdicionarFaixa` → resolvedor
-`mod_provisoes.resolver_comissao_venda` → validação `mod_provisoes.validar`) e comissão por função
-do não-consultor (configurador `_rmAddFaixa`/`_rmRenderFaixas` → resolvedor
-`mod_folha._resolver_pct_funcao` → **validação nenhuma**: `mod_cadastro` grava `comissao.faixas`
-sem conferir). Os dois resolvedores têm a mesma comparação estrita e o mesmo `faixas[-1]` de
-escape; os dois configuradores anunciam a convenção no texto de apoio e os dois deixam quebrá-la.
-O conserto vale para os dois lados. Detalhamento em `docs/db/TAREFA_LOTE_ACEITE6.md`, Tarefa 3.
+**Onde o conserto vale (medido e corrigido em 17/09).** A primeira leitura sugeria dois
+configuradores duplicados; **não é isso**. Existe um configurador único de remuneração por função
+(`cfgRemuneracaoEditar`), genérico, e dentro dele uma chave escolhe o modelo: ligada, a função usa
+o **motor da loja** (`modal-comissao` — meta mensal, faixas e limitador de desconto por margem),
+que é um só por loja e resolvido por `mod_provisoes.resolver_comissao_venda`; desligada, a função
+tem comissão própria (`_rmFaixas`), resolvida por `mod_folha._resolver_pct_funcao`. Os dois
+modelos são diferentes **de propósito** (decisão do Marcelo, 17/09) — não unificar.
+
+O que é compartilhado é a **forma da faixa** (`venda_ate` + `pct`, última aberta) e, com ela, os
+dois defeitos: comparação estrita e escape para `faixas[-1]` em ambos os resolvedores, e nenhuma
+validação no lado da função (`mod_cadastro` grava `comissao.faixas` sem conferir; só
+`mod_provisoes.validar` existe, e só para o motor da loja). Por isso o conserto vale nos dois
+lados, e o lado da função ainda precisa ganhar a validação que não tem. Detalhamento em
+`docs/db/TAREFA_LOTE_ACEITE6.md`, Tarefa 3c.
 
 *Nota (Marcelo, 16/09):* a **meta mensal não participa** do cálculo de faixa — é indicador, para
 premiação e estatística de cumprimento no futuro. As faixas não precisam ter relação com ela, e o

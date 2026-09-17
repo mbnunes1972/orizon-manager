@@ -123,23 +123,44 @@ digitado é o alvo a **atingir**, e atingi-lo promove.
 apoio dizendo que atingir o valor leva à faixa seguinte; a última linha (fixa, sem valor editável)
 identifica-se como "acima da última meta". **Nenhuma mudança em `resolver_comissao_venda`.**
 
-### 3c — Os quatro pontos (regra dos irmãos)
+### 3c — Onde o conserto tem que valer (dois modelos de comissão, um defeito compartilhado)
 
-O mesmo mecanismo de faixas existe **duas vezes**, com dois configuradores e dois resolvedores:
+**Leia isto antes de mexer, porque a primeira leitura deste código engana.** Não existem dois
+configuradores da mesma coisa. Existe **um** configurador de remuneração por função,
+`cfgRemuneracaoEditar` (`static/index.html`) — genérico, o mesmo para toda função — e dentro dele
+o administrador escolhe o modelo:
 
-| | Comissão de vendas da loja (consultor) | Comissão por função (não-consultor) |
+- **Chave "Usa comissão de vendas por metas (motor da loja...)" LIGADA** → a função não configura
+  faixa nenhuma própria; o modal só oferece o botão que abre `abrirModalComissao`, o **motor da
+  loja** (`modal-comissao`: meta mensal + faixas + limitador de desconto por margem). Esse motor é
+  **um só, por loja** — toda função que liga a chave aponta para o mesmo objeto, não para uma
+  cópia. Resolvido por `mod_provisoes.resolver_comissao_venda`.
+- **Chave DESLIGADA** → aparece o bloco simples: base (Líquido de Vendas / Custo Fábrica) e ou um
+  % fixo, ou "comissão por meta" com faixas próprias daquela função (`_rmFaixas`, `_rmAddFaixa`,
+  `_rmRenderFaixas`). Resolvido por `mod_folha._resolver_pct_funcao`.
+
+Os dois modelos são **diferentes de propósito** e a diferença é decisão de negócio do Marcelo,
+confirmada em 17/09: o motor da loja tem meta e redutor por margem, o modelo por função não tem.
+**Não unifique os dois configuradores.** O histórico ajuda a entender por quê: o comentário de
+2026-08-08 no código ("achado da Vera") registra que antes só a função de nome exato "Consultor de
+Vendas" alcançava o motor da loja, e que a chave existe justamente para qualquer função poder
+optar. Portanto o recorte real não é "consultor × os outros", é "quem usa o motor da loja × quem
+tem comissão própria" — e isso é configuração, não código.
+
+**O que É compartilhado, e por isso o conserto vale nos dois lados:** a forma do dado (`venda_ate`
++ `pct`, última aberta) e os dois defeitos em cima dela.
+
+| | Motor da loja | Comissão própria da função |
 |---|---|---|
-| Configurador | `cvAdicionarFaixa` + cabeçalho "Venda até (R$)" (`static/index.html`) | `_rmAddFaixa` / `_rmRenderFaixas` / `_rmFaixas` (`static/index.html`) |
+| Configurador | `cvAdicionarFaixa` (`modal-comissao`) | `_rmAddFaixa` / `_rmRenderFaixas` |
 | Resolvedor | `mod_provisoes.resolver_comissao_venda` | `mod_folha._resolver_pct_funcao` |
-| Validação | `mod_provisoes.validar` | **nenhuma** — `mod_cadastro` grava `comissao.faixas` sem conferir |
+| Comparação estrita `<` | sim | sim |
+| Escape para `faixas[-1]` | sim | sim |
+| Validação no servidor | `mod_provisoes.validar` | **nenhuma** — `mod_cadastro` grava `comissao.faixas` sem conferir |
 
-Os dois resolvedores têm a mesma comparação estrita e o mesmo `faixas[-1]` de escape. Os dois
-configuradores anunciam a convenção no texto de apoio ("última com 'até' vazio = acima",
-placeholder "(sem teto)") e os dois deixam quebrá-la.
-
-**Portanto o conserto vale para os dois**, salvo se você medir alguma razão para não valer — e aí
-reporte ao Marcelo em vez de decidir sozinho. Um conserto só no lado do consultor deixa o gêmeo
-com o mesmo defeito, que é exatamente o que a regra dos irmãos existe para evitar.
+Ou seja: 3a e 3b valem para os dois configuradores e para os dois resolvedores, e o lado da função
+precisa **ganhar** a validação que hoje não tem. Se ao medir você achar razão para algum dos dois
+lados ficar de fora, **reporte ao Marcelo** em vez de decidir sozinho.
 
 ### 3d — Testes
 
