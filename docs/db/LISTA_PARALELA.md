@@ -147,10 +147,15 @@ presente, exige percentual e não permite editar o valor de venda** — ela é, 
 faixa sem teto. `mod_provisoes.validar` ganha a regra correspondente (última faixa com
 `venda_ate` nulo), para a garantia não depender só da tela.
 
-**Segundo detalhe do mesmo trecho:** a comparação é `val_liq_mes < ate`, estritamente menor. Uma
-venda de exatamente R$ 100.000 **não** entra na faixa rotulada "venda até 100.000" — cai na
-seguinte. O rótulo "até" promete inclusão que o código não cumpre; decidir no mesmo conserto qual
-dos dois muda, o rótulo ou a comparação.
+**Segundo detalhe do mesmo trecho — decidido em 16/09: muda o RÓTULO, não o código.** A comparação
+é `val_liq_mes < ate`, estritamente menor: uma venda de exatamente R$ 100.000 **não** entra na
+faixa rotulada "venda até 100.000", cai na seguinte. O Marcelo confirmou que o comportamento do
+código é o correto — *"as vendas são 'abaixo de'; o valor colocado é a meta da faixa, atingiu,
+sobe de faixa"*. Ou seja, o número digitado é o alvo a **atingir**, e atingi-lo promove. O que
+mente é a palavra "até". Conserto: a coluna passa a se chamar **"Vendas abaixo de (R$)"**, com
+texto de apoio dizendo que atingir o valor leva à faixa seguinte, e a última linha (fixa, sem
+valor editável) se identifica como "acima da última meta". Nenhuma mudança em
+`resolver_comissao_venda`.
 
 *Nota (Marcelo, 16/09):* a **meta mensal não participa** do cálculo de faixa — é indicador, para
 premiação e estatística de cumprimento no futuro. As faixas não precisam ter relação com ela, e o
