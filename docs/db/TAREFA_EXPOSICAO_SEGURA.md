@@ -9,7 +9,7 @@ gatilho, não 01/10.
 **Decisão do Marcelo (17/09):** as lojas-piloto rodam em **Homologação** de 01/10 a 31/10 e migram
 para Produção em 01/11. Homologação **continua podendo absorver erro** — o Pontta segue como
 sistema oficial e a loja-piloto sabe que está numa versão beta em teste. Integração também será
-ativada. Perda de dado em Homologação, portanto, é incômodo operacional, não catástrofe.
+ativada — se com ou sem exposição pública, ver a proposta abaixo (pendente de decisão). Perda de dado em Homologação, portanto, é incômodo operacional, não catástrofe.
 
 **O que a condição de beta NÃO cobre:** o nome, telefone e a conversa de WhatsApp de um lead são
 dados de terceiro. "É beta" explica uma tela quebrada; não explica senha e telefone atravessando a
@@ -73,19 +73,98 @@ apontar, só ele pode criar os registros A.
 
 ---
 
-## Passos 1 a 3 — nginx, TLS, bind interno, firewall
+## Passos 1 a 3 — REESCRITOS em 17/09, depois da medição
 
-Seguir `IMPLANTAR.md`, seção citada, **sem reescrever**. Substituir os nomes pelos que o Passo 0
-definir — a própria seção já prevê isso ("se os nomes escolhidos forem outros, troque nos comandos
-abaixo — é substituição mecânica").
+**O runbook de 14/09 não se aplica a este host.** Medido pela Sessão A em 17/09, e é preciso
+registrar de uma vez porque nenhum documento nosso dizia isto:
 
-Ordem e provas são as de lá, e a ordem importa: o Passo 3 fecha 8765/8766 no firewall, e fazê-lo
-antes do HTTPS provado deixaria os dois ambientes inacessíveis por qualquer caminho.
+- `167.88.33.121` roda **EasyPanel** (PaaS sobre Docker Swarm). O **Traefik** do EasyPanel ocupa
+  80 e 443 globalmente e termina o TLS.
+- `homolog.orizonone.com.br` já funciona de ponta a ponta desde 31/07: DNS → Traefik (certificado
+  Let's Encrypt válido, expira 29/10/2026) → container `orizon-proxy_whatsapp-proxy`
+  (`nginx:alpine`) → aplicação na 8766.
+- O **nginx bare-metal do host está `failed` desde 30/07** (conflito de porta com o Traefik), e
+  `/etc/nginx/sites-enabled/orizon-homolog` é artefato morto daquela primeira tentativa. `certbot
+  certificates` no host devolve "No certificates found".
+- **`ufw` está `inactive`** — não faltam regras, não há firewall.
+- O mesmo host serve **`archdecorpoints-dev`** (web/api/batch/mysql/minio/phpmyadmin), que é
+  **outro projeto do próprio Marcelo**, não de terceiro.
+- Não existe DNS para `integracao.*` nem `homologacao.*`. A raiz `orizonone.com.br` aponta para
+  `179.197.77.9`, que é **Produção, outro host**.
 
-Fazer **nos dois ambientes**. Integração passa a ser usada de verdade a partir de agora — foi
-decisão do Marcelo em 17/09 — então ela precisa estar tão acessível quanto Homologação.
+**Consequência:** `apt install nginx` + `certbot --nginx` + bind em 80/443 **não é o caminho neste
+host** e não deve ser tentado. Quem expõe aqui é o EasyPanel.
 
----
+### Passo 1 — não fazer nada
+
+Homologação já tem TLS e roteamento corretos. Não refazer o que funciona.
+
+### Proposta sobre Integração — não expor à internet (pendente de decisão do Marcelo)
+
+Integração é degrau de teste da esteira, usado **só pelo Marcelo** e pelas sessões de
+desenvolvimento. Ninguém de loja entra lá, hoje nem em outubro. Publicar um domínio, um
+certificado e uma rota para ela acrescenta superfície de ataque sem acrescentar uso.
+
+O acesso que ela precisa já existe e é mais seguro: **túnel SSH**
+(`ssh -L 8765:127.0.0.1:8765 root@167.88.33.121`, depois abrir `http://127.0.0.1:8765` no
+navegador local). Não precisa de DNS, nem de certificado, nem de rota no Traefik — e, com o Passo
+2 aplicado, a porta some da internet sem ficar inacessível para quem trabalha nela.
+
+Se mais tarde alguém além do Marcelo precisar entrar em Integração, aí sim se cria a rota pelo
+EasyPanel, do mesmo jeito que `homolog` já é servido. Não é caminho fechado, é caminho adiado — e
+sai do caminho crítico de 20/09.
+
+### Passo 2 — bind interno: MEDIR ANTES, não aplicar direto
+
+O objetivo continua certo: com `ORIZON_HOST=127.0.0.1` a aplicação **para de escutar a internet no
+nível do socket**, o que é melhor que qualquer regra de firewall — não há o que configurar errado
+nem o que esquecer de reaplicar.
+
+**Mas há um risco concreto de derrubar `homolog.orizonone.com.br`, e ele precisa ser medido
+primeiro.** Quem faz o proxy hoje é um **container**. Dentro de um container, `127.0.0.1` é o
+loopback DO CONTAINER, não o do host — a menos que ele rode em `network_mode: host`. O
+`proxy_pass http://127.0.0.1:8766` que a Sessão A leu estava no arquivo **morto** do nginx
+bare-metal, não necessariamente na configuração do container vivo.
+
+Medir, e reportar antes de aplicar:
+
+1. A configuração **de dentro do container vivo** (`orizon-proxy_whatsapp-proxy`): para onde o
+   `proxy_pass` aponta de verdade — `127.0.0.1`, o IP do gateway da bridge (`172.x.0.1`),
+   `host.docker.internal`, ou um nome de serviço?
+2. O modo de rede do container (host ou bridge).
+
+**Se o container usa rede de host e aponta para `127.0.0.1`** → o Passo 2 é seguro, aplicar nos
+dois ambientes com o teste de fumaça do runbook.
+**Se ele alcança a aplicação por IP de gateway da bridge** → `127.0.0.1` derruba o site. Nesse
+caso, **pare e reporte**: a saída é fazer o app escutar só na interface que o container alcança
+(não em `0.0.0.0`), ou mover a exposição para dentro do EasyPanel. É decisão de desenho, não de
+execução.
+
+Isto é especialmente sério porque o site que seria derrubado é o que recebe lead real a partir de
+20/09.
+
+### Passo 3 — `ufw` sai deste lote
+
+Dois motivos, e o segundo é técnico e decisivo:
+
+1. O host não tem firewall nenhum hoje, e ele serve outro projeto do Marcelo. Ligar `ufw` do zero
+   aqui é mudança de superfície do **host inteiro**, não "fechar uma porta do Orizon" — não cabe
+   num lote cujo objetivo é proteger o Orizon antes de 20/09.
+2. **`ufw` não filtra porta publicada por Docker.** O Docker insere as próprias regras na cadeia
+   `DOCKER`, que passa ao largo do `INPUT` onde o `ufw` atua. Ou seja: ligar `ufw` não fecharia
+   nada do EasyPanel/archdecorpoints (inclusive o que estiver publicado lá), e fecharia só os
+   serviços de systemd — `orizon-a`, `orizon-b` e **o SSH**, com risco de trancar o acesso se a
+   regra do SSH falhar. Muito trabalho e muito risco para um efeito que o Passo 2 já alcança
+   melhor. *(Verificar antes de agir: é o comportamento padrão do Docker, mas confirme neste host.)*
+
+**Portanto: o Passo 2, bem medido, é o que fecha a exposição do Orizon.** O firewall do host vira
+item próprio — ver abaixo.
+
+### Item novo — higiene do host (fora deste lote, com dono e prazo próprios)
+
+Um host sem firewall servindo `phpmyadmin`, `mysql` e `minio` publicados merece uma passada
+própria, independente do Orizon. **Medir e reportar** (só leitura): quais portas o Docker publica
+em `0.0.0.0` hoje. Não mexer. O resultado vira decisão do Marcelo sobre o host, não sobre o Orizon.
 
 ## Passo 4 — senhas (não está no runbook)
 
