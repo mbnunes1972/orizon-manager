@@ -68,6 +68,29 @@ aplicação ou do próprio teste** — algo que às vezes não acontece, e não 
 A diferença importa: "devagar" se resolve esperando mais; "às vezes não acontece" não se resolve
 esperando, e é por isso que alargar timeout nunca funcionou aqui.
 
+**Dado novo de 17/09, que não estava no registro e pode ser a pista mais barata da lista.** As duas
+passadas da suíte no mesmo dia, mesma máquina, mesmo código:
+
+| | Duração | Vermelhos |
+|---|---|---|
+| 1ª passada | **19 min 05 s** | 8 (todos E2E de navegador) |
+| 2ª passada | **10 min 36 s** | **0** |
+
+A rodada que falhou levou **quase o dobro do tempo**. Isso é covariável medida, não hipótese de
+carga: a suíte inteira ficou lenta, e foi nela que os oito apareceram. A RODADA3 mediu a duração de
+uma espera **bem-sucedida** (783 ms isolado × 780–785 ms em suíte) e concluiu, corretamente, que
+esperar mais não resolveria. Mas ninguém tinha registrado a duração da **rodada** ao lado do número
+de falhas.
+
+Isso não contradiz o fato 1 (os testes falham isolados também) — provavelmente há mais de um
+mecanismo na mesma assinatura. Mas sugere uma medição barata que ninguém fez: **anotar a duração
+total da rodada junto com a lista de falhas, em toda execução completa**, e ver se a correlação se
+sustenta em cinco ou seis pontos. Se sustentar, a pergunta deixa de ser "por que este teste falha"
+e passa a ser "o que faz a suíte inteira levar o dobro do tempo às vezes" — que é pergunta
+diferente, e com bem menos lugares onde se esconder.
+
+---
+
 ---
 
 ## 3. Proposta para (A) — devolver a legibilidade ao portão
