@@ -35,7 +35,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 
 | Destino | Itens | Observação |
 |---|---|---|
-| **BETA** | 3 | LP-31 (clone herda `rede_id`), LP-32 (identificação da loja no cabeçalho) e LP-33 (faixa sem teto no configurador) — os três de 16/09. LP-02 implementado em 15/09 — ver o item, abaixo, mantido como registro. |
+| **BETA** | 4 | LP-31 (clone herda `rede_id`), LP-32 (identificação da loja no cabeçalho) e LP-33 (faixa sem teto no configurador) — os três de 16/09. LP-02 implementado em 15/09 — ver o item, abaixo, mantido como registro. |
 | **FRONTEIRA** | 10 | Agrupados por fronteira — ver detalhamento abaixo. |
 | ↳ 6.1 (regra única de transição) | 2 | Ainda não construída — Marcelo quer desenhar com calma. |
 | ↳ 6.2 (Tela Única de Provisões) | 3 | **Em construção nesta Semana 2** — `docs/db/TAREFA_TELA_UNICA_PROVISOES.md`. |
@@ -47,7 +47,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | **DECIDIDO — fila da 1.0** | 3 | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. |
 | **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **28** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (todos de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste). |
+| **Total aberto** | **29** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste) e LP-35 (17/09, do lote da exposição segura). |
 
 ---
 
@@ -176,6 +176,34 @@ lados, e o lado da função ainda precisa ganhar a validação que não tem. Det
 premiação e estatística de cumprimento no futuro. As faixas não precisam ter relação com ela, e o
 fato de o topo (300.000) ser menor que a meta (500.000) não é, por si, inconsistência.
 
+
+**LP-35 · `senha_provisoria` nasce em 0 por padrão no modelo — esquecer produz conta insegura.**
+*Destino: BETA — o endpoint da tela de Admin já foi consertado em 17/09; o que fica aqui é a
+inversão do default, que é o conserto estrutural e precisa de migração.*
+
+**Medido em 17/09 (regra dos irmãos — quatro pontos de criação de `Usuario`):**
+
+| ponto | nasce com | avaliação |
+|---|---|---|
+| `main.py` — tela de Admin | 0 → **1 desde 17/09** | era o fora de padrão; consertado |
+| `main.py` — fluxo de diretor de PDV | 1 | correto |
+| `scripts/criar_primeiro_admin.py` | 1 | correto, com motivo documentado (caso real de 28/08: conta assim virou super_admin de verdade via dump) |
+| `scripts/seed_funcionarios_homolog.py`, `scripts/seed_loja15.py` | 0 | deliberado — dado de teste descartável |
+
+**O que falta, e por que é diferente do conserto já feito:** `database.py` declara
+`senha_provisoria` com `default=0, server_default="0"`. Enquanto for assim, **esquecer de passar o
+parâmetro produz conta insegura** — foi exatamente o que aconteceu na tela de Admin, e volta a
+acontecer no próximo ponto de criação que alguém escrever. Invertendo para 1, esquecer passa a
+produzir conta segura, e quem quiser 0 (os dois seeds) passa explícito. É a diferença entre
+proteger um lugar e mudar o modo de falhar.
+
+**Por que não foi feito junto:** mexer em `server_default` é DDL e exige migração (R1), e mudar o
+default de uma coluna lida por milhares de testes pede varredura, não pressa. Estadiamento
+deliberado, não esquecimento — decidido em 17/09, com o endpoint consertado antes de 20/09 e a
+inversão agendada para depois.
+
+*Cuidado ao implementar:* mudar só o `default` do Python e deixar o `server_default` em `"0"` cria
+duas verdades divergentes (insert por ORM ≠ insert por SQL cru). Os dois mudam juntos, ou nenhum.
 
 ---
 

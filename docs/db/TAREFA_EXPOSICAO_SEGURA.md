@@ -18,6 +18,32 @@ dado aceitável.
 
 ---
 
+## PRIORIDADE REVISTA — 17/09, depois de confirmar `dev.orizonone.com.br`
+
+**Confirmado no navegador:** `https://dev.orizonone.com.br` está no ar, servindo **Integração**,
+com TLS, e aceitou login de **`pdm2026` (Pedro da Mota, MASTER)** — a conta cuja senha é
+`orizon123` e que já estava marcada para ser apagada dos servidores.
+
+Isso reordena o lote. A exposição real não é a que estávamos consertando:
+
+**O buraco de verdade são as senhas, e ele está aberto AGORA.** `homolog.orizonone.com.br` é
+público **de propósito** e vai continuar sendo — é por onde a loja-piloto entra. Nele existem
+contas de nível **master** com senha `orizon123` e `senha_provisoria=0`. Qualquer pessoa que
+chegue ao domínio e tente a senha óbvia entra como master. Não é risco futuro nem hipótese: é o
+estado de hoje, e fechar a rota do `dev` não muda nada nele.
+
+**Ordem correta, a partir de 17/09:**
+
+1. **Passo 4 (senhas) — HOJE, antes de tudo.** Foi escrito como último passo por ordem de assunto,
+   não de urgência. Passou a ser o primeiro. Começar pelas contas de nível master/gerencial,
+   que são as que dão dano.
+2. **Passo 2b** — remover a rota `dev` (Integração sai da internet, decisão já tomada).
+3. **Passo 2** — bind em `172.19.0.1`.
+
+O resto do documento continua valendo como está; só a ordem mudou.
+
+---
+
 ## Antes de escrever qualquer coisa: o runbook já existe
 
 **Não escreva procedimento novo.** `docs/db/IMPLANTAR.md`, seção **"Exposição segura de
