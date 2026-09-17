@@ -13875,13 +13875,20 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": _e}, code=400)
                         return
                     primary_loja_id = loja_ids[0] if loja_ids else None
+                    # TAREFA_EXPOSICAO_SEGURA.md, Passo 4 (17/09, decisão do Marcelo): conserto
+                    # SÓ deste endpoint — a conta criada pela tela de Admin nasce exigindo troca
+                    # de senha no 1º login. O default do modelo (database.py, Usuario.
+                    # senha_provisoria) fica intocado neste lote de propósito: invertê-lo é o
+                    # conserto estrutural certo, mas exige migração (R1) e varredura dos testes
+                    # que hoje assumem o default 0 — vira item próprio depois de 20/09.
                     u = Usuario(nome=req["nome"].strip(), login=req["login"].strip(),
                                 nivel=req["nivel"].strip(),
                                 telefone=(req.get("telefone") or "").strip(),
                                 whatsapp=(req.get("whatsapp") or "").strip(),
                                 email=(req.get("email") or "").strip(),
                                 cpf=(req.get("cpf") or "").strip(),
-                                loja_id=primary_loja_id, rede_id=rede_id)
+                                loja_id=primary_loja_id, rede_id=rede_id,
+                                senha_provisoria=1)
                     u.set_senha(req["senha"])
                     db.add(u); db.flush()
                     for lid in loja_ids:
