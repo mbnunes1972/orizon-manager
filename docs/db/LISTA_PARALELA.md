@@ -35,7 +35,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 
 | Destino | Itens | Observação |
 |---|---|---|
-| **BETA** | 1 | LP-31, novo (16/09) — clone de loja herda `rede_id` em silêncio. LP-02 implementado em 15/09 — ver o item, abaixo, mantido como registro. |
+| **BETA** | 3 | LP-31 (clone herda `rede_id`), LP-32 (identificação da loja no cabeçalho) e LP-33 (faixa sem teto no configurador) — os três de 16/09. LP-02 implementado em 15/09 — ver o item, abaixo, mantido como registro. |
 | **FRONTEIRA** | 10 | Agrupados por fronteira — ver detalhamento abaixo. |
 | ↳ 6.1 (regra única de transição) | 2 | Ainda não construída — Marcelo quer desenhar com calma. |
 | ↳ 6.2 (Tela Única de Provisões) | 3 | **Em construção nesta Semana 2** — `docs/db/TAREFA_TELA_UNICA_PROVISOES.md`. |
@@ -43,11 +43,11 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | ↳ 6.4 (Montagem como domínio) | 1 | Ainda não construída — fora do escopo desta Semana 2. |
 | ↳ 6.7 (Captação como domínio, nova) | 1 | Ainda não construída — pós-1.0; o `Lead` provisório (`PLANO_SEMANA_1.md`) segura a demanda até lá. |
 | ↳ 6.8 (extração do JS de index.html, nova) | 1 | Ainda não construída — os ratchets de linha/contagem sobre `static/index.html` precisam ser repensados quando a Semana 2 chegar lá. |
-| **HIGIENE** | 3 | LP-11 implementado em 15/09 — sai da contagem, fica como registro. Lote único, quando alguém tiver uma tarde livre. |
+| **HIGIENE** | 4 | LP-34, novo (16/09) — clone copia funções de teste da loja-fonte. LP-11 implementado em 15/09 — sai da contagem, fica como registro. Lote único, quando alguém tiver uma tarde livre. |
 | **DECIDIDO — fila da 1.0** | 3 | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. |
 | **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **25** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31 (achado em 16/09, vazamento de tenancy medido em Homologação). |
+| **Total aberto** | **28** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (todos de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste). |
 
 ---
 
@@ -116,6 +116,46 @@ precisa do mesmo tipo de gate explícito em `aplicar_config_loja`, em vez de viv
 `_LOJA_CONFIG` sem condição. Não implementado — decisão de desenho ainda não tomada (o comentário
 do código já registra `rede_id` ombro a ombro com "config financeira, contato, endereço", e não
 é disso que se trata).
+
+**LP-32 · Identificação da loja no cabeçalho é pequena demais para quem opera duas lojas.**
+*Destino: BETA — ajuste de layout, sem decisão de arquitetura; precisa estar pronto antes das
+cinco lojas-piloto.*
+Hoje o nome da loja ativa aparece como texto miúdo ao lado do logo "OrizonOne" (verificado em
+Homologação, 16/09, Loja Teste). Enquanto existe uma loja só, é cosmético. Com cinco lojas-piloto
+simultâneas vira **segurança operacional**: quem atende mais de uma unidade precisa saber em qual
+está *antes* de aprovar um desconto ou assinar um contrato — o custo do erro é um ato gerencial
+praticado na loja errada. Tratar como selo de contexto com peso próprio, não como legenda do logo.
+(Achado do Marcelo no Aceite 6 da Loja Teste, 16/09.)
+
+**LP-33 · Configurador de faixas de comissão aceita salvar sem faixa "sem teto" — a tela diz uma
+coisa, o motor faz outra.**
+*Destino: BETA — toda loja nova passa por esse configurador na implantação; sem conserto, o
+defeito se reproduz cinco vezes nas lojas-piloto.*
+
+**Medido (16/09, bancada):** `mod_provisoes.resolver_comissao_venda` usa `for/else` — se a venda
+ultrapassa todas as faixas, nenhum `break` acontece e o `else` aplica `faixas[-1]["pct"]`. Ou
+seja, **não há buraco de comissão**: a configuração atual (topo em "venda até 300.000 = 6%") paga
+6% também numa venda de 400.000. O dinheiro está certo hoje.
+
+**O defeito é de verdade declarada.** A tela afirma "venda até R$ 300.000" e o motor trata essa
+faixa como aberta. Quem configura acredita ter posto um teto; quem vende recebe como se não
+houvesse. O próprio default do sistema já tem a forma certa — `mod_provisoes.py`,
+`"faixas_comissao": [{"venda_ate": None, "pct": 0.0}]` — é a UI que deixa quebrá-la.
+
+**Conserto decidido pelo Marcelo (16/09):** a última linha do configurador passa a ser **sempre
+presente, exige percentual e não permite editar o valor de venda** — ela é, por construção, a
+faixa sem teto. `mod_provisoes.validar` ganha a regra correspondente (última faixa com
+`venda_ate` nulo), para a garantia não depender só da tela.
+
+**Segundo detalhe do mesmo trecho:** a comparação é `val_liq_mes < ate`, estritamente menor. Uma
+venda de exatamente R$ 100.000 **não** entra na faixa rotulada "venda até 100.000" — cai na
+seguinte. O rótulo "até" promete inclusão que o código não cumpre; decidir no mesmo conserto qual
+dos dois muda, o rótulo ou a comparação.
+
+*Nota (Marcelo, 16/09):* a **meta mensal não participa** do cálculo de faixa — é indicador, para
+premiação e estatística de cumprimento no futuro. As faixas não precisam ter relação com ela, e o
+fato de o topo (300.000) ser menor que a meta (500.000) não é, por si, inconsistência.
+
 
 ---
 
@@ -438,6 +478,17 @@ manifesto não acompanhou o rename. **Não é só um detalhe interno:** `mod_per
 pela tela **Admin › Perfis de Usuário**, a matriz onde se escolhe quais domínios cada perfil pode
 acessar. Um admin configurando permissões hoje vê um checkbox rotulado "Operacional", não
 "Montagem". (Achado do `MAPA_MODULOS.md`, § Candidato 3, corrigido/fortalecido em 15/09.)
+
+**LP-34 · O clone de loja copia também o lixo da loja-fonte.**
+*Destino: HIGIENE — não é defeito de código; é passo de procedimento de implantação mais uma
+limpeza pontual na loja-template.*
+A Loja Teste nasceu com a função **"Teste Novo"** (resumo vazio), que existe na Inspirium por ter
+sido criada em algum teste antigo. O clone foi fiel — o problema está na fonte. Como a Inspirium é
+a loja-template das cinco implantações-piloto, cada função de teste que sobrar lá nasce cinco
+vezes. Dois passos: (1) limpar as funções de teste da Inspirium antes da primeira implantação
+real; (2) acrescentar "conferir funções da loja-fonte" ao roteiro de implantação
+(`docs/db/TAREFA_LOJA_TESTE.md`). (Achado do Marcelo no Aceite 6, 16/09.)
+
 
 ---
 
