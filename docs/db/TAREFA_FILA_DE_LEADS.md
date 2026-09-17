@@ -25,12 +25,16 @@ funcionário com função **"SAC"** e conta de login na loja (`_sac_usuario_id`)
 essa função — por isso o caminho "sem SAC" (conversa nua, zero participantes) roda sempre.
 
 1. Criar a função **SAC** na loja 1 (Inspirium), pela tela de Config › Funções.
-2. Vincular a ela o funcionário que o Marcelo indicar, **com conta de login ativa**.
-3. **Provar**, sem inventar mensagem: confirme que `_sac_usuario_id` passa a resolver para essa
-   conta. Só o próximo lead real fecha a prova de ponta a ponta — não force um POST no webhook
-   público para testar (injetaria conversa falsa num banco que em outubro é de loja-piloto).
-
-**Depende do Marcelo:** o nome da pessoa. Sem isso, pare aqui e reporte.
+2. **Criar um usuário novo** para ocupar a função (decisão do Marcelo, 17/09 — por enquanto é
+   conta de teste; a pessoa real entra depois). Sugestão de nome/login: **"SAC Inspirium"** /
+   `sac.inspirium` — confirme que o login não colide antes. Nível: o **mínimo** que permita
+   receber e assumir conversa; **meça qual é** e reporte, não escolha por conforto.
+3. **Crie-o pela tela de Admin**, não por script — assim a criação serve de verificação ao vivo do
+   conserto de hoje (`senha_provisoria` nascendo em 1). Confirme depois que o registro nasceu com
+   a flag ligada. Se nascer em 0, o conserto de hoje não pegou e isso é achado — reporte.
+4. **Provar**, sem inventar mensagem: confirme que `_sac_usuario_id` passa a resolver para essa
+   conta. Só o próximo lead real fecha a prova de ponta a ponta — **não force um POST no webhook
+   público** para testar (injetaria conversa falsa num banco que em outubro é de loja-piloto).
 
 ### 1b — Adotar as sete conversas órfãs
 
