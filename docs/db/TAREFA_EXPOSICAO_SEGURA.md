@@ -9,7 +9,7 @@ gatilho, não 01/10.
 **Decisão do Marcelo (17/09):** as lojas-piloto rodam em **Homologação** de 01/10 a 31/10 e migram
 para Produção em 01/11. Homologação **continua podendo absorver erro** — o Pontta segue como
 sistema oficial e a loja-piloto sabe que está numa versão beta em teste. Integração também será
-ativada — se com ou sem exposição pública, ver a proposta abaixo (pendente de decisão). Perda de dado em Homologação, portanto, é incômodo operacional, não catástrofe.
+ativada, mas **sem exposição pública** (decidido em 17/09 — ver a seção própria abaixo). Perda de dado em Homologação, portanto, é incômodo operacional, não catástrofe.
 
 **O que a condição de beta NÃO cobre:** o nome, telefone e a conversa de WhatsApp de um lead são
 dados de terceiro. "É beta" explica uma tela quebrada; não explica senha e telefone atravessando a
@@ -99,7 +99,7 @@ host** e não deve ser tentado. Quem expõe aqui é o EasyPanel.
 
 Homologação já tem TLS e roteamento corretos. Não refazer o que funciona.
 
-### Proposta sobre Integração — não expor à internet (pendente de decisão do Marcelo)
+### Integração não vai para a internet — DECIDIDO pelo Marcelo em 17/09
 
 Integração é degrau de teste da esteira, usado **só pelo Marcelo** e pelas sessões de
 desenvolvimento. Ninguém de loja entra lá, hoje nem em outubro. Publicar um domínio, um
@@ -113,6 +113,10 @@ navegador local). Não precisa de DNS, nem de certificado, nem de rota no Traefi
 Se mais tarde alguém além do Marcelo precisar entrar em Integração, aí sim se cria a rota pelo
 EasyPanel, do mesmo jeito que `homolog` já é servido. Não é caminho fechado, é caminho adiado — e
 sai do caminho crítico de 20/09.
+
+**Consequência para este lote:** nenhum registro DNS novo, nenhum certificado novo, nenhuma rota
+nova no Traefik. O que sobra para Integração é o Passo 2 (bind interno), igual ao de Homologação,
+e o acesso passa a ser por túnel.
 
 ### Passo 2 — bind interno: MEDIR ANTES, não aplicar direto
 
