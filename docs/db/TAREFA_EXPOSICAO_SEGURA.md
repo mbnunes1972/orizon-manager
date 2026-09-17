@@ -41,6 +41,19 @@ Sessão A relatou no mesmo dia que `integracao.orizonone.com.br` não respondeu.
 real do DNS não bate com o que o runbook supõe, em nenhum dos dois nomes. Isso precisa ser
 medido antes de qualquer `certbot` — o desafio HTTP-01 falha se o nome não apontar para o host.
 
+**Fato novo, 17/09, observado pelo Marcelo no navegador: `https://homolog.orizonone.com.br`
+RESPONDE, com TLS válido e a aplicação servida normalmente.** Isso contradiz uma premissa do
+runbook de 14/09, que diz "diferente de Produção, este nunca teve os dois [nginx/certbot]". Ou
+seja: em Homologação, o Passo 1 já está feito — sob o nome **abreviado**, não o que o runbook
+supôs. **Confirme isso na máquina antes de tudo** (nginx ativo, sites habilitados, certificado
+emitido e para quais nomes) e trate o runbook como desatualizado nesse ponto, não como verdade.
+
+**O que isso muda, e é o ponto que importa:** TLS existir não fecha a porta direta. Se 8766
+continuar aberta em `0.0.0.0` (e tudo indica que sim — os Passos 2 e 3 nunca rodaram), Homologação
+está acessível pelos DOIS caminhos, e o caminho em claro continua valendo para quem tiver o IP ou
+um link antigo salvo. **O trabalho que falta em Homologação não é instalar TLS — é fechar a outra
+porta** (Passos 2 e 3). Integração, essa sim, provavelmente precisa do caminho inteiro.
+
 Medir, do próprio host (`167.88.33.121`) e reportar:
 
 ```bash
