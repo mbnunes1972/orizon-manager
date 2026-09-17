@@ -157,6 +157,15 @@ texto de apoio dizendo que atingir o valor leva à faixa seguinte, e a última l
 valor editável) se identifica como "acima da última meta". Nenhuma mudança em
 `resolver_comissao_venda`.
 
+**Regra dos irmãos (medido em 17/09) — são QUATRO pontos, não um.** O mesmo mecanismo de faixas
+existe duas vezes: comissão de vendas da loja (configurador `cvAdicionarFaixa` → resolvedor
+`mod_provisoes.resolver_comissao_venda` → validação `mod_provisoes.validar`) e comissão por função
+do não-consultor (configurador `_rmAddFaixa`/`_rmRenderFaixas` → resolvedor
+`mod_folha._resolver_pct_funcao` → **validação nenhuma**: `mod_cadastro` grava `comissao.faixas`
+sem conferir). Os dois resolvedores têm a mesma comparação estrita e o mesmo `faixas[-1]` de
+escape; os dois configuradores anunciam a convenção no texto de apoio e os dois deixam quebrá-la.
+O conserto vale para os dois lados. Detalhamento em `docs/db/TAREFA_LOTE_ACEITE6.md`, Tarefa 3.
+
 *Nota (Marcelo, 16/09):* a **meta mensal não participa** do cálculo de faixa — é indicador, para
 premiação e estatística de cumprimento no futuro. As faixas não precisam ter relação com ela, e o
 fato de o topo (300.000) ser menor que a meta (500.000) não é, por si, inconsistência.
