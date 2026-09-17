@@ -10917,6 +10917,19 @@ class Handler(BaseHTTPRequestHandler):
                     obj = Model(loja_id=loja_id); db.add(obj)
                 if not ((req.get("nome") or "").strip() or (rid and obj.nome)):
                     self.send_json({"ok": False, "erro": "Nome é obrigatório."}, code=400); return
+                # LP-33/3a (17/09): comissão própria da função (não-consultor, "por_meta") tinha
+                # ZERO validação de faixas — mod_folha lia direto do JSON sem conferir nada (a
+                # tabela da Tarefa 3c do lote). Mesma regra do motor da loja
+                # (mod_provisoes.validar_config_financeira), mesma função compartilhada — só o
+                # ponto de entrada é diferente (os dois configuradores continuam separados).
+                if ent == "funcoes" and "comissao" in req:
+                    _com = req.get("comissao") or {}
+                    if _com.get("por_meta"):
+                        import mod_provisoes as _mprov
+                        _erros_faixas = _mprov.validar_faixas_comissao(_com.get("faixas") or [])
+                        if _erros_faixas:
+                            self.send_json({"ok": False, "erro": " ".join(_erros_faixas)}, code=400)
+                            return
                 apl(db, obj, req, loja_id)
                 db.flush()
                 if ent == "funcionarios":   # fronteira: sincroniza a conta de login vinculada

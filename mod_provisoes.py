@@ -105,6 +105,40 @@ def normalizar_cronograma_formato(cfg):
     return cfg
 
 
+def validar_faixas_comissao(faixas, exigir_faixas=True):
+    """Regra compartilhada (LP-33/3a, decisão do Marcelo 16/09) entre os DOIS modelos de comissão
+    por meta — o motor de vendas da loja (`comissao_vendas.faixas_comissao`, aqui) e a comissão
+    própria de função não-consultor (`funcao.comissao_json['faixas']`, validada por quem chama
+    esta função a partir de `mod_cadastro.funcao_aplicar`). Os configuradores da tela NÃO SE
+    UNIFICAM (3c — são propositalmente diferentes: um tem meta/limitador por margem, o outro não)
+    mas a FORMA do dado é a mesma, e por isso o defeito e o conserto também são: `resolver_
+    comissao_venda`/`mod_folha._resolver_pct_funcao` já aplicam a última faixa em silêncio quando
+    a venda passa de todas as metas (comportamento correto, sem buraco de comissão) — o que faltava
+    era a GARANTIA de que existe mesmo uma última faixa "sem teto" (`venda_ate=None`), declarada,
+    não uma faixa qualquer que por acaso é a última da lista.
+
+    Retorna lista de erros (vazia se ok). `exigir_faixas=False` permite lista vazia passar batido
+    (caso de uso: função com comissão simples, sem faixa nenhuma configurada — não é este caso que
+    a regra do topo cobre)."""
+    erros = []
+    faixas = faixas or []
+    if not faixas:
+        if exigir_faixas:
+            erros.append("Comissão por faixas precisa de ao menos uma faixa.")
+        return erros
+    for fx in faixas:
+        if "pct" not in fx or fx.get("pct") is None:
+            erros.append("Cada faixa de comissão precisa de 'pct'.")
+        elif _f(fx.get("pct")) < 0:
+            erros.append("Percentual de faixa não pode ser negativo.")
+        elif _f(fx.get("pct")) > 100:
+            erros.append("Percentual de faixa não pode passar de 100%.")
+    if faixas[-1].get("venda_ate") is not None:
+        erros.append("A última faixa de comissão tem que ser sem teto (sem valor de venda) — "
+                      "é ela que cobre qualquer venda acima das demais.")
+    return erros
+
+
 def validar_config_financeira(dados):
     erros = []
     d = dados or {}
@@ -125,15 +159,7 @@ def validar_config_financeira(dados):
             erros.append(f"Provisão contábil {k} deve estar entre 0 e 100%.")
     cv = d.get("comissao_vendas", {}) or {}
     faixas = cv.get("faixas_comissao", [])
-    if not faixas:
-        erros.append("Comissão de vendas precisa de ao menos uma faixa.")
-    for fx in faixas:
-        if "pct" not in fx:
-            erros.append("Cada faixa de comissão precisa de 'pct'.")
-        elif _f(fx.get("pct")) < 0:
-            erros.append("Percentual de faixa não pode ser negativo.")
-        elif _f(fx.get("pct")) > 100:
-            erros.append("Percentual de faixa não pode passar de 100%.")
+    erros.extend(validar_faixas_comissao(faixas, exigir_faixas=True))
     for lim in (cv.get("limitador_desconto", {}) or {}).get("limites", []):
         if _f(lim.get("redutor_pct")) < 0 or _f(lim.get("desconto_acima_de")) < 0:
             erros.append("Limite de desconto com valor negativo.")

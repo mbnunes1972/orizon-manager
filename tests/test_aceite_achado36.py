@@ -22,10 +22,14 @@ INDEX_HTML = os.path.join(REPO, "static", "index.html")
 # Faixa do módulo financeiro/provisões levantada para o B2 (funções recon*/filaProv*/efetivar*/
 # resolver*/folha*/contasPagar*/pagarFornecedor*/provisao*/lancamento*/rateio*/periodo*).
 # Range absoluto — desloca com qualquer inserção ACIMA dele. Reajustado em 14/09/2026 (+99
-# linhas: entidade Lead/Captação provisória, PLANO_SEMANA_1.md, inserida antes deste trecho) —
-# deslocamento medido via `git show HEAD~1:static/index.html`, comparando a linha de uma âncora
-# estável nas duas pontas do range antes/depois do commit, não estimado de cabeça.
-FAIXA_INICIO, FAIXA_FIM = 14754, 16799
+# linhas: entidade Lead/Captação provisória, PLANO_SEMANA_1.md, inserida antes deste trecho);
+# reajustado de novo em 17/09/2026 (+36 linhas: Tarefas 2/3 do lote do Aceite 6 — LP-32 selo da
+# loja no CSS/HTML do topframe, LP-33 configurador de comissão da loja, todos ANTES deste trecho,
+# nenhuma inserção DENTRO dele — confirmado pelo mesmo delta nas duas pontas). Deslocamento medido
+# função por função (âncoras: comentário "Financeiro: seções no SUBMENU da sidebar" no início,
+# `function planoContasCarregar(){` no fim — `grep -n` em HEAD vs. working tree, não estimado de
+# cabeça, mesma disciplina de 14/09).
+FAIXA_INICIO, FAIXA_FIM = 14790, 16835
 
 
 def _texto_do_modulo():
@@ -54,26 +58,44 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
     do PUT out-forn) e `abrirItemEspecial` (valor inválido digitado na caixa) — sites NOVOS, não
     conversão de nenhum toast existente, então o total sobe pra 135; +8 novos na Captação
     provisória (14/09/2026, PLANO_SEMANA_1.md — entidade `Lead`): `leadSalvar`, `leadConverterConfirmar`
-    e `abrirConversaLead`, tela nova sem toast anterior pra converter — total sobe pra 143."""
+    e `abrirConversaLead`, tela nova sem toast anterior pra converter — total sobe pra 143; +2
+    novos no LP-02 (15/09, commit `5160ba1`, CPF divergente do cadastro): "Assinatura não
+    confirmada — CPF divergente sem autorização.", um site em cada um dos dois fluxos de
+    assinatura unificada (`_confirmarAssinaturaUnificada` e o irmão de credenciais) — sites
+    NOVOS, sem toast anterior ali — total sobe pra 145.
+
+    Tarefa 1 do lote do Aceite 6 (17/09, `docs/db/TAREFA_LOTE_ACEITE6.md`) atribuía este salto aos
+    Consertos 1/2/3 desta semana — MEDIDO e CORRIGIDO aqui: nenhum deles toca `showToast` (os três
+    dedicados confirmaram `git diff` vazio pra essa chamada); o total já estava em 145 no commit
+    imediatamente anterior a essa leva (`c148db8`, bisectado por `git log -S` até o LP-02 acima).
+    Reportado ao Marcelo — a catraca em si (o teste vermelho) é a mesma, só a causa que o
+    documento do lote citava estava errada."""
     with open(INDEX_HTML, encoding="utf-8") as f:
         conteudo = f.read()
     total = len(re.findall(r"showToast\([^;]*,\s*true\)", conteudo))
-    assert total == 143, "a contagem mudou — reveja o número reportado (%d)" % total
+    assert total == 145, "a contagem mudou — reveja o número reportado (%d)" % total
 
 
 # ── F2-23 (04/09) — faixa do ciclo (Projeto/Transferência de etapa/PE/Medição) ───────────────────
 # Não é um bloco contíguo como o financeiro — são as funções que o percurso do Marcelo atravessa
 # (abrir projeto, transferir etapa, ClickSign de PE e de Medição), espalhadas pelo arquivo.
+# Reajustado em 17/09/2026 (Tarefas 2/3 do lote do Aceite 6): +36 linhas antes do ponto de
+# inserção dos configuradores `cv*` (motor de comissão da loja, ~linha 17500) — a 1ª faixa
+# (abrirProjeto/filtro de projetos, ~7970, ANTES desse ponto) desloca só +36; as 5 faixas
+# seguintes (todas DEPOIS desse ponto) somam mais +28 das próprias funções `cv*` inseridas ali,
+# +64 no total. Cada faixa remedida por âncora própria (grep -n em HEAD vs. working tree), não
+# por um delta único aplicado de cabeça — as duas famílias de shift (+36 / +64) são reais, não
+# arredondamento.
 FAIXAS_CICLO = [
-    (7932, 7980),      # abrirProjeto
-    (19883, 19929),    # _cicloTransferResponder / _cicloTransferConfirmar
-    (22459, 22531),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
-                       # verificarClickSignPEAgora / reenviarConviteClickSignPE
-    (22980, 22997),    # peConciliacaoReprovar
-    (23814, 23864),    # toggleSalvarEtapa / reabrirEtapaCascata
-    (24582, 24681),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
+    (7968, 8016),      # abrirProjeto (+36)
+    (19947, 19993),    # _cicloTransferResponder / _cicloTransferConfirmar (+64)
+    (22523, 22595),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
+                       # verificarClickSignPEAgora / reenviarConviteClickSignPE (+64)
+    (23044, 23061),    # peConciliacaoReprovar (+64)
+    (23878, 23928),    # toggleSalvarEtapa / reabrirEtapaCascata (+64)
+    (24646, 24745),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
                        # _confirmarEnvioClickSignMedicao / verificarClickSignMedicaoAgora /
-                       # reenviarConviteClickSignMedicao
+                       # reenviarConviteClickSignMedicao (+64)
     # F2-40 (08/09): linhas deslocadas pela Fatia 1/2 (botão "Negociar Complemento" movido +
     # modal reescrito, ~150 linhas novas entre a 11c e a 11e) — mesmas 4 funções de antes,
     # conteúdo intocado, só a numeração absoluta mudou (medido função por função, não chutado).

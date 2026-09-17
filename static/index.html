@@ -110,9 +110,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
 .tf-wordmark .wm-linha{display:flex;align-items:baseline;gap:1px}
 .tf-wordmark .wm-orizon{font-weight:700;font-size:19px;letter-spacing:.01em;color:var(--sidebar-text-active)}
 .tf-wordmark .wm-manager{font-weight:700;font-size:19px;letter-spacing:.01em;color:var(--sidebar-accent)}
-.tf-marca-loja{display:flex;align-items:center}
-.tf-loja-nome{font-size:9.5px;color:var(--sidebar-text);letter-spacing:.3px;
+/* LP-32 (17/09, achado do Marcelo: "o nome da loja ficou muito pequeno e mal posicionado") —
+   selo de contexto com peso próprio, separado da marca por um container com fundo/borda
+   próprios (não mais um texto solto do tamanho de legenda colado no wordmark). Continua na
+   MESMA LINHA do glifo/wordmark (decisão de 2026-08-24, não empilha — ver os comentários acima
+   sobre `.topframe`). `--sidebar-item-active` é o MESMO tom já usado pro item ativo da sidebar —
+   reaproveitado aqui como "isto é o contexto atual", não um token novo. */
+.tf-marca-loja{display:flex;align-items:center;margin-left:6px;padding:6px 14px;border-radius:999px;
+  background:var(--sidebar-item-active);border:1px solid var(--sidebar-border)}
+.tf-loja-nome{font-size:13px;font-weight:600;color:var(--sidebar-text-active);letter-spacing:.2px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+/* Seletor de loja (2+ lojas — `_renderSeletorLoja`): vive dentro do MESMO selo acima, por isso
+   sem fundo/borda própria (herdaria do pill) — só tipografia igual à do nome fixo, pra ficar
+   coerente com quem vê o nome sem seletor. `color-scheme:dark` no `.topframe` (regra já
+   existente) cobre o arrow nativo do <select> e as opções do dropdown nos dois temas. */
+.tf-seletor-loja{background:transparent;border:none;color:var(--sidebar-text-active);
+  font-family:var(--font-sans);font-size:13px;font-weight:600;padding:0;max-width:200px;
+  text-overflow:ellipsis;cursor:pointer}
+.tf-seletor-loja:focus{outline:none}
 .tf-central{display:flex;align-items:center;gap:10px;flex-shrink:0;justify-content:center}
 .tf-conta{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .tf-conta #sb-user-btn{margin-top:0}
@@ -3891,11 +3906,11 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
     </div>
     <div style="margin-bottom:6px">
       <strong style="font-size:13px">Faixas de comissão</strong>
-      <span style="font-size:11px;color:var(--muted);margin-left:8px">(venda até — deixe em branco na última faixa = sem teto)</span>
+      <span style="font-size:11px;color:var(--muted);margin-left:8px">(atingir o valor leva à faixa seguinte; a última linha é fixa — cobre o que ficar acima da última meta)</span>
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
       <thead><tr>
-        <th style="text-align:left;padding:4px 6px;color:var(--muted);font-weight:600">Venda até (R$)</th>
+        <th style="text-align:left;padding:4px 6px;color:var(--muted);font-weight:600">Vendas abaixo de (R$)</th>
         <th style="text-align:left;padding:4px 6px;color:var(--muted);font-weight:600">% Comissão</th>
         <th style="width:32px"></th>
       </tr></thead>
@@ -4733,13 +4748,11 @@ function _renderSeletorLoja(){
   }
   if (nomeEl) nomeEl.textContent = '';     // 2+ lojas: o seletor abaixo já mostra qual está ativa
   host.style.display = 'flex';
-  host.innerHTML = '<label class="field-label" style="margin:0 6px 0 0">Loja</label>' +
-    '<select id="seletor-loja" style="background:var(--surface);border:1px solid var(--border);'
-    // max-width (2026-08-23, achado da Vera): sem isto o nome legal da loja (ex. "INSPIRIUM
-    // MOVEIS PLANEJADOS E DECORACAO LTDA") deixava o <select> largo o bastante pra estourar o
-    // frame de topo em telas menores.
-    + 'border-radius:8px;padding:6px 10px;color:var(--text);font-size:12px;max-width:220px;'
-    + 'text-overflow:ellipsis"></select>';
+  // LP-32 (17/09): estilo migrou pra `.tf-seletor-loja` (CSS acima) — o mesmo selo que mostra o
+  // nome fixo quando há só 1 loja, pra ficar coerente com quem vê o seletor. max-width (herdado
+  // do achado de 2026-08-23, Vera): sem isto o nome legal da loja (ex. "INSPIRIUM MOVEIS
+  // PLANEJADOS E DECORACAO LTDA") deixava o <select> largo o bastante pra estourar o frame.
+  host.innerHTML = '<select id="seletor-loja" class="tf-seletor-loja"></select>';
   const sel = document.getElementById('seletor-loja');
   sel.innerHTML = lojas.map(l => `<option value="${l.id}">${esc(l.nome)}</option>`).join('');
   if (_lojaAtiva) sel.value = String(_lojaAtiva);
@@ -6304,7 +6317,7 @@ function cfgRemuneracaoEditar(id){
     +`<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">`
     +`<label style="${lf}"><span>Base</span><select id="rm-base" style="padding:5px 8px"><option value="liquido" ${com.base==='liquido'?'selected':''}>Líquido de Vendas</option><option value="fabrica" ${com.base==='fabrica'?'selected':''}>Custo Fábrica</option></select></label>`
     +`<label id="rm-pct-wrap" style="${lf};display:${com.por_meta?'none':'flex'}"><span>% comissão</span><input id="rm-pct" type="number" step="0.01" value="${com.pct||0}" style="width:100px;padding:5px 8px"></label></div>`
-    +`<div id="rm-faixas-wrap" style="display:${com.por_meta?'block':'none'};margin-top:8px"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Faixas (venda até R$ → %; última com "até" vazio = acima)</div><div id="rm-faixas"></div><button class="btn btn-ghost btn-sm" type="button" style="font-size:11px;margin-top:6px" onclick="_rmAddFaixa()">+ faixa</button></div>`;
+    +`<div id="rm-faixas-wrap" style="display:${com.por_meta?'block':'none'};margin-top:8px"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">Faixas (vendas abaixo de R$ → %; atingir o valor leva à faixa seguinte; a última é fixa — cobre acima da última meta)</div><div id="rm-faixas"></div><button class="btn btn-ghost btn-sm" type="button" style="font-size:11px;margin-top:6px" onclick="_rmAddFaixa()">+ faixa</button></div>`;
   const comHtml = `<label style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:8px">`
     +`<input type="checkbox" id="rm-usa-comvendas" ${usaComVendasIni?'checked':''} onchange="_rmToggleUsaComVendas()"> Usa comissão de vendas por metas (motor da loja, mesmo do Consultor de Vendas)</label>`
     +`<div id="rm-com-vendas" style="display:${usaComVendasIni?'block':'none'}">${comHtmlVendas}</div>`
@@ -6341,23 +6354,46 @@ function _rmToggleMeta(){
   if(on && _rmFaixas.length===0) _rmFaixas.push({venda_ate:null, pct:0});   // já mostra o 1º degrau
   _rmRenderFaixas();
 }
+// LP-33/3a (17/09, decidido pelo Marcelo): mesma regra do motor da loja (`cv*` acima), configurador
+// SEPARADO de propósito (3c — não unificar). A última faixa de `_rmFaixas` é sempre sem teto — a
+// linha 1 abaixo AUTOCORRIGE o array em memória (não só a tela) sempre que renderiza, porque uma
+// função salva ANTES desta decisão pode ter chegado aqui com `venda_ate` preenchido na última
+// posição; sem essa correção o servidor recusaria (mod_provisoes.validar_config_financeira) sem o
+// usuário ter como consertar pela tela (o campo nem aparece editável na última linha).
 function _rmRenderFaixas(){
   const box=document.getElementById('rm-faixas'); if(!box) return;
+  if(_rmFaixas.length) _rmFaixas[_rmFaixas.length-1].venda_ate = null;
   let prev=0;
+  const total=_rmFaixas.length;
   box.innerHTML=_rmFaixas.map((fx,i)=>{
+    const ehUltima = i === total-1;
     const deLbl='De R$ '+Number(prev||0).toLocaleString('pt-BR');
+    const ateBloco = ehUltima
+      ? `<span style="color:var(--muted);min-width:150px;display:inline-block">acima da última meta (sem teto)</span>`
+      : `<span style="color:var(--muted);white-space:nowrap">abaixo de R$</span>
+         <input type="number" step="0.01" value="${fx.venda_ate!=null?fx.venda_ate:''}" placeholder="meta desta faixa" onchange="_rmFaixas[${i}].venda_ate=this.value===''?null:parseFloat(this.value); _rmRenderFaixas()" style="width:130px;padding:4px 8px">`;
+    const removerBtn = ehUltima ? ''
+      : `<button class="btn btn-ghost btn-sm" type="button" style="font-size:10px" onclick="_rmDelFaixa(${i})">&times;</button>`;
     const html=`<div style="display:flex;gap:6px;align-items:center;margin-bottom:5px;font-size:12px;flex-wrap:nowrap">
-      <span style="color:var(--muted);min-width:112px;white-space:nowrap">${deLbl}</span><span style="color:var(--muted);white-space:nowrap">até R$</span>
-      <input type="number" step="0.01" value="${fx.venda_ate!=null?fx.venda_ate:''}" placeholder="(vazio = acima)" onchange="_rmFaixas[${i}].venda_ate=this.value===''?null:parseFloat(this.value); _rmRenderFaixas()" style="width:130px;padding:4px 8px">
+      <span style="color:var(--muted);min-width:112px;white-space:nowrap">${deLbl}</span>
+      ${ateBloco}
       <span style="color:var(--muted)">→</span>
-      <input type="number" step="0.01" value="${fx.pct!=null?fx.pct:''}" placeholder="%" onchange="_rmFaixas[${i}].pct=parseFloat(this.value)||0" style="width:70px;padding:4px 8px"><span style="color:var(--muted)">%</span>
-      <button class="btn btn-ghost btn-sm" type="button" style="font-size:10px" onclick="_rmDelFaixa(${i})">&times;</button></div>`;
+      <input type="number" step="0.01" required value="${fx.pct!=null?fx.pct:''}" placeholder="%" onchange="_rmFaixas[${i}].pct=parseFloat(this.value)||0" style="width:70px;padding:4px 8px"><span style="color:var(--muted)">%</span>
+      ${removerBtn}</div>`;
     prev=fx.venda_ate!=null?fx.venda_ate:prev;
     return html;
   }).join('') || '<div style="color:var(--muted);font-size:11px">Clique em "+ faixa" para adicionar um degrau.</div>';
 }
-function _rmAddFaixa(){ _rmFaixas.push({venda_ate:null, pct:0}); _rmRenderFaixas(); }
-function _rmDelFaixa(i){ _rmFaixas.splice(i,1); _rmRenderFaixas(); }
+function _rmAddFaixa(){
+  // insere ANTES da última faixa (sempre presente, sem teto) — nunca depois dela.
+  if(_rmFaixas.length === 0) _rmFaixas.push({venda_ate:null, pct:0});
+  else _rmFaixas.splice(_rmFaixas.length-1, 0, {venda_ate:0, pct:0});
+  _rmRenderFaixas();
+}
+function _rmDelFaixa(i){
+  if(i === _rmFaixas.length-1) return;   // a última (sem teto) não se remove
+  _rmFaixas.splice(i,1); _rmRenderFaixas();
+}
 async function cfgRemuneracaoSalvar(){
   const id=document.getElementById('rm-id').value;
   const erro=document.getElementById('rm-erro');
@@ -17445,24 +17481,45 @@ async function adminPerfilEmissaoSalvar(kind, id){
   adminPerfilEmissaoCarregar(kind, id);
 }
 
-function _cvLinha(cells, onRemove){
+function _cvLinha(cells, removivel){
   const tr = document.createElement('tr');
   cells.forEach(html => { const td = document.createElement('td'); td.style.padding='3px 4px'; td.innerHTML = html; tr.appendChild(td); });
   const tdRem = document.createElement('td'); tdRem.style.padding='3px 4px';
-  const btn = document.createElement('button');
-  btn.className='btn btn-ghost btn-sm'; btn.style.padding='2px 6px'; btn.style.fontSize='11px'; btn.innerHTML='<i class="ti ti-x"></i>';
-  btn.onclick = () => tr.remove();
-  tdRem.appendChild(btn); tr.appendChild(tdRem);
+  if(removivel){
+    const btn = document.createElement('button');
+    btn.className='btn btn-ghost btn-sm'; btn.style.padding='2px 6px'; btn.style.fontSize='11px'; btn.innerHTML='<i class="ti ti-x"></i>';
+    btn.onclick = () => tr.remove();
+    tdRem.appendChild(btn);
+  }
+  tr.appendChild(tdRem);
   return tr;
 }
 function _cvInputStyle(){ return 'background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;width:100%'; }
+// LP-33/3a (17/09, decidido pelo Marcelo): a ÚLTIMA faixa é sempre presente, sem teto (não tem
+// campo de "vendas abaixo de" editável), exige percentual e não pode ser removida — é ela que
+// cobre qualquer venda acima das demais. `cvAdicionarFaixa` (botão "+ faixa" e carga inicial de
+// faixas que NÃO são a última) insere sempre ANTES da linha travada; `cvGarantirFaixaSemTeto`
+// garante que a linha travada exista (idempotente — não duplica se já está lá).
 function cvAdicionarFaixa(venda_ate, pct){
   const s = _cvInputStyle();
+  const tbody = document.getElementById('cv-faixas-tbody');
+  const ultima = tbody.querySelector('tr.cv-linha-topo');
   const tr = _cvLinha([
-    `<input type="number" step="0.01" min="0" class="cv-faixa-ate" placeholder="(sem teto)" style="${s}" value="${venda_ate != null ? venda_ate : ''}">`,
+    `<input type="number" step="0.01" min="0" class="cv-faixa-ate" placeholder="meta desta faixa" style="${s}" value="${venda_ate != null ? venda_ate : ''}">`,
     `<input type="number" step="0.01" min="0" max="100" class="cv-faixa-pct" style="${s}" value="${pct != null ? pct : 0}">`
-  ]);
-  document.getElementById('cv-faixas-tbody').appendChild(tr);
+  ], /*removivel*/true);
+  if(ultima) tbody.insertBefore(tr, ultima); else tbody.appendChild(tr);
+}
+function cvGarantirFaixaSemTeto(pct){
+  const tbody = document.getElementById('cv-faixas-tbody');
+  if(tbody.querySelector('tr.cv-linha-topo')) return;   // já existe — idempotente
+  const s = _cvInputStyle();
+  const tr = _cvLinha([
+    `<span style="color:var(--muted);font-size:12px;padding:5px 8px;display:inline-block">acima da última meta (sem teto)</span>`,
+    `<input type="number" step="0.01" min="0" max="100" class="cv-faixa-pct" required style="${s}" value="${pct != null ? pct : 0}">`
+  ], /*removivel*/false);
+  tr.classList.add('cv-linha-topo');
+  tbody.appendChild(tr);
 }
 function cvAdicionarLimite(desc_acima, redutor){
   const s = _cvInputStyle();
@@ -17486,7 +17543,12 @@ async function abrirModalComissao(lid){
   document.getElementById('cv-meta').value = cv.meta_mensal || 0;
   const ftb = document.getElementById('cv-faixas-tbody');
   ftb.innerHTML = '';
-  (cv.faixas_comissao || []).forEach(f => cvAdicionarFaixa(f.venda_ate, f.pct));
+  const faixasSalvas = cv.faixas_comissao || [];
+  faixasSalvas.forEach((f, i) => {
+    if (i === faixasSalvas.length - 1) cvGarantirFaixaSemTeto(f.pct);   // última carregada = a travada
+    else cvAdicionarFaixa(f.venda_ate, f.pct);
+  });
+  cvGarantirFaixaSemTeto(0);   // garante mesmo se faixasSalvas veio vazio (config nova/corrompida)
   const ld = cv.limitador_desconto || {ativo: false, base_desconto: 'Desc_Orc', limites: []};
   const chk = document.getElementById('cv-lim-ativo');
   chk.checked = !!ld.ativo;
@@ -17507,7 +17569,9 @@ async function salvarModalComissao(lid){
   const n = v => parseFloat(v) || 0;
   const meta = n(document.getElementById('cv-meta').value);
   const faixas = Array.from(document.querySelectorAll('#cv-faixas-tbody tr')).map(tr => {
-    const ate = tr.querySelector('.cv-faixa-ate').value.trim();
+    // a linha travada (cv-linha-topo) não tem .cv-faixa-ate — sem teto sempre, por construção.
+    const ateEl = tr.querySelector('.cv-faixa-ate');
+    const ate = ateEl ? ateEl.value.trim() : '';
     const pct = n(tr.querySelector('.cv-faixa-pct').value);
     return {venda_ate: ate === '' ? null : n(ate), pct};
   });
