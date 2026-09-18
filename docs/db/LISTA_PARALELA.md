@@ -223,10 +223,40 @@ nunca recebeu — falha silenciosa, o mesmo padrão dos dezessete dias de 31/08 
 menor e mais frequente. Melhor ainda: **avisar antes**, quando a janela já está fechada, para a
 pessoa nem tentar e ir direto ao telefone.
 
-**Medir antes de consertar (não implementado, sem medição):**
-1. Quando a Meta recusa um envio, o que a tela mostra? Caminho do `status` de `envios_externos`
-   até a interface. Se recusa passa por "enviado", é achado.
-2. Existe hoje qualquer tratamento da janela de 24 h — detecção de fechamento, ou uso de template?
+**Medido em 18/09 (sem consertar nada, como pedido):**
+
+1. **Quando a Meta recusa um envio, o que a tela mostra? Nada — e não é por mislabeling.**
+   `EnvioExterno.status` está CORRETO: `espelhar_para_externos`/`notificar_usuario`
+   (`chat/externo.py`) chamam `despachar()`, que devolve `ok=False` numa recusa, e o status vira
+   `"falhou"` (nunca `"enviado"`) com `env.erro` preenchido — inclusive com a mensagem REAL da
+   Meta (`_erro_meta`, que já trata o código 131047 = janela fechada). O achado é um passo
+   ADIANTE: **nada dessa informação sai do banco.** `serializar_mensagem` (`chat/core.py`) não
+   tem nenhum campo de status/erro de entrega. O endpoint que posta a mensagem
+   (`POST /api/comunicacao/conversas/<id>/mensagens`, `main.py`) chama
+   `espelhar_para_externos` dentro de um `try/except Exception: pass` — "best-effort: nunca
+   quebra o envio interno" — e responde `{"ok": true, ...}` **sempre**, mesmo que o espelhamento
+   tenha falhado ou até lançado exceção. O frontend (`ocEnviar`, `static/index.html`) só mostra
+   erro quando `d.ok` é falso — o que nunca acontece nesse caminho. Resultado prático: a bolha da
+   mensagem fica idêntica entregue, recusada pela Meta, ou nem tentada (`pendente_config`) —
+   exatamente a falha silenciosa que o item descreve, só que a causa não é o valor do `status`
+   (que está certo), é a ausência total de qualquer ponte dele até a tela.
+2. **Existe tratamento da janela de 24h? Parcial — detecção sim, no ponto errado.**
+   `janela_da_conversa`/`dentro_da_janela_24h` (`chat/externo.py`) calculam o estado corretamente
+   (aberta/fechando/fechada) e alimentam um badge real na LISTA de Atendimentos
+   (`_atdJanelaBadge`, `static/index.html`: "Janela aberta" / "Janela fecha em Xh" / "Janela
+   fechada"). O que falta é exatamente o "avisar antes" que o item pede: esse badge só existe na
+   LISTA — o cabeçalho da conversa aberta e o composer (`ocEnviar`) não consultam `janela.estado`
+   em nenhum momento antes de enviar. Enviar por template
+   (`enviar_template_conversa`/`despachar_template`) já existe e funciona, mas é uma ação
+   separada que a pessoa precisa escolher conscientemente — nada substitui automaticamente o
+   texto livre por template quando a janela já está fechada.
+
+**Fecha o diagnóstico, não fecha o item:** os dois pontos medidos confirmam a decisão do Marcelo
+(a loja resolve por outro canal) e mostram que o "não esconder" ainda não existe — o conserto seria
+(a) `serializar_mensagem`/o endpoint de postagem devolverem o status real do espelhamento e o
+frontend reagir a isso, e (b) o badge de janela (já calculado, já correto) aparecer também no
+cabeçalho/composer da conversa aberta, não só na lista. Nenhum dos dois foi implementado nesta
+rodada — é medição.
 
 *Contexto de origem:* 18/09, ao tentar responder um lead real (Felipe, contato de 17/09) o Marcelo
 esbarrou primeiro num erro interno ("Sem permissão para postar aqui" — `pode_escrever_conversa`,

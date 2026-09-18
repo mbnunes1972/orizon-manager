@@ -232,3 +232,43 @@ def test_assumir_recusa_item_de_outra_loja(http_client_factory, app_db, seed, sa
         assert db.get(TriagemEntrada, eid).status == "pendente"
     finally:
         db.close()
+
+
+# ── Assumir libera a escrita (caso real: Gabriela/Marcelo, 18/09) ────────────────────────────
+
+def test_assumir_pela_fila_libera_escrita_que_antes_dava_sem_permissao(http_client_factory,
+                                                                        app_db, seed,
+                                                                        gerencial_l1):
+    """Caso real de 18/09 (LP-36, contexto de origem): um MASTER/gerencial abria a conversa de
+    um lead sem dono (a leitura passa por oversight, `ver_todas_conversas`) e ao tentar
+    responder levava "Sem permissão para postar aqui" — `pode_escrever_conversa` não tem o
+    mesmo bypass de oversight que a leitura, exige participante de verdade
+    (`eh_participante`). Antes do portão alargado (ADR-029), esse gerencial não via a fila e
+    não tinha como assumir — ficava preso. Prova ponta a ponta pelo HTTP real: 403 antes de
+    assumir, 200 depois, exatamente o endpoint que a Gabriela usou."""
+    db = app_db.get_session()
+    try:
+        conv = Conversa(loja_id=seed["loja1_id"], tipo="grupo", titulo="Lead — Escrita Bloqueada",
+                        origem_entrada="triagem")
+        db.add(conv); db.commit()
+        cid = conv.id
+    finally:
+        db.close()
+
+    c = _login(http_client_factory, "ger_l1_teste")
+    # antes de assumir: lê (oversight) mas não escreve (não é participante)
+    st_get, _ = c.get("/api/comunicacao/inbox")
+    assert st_get == 200
+    st_post, body_post = c.post("/api/comunicacao/conversas/%d/mensagens" % cid,
+                                {"corpo": "Oi, tudo bem?"})
+    assert st_post == 403 and body_post["erro"] == "Sem permissão para postar aqui."
+
+    # assume pela fila
+    st_assumir, body_assumir = c.post("/api/comunicacao/fila/assumir",
+                                      {"tipo": "conversa", "id": cid})
+    assert st_assumir == 200 and body_assumir["ok"]
+
+    # agora escreve (201 — mensagem criada)
+    st_post2, body_post2 = c.post("/api/comunicacao/conversas/%d/mensagens" % cid,
+                                  {"corpo": "Oi, tudo bem?"})
+    assert st_post2 == 201 and body_post2["ok"], body_post2
