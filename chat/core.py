@@ -312,10 +312,62 @@ def criar_anexo(db, mensagem_id, nome, mime, tamanho, caminho):
     return a
 
 
+# ── Estado de entrega externa (Conserto 1, TAREFA_ENTREGA_VISIVEL, 18/09) ────────────────────
+# A medição do LP-36 achou que envios_externos.status já fica "falhou" (nunca "enviado") numa
+# recusa da Meta — o defeito é essa informação nunca chegar na tela. Os TRÊS call sites de
+# espelhar_para_externos hoje são main.py:9339, 9742 e 9833 — se aparecer um quarto, ele precisa
+# passar por aqui também (regra dos irmãos, mesma prática do ADR-028).
+_CODIGO_JANELA_FECHADA = "131047"
+
+
+def _motivo_falha_legivel(env):
+    erro = env.erro or ""
+    if _CODIGO_JANELA_FECHADA in erro:
+        return ("Janela de 24h fechada — a Meta só aceita template aprovado depois desse prazo. "
+                "Fale com o cliente por outro canal (telefone, etc.).")
+    return erro or "Falha ao entregar pela ponte externa."
+
+
+def entregas_por_mensagem(db, mensagem_ids):
+    """Estado de entrega EXTERNA por mensagem: 'entregue' | 'falhou' | 'nao_se_aplica' (sem
+    EnvioExterno de saída — a maioria do Chat Interno). Nunca esconde falha: se qualquer envio
+    ligado à mensagem falhou, o estado é 'falhou', mesmo que outro (caso raro de múltiplos
+    externos na mesma conversa) tenha ido. Batch por lista de ids, mesmo padrão de
+    anexos_por_mensagem — para usar na listagem do histórico inteiro sem 1 query por mensagem."""
+    if not mensagem_ids:
+        return {}
+    envios = (db.query(EnvioExterno)
+                .filter(EnvioExterno.mensagem_id.in_(mensagem_ids),
+                        EnvioExterno.direcao == "saida")
+                .all())
+    por_msg = {}
+    for e in envios:
+        por_msg.setdefault(e.mensagem_id, []).append(e)
+    out = {}
+    for mid, envs in por_msg.items():
+        falhas = [e for e in envs if e.status == "falhou"]
+        if falhas:
+            out[mid] = {"estado": "falhou", "motivo": _motivo_falha_legivel(falhas[0])}
+        else:
+            out[mid] = {"estado": "entregue", "motivo": None}
+    return out
+
+
+def estado_entrega_mensagem(db, mensagem_id):
+    """Mesma regra de entregas_por_mensagem, para UMA mensagem só — os 3 call sites de envio
+    chamam logo depois de despachar; não vale montar o batch pra 1 item."""
+    return entregas_por_mensagem(db, [mensagem_id]).get(
+        mensagem_id, {"estado": "nao_se_aplica", "motivo": None})
+
+
 def serializar_mensagem(m, autor_nome=None, transferido_nome=None,
-                        documento=None, anexos=None, destinatario_nome=None):
+                        documento=None, anexos=None, destinatario_nome=None, entrega=None):
     """`documento`: CicloDocumento já resolvido pelo chamador (ou None) — a mensagem devolve
-    nome/tipo prontos, não só o id cru (Fatia 5). `destinatario_nome`: alvo dirigido (F2)."""
+    nome/tipo prontos, não só o id cru (Fatia 5). `destinatario_nome`: alvo dirigido (F2).
+    `entrega` (Conserto 1, 18/09): {"estado", "motivo"} de estado_entrega_mensagem/
+    entregas_por_mensagem — None (default) vira 'nao_se_aplica', correto pra Chat Interno/Mural/
+    Fórum, que nunca tiveram ponte externa pra medir."""
+    entrega = entrega or {}
     return {"id": m.id, "autor_usuario_id": m.autor_usuario_id,
             "autor_nome": autor_nome or "—",
             "destinatario_usuario_id": m.destinatario_usuario_id,
@@ -334,6 +386,8 @@ def serializar_mensagem(m, autor_nome=None, transferido_nome=None,
             "privada": bool(m.privada),
             "evento": m.evento,
             "anexos": anexos or [],
+            "entrega_estado": entrega.get("estado", "nao_se_aplica"),
+            "entrega_motivo": entrega.get("motivo"),
             "criado_em": m.criado_em.isoformat() if m.criado_em else None}
 
 
@@ -356,10 +410,12 @@ def listar_mensagens(db, conversa_id):
     dest_nomes = ({u.id: u.nome for u in db.query(Usuario)
                    .filter(Usuario.id.in_(ids_dest)).all()} if ids_dest else {})
     anexos = anexos_por_mensagem(db, [m.id for m, _ in rows])
+    entregas = entregas_por_mensagem(db, [m.id for m, _ in rows])
     return [serializar_mensagem(m, nome, nomes.get(m.transferido_para_funcionario_id),
                                 documento=docs.get(m.documento_ref_id),
                                 anexos=anexos.get(m.id),
-                                destinatario_nome=dest_nomes.get(m.destinatario_usuario_id))
+                                destinatario_nome=dest_nomes.get(m.destinatario_usuario_id),
+                                entrega=entregas.get(m.id))
             for m, nome in rows]
 
 

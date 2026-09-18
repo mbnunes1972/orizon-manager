@@ -9341,9 +9341,13 @@ class Handler(BaseHTTPRequestHandler):
                     db.rollback()   # ponte WhatsApp é best-effort — nunca quebra o anexo
                 storage_salvar_binario(os.path.join(_BASE_DIR, "COMUNICACAO", rel), data)
                 nome = (db.get(Usuario, usuario["id"]).nome if usuario.get("id") else None)
+                # Conserto 1 (TAREFA_ENTREGA_VISIVEL, 18/09) — call site 1/3 de
+                # espelhar_para_externos: a resposta conta o destino real da ponte, não só que
+                # a mensagem foi salva (que sempre foi certo — o try/except acima não muda).
+                entrega = mod_chat.estado_entrega_mensagem(db, msg.id)
                 self.send_json({"ok": True, "mensagem": mod_chat.serializar_mensagem(
                     msg, autor_nome=nome,
-                    anexos=[mod_chat._serializar_anexo(anexo)])}, code=201)
+                    anexos=[mod_chat._serializar_anexo(anexo)], entrega=entrega)}, code=201)
             finally:
                 db.close()
             return
@@ -9743,8 +9747,11 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:
                     db.rollback()   # ponte WhatsApp best-effort — nunca quebra a mensagem
                 nome = (db.get(Usuario, usuario["id"]).nome if usuario.get("id") else None)
+                # Conserto 1 (TAREFA_ENTREGA_VISIVEL, 18/09) — call site 2/3.
+                entrega = mod_chat.estado_entrega_mensagem(db, msg.id)
                 self.send_json({"ok": True,
-                                "mensagem": mod_chat.serializar_mensagem(msg, autor_nome=nome)},
+                                "mensagem": mod_chat.serializar_mensagem(msg, autor_nome=nome,
+                                                                         entrega=entrega)},
                                code=201)
             finally:
                 db.close()
@@ -9834,8 +9841,11 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:
                     pass   # best-effort: espelho externo nunca quebra a mensagem interna
                 db.commit()
+                # Conserto 1 (TAREFA_ENTREGA_VISIVEL, 18/09) — call site 3/3.
+                entrega = mod_chat.estado_entrega_mensagem(db, msg.id)
                 self.send_json({"ok": True,
-                                "mensagem": mod_chat.serializar_mensagem(msg, usuario.get("nome"))},
+                                "mensagem": mod_chat.serializar_mensagem(msg, usuario.get("nome"),
+                                                                         entrega=entrega)},
                                code=201)
             except Exception as e:
                 db.rollback()

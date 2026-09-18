@@ -3336,6 +3336,12 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
                   <button class="btn btn-ghost btn-sm" style="margin-left:auto;padding:1px 8px" onclick="ocRemoverAnexo()">×</button>
                 </div>
                 <input type="file" id="oc-file" style="display:none" onchange="ocArquivoSelecionado(this)">
+                <!-- Aviso de janela de 24h NO COMPOSER (Conserto 2, TAREFA_ENTREGA_VISIVEL,
+                     18/09) — reusa c.janela (janela_da_conversa, já calculado no servidor pro
+                     badge da lista); aqui só aparece, não recalcula nada. Antes só existia na
+                     lista de Atendimentos ("corredor"); a pessoa via depois de já ter escrito.
+                     Some quando aberta — _ocJanelaAvisoSet() controla display/texto. -->
+                <div id="oc-janela-aviso" style="display:none;margin-bottom:8px;padding:8px 12px;border-radius:8px;font-size:12px"></div>
                 <!-- faixa única (padrão WhatsApp): 1 linha por padrão, cresce com o conteúdo até um
                      teto (ocAutoResizeTexto) — Enter envia, Shift+Enter quebra linha. -->
                 <div class="oc-compose-row">
@@ -18810,6 +18816,25 @@ function _ocSetHeaderExtras(c){
   if(actionBar) actionBar.style.display = ehAtendimento ? '' : 'none';
   document.querySelectorAll('.oc-am-menu.open').forEach(m=>m.classList.remove('open'));
   const flash = document.getElementById('oc-action-flash'); if(flash) flash.textContent = '';
+  _ocJanelaAvisoSet(c);
+}
+// Conserto 2 (TAREFA_ENTREGA_VISIVEL, 18/09): o aviso de janela de 24h muda de lugar — da LISTA
+// (onde já existia, _atdJanelaBadge) pro COMPOSER, onde a pessoa está prestes a escrever. Reusa
+// `c.janela` (janela_da_conversa, calculado no servidor pro badge da lista) e `_atdHoras` —
+// nenhum cálculo novo aqui, só apresentação.
+function _ocJanelaAvisoSet(c){
+  const el = document.getElementById('oc-janela-aviso');
+  if(!el) return;
+  const j = c && c.janela;
+  if(!j || j.estado === 'na' || j.estado === 'aberta'){ el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  if(j.estado === 'fechando'){
+    el.style.background = 'var(--warn-tint)'; el.style.color = 'var(--text)'; el.style.border = 'none';
+    el.textContent = '⏳ Janela fecha em ' + _atdHoras(j.restante_seg) + ' — depois disso a Meta só aceita template aprovado.';
+  } else {   // 'fechada'
+    el.style.background = 'transparent'; el.style.color = 'var(--err)'; el.style.border = '1px solid var(--err)';
+    el.textContent = '🔒 Janela de 24h fechada — a mensagem pode ser recusada pela Meta. Fale com o cliente por outro canal (telefone, etc.).';
+  }
 }
 function _ocFlash(msg){
   const f = document.getElementById('oc-action-flash'); if(!f) return;
@@ -19322,6 +19347,16 @@ function _ocEventoFaixa(m){
 // "out" = eu mandei (autor_usuario_id bate com o usuário logado); tudo mais (contato externo
 // OU colega) = "in", com o nome do autor visível (útil em grupo; num 1:1 externo o nome real
 // já aparece no cabeçalho da conversa, mas não atrapalha repetir aqui).
+// Conserto 1 (TAREFA_ENTREGA_VISIVEL, 18/09): a bolha mostra a falha de entrega EXTERNA, com o
+// motivo já traduzido pelo backend (estado_entrega_mensagem — janela fechada tem texto próprio).
+// 'entregue'/'nao_se_aplica' não mostram nada — só 'falhou' rompe o silêncio.
+function _ocEntregaFalhaHtml(m){
+  if(m.entrega_estado !== 'falhou') return '';
+  return '<div style="margin-top:5px;background:var(--err-soft);color:var(--err);border:1px solid var(--err-line);'
+    + 'border-radius:6px;padding:5px 9px;font-size:11px;display:flex;gap:6px;align-items:flex-start">'
+    + '<i class="ti ti-alert-triangle" style="flex:none;margin-top:1px"></i><span>Não chegou ao WhatsApp: '
+    + esc(m.entrega_motivo || 'falha na entrega.') + '</span></div>';
+}
 function _ocBubbleHTML(m){
   const meu = !!(m.autor_usuario_id && _usuarioAtual && m.autor_usuario_id === _usuarioAtual.id);
   const hora = (m.criado_em||'').replace('T',' ').slice(11,16);
@@ -19332,6 +19367,7 @@ function _ocBubbleHTML(m){
     + autor
     + (m.corpo ? '<div class="oc-bubble-corpo">'+esc(m.corpo)+'</div>' : '')
     + _ocAnexosHtml(m)
+    + _ocEntregaFalhaHtml(m)
     + '<div class="oc-bubble-meta">'+esc(hora)+'</div>'
     + '</div></div>';
 }
