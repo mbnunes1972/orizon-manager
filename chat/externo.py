@@ -725,6 +725,7 @@ def espelhar_para_externos(db, conversa, mensagem, autor_nome=None):
         destino = (e.telefone if e.meio == "whatsapp" else e.email or "").strip() if (e.telefone or e.email) else ""
         if not destino:
             continue
+        env = None
         try:
             env = registrar_envio(db, mensagem, e.meio, "comercial", "avulso", e.id, destino)
             if env.status == "enfileirado":
@@ -735,8 +736,22 @@ def espelhar_para_externos(db, conversa, mensagem, autor_nome=None):
                     env.erro = err
                 db.flush()
             enviados.append(env.id)
-        except Exception:
-            pass   # best-effort
+        except Exception as exc:
+            # 2º nível de engolimento (achado do Marcelo, 18/09, TAREFA_ENTREGA_VISIVEL): best-
+            # effort continua best-effort — um externo problemático não pode travar os outros do
+            # laço nem a mensagem interna — mas a falha não pode só desaparecer. despachar() já
+            # captura tudo e devolve (False, None, erro); isto aqui é a rede de segurança pro
+            # caso raro de algo escapar dela (ex.: o próprio registrar_envio/flush). Se o
+            # registro já existia, marca 'falhou' com o motivo real — sem isso,
+            # entregas_por_mensagem relataria 'nao_se_aplica' quando na verdade algo quebrou.
+            if env is not None:
+                try:
+                    env.status = "falhou"
+                    env.erro = str(exc)
+                    db.flush()
+                    enviados.append(env.id)
+                except Exception:
+                    pass   # rede de segurança final — nunca quebra a mensagem interna
     return enviados
 
 

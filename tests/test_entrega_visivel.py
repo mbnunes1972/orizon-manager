@@ -177,3 +177,34 @@ def test_call_site_conversa_de_projeto_recusado_pela_meta(http_client_factory, a
     assert st == 201 and body["ok"], body
     assert body["mensagem"]["entrega_estado"] == "falhou"
     assert "Projeto recusado" in (body["mensagem"]["entrega_motivo"] or "")
+
+
+# ── 2º nível de engolimento — o próprio laço de espelhar_para_externos (achado do Marcelo) ──
+# despachar() já captura tudo (retorna ok=False em vez de lançar); isto cobre o caso raro de
+# algo escapar dessa proteção interna — o laço por externo não pode deixar a falha desaparecer.
+
+def test_excecao_dentro_do_laco_de_espelhar_ainda_marca_falhou(http_client_factory, app_db, seed,
+                                                                monkeypatch):
+    import mod_chat_externo as mce
+    _configurar_whatsapp(monkeypatch)
+
+    def _despachar_quebrado(env, corpo):
+        raise RuntimeError("algo escapou do try/except interno de despachar")
+    monkeypatch.setattr(mce, "despachar", _despachar_quebrado)
+
+    cid = _conversa_com_externo(app_db, seed, "Lead — Excecao Interna")
+    c = _login(http_client_factory, "dir_l1")
+    st, body = c.post("/api/comunicacao/conversas/%d/mensagens" % cid, {"corpo": "Oi!"})
+    assert st == 201 and body["ok"], body
+    assert body["mensagem"]["entrega_estado"] == "falhou"
+    assert "algo escapou" in (body["mensagem"]["entrega_motivo"] or "")
+
+    db = app_db.get_session()
+    try:
+        msg = db.query(ConversaMensagem).filter_by(conversa_id=cid, corpo="Oi!").first()
+        assert msg is not None   # mensagem interna persistiu — o ponto do conserto
+        env = db.query(EnvioExterno).filter_by(mensagem_id=msg.id, direcao="saida").first()
+        assert env is not None and env.status == "falhou"
+        assert "algo escapou" in (env.erro or "")
+    finally:
+        db.close()
