@@ -1806,15 +1806,25 @@ def funcionario_por_funcao(db, loja_id, nome_funcao):
 
 def usuario_e_sac(db, loja_id, usuario_id):
     """True se `usuario_id` é quem ocupa a Função SAC da loja — mesma resolução de
-    responsavel_sac/_sac_usuario_id (1 pessoa por função). Gate da fila de leads sem dono
-    (TAREFA_FILA_DE_LEADS, 18/09): tenancy + função, NUNCA nível — o SAC nasce Operador
-    (medido: nenhuma capacidade de nível é necessária pra ler/escrever conversa), então gatear
-    por `ver_todas_conversas` deixaria a própria pessoa que trabalha a fila sem enxergá-la."""
+    responsavel_sac/_sac_usuario_id (1 pessoa por função)."""
     fid = funcionario_por_funcao(db, loja_id, "SAC")
     if not fid:
         return False
     f = db.get(Funcionario, fid)
     return bool(f and f.usuario_id == usuario_id)
+
+
+def pode_trabalhar_fila(db, loja_id, usuario_id, nivel):
+    """Gate da fila de leads sem dono (ADR-029, 18/09 — revisão do gate original de
+    TAREFA_FILA_DE_LEADS): vê e assume quem é SAC da loja OU gerencial/master da loja, sempre
+    com tenancy (loja_id já resolvido pelo chamador via escopo_operacional). O gate original
+    ("só SAC") deixava um MASTER da loja ver "fila vazia" por não ocupar a função — gerente
+    responde pelo resultado da loja e não pode ficar cego pro que está entrando. Continua NUNCA
+    sendo checado por capacidade de nível (`ver_todas_conversas` etc.) — é nível bruto
+    (gerencial/master) OU a função SAC, nunca uma capacidade de perfil configurável."""
+    if nivel in ("gerencial", "master"):
+        return True
+    return usuario_e_sac(db, loja_id, usuario_id)
 
 
 def listar_conversas_sem_dono(db, loja_id, limite=None):

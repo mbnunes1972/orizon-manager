@@ -5190,9 +5190,11 @@ class Handler(BaseHTTPRequestHandler):
             # ANTES de a conversa existir (decide se "Mensagem livre" pode ser oferecida).
             # GET /api/comunicacao/fila — TAREFA_FILA_DE_LEADS (18/09): "contato de fora sem
             # dono" (triagem pendente + conversa externa materializada sem participante/
-            # responsável). Gate por TENANCY + quem ocupa a Função SAC da loja — NUNCA por
-            # nível: o SAC nasce Operador (medido em 17/09), gatear por ver_todas_conversas
-            # deixaria a própria pessoa que trabalha a fila sem enxergá-la.
+            # responsável). Gate por TENANCY + (Função SAC da loja OU gerencial/master da
+            # loja) — ADR-029 (18/09): o gate original ("só SAC") deixava um MASTER ver "fila
+            # vazia" por não ocupar a função; gerente responde pelo resultado da loja e não pode
+            # ficar cego pro que está entrando. Continua nunca sendo por CAPACIDADE de nível
+            # (ver_todas_conversas etc.), só nível bruto ou função.
             if path == "/api/comunicacao/fila":
                 usuario = get_usuario_sessao(self)
                 if not usuario:
@@ -5204,7 +5206,7 @@ class Handler(BaseHTTPRequestHandler):
                     if _err:
                         self.send_json({"ok": False, "erro": _err}, code=403); return
                     import mod_chat
-                    if not mod_chat.usuario_e_sac(db, loja_id, usuario["id"]):
+                    if not mod_chat.pode_trabalhar_fila(db, loja_id, usuario["id"], usuario.get("nivel")):
                         self.send_json({"ok": False, "erro": "Sem permissão."}, code=403); return
                     import mod_chat_externo
                     itens = mod_chat_externo.listar_fila(db, loja_id)
@@ -9245,7 +9247,7 @@ class Handler(BaseHTTPRequestHandler):
         # materializa a triagem se preciso, e SEMPRE adiciona QUEM ASSUMIU (não necessariamente
         # o SAC) como participante e responsável (chat.triagem.assumir_da_fila reusa
         # core.transferir_responsavel — regra dos irmãos, sem duplicar lógica de participante).
-        # Mesmo gate de leitura: tenancy + Função SAC da loja, nunca nível.
+        # Mesmo gate de leitura (ADR-029): tenancy + (Função SAC da loja OU gerencial/master).
         if path == "/api/comunicacao/fila/assumir":
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -9257,7 +9259,7 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403); return
                 import mod_chat
-                if not mod_chat.usuario_e_sac(db, loja_id, usuario["id"]):
+                if not mod_chat.pode_trabalhar_fila(db, loja_id, usuario["id"], usuario.get("nivel")):
                     self.send_json({"ok": False, "erro": "Sem permissão."}, code=403); return
                 import mod_chat_externo
                 dd = json.loads(body or b'{}')

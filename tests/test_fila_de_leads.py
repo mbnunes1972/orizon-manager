@@ -5,10 +5,14 @@ Recorte (2a): TriagemEntrada pendente + Conversa externa materializada sem parti
 responsável — as duas metades, senão o item só existe por minutos e some ao materializar
 (foi o que aconteceu com o Felipe em 17/09).
 
-Gate (decisão do Marcelo, 18/09): TENANCY + quem ocupa a Função SAC da loja, NUNCA nível — o
-SAC nasce Operador (medido na Parte 1: nenhuma capacidade de nível é necessária pra ler/
-escrever conversa), então gatear por `ver_todas_conversas` deixaria a própria pessoa que
-trabalha a fila sem enxergá-la."""
+Gate original (18/09, TAREFA_FILA_DE_LEADS): TENANCY + quem ocupa a Função SAC da loja, nunca
+capacidade de nível (`ver_todas_conversas` etc.) — o SAC nasce Operador, e gatear por essa
+capacidade deixaria a própria pessoa que trabalha a fila sem enxergá-la.
+
+Gate alargado no mesmo dia (ADR-029, `docs/arquitetura/DECISOES.md`): o gate original deixava
+um MASTER da loja ver "fila vazia" por não ocupar a função SAC — gerente responde pelo
+resultado da loja e não pode ficar cego pro que está entrando. Vê e assume quem é SAC da loja
+OU gerencial/master da loja, sempre com tenancy."""
 import pytest
 
 from database import Conversa, ConversaParticipante, TriagemEntrada
@@ -43,6 +47,20 @@ def sac_l1(app_db, seed):
         db.close()
 
 
+@pytest.fixture(scope="module")
+def gerencial_l1(app_db, seed):
+    """Gerencial da loja 1, NÃO SAC — prova o portão alargado pela ADR-029 (não a Função)."""
+    db = app_db.get_session()
+    try:
+        u = app_db.Usuario(nome="Gerente L1 (teste)", login="ger_l1_teste", nivel="gerencial",
+                           loja_id=seed["loja1_id"], ativo=1)
+        u.set_senha("senha123")
+        db.add(u); db.commit()
+        return u.id
+    finally:
+        db.close()
+
+
 # ── Gate de leitura (GET /api/comunicacao/fila) ──────────────────────────────────────────────
 
 def test_sac_ve_a_fila(http_client_factory, app_db, seed, sac_l1):
@@ -60,18 +78,47 @@ def test_sac_ve_a_fila(http_client_factory, app_db, seed, sac_l1):
     assert any(it["tipo"] == "triagem" and it["id"] == eid for it in body["itens"])
 
 
+def test_gerencial_nao_sac_ve_a_fila(http_client_factory, app_db, seed, sac_l1, gerencial_l1):
+    """ADR-029: gerencial da loja vê a fila mesmo sem ocupar a Função SAC."""
+    db = app_db.get_session()
+    try:
+        ent = TriagemEntrada(loja_id=seed["loja1_id"], meio="whatsapp",
+                             remetente="5512999991005", texto="gerencial tem que ver")
+        db.add(ent); db.commit()
+        eid = ent.id
+    finally:
+        db.close()
+    c = _login(http_client_factory, "ger_l1_teste")
+    st, body = c.get("/api/comunicacao/fila")
+    assert st == 200 and body["ok"]
+    assert any(it["tipo"] == "triagem" and it["id"] == eid for it in body["itens"])
+
+
 def test_operador_nao_sac_nao_ve_a_fila(http_client_factory, seed, sac_l1):
-    """cons_l1 (seed): operador da loja 1, mas NÃO ocupa a Função SAC."""
+    """cons_l1 (seed): operador da loja 1 — nem SAC, nem gerencial/master."""
     c = _login(http_client_factory, "cons_l1")
     st, body = c.get("/api/comunicacao/fila")
     assert st == 403 and body["ok"] is False
 
 
-def test_usuario_de_outra_loja_nao_ve_a_fila(http_client_factory, seed, sac_l1):
-    """dir_l2 (seed): master, mas de outra loja — nível não importa, tenancy manda."""
+def test_usuario_de_outra_loja_nao_ve_itens_da_loja_1(http_client_factory, app_db, seed, sac_l1):
+    """dir_l2 (seed): master, mas de OUTRA loja — o gate alargado (ADR-029) libera quem é
+    gerencial/master, mas só DA PRÓPRIA loja: `escopo_operacional` resolve a loja do próprio
+    dir_l2 (loja 2), nunca a loja 1 — não há como pedir a fila de outra loja por este endpoint.
+    Confirma isolamento por DADO (a loja 1 nunca aparece pra ele), não por 403 — 200 com a
+    fila (vazia) da própria loja 2 é o resultado correto pra um master de outra loja."""
+    db = app_db.get_session()
+    try:
+        ent = TriagemEntrada(loja_id=seed["loja1_id"], meio="whatsapp",
+                             remetente="5512999991006", texto="loja 1, ninguem de fora ve")
+        db.add(ent); db.commit()
+        eid_loja1 = ent.id
+    finally:
+        db.close()
     c = _login(http_client_factory, "dir_l2")
     st, body = c.get("/api/comunicacao/fila")
-    assert st == 403 and body["ok"] is False
+    assert st == 200 and body["ok"]
+    assert not any(it["tipo"] == "triagem" and it["id"] == eid_loja1 for it in body["itens"])
 
 
 def test_fila_inclui_conversa_externa_ja_materializada_sem_dono(http_client_factory, app_db,

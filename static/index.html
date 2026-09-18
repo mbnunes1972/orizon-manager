@@ -3103,11 +3103,12 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
         <div class="ochat-side-title">Comunicação</div>
         <div class="ochat-nav" data-scr="atend" onclick="ochatIr('atend')" style="display:flex;align-items:center"><i class="ti ti-message-circle-2"></i> Atendimentos<span id="oc-badge-atend" style="display:none;margin-left:auto;background:var(--accent);color:var(--btn-primary-text);font-size:10px;font-weight:800;border-radius:9px;padding:1px 7px;min-width:16px;text-align:center"></span></div>
         <div class="ochat-nav" data-scr="interno" onclick="ochatIr('interno')" style="display:flex;align-items:center"><i class="ti ti-users-group"></i> Chat Interno<span id="oc-badge-interno" style="display:none;margin-left:auto;background:var(--accent);color:var(--btn-primary-text);font-size:10px;font-weight:800;border-radius:9px;padding:1px 7px;min-width:16px;text-align:center"></span></div>
-        <!-- Triagem (TAREFA_FILA_DE_LEADS, 18/09): contato de fora sem dono — canal de LISTA,
-             visível só a quem ocupa a Função SAC da loja (o backend 403 pra quem não é; sem
-             badge quando 403). Não pode reusar o nome com o item de config, que virou
-             OrizonBot por causa disso: dois "Triagem" (lista × config) foi a ambiguidade que
-             fez o Marcelo clicar no nome certo e achar a tela errada. -->
+        <!-- Triagem (TAREFA_FILA_DE_LEADS, 18/09; portão alargado pela ADR-029, mesma data):
+             contato de fora sem dono — canal de LISTA, visível a quem ocupa a Função SAC da
+             loja OU é gerencial/master da loja (o backend 403 os outros; sem badge quando
+             403). Não pode reusar o nome com o item de config, que virou OrizonBot por causa
+             disso: dois "Triagem" (lista × config) foi a ambiguidade que fez o Marcelo clicar
+             no nome certo e achar a tela errada. -->
         <div class="ochat-nav" data-scr="triagem" onclick="ochatIr('triagem')" style="display:flex;align-items:center"><i class="ti ti-inbox"></i> Triagem<span id="oc-badge-triagem" style="display:none;margin-left:auto;background:var(--accent);color:var(--btn-primary-text);font-size:10px;font-weight:800;border-radius:9px;padding:1px 7px;min-width:16px;text-align:center"></span></div>
         <button type="button" class="ochat-nav" id="ochat-cfg-toggle" onclick="ochatToggleConfig()" style="display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:none;cursor:pointer;font:inherit;color:inherit;text-align:left"><span><i class="ti ti-settings"></i> Configurações</span><i class="ti ti-chevron-down" id="ochat-cfg-chevron"></i></button>
         <div id="ochat-cfg-itens" style="display:none">
@@ -3534,9 +3535,10 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
               </div>
             </div>
           </div>
-          <!-- Triagem (fila de leads sem dono, TAREFA_FILA_DE_LEADS 18/09): contato de fora sem
-               participante nem responsável — triagem pendente OU conversa já materializada.
-               Só quem ocupa a Função SAC da loja chega aqui (o backend 403 os outros). -->
+          <!-- Triagem (fila de leads sem dono, TAREFA_FILA_DE_LEADS 18/09; ADR-029 alarga o
+               portão): contato de fora sem participante nem responsável — triagem pendente OU
+               conversa já materializada. Chega aqui quem ocupa a Função SAC da loja OU é
+               gerencial/master da loja (o backend 403 os outros). -->
           <div class="ochat-scr" id="ochat-scr-triagem">
             <div class="ochat-panel" style="max-width:760px">
               <div class="hint" style="font-size:var(--fs-xs);color:var(--text-3);margin-bottom:12px">Contato de fora ainda sem dono — mensagem que chegou e ainda não virou conversa, ou conversa já criada que ninguém assumiu. Some daqui assim que alguém assume: passa a viver no inbox normal de quem assumiu.</div>
@@ -13142,7 +13144,7 @@ function empresaTrocar(id){
 const _OCHAT_TOP = {
   atend:    ['Atendimentos', 'Pessoais · Grupos · Arquivadas — "Pendentes" filtra o recebido sem resposta; o segmento é etiqueta interna de roteamento, não muda o número que o cliente vê.'],
   interno:  ['Chat Interno', 'Conversas da equipe nas mesmas abas dos Atendimentos — Mural, Fóruns e Administração ficam na barra de ações. Sem canal externo.'],
-  triagem:  ['Triagem', 'Contato de fora sem dono — aguardando alguém assumir. Só quem ocupa a Função SAC da loja vê esta fila.'],
+  triagem:  ['Triagem', 'Contato de fora sem dono — aguardando alguém assumir. Vê esta fila quem é SAC, gerencial ou master da loja.'],
   modelos:  ['Modelos de Mensagem', 'Checklist de configuração inicial — as 9 mensagens obrigatórias precisam de um template aprovado pela Meta para o WhatsApp operar em produção.'],
   segmentos:['Segmentos', 'Canais de entrada da triagem — responsável, template padrão, ativar/desativar; crie ou apague segmentos da loja.'],
   orizonbot:['OrizonBot', 'Como o sistema pergunta o departamento quando um contato novo escreve.'],
@@ -13668,9 +13670,10 @@ async function segApagar(seg){
 
 // ── Fila de leads sem dono (TAREFA_FILA_DE_LEADS, 18/09) — canal "Triagem" ──────
 // Recorte 2a: TriagemEntrada pendente + Conversa externa materializada sem participante/
-// responsável, os dois num só (chat/triagem.py::listar_fila). Só quem ocupa a Função SAC da
-// loja enxerga (backend 403 os outros — sem erro visível aqui, ocAtualizarBadges trata o 403
-// como fila vazia).
+// responsável, os dois num só (chat/triagem.py::listar_fila). Enxerga quem ocupa a Função SAC
+// da loja OU é gerencial/master da loja (ADR-029, 18/09 — alargou o portão original de
+// TAREFA_FILA_DE_LEADS, que deixava um MASTER ver "fila vazia"); backend 403 os outros — sem
+// erro visível aqui, ocAtualizarBadges trata o 403 como fila vazia.
 let _ocFilaItens = [];
 async function _ocFilaAtualizar(){
   try{
@@ -14922,7 +14925,14 @@ function sbNavRender(){
   if (_usuarioAtual && _usuarioAtual.pode_gerir_redes){ box.innerHTML = ''; return; }
   const grupos = (_usuarioAtual && _usuarioAtual.hub) || null;
   if(!grupos){ box.innerHTML = ''; return; }      // sem info do hub -> nada (compat)
-  const mods = grupos.flatMap(g => g.modulos || []).filter(m => m.id !== 'folha' && m.id !== 'assistencias');   // Folha = seção do Financeiro; Assistências = ABA do Operacional (rev 2026-08-03)
+  // 'captacao': medido em 18/09 (item 3, mesmo lote da ADR-029) — sem `go` nem `secoes` em
+  // _SB_MODULOS, clicar só mostrava "EM CONSTRUÇÃO". Era o 2º "Captação" do menu (o 1º, em
+  // Atalhos, abre a lista de leads de verdade) — a mesma ambiguidade de duas telas pro mesmo
+  // conceito que a ADR-029 já resolveu pra Triagem×Config. Some da SIDEBAR só: o domínio
+  // 'captacao' continua existindo em modulos.py/perfis.py (classificação de arquivo, acesso),
+  // não mexido aqui — é o item de MENU sem destino que estava morto.
+  const mods = grupos.flatMap(g => g.modulos || [])
+    .filter(m => m.id !== 'folha' && m.id !== 'assistencias' && m.id !== 'captacao');   // Folha = seção do Financeiro; Assistências = ABA do Operacional (rev 2026-08-03)
   box.innerHTML = mods.map(m => {
     if(m.bloqueado){
       return '<div class="nav-item sb-mod" style="opacity:.55" title="Sem acesso — clique para liberar com senha"'
