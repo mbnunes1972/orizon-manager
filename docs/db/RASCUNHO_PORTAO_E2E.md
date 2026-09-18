@@ -103,6 +103,14 @@ produzem colisão sistemática — é por isso que a Sessão B nunca roda a suí
 é que **sessões concorrentes degradam a suíte mesmo sem rodar `pytest`**: basta consumirem a
 máquina.
 
+**Correção de 18/09, e ela importa para quem for investigar:** o rastro dizia "memória", e não é.
+O próprio `free -h` mostrava **13 GB livres** nas três mortes, e o `memory.max` do cgroup é `max`.
+Conferido depois: as duas sessões são o **Terminal A e o Terminal B** do arranjo da Semana 1
+(iniciados em 15/09 e 16/09, ambos no repositório) — não há sessão órfã para limpar, e liberar RAM
+não resolveria nada. O que há é **contenção de CPU**: duas sessões Claude, dois Chromium headless e
+uma suíte que dirige navegador, disputando processador. Isso explica 19 min × 10 min muito melhor
+que RAM. Deixar "memória" escrito aqui faria alguém procurar no lugar errado daqui a um mês.
+
 **Consequência para o desenho: medir com a máquina exclusiva ANTES de propor quarentena ou trace.**
 Uma regra operacional — uma sessão por vez enquanto a suíte roda, e conferir `ps aux` por sessões
 órfãs antes de cortar tag — pode resolver a maior parte do problema sem uma linha de código. Se

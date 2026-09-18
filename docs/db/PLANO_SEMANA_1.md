@@ -50,6 +50,15 @@ Duas sessões de Claude Code rodando em paralelo, com papéis que **não se cruz
    `docs/db/MAPA_MODULOS.md`. Nada mais.
 2. **Só a Sessão A roda `pytest`.** Duas invocações simultâneas contra os mesmos bancos é o LP-22,
    que já custou uma manhã inteira perseguindo falhas que eram colisão.
+
+   **2b — acrescentado em 18/09, a outra metade da mesma regra: enquanto a Sessão A roda a suíte
+   completa, a Sessão B fica PARADA.** Não é fechar a janela nem perder contexto — é não trabalhar
+   no mesmo minuto. Medido: as duas sessões vivem na mesma máquina, cada uma com seu Chromium
+   headless; a suíte completa levou **19 min com 8 vermelhos** enquanto as duas trabalhavam e
+   **~10 min com 0 vermelhos** com a máquina folgada. Não é memória (havia 13 GB livres nas
+   mortes) — é **CPU**: duas sessões, dois navegadores e uma suíte que dirige navegador disputando
+   processador. A regra 2 impedia a colisão de banco; esta impede a contenção de máquina, que é
+   como o portão da suíte vinha ficando ilegível. Ver `docs/db/RASCUNHO_PORTAO_E2E.md`.
 3. **A Sessão B ancora por NOME, nunca por número de linha.** A Sessão A está editando `main.py` e
    `index.html` ao mesmo tempo; qualquer `main.py:9587` anotado hoje estará errado amanhã. Anote
    nome de função, id de elemento, rota — coisas que sobrevivem a uma edição.
