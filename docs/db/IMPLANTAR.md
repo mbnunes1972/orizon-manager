@@ -106,9 +106,14 @@ bash docs/db/confirmar.sh                    # espera 15 OK / 0 FALHA
 # 7. Smoke — a porta não vem do .env (ver o porquê abaixo), descubra com:
 ss -lntp | grep python3                      # ou: journalctl -u orizon-a | grep -i porta
 PORTA=8765                                   # substitua pela porta real lida acima
-curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:${PORTA}/"                     # espera 302
-curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:${PORTA}/static/login.html"    # espera 200
-curl -s -o /dev/null -w '%{http_code}\n' -X POST "http://127.0.0.1:${PORTA}/api/auth/login" \
+# ATENÇÃO (18/09): desde o bind interno de 17/09 (TAREFA_EXPOSICAO_SEGURA.md, Passo 2) a aplicação
+# NÃO escuta mais em 127.0.0.1 — escuta em 172.19.0.1, o docker_gwbridge deste host. Use HOST=172.19.0.1
+# nos três curl abaixo. Se algum dia o bind mudar de novo, este bloco muda junto: smoke que aponta
+# para endereço errado devolve falso negativo e faz alguém "consertar" um deploy que está bom.
+HOST=172.19.0.1
+curl -s -o /dev/null -w '%{http_code}\n' "http://${HOST}:${PORTA}/"                     # espera 302
+curl -s -o /dev/null -w '%{http_code}\n' "http://${HOST}:${PORTA}/static/login.html"    # espera 200
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "http://${HOST}:${PORTA}/api/auth/login" \
   -H 'Content-Type: application/json' -d '{"login":"nao-existe","senha":"x"}'             # espera 401
 ```
 

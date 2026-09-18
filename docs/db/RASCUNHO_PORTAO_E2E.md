@@ -91,6 +91,25 @@ diferente, e com bem menos lugares onde se esconder.
 
 ---
 
+**18/09 — a correlação tem explicação, e ela já estava na lista.** Investigando três mortes da
+suíte por memória, a Sessão A mediu o próprio cgroup (`memory.max` = `max`, sem teto) e achou a
+causa real: **duas outras sessões Claude Code rodando ao mesmo tempo na mesma máquina** (PIDs 583 e
+15740). A pressão agregada do host é o que o guardião de memória vê — não uma cota do processo.
+
+Isso fecha o raciocínio do bloco anterior. A rodada de 19 min com 8 vermelhos e as de ~10 min com 0
+são a mesma suíte sob **contenção de recursos diferente**, não intermitência misteriosa. E não é
+novidade: o **LP-22 já registra**, desde 11/09, que duas invocações simultâneas de `pytest`
+produzem colisão sistemática — é por isso que a Sessão B nunca roda a suíte. O que faltava perceber
+é que **sessões concorrentes degradam a suíte mesmo sem rodar `pytest`**: basta consumirem a
+máquina.
+
+**Consequência para o desenho: medir com a máquina exclusiva ANTES de propor quarentena ou trace.**
+Uma regra operacional — uma sessão por vez enquanto a suíte roda, e conferir `ps aux` por sessões
+órfãs antes de cortar tag — pode resolver a maior parte do problema sem uma linha de código. Se
+resolver, a quarentena da §3 fica menor, ou desnecessária. É o primeiro passo, não o último.
+
+---
+
 ---
 
 ## 3. Proposta para (A) — devolver a legibilidade ao portão
