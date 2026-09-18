@@ -24,11 +24,23 @@ autor.
 
 ## Passo 0 — as duas coisas que dependem do Marcelo
 
-**(a) Qual conta master fica ativa?** Precisa ser nomeada antes de rodar. Candidatas da Inspirium:
-`alopes`, `lds2026`, `rvieira`, `gaf2026`. Ele não lembra a senha de pelo menos uma — use
-`scripts/redefinir_senha.py` (Caminho 3, já no ar) para definir uma senha forte **antes** da
-limpeza, e confirme o login funcionando. **Não comece sem ter entrado com essa conta.** Uma
-limpeza que deixa ninguém dentro é um incidente, não uma limpeza.
+**(a) A conta master que fica: a GABRIELA** — decidido pelo Marcelo em 18/09. Ela aparece como
+"Gabriela Adm/Fin · MASTER" na Inspirium; o login é provavelmente `gaf2026`, mas **confirme no
+banco antes de rodar** — dedução de iniciais não é medição.
+
+Use `scripts/redefinir_senha.py` (Caminho 3, já no ar) para definir uma senha forte **antes** da
+limpeza, e **entre com ela** para confirmar. **Não comece sem ter entrado.** Uma limpeza que deixa
+ninguém dentro é um incidente, não uma limpeza.
+
+**(a-bis) O nome dela vira a assinatura da loja — corrija ANTES.** Com a Gabriela como única conta
+ativa, o `Usuario.nome` dela passa a assinar **toda** mensagem que sai para cliente pelo WhatsApp
+(`espelhar_para_externos` monta `"💬 <nome>: <texto>"`). Hoje esse nome é **"Gabriela Adm/Fin"** —
+a abreviação de função iria para o cliente em cada mensagem. Corrigir para só o nome próprio deixa
+de ser cosmético e vira pré-requisito.
+
+Atenção a onde editar: o prefixo vem do **`Usuario.nome`**, não do `Funcionario.nome`. Se os dois
+não estiverem sincronizados, editar o funcionário muda a tela e não muda o WhatsApp. Prova simples:
+entrar como ela e olhar o cabeçalho — o nome ali é o do `Usuario`, o mesmo que vai na mensagem.
 
 **(b) Os dois contatos reais.** Entre as 8 conversas externas, duas são de **pessoas de verdade que
 escreveram para o negócio**: **Felipe Guizalberte** (5512988056021, 17/09) e **5511952135165**
