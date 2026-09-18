@@ -379,6 +379,12 @@ def _parse_multipart_arquivos(body, ct):
 _STEPUP_GRANTS = {}   # {(token, recurso): expira_em_epoch}
 _STEPUP_TTL = 30 * 60
 
+# Hierarquia dos 3 perfis DE LOJA (Redefinição de senha, Caminho 1 — TAREFA_REDEFINICAO_DE_SENHA,
+# 18/09): quem redefine não pode redefinir alguém do próprio nível ou acima — senão um gerencial
+# toma a conta do master. admin_rede/super_admin ficam FORA (não são de loja; seguem outro
+# caminho, ver perfis.pode_usuario/"gerir_usuarios" no PATCH .../usuarios/<id> existente).
+_NIVEL_RANK_LOJA = {"operador": 1, "gerencial": 2, "master": 3}
+
 # ACHADO-68 (10/09, docs/db/TAREFA_ACHADO68_REAUTENTICACAO.md): janela de reaprovação de
 # aprovar_financeiro — 15 min, POR CAPACIDADE (chave (token, 'aprovar_financeiro'), nunca vaza
 # pra outro recurso). Reusa o mesmo `_STEPUP_GRANTS` do step-up de módulo (financeiro/folha/
@@ -18298,6 +18304,55 @@ class Handler(BaseHTTPRequestHandler):
                         u.loja_id = novas[0] if novas else u.loja_id
                     db.commit()
                     self.send_json({"ok": True})
+                finally:
+                    db.close()
+                return
+
+            # PATCH .../usuarios/<id>/redefinir-senha — Caminho 1 (TAREFA_REDEFINICAO_DE_SENHA,
+            # 18/09): master/gerencial da loja redefine a senha de um funcionário DA PRÓPRIA
+            # LOJA, sem depender do Marcelo. Tenancy + hierarquia (nunca de nível igual ou
+            # acima) + trilha (LogAcaoGerencial) — o que torna aceitável o gestor poder tomar
+            # a conta de quem ele mesmo cadastrou. O valor aparece uma vez nesta resposta;
+            # nunca é relido, nunca vai pro log (contexto guarda só id/login/nível do alvo).
+            m_redef = re.match(r"^/api/admin/usuarios/(\d+)/redefinir-senha$", path)
+            if m_redef:
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                ator_nivel = usuario.get("nivel")
+                if ator_nivel not in ("master", "gerencial"):
+                    self.send_json({"ok": False, "erro": "Sem permissão."}, code=403); return
+                db = get_session()
+                try:
+                    alvo = db.get(Usuario, int(m_redef.group(1)))
+                    if not alvo:
+                        self.send_json({"ok": False, "erro": "Usuário não encontrado."}, code=404)
+                        return
+                    ator = _ator_dict(db, usuario)
+                    # tenancy: só da PRÓPRIA loja — admin_rede/super_admin (loja_id None) e
+                    # contas de outra loja seguem de fora, de propósito (medido, não assumido:
+                    # este caminho é só "gestor de loja redefine funcionário da mesma loja").
+                    if alvo.loja_id is None or alvo.loja_id != ator.get("loja_id"):
+                        self.send_json({"ok": False, "erro": "Usuário fora da sua loja."}, code=403)
+                        return
+                    if _NIVEL_RANK_LOJA.get(alvo.nivel, 0) >= _NIVEL_RANK_LOJA.get(ator_nivel, 0):
+                        self.send_json({"ok": False,
+                            "erro": "Você não pode redefinir a senha de alguém do seu nível "
+                                    "ou acima."}, code=403)
+                        return
+                    import validacao_doc
+                    # mesmo gerador de mod_cadastro.func_sync_acesso (regra dos irmãos): dígitos
+                    # do documento da própria conta, ou token aleatório quando não há.
+                    nova = validacao_doc._digitos(alvo.cpf) or secrets.token_urlsafe(16)
+                    alvo.set_senha(nova)
+                    alvo.senha_provisoria = 1
+                    db.add(LogAcaoGerencial(solicitante_id=usuario["id"], autorizador_id=usuario["id"],
+                            acao="redefinir_senha_funcionario",
+                            contexto=json.dumps({"usuario_alvo_id": alvo.id,
+                                                 "login_alvo": alvo.login,
+                                                 "nivel_alvo": alvo.nivel})))
+                    db.commit()
+                    self.send_json({"ok": True, "senha": nova})
                 finally:
                     db.close()
                 return

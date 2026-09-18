@@ -76,11 +76,15 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 
     +1 novo em TAREFA_FILA_DE_LEADS (18/09, Parte 2b): `chatFilaAssumir` — falha ao assumir um
     item da fila ("Não foi possível assumir."), site NOVO (a ação Assumir não existia antes) —
-    total sobe pra 146."""
+    total sobe pra 146.
+
+    +1 novo em TAREFA_REDEFINICAO_DE_SENHA (18/09, Caminho 1): `usrRedefinirSenha` — falha ao
+    redefinir a senha pelo gestor ("Não foi possível redefinir a senha."), site NOVO (a ação não
+    existia antes) — total sobe pra 147."""
     with open(INDEX_HTML, encoding="utf-8") as f:
         conteudo = f.read()
     total = len(re.findall(r"showToast\([^;]*,\s*true\)", conteudo))
-    assert total == 146, "a contagem mudou — reveja o número reportado (%d)" % total
+    assert total == 147, "a contagem mudou — reveja o número reportado (%d)" % total
 
 
 # ── F2-23 (04/09) — faixa do ciclo (Projeto/Transferência de etapa/PE/Medição) ───────────────────
@@ -96,19 +100,24 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 # Reajustado de novo em 18/09/2026 (TAREFA_FILA_DE_LEADS Parte 2c): +17 linhas antes da 1ª faixa
 # (nav/telas do Orizon Chat, ~linha 3100-3540 — ANTES de abrirProjeto), +85 no total antes das 5
 # faixas seguintes (o +17 de cima + mais 68 dos blocos `_OCHAT_TOP`/`ochatToggleConfig`/
-# `chatFilaCarregar`/`ocAtualizarBadges`, todos entre a 1ª faixa e a 2ª). Deslocamento calculado
-# a partir dos hunks do diff (offset cumulativo por posição), não estimado — cada faixa conferida
-# batendo o conteúdo da linha do meio contra o HEAD antes de trocar o número.
+# `chatFilaCarregar`/`ocAtualizarBadges`, todos entre a 1ª faixa e a 2ª). Reajustado de novo,
+# mesmo dia (TAREFA_REDEFINICAO_DE_SENHA, Caminho 1): botão "Redefinir senha" +
+# `usrRedefinirSenha` em `adminUsuariosCarregar` (~linha 17880, ENTRE a 1ª faixa e a 2ª — depois
+# do ponto de inserção de 17/09, antes do de 18/09 de cima) — +18 linhas só nas 5 faixas
+# seguintes, a 1ª (abrirProjeto, ~7985, ANTES do ponto de inserção) fica intocada. Deslocamento
+# calculado a partir dos hunks do diff (offset cumulativo por posição), não estimado — cada
+# faixa conferida batendo o conteúdo da linha do meio contra o commit anterior antes de trocar
+# o número.
 FAIXAS_CICLO = [
-    (7985, 8033),      # abrirProjeto (+17)
-    (20032, 20078),    # _cicloTransferResponder / _cicloTransferConfirmar (+85)
-    (22608, 22680),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
-                       # verificarClickSignPEAgora / reenviarConviteClickSignPE (+85)
-    (23129, 23146),    # peConciliacaoReprovar (+85)
-    (23963, 24013),    # toggleSalvarEtapa / reabrirEtapaCascata (+85)
-    (24731, 24830),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
+    (7985, 8033),      # abrirProjeto (+17, sem mudança nesta rodada)
+    (20050, 20096),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
+    (22626, 22698),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
+                       # verificarClickSignPEAgora / reenviarConviteClickSignPE (+103)
+    (23147, 23164),    # peConciliacaoReprovar (+103)
+    (23981, 24031),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
+    (24749, 24848),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
                        # _confirmarEnvioClickSignMedicao / verificarClickSignMedicaoAgora /
-                       # reenviarConviteClickSignMedicao (+85)
+                       # reenviarConviteClickSignMedicao (+103)
     # F2-40 (08/09): linhas deslocadas pela Fatia 1/2 (botão "Negociar Complemento" movido +
     # modal reescrito, ~150 linhas novas entre a 11c e a 11e) — mesmas 4 funções de antes,
     # conteúdo intocado, só a numeração absoluta mudou (medido função por função, não chutado).

@@ -17879,8 +17879,26 @@ async function adminUsuariosCarregar() {
             <td style="text-align:right">
               <button class="btn btn-ghost btn-sm" style="font-size:10px"
                 onclick='abrirModalUsuarioEditar(${_attrJson(u)})'>Editar</button>
+              <button class="btn btn-ghost btn-sm" style="font-size:10px"
+                onclick='usrRedefinirSenha(${u.id}, ${_attrJson(u.nome)})'>Redefinir senha</button>
             </td></tr>`).join('')}</tbody></table>`;
   } catch(e) { box.innerHTML = '<em style="color:var(--err)">Erro de rede</em>'; }
+}
+
+// Redefinição de senha pelo gestor (Caminho 1, TAREFA_REDEFINICAO_DE_SENHA, 18/09): backend já
+// recusa nível igual/acima e fora da loja (403) — aqui só confirma a intenção e mostra o valor
+// UMA VEZ (não é relido depois, não vai pro log do navegador). "Redefinir senha" some da tela
+// pra quem o backend recusaria de qualquer forma (a ação falha com aviso claro, não silencioso).
+async function usrRedefinirSenha(id, nome) {
+  const ok = await confirmarPopup(
+    'Uma senha nova será gerada para ' + nome + '. A pessoa vai precisar trocá-la no próximo login.',
+    {titulo: 'Redefinir senha', okLabel: 'Redefinir'});
+  if (!ok) return;
+  const d = await fetch('/api/admin/usuarios/' + id + '/redefinir-senha',
+    {method: 'PATCH', credentials: 'same-origin'}).then(r => r.json()).catch(() => ({}));
+  if (!d || !d.ok) { showToast((d && d.erro) || 'Não foi possível redefinir a senha.', true); return; }
+  await avisoPopup('Senha nova de ' + nome + ' (entregue em mãos — não aparece de novo):\n\n' + d.senha,
+    {titulo: 'Senha redefinida'});
 }
 
 let _modalUserCtx = null;
