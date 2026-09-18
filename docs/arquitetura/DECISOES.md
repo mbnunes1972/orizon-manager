@@ -706,3 +706,44 @@ criação de `Cliente` atualiza esta lista no mesmo commit.
 **Fonte:** commit `69a9b88`; `tests/test_cliente_unicidade_por_rede.py` (7 testes, incluindo
 isolamento de histórico nos dois sentidos); migrações de `uq_clientes_cpf_rede` /
 `uq_clientes_cpf_loja_avulsa`; `docs/db/LISTA_PARALELA.md`.
+
+---
+
+## ADR-029 — Triagem é canal (vive no Chat); Captação é funil (vive na estatística)
+**Data:** 2026-09-18
+**Status:** Ativo
+
+**Decisão (de negócio, do Marcelo):** as duas telas que hoje mostram contato novo ficam com
+fronteiras separadas e explícitas:
+
+- **Triagem** vive no **Orizon Chat** e é **o canal**. É onde o contato de fora aparece enquanto
+  não tem dono, e é de lá que alguém assume. Ao passar para o SAC ou para outro usuário, **toda a
+  comunicação pelo sistema segue concentrada no Chat** — não se conversa com o contato por nenhuma
+  outra tela.
+- **Captação** é **o funil**, não uma caixa de entrada. Ela existe para tratar a estatística de
+  origem do lead — lead espontâneo, indicação, arquiteto, retorno, feira, e o que vier — e para
+  a conversão em cliente. Não é onde alguém vai "ver quem escreveu".
+
+**Contexto:** em 17–18/09 descobriu-se que sete contatos de WhatsApp reais tinham ficado
+dezessete dias invisíveis. A causa raiz era não haver dono (`triagem_materializar` não achava
+funcionário na função SAC), mas a causa *operacional* era mais simples: **ninguém sabia em que
+tela olhar**. A tela chamada "Triagem" era a configuração do robô; o contato pendente não aparecia
+em lugar nenhum; e a Captação mostrava o lead, mas ninguém a tratava como caixa de entrada.
+
+Ao construir a fila de contatos sem dono (18/09), as duas telas passaram a mostrar o mesmo item —
+o mesmo contato, no mesmo estado, em dois lugares. Manter assim reproduziria a causa operacional
+que a fila foi criada para eliminar: dois lugares para olhar é o mesmo que nenhum.
+
+**Consequência:**
+- Contato sem dono aparece **na Triagem**. A Captação não é caminho para atender ninguém.
+- Quem constrói Captação daqui em diante **não** deve transformá-la em caixa de entrada, mesmo
+  quando parecer conveniente — se a informação que falta é "quem chegou e não foi atendido", o
+  lugar é a Triagem.
+- O que a Captação precisa ganhar é dimensão de **origem** e números de funil, não ações de
+  atendimento.
+- Consequência de portão (mesma data): quem vê a fila da Triagem é **SAC da loja ou
+  gerencial/master da loja**, com tenancy. Gerente responde pelo resultado da loja e não pode
+  ficar cego para o que está entrando — foi o que motivou a correção, quando um MASTER viu "fila
+  vazia" por não ocupar a função SAC.
+
+**Fonte:** `docs/db/TAREFA_FILA_DE_LEADS.md`; `docs/db/TAREFA_MEDIR_AVISO_DE_LEAD.md`.
