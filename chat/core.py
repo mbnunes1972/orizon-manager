@@ -1804,6 +1804,41 @@ def funcionario_por_funcao(db, loja_id, nome_funcao):
     return f.id if f else None
 
 
+def usuario_e_sac(db, loja_id, usuario_id):
+    """True se `usuario_id` é quem ocupa a Função SAC da loja — mesma resolução de
+    responsavel_sac/_sac_usuario_id (1 pessoa por função). Gate da fila de leads sem dono
+    (TAREFA_FILA_DE_LEADS, 18/09): tenancy + função, NUNCA nível — o SAC nasce Operador
+    (medido: nenhuma capacidade de nível é necessária pra ler/escrever conversa), então gatear
+    por `ver_todas_conversas` deixaria a própria pessoa que trabalha a fila sem enxergá-la."""
+    fid = funcionario_por_funcao(db, loja_id, "SAC")
+    if not fid:
+        return False
+    f = db.get(Funcionario, fid)
+    return bool(f and f.usuario_id == usuario_id)
+
+
+def listar_conversas_sem_dono(db, loja_id, limite=None):
+    """Conversa de origem externa (triagem|avulsa) já materializada, sem participante interno
+    ativo e sem responsável — a metade "conversa" do recorte da fila (a outra é TriagemEntrada
+    pendente, em chat/triagem.py::listar_fila). Cobre as órfãs de 31/08-16/09 sem migração nem
+    adoção manual: o recorte simplesmente as inclui. `limite` (18/09, achado da revisão
+    pós-suíte): sem teto era defeito por si só — todo poll de 45s de todo SAC carregaria a
+    tabela inteira; None mantém sem teto pra quem chama direto (ex.: testes)."""
+    tem_participante = (db.query(ConversaParticipante.id)
+                          .filter(ConversaParticipante.conversa_id == Conversa.id,
+                                  ConversaParticipante.removido == 0)
+                          .exists())
+    q = (db.query(Conversa)
+           .filter(Conversa.loja_id == loja_id,
+                   Conversa.origem_entrada.isnot(None),
+                   Conversa.responsavel_usuario_id.is_(None),
+                   ~tem_participante)
+           .order_by(Conversa.criado_em.asc()))
+    if limite:
+        q = q.limit(limite)
+    return q.all()
+
+
 def responsavel_sac(db, loja_id):
     """SAC fica FORA do v12 (spec seção 6): conversa de SAC pode nem ter projeto, logo não há
     CicloEtapa para ancorar — resolve direto pela Função 'SAC' da loja da conversa."""

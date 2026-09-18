@@ -24,7 +24,16 @@ Faz o fluxo funcionar para **todo lead novo**, sem tocar em uma linha de código
 funcionário com função **"SAC"** e conta de login na loja (`_sac_usuario_id`). A Inspirium não tem
 essa função — por isso o caminho "sem SAC" (conversa nua, zero participantes) roda sempre.
 
-1. Criar a função **SAC** na loja 1 (Inspirium), pela tela de Config › Funções.
+1. ~~Criar a função **SAC** na loja 1~~ — **já existe; passo feito.** Correção da Sessão A,
+   17/09: `funcoes.id=12`, nome `SAC`, ativo, criada em **16/07/2026**. A medição do item 5 de
+   `TAREFA_MEDIR_AVISO_DE_LEAD.md` relatou "0 registros" porque a consulta juntava
+   `funcionarios → funcoes` — respondeu "quem OCUPA a função", não "a função EXISTE". A conclusão
+   de fundo continua de pé (`_sac_usuario_id` não resolve para ninguém); muda a causa: não é "a
+   função não existe", é **"a função existe e ninguém a ocupa"**.
+
+   *Efeito colateral bom:* a mesma consulta produziu o "a Inspirium tem 8 funções" que fez duvidar
+   do clone (a Loja Teste, clonada dela, mostra 15). A dúvida **cai** — eram 8 funções *ocupadas*,
+   não 8 existentes. O clone não está sob suspeita.
 2. **Criar um usuário novo** para ocupar a função (decisão do Marcelo, 17/09 — por enquanto é
    conta de teste; a pessoa real entra depois). Sugestão de nome/login: **"SAC Inspirium"** /
    `sac.inspirium` — confirme que o login não colide antes. Nível: o **mínimo** que permita

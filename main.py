@@ -5182,6 +5182,31 @@ class Handler(BaseHTTPRequestHandler):
             # GET /api/comunicacao/janela?telefone= — Atendimentos UI (spec 2026-08-04 §11): a
             # etapa 1/2 do Iniciar Conversa precisa saber se JÁ há janela aberta com o telefone
             # ANTES de a conversa existir (decide se "Mensagem livre" pode ser oferecida).
+            # GET /api/comunicacao/fila — TAREFA_FILA_DE_LEADS (18/09): "contato de fora sem
+            # dono" (triagem pendente + conversa externa materializada sem participante/
+            # responsável). Gate por TENANCY + quem ocupa a Função SAC da loja — NUNCA por
+            # nível: o SAC nasce Operador (medido em 17/09), gatear por ver_todas_conversas
+            # deixaria a própria pessoa que trabalha a fila sem enxergá-la.
+            if path == "/api/comunicacao/fila":
+                usuario = get_usuario_sessao(self)
+                if not usuario:
+                    self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+                db = get_session()
+                try:
+                    ator = _ator_dict(db, usuario)
+                    loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                    if _err:
+                        self.send_json({"ok": False, "erro": _err}, code=403); return
+                    import mod_chat
+                    if not mod_chat.usuario_e_sac(db, loja_id, usuario["id"]):
+                        self.send_json({"ok": False, "erro": "Sem permissão."}, code=403); return
+                    import mod_chat_externo
+                    itens = mod_chat_externo.listar_fila(db, loja_id)
+                    self.send_json({"ok": True, "itens": itens, "total": len(itens)})
+                finally:
+                    db.close()
+                return
+
             if path == "/api/comunicacao/janela":
                 usuario = get_usuario_sessao(self)
                 if not usuario:
@@ -9206,6 +9231,38 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True,
                                 "conversa": mod_chat.serializar_conversa(db, conv, usuario["id"])},
                                code=201)
+            finally:
+                db.close()
+            return
+
+        # POST /api/comunicacao/fila/assumir — Ação Assumir da fila de leads sem dono (2b):
+        # materializa a triagem se preciso, e SEMPRE adiciona QUEM ASSUMIU (não necessariamente
+        # o SAC) como participante e responsável (chat.triagem.assumir_da_fila reusa
+        # core.transferir_responsavel — regra dos irmãos, sem duplicar lógica de participante).
+        # Mesmo gate de leitura: tenancy + Função SAC da loja, nunca nível.
+        if path == "/api/comunicacao/fila/assumir":
+            usuario = get_usuario_sessao(self)
+            if not usuario:
+                self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
+            db = get_session()
+            try:
+                ator = _ator_dict(db, usuario)
+                loja_id, _err = mod_tenancy.escopo_operacional(ator)
+                if _err:
+                    self.send_json({"ok": False, "erro": _err}, code=403); return
+                import mod_chat
+                if not mod_chat.usuario_e_sac(db, loja_id, usuario["id"]):
+                    self.send_json({"ok": False, "erro": "Sem permissão."}, code=403); return
+                import mod_chat_externo
+                dd = json.loads(body or b'{}')
+                try:
+                    conv = mod_chat_externo.assumir_da_fila(
+                        db, loja_id, usuario["id"], dd.get("tipo"), dd.get("id"))
+                except ValueError as ve:
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(ve)}, code=400); return
+                db.commit()
+                self.send_json({"ok": True, "conversa_id": conv.id})
             finally:
                 db.close()
             return

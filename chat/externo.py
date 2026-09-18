@@ -874,4 +874,5 @@ def rotear_entrada(db, meio, id_externo_ref=None, remetente=None):
 
 # Re-export de compatibilidade: a fila de triagem vive em chat/triagem.py (spec de portas).
 from .triagem import (serializar_triagem, triagem_listar,            # noqa: E402,F401
-                      triagem_materializar, varrer_triagem_vencida)
+                      triagem_materializar, varrer_triagem_vencida,
+                      listar_fila, assumir_da_fila)

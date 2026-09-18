@@ -25,11 +25,14 @@ INDEX_HTML = os.path.join(REPO, "static", "index.html")
 # linhas: entidade Lead/Captação provisória, PLANO_SEMANA_1.md, inserida antes deste trecho);
 # reajustado de novo em 17/09/2026 (+36 linhas: Tarefas 2/3 do lote do Aceite 6 — LP-32 selo da
 # loja no CSS/HTML do topframe, LP-33 configurador de comissão da loja, todos ANTES deste trecho,
-# nenhuma inserção DENTRO dele — confirmado pelo mesmo delta nas duas pontas). Deslocamento medido
-# função por função (âncoras: comentário "Financeiro: seções no SUBMENU da sidebar" no início,
-# `function planoContasCarregar(){` no fim — `grep -n` em HEAD vs. working tree, não estimado de
-# cabeça, mesma disciplina de 14/09).
-FAIXA_INICIO, FAIXA_FIM = 14790, 16835
+# nenhuma inserção DENTRO dele — confirmado pelo mesmo delta nas duas pontas); reajustado de novo
+# em 18/09/2026 (+80 linhas: TAREFA_FILA_DE_LEADS Parte 2c — canal "Triagem" + botão
+# "Configurações" colapsado na navegação do Orizon Chat, `_OCHAT_TOP`/`ochatToggleConfig` e o
+# bloco `chatFilaCarregar`/`chatFilaAssumir`, todos ANTES deste trecho; as duas pontas moveram o
+# MESMO delta). Deslocamento medido função por função (âncoras: comentário "Financeiro: seções no
+# SUBMENU da sidebar" no início, `function planoContasCarregar(){` no fim — `grep -n` em HEAD vs.
+# working tree, não estimado de cabeça, mesma disciplina de 14/09).
+FAIXA_INICIO, FAIXA_FIM = 14870, 16915
 
 
 def _texto_do_modulo():
@@ -69,11 +72,15 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
     dedicados confirmaram `git diff` vazio pra essa chamada); o total já estava em 145 no commit
     imediatamente anterior a essa leva (`c148db8`, bisectado por `git log -S` até o LP-02 acima).
     Reportado ao Marcelo — a catraca em si (o teste vermelho) é a mesma, só a causa que o
-    documento do lote citava estava errada."""
+    documento do lote citava estava errada.
+
+    +1 novo em TAREFA_FILA_DE_LEADS (18/09, Parte 2b): `chatFilaAssumir` — falha ao assumir um
+    item da fila ("Não foi possível assumir."), site NOVO (a ação Assumir não existia antes) —
+    total sobe pra 146."""
     with open(INDEX_HTML, encoding="utf-8") as f:
         conteudo = f.read()
     total = len(re.findall(r"showToast\([^;]*,\s*true\)", conteudo))
-    assert total == 145, "a contagem mudou — reveja o número reportado (%d)" % total
+    assert total == 146, "a contagem mudou — reveja o número reportado (%d)" % total
 
 
 # ── F2-23 (04/09) — faixa do ciclo (Projeto/Transferência de etapa/PE/Medição) ───────────────────
@@ -86,16 +93,22 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 # +64 no total. Cada faixa remedida por âncora própria (grep -n em HEAD vs. working tree), não
 # por um delta único aplicado de cabeça — as duas famílias de shift (+36 / +64) são reais, não
 # arredondamento.
+# Reajustado de novo em 18/09/2026 (TAREFA_FILA_DE_LEADS Parte 2c): +17 linhas antes da 1ª faixa
+# (nav/telas do Orizon Chat, ~linha 3100-3540 — ANTES de abrirProjeto), +85 no total antes das 5
+# faixas seguintes (o +17 de cima + mais 68 dos blocos `_OCHAT_TOP`/`ochatToggleConfig`/
+# `chatFilaCarregar`/`ocAtualizarBadges`, todos entre a 1ª faixa e a 2ª). Deslocamento calculado
+# a partir dos hunks do diff (offset cumulativo por posição), não estimado — cada faixa conferida
+# batendo o conteúdo da linha do meio contra o HEAD antes de trocar o número.
 FAIXAS_CICLO = [
-    (7968, 8016),      # abrirProjeto (+36)
-    (19947, 19993),    # _cicloTransferResponder / _cicloTransferConfirmar (+64)
-    (22523, 22595),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
-                       # verificarClickSignPEAgora / reenviarConviteClickSignPE (+64)
-    (23044, 23061),    # peConciliacaoReprovar (+64)
-    (23878, 23928),    # toggleSalvarEtapa / reabrirEtapaCascata (+64)
-    (24646, 24745),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
+    (7985, 8033),      # abrirProjeto (+17)
+    (20032, 20078),    # _cicloTransferResponder / _cicloTransferConfirmar (+85)
+    (22608, 22680),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
+                       # verificarClickSignPEAgora / reenviarConviteClickSignPE (+85)
+    (23129, 23146),    # peConciliacaoReprovar (+85)
+    (23963, 24013),    # toggleSalvarEtapa / reabrirEtapaCascata (+85)
+    (24731, 24830),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
                        # _confirmarEnvioClickSignMedicao / verificarClickSignMedicaoAgora /
-                       # reenviarConviteClickSignMedicao (+64)
+                       # reenviarConviteClickSignMedicao (+85)
     # F2-40 (08/09): linhas deslocadas pela Fatia 1/2 (botão "Negociar Complemento" movido +
     # modal reescrito, ~150 linhas novas entre a 11c e a 11e) — mesmas 4 funções de antes,
     # conteúdo intocado, só a numeração absoluta mudou (medido função por função, não chutado).

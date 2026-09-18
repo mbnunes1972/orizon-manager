@@ -16,6 +16,12 @@ from .externo import (_canal_do_thread, _cliente_por_telefone, _cliente_por_emai
 
 SEGMENTO_TRIAGEM = "triagem"   # selo próprio (não é um dos 7 de SEGMENTOS) — SAC distribui
 MINUTOS_SWEEP = 2
+# Teto da fila (18/09, achado da revisão pós-suíte): listar_fila/listar_conversas_sem_dono não
+# tinham LIMIT — uma união sem teto é defeito por si só (todo poll de 45s de todo SAC de toda
+# loja carregaria a tabela inteira). 300 por estado é folga generosa pro uso real (a Inspirium
+# tem 7-8 órfãs hoje); estourar isso é sintoma de outro problema (fila sem trabalhar há muito
+# tempo), não motivo pra a tela não abrir — por isso trunca, não recusa.
+LIMITE_FILA = 300
 
 
 def serializar_triagem(e):
@@ -34,6 +40,56 @@ def triagem_listar(db, loja_id, status="pendente"):
     if status:
         q = q.filter(TriagemEntrada.status == status)
     return [serializar_triagem(e) for e in q.order_by(TriagemEntrada.id.asc()).all()]
+
+
+def listar_fila(db, loja_id):
+    """Fila de leads sem dono (TAREFA_FILA_DE_LEADS, 18/09): "contato de fora sem dono", os dois
+    estados — TriagemEntrada pendente (ainda não materializou) e Conversa externa já
+    materializada sem participante/responsável (as órfãs de 31/08-16/09). Recorte deliberado:
+    só triagem pendente perderia o item no instante em que materializa (foi o que aconteceu com
+    o Felipe em 17/09 — saiu da triagem e virou conversa invisível). Mais antigo primeiro."""
+    from . import core as _mc
+    itens = [{"tipo": "triagem", "id": e.id,
+              "nome": e.nome_whatsapp or e.remetente, "remetente": e.remetente,
+              "meio": e.meio, "texto": e.texto,
+              "criado_em": e.criado_em.isoformat() if e.criado_em else None}
+             for e in (db.query(TriagemEntrada)
+                         .filter_by(loja_id=loja_id, status="pendente")
+                         .order_by(TriagemEntrada.criado_em.asc())
+                         .limit(LIMITE_FILA).all())]
+    itens += [{"tipo": "conversa", "id": c.id, "nome": c.titulo,
+               "origem_entrada": c.origem_entrada,
+               "criado_em": c.criado_em.isoformat() if c.criado_em else None}
+              for c in _mc.listar_conversas_sem_dono(db, loja_id, limite=LIMITE_FILA)]
+    itens.sort(key=lambda it: it["criado_em"] or "")
+    return itens[:LIMITE_FILA]
+
+
+def assumir_da_fila(db, loja_id, usuario_id, tipo, item_id):
+    """Ação Assumir (2b): materializa a triagem se ainda for o caso, depois adiciona quem assumiu
+    como participante e responsável — regra dos irmãos: reusa core.transferir_responsavel
+    (mesma trilha da Transferência manual §7.1-A) em vez de duplicar a lógica de participante.
+    Não commita."""
+    from . import core as _mc
+    try:
+        item_id = int(item_id)
+    except (TypeError, ValueError):
+        raise ValueError("Item inválido.")
+    if tipo == "triagem":
+        entrada = db.get(TriagemEntrada, item_id)
+        if entrada is None or entrada.loja_id != loja_id:
+            raise ValueError("Entrada de triagem não encontrada nesta loja.")
+        if entrada.status != "pendente":
+            raise ValueError("Esta entrada já foi resolvida.")
+        conv = triagem_materializar(db, entrada, SEGMENTO_TRIAGEM)
+    elif tipo == "conversa":
+        conv = db.get(Conversa, item_id)
+        if conv is None or conv.loja_id != loja_id:
+            raise ValueError("Conversa não encontrada nesta loja.")
+    else:
+        raise ValueError("Tipo inválido (triagem|conversa).")
+    _mc.transferir_responsavel(db, conv, usuario_id, usuario_id)
+    return conv
 
 
 def _triagem_marcar(db, entrada, conversa_id):
