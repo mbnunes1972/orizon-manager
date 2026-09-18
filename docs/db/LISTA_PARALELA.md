@@ -35,7 +35,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 
 | Destino | Itens | Observação |
 |---|---|---|
-| **BETA** | 4 | LP-31 (clone herda `rede_id`), LP-32 (identificação da loja no cabeçalho) e LP-33 (faixa sem teto no configurador) — os três de 16/09. LP-02 implementado em 15/09 — ver o item, abaixo, mantido como registro. |
+| **BETA** | 5 | LP-31 (clone herda `rede_id`), LP-32 (identificação da loja no cabeçalho) e LP-33 (faixa sem teto no configurador) — os três de 16/09. LP-02 implementado em 15/09 — ver o item, abaixo, mantido como registro. |
 | **FRONTEIRA** | 10 | Agrupados por fronteira — ver detalhamento abaixo. |
 | ↳ 6.1 (regra única de transição) | 2 | Ainda não construída — Marcelo quer desenhar com calma. |
 | ↳ 6.2 (Tela Única de Provisões) | 3 | **Em construção nesta Semana 2** — `docs/db/TAREFA_TELA_UNICA_PROVISOES.md`. |
@@ -47,7 +47,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | **DECIDIDO — fila da 1.0** | 3 | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. |
 | **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **29** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste) e LP-35 (17/09, do lote da exposição segura). |
+| **Total aberto** | **30** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste) e LP-35 (17/09, do lote da exposição segura) e LP-36 (18/09, janela de 24 h da Meta). |
 
 ---
 
@@ -204,6 +204,34 @@ inversão agendada para depois.
 
 *Cuidado ao implementar:* mudar só o `default` do Python e deixar o `server_default` em `"0"` cria
 duas verdades divergentes (insert por ORM ≠ insert por SQL cru). Os dois mudam juntos, ou nenhum.
+
+**LP-36 · A janela de 24 h da Meta e o envio que pode falhar sem ninguém ver.**
+*Destino: BETA — vale para as cinco lojas-piloto a partir de 01/10; fim de semana, feriado e folga
+fecham a janela sozinhos.*
+
+**A regra externa:** a API da Meta só permite mensagem livre dentro de **24 h** desde a última
+mensagem do cliente. Passado isso, só **template aprovado** — e a aprovação tem prazo que não
+depende de nós.
+
+**Decisão do Marcelo (18/09):** quando a janela fechar, **a loja toma a providência por outro
+canal** — tem o telefone do contato e liga, ou manda mensagem por fora. O caso ideal é um
+**template específico de reengajamento**, aprovado na Meta, mas isso é meta, não pré-requisito.
+
+**O que o sistema deve, e é o ponto do item:** **não esconder a falha.** Se um envio for recusado
+pela Meta e a conversa exibir a mensagem como enviada, a pessoa acredita que respondeu e o cliente
+nunca recebeu — falha silenciosa, o mesmo padrão dos dezessete dias de 31/08 a 17/09, em versão
+menor e mais frequente. Melhor ainda: **avisar antes**, quando a janela já está fechada, para a
+pessoa nem tentar e ir direto ao telefone.
+
+**Medir antes de consertar (não implementado, sem medição):**
+1. Quando a Meta recusa um envio, o que a tela mostra? Caminho do `status` de `envios_externos`
+   até a interface. Se recusa passa por "enviado", é achado.
+2. Existe hoje qualquer tratamento da janela de 24 h — detecção de fechamento, ou uso de template?
+
+*Contexto de origem:* 18/09, ao tentar responder um lead real (Felipe, contato de 17/09) o Marcelo
+esbarrou primeiro num erro interno ("Sem permissão para postar aqui" — `pode_escrever_conversa`,
+conversa sem participante, resolvido pelo conserto do portão da Triagem). A janela de 24 h é o
+obstáculo **seguinte**, que aparece depois que o interno sai da frente.
 
 ---
 
