@@ -78,6 +78,20 @@ Parâmetros: a loja alvo (nunca embutida no código) e o login do master que per
 - Leads, triagem, envios externos.
 - Financeiro, contábil, folha, provisões, agenda.
 - Clientes da loja 1.
+- **`log_acoes_gerenciais`** — decidido pelo Marcelo em 19/09, depois do ensaio: **sai**. É
+  auditoria do período de teste (centenas de linhas, 330 só do `pdm2026`), e manter um histórico
+  falando de projetos que não existem mais contraria o objetivo de base limpa. **Registrado aqui
+  com data justamente porque auditoria apagada não volta** — quem notar a ausência depois vai
+  achar este parágrafo em vez de suspeitar de perda acidental.
+
+**O que NÃO entra no script — decidido em 19/09, depois do ensaio:** `fornecedores`, `terceiros`,
+`simulador_autorizacoes` e `simulador_log_acessos`, que a Sessão A havia incluído por inferência e
+separado para aprovação (foi a conduta certa). Motivos: fornecedor e terceiro são **cadastro**, da
+família das funções e dos parâmetros, não da operação — uma loja entrando em produção com eles
+registrados está melhor; `simulador_autorizacoes` é concessão de acesso, família de usuário, onde a
+regra desta tarefa é **desativar, não apagar**. E o motivo que vale para os quatro: **zero hoje não
+é zero sempre** — este script roda de novo, noutra loja, com dado dentro, e tabela que entrou sem
+decisão explícita é surpresa agendada.
 
 **O que FICA** — a loja e a forma dela:
 - A própria `Loja` (id 1) e sua configuração: funções, remuneração, parâmetros financeiros,
