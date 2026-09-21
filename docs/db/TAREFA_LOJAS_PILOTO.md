@@ -30,7 +30,20 @@ O próprio docstring diz: *"Multi-número por loja fica p/ quando o webhook repa
 deixa de valer (não há número único) e **todo lead novo de qualquer loja cai na primeira loja**.
 Lead da Salinas aparece na Inspirium. Não é hipótese — é o que o código faz hoje.
 
-**Isso é decisão do Marcelo, e precisa ser tomada antes de 01/10:**
+**DECIDIDO em 21/09: hoje só a Inspirium tem número, e o chat é por loja.** Com um número só, a
+regra (2) funciona e não há defeito. Portanto isto **sai do caminho crítico de 01/10** e vira
+**pré-requisito para conectar o segundo número**: no dia em que a Salinas (ou qualquer outra)
+ligar o WhatsApp dela, o roteamento por `phone_number_id` precisa estar pronto **antes** — senão
+os leads dela caem na primeira loja, em silêncio, sem erro nenhum.
+
+**Regra operacional até lá: não conecte um segundo `NumeroConectado` em Homologação.**
+
+*Pergunta aberta para quando o roteamento for feito:* a regra (1) manda a entrada para a loja do
+`Cliente` cadastrado. Com cadastro compartilhado na rede, um cliente da Salinas que escreva para o
+número da Inspirium cairia na Salinas. Isso pode ser o certo (é a loja dele, ADR-030) ou o errado
+(ele escreveu para a Inspirium). Medir e decidir junto com o roteamento, não antes.
+
+**Referência antiga, mantida para contexto:**
 
 - **(a) Piloto de chat só na Inspirium.** Uma loja, um número, regra (2) funciona. As outras três
   usam o resto do sistema sem o chat externo. Custo zero, escopo menor.
@@ -82,9 +95,9 @@ A regra existe e é real, espalhada por vários pontos: `database.py` (`loja_mae
 `lojas_acessiveis` filtrando por mãe), `auth/auth_routes.py` (loja ativa), `main.py` (lista de PDVs
 da mãe), e **`fiscal/mod_fiscal.py`: PDV sem emitente próprio herda o emitente da mãe.**
 
-Acrescente o parâmetro e faça o PDV nascer certo. **Decisão de negócio embutida, confirme com o
-Marcelo:** Caraguatatuba deve ter emitente próprio, ou herdar o da Inspirium? O código já suporta
-herdar; herdar é o comportamento padrão de PDV.
+Acrescente o parâmetro e faça o PDV nascer certo. **Decidido em 21/09 (ADR-030):** Caraguatatuba **herda o emitente da
+Inspirium**. Ponto de venda é, por definição, a condição em que o tratamento fiscal é feito pela
+loja mãe; quando houver CNPJ próprio, deixa de ser PDV e vira loja nova.
 
 ---
 

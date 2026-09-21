@@ -747,3 +747,50 @@ que a fila foi criada para eliminar: dois lugares para olhar é o mesmo que nenh
   vazia" por não ocupar a função SAC.
 
 **Fonte:** `docs/db/TAREFA_FILA_DE_LEADS.md`; `docs/db/TAREFA_MEDIR_AVISO_DE_LEAD.md`.
+
+---
+
+## ADR-030 — Ponto de venda é fiscalidade da mãe; e o cliente tem uma loja ativa
+**Data:** 2026-09-21
+**Status:** Ativo — decisão tomada; **implementação da parte 2 ainda não existe**
+
+Duas decisões de negócio do Marcelo, tomadas juntas ao desenhar as lojas-piloto.
+
+### 1. O que é ponto de venda (e o que não é)
+
+**Ponto de venda é exatamente a condição em que o tratamento fiscal é feito pela loja mãe.**
+Quando o ponto passa a ter **CNPJ próprio**, ele deixa de ser PDV e vira **loja nova**.
+
+É definição, não caso particular: dá o critério para toda implantação futura, sem ninguém precisar
+reperguntar. Caraguatatuba nasce como PDV da Inspirium e **herda o emitente da mãe** —
+comportamento que `fiscal/mod_fiscal.py` já implementa quando o PDV não tem emitente próprio.
+
+O suporte a PDV existe espalhado (`database.py` `loja_mae_id` e `lojas_acessiveis`,
+`auth/auth_routes.py`, `main.py` lista de PDVs da mãe, `fiscal/mod_fiscal.py`), mas
+**`scripts/clonar_loja.py` não sabe criar um** — não tem `--loja-mae-id`. Ver
+`docs/db/TAREFA_LOJAS_PILOTO.md`, Passo 2.
+
+### 2. A loja ativa do cliente
+
+O ADR-028 fixou: **compartilha-se o cadastro, nunca o histórico comercial**. Falta a terceira
+peça, que é esta: **o cliente tem uma loja ativa** — a loja responsável por ele hoje.
+
+- O cadastro **em regra fica na loja de origem**.
+- Eventualmente o mesmo cliente leva um projeto para outra loja da rede.
+- **A loja ativa muda quando a outra loja CRIA O PROJETO — não quando apenas puxa o cadastro.**
+
+**Por que na criação do projeto, e não na consulta** (decidido em 21/09): puxar o cadastro pode ser
+só conferir um telefone ou ver se o cliente já é conhecido. Se a consulta movesse a titularidade, a
+loja de origem perderia o cliente sem que nada tivesse acontecido — e, com comissão e
+responsabilidade em jogo, isso vira atrito entre lojas da mesma rede. O ato que significa "estou
+atendendo este cliente" é **abrir o projeto**.
+
+**Cuidado para quem implementar — medir antes de escolher o caminho.** É tentador tratar a loja
+ativa como o `Cliente.loja_id` que já existe, movendo-o. Mas `loja_id` é usado como **escopo de
+acesso** em pontos que não são sobre titularidade: `/briefing`, por exemplo, usa `_obj_da_loja`
+sobre `Cliente` de propósito (ADR-028 — briefing é qualificação comercial e fica loja a loja).
+Mover `loja_id` faria a loja de origem **perder o briefing que ela mesma escreveu**. Enumere todos
+os usos de `Cliente.loja_id` antes de decidir entre mover o campo existente ou acrescentar um
+ponteiro próprio; a escolha errada troca um problema de negócio por um vazamento de escopo.
+
+**Fonte:** conversa de 21/09; `docs/db/TAREFA_LOJAS_PILOTO.md`; ADR-028.
