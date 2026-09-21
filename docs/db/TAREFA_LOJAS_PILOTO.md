@@ -132,6 +132,26 @@ Para cada loja nova, depois do clone:
 
 ---
 
+## Passo 3 — concluído em 21/09 (Homologação)
+
+Salinas (id=16), Casa Shopping (id=17) e Caraguatatuba (id=4, completada — já existia como PDV
+desde 22/07, faltava master+SAC) criadas/atualizadas via `scripts/clonar_loja.py`. `rede_id=1`
+confirmado por medição direta (não pelo plano) nas três. Master + funcionário SAC com login
+criados para as três (`master.<slug>`/`sac.<slug>`), senha forte + `senha_provisoria=1` via
+`scripts/redefinir_senha.py`, valor reportado ao Marcelo em cada caso.
+
+**Pendência para a implantação de Produção (antes de 01/11) — registrado aqui de propósito:**
+Salinas e Casa Shopping nasceram com Emitente **sem identidade** (CNPJ, razão social, inscrições
+em branco — só o fiscal não-identidade foi copiado da Inspirium, `--permitir-identidade` não foi
+usado porque cada uma é uma pessoa jurídica diferente da fonte). **Isto é correto para o piloto em
+Homologação**, mas em Produção cada loja precisa do CNPJ/razão social/inscrições PRÓPRIOS
+preenchidos na tela de Emitente antes de emitir a primeira nota fiscal real — sem isso,
+`fiscal/mod_fiscal.prontidao_emitente` recusa a emissão (ou, pior, se alguém preencher errado sob
+pressa, sai nota no CNPJ errado). Caraguatatuba é o caso oposto e não entra nesta pendência: como
+PDV ela nunca tem Emitente próprio, por definição (ADR-030) — usa sempre o da Inspirium.
+
+---
+
 ## Regras deste lote
 
 1. **Homologação apenas.** Confirme o banco antes de cada comando.

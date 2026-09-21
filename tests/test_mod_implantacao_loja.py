@@ -291,3 +291,102 @@ def test_gabarito_semeado_nunca_copiado_e_divergencia_so_aplica_se_aceita(app_db
         assert conta_nova2.nome == nome_original + " (RENOMEADA NA ORIGEM)"
     finally:
         db.close()
+
+
+# ── LP-31: rede_id é decisão explícita de quem chama, nunca reaplicado por tabela ──────────────
+
+def test_rede_id_nao_copia_por_padrao_e_avisa(app_db, seed):
+    """Antes desta flag existir, aplicar_config_loja reaplicava o rede_id da ORIGEM por cima do
+    --rede-id do destino incondicionalmente (junto do resto de _LOJA_CONFIG) — como toda
+    loja-piloto nasce na mesma rede da Inspirium, o resultado saía certo por ACIDENTE. Sem a
+    flag, o rede_id decidido na criação do destino tem que sobreviver."""
+    db = app_db.get_session()
+    try:
+        origem = mil.criar_loja_base(db, nome="Origem Rede", codigo="ORD", rede_id=seed["rede_id"])
+        artefato = mil.exportar_config_loja(db, origem.id)
+        assert artefato["loja_rede_id"] == seed["rede_id"]
+
+        outra_rede = app_db.Rede(nome="Outra Rede")
+        db.add(outra_rede); db.flush()
+        nova = mil.criar_loja_base(db, nome="Destino Rede", codigo="DRD", rede_id=outra_rede.id)
+        rel = mil.aplicar_config_loja(db, nova.id, artefato)   # sem excecoes
+
+        assert db.get(Loja, nova.id).rede_id == outra_rede.id, (
+            "rede_id do destino não pode ser sobrescrito sem a flag explícita")
+        assert any("rede_id" in r for r in rel["recusado"]), (
+            "a recusa tem que aparecer no relatório: %r" % rel["recusado"])
+    finally:
+        db.close()
+
+
+def test_aplicar_rede_id_com_flag_explicita(app_db, seed):
+    """Com aplicar_rede_id=True, o rede_id da origem sobrescreve o do destino de verdade."""
+    db = app_db.get_session()
+    try:
+        origem = mil.criar_loja_base(db, nome="Origem Rede2", codigo="RE2", rede_id=seed["rede_id"])
+        artefato = mil.exportar_config_loja(db, origem.id)
+
+        nova = mil.criar_loja_base(db, nome="Destino Rede2", codigo="RD2")
+        rel = mil.aplicar_config_loja(db, nova.id, artefato, excecoes={"aplicar_rede_id": True})
+
+        assert db.get(Loja, nova.id).rede_id == seed["rede_id"]
+        assert not any("rede_id" in r for r in rel["recusado"])
+    finally:
+        db.close()
+
+
+# ── ADR-030: PDV nasce com loja_mae_id, nunca ganha Emitente próprio ────────────────────────────
+
+def test_loja_mae_id_setado_na_criacao(app_db):
+    db = app_db.get_session()
+    try:
+        mae = mil.criar_loja_base(db, nome="Mae", codigo="MAE")
+        pdv = mil.criar_loja_base(db, nome="PDV", codigo="PDV", loja_mae_id=mae.id)
+        assert db.get(Loja, pdv.id).loja_mae_id == mae.id
+    finally:
+        db.close()
+
+
+def test_pdv_nao_recebe_emitente_proprio(app_db, origem_configurada):
+    """ADR-030: loja com loja_mae_id setado é PDV — nunca ganha Emitente próprio via clone, nem
+    com o artefato trazendo um (a origem tem): fiscal.mod_fiscal.resolver_emitente já sobe a
+    cadeia até a mãe antes de olhar loja.emitente_id."""
+    db = app_db.get_session()
+    try:
+        artefato = mil.exportar_config_loja(db, origem_configurada)
+        assert artefato["emitente"] is not None, "pré-condição: a origem tem Emitente"
+
+        mae = mil.criar_loja_base(db, nome="Mae do PDV", codigo="MPD")
+        pdv = mil.criar_loja_base(db, nome="PDV Caragua", codigo="PDC", loja_mae_id=mae.id)
+        rel = mil.aplicar_config_loja(db, pdv.id, artefato, excecoes={"permitir_identidade": True})
+
+        assert db.get(Loja, pdv.id).emitente_id is None, (
+            "PDV não pode ganhar Emitente próprio via clone — herda da mãe em tempo real")
+        assert "PDV" in rel["aplicado"].get("emitente", ""), (
+            "o pulo do emitente tem que aparecer no relatório: %r" % rel["aplicado"])
+    finally:
+        db.close()
+
+
+def test_pdv_com_emitente_proprio_preexistente_e_preservado(app_db, origem_configurada):
+    """Se um PDV JÁ tem Emitente próprio (caso legado/manual), o clone não mexe nele — só recusa
+    e explica, nunca troca por baixo."""
+    db = app_db.get_session()
+    try:
+        artefato = mil.exportar_config_loja(db, origem_configurada)
+        emitente_preexistente_id = db.get(Loja, origem_configurada).emitente_id
+        assert emitente_preexistente_id is not None, "pré-condição: a origem tem Emitente"
+
+        mae = mil.criar_loja_base(db, nome="Mae do PDV 2", codigo="MP2")
+        pdv = mil.criar_loja_base(db, nome="PDV Com Emitente", codigo="PCE", loja_mae_id=mae.id)
+        pdv.emitente_id = emitente_preexistente_id   # qualquer emitente_id não-nulo serve pro teste
+        db.commit()
+
+        rel = mil.aplicar_config_loja(db, pdv.id, artefato, excecoes={"permitir_identidade": True})
+
+        assert db.get(Loja, pdv.id).emitente_id == emitente_preexistente_id, (
+            "emitente pré-existente do PDV não pode ser trocado pelo clone")
+        assert any("PDV" in r for r in rel["recusado"]), (
+            "a recusa tem que aparecer no relatório: %r" % rel["recusado"])
+    finally:
+        db.close()

@@ -64,7 +64,7 @@ _EMITENTE_IDENTIDADE = ("cnpj", "razao_social", "inscricao_estadual", "inscricao
 
 _LOJA_CONFIG = (
     "config_financeira_json", "telefone", "email", "responsavel",
-    "cep", "logradouro", "numero", "complemento", "bairro", "cidade", "estado", "rede_id",
+    "cep", "logradouro", "numero", "complemento", "bairro", "cidade", "estado",
 )
 
 
@@ -179,15 +179,20 @@ def _aplicar_divergencias_aceitas(db, owner_tipo, owner_id, divergencias, codigo
 
 # ── Criação da loja-base — mesma sequência de main.py (POST /api/admin/lojas), sem o diretor ───
 
-def criar_loja_base(db, nome, codigo, rede_id=None):
+def criar_loja_base(db, nome, codigo, rede_id=None, loja_mae_id=None):
     """Cria a Loja e semeia o baseline padrão — a MESMA sequência que main.py usa na criação de
     loja pela tela (perfis, funções, gabarito), menos a criação do usuário diretor: a Loja Teste
     (e qualquer loja implantada por este mecanismo) nasce SEM equipe — funcionários e usuários
     não fazem parte de config de loja. Reusa `perfil_store.seed_perfis_loja`, `seed.
-    criar_funcoes_seed` e `mod_contabil.aplicar_gabarito_completo` — não uma cópia paralela."""
+    criar_funcoes_seed` e `mod_contabil.aplicar_gabarito_completo` — não uma cópia paralela.
+
+    `loja_mae_id` (ADR-030): setado, a loja nasce PDV — tratamento fiscal pela loja-mãe. NÃO cria
+    Emitente próprio aqui (nem em `aplicar_config_loja`, ver o bloco de Emitente lá): o PDV fica
+    com `emitente_id=NULL` de propósito, e `fiscal/mod_fiscal.resolver_emitente` já sobe a cadeia
+    até a mãe antes de olhar o emitente da própria loja."""
     if db.query(Loja).filter_by(codigo=codigo).first() is not None:
         raise ValueError("já existe uma loja com codigo=%r" % codigo)
-    loja = Loja(nome=nome, codigo=codigo, rede_id=rede_id)
+    loja = Loja(nome=nome, codigo=codigo, rede_id=rede_id, loja_mae_id=loja_mae_id)
     db.add(loja)
     db.flush()   # precisa do id para os seeds abaixo
 
@@ -254,6 +259,10 @@ def exportar_config_loja(db, loja_id, exportado_por=None, ambiente_origem=None):
         "exportado_em": datetime.utcnow().isoformat() + "Z",
         "exportado_por": exportado_por,
         "loja": {c: getattr(loja, c) for c in _LOJA_CONFIG},
+        # Separado de _LOJA_CONFIG de propósito (LP-31): rede_id do destino é decisão explícita
+        # de quem chama `aplicar_config_loja` (excecoes["aplicar_rede_id"]), nunca aplicado por
+        # tabela — mesmo padrão de `_EMITENTE_IDENTIDADE`/`permitir_identidade`.
+        "loja_rede_id": loja.rede_id,
         "perfis": perfis,
         "funcoes": funcoes,
         "documentos_modelo": documentos,
@@ -287,11 +296,24 @@ def aplicar_config_loja(db, loja_destino_id, artefato, excecoes=None):
         específico e datado: a Loja Teste herda a folha de teste já montada na Inspirium em
         10/09, pra não obrigar refazer esse trabalho só pra continuar testando. Loja real em
         Produção nunca liga esta flag — nasce sem salário nenhum, cada uma define o seu.
+      - "aplicar_rede_id" (bool, default False — LP-31): só com True `rede_id` do destino é
+        sobrescrito pelo da origem (`artefato["loja_rede_id"]`). Sem a flag, o `rede_id` decidido
+        na criação (`criar_loja_base(..., rede_id=...)`) fica intocado — antes desta flag existir,
+        esta função reaplicava o `rede_id` da origem incondicionalmente (junto do resto de
+        `_LOJA_CONFIG`), e como toda loja-piloto nasce na mesma rede da Inspirium o resultado
+        saía certo POR ACIDENTE. Mesmo padrão de `permitir_identidade`: decisão explícita, gate
+        próprio, nunca implícita.
+
+    Loja com `loja_mae_id` setado é PDV (ADR-030) — NUNCA recebe Emitente próprio aqui, mesmo se
+    o artefato trouxer um: `fiscal/mod_fiscal.resolver_emitente` já sobe a cadeia até a mãe antes
+    de olhar `loja.emitente_id`, e dar um Emitente "meio" (fiscal sem identidade) ao PDV não é
+    usado por ninguém e só confunde quem ler o banco depois.
 
     Retorna relatório: {"recusado": [...], "aplicado": {...}}."""
     excecoes = excecoes or {}
     permitir_identidade = bool(excecoes.get("permitir_identidade"))
     copiar_remuneracao = bool(excecoes.get("copiar_remuneracao"))
+    aplicar_rede_id = bool(excecoes.get("aplicar_rede_id"))
     codigos_aceitos = excecoes.get("divergencias_gabarito_aceitas") or []
 
     loja = db.get(Loja, loja_destino_id)
@@ -306,6 +328,16 @@ def aplicar_config_loja(db, loja_destino_id, artefato, excecoes=None):
     for campo, valor in artefato["loja"].items():
         setattr(loja, campo, valor)
     aplicado["loja"] = list(artefato["loja"].keys())
+
+    # ── rede_id: gate próprio (LP-31) — nunca junto do loop acima ────────────────────────────
+    if aplicar_rede_id:
+        loja.rede_id = artefato.get("loja_rede_id")
+        aplicado["loja_rede_id"] = "aplicado (origem=%r)" % artefato.get("loja_rede_id")
+    else:
+        recusado.append(
+            "rede_id da origem (%r) NÃO aplicado — aplicar_rede_id=False; destino mantém "
+            "rede_id=%r (decidido em --rede-id na criação)." % (artefato.get("loja_rede_id"),
+                                                                 loja.rede_id))
 
     # ── Perfis: upsert por slug ──────────────────────────────────────────────────────────────
     existentes = {p.slug: p for p in db.query(PerfilAcesso).filter_by(loja_id=loja.id).all()}
@@ -382,8 +414,17 @@ def aplicar_config_loja(db, loja_destino_id, artefato, excecoes=None):
         docs_criados += 1
     aplicado["documentos_modelo"] = {"criados": docs_criados, "pulados_ja_iguais": docs_pulados}
 
-    # ── Emitente: fiscal sempre; identidade só com a flag; token/cert nunca por aqui ─────────
-    if artefato.get("emitente"):
+    # ── Emitente: fiscal sempre; identidade só com a flag; token/cert nunca por aqui.
+    #    PDV (loja_mae_id setado) NUNCA recebe Emitente próprio — ver docstring acima ──────────
+    if loja.loja_mae_id:
+        if loja.emitente_id:
+            recusado.append(
+                "emitente do artefato NÃO aplicado — loja é PDV (loja_mae_id=%s), mantém "
+                "emitente_id=%r." % (loja.loja_mae_id, loja.emitente_id))
+        else:
+            aplicado["emitente"] = ("pulado — PDV herda da mãe em tempo real "
+                                     "(fiscal.mod_fiscal.resolver_emitente)")
+    elif artefato.get("emitente"):
         em_art = artefato["emitente"]
         em = db.get(Emitente, loja.emitente_id) if loja.emitente_id else None
         if em is None:

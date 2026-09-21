@@ -104,20 +104,27 @@ def cmd_clone(args):
         artefato = mil.exportar_config_loja(db, origem.id, exportado_por=os.environ.get("USER"))
         _imprimir_divergencias(artefato["gabarito_divergencias"])
 
-        print("\nplano: nova loja nome=%r codigo=%r rede_id=%r" %
-              (args.nome, args.codigo, args.rede_id))
+        print("\nplano: nova loja nome=%r codigo=%r rede_id=%r loja_mae_id=%r" %
+              (args.nome, args.codigo, args.rede_id, args.loja_mae_id))
         print("  perfis a aplicar: %d (%s)" % (len(artefato["perfis"]),
               ", ".join(p["slug"] for p in artefato["perfis"])))
         print("  funções a aplicar: %d" % len(artefato["funcoes"]))
         print("  documentos-modelo (versão ativa) a aplicar: %d (%s)" %
               (len(artefato["documentos_modelo"]),
                ", ".join(d["tipo"] for d in artefato["documentos_modelo"])))
-        print("  emitente: %s" % ("sim" if artefato["emitente"] else "não (origem sem Emitente)"))
+        if args.loja_mae_id:
+            print("  PDV (ADR-030): emitente NUNCA é copiado — herda da mãe (id=%s) em tempo "
+                  "real (fiscal.mod_fiscal.resolver_emitente)." % args.loja_mae_id)
+        else:
+            print("  emitente: %s" % ("sim" if artefato["emitente"] else "não (origem sem Emitente)"))
         print("  identidade (cnpj/razão social) será aplicada: %s" %
               ("sim" if args.permitir_identidade else "NÃO — falta --permitir-identidade"))
         print("  remuneração (salario_fixo/beneficios/comissao_fixa) será copiada: %s" %
               ("sim" if args.copiar_remuneracao else
                "NÃO — configure na tela de Funções (falta --copiar-remuneracao)"))
+        print("  rede_id da origem (%r) será aplicado por cima do --rede-id: %s" %
+              (artefato["loja_rede_id"],
+               "sim" if args.aplicar_rede_id else "NÃO — falta --aplicar-rede-id (LP-31)"))
 
         if not args.aplicar:
             print("\nPLANO apenas. Rode de novo com --aplicar pra gravar.")
@@ -126,7 +133,7 @@ def cmd_clone(args):
         nova = db.query(Loja).filter_by(codigo=args.codigo).first()
         if nova is None:
             nova = mil.criar_loja_base(db, nome=args.nome, codigo=args.codigo,
-                                       rede_id=args.rede_id)
+                                       rede_id=args.rede_id, loja_mae_id=args.loja_mae_id)
             print("\nloja criada: id=%s" % nova.id)
         else:
             print("\nloja já existe (id=%s) — reaplicando config por cima (idempotente)." % nova.id)
@@ -135,6 +142,7 @@ def cmd_clone(args):
             "permitir_identidade": args.permitir_identidade,
             "divergencias_gabarito_aceitas": args.aceitar_divergencia,
             "copiar_remuneracao": args.copiar_remuneracao,
+            "aplicar_rede_id": args.aplicar_rede_id,
         })
         _relatorio(rel)
         print("\nGRAVADO. Rode `mod_contabil.varrer_orfaos_gabarito` (R16) antes de considerar concluído.")
@@ -181,20 +189,26 @@ def cmd_importar(args):
     try:
         _conferir_banco(db, args.banco_esperado)
         _imprimir_divergencias(artefato["gabarito_divergencias"])
-        print("\nplano: nova loja nome=%r codigo=%r rede_id=%r" %
-              (args.nome, args.codigo, args.rede_id))
+        print("\nplano: nova loja nome=%r codigo=%r rede_id=%r loja_mae_id=%r" %
+              (args.nome, args.codigo, args.rede_id, args.loja_mae_id))
+        if args.loja_mae_id:
+            print("  PDV (ADR-030): emitente NUNCA é copiado — herda da mãe (id=%s) em tempo "
+                  "real (fiscal.mod_fiscal.resolver_emitente)." % args.loja_mae_id)
         print("  identidade (cnpj/razão social) será aplicada: %s" %
               ("sim" if args.permitir_identidade else "NÃO — falta --permitir-identidade"))
         print("  remuneração (salario_fixo/beneficios/comissao_fixa) será copiada: %s" %
               ("sim" if args.copiar_remuneracao else
                "NÃO — configure na tela de Funções (falta --copiar-remuneracao)"))
+        print("  rede_id da origem (%r) será aplicado por cima do --rede-id: %s" %
+              (artefato["loja_rede_id"],
+               "sim" if args.aplicar_rede_id else "NÃO — falta --aplicar-rede-id (LP-31)"))
         if not args.aplicar:
             print("\nPLANO apenas. Rode de novo com --aplicar pra gravar.")
             return
         nova = db.query(Loja).filter_by(codigo=args.codigo).first()
         if nova is None:
             nova = mil.criar_loja_base(db, nome=args.nome, codigo=args.codigo,
-                                       rede_id=args.rede_id)
+                                       rede_id=args.rede_id, loja_mae_id=args.loja_mae_id)
             print("\nloja criada: id=%s" % nova.id)
         else:
             print("\nloja já existe (id=%s) — reaplicando config por cima (idempotente)." % nova.id)
@@ -202,6 +216,7 @@ def cmd_importar(args):
             "permitir_identidade": args.permitir_identidade,
             "divergencias_gabarito_aceitas": args.aceitar_divergencia,
             "copiar_remuneracao": args.copiar_remuneracao,
+            "aplicar_rede_id": args.aplicar_rede_id,
         })
         _relatorio(rel)
         print("\nGRAVADO. Rode `mod_contabil.varrer_orfaos_gabarito` (R16) antes de considerar concluído.")
@@ -221,6 +236,11 @@ def main():
     p_clone.add_argument("--nome", required=True)
     p_clone.add_argument("--codigo", required=True, help="3 letras, unique (ex.: TES)")
     p_clone.add_argument("--rede-id", type=int, default=None)
+    p_clone.add_argument("--loja-mae-id", type=int, default=None,
+                         help="ADR-030: PDV da loja-mãe (fiscalidade dela) — nunca copia emitente")
+    p_clone.add_argument("--aplicar-rede-id", action="store_true",
+                         help="aplica o rede_id da origem por cima do --rede-id (LP-31; default: "
+                              "NÃO — --rede-id decide sozinho)")
     p_clone.add_argument("--permitir-identidade", action="store_true")
     p_clone.add_argument("--copiar-remuneracao", action="store_true",
                          help="copia salario_fixo/beneficios_json/comissao_fixa das Funções "
@@ -241,6 +261,11 @@ def main():
     p_imp.add_argument("--nome", required=True)
     p_imp.add_argument("--codigo", required=True)
     p_imp.add_argument("--rede-id", type=int, default=None)
+    p_imp.add_argument("--loja-mae-id", type=int, default=None,
+                       help="ADR-030: PDV da loja-mãe (fiscalidade dela) — nunca copia emitente")
+    p_imp.add_argument("--aplicar-rede-id", action="store_true",
+                       help="aplica o rede_id da origem por cima do --rede-id (LP-31; default: "
+                            "NÃO — --rede-id decide sozinho)")
     p_imp.add_argument("--permitir-identidade", action="store_true")
     p_imp.add_argument("--copiar-remuneracao", action="store_true",
                        help="copia salario_fixo/beneficios_json/comissao_fixa das Funções "
