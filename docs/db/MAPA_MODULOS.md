@@ -543,6 +543,12 @@ desligar Fiscal mantendo Comercial ligado. **Fronteira:** completar as listas de
 Comercial e do Ciclo no manifesto — é o próprio manifesto que precisa da correção, não um módulo
 novo.
 
+**Consequência nova, encontrada em 21/09 ao planejar a extração física de `main.py` (Candidato 9,
+Seção 7):** a mesma causa (guarda-chuva `/api/projetos/<nome>/...` sem prefixo próprio por domínio)
+não afeta só o guard de topologia — também encarece a extração de rota de `main.py` para Comercial/
+Ciclo/Fiscal-por-projeto, porque não dá para despachar por prefixo, só por sufixo. Ver
+`docs/db/TAREFA_SPLIT_BACKEND.md`, Armadilha 3.
+
 ### Causa F — Conta/campo com nome que não corresponde ao comportamento (higiene, sem causa de fronteira)
 **Achados:** ACHADO-04 (`2.1.05` nunca tocada, resíduo), ACHADO-05 (`2.1.04.01` + evento
 `pagamento_comissao`, mecanismo morto), ACHADO-08 (parcial — grupo "módulo declarado" segue como
@@ -828,6 +834,23 @@ decidir. Nenhum foi corrigido.)*
    depende da capability `acesso_config` do perfil do usuário — não é "sempre oculto", é "oculto
    só para quem não tem a capability, mais super_admin/admin_rede (que usam outro caminho)". Este
    item some da lista de candidatos.
+
+9. **A Causa E torna cara a extração física de rota de `main.py` para Comercial/Ciclo/Fiscal-por-
+   projeto — não só o guard de topologia.** Encontrado em 21/09, ao planejar
+   `docs/db/TAREFA_SPLIT_BACKEND.md` (o companheiro backend do `TAREFA_SPLIT_FRONTEND.md`).
+   Medido: **157 ocorrências** de `/api/projetos` em `main.py`, contra **zero** de prefixo próprio
+   para `/api/ciclo`, `/api/pe/`, `/api/aditivo`, `/api/medicao`, `/api/equipe`, `/api/fiscal` —
+   rotas de Comercial (`mod_equipe.py`), do Ciclo (núcleo) e da emissão de NF-e do Fiscal
+   (`/api/projetos/<nome>/ciclo/15/nfe`, `.../emitir-nfe`) convivem sob o MESMO guarda-chuva
+   `/api/projetos/<nome>/...`, distinguíveis só pelo SUFIXO da URL, nunca pelo prefixo. Uma função
+   de extração que decida "é meu domínio?" pelo prefixo (o padrão que `auth/auth_routes.py` já
+   prova para Admin/Cadastro/Financeiro-global/Folha/Expedição/Assistências/Chat, todos com
+   prefixo próprio limpo) captura por engano rotas de outro domínio para este grupo específico.
+   **Não é achado sobre comportamento hoje** (nada quebra em produção por causa disto) — é achado
+   sobre CUSTO de uma extração futura: o Grupo B (Comercial/Ciclo/Fiscal-por-projeto) precisa de um
+   desenho de despacho por sufixo antes de começar, o Grupo A não. **Fica registrado aqui, e
+   reportado ao Marcelo — não decidido por esta sessão** (ver `TAREFA_SPLIT_BACKEND.md`, rodapé
+   "O que este plano NÃO decide").
 
 ---
 
