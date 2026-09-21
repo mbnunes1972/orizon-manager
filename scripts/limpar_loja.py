@@ -2,10 +2,13 @@
 """Limpar a operação de uma loja — docs/db/TAREFA_LIMPAR_INSPIRIUM.md, Passo 2.
 
 Apaga TODA a operação de uma loja (projetos, orçamentos, contratos, ciclo, conversas, leads,
-triagem, financeiro/contábil de movimento, folha, clientes) e DESATIVA (nunca apaga) todos os
-usuários e funcionários dela, exceto o login indicado como master que fica. A `Loja` e a
-configuração dela (funções, perfil de acesso, segmentos, config do OrizonBot, emitente, modelos
-de documento, plano de contas/centro de custo — GABARITO, não movimento) nunca são tocados.
+triagem, financeiro/contábil de movimento, folha, clientes, auditoria de ações gerenciais) e
+DESATIVA (nunca apaga) todos os usuários e funcionários dela, exceto o login indicado como master
+que fica. A `Loja` e a configuração dela (funções, perfil de acesso, segmentos, config do
+OrizonBot, emitente, modelos de documento, plano de contas/centro de custo — GABARITO, não
+movimento) nunca são tocados. `fornecedores`, `terceiros`, `simulador_autorizacoes` e
+`simulador_log_acessos` FICAM de propósito (decisão de 19/09 — são cadastro/concessão de acesso,
+não operação; ver comentário perto de PASSOS).
 
 CONFIGURAÇÃO fica, DADO sai — mesmo princípio de mod_implantacao_loja.py, aplicado ao inverso
 (limpar em vez de clonar). `conta`/`centro_custo` são estrutura (mesma decisão de
@@ -27,13 +30,14 @@ Guardas (mesmo padrão de clonar_loja.py):
   - tudo numa transação: ou a limpeza inteira acontece, ou nada acontece (exceção → rollback,
     nunca commit parcial);
   - erro de chave estrangeira não é contornado com CASCADE — a ordem abaixo foi construída
-    das folhas para a raiz a partir do grafo real de FKs do schema (medido 18/09). Um erro aqui
+    das folhas para a raiz a partir do grafo real de FKs do schema (medido 18/09, aplicada com
+    sucesso de ponta a ponta contra um clone descartável do dump de Homologação). Um erro aqui
     é sinal de schema mudou desde a medição: pare e reporte, não improvise.
 
 O único ciclo genuíno do schema que entra no caminho (`orcamentos.parcela_id` <->
 `parcela_projeto.orcamento_id`, documentado em CLAUDE.md — "3 ciclos de FK bidirecional") é
 quebrado explicitamente (UPDATE ... SET parcela_id = NULL) antes de apagar os dois lados —
-não é CASCADE improvisado, é a mesma técnica que a própria baseline do Alembo usa
+não é CASCADE improvisado, é a mesma técnica que a própria baseline do Alembic usa
 (`use_alter=True`) para poder ordenar a criação das tabelas.
 
 Uso:
@@ -51,7 +55,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
 
-from database import Loja, Usuario, get_session
+from database import Loja, get_session
 
 
 def _conferir_banco(db, banco_esperado):
@@ -65,117 +69,121 @@ def _conferir_banco(db, banco_esperado):
     return banco
 
 
-# Cada passo: (tabela, WHERE usando :loja / :master_login, além_do_documento).
-# Ordem: das folhas para a raiz, medida contra o grafo de FK real do schema em 18/09/2026
-# (docs/db/TAREFA_LIMPAR_INSPIRIUM.md). "projetos desta loja" = SELECT nome_safe FROM
-# projetos_meta WHERE loja_id=:loja — ver docstring do módulo.
+# Cada passo: (tabela, WHERE usando :loja). Ordem: das folhas para a raiz, medida contra o grafo
+# real de FKs do schema em 18/09/2026 (docs/db/TAREFA_LIMPAR_INSPIRIUM.md). "projetos desta loja"
+# = SELECT nome_safe FROM projetos_meta WHERE loja_id=:loja — ver docstring do módulo.
 _PROJETOS_DA_LOJA = "(SELECT nome_safe FROM projetos_meta WHERE loja_id=:loja)"
 _CONVERSAS_DA_LOJA = "(SELECT id FROM conversas WHERE loja_id=:loja)"
 _MENSAGENS_DA_LOJA = "(SELECT id FROM conversa_mensagens WHERE conversa_id IN %s)" % _CONVERSAS_DA_LOJA
 _ORCAMENTOS_DA_LOJA = "(SELECT id FROM orcamentos WHERE loja_id=:loja)"
 _CLIENTES_DA_LOJA = "(SELECT id FROM clientes WHERE loja_id=:loja)"
+_USUARIOS_DA_LOJA = "(SELECT id FROM usuarios WHERE loja_id=:loja)"
 
 PASSOS = [
     # ── chat/comunicação ────────────────────────────────────────────────────────────────
     ("envios_externos",
      "mensagem_id IN %s OR triagem_id IN (SELECT id FROM triagem_entradas WHERE loja_id=:loja)"
-     % _MENSAGENS_DA_LOJA, False),
-    ("mensagem_anexos", "mensagem_id IN %s" % _MENSAGENS_DA_LOJA, False),
-    ("conversa_participantes", "conversa_id IN %s" % _CONVERSAS_DA_LOJA, False),
-    ("conversa_participantes_externos", "conversa_id IN %s" % _CONVERSAS_DA_LOJA, False),
-    ("conversa_mensagens", "conversa_id IN %s" % _CONVERSAS_DA_LOJA, False),
-    ("triagem_entradas", "loja_id=:loja", False),
-    ("conversas", "loja_id=:loja", False),
+     % _MENSAGENS_DA_LOJA),
+    ("mensagem_anexos", "mensagem_id IN %s" % _MENSAGENS_DA_LOJA),
+    ("conversa_participantes", "conversa_id IN %s" % _CONVERSAS_DA_LOJA),
+    ("conversa_participantes_externos", "conversa_id IN %s" % _CONVERSAS_DA_LOJA),
+    ("conversa_mensagens", "conversa_id IN %s" % _CONVERSAS_DA_LOJA),
+    ("triagem_entradas", "loja_id=:loja"),
+    ("conversas", "loja_id=:loja"),
 
     # ── assinaturas (filhas de contrato/aditivo/aprovação/medição) ─────────────────────
-    ("aditivos_assinaturas",
-     "aditivo_id IN (SELECT id FROM aditivos WHERE loja_id=:loja)", False),
+    ("aditivos_assinaturas", "aditivo_id IN (SELECT id FROM aditivos WHERE loja_id=:loja)"),
     ("aprovacoes_pe_assinaturas",
-     "aprovacao_id IN (SELECT id FROM aprovacoes_pe WHERE loja_id=:loja)", False),
-    ("contratos_assinaturas",
-     "contrato_id IN (SELECT id FROM contratos WHERE loja_id=:loja)", False),
+     "aprovacao_id IN (SELECT id FROM aprovacoes_pe WHERE loja_id=:loja)"),
+    ("contratos_assinaturas", "contrato_id IN (SELECT id FROM contratos WHERE loja_id=:loja)"),
     ("solicitacoes_medicao_assinaturas",
-     "solicitacao_id IN (SELECT id FROM solicitacoes_medicao WHERE loja_id=:loja)", False),
+     "solicitacao_id IN (SELECT id FROM solicitacoes_medicao WHERE loja_id=:loja)"),
 
     # ── fábrica (acordo/ajuste) ─────────────────────────────────────────────────────────
     ("acordo_movimento",
-     "acordo_id IN (SELECT id FROM acordo_fabrica WHERE loja_titular_id=:loja)", False),
+     "acordo_id IN (SELECT id FROM acordo_fabrica WHERE loja_titular_id=:loja)"),
     ("ajuste_fabrica_aplicacao",
-     "ajuste_id IN (SELECT id FROM ajuste_fabrica WHERE loja_id=:loja)", False),
+     "ajuste_id IN (SELECT id FROM ajuste_fabrica WHERE loja_id=:loja)"),
 
     # ── ambiente/pool (sem FK — projeto_nome é texto puro) ─────────────────────────────
     ("parcela_ambiente",
-     "parcela_id IN (SELECT id FROM parcela_projeto WHERE projeto_nome IN %s)" % _PROJETOS_DA_LOJA,
-     False),
-    ("conciliacao_pe_fase", "projeto_nome IN %s" % _PROJETOS_DA_LOJA, False),
-    ("sinal_retido", "projeto_nome IN %s" % _PROJETOS_DA_LOJA, False),
-    ("arquivo_pe", "projeto_nome IN %s" % _PROJETOS_DA_LOJA, False),
-    ("orcamento_ambientes", "orcamento_id IN %s" % _ORCAMENTOS_DA_LOJA, False),
+     "parcela_id IN (SELECT id FROM parcela_projeto WHERE projeto_nome IN %s)" % _PROJETOS_DA_LOJA),
+    ("conciliacao_pe_fase", "projeto_nome IN %s" % _PROJETOS_DA_LOJA),
+    ("sinal_retido", "projeto_nome IN %s" % _PROJETOS_DA_LOJA),
+    ("arquivo_pe", "projeto_nome IN %s" % _PROJETOS_DA_LOJA),
+    ("orcamento_ambientes", "orcamento_id IN %s" % _ORCAMENTOS_DA_LOJA),
 
     # ── assistência ──────────────────────────────────────────────────────────────────
-    ("assistencia_anexos",
-     "caso_id IN (SELECT id FROM assistencia_caso WHERE loja_id=:loja)", False),
+    ("assistencia_anexos", "caso_id IN (SELECT id FROM assistencia_caso WHERE loja_id=:loja)"),
     ("assistencia_executores",
-     "caso_id IN (SELECT id FROM assistencia_caso WHERE loja_id=:loja)", False),
+     "caso_id IN (SELECT id FROM assistencia_caso WHERE loja_id=:loja)"),
 
     # ── ciclo logístico ──────────────────────────────────────────────────────────────
     ("ciclo_logistico_transicao",
-     "ciclo_logistico_id IN (SELECT id FROM ciclo_logistico WHERE loja_id=:loja)", False),
-    ("ciclo_logistico", "loja_id=:loja", False),
+     "ciclo_logistico_id IN (SELECT id FROM ciclo_logistico WHERE loja_id=:loja)"),
+    ("ciclo_logistico", "loja_id=:loja"),
 
     # ── nível intermediário (loja_id direto, já sem filhos pendentes) ──────────────────
-    ("aditivos", "loja_id=:loja", False),
-    ("aprovacoes_pe", "loja_id=:loja", False),
-    ("assistencia_caso", "loja_id=:loja", False),
-    ("atribuicoes_ambiente", "loja_id=:loja", False),
-    ("ajuste_fabrica", "loja_id=:loja", False),
-    ("acordo_fabrica", "loja_titular_id=:loja", False),
-    ("solicitacoes_medicao", "loja_id=:loja", False),
+    ("aditivos", "loja_id=:loja"),
+    ("aprovacoes_pe", "loja_id=:loja"),
+    ("assistencia_caso", "loja_id=:loja"),
+    ("atribuicoes_ambiente", "loja_id=:loja"),
+    ("ajuste_fabrica", "loja_id=:loja"),
+    ("acordo_fabrica", "loja_titular_id=:loja"),
+    ("solicitacoes_medicao", "loja_id=:loja"),
 
     # -- aqui, entre estes dois pontos, o script quebra o ciclo orcamentos<->parcela_projeto --
 
-    ("contratos", "loja_id=:loja", False),
-    ("provisao_registro", "orcamento_id IN %s" % _ORCAMENTOS_DA_LOJA, False),
-    ("recebivel", "loja_id=:loja", False),
-    ("parcela_projeto", "projeto_nome IN %s" % _PROJETOS_DA_LOJA, False),
-    ("orcamentos", "loja_id=:loja", False),
-    ("pool_ambientes", "projeto_id IN %s" % _PROJETOS_DA_LOJA, False),
+    ("contratos", "loja_id=:loja"),
+    ("provisao_registro", "orcamento_id IN %s" % _ORCAMENTOS_DA_LOJA),
+    ("recebivel", "loja_id=:loja"),
+    ("parcela_projeto", "projeto_nome IN %s" % _PROJETOS_DA_LOJA),
+    ("orcamentos", "loja_id=:loja"),
+    ("pool_ambientes", "projeto_id IN %s" % _PROJETOS_DA_LOJA),
 
     # ── tabelas de projeto puramente por texto (sem FK, folhas em relação ao resto) ────
-    ("ciclo_etapas", "projeto_nome IN %s" % _PROJETOS_DA_LOJA, False),
-    ("ciclo_revisoes", "projeto_nome IN %s" % _PROJETOS_DA_LOJA, False),
-    ("documento_fiscal", "loja_id=:loja", False),
-    ("ciclo_documentos", "projeto_nome IN %s" % _PROJETOS_DA_LOJA, False),
-    ("medicoes", "projeto_nome IN %s" % _PROJETOS_DA_LOJA, False),
-    ("retencao_obra", "projeto_nome IN %s" % _PROJETOS_DA_LOJA, False),
-    ("briefings", "projeto_nome IN %s OR cliente_id IN %s" % (_PROJETOS_DA_LOJA, _CLIENTES_DA_LOJA),
-     False),
-    ("veredictos_provisao", "owner_tipo='loja' AND owner_id=:loja", False),
+    ("ciclo_etapas", "projeto_nome IN %s" % _PROJETOS_DA_LOJA),
+    ("ciclo_revisoes", "projeto_nome IN %s" % _PROJETOS_DA_LOJA),
+    ("documento_fiscal", "loja_id=:loja"),
+    ("ciclo_documentos", "projeto_nome IN %s" % _PROJETOS_DA_LOJA),
+    ("medicoes", "projeto_nome IN %s" % _PROJETOS_DA_LOJA),
+    ("retencao_obra", "projeto_nome IN %s" % _PROJETOS_DA_LOJA),
+    ("briefings", "projeto_nome IN %s OR cliente_id IN %s" % (_PROJETOS_DA_LOJA, _CLIENTES_DA_LOJA)),
+    ("veredictos_provisao", "owner_tipo='loja' AND owner_id=:loja"),
 
-    ("projetos_meta", "loja_id=:loja", False),
+    ("projetos_meta", "loja_id=:loja"),
 
     # ── financeiro/contábil — só MOVIMENTO; conta/centro_custo são gabarito e ficam ────
-    ("lancamento", "owner_tipo='loja' AND owner_id=:loja", False),
-    ("comissao_folha", "loja_id=:loja", False),
-    ("folha_pagamento", "loja_id=:loja", False),
-    ("adiantamento_funcionario", "loja_id=:loja", False),
+    ("lancamento", "owner_tipo='loja' AND owner_id=:loja"),
+    ("comissao_folha", "loja_id=:loja"),
+    ("folha_pagamento", "loja_id=:loja"),
+    ("adiantamento_funcionario", "loja_id=:loja"),
 
-    ("leads", "loja_id=:loja", False),
-    ("contato_confirmacoes", "loja_id=:loja", False),
+    ("leads", "loja_id=:loja"),
+    ("contato_confirmacoes", "loja_id=:loja"),
 
-    # ── além do que o documento nomeia literalmente — cadastro operacional da loja,
-    #    incluído por inferência (mesma família de "clientes da loja"); avalie antes de aprovar ──
-    ("fornecedores", "loja_id=:loja", True),
-    ("terceiros", "loja_id=:loja", True),
-    ("simulador_autorizacoes", "loja_id=:loja", True),
-    ("simulador_log_acessos", "loja_id=:loja", True),
+    # log_acoes_gerenciais SAI — decidido pelo Marcelo em 19/09, depois do ensaio: auditoria do
+    # período de teste, não faz sentido preservar histórico de projetos que deixaram de existir
+    # (registrado com data em docs/db/TAREFA_LIMPAR_INSPIRIUM.md, de propósito — auditoria
+    # apagada não volta). Sem loja_id próprio (nem todo registro tem projeto associado) — escopo
+    # por quem agiu/foi alvo (usuário da loja) OU pelo projeto, quando o registro tiver um.
+    ("log_acoes_gerenciais",
+     "solicitante_id IN %s OR autorizador_id IN %s OR projeto_nome IN %s"
+     % (_USUARIOS_DA_LOJA, _USUARIOS_DA_LOJA, _PROJETOS_DA_LOJA)),
 
-    ("clientes", "loja_id=:loja", False),
+    ("clientes", "loja_id=:loja"),
 ]
+
+# fornecedores, terceiros, simulador_autorizacoes, simulador_log_acessos: entraram por inferência
+# no primeiro ensaio (18/09) e foram DELIBERADAMENTE excluídos em 19/09, depois de decisão
+# explícita do Marcelo (docs/db/TAREFA_LIMPAR_INSPIRIUM.md) — fornecedor/terceiro são cadastro
+# (família de funções/parâmetros, não operação); simulador_autorizacoes é concessão de acesso
+# (família de usuário — aqui a regra é desativar, nunca apagar). Registrado aqui, e não só no
+# documento, para quem ler só o código não reabrir a inferência por engano.
 
 
 def _confirmar_master(db, loja_id, login):
-    m = db.execute(text("SELECT id, loja_id, ativo FROM usuarios WHERE login=:l"),
+    m = db.execute(text("SELECT id, loja_id, nivel, ativo FROM usuarios WHERE login=:l"),
                     {"l": login}).mappings().first()
     if m is None:
         sys.exit("RECUSADO: login master %r não existe." % login)
@@ -201,24 +209,14 @@ def _rodar(args):
         print("loja alvo: id=%s %r" % (loja.id, loja.nome))
 
         master = _confirmar_master(db, loja.id, args.master_login)
-        print("master que fica ativo: %r (id=%s, ativo hoje=%s)"
-              % (args.master_login, master["id"], master["ativo"]))
+        print("master que fica ativo: %r (id=%s, nivel=%s, ativo hoje=%s)"
+              % (args.master_login, master["id"], master["nivel"], master["ativo"]))
 
         params = {"loja": loja.id, "master_login": args.master_login}
 
         total = 0
         print("\n=== SAI (conforme docs/db/TAREFA_LIMPAR_INSPIRIUM.md) ===")
-        for tabela, where, alem_do_doc in PASSOS:
-            if alem_do_doc:
-                continue
-            n = _contar(db, tabela, where, params)
-            total += n
-            print("  %-38s %6d" % (tabela, n))
-
-        print("\n=== ALÉM DO QUE O DOCUMENTO NOMEIA — avalie antes de aprovar ===")
-        for tabela, where, alem_do_doc in PASSOS:
-            if not alem_do_doc:
-                continue
+        for tabela, where in PASSOS:
             n = _contar(db, tabela, where, params)
             total += n
             print("  %-38s %6d" % (tabela, n))
@@ -235,7 +233,9 @@ def _rodar(args):
         print("  a própria Loja, funcoes, perfil_acesso, segmento_config, triagem_config,")
         print("  emitente, documento_modelos, documento_tipos, numero_conectado,")
         print("  template_mensagem, assuntos, integracoes_clicksign, parceiro_lojas,")
-        print("  usuario_lojas, conta/centro_custo (gabarito — só o lancamento sai)")
+        print("  usuario_lojas, conta/centro_custo (gabarito — só o lancamento sai),")
+        print("  fornecedores, terceiros, simulador_autorizacoes, simulador_log_acessos")
+        print("  (decisão de 19/09 — cadastro/concessão de acesso, não operação)")
 
         print("\n=== DESATIVAR (ativo=0 / status='inativo'), nunca apagar ===")
         print("  %-38s %6d" % ("usuarios (loja, exceto master)", n_desativar))
@@ -259,7 +259,7 @@ def _rodar(args):
             db.execute(text("UPDATE orcamentos SET parcela_id=NULL "
                              "WHERE loja_id=:loja AND parcela_id IS NOT NULL"), params)
 
-            for tabela, where, _ in PASSOS:
+            for tabela, where in PASSOS:
                 db.execute(text("DELETE FROM %s WHERE %s" % (tabela, where)), params)
 
             db.execute(text("UPDATE usuarios SET ativo=0 "
