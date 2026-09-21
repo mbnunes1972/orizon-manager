@@ -229,6 +229,29 @@ test_schema_boot_estavel prova que ele nao altera o schema — mas leia o log
 mesmo assim, e refaca a conferencia do 3.7 depois de subir. Se algum numero
 mudou, o boot mexeu em dado e precisamos saber.
 
+## Duas regras que custaram susto — leia antes de operar um ambiente
+
+**1. Script que executa contra dado real é commitado ANTES de rodar.** O commit faz parte da
+execução, não do que vem depois.
+
+*Motivo (19/09/2026):* o `scripts/limpar_loja.py` que apagou 1.688 linhas da Inspirium ficou
+**dois dias sem commit**. A versão versionada era a **anterior** às decisões tomadas depois do
+ensaio — apagava `fornecedores`/`terceiros` e poupava `log_acoes_gerenciais`, o contrário do
+combinado. Quem clonasse o repositório nesse intervalo e rodasse o script faria o oposto do
+decidido, sem perceber. O que roda e o que está versionado têm que ser a mesma coisa, sempre.
+
+**2. Nada chega a um ambiente por `scp`.** Ambiente recebe código por `git checkout <tag>`, só
+(ADR-011).
+
+*Motivo (21/09/2026):* Homologação tinha arquivos copiados à mão, fora do controle de versão.
+Desta vez eram byte-a-byte idênticos à tag e não houve dano — mas arquivo não rastreado que também
+existe no commit alvo faz o `git checkout` **abortar**, e o resto do bloco roda contra código
+velho com o `confirmar.sh` reportando OK sobre o schema errado (é a lição de 13/09, mais abaixo
+neste arquivo). Cópia manual é como um ambiente começa a divergir do repositório sem ninguém
+perceber. Se algo precisa chegar ao servidor, vira commit e vira tag.
+
+---
+
 ## Exposição segura de Integração/Homologação — nginx + TLS + bind interno
 
 Escrito em 14/09/2026 (PLANO_SEMANA_1.md, pendência operacional #1). **Pré-requisito para dado

@@ -59,6 +59,12 @@ Duas sessões de Claude Code rodando em paralelo, com papéis que **não se cruz
    mortes) — é **CPU**: duas sessões, dois navegadores e uma suíte que dirige navegador disputando
    processador. A regra 2 impedia a colisão de banco; esta impede a contenção de máquina, que é
    como o portão da suíte vinha ficando ilegível. Ver `docs/db/RASCUNHO_PORTAO_E2E.md`.
+
+   **Como conferir — precisão da Sessão A (21/09), melhor que a redação original:** não basta
+   procurar `pytest` nas outras sessões. O que consome a máquina é o **Chromium do Playwright
+   MCP**, que fica vivo mesmo com a sessão ociosa. Antes da suíte completa:
+   `ps -eo pid,etime,rss,args | grep -Ei 'chrom|playwright|claude' | grep -v grep`. Sessão-irmã
+   com Chromium vivo conta como ocupada, ainda que ninguém esteja digitando nela.
 3. **A Sessão B ancora por NOME, nunca por número de linha.** A Sessão A está editando `main.py` e
    `index.html` ao mesmo tempo; qualquer `main.py:9587` anotado hoje estará errado amanhã. Anote
    nome de função, id de elemento, rota — coisas que sobrevivem a uma edição.
