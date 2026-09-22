@@ -31,8 +31,11 @@ Estados válidos: `ABERTO`, `EM CURSO (<terminal>)`, `FECHADO`, `CORTADO (<motiv
 escrever `FECHADO (<hash>)` no MESMO commit do conserto, o que é impossível: o hash só existe
 depois que o commit existe, e cada `git commit --amend` para corrigi-lo muda o próprio hash de
 novo. Medido no LI-1: duas rodadas de convergência (`b6cd6da` → `b7c252c`) e a tabela acabou
-apontando para um hash que o amend seguinte apagou — pior que não ter hash nenhum, porque um
-hash morto parece verdade. **O vínculo é o número do LI na mensagem do commit**, que é estável e
+apontando para `b7c252c`, que **não é o commit do conserto** — o commit real é uma geração
+adiante. E o detalhe que torna isso pior do que não ter hash: `b7c252c` ainda RESOLVE (o amend
+órfã o commit, não o apaga — ele vive no reflog até o gc), então `git show b7c252c` funciona e
+exibe com toda a confiança uma versão que não está na `main`. Hash órfão não parece errado,
+parece verdade. **O vínculo é o número do LI na mensagem do commit**, que é estável e
 não depende de ordem: `git log --grep="LI-1"` acha o conserto, e é isso que a coluna registra.
 Quando os oito saírem de ABERTO, esta lista é apagada e o que sobrar volta para a
 `LISTA_PARALELA.md` com destino.
