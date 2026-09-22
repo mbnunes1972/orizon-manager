@@ -342,3 +342,114 @@ extração, e que NÃO devem ser consertadas ali:**
 
 Nada disto impede começar pelo Grupo A (Admin primeiro) — só impede avançar para o Grupo B sem essa
 conversa.
+
+---
+
+## Respostas do Marcelo (21/09/2026)
+
+**Sobre o item 1 (como despachar o Grupo B por sufixo):** não se decide, se mede. Listar as 157
+rotas de `/api/projetos/<nome>/...` e verificar se o sufixo particiona limpo entre Comercial, Ciclo
+e Fiscal. Se particionar, a tabela de despacho se escreve sozinha a partir da medição; se houver
+ambiguidade real, aí sim existe decisão de desenho a tomar. **Medição feita em 21/09/2026 — não
+particiona limpo. Ver subseção abaixo.**
+
+### Medição do item 1 — resultado (21/09/2026)
+
+Das 157 ocorrências de `/api/projetos` em `main.py` (104 são pontos de despacho reais; o resto é
+comentário/prosa), a maior parte segue limpa:
+
+| Domínio | Sufixos | Contagem aprox. |
+|---|---|---|
+| **Comercial** | `equipe`, `pe/*` (exceto os de PE-sob-`/ciclo/`, ver abaixo), `parcelas*`, `retencoes`/`retido/*`, `briefing`, `parametros`, `aprovacao-pe*`, `aditivo*`, `contrato` (GET/POST/PUT — exceto `concluir-financeiro`), `medicao*`, `parceiro`, `editar`, `consultores`, `status` | ~62 |
+| **Ciclo (núcleo genuíno)** | `ciclo` (bare), `ciclo/<codigo>` PATCH genérico, `ciclo/<codigo>/reabrir`/`/data-prevista`/`/responsavel`/`/pos-conclusao`/`/transferencia/aceitar`, `cronograma` | ~15 |
+| **Fiscal** | `ciclo/15/nfe`, `/nfe-fabrica`, `/emitir-nfe`, `/emitir-nfse`, `/nfe/consultar`, `/nfe/cancelar` | 7 |
+
+**O achado: o prefixo `/ciclo/` não é homogêneo — mistura Ciclo-núcleo com rotas de outro domínio,
+sem nenhuma marca sintática de sufixo que distinga as duas.** Casos concretos, confirmados lendo o
+código (não só o nome da rota):
+
+| Linha (main.py) | Rota | Sufixo sugere | Domínio real (pelo código) |
+|---|---|---|---|
+| 8558 | `ciclo/11d/aprovar` | Ciclo | **Financeiro** — comentário "Gate financeiro", AF2 |
+| 8652 | `ciclo/11d/reprovar` | Ciclo | **Financeiro** — mesma AF2 |
+| 11191 | `ciclo/21/conciliar` | Ciclo | **Financeiro** — `mod_contabil`, comentário "Gate financeiro", Conciliação Final |
+| 15161 | `contrato/concluir-financeiro` | Comercial | **Financeiro** — importa `mod_contabil`, exige `_aprovador_financeiro` |
+| 6510 | `ciclo/pe` | Ciclo | **Comercial (PE)** — "documentos + revisões + status das subfases" de PE |
+| 16283 | `ciclo/<codigo>/revisao` | Ciclo | **Comercial (PE)** — revisão + reabertura em cascata da subfase de PE |
+| 16365 | `ciclo/<codigo>/concluir` | Ciclo | **Comercial (PE)** — comentário "fecha a subfase de PE" |
+| 16004 | `ciclo/<codigo>/documento` (upload) | Ciclo | **Comercial (PE)** |
+| 6548, 16115 | `ciclo/documento/<id>`, `ciclo/<codigo>/documentos/<id>/remover` | Ciclo | **ambíguo de fato** — endpoint genérico; o documento pode ser de Contrato/PE/Aditivo/Medição, só se sabe em runtime |
+| 6580, 16056 | `ciclo/<codigo>/pedido-xml` | Ciclo | zona cinzenta Ciclo↔Expedição (usa `mod_ciclo.tipo_doc_operacional`, mas Expedição já tem prefixo próprio `/api/expedicao`, não usado aqui) |
+| 14285 | `ciclo/desfazer_aprovacao` | Ciclo | **Comercial (Negociação)** — "volta ao orçamento" |
+
+Fora do prefixo `/ciclo/`, mais quatro rotas sem dono único nos três domínios nomeados:
+- **2195 `auditoria-contabil`** → Financeiro (`mod_contabil`).
+- **5084, 8874 `contatos-comunicacao`(`/confirmar`)** → Chat/Comunicação (`mod_chat`) — domínio que
+  já tem prefixo próprio (`/api/comunicacao/*`) em outro lugar, reaparecendo aqui embutido.
+- **3172 `entrega-resumo`** → lê `CicloLogistico` (Expedição) **e** `Projeto.data_entrega`
+  (Comercial/Ciclo) na mesma resposta — sem dono único.
+- **5869, 14756 `atribuicoes`** (Mapa de Atribuições) → cross-cutting, não claramente Comercial nem
+  Ciclo.
+
+**Conclusão: existe decisão de desenho real, não só trabalho mecânico — exatamente o segundo ramo
+que a orientação do Marcelo previu.** Um despachante ingênuo por sufixo (`ciclo/*` → Ciclo) captura
+por engano pelo menos 9 rotas que pertencem, pelo código que executam, a Financeiro ou a
+Comercial(PE). A 6.6 do manifesto não resolve isso sozinha classificando por prefixo — precisa, no
+mínimo, de uma decisão sobre se essas rotas entram na lista de Financeiro/Comercial (fiéis ao que o
+código faz) ou ficam em Ciclo (fiéis ao prefixo da URL, por simplicidade de guarda de módulo — a
+guarda hoje é "tudo ligado" por padrão, então o custo de errar aqui é sobre uma loja hipotética que
+desligue só Financeiro ou só Comercial mantendo Ciclo ligado). **Decisão pendente do Marcelo — não
+resolvida por esta medição**, que só troca a pergunta original ("existe ambiguidade?") por uma mais
+concreta ("o que fazer com estas ~11 rotas nomeadas?").
+
+### As duas opções para as ~11 rotas ambíguas (proposta, não decisão)
+
+**Opção A — despachar por comportamento.** `handle_financeiro_get/post` reivindica `ciclo/11d/
+aprovar`, `ciclo/11d/reprovar`, `ciclo/21/conciliar` e `contrato/concluir-financeiro`;
+`handle_comercial_get/post` reivindica `ciclo/pe`, `ciclo/<codigo>/revisao`, `ciclo/<codigo>/
+concluir`, `ciclo/<codigo>/documento`, `ciclo/desfazer_aprovacao`. `handle_ciclo_get/post` só pega o
+que sobrar do prefixo, checado por último (Armadilha 4 da Seção 4 — ordem de checagem importa: as
+exceções específicas têm que ser checadas ANTES do `handle_ciclo` genérico, ou o genérico as
+captura primeiro).
+- **Prós:** a guarda de módulo (`_bloqueio_modulo`/`modulo_do_path`, Causa E) fica correta de
+  verdade — desligar Financeiro numa loja bloqueia `ciclo/21/conciliar` de fato, não só de nome.
+  Fiel ao que `MAPA_MODULOS.md` § 1 já diz sobre onde cada lógica mora.
+- **Contras:** `handle_ciclo_get/post` deixa de ser "tudo que começa com `/ciclo/`" — vira uma
+  lista de exclusões que precisa ser mantida manualmente conforme rotas novas nascerem sob esse
+  prefixo (o mesmo risco de manutenção manual que a Causa E já descreve para o manifesto hoje).
+  As 3 rotas "ambíguas de fato" (`ciclo/documento/<id>` etc., que só sabem o domínio em runtime)
+  não se resolvem nem aqui — precisam de uma checagem própria (ler o documento, decidir o domínio)
+  dentro do handler, não só no despacho.
+
+**Opção B — despachar por prefixo de URL.** `handle_ciclo_get/post` reivindica TUDO sob `/ciclo/*`,
+sem exceção — mecânico, replica o padrão de `auth_routes.py` sem lista de exclusão nenhuma. A
+lógica de Financeiro/Comercial(PE) continua chamada de dentro do handler de Ciclo (como já é hoje),
+só que agora hospedada num arquivo/pacote com nome "Ciclo".
+- **Prós:** zero lista de exceção pra manter; a extração fica tão simples quanto Admin/Cadastro/
+  Financeiro-global — sem decisão de desenho nenhuma, só mecânica.
+- **Contras:** a guarda de módulo continua errada pelo MESMO motivo da Causa E — só que agora o
+  "prefixo largo demais" migra de Fiscal (hoje) para Ciclo (depois da extração), sem consertar o
+  problema que motivou medir isto. `ciclo/11d/aprovar`/`reprovar`/`21/conciliar` ficariam
+  fisicamente dentro do módulo/pacote "Ciclo", o que text-searches futuras por "onde mora a lógica
+  financeira" não vão esperar encontrar.
+
+Nenhuma das duas resolve os 3 casos "ambíguos de fato" (documento genérico, `entrega-resumo`,
+`atribuicoes`) — esses continuam precisando de uma checagem em runtime independente de qual opção
+for escolhida para o resto.
+
+**Sobre o item 2 (se a 6.6 do `MAPA_MODULOS.md` deveria vir antes):** sim, na ordem 6.6 → extração
+do Grupo B. Completar as listas de rota do manifesto (Comercial/Ciclo em `modulos.py`) entrega a
+tabela de despacho do Grupo B como subproduto — é o mesmo trabalho visto de dois ângulos; fazer na
+ordem inversa resolveria a mesma coisa duas vezes.
+
+**Sobre o item 3 (nome/local dos arquivos novos):** nomes seguem o precedente já provado em
+produção — `<dominio>/<dominio>_routes.py`, com a assinatura `handle_<dominio>_get/post(handler,
+path) -> bool` de `auth/auth_routes.py`. Para domínios que ainda são arquivo solto na raiz (Admin,
+Financeiro-routes), o mesmo padrão de nome sem o pacote: `mod_<dominio>_routes.py` (ou, no caso de
+Admin, o arquivo novo já previsto, `mod_admin.py`, ganha `handle_admin_get/post/put/patch` direto —
+sem sufixo `_routes` quando o arquivo inteiro já é só roteamento).
+
+**Item à parte, fora dos três do rodapé:** os comentários `main.py:NNNN` da Seção 5, espalhados em
+16 arquivos de teste, viraram item próprio — `LP-37` (`docs/db/LISTA_PARALELA.md`, destino HIGIENE)
+— em vez de ficarem só como prosa nesta seção. Continuam com a mesma regra: corrigir só o que a
+própria extração tocar, no mesmo commit que move a rota; não é varredura para fazer isolada agora.

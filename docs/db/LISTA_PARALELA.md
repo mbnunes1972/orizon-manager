@@ -43,11 +43,11 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | ↳ 6.4 (Montagem como domínio) | 1 | Ainda não construída — fora do escopo desta Semana 2. |
 | ↳ 6.7 (Captação como domínio, nova) | 1 | Ainda não construída — pós-1.0; o `Lead` provisório (`PLANO_SEMANA_1.md`) segura a demanda até lá. |
 | ↳ 6.8 (extração do JS de index.html, nova) | 1 | Ainda não construída — os ratchets de linha/contagem sobre `static/index.html` precisam ser repensados quando a Semana 2 chegar lá. |
-| **HIGIENE** | 4 | LP-34, novo (16/09) — clone copia funções de teste da loja-fonte. LP-11 implementado em 15/09 — sai da contagem, fica como registro. Lote único, quando alguém tiver uma tarde livre. |
+| **HIGIENE** | 5 | LP-34, novo (16/09) — clone copia funções de teste da loja-fonte. LP-37, novo (21/09) — comentários `main.py:NNNN` em 16 arquivos de teste, órfãos em silêncio quando a rota se mover na extração do `TAREFA_SPLIT_BACKEND.md`. LP-11 implementado em 15/09 — sai da contagem, fica como registro. Lote único, quando alguém tiver uma tarde livre. |
 | **DECIDIDO — fila da 1.0** | 3 | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. |
 | **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **30** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste) e LP-35 (17/09, do lote da exposição segura) e LP-36 (18/09, janela de 24 h da Meta). |
+| **Total aberto** | **31** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste), LP-35 (17/09, do lote da exposição segura), LP-36 (18/09, janela de 24 h da Meta) e LP-37 (21/09, comentários `main.py:NNNN` desatualizáveis, achado do planejamento de `TAREFA_SPLIT_BACKEND.md`). |
 
 ---
 
@@ -584,6 +584,27 @@ manifesto não acompanhou o rename. **Não é só um detalhe interno:** `mod_per
 pela tela **Admin › Perfis de Usuário**, a matriz onde se escolhe quais domínios cada perfil pode
 acessar. Um admin configurando permissões hoje vê um checkbox rotulado "Operacional", não
 "Montagem". (Achado do `MAPA_MODULOS.md`, § Candidato 3, corrigido/fortalecido em 15/09.)
+
+**LP-37 · Comentários `main.py:NNNN` em 16 arquivos de teste — ficam errados em silêncio quando a rota se mover.**
+*Destino: HIGIENE — dívida de documentação (comentário/docstring desatualizável), não decisão de
+arquitetura nem de produto. Registrado como item próprio a pedido do Marcelo em 21/09, respondendo
+ao rodapé "O que este plano NÃO decide" do `TAREFA_SPLIT_BACKEND.md`.*
+Dezenas de arquivos de teste citam `main.py:NNNN`/`main.py ~NNNN` em docstring/comentário, como
+referência de onde uma rota vive (ex.: `test_aceite_achado18.py:33` → "main.py:12278";
+`test_contrato_modelo_versionado_e2e.py` → "main.py ~6070"/"~7476"). Confirmado em 21/09: 16
+arquivos (`test_aceite_achado18.py`, `test_aceite_achado19_20.py`, `test_aceite_achado24.py`,
+`test_aceite_achado36.py`, `test_aceite_conciliacao_ui_item1.py`, `test_achado65_item_especial.py`,
+`test_bateria_ciclo.py`, `test_complemento_pe_e2e.py`, `test_contrato_modelo_versionado_e2e.py`,
+`test_f2_41_sombra_complemento.py`, `test_f2_42_fonte_unica_e_interface.py`,
+`test_fail_soft_medicao2.py`, `test_failsoft_nfe_medicao.py`, `test_fluxo_completo_e2e.py`,
+`test_medicao_segmentacao_congelada.py`, `test_negociacao_breakdown_excecoes.py`). Nenhuma dessas
+referências é executável — são prosa, não asserção; não ficam vermelhas quando erradas, ficam
+erradas em silêncio, apontando para uma linha que depois da extração de `TAREFA_SPLIT_BACKEND.md`
+pertence a outro arquivo, ou que nem existe mais em `main.py`. Não é para varrer e corrigir tudo
+agora (mesmo princípio do LP-30/6.8) — a correção é: ao mover uma rota, `grep -rn "main\.py.*<faixa
+de linha antiga>" tests/` no mesmo commit, trocando a referência pelo arquivo/rota novos (ou
+apagando o número, já que o nome da rota já identifica o lugar). (`TAREFA_SPLIT_BACKEND.md`, Seção
+5.)
 
 **LP-34 · O clone de loja copia também o lixo da loja-fonte.**
 *Destino: HIGIENE — não é defeito de código; é passo de procedimento de implantação mais uma

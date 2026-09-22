@@ -852,6 +852,16 @@ decidir. Nenhum foi corrigido.)*
    reportado ao Marcelo — não decidido por esta sessão** (ver `TAREFA_SPLIT_BACKEND.md`, rodapé
    "O que este plano NÃO decide").
 
+   **Medido em 21/09/2026** (`TAREFA_SPLIT_BACKEND.md`, "Medição do item 1"): o Marcelo pediu para
+   medir, não decidir, se o sufixo particiona limpo entre Comercial/Ciclo/Fiscal — **não
+   particiona**. O prefixo `/ciclo/` mistura Ciclo-núcleo genuíno com pelo menos 9 rotas nomeadas
+   que são, pelo código que executam, Financeiro (`ciclo/11d/aprovar`/`reprovar`, `ciclo/21/
+   conciliar`, `contrato/concluir-financeiro`) ou Comercial/PE (`ciclo/pe`, `ciclo/<codigo>/
+   revisao`/`concluir`/`documento`), sem marca sintática que as distinga das rotas de Ciclo real.
+   Decisão de desenho concreta e pendente: essas rotas entram na lista de Financeiro/Comercial (por
+   comportamento) ou ficam em Ciclo (por prefixo de URL)? Detalhe completo, tabela por linha, na
+   seção citada.
+
 ---
 
 ## Referências consultadas
