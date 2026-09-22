@@ -167,6 +167,42 @@ def test_motivo_do_catalogo_e_obrigatorio(app_db, seed, http_client_factory):
     assert st == 400, (st, d)                            # fora do catálogo
 
 
+def test_parcelas_serve_o_mesmo_catalogo_que_o_post_valida(app_db, seed, http_client_factory):
+    """LI-5 (docs/db/LISTA_IMEDIATA.md): uma fonte (mod_retido.MOTIVOS_RETENCAO — a mesma que
+    `test_motivo_do_catalogo_e_obrigatorio` acima exercita via 400), dois consumidores — o
+    POST .../retencoes que valida, e este GET .../parcelas que a tela lê pra montar o <select>
+    do modal (era espelho hardcoded em static/index.html antes deste item). Muda a lista no
+    backend e confere que o payload reflete — não um snapshot copiado à mão aqui."""
+    import mod_retido
+    nome = seed["projeto_l1"]
+    _setup_pool(app_db, seed)
+    c = http_client_factory(); c.login("dir_l1", "senha123")
+    st, d = c.get("/api/projetos/%s/parcelas" % nome)
+    assert st == 200 and d["ok"], (st, d)
+    assert d["motivos_retencao"] == mod_retido.MOTIVOS_RETENCAO
+
+
+def test_static_index_nao_tem_mais_o_espelho_hardcoded():
+    """LI-5: o `const motivos = [...]` literal em static/index.html (o "espelho de
+    mod_retido.MOTIVOS_RETENCAO" que o próprio comentário antigo confessava) tem que ter
+    sumido — a tela lê `d.motivos_retencao` do GET .../parcelas agora.
+
+    Varre os valores MULTI-PALAVRA do catálogo (não os de uma palavra só — 'Financeiro',
+    'Fábrica', 'Outros' aparecem em dezenas de lugares não relacionados do arquivo, tela de
+    Assistências/Provisões/segmento — casaria por acidente e mascararia um falso-negativo real).
+    'Atraso da Obra' e os dois 'Aprovação do ...' são frases específicas o bastante pra não
+    colidir com mais nada."""
+    import os
+    index_html = os.path.join(os.path.dirname(__file__), "..", "static", "index.html")
+    with open(index_html, encoding="utf-8") as f:
+        html = f.read()
+    frases_distintas = ["Atraso da Obra", "Aprovação do Arquiteto", "Aprovação do Cliente",
+                        "Definição de Projeto"]
+    achados = [m for m in frases_distintas if m in html]
+    assert not achados, (
+        "frase(s) do catálogo de motivos de retenção ainda hardcoded no JS: %r" % achados)
+
+
 def test_segunda_retencao_faz_split_preservando_congelados(app_db, seed, http_client_factory):
     nome = seed["projeto_l1"]
     ids = _setup_pool(app_db, seed)

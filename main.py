@@ -3178,7 +3178,13 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     pool_out = [{"id": i, "nome": n} for i, n in pa_nome.items()]
                 self.send_json({"ok": True, "parcelas": out, "desmembrado": bool(out),
-                                "sinais_retido": sinais, "pool": pool_out})
+                                "sinais_retido": sinais, "pool": pool_out,
+                                # LI-5 (docs/db/LISTA_IMEDIATA.md): catálogo de motivos —
+                                # uma fonte (mod_retido.MOTIVOS_RETENCAO, a mesma que o POST
+                                # .../retencoes valida), dois consumidores. Vai neste payload
+                                # (não rota nova) porque é o GET que retidoRecarregar() já
+                                # busca antes de montar o <select> do modal.
+                                "motivos_retencao": _mret.MOTIVOS_RETENCAO})
             finally:
                 db.close()
             return

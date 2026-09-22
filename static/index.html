@@ -21421,7 +21421,10 @@ function _retidoRenderNova(d){
     : `<button onclick="retidoSinalizar()" style="background:var(--btn-primary-bg);color:var(--btn-primary-text);border:var(--btn-primary-border);border-radius:6px;padding:8px 18px;font-weight:700;cursor:pointer">Sinalizar retenção (medidor)</button>`;
   // rev 2026-08-03 (auditoria): motivo = SELETOR do catálogo + descrição livre; a data da
   // RETENÇÃO é o dia do ato (exibida, não editável) — editável é só a liberação prevista.
-  const motivos = ['Atraso da Obra','Aprovação do Arquiteto','Aprovação do Cliente','Financeiro','Definição de Projeto','Fábrica','Outros'];   // espelho de mod_retido.MOTIVOS_RETENCAO (backend valida)
+  // LI-5 (docs/db/LISTA_IMEDIATA.md): catálogo vem do servidor (`d.motivos_retencao`, GET
+  // .../parcelas) — uma fonte (mod_retido.MOTIVOS_RETENCAO), dois consumidores; nada mais
+  // hardcoded aqui (era o espelho que este item removeu).
+  const motivos = d.motivos_retencao || [];
   const opts = '<option value="">— motivo —</option>' + motivos.map(m=>`<option value="${m}">${m}</option>`).join('');
   return `<div style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
     <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">Nova retenção${_retidoEtapaCtx ? ` <span style="color:var(--muted);font-weight:400">— acionada na etapa ${esc(_etapaRotulo(_retidoEtapaCtx))}</span>` : ''}</div>

@@ -20,7 +20,7 @@ ninguém: o repositório é a memória, a conversa não é.
 | LI-2 | LP-33b — validação de servidor no lado da FUNÇÃO | **CORTADO (já estava feito desde 17/09)** | — |
 | LI-3 | LP-35 — inverter o default de `senha_provisoria` (DDL) | ABERTO | — |
 | LI-4 | LP-32 — selo da loja no cabeçalho | ABERTO | — |
-| LI-5 | LP-27 — motivos de retenção servidos pelo backend | ABERTO | — |
+| LI-5 | LP-27 — motivos de retenção servidos pelo backend | **FECHADO** | `git log --grep="LI-5"` |
 | LI-6 | LP-28 — rótulo "Operacional" → Montagem | ABERTO | — |
 | LI-7 | LP-36 — verificar a tarja em campo (não é código) | ABERTO | — |
 | LI-8 | Lote Causa F — sete achados de higiene contábil | ABERTO | — |
