@@ -305,10 +305,50 @@ def enviar_pergunta_triagem(db, entrada):
     return _enviar_texto_triagem(db, entrada, corpo)
 
 
+def ja_reformulou(db, entrada):
+    """True quando a pergunta de triagem já foi reformulada uma vez para esta `entrada`
+    (TAREFA_TRIAGEM_E_CONTADOR.md, Item 1, decisão de 21/09/2026: derivar em vez de abrir
+    coluna nova — R1 proíbe DDL fora de migração).
+
+    Não existe onde guardar "já reformulei" em `TriagemEntrada`, então isso é CONTADO: cada
+    envio de saída da triagem grava um `EnvioExterno.triagem_id` ligado a esta entrada
+    (`_enviar_texto_triagem` é o ÚNICO escritor desse campo — medido em 21/09/2026). A
+    pergunta original conta 1; a reformulação, se já mandada, conta 2 — daí o corte em `>= 2`.
+    O corte pressupõe a pergunta original GRAVADA: `enviar_pergunta_triagem` roda dentro de
+    try/except em `chat/externo.py`, então se ela estourar antes do `db.add` (falha de despacho
+    não conta — a linha já nasceu 'falhou'/'pendente_config') a contagem começa em 0 e o robô
+    reformula duas vezes. Degradação aceita e limitada: nunca vira loop.
+    Essa contagem só é confiável enquanto for verdade que ninguém mais escreve
+    `EnvioExterno.triagem_id`: `test_ja_reformulou_escritores_fixos` fixa os dois escritores
+    de hoje (`_enviar_texto_triagem` via `enviar_pergunta_triagem` e via a confirmação de
+    segmento reconhecido) — um terceiro escritor tem que aparecer como teste vermelho ali,
+    nunca como contagem errada em produção."""
+    return (db.query(EnvioExterno)
+              .filter_by(triagem_id=entrada.id, direcao="saida")
+              .count()) >= 2
+
+
+def _texto_reformulacao_triagem(ops):
+    """Texto da SEGUNDA (e última) tentativa — decisão 18/09, Item 1 da
+    TAREFA_TRIAGEM_E_CONTADOR: mesmas opções, deixando explícito o formato esperado (o que
+    faltou na resposta livre que não casou)."""
+    linhas = "\n".join("%d. %s" % (i + 1, o["rotulo"]) for i, o in enumerate(ops))
+    return ("Desculpe, não entendi sua resposta 🙏 Pra eu te direcionar certinho, responda só "
+            "com o NÚMERO do assunto:\n%s" % linhas)
+
+
 def registrar_resposta_triagem(db, entrada, texto):
-    """RF-09 (lite): interpreta a resposta do contato que JÁ está na fila. Reconheceu →
-    grava `segmento_sugerido` + confirma ao cliente; não reconheceu → anexa o texto à MESMA
-    entrada (sem nova pergunta — evita loop de mensagens). Retorna o segmento ou None."""
+    """RF-09: interpreta a resposta do contato que JÁ está na fila. Reconheceu → grava
+    `segmento_sugerido` + confirma ao cliente. Não reconheceu (texto livre, mídia, mensagem
+    vazia) → SEMPRE anexa o texto à MESMA entrada (nada se descarta) e, se ainda não tinha
+    reformulado (`ja_reformulou`), reformula a pergunta UMA vez; na segunda falha, o robô
+    para — o texto já está preservado na entrada e ela segue 'pendente' (listar_fila/
+    triagem_listar já a mostram), pra um humano resolver. Nunca insiste pela terceira vez
+    (decisão 18/09/2026, TAREFA_TRIAGEM_E_CONTADOR.md Item 1 — evita o loop que o comentário
+    antigo temia, sem deixar o contato sem resposta nenhuma). A PRIMEIRA mensagem de um
+    contato nunca passa por aqui — ela cria a `TriagemEntrada` e recebe a pergunta original
+    (`enviar_pergunta_triagem`); só uma RESPOSTA que não casou conta como falha. Retorna o
+    segmento ou None."""
     _texto = (texto or "").strip()
     if entrada.segmento_sugerido:                      # já escolhido antes: só anexa
         entrada.texto = ((entrada.texto or "") + "\n" + _texto).strip()
@@ -324,6 +364,8 @@ def registrar_resposta_triagem(db, entrada, texto):
                               "da equipe continua o atendimento por aqui." % rotulo)
     else:
         entrada.texto = ((entrada.texto or "") + "\n" + _texto).strip()
+        if not ja_reformulou(db, entrada):
+            _enviar_texto_triagem(db, entrada, _texto_reformulacao_triagem(ops))
     db.flush()
     return seg
 

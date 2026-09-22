@@ -5,6 +5,9 @@ triagem de volta (texto livre — janela de 24h recém-aberta; sem template) e a
 Meta o envio nasce `pendente_config` (a rede nunca é tocada em teste). A resolução é sempre
 AUTOMÁTICA (2026-08-05): resposta reconhecida materializa a conversa na hora
 (chat.triagem.triagem_materializar) — não fica mais esperando humano na fila."""
+import ast
+import inspect
+
 import mod_chat_externo as wa
 from chat import triagem as tri
 from database import EnvioExterno, TriagemEntrada
@@ -83,7 +86,11 @@ def test_contato_novo_recebe_pergunta_e_resposta_materializa_conversa(app_db, se
         db.close()
 
 
-def test_resposta_nao_reconhecida_nao_reenvia_pergunta(app_db, seed, monkeypatch):
+def test_resposta_nao_reconhecida_reformula_uma_vez_depois_some(app_db, seed, monkeypatch):
+    """Decisão 18/09/2026 (TAREFA_TRIAGEM_E_CONTADOR.md, Item 1): a 1ª resposta que não casa
+    reformula a pergunta (nunca a mensagem inicial em si, que já recebeu a pergunta original);
+    a 2ª que também não casa não reenvia — some, com o texto preservado e a entrada pendente
+    na fila pra um humano."""
     monkeypatch.delenv("ORIZON_WA_TOKEN", raising=False)
     monkeypatch.delenv("ORIZON_WA_PHONE_ID", raising=False)
     tel = "5512999990002"
@@ -92,14 +99,57 @@ def test_resposta_nao_reconhecida_nao_reenvia_pergunta(app_db, seed, monkeypatch
     try:
         r1 = wa.processar_entrada(db, "whatsapp", tel, "olá", id_externo="wamid.auto.4")
         db.commit()
+        ent = db.get(TriagemEntrada, r1["triagem_id"])
+        assert not tri.ja_reformulou(db, ent)            # só a pergunta original até aqui
+
+        # 1ª resposta que não casa (inclui o caso de mídia/mensagem vazia — mesmo texto
+        # "(mensagem sem texto)" da Meta, que também não reconhece nenhum segmento)
         r2 = wa.processar_entrada(db, "whatsapp", tel, "quero falar com alguém",
                                   id_externo="wamid.auto.5")
         db.commit()
         assert r2["triagem_id"] == r1["triagem_id"]
         assert r2["segmento_sugerido"] is None
         ent = db.get(TriagemEntrada, r1["triagem_id"])
-        assert "falar com alguém" in ent.texto          # anexado à mesma entrada
+        assert "falar com alguém" in ent.texto           # nada se descarta
+        envs = db.query(EnvioExterno).filter_by(triagem_id=ent.id, direcao="saida").all()
+        assert len(envs) == 2                             # pergunta original + reformulação
+        assert tri.ja_reformulou(db, ent)
+
+        # 2ª resposta que também não casa: robô some — sem 3ª pergunta, texto preservado
+        r3 = wa.processar_entrada(db, "whatsapp", tel, "ainda não entendi o que vocês fazem",
+                                  id_externo="wamid.auto.6")
+        db.commit()
+        assert r3["triagem_id"] == r1["triagem_id"]
+        ent = db.get(TriagemEntrada, r1["triagem_id"])
+        assert "ainda não entendi" in ent.texto
+        assert ent.status == "pendente"                   # segue na fila (listar_fila)
         assert db.query(EnvioExterno).filter_by(triagem_id=ent.id,
-                                                direcao="saida").count() == 1   # só a pergunta
+                                                direcao="saida").count() == 2   # nenhuma 3ª
     finally:
         db.close()
+
+
+def test_ja_reformulou_escritores_fixos():
+    """Fixa a premissa do docstring de `ja_reformulou`: hoje só DUAS funções deste módulo
+    levam a um `EnvioExterno.triagem_id` gravado (as duas chamam `_enviar_texto_triagem`,
+    que é o ÚNICO ponto que constrói `EnvioExterno(triagem_id=...)`). Uma terceira função
+    passando a chamar o escritor, OU um segundo ponto de construção direta, tem que estourar
+    AQUI — vermelho no teste — nunca virar contagem errada em produção."""
+    arvore = ast.parse(inspect.getsource(tri))
+
+    def chama_o_escritor(no):
+        return any(isinstance(f, ast.Call) and isinstance(f.func, ast.Name)
+                   and f.func.id == "_enviar_texto_triagem" for f in ast.walk(no))
+
+    # ast.walk (e não arvore.body): um escritor novo escondido dentro de uma classe ou de uma
+    # função aninhada tem que aparecer aqui do mesmo jeito.
+    chamadores = {no.name for no in ast.walk(arvore)
+                  if isinstance(no, ast.FunctionDef) and no.name != "_enviar_texto_triagem"
+                  and chama_o_escritor(no)}
+    assert chamadores == {"enviar_pergunta_triagem", "registrar_resposta_triagem"}
+
+    construtores = [no for no in ast.walk(arvore)
+                    if isinstance(no, ast.Call) and isinstance(no.func, ast.Name)
+                    and no.func.id == "EnvioExterno"
+                    and any(kw.arg == "triagem_id" for kw in no.keywords)]
+    assert len(construtores) == 1
