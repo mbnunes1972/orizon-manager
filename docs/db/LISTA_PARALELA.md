@@ -44,10 +44,10 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | ↳ 6.7 (Captação como domínio, nova) | 1 | Ainda não construída — pós-1.0; o `Lead` provisório (`PLANO_SEMANA_1.md`) segura a demanda até lá. |
 | ↳ 6.8 (extração do JS de index.html, nova) | 1 | Ainda não construída — os ratchets de linha/contagem sobre `static/index.html` precisam ser repensados quando a Semana 2 chegar lá. |
 | **HIGIENE** | 5 | LP-34, novo (16/09) — clone copia funções de teste da loja-fonte. LP-37, novo (21/09) — comentários `main.py:NNNN` em 16 arquivos de teste, órfãos em silêncio quando a rota se mover na extração do `TAREFA_SPLIT_BACKEND.md`. LP-11 implementado em 15/09 — sai da contagem, fica como registro. Lote único, quando alguém tiver uma tarde livre. |
-| **DECIDIDO — fila da 1.0** | 3 | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. |
+| **DECIDIDO — fila da 1.0** | **4** | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. **LP-38 novo (22/09)** — separar assistência durante a montagem (vira Pendência de Montagem) da assistência de pós-venda (garantia ou contratada). |
 | **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **28** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste), LP-35 (17/09, do lote da exposição segura), LP-36 (18/09, janela de 24 h da Meta) e LP-37 (21/09, comentários `main.py:NNNN` desatualizáveis, achado do planejamento de `TAREFA_SPLIT_BACKEND.md`). |
+| **Total aberto** | **29** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste), LP-35 (17/09, do lote da exposição segura), LP-36 (18/09, janela de 24 h da Meta) e LP-37 (21/09, comentários `main.py:NNNN` desatualizáveis, achado do planejamento de `TAREFA_SPLIT_BACKEND.md`). |
 
 ---
 
@@ -714,6 +714,29 @@ com exceção por pessoa específica onde precisar, notificando por tela e chat 
 WhatsApp por ora). O pacote completo — incluindo a medição de que metade do mecanismo já existe
 (`_ETAPA_PAPEL`, a mesma tabela que já dispara comissão) — está no arquivo dedicado, porque o
 desenho tem peças demais para caber numa entrada desta lista.
+
+**LP-38 · Assistência DURANTE a montagem não é o mesmo processo que assistência depois dela.**
+*Destino: DECIDIDO / fila da 1.0 — decisão do Marcelo em 22/09, ao responder a pergunta de nome do
+LP-28. Não é defeito: é separação de processo que hoje não existe.*
+
+**Como o Marcelo colocou (22/09), nas palavras dele:** Montagem e Assistências são atividades
+relacionadas mas **processualmente diferentes**, e solicitações de assistência podem seguir um
+caminho independente. O que falta hoje é a separação dos dois momentos:
+
+- **assistência DURANTE a montagem** deve viver dentro da própria etapa de Montagem — *"já tem
+  Pendência de Montagem e resolve"*. É problema de execução da obra, não caso de pós-venda;
+- **"Assistências" (módulo operacional)** fica para o que é genuinamente pós: assistência em
+  **garantia** (loja ou fábrica) ou **contratada** (cliente paga).
+
+**Por que isso importa além da arrumação:** garantia e contratada têm consequência de dinheiro
+diferente (quem paga é loja, fábrica ou cliente), e hoje elas dividem o mesmo balcão com um
+problema de montagem que nem deveria ter virado caso. Enquanto os dois moram no mesmo lugar,
+qualquer contagem de "assistências" mistura obra em andamento com pós-venda de verdade.
+
+**O que ESTE item não é:** não é o LP-28 (rótulo do manifesto, higiene pura, fechado à parte) e
+não é decisão pendente — a decisão está tomada acima. Falta desenhar como a Pendência de Montagem
+absorve o caso durante a obra e como o balcão de Assistências passa a distinguir garantia de
+contratada.
 
 ---
 
