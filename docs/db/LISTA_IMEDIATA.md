@@ -101,8 +101,40 @@ o snapshot congelado — **não** da chamada de cima. Eu li o comentário e não
 4. A guarda do endpoint do contrato (a porta) continua como estava — ela impede o estado; esta
    impede o laço para o estado que já existir no banco.
 
+### Segunda remedição de 22/09 (Terminal A) — o erro morria no meio do caminho
+
+Com os itens 1–4 acima implementados, o ciclo fecha (não há mais `RecursionError`), **mas
+`_negociacao_breakdown` chamada DIRETO devolve um breakdown de complemento zerado, calada.**
+Medido, não deduzido. A causa: `_negociacao_breakdown` não é um dos cinco chamadores de
+`_pe_fator_contexto` — ela chama `_complemento_diferencas`, que (pelo item 3) convertia a exceção
+em `(None, erro)`, e então descarta esse retorno: `for l in (linhas_c or [])` transforma o `None`
+em lista vazia e o texto do erro nunca é lido. Trocamos `RecursionError` por número errado em
+silêncio, que é pior.
+
+**O erro de desenho foi meu, e é de LUGAR:** o item 3 mandou converter a exceção em
+`_complemento_diferencas`/`_complemento_diferencas_fase`, que são funções INTERMEDIÁRIAS. Converter
+no meio do caminho é o que permite alguém acima descartar o resultado sem perceber.
+
+**Regra, que substitui o item 3:** *a exceção nomeada só se captura em FRONTEIRA HTTP.* Nenhuma
+função intermediária a captura — nem as duas de complemento, nem `_negociacao_breakdown`. Ela sobe
+até o handler que responde ao usuário, e ali vira 409 com mensagem nomeada. Duas consequências
+diretas:
+
+- as capturas dentro de `_complemento_diferencas` e `_complemento_diferencas_fase` **saem**;
+- os dois endpoints que chamam essas funções (`main.py` 6064 e 8848) ganham a captura que elas
+  perderam, e `_aditivo_dados_calculo` apenas deixa passar, porque quem o chama é endpoint.
+
+**E o `except Exception` largo é o inimigo desta regra.** Onde houver um no caminho — o
+`[F2-41-SOMBRA]` dentro de `_complemento_diferencas`, e o que o Terminal A já achou acima do
+handler de 18146 — a captura específica da exceção nomeada vem ANTES, re-levantando. Um
+`except Exception` que engole esta exceção recria a falha silenciosa por outra porta.
+
+**O que continua valendo do desenho anterior:** guarda na porta (endpoint do contrato), guarda
+única no fundo (`_pe_fator_contexto`, antes da chamada que fecha o ciclo), exceção nomeada em vez
+de sentinela, e nenhuma guarda inalcançável.
+
 **Conserto (na redação original, mantida como registro — a guarda 2 abaixo foi movida pelo item
-1 acima):**
+1 da primeira remedição, e o item 3 foi substituído pela regra da segunda):**
 1. no endpoint do contrato — recusar `orcamento_id` de orçamento `complemento_pe=1`, com erro
    nomeado. É a porta;
 2. em `_complemento_diferencas` e `_complemento_diferencas_fase` — se o orçamento do contrato for
