@@ -547,7 +547,10 @@ novo.
 Seção 7):** a mesma causa (guarda-chuva `/api/projetos/<nome>/...` sem prefixo próprio por domínio)
 não afeta só o guard de topologia — também encarece a extração de rota de `main.py` para Comercial/
 Ciclo/Fiscal-por-projeto, porque não dá para despachar por prefixo, só por sufixo. Ver
-`docs/db/TAREFA_SPLIT_BACKEND.md`, Armadilha 3.
+`docs/db/TAREFA_SPLIT_BACKEND.md`, Armadilha 3. **Decidido em 22/09 (Opção B): despacha por prefixo
+de URL — `/ciclo/*` inteiro conta como Ciclo, inclusive as ~9 rotas que pelo código são de
+Financeiro ou Comercial(PE). Critério do Marcelo: hoje módulo desligado some da tela, não bloqueia
+a operação. Ver a seção "Decisão do Marcelo (22/09/2026)" naquela tarefa.**
 
 ### Causa F — Conta/campo com nome que não corresponde ao comportamento (higiene, sem causa de fronteira)
 **Achados:** ACHADO-04 (`2.1.05` nunca tocada, resíduo), ACHADO-05 (`2.1.04.01` + evento

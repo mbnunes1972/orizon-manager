@@ -449,6 +449,38 @@ Financeiro-routes), o mesmo padrão de nome sem o pacote: `mod_<dominio>_routes.
 Admin, o arquivo novo já previsto, `mod_admin.py`, ganha `handle_admin_get/post/put/patch` direto —
 sem sufixo `_routes` quando o arquivo inteiro já é só roteamento).
 
+## Decisão do Marcelo (22/09/2026) — Opção B, por enquanto
+
+**Escolhida a Opção B: despachar por prefixo de URL.** `handle_ciclo_get/post` reivindica tudo sob
+`/ciclo/*`, sem lista de exceção. O critério foi de modelo de negócio, não de código: **hoje,
+desligar o módulo Financeiro numa loja significa "some da tela", não "bloqueia a operação"**.
+
+**O que isso compra, dito explicitamente para não virar surpresa depois.** A guarda de módulo
+(`_bloqueio_modulo` + `modulo_do_path`) bloqueia de verdade no backend, por prefixo do manifesto —
+não é enfeite. Com a Opção B, as rotas financeiras que moram sob `/ciclo/` ficam classificadas como
+Ciclo, então **uma loja com Financeiro desligado e Ciclo ligado continua aprovando o gate 11d e
+conciliando na etapa 21**, pela tela do Ciclo. Isso é coerente com a decisão: o módulo Financeiro
+que ela não assina são as telas próprias dele (DRE, contas, provisões), não o gate operacional que
+vive dentro do ciclo. O que NÃO se pode fazer é vender "Financeiro desligado" como se fosse uma
+fronteira que impede a loja de tocar em dinheiro — hoje não é, e esta decisão mantém assim.
+
+**Consequência para a 6.6 do `MAPA_MODULOS.md`:** a classificação fica trivial — `/ciclo/*` inteiro
+entra na lista de rota de Ciclo, sem exceção a manter à mão. A ordem 6.6 → extração do Grupo B
+continua valendo.
+
+**O que destrava:** o Grupo B deixa de estar bloqueado por decisão de desenho. Continua atrás da
+6.6 e da ordem da Seção 3 (Grupo A primeiro, Financeiro e Grupo B por último), mas não há mais
+pergunta em aberto para o Marcelo.
+
+**"Por enquanto" é literal, e o custo de mudar de ideia é conhecido:** o dia em que existir loja
+assinando sem Financeiro e a guarda precisar valer como fronteira comercial de verdade, a virada
+para a Opção A é mover ~9 rotas nomeadas de arquivo e checá-las antes do genérico — trabalho
+delimitado, na casa de um lote, não uma reescrita. As 3 rotas ambíguas de fato (`ciclo/documento/
+<id>`, `entrega-resumo`, `atribuicoes`) continuam precisando de checagem em runtime em qualquer
+cenário; a Opção B não as resolve, só não piora.
+
+---
+
 **Item à parte, fora dos três do rodapé:** os comentários `main.py:NNNN` da Seção 5, espalhados em
 16 arquivos de teste, viraram item próprio — `LP-37` (`docs/db/LISTA_PARALELA.md`, destino HIGIENE)
 — em vez de ficarem só como prosa nesta seção. Continuam com a mesma regra: corrigir só o que a
