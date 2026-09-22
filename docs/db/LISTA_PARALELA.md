@@ -35,7 +35,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 
 | Destino | Itens | Observação |
 |---|---|---|
-| **BETA** | 5 | LP-31 (clone herda `rede_id`), LP-32 (identificação da loja no cabeçalho) e LP-33 (faixa sem teto no configurador) — os três de 16/09. LP-02 implementado em 15/09 — ver o item, abaixo, mantido como registro. |
+| **BETA** | **3** | Conferido em 22/09 contra o código, não contra o texto desta lista: LP-32 (identificação da loja no cabeçalho — a pílula do topo é de 23/08, ANTERIOR ao achado de 16/09, então segue aberta), LP-33 (só a metade do lado da FUNÇÃO — o resto foi implementado) e LP-35 (inversão do default, precisa de migração). **LP-31 implementado em 21/09 (`67fb832`) e LP-36 em 18/09 (`c070b46`)** — saem da contagem de aberto e ficam como registro, junto de LP-02 (15/09). |
 | **FRONTEIRA** | 10 | Agrupados por fronteira — ver detalhamento abaixo. |
 | ↳ 6.1 (regra única de transição) | 2 | Ainda não construída — Marcelo quer desenhar com calma. |
 | ↳ 6.2 (Tela Única de Provisões) | 3 | **Em construção nesta Semana 2** — `docs/db/TAREFA_TELA_UNICA_PROVISOES.md`. |
@@ -47,7 +47,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | **DECIDIDO — fila da 1.0** | 3 | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. |
 | **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **31** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste), LP-35 (17/09, do lote da exposição segura), LP-36 (18/09, janela de 24 h da Meta) e LP-37 (21/09, comentários `main.py:NNNN` desatualizáveis, achado do planejamento de `TAREFA_SPLIT_BACKEND.md`). |
+| **Total aberto** | **29** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste), LP-35 (17/09, do lote da exposição segura), LP-36 (18/09, janela de 24 h da Meta) e LP-37 (21/09, comentários `main.py:NNNN` desatualizáveis, achado do planejamento de `TAREFA_SPLIT_BACKEND.md`). |
 
 ---
 
@@ -89,8 +89,13 @@ contra o cadastro que ficou pendente dele, decidida agora.
 
 **LP-31 · `clonar_loja.py` herda `rede_id` da loja de origem em silêncio — implantação real
 precisa que seja parâmetro explícito. Registrado em 16/09, achado durante a medição do
-vazamento de tenancy (Homologação, item abaixo). NÃO CORRIGIDO — só registrado, por pedido do
-Marcelo.**
+vazamento de tenancy (Homologação, item abaixo). IMPLEMENTADO em 21/09 (`67fb832`) — mantido como
+registro.**
+
+*Conferido em 22/09 lendo o código:* `aplicar_config_loja` ganhou o gate
+`excecoes["aplicar_rede_id"]` (default **False**), e `rede_id` saiu do loop de `_LOJA_CONFIG` para
+um bloco próprio — exatamente a regra que o item pedia. Sem a flag, o `rede_id` decidido em
+`criar_loja_base` fica intocado. O texto abaixo é o registro da medição original.
 *Destino: BETA — as cinco lojas-piloto entram em outubro, e este mecanismo é exatamente o que
 vai ser reusado (ou uma variante dele) pra colocá-las de pé.*
 
@@ -128,7 +133,13 @@ praticado na loja errada. Tratar como selo de contexto com peso próprio, não c
 (Achado do Marcelo no Aceite 6 da Loja Teste, 16/09.)
 
 **LP-33 · Configurador de faixas de comissão aceita salvar sem faixa "sem teto" — a tela diz uma
-coisa, o motor faz outra.**
+coisa, o motor faz outra. PARCIALMENTE IMPLEMENTADO — conferido em 22/09.**
+
+*O que já existe no código:* o rótulo virou **"Vendas abaixo de (R$)"** (`static/index.html`),
+`mod_provisoes.validar` exige a última faixa com `venda_ate=None`, e o configurador da FUNÇÃO
+(`_rmFaixas`) força a última faixa sem teto na tela. *O que falta, e é só isto:* o lado da função
+não tem validação de servidor — `mod_cadastro` ainda grava `comissao.faixas` sem conferir a forma,
+então a garantia daquele lado depende só da tela. Enquanto isso não fechar, o item segue em BETA.
 *Destino: BETA — toda loja nova passa por esse configurador na implantação; sem conserto, o
 defeito se reproduz cinco vezes nas lojas-piloto.*
 
@@ -205,7 +216,17 @@ inversão agendada para depois.
 *Cuidado ao implementar:* mudar só o `default` do Python e deixar o `server_default` em `"0"` cria
 duas verdades divergentes (insert por ORM ≠ insert por SQL cru). Os dois mudam juntos, ou nenhum.
 
-**LP-36 · A janela de 24 h da Meta e o envio que pode falhar sem ninguém ver.**
+**LP-36 · A janela de 24 h da Meta e o envio que pode falhar sem ninguém ver. IMPLEMENTADO em
+18/09 (`c070b46`, `TAREFA_ENTREGA_VISIVEL.md`) — falta VERIFICAR EM CAMPO.**
+
+*Conferido em 22/09 lendo o código:* os dois consertos que a medição abaixo nomeou existem.
+(a) `serializar_mensagem` devolve `entrega_estado`/`entrega_motivo`, alimentados por
+`entregas_por_mensagem`/`estado_entrega_mensagem` (`chat/core.py`) — a informação parou de ser
+jogada fora. (b) O aviso de janela mudou de lugar: `#oc-janela-aviso` vive no composer da conversa
+aberta, não só como badge na lista. **O que continua em aberto não é código, é prova:** ninguém
+viu a tarja vermelha funcionar com um contato de janela fechada de verdade (`RETOMAR.md` já
+registra isso como item sem dono). Até essa verificação acontecer, o item fica aqui — a medição
+original segue abaixo como registro do que foi consertado.
 *Destino: BETA — vale para as cinco lojas-piloto a partir de 01/10; fim de semana, feriado e folga
 fecham a janela sozinhos.*
 
@@ -317,6 +338,10 @@ ACHADO-26, 32, 33 e 41. O alvo: uma tela por projeto onde tudo acontece — ver,
 resolver, dar veredito — e link para ela onde hoje há modal ou tabela editável. O botão "Resolver"
 volta e leva até lá, com a rubrica em foco. Resolve o ACHADO-37 (a fila empilhando todos os
 projetos) de graça.
+*Acrescentado em 22/09:* leva junto a metade ainda aberta do **ACHADO-40** — o link "Dar veredito
+na Fila de Provisões" saiu como `<a>` sem classe (azul de navegador, fora do design system), e o
+próprio achado registra que o conserto é o botão "Resolver" voltar, ou seja, esta fronteira. Era
+o único achado aberto de `ACHADOS_CONTABEIS.md` sem destino escrito em lugar nenhum; agora tem.
 *Adiado (histórico):* era redesenho, não conserto, e mexeria justamente na tela que tinha acabado
 de ser estabilizada. Desenho completo na Parte A do `TAREFA_CONCILIACAO_UI.md`. (Marcelo, 01/09, e
 reafirmado em 02/09.)

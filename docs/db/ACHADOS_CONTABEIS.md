@@ -2849,6 +2849,10 @@ fonte monoespaçada, botão `flex:0 0 auto`) — rótulo/valor/botão caem no
 mesmo lugar horizontal em toda linha, qualquer que seja o texto
 ("Manter"/"Absorver"/"Cobrar"/"Estornar", R$ 100,00/R$ 123.456,78).
 
+**Destino da metade aberta (registrado em 22/09):** morre com a Fronteira 6.2 / LP-13 (Tela Única
+de Provisões) — o botão "Resolver" que aquela fronteira traz de volta substitui o link. Rastreado
+em `docs/db/LISTA_PARALELA.md`, item LP-13.
+
 **O link azul NÃO foi tocado nesta rodada** — a própria Parte A do
 TAREFA_PERCURSO_0109.md nomeia esse conserto como parte do redesenho da
 tela de Provisões (botão "Resolver" volta, substituindo o link), e a Parte
