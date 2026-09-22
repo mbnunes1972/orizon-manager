@@ -13234,6 +13234,16 @@ let _atdChip = 'all', _intChip = 'all';
 let _atdOversight = false, _intOversight = false;
 const _INT_TIPOROT = {direct:'Pessoal', grupo:'Grupo', mural:'Mural', publico:'Mural'};
 const _INT_TIPOS = ['direct','grupo'];   // equipe; Mural via botão; projeto vai em Atendimentos
+// ── Partição do painel de Comunicação — FONTE ÚNICA (TAREFA_TRIAGEM_E_CONTADOR.md Item 2,
+// 22/09/2026). Antes cada consumidor reescrevia a regra e havia QUATRO cópias divergindo: a
+// lista do Chat Interno, a de Atendimentos, o Oversight (`_ocTodasDoCanal`) e o contador do
+// topo. O contador particionava só por `tipo`, então somava grupo-COM-segmento — que é
+// atendimento — no badge do Chat Interno, apontando pra uma lista onde ele nunca aparece; e o
+// Oversight tratava `direct` com segmento como atendimento, coisa que a lista não faz. Um
+// predicado por categoria, todo mundo lê daqui: divergir agora exige mudar ESTA linha.
+function _ocEhInterno(c){ return _INT_TIPOS.includes(c.tipo) && !c.segmento; }
+function _ocEhAtendimento(c){ return c.tipo==='projeto' || (c.tipo==='grupo' && c.segmento); }
+function _ocEhMural(c){ return c.tipo==='mural' || c.tipo==='publico'; }
 function _ocDaChip(c, chip){
   const arqOuConcl = !!c.arquivada || c.status==='concluida';
   if(chip==='arquivadas') return arqOuConcl;
@@ -13292,7 +13302,7 @@ function ocTogglePend(qual){
   else { _intChip = (_intChip==='pendentes') ? 'all' : 'pendentes'; intRender(); }
 }
 function ocAbrirMural(){
-  const m = (_ocInbox||[]).find(c=>c.tipo==='mural'||c.tipo==='publico');
+  const m = (_ocInbox||[]).find(_ocEhMural);
   if(m) ocAbrirConversa(m.id);
   else if(typeof showToast==='function') showToast('Mural indisponível — atualize a lista.', true);
 }
@@ -13312,8 +13322,7 @@ async function _ocTodasCarregar(force){
 }
 function _ocTodasDoCanal(qual){
   const l = _ocTodas || [];
-  return qual==='atd' ? l.filter(c=>c.tipo==='projeto' || c.segmento)
-                      : l.filter(c=>(c.tipo==='direct'||c.tipo==='grupo') && !c.segmento);
+  return qual==='atd' ? l.filter(_ocEhAtendimento) : l.filter(_ocEhInterno);
 }
 function _ocTodasItemHTML(c){
   const tipoRot = c.tipo==='projeto' ? 'Projeto' : (_INT_TIPOROT[c.tipo]||c.tipo);
@@ -13352,8 +13361,8 @@ async function chatInternoCarregar(){
   // (segmento definido — externo) no Chat Interno, trazendo junto o seletor de segmento pro
   // header (sem sentido pra comunicação interna). Mesma partição já usada no Oversight
   // (_ocTodasDoCanal): interno = direct/grupo SEM segmento.
-  _intInbox = _ocInbox.filter(c=>_INT_TIPOS.includes(c.tipo) && !c.segmento);
-  const mural = _ocInbox.find(c=>c.tipo==='mural'||c.tipo==='publico');
+  _intInbox = _ocInbox.filter(_ocEhInterno);
+  const mural = _ocInbox.find(_ocEhMural);
   const mb = document.getElementById('int-mural-nl');
   if(mb){ const n = mural ? (mural.nao_lidas||0) : 0;
           mb.textContent = n>99?'99+':n; mb.style.display = n>0?'':'none'; }
@@ -13450,7 +13459,7 @@ async function chatAtendCarregar(){
   // projeto pra ancorar (daí sem Concluir — o gate de temAtendimentoReal já tava certo, o
   // vazamento é que trazia gente errada pra lista). Mesma partição do Oversight
   // (_ocTodasDoCanal): atendimento = projeto OU grupo COM segmento.
-  _atdInbox = _ocInbox.filter(c=>c.tipo==='projeto' || (c.tipo==='grupo' && c.segmento));
+  _atdInbox = _ocInbox.filter(_ocEhAtendimento);
   // Seletor de segmento DINÂMICO (r4): todos os ativos da loja (base + custom).
   await _ocSegsCarregar();
   const sel = document.getElementById('atd-seg-filtro'), atual = sel.value;
@@ -18694,8 +18703,15 @@ async function _ocInboxAtualizar(){
 // externas/projeto) e Chat Interno (equipe + Mural).
 function ocAtualizarBadges(){
   const soma = lst => lst.reduce((s,c)=>s+(c.nao_lidas||0), 0);
-  const interno = (_ocInbox||[]).filter(c=>_INT_TIPOS.includes(c.tipo) || c.tipo==='mural' || c.tipo==='publico');
-  const atend   = (_ocInbox||[]).filter(c=>!interno.includes(c));
+  // Cada badge soma EXATAMENTE o que a tela dele mostra, pelos mesmos predicados das listas.
+  // O Mural entra no badge do Chat Interno porque o botão do Mural mora DENTRO dessa tela (e
+  // tem badge próprio em `int-mural-nl`); o que saiu daqui foi grupo-com-segmento, que é
+  // atendimento. Nada de complemento (`!interno.includes(c)`): com três categorias, "o que não
+  // é interno é atendimento" passaria a mentir do outro lado — e a busca linear dentro do
+  // filtro era O(n²).
+  const inbox   = _ocInbox || [];
+  const interno = inbox.filter(c=>_ocEhInterno(c) || _ocEhMural(c));
+  const atend   = inbox.filter(_ocEhAtendimento);
   [['oc-badge-atend', soma(atend)], ['oc-badge-interno', soma(interno)],
    ['oc-badge-triagem', (_ocFilaItens||[]).length]].forEach(([id,total])=>{
     const b = document.getElementById(id);
@@ -18762,7 +18778,7 @@ async function ocAbrirConversa(convId){
   if(!c){ await _ocInboxAtualizar(); c = (_ocInbox||[]).find(x=>x.id===convId); }
   if(!c){ if(typeof showToast==='function') showToast('Conversa indisponível — atualize a fila.', true); return; }
   let podePostar = true;
-  if(c.tipo === 'mural' || c.tipo === 'publico') podePostar = !!(_usuarioAtual && _usuarioAtual.pode_ver_todas_conversas);
+  if(_ocEhMural(c)) podePostar = !!(_usuarioAtual && _usuarioAtual.pode_ver_todas_conversas);
   await ocAbrirConversaPorId(c.id, _ocTituloComAssunto(c), podePostar, c.tipo, c.projeto_nome);
   _ocSetArquivarBtn(c);
   _ocSetSegSel(c);
