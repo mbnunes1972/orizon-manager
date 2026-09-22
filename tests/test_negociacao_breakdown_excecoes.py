@@ -123,17 +123,24 @@ def test_complemento_pe_sem_contrato_nao_levanta(app_db, seed):
 
 
 def test_complemento_pe_no_proprio_orcamento_do_contrato_recursao_infinita(app_db, seed):
-    """ACHADO DESTA MEDIÇÃO: `complemento_pe=1` setado no MESMO orçamento que é
-    `Contrato.orcamento_id` do projeto (auto-referência) causa `RecursionError` — sem guarda de
-    profundidade nenhuma. `_negociacao_breakdown` (orc, complemento_pe=1) → `_complemento_diferencas`
-    → busca o Contrato do projeto → pega o MESMO orçamento (`ct.orcamento_id == orc.id`) →
-    `_negociacao_breakdown(orc_ct, ...)` de novo → mesmo complemento_pe=1 → repete para sempre.
+    """ACHADO-20/LI-1 — CONSERTADO (docs/db/LISTA_IMEDIATA.md, remedições de 22/09).
+    `complemento_pe=1` setado no MESMO orçamento que é `Contrato.orcamento_id` do projeto
+    (auto-referência): `_pe_fator_contexto` levanta `main.ContratoComplementoAutoReferente`
+    ANTES da única aresta do ciclo (`d_ct = _negociacao_breakdown(orc_ct, db)`) — não é mais
+    `RecursionError`. Este teste FIXAVA o defeito (media o RecursionError como comportamento
+    atual); agora fixa o conserto, mesmo caso do teste que fixava o silêncio da triagem.
+
+    A exceção só se captura em FRONTEIRA HTTP (2ª remedição de 22/09) — nenhuma função
+    intermediária a engole, nem `_negociacao_breakdown` — por isso chamá-la direto, como este
+    teste faz, também a propaga (não um retorno calado com breakdown zerado).
 
     Não confirmei um caminho de UI que produza esse estado (o endpoint real de criação de
     complemento sempre cria uma linha de Orcamento NOVA e separada — nunca marca
     complemento_pe=1 no orçamento que já é o do contrato) — mas nenhum código impede essa
-    combinação de acontecer por outro caminho (correção manual, migração, bug futuro), e o
-    resultado hoje é um RecursionError opaco, não um erro claro."""
+    combinação de acontecer por outro caminho (correção manual, migração, bug futuro); a guarda
+    do endpoint do contrato (LI-1) impede o estado NASCER, esta guarda impede o LAÇO para o
+    estado que já exista no banco."""
+    import main
     oid = seed["orcamento_l1_id"]   # este é o mesmo Orcamento de seed["contrato_l1_id"]
     db = app_db.get_session()
     orc = db.get(app_db.Orcamento, oid)
@@ -142,13 +149,52 @@ def test_complemento_pe_no_proprio_orcamento_do_contrato_recursao_infinita(app_d
 
     try:
         levantou, exc = _breakdown_levanta(app_db, oid)
-        assert levantou and isinstance(exc, RecursionError), (
-            "esperava RecursionError pela auto-referência — se isto mudou, o achado foi "
-            "corrigido ou o desenho mudou: %r" % (exc,))
+        assert levantou and isinstance(exc, main.ContratoComplementoAutoReferente), (
+            "esperava ContratoComplementoAutoReferente pela auto-referência (nem RecursionError, "
+            "nem retorno calado) — se isto mudou, o conserto do LI-1 regrediu ou o desenho "
+            "mudou: %r" % (exc,))
     finally:
         db = app_db.get_session()
         db.get(app_db.Orcamento, oid).complemento_pe = 0
         db.commit(); db.close()
+
+
+def test_complemento_pe_sem_contrato_continua_erro_de_negocio_sem_excecao(app_db, seed):
+    """TESTE DE CONTROLE do LI-1 (item 7, obrigatório): a guarda nova de `_pe_fator_contexto`
+    (`ContratoComplementoAutoReferente`) só dispara quando o CONTRATO do projeto aponta para o
+    orçamento auto-referente. Um orçamento de complemento NUM PROJETO SEM CONTRATO NENHUM é
+    outro estado — `_pe_fator_contexto` devolve `orc_ct is None` (ANTES de sequer chegar na
+    guarda nova) e `_complemento_diferencas` devolve o erro de NEGÓCIO de sempre, "Projeto sem
+    contrato para comparar.", sem exceção nenhuma. Prova que a guarda nova não transformou erro
+    de negócio em estado inválido — sem este controle, uma regressão que confundisse os dois
+    casos passaria despercebida.
+
+    Projeto NOVO, sem usar `seed["projeto_l1"]`/`seed["projeto_l2"]` de propósito: os dois JÁ
+    têm Contrato no seed (`ct1`/`ct2`, tests/conftest.py) — reaproveitar um deles testaria "orça-
+    mento de complemento distinto do orçamento do contrato" (caminho normal de aditivo), não
+    "projeto sem contrato nenhum", que é o que este controle precisa."""
+    import main
+    db = app_db.get_session()
+    proj_sc = app_db.Projeto(nome_safe="Proj_SemContrato_LI1", cliente_id=seed["cliente_l1_id"],
+                             status="quente", loja_id=seed["loja1_id"])
+    db.add(proj_sc); db.flush()
+    orc_novo = app_db.Orcamento(projeto_id=proj_sc.nome_safe, nome="Complemento sem contrato",
+                                ordem=1, complemento_pe=1, loja_id=seed["loja1_id"])
+    db.add(orc_novo); db.commit()
+    nome_safe = proj_sc.nome_safe
+    db.close()
+
+    db = app_db.get_session()
+    try:
+        assert db.query(app_db.Contrato).filter_by(projeto_nome=nome_safe).first() is None, (
+            "pré-condição do controle: este projeto não pode ter Contrato nenhum")
+        linhas, erro = main._complemento_diferencas(db, nome_safe)
+        assert linhas is None and erro == "Projeto sem contrato para comparar.", (
+            "orçamento de complemento em projeto SEM contrato deveria continuar devolvendo o "
+            "erro de NEGÓCIO pelo caminho de sempre (None, mensagem) — sem exceção: %r"
+            % ((linhas, erro),))
+    finally:
+        db.close()
 
 
 # ── candidato 5: complemento_pe por fase, parcela_id sem decisões ────────────────────────────

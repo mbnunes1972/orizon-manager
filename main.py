@@ -3009,8 +3009,14 @@ class Handler(BaseHTTPRequestHandler):
                 for _l in linhas:
                     _l["pool_ambiente_id"] = _id_por_nome.get(_l["ambiente"])
 
-                orc_ct, vava_ct, fator_ca, d_orc_pct, d_amb_pct, _vavo_ct, _cad_ct, ja_contratado = \
-                    _pe_fator_contexto(db, nome)
+                try:
+                    orc_ct, vava_ct, fator_ca, d_orc_pct, d_amb_pct, _vavo_ct, _cad_ct, ja_contratado = \
+                        _pe_fator_contexto(db, nome)
+                except ContratoComplementoAutoReferente as e:
+                    # ACHADO-20 (LI-1): este try/except não tem `except` mais abaixo (só
+                    # `finally: db.close()`) — sem isto, a exceção escaparia pro dispatcher HTTP
+                    # sem resposta nenhuma (conexão cai muda, pior que um 500).
+                    self.send_json({"ok": False, "erro": str(e)}, code=409); return
                 markup = _markup_merc_puro(orc_ct)
 
                 # F2-42 (docs/db/TAREFA_F2_42_FONTE_UNICA_E_INTERFACE.md): esta prévia da AF2 é um
@@ -3023,6 +3029,14 @@ class Handler(BaseHTTPRequestHandler):
                         _d_motor_af2 = _negociacao_breakdown(orc_ct, db, vbva_override=_sombra_override_af2)
                         _vava_motor_af2 = {a.get("id"): float(a.get("VAVA", 0.0))
                                           for a in _d_motor_af2.get("ambientes", [])}
+                    except ContratoComplementoAutoReferente as e:
+                        # ACHADO-20 (LI-1, 2ª remedição 22/09): este try é IRMÃO do try/except
+                        # que já cobre a chamada de `_pe_fator_contexto` acima, não fica dentro
+                        # dele — um `raise` aqui escaparia deste handler sem resposta nenhuma
+                        # (este `try:` externo, do handler, não tem `except`, só `finally:
+                        # db.close()`). Responde 409 aqui mesmo: esta função JÁ É a fronteira
+                        # HTTP de GET .../pe/conciliacao.
+                        self.send_json({"ok": False, "erro": str(e)}, code=409); return
                     except Exception as _e:
                         print("[F2-41-SOMBRA] motor falhou (AF2 prévia) — seguindo com fallback:", _e)
                         _vava_motor_af2 = {}
@@ -6055,7 +6069,13 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": _err}, code=403); return
                     if _projeto_da_loja(db, nome_safe, loja_id) is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
-                    linhas, resumo = _complemento_diferencas(db, nome_safe)
+                    try:
+                        linhas, resumo = _complemento_diferencas(db, nome_safe)
+                    except ContratoComplementoAutoReferente as e:
+                        # ACHADO-20 (LI-1, 2ª remedição 22/09): a exceção nomeada só se captura
+                        # em fronteira HTTP — este endpoint é a fronteira de
+                        # .../pe/complemento/comparativo.
+                        self.send_json({"ok": False, "erro": str(e)}, code=409); return
                     if linhas is None:
                         self.send_json({"ok": False, "erro": resumo}, code=400); return
                     self.send_json({"ok": True, "linhas": linhas, "resumo": resumo})
@@ -6240,7 +6260,13 @@ class Handler(BaseHTTPRequestHandler):
                                         "o termo aditivo (11e → Negociar Complemento)."},
                                        code=400); return
                     import mod_contrato as _mc
-                    defaults, calc = _aditivo_defaults_blocos(db, nome_safe, contrato, orc_aj)
+                    try:
+                        defaults, calc = _aditivo_defaults_blocos(db, nome_safe, contrato, orc_aj)
+                    except ContratoComplementoAutoReferente as e:
+                        # ACHADO-20 (LI-1, 2ª remedição 22/09): fronteira HTTP de
+                        # .../aditivo/defaults — _aditivo_defaults_blocos → _aditivo_dados_calculo
+                        # → _complemento_diferencas, nenhuma delas captura.
+                        self.send_json({"ok": False, "erro": str(e)}, code=409); return
                     a = (db.query(Aditivo).filter_by(projeto_nome=nome_safe)
                            .order_by(Aditivo.id.desc()).first())
                     blocos_salvos = None
@@ -8464,8 +8490,13 @@ class Handler(BaseHTTPRequestHandler):
                 if arq is None or arq.valor_atualizado is None:
                     self.send_json({"ok": False, "erro": "PE não carregado para este ambiente"}, code=400); return
                 diferenca_cfo = round(float(arq.valor_atualizado) - float(pa.order_total or 0.0), 2)
-                orc_ct, vava_ct, fator_ca, d_orc_pct, d_amb_pct, _vavo_ct, _cad_ct, _ja_contratado = \
-                    _pe_fator_contexto(db, nome)
+                try:
+                    orc_ct, vava_ct, fator_ca, d_orc_pct, d_amb_pct, _vavo_ct, _cad_ct, _ja_contratado = \
+                        _pe_fator_contexto(db, nome)
+                except ContratoComplementoAutoReferente as e:
+                    # ACHADO-20 (LI-1): mesmo motivo do GET .../pe/conciliacao — este try não tem
+                    # `except` mais abaixo, só `finally: db.close()`.
+                    self.send_json({"ok": False, "erro": str(e)}, code=409); return
                 markup = _markup_merc_puro(orc_ct)
                 # F2-42: 3º consumidor de valor_complemento_por_fator movido pro motor — um único
                 # ambiente por chamada aqui, então "uma chamada só" já vale por construção.
@@ -8480,6 +8511,12 @@ class Handler(BaseHTTPRequestHandler):
                         if _vava_motor_1amb is None:
                             print("[F2-42-FALLBACK] projeto=%r ambiente=%r — motor não devolveu o "
                                   "ambiente, caiu na proporção" % (nome, pa.nome_exibicao or pa.nome))
+                    except ContratoComplementoAutoReferente as e:
+                        # ACHADO-20 (LI-1, 2ª remedição 22/09): mesmo motivo do GET
+                        # .../pe/conciliacao — try IRMÃO do que já cobre `_pe_fator_contexto`
+                        # acima, um `raise` aqui não seria pego por ele. Responde 409 aqui
+                        # mesmo: esta função É a fronteira HTTP.
+                        self.send_json({"ok": False, "erro": str(e)}, code=409); return
                     except Exception as _e:
                         print("[F2-41-SOMBRA] motor falhou (decisão AF2/ambiente) — seguindo com "
                               "fallback:", _e)
@@ -8623,7 +8660,12 @@ class Handler(BaseHTTPRequestHandler):
                         "erro": "Aprove a Revisão de Provisões (AF2) antes de concluir."}, code=400); return
                 # ACHADO-39 (B4): ambiente com Δ a cobrar zero não é pendência — usa a mesma
                 # conta do GET /pe/conciliacao, nunca "todo PE carregado" cru.
-                com_pe = _pe_ambientes_pendentes_decisao(db, nome)
+                try:
+                    com_pe = _pe_ambientes_pendentes_decisao(db, nome)
+                except ContratoComplementoAutoReferente as e:
+                    # ACHADO-20 (LI-1): este try não tem `except` mais abaixo, só
+                    # `finally: db.close()`.
+                    self.send_json({"ok": False, "erro": str(e)}, code=409); return
                 registradas = {d.pool_ambiente_id for d in
                                db.query(ConciliacaoPeFase).filter_by(projeto_nome=nome).all()}
                 completa, faltam = _mconc.fase_completa(com_pe, registradas)
@@ -8829,7 +8871,12 @@ class Handler(BaseHTTPRequestHandler):
                     parc = db.get(ParcelaProjeto, parcela_id)
                     if parc is None or parc.projeto_nome != nome:
                         self.send_json({"ok": False, "erro": "Fase não encontrada"}, code=404); return
-                linhas, resumo_ou_erro = _complemento_diferencas_fase(db, nome, parcela_id)
+                try:
+                    linhas, resumo_ou_erro = _complemento_diferencas_fase(db, nome, parcela_id)
+                except ContratoComplementoAutoReferente as e:
+                    # ACHADO-20 (LI-1, 2ª remedição 22/09): fronteira HTTP de
+                    # .../pe/complemento/fase/<fase>.
+                    self.send_json({"ok": False, "erro": str(e)}, code=409); return
                 if linhas is None:
                     self.send_json({"ok": False, "erro": resumo_ou_erro}, code=400); return
                 if not linhas:
@@ -10055,6 +10102,13 @@ class Handler(BaseHTTPRequestHandler):
                 aditivo.status = "para_assinatura"
                 db.commit()
                 self.send_json({"ok": True, "aditivo": _aditivo_dict(aditivo)})
+            except ContratoComplementoAutoReferente as e:
+                # ACHADO-20 (LI-1, 2ª remedição 22/09): precisa vir ANTES do `except Exception`
+                # largo abaixo — senão cai nele e vira 500 (mesma troca de disfarce que a regra
+                # deste item existe pra evitar). Fronteira HTTP de POST .../aditivo
+                # (_aditivo_dados_calculo/_aditivo_defaults_blocos → _complemento_diferencas).
+                db.rollback()
+                self.send_json({"ok": False, "erro": str(e)}, code=409)
             except Exception as e:
                 db.rollback()
                 self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -15444,6 +15498,27 @@ class Handler(BaseHTTPRequestHandler):
                         return
                     projeto_dict, cliente_dict, orcamento_dict = \
                         _montar_dados_projeto_para_contrato(nome_safe, orcamento_id, db)
+                    # ACHADO-20 (docs/db/LISTA_IMEDIATA.md, LI-1) — A PORTA: orçamento de
+                    # COMPLEMENTO de PE não pode virar contrato por aqui (vira aditivo, por outro
+                    # caminho). Sem esta guarda, Contrato.orcamento_id passa a apontar pra um
+                    # Orcamento com complemento_pe=1; _pe_fator_contexto lê ESSE MESMO orçamento
+                    # como "o contrato", _complemento_diferencas chama _negociacao_breakdown, que
+                    # vê complemento_pe=1 e chama _complemento_diferencas de volta — recursão
+                    # infinita (RecursionError, 500 mudo). Não vai dentro de
+                    # _montar_dados_projeto_para_contrato: ela tem ~10 chamadores, e vários são
+                    # fluxos de aditivo que trabalham legitimamente com orçamento de complemento —
+                    # a guarda lá quebraria o caminho feliz do aditivo. A guarda do fundo do poço
+                    # (_complemento_diferencas/_complemento_diferencas_fase) cobre quem chega ao
+                    # estado auto-referente por fora desta porta (correção manual, migração,
+                    # importação).
+                    _orc_para_contrato = db.get(Orcamento, orcamento_id)
+                    if _orc_para_contrato is not None and _orc_para_contrato.complemento_pe:
+                        self.send_json({
+                            "ok": False,
+                            "erro": "Este orçamento é um complemento de PE — não pode virar "
+                                    "contrato diretamente (vira aditivo do contrato existente).",
+                        }, code=400)
+                        return
                     # Gate: orçamento precisa ter ao menos um ambiente (1º orçamento concluído).
                     if not orcamento_dict.get("ambientes"):
                         self.send_json({
@@ -18106,6 +18181,12 @@ class Handler(BaseHTTPRequestHandler):
                     db.commit()
                     self.send_json(_resposta_pos_aprovacao_financeira(
                         aprovador, {"ok": True, "etapa_codigo": etapa_cod, "status": etapa.status}))
+                except ContratoComplementoAutoReferente as e:
+                    # ACHADO-20 (LI-1): precisa vir ANTES do `except Exception` largo abaixo —
+                    # senão cai nele e vira 500 (mensagem certa, código errado; e essa é
+                    # exatamente a troca de disfarce que a regra do item pede pra evitar).
+                    db.rollback()
+                    self.send_json({"ok": False, "erro": str(e)}, code=409)
                 except Exception as e:
                     db.rollback()
                     self.send_json({"ok": False, "erro": str(e)}, code=500)
@@ -18782,7 +18863,14 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
     "já contratado", subtraindo o aditivo de si próprio e zerando o resultado (achado ao medir o
     custo financeiro do aditivo, 6-c).
 
-    Retorna (linhas, resumo) ou (None, erro_str). linhas só dos ambientes marcados."""
+    Retorna (linhas, resumo) ou (None, erro_str). linhas só dos ambientes marcados.
+
+    ACHADO-20 (LI-1, 2ª remedição 22/09): NÃO captura `ContratoComplementoAutoReferente` — a
+    exceção nomeada só se captura em FRONTEIRA HTTP (a captura aqui, função INTERMEDIÁRIA, foi o
+    que deixou `_negociacao_breakdown` chamada direto descartar o `(None, erro)` sem perceber,
+    medido). `(None, erro_str)` continua valendo só para erro de NEGÓCIO ("Projeto sem contrato
+    para comparar."), não para estado inválido — quem chama esta função converte a exceção, no
+    endpoint `.../pe/complemento/comparativo`."""
     orc_ct, vava_ct, fator_ca, d_orc_pct, d_amb_pct, vavo_ct, cad_ct, ja_contratado = \
         _pe_fator_contexto(db, nome_safe, excluir_orcamento_id=excluir_orcamento_id)
     if orc_ct is None:
@@ -18808,6 +18896,11 @@ def _complemento_diferencas(db, nome_safe, excluir_orcamento_id=None):
             _d_motor = _negociacao_breakdown(orc_ct, db, vbva_override=_sombra_override)
             _vava_motor_por_id = {a.get("id"): float(a.get("VAVA", 0.0))
                                   for a in _d_motor.get("ambientes", [])}
+        except ContratoComplementoAutoReferente:
+            # ACHADO-20 (LI-1, 2ª remedição 22/09): re-levanta — o `except Exception` logo
+            # abaixo é fallback de MOTOR indisponível, não pode engolir estado inválido (a
+            # exceção nomeada só se captura em fronteira HTTP).
+            raise
         except Exception as _e:
             print("[F2-41-SOMBRA] motor falhou (ambiente) — seguindo com fallback:", _e)
             _vava_motor_por_id = {}
@@ -18888,6 +18981,17 @@ def _markup_merc_puro(orc):
     return val_liq_merc / float(orc.cfo)
 
 
+class ContratoComplementoAutoReferente(RuntimeError):
+    """ACHADO-20 (docs/db/LISTA_IMEDIATA.md, LI-1, remedição 22/09): o Contrato do projeto aponta
+    para um Orcamento que é ele próprio um complemento de PE (`complemento_pe=1`) — estado
+    inválido (o orçamento BASE de um contrato nunca deveria ser um complemento; complementos
+    nascem em linhas de Orcamento novas e separadas). Levantada por `_pe_fator_contexto` — nunca
+    alcançável pelo caminho normal (a guarda do endpoint do contrato barra a entrada), só por
+    correção manual no banco, migração ou importação. Cada um dos 5 chamadores de
+    `_pe_fator_contexto` converte esta exceção no formato de erro que já usa — nenhum deixa cair
+    num `except Exception` largo (viraria 500/interface muda de novo, só troca o disfarce)."""
+
+
 def _pe_fator_contexto(db, nome_safe, excluir_orcamento_id=None):
     """Contexto do fator VAVA/VBVA por ambiente contratado — compartilhado entre a Conciliação de
     PE/AF2 (decisão) e o Complemento de Projeto de fato (`_complemento_diferencas`/
@@ -18919,12 +19023,26 @@ def _pe_fator_contexto(db, nome_safe, excluir_orcamento_id=None):
     recursão infinita a cada aditivo assinado (não só no caso auto-referente do ACHADO-20). Ler o
     snapshot também é o correto pelo princípio do 6-b: depois de assinado, o número é imutável —
     não deve derivar de um recálculo que poderia divergir do que o cliente assinou.
-    `(None, {}, 1.0, 0.0, {}, 0.0, 0.0, {})` se o projeto não tem contrato."""
+    `(None, {}, 1.0, 0.0, {}, 0.0, 0.0, {})` se o projeto não tem contrato.
+
+    Levanta `ContratoComplementoAutoReferente` (ACHADO-20, LI-1, remedição 22/09) se `orc_ct`
+    (o orçamento do Contrato) for ele próprio complemento_pe=1 — ANTES de chamar
+    `_negociacao_breakdown(orc_ct, db)` logo abaixo, que é a ÚNICA aresta do ciclo: sem esta
+    guarda, `_negociacao_breakdown` vê complemento_pe=1 e chama `_complemento_diferencas` de
+    volta, que chama esta função de novo, que chama `_negociacao_breakdown` de novo — para
+    sempre. Não reaproveita o `None` de "projeto sem contrato" (linha acima): são estados
+    diferentes — este projeto TEM contrato, é o contrato que aponta para um orçamento inválido —
+    e confundir os dois faria a tela mostrar "Projeto sem contrato para comparar" num projeto que
+    tem um. Nenhum sentinela: exceção nomeada, pra cada chamador decidir a própria conversão."""
     ct = (db.query(Contrato).filter_by(projeto_nome=nome_safe)
             .order_by(Contrato.id.desc()).first())
     orc_ct = db.get(Orcamento, ct.orcamento_id) if ct else None
     if orc_ct is None:
         return None, {}, 1.0, 0.0, {}, 0.0, 0.0, {}
+    if getattr(orc_ct, "complemento_pe", 0):
+        raise ContratoComplementoAutoReferente(
+            "O contrato deste projeto aponta para um orçamento de complemento de PE "
+            "(estado inválido — não é possível calcular a diferença).")
     d_ct = _negociacao_breakdown(orc_ct, db)
     vava_ct = {a.get("id"): float(a.get("VAVA", 0.0)) for a in d_ct.get("ambientes", [])}
     ja_contratado = dict(vava_ct)
@@ -18977,6 +19095,11 @@ def _pe_ambientes_pendentes_decisao(db, nome_safe):
             _d_motor_pend = _negociacao_breakdown(orc_ct, db, vbva_override=_sombra_override_pend)
             _vava_motor_pend = {a.get("id"): float(a.get("VAVA", 0.0))
                                 for a in _d_motor_pend.get("ambientes", [])}
+        except ContratoComplementoAutoReferente:
+            # ACHADO-20 (LI-1, 2ª remedição 22/09): _pe_ambientes_pendentes_decisao é função
+            # INTERMEDIÁRIA (não HTTP) — não captura, propaga. Os dois chamadores
+            # (main.py, aprovação AF2 e o PATCH genérico de etapa) já capturam na fronteira.
+            raise
         except Exception as _e:
             print("[F2-41-SOMBRA] motor falhou (pendências AF2) — seguindo com fallback:", _e)
             _vava_motor_pend = {}
@@ -19023,7 +19146,11 @@ def _complemento_diferencas_fase(db, nome_safe, parcela_id, excluir_orcamento_id
     contrato sozinho — mesmo motivo/mecanismo de `_complemento_diferencas`. `excluir_orcamento_id`:
     ver docstring de `_complemento_diferencas`.
 
-    Retorna (linhas, resumo) ou (None, erro_str)."""
+    Retorna (linhas, resumo) ou (None, erro_str).
+
+    ACHADO-20 (LI-1, 2ª remedição 22/09): mesma regra de `_complemento_diferencas` — NÃO captura
+    `ContratoComplementoAutoReferente` (função intermediária). Quem converte é o endpoint
+    `.../pe/complemento/fase/<fase>`."""
     import mod_conciliacao_pe as _mconc
     orc_ct, vava_ct, fator_ca, d_orc_pct, d_amb_pct, vavo_ct, cad_ct, ja_contratado = \
         _pe_fator_contexto(db, nome_safe, excluir_orcamento_id=excluir_orcamento_id)
@@ -19051,6 +19178,10 @@ def _complemento_diferencas_fase(db, nome_safe, parcela_id, excluir_orcamento_id
             _d_motor = _negociacao_breakdown(orc_ct, db, vbva_override=_sombra_override)
             _vava_motor_por_id = {a.get("id"): float(a.get("VAVA", 0.0))
                                   for a in _d_motor.get("ambientes", [])}
+        except ContratoComplementoAutoReferente:
+            # ACHADO-20 (LI-1, 2ª remedição 22/09): ver comentário equivalente em
+            # _complemento_diferencas — re-levanta, nunca engole.
+            raise
         except Exception as _e:
             print("[F2-41-SOMBRA] motor falhou (fase) — seguindo com fallback:", _e)
             _vava_motor_por_id = {}

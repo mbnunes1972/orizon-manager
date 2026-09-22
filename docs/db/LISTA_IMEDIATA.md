@@ -16,7 +16,7 @@ ninguém: o repositório é a memória, a conversa não é.
 
 | item | o que é | estado | commit |
 |---|---|---|---|
-| LI-1 | ACHADO-20 — guarda no endpoint do contrato + guarda de ciclo | **EM CURSO (Terminal A)** — desenho remedido em 22/09, ver o item | — |
+| LI-1 | ACHADO-20 — guarda no endpoint do contrato + guarda de ciclo | FECHADO (b7c252c) | — |
 | LI-2 | LP-33b — validação de servidor no lado da FUNÇÃO | **CORTADO (já estava feito desde 17/09)** | — |
 | LI-3 | LP-35 — inverter o default de `senha_provisoria` (DDL) | ABERTO | — |
 | LI-4 | LP-32 — selo da loja no cabeçalho | ABERTO | — |

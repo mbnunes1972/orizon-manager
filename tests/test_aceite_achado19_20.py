@@ -56,12 +56,18 @@ def test_parametros_json_malformado_cai_no_default(app_db, seed):
 
 
 # ── 2. complemento auto-referente: recusado com erro nomeado, não RecursionError ─────────────
-@pytest.mark.xfail(strict=True, reason="ACHADO-20 (docs/db/ACEITE.md): complemento_pe=1 no MESMO "
-                    "orçamento que já é o Contrato.orcamento_id do projeto (auto-referência) "
-                    "deveria ser RECUSADO com um erro nomeado — hoje é RecursionError opaco "
-                    "(confirmado em test_negociacao_breakdown_excecoes.py::"
-                    "test_complemento_pe_no_proprio_orcamento_do_contrato_recursao_infinita).")
+# ACHADO-20 (LI-1, docs/db/LISTA_IMEDIATA.md — remedições de 22/09, commit a confirmar):
+# CONSERTADO — não é mais xfail. A guarda mora em `_pe_fator_contexto`, imediatamente antes da
+# única aresta do ciclo (`d_ct = _negociacao_breakdown(orc_ct, db)`), e levanta
+# `main.ContratoComplementoAutoReferente` (nomeada, não sentinela — reaproveitar `orc_ct is
+# None` faria este caso responder "Projeto sem contrato para comparar." num projeto que TEM
+# contrato). A exceção só se captura em fronteira HTTP — nenhuma função intermediária
+# (`_complemento_diferencas`/`_complemento_diferencas_fase`/`_negociacao_breakdown`) a
+# engole — por isso chamar `_negociacao_breakdown` direto, como este teste faz, também a
+# propaga (medido: a 1ª versão do conserto convertia a exceção em `_complemento_diferencas`,
+# que `_negociacao_breakdown` descartava calada — ver 2ª remedição de 22/09 no item).
 def test_complemento_auto_referente_recusado_com_erro_nomeado(app_db, seed):
+    import main
     oid = seed["orcamento_l1_id"]   # é o mesmo Orcamento de seed["contrato_l1_id"]
     db = app_db.get_session()
     orc = db.get(app_db.Orcamento, oid)
@@ -71,8 +77,11 @@ def test_complemento_auto_referente_recusado_com_erro_nomeado(app_db, seed):
     try:
         levantou, exc = _breakdown_levanta(app_db, oid)
         assert levantou and not isinstance(exc, RecursionError), (
-            "complemento auto-referente deveria levantar um erro NOMEADO (ex.: ValueError "
-            "citando a auto-referência), nunca RecursionError opaco — hoje: %r" % (exc,))
+            "complemento auto-referente deveria levantar um erro NOMEADO, nunca RecursionError "
+            "opaco — hoje: %r" % (exc,))
+        assert isinstance(exc, main.ContratoComplementoAutoReferente), (
+            "esperava especificamente ContratoComplementoAutoReferente (a guarda de "
+            "_pe_fator_contexto) — %r" % (exc,))
     finally:
         db = app_db.get_session()
         db.get(app_db.Orcamento, oid).complemento_pe = 0
