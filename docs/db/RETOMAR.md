@@ -1,4 +1,4 @@
-# Retomar — onde estamos (21/09/2026)
+# Retomar — onde estamos (22/09/2026)
 
 > **Camada 4 · TRABALHO EM ANDAMENTO.** Este arquivo é **descartável e datado**. Se a data acima
 > estiver velha, ele mente: confie na `LISTA_PARALELA.md` e nos ADRs, não nele.
@@ -35,10 +35,15 @@ inteira sem reler o histórico. **A memória deste projeto é o repositório, n�
 
 ## Em curso, ainda não entregue
 
-- `docs/db/TAREFA_TRIAGEM_E_CONTADOR.md` — **acabou de ser escrita, ainda não foi passada à
-  Sessão A.** Dois itens: a triagem que não responde quando o contato foge do formato (decisão:
-  reformular **uma** vez, depois fila) e o contador do Chat Interno que soma conversas que não
-  aparecem nele.
+- `docs/db/TAREFA_TRIAGEM_E_CONTADOR.md` — **FECHADA em 22/09** (`9aa79b4` e `33a9bcb`, suíte
+  completa 2.884 verdes). A triagem agora reformula a pergunta uma vez e depois entrega à fila com
+  o texto preservado; o contador do Chat Interno passou a somar pelo mesmo predicado que a lista
+  usa. Ver o cabeçalho da própria tarefa pelo que foi decidido e pelo que divergiu do plano.
+- `docs/db/TAREFA_SPLIT_BACKEND.md` — plano pronto (Sessão B, `f60cf3b`). O Grupo A pode começar
+  por Admin a qualquer momento; o Grupo B está **travado numa decisão do Marcelo**: as ~9 rotas
+  sob `/ciclo/` que, pelo código, são de Financeiro ou Comercial(PE) seguem o comportamento
+  (Opção A) ou o prefixo da URL (Opção B). A pergunta é de modelo de negócio — se desligar o
+  módulo Financeiro numa loja tem que bloquear `ciclo/21/conciliar` de verdade ou não.
 - `docs/db/RASCUNHO_PORTAO_E2E.md` — rascunho para debate sobre o portão da suíte; ainda não foi
   discutido com o Claude Code.
 

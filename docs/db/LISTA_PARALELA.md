@@ -924,6 +924,25 @@ derrubada) **mais o que sobrar do restante** (`#np-cli-dropdown` era o mais comu
 resolve o LP-22 em si (boot/DDL é mecanismo diferente) — é o primeiro corte real dentro da família
 mais ampla de flakes de E2E que este item vem acumulando desde 09/09.
 
+**Atualização 22/09 — o `#neg-subtotal` isolado não é lentidão marginal.** A suíte completa de
+22/09 (2.884 verdes) trouxe 3 vermelhos, todos no mesmo ponto de espera do `#neg-subtotal`, nos
+três arquivos que compartilham o helper de criar projeto e assinar contrato
+(`test_e2e_browser_remover_ciclo.py`, `test_e2e_browser_conciliacao_final.py`,
+`test_e2e_browser_f2_40_fatia2_modal_complemento.py`). Medição feita em seguida, seis rodadas dos
+três arquivos — 3 com `33a9bcb` e 3 com o `static/index.html` anterior (`dd45049`), para descartar
+o lote da triagem/contador como causa: **5/5 verdes nas seis rodadas**, e as 24 leituras da
+instrumentação `MEDICAO neg-subtotal` ficaram entre **780,7 ms e 786,3 ms** — a mesma faixa que a
+RODADA3 mediu em 13/09 (780–785 ms), nove dias e um commit de `index.html` depois, sem separação
+visível entre as duas pernas.
+
+O que isso acrescenta: isolado, o subtotal chega em ~783 ms, **12× abaixo** do teto de 10 s do
+Playwright. O estouro só aparece DENTRO da suíte completa, e não como uma degradação gradual que
+encosta no limite — é um salto. Isso é argumento contra a hipótese de lentidão acumulada e a favor
+de algo categórico do contexto da suíte cheia (candidato natural: o boot/DDL que este próprio
+LP-22 rastreia). **Zero falhas em 6 rodadas não prova ausência** — a taxa registrada em
+`TAREFA_FLAKES_E2E.md` é de 1/10 a 10/10; o que o A/B prova é só que o lote de 22/09 não piorou
+nada.
+
 ---
 
 ## Fechados — não são adiamento, e por isso não estão na lista acima

@@ -60,11 +60,28 @@ Duas sessões de Claude Code rodando em paralelo, com papéis que **não se cruz
    processador. A regra 2 impedia a colisão de banco; esta impede a contenção de máquina, que é
    como o portão da suíte vinha ficando ilegível. Ver `docs/db/RASCUNHO_PORTAO_E2E.md`.
 
-   **Como conferir — precisão da Sessão A (21/09), melhor que a redação original:** não basta
-   procurar `pytest` nas outras sessões. O que consome a máquina é o **Chromium do Playwright
-   MCP**, que fica vivo mesmo com a sessão ociosa. Antes da suíte completa:
-   `ps -eo pid,etime,rss,args | grep -Ei 'chrom|playwright|claude' | grep -v grep`. Sessão-irmã
-   com Chromium vivo conta como ocupada, ainda que ninguém esteja digitando nela.
+   **Como conferir — corrigido em 22/09, depois de a redação anterior produzir dois erros no
+   mesmo dia.** Não basta procurar `pytest`: o que consome a máquina é o **Chromium do Playwright
+   MCP**, vivo mesmo com a sessão ociosa. Mas o `grep` da redação anterior
+   (`grep -Ei 'chrom|playwright|claude'`) tem dois defeitos, os dois medidos em 22/09:
+
+   - **casa o processo `claude` da própria sessão** — quem confere se auto-bloqueia. Foi o que
+     aconteceu: a Sessão A leu dois PIDs `claude` (o dela e o da Sessão B) como sessão-irmã
+     ocupada e parou sem rodar a suíte, sendo que uma das duas era ela mesma;
+   - **o PID que aparece não é o do navegador.** O `claude` é o PAI; o Chromium descartável são os
+     filhos (`npm exec` → `sh` → `node ... playwright-mcp`). Matar o PID do `claude` derruba a
+     sessão inteira, não um navegador — erro que só não foi executado porque a Sessão A conferiu
+     a ancestralidade antes de obedecer.
+
+   Confira assim, olhando o processo certo e excluindo a própria árvore:
+   `ps -eo pid,ppid,etime,rss,args | grep -i playwright-mcp | grep -v grep` — e compare o PPID
+   com o `claude` desta sessão antes de concluir qualquer coisa.
+
+   **E ocioso não é ocupado.** A medição que originou esta regra (19 min/8 vermelhos contra
+   ~10 min/0) foi com as duas sessões TRABALHANDO — dois navegadores sendo dirigidos enquanto a
+   suíte dirigia o dela. Chromium de pé desde a véspera, sem ninguém dirigindo, não compete por
+   CPU: em 22/09 a suíte completa rodou com o Chromium da sessão-irmã vivo e ocioso e fechou em
+   13m20 com 2.884 verdes e 3 vermelhos, todos do flake conhecido do `#neg-subtotal` (LP-22).
 3. **A Sessão B ancora por NOME, nunca por número de linha.** A Sessão A está editando `main.py` e
    `index.html` ao mesmo tempo; qualquer `main.py:9587` anotado hoje estará errado amanhã. Anote
    nome de função, id de elemento, rota — coisas que sobrevivem a uma edição.

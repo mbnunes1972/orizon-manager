@@ -1,6 +1,24 @@
 # Tarefa — A triagem que não responde, e o contador que mente
 
-> **Camada 4 · TRABALHO EM ANDAMENTO.** Descartável quando fechar.
+> **Camada 4 · FECHADA em 22/09/2026.** Mantida como registro do que foi decidido e medido;
+> não é mais fila.
+>
+> - **Item 1** — `9aa79b4`. Escolha entre coluna e inferência: **inferência** (contagem de
+>   `EnvioExterno.triagem_id`), porque coluna nova é DDL fora de migração (R1). A fragilidade que
+>   a tarefa temia está travada por teste: `test_ja_reformulou_escritores_fixos` fixa o único
+>   ponto que grava esse campo e as duas funções que chegam nele — escritor novo nasce vermelho
+>   no teste, não como contagem errada em produção.
+> - **Item 2** — `33a9bcb`. Divergência do que a tarefa pedia, de propósito: não **um** predicado,
+>   e sim **três** (`_ocEhInterno`, `_ocEhAtendimento`, `_ocEhMural`). Um só não resolveria, porque
+>   o contador usava o complemento `!interno.includes(c)` e existem três categorias — "o que não é
+>   interno é atendimento" passaria a mentir do outro lado, sobre Mural/público. O Mural continua
+>   somando no badge do Chat Interno porque o botão dele mora nessa tela. Achado de brinde,
+>   corrigido junto: o Oversight (`_ocTodasDoCanal`) era uma **quarta** cópia divergente, tratando
+>   `direct` com segmento como atendimento.
+> - **Portão** — suíte completa em 22/09: **2.884 passed, 4 xfailed, 3 failed em 13m20**. Os três
+>   vermelhos são `#neg-subtotal`, flake conhecido da família LP-22, descartado como consequência
+>   deste lote por A/B de seis rodadas (3 em `33a9bcb`, 3 em `dd45049`): 5/5 verdes nas seis, sem
+>   separação entre as pernas. Medição registrada no LP-22 da `LISTA_PARALELA.md`.
 
 **Data:** 2026-09-21
 **Origem:** as duas saíram das medições de 18/09, já feitas — nenhuma precisa ser remedida.
