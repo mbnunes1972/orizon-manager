@@ -16,7 +16,7 @@ ninguém: o repositório é a memória, a conversa não é.
 
 | item | o que é | estado | commit |
 |---|---|---|---|
-| LI-1 | ACHADO-20 — guarda no endpoint do contrato + guarda de ciclo | ABERTO | — |
+| LI-1 | ACHADO-20 — guarda no endpoint do contrato + guarda de ciclo | **EM CURSO (Terminal A)** — desenho remedido em 22/09, ver o item | — |
 | LI-2 | LP-33b — validação de servidor no lado da FUNÇÃO | **CORTADO (já estava feito desde 17/09)** | — |
 | LI-3 | LP-35 — inverter o default de `senha_provisoria` (DDL) | ABERTO | — |
 | LI-4 | LP-32 — selo da loja no cabeçalho | ABERTO | — |
@@ -65,7 +65,44 @@ snapshot, não fechado.
 **O que NÃO foi medido, e é a única incógnita que sobra:** se a tela oferece esse caminho, ou se
 hoje ele só é alcançável por quem chama a rota direto. Isso muda a urgência, não o conserto.
 
-**Conserto (duas guardas, não uma):**
+### Remedição de 22/09 (Terminal A) — o conserto de duas guardas estava errado
+
+**A guarda "fundo do poço" que este item mandava pôr em `_complemento_diferencas` é CÓDIGO MORTO
+para o caso que interessa.** O laço não passa por ela: `_pe_fator_contexto` (`main.py`) chama
+`d_ct = _negociacao_breakdown(orc_ct, db)` **incondicionalmente, antes de retornar**. No estado
+auto-referente é ali que o ciclo fecha — `_negociacao_breakdown` → `_complemento_diferencas` →
+`_pe_fator_contexto` → a mesma chamada — e `_complemento_diferencas` nunca chega a receber o
+`orc_ct` para conferir. Medido rodando
+`test_negociacao_breakdown_excecoes.py::test_complemento_pe_no_proprio_orcamento_do_contrato_recursao_infinita`
+COM as duas guardas no código: continua passando, ou seja, o `RecursionError` continua
+acontecendo. (Esse teste **fixa o defeito** hoje — como o teste do silêncio da triagem fixava o
+silêncio. Ele tem que virar quando o conserto entrar.)
+
+O comentário de `_pe_fator_contexto` que este item citava ("recomputar ao vivo aqui criaria
+recursão infinita a cada aditivo assinado") fala do laço de `Aditivo` logo abaixo, que por isso lê
+o snapshot congelado — **não** da chamada de cima. Eu li o comentário e não o código.
+
+**Desenho decidido em 22/09 (decisão técnica, não de produto):**
+
+1. **Uma guarda só no fundo, e no lugar certo:** dentro de `_pe_fator_contexto`, imediatamente
+   antes de `d_ct = _negociacao_breakdown(orc_ct, db)` — é a ÚNICA aresta do ciclo. As duas
+   guardas em `_complemento_diferencas`/`_complemento_diferencas_fase` **saem**: depois desta,
+   elas são inalcançáveis, e guarda inalcançável sem teste é ruído que engana o próximo leitor.
+2. **O sinal é EXCEÇÃO nomeada, não sentinela.** `_pe_fator_contexto` tem **cinco** chamadores
+   (`main.py` 3013, 8468, 18808, 18997, 19057). Reaproveitar `orc_ct is None` faria o caso
+   auto-referente responder *"Projeto sem contrato para comparar."* — e o projeto TEM contrato;
+   é afirmação falsa na tela, a família do ADR-004 e do "Venda até". Sentinela nova exige que os
+   cinco lembrem de conferir, e quem esquecer produz número errado em silêncio. Exceção nomeada
+   falha alto e não tem como ser ignorada por engano.
+3. **Cada chamador converte a exceção em erro nomeado do usuário** — os dois de complemento para
+   o contrato `(None, erro)` que já usam; os outros três para 409 com a mesma mensagem. Nenhum
+   deles pode deixar a exceção cair num `except Exception` largo e virar 500 mudo: isso
+   reintroduziria a falha silenciosa por outro caminho.
+4. A guarda do endpoint do contrato (a porta) continua como estava — ela impede o estado; esta
+   impede o laço para o estado que já existir no banco.
+
+**Conserto (na redação original, mantida como registro — a guarda 2 abaixo foi movida pelo item
+1 acima):**
 1. no endpoint do contrato — recusar `orcamento_id` de orçamento `complemento_pe=1`, com erro
    nomeado. É a porta;
 2. em `_complemento_diferencas` e `_complemento_diferencas_fase` — se o orçamento do contrato for
