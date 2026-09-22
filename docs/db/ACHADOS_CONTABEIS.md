@@ -1310,6 +1310,13 @@ Um `Orcamento` com `complemento_pe = 1` que seja, ele próprio, o
 `_complemento_diferencas` que volta a pedir o breakdown do mesmo orçamento:
 `RecursionError`. Não há guarda de ciclo.
 
+**REMEDIDO EM 22/09 — a avaliação abaixo subestimava.** A porta não é o endpoint de criação
+de complemento; é o **endpoint do contrato**: `POST /api/projetos/<nome>/contrato` aceita
+`orcamento_id` do corpo e valida só existência e pertencimento ao projeto
+(`_montar_dados_projeto_para_contrato`), **sem nenhuma checagem de `complemento_pe`** — e cria o
+`Contrato` apontando para ele. Conserto agora tem item próprio e duas guardas (endpoint + fundo do
+poço): `docs/db/LISTA_IMEDIATA.md`, LI-1. O texto original segue abaixo como registro.
+
 **Alcançável hoje?** Não pelo endpoint real de criação de complemento, que
 sempre cria um `Orcamento` novo e separado. Ou seja: mais uma proteção que
 vem do desenho, não de uma verificação.
