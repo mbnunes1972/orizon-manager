@@ -16,7 +16,7 @@ ninguém: o repositório é a memória, a conversa não é.
 
 | item | o que é | estado | commit |
 |---|---|---|---|
-| LI-1 | ACHADO-20 — guarda no endpoint do contrato + guarda de ciclo | FECHADO (b7c252c) | — |
+| LI-1 | ACHADO-20 — guarda no endpoint do contrato + guarda de ciclo | **FECHADO** | `git log --grep="LI-1"` |
 | LI-2 | LP-33b — validação de servidor no lado da FUNÇÃO | **CORTADO (já estava feito desde 17/09)** | — |
 | LI-3 | LP-35 — inverter o default de `senha_provisoria` (DDL) | ABERTO | — |
 | LI-4 | LP-32 — selo da loja no cabeçalho | ABERTO | — |
@@ -25,7 +25,15 @@ ninguém: o repositório é a memória, a conversa não é.
 | LI-7 | LP-36 — verificar a tarja em campo (não é código) | ABERTO | — |
 | LI-8 | Lote Causa F — sete achados de higiene contábil | ABERTO | — |
 
-Estados válidos: `ABERTO`, `EM CURSO (<terminal>)`, `FECHADO (<hash>)`, `CORTADO (<motivo>)`.
+Estados válidos: `ABERTO`, `EM CURSO (<terminal>)`, `FECHADO`, `CORTADO (<motivo>)`.
+
+**Correção de 22/09 — a coluna não guarda hash, e o motivo é bom.** A regra original mandava
+escrever `FECHADO (<hash>)` no MESMO commit do conserto, o que é impossível: o hash só existe
+depois que o commit existe, e cada `git commit --amend` para corrigi-lo muda o próprio hash de
+novo. Medido no LI-1: duas rodadas de convergência (`b6cd6da` → `b7c252c`) e a tabela acabou
+apontando para um hash que o amend seguinte apagou — pior que não ter hash nenhum, porque um
+hash morto parece verdade. **O vínculo é o número do LI na mensagem do commit**, que é estável e
+não depende de ordem: `git log --grep="LI-1"` acha o conserto, e é isso que a coluna registra.
 Quando os oito saírem de ABERTO, esta lista é apagada e o que sobrar volta para a
 `LISTA_PARALELA.md` com destino.
 
