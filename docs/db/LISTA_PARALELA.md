@@ -35,7 +35,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 
 | Destino | Itens | Observação |
 |---|---|---|
-| **BETA** | **3** | Conferido em 22/09 contra o código, não contra o texto desta lista: LP-32 (identificação da loja no cabeçalho — a pílula do topo é de 23/08, ANTERIOR ao achado de 16/09, então segue aberta), LP-33 (só a metade do lado da FUNÇÃO — o resto foi implementado) e LP-35 (inversão do default, precisa de migração). **LP-31 implementado em 21/09 (`67fb832`) e LP-36 em 18/09 (`c070b46`)** — saem da contagem de aberto e ficam como registro, junto de LP-02 (15/09). |
+| **BETA** | **2** | Conferido em 22/09 contra o código, não contra o texto desta lista: sobram LP-32 (identificação da loja no cabeçalho — a pílula do topo é de 23/08, ANTERIOR ao achado de 16/09, então segue aberta) e LP-35 (inversão do default, precisa de migração). **LP-31 implementado em 21/09 (`67fb832`), LP-36 em 18/09 (`c070b46`) e LP-33 em 16–17/09** — saem da contagem de aberto e ficam como registro, junto de LP-02 (15/09). |
 | **FRONTEIRA** | 10 | Agrupados por fronteira — ver detalhamento abaixo. |
 | ↳ 6.1 (regra única de transição) | 2 | Ainda não construída — Marcelo quer desenhar com calma. |
 | ↳ 6.2 (Tela Única de Provisões) | 3 | **Em construção nesta Semana 2** — `docs/db/TAREFA_TELA_UNICA_PROVISOES.md`. |
@@ -47,7 +47,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | **DECIDIDO — fila da 1.0** | 3 | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. |
 | **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **29** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste), LP-35 (17/09, do lote da exposição segura), LP-36 (18/09, janela de 24 h da Meta) e LP-37 (21/09, comentários `main.py:NNNN` desatualizáveis, achado do planejamento de `TAREFA_SPLIT_BACKEND.md`). |
+| **Total aberto** | **28** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste), LP-35 (17/09, do lote da exposição segura), LP-36 (18/09, janela de 24 h da Meta) e LP-37 (21/09, comentários `main.py:NNNN` desatualizáveis, achado do planejamento de `TAREFA_SPLIT_BACKEND.md`). |
 
 ---
 
@@ -133,13 +133,17 @@ praticado na loja errada. Tratar como selo de contexto com peso próprio, não c
 (Achado do Marcelo no Aceite 6 da Loja Teste, 16/09.)
 
 **LP-33 · Configurador de faixas de comissão aceita salvar sem faixa "sem teto" — a tela diz uma
-coisa, o motor faz outra. PARCIALMENTE IMPLEMENTADO — conferido em 22/09.**
+coisa, o motor faz outra. IMPLEMENTADO em 16–17/09 — mantido como registro.**
 
-*O que já existe no código:* o rótulo virou **"Vendas abaixo de (R$)"** (`static/index.html`),
-`mod_provisoes.validar` exige a última faixa com `venda_ate=None`, e o configurador da FUNÇÃO
-(`_rmFaixas`) força a última faixa sem teto na tela. *O que falta, e é só isto:* o lado da função
-não tem validação de servidor — `mod_cadastro` ainda grava `comissao.faixas` sem conferir a forma,
-então a garantia daquele lado depende só da tela. Enquanto isso não fechar, o item segue em BETA.
+*Conferido em 22/09, em duas passadas — a primeira errou e fica registrada aqui como aviso.* O
+rótulo virou **"Vendas abaixo de (R$)"** (`static/index.html`), a última faixa do configurador da
+FUNÇÃO (`_rmFaixas`) é sempre sem teto na tela, e a regra virou função compartilhada:
+`mod_provisoes.validar_faixas_comissao`, chamada pelos DOIS lados — pelo motor da loja (via
+`validar_config_financeira`) e pelo lado da FUNÇÃO no endpoint `/api/funcoes` (`main.py`, antes de
+`apl()`, desde 17/09), com `tests/test_lp33_faixas_sem_teto.py` cobrindo os dois. **O erro da
+primeira passada:** olhei `mod_cadastro.funcao_aplicar`, não achei validação ali e concluí que não
+existia — a guarda mora no endpoint que chama `apl()`, um nível acima. Concluir ausência por um
+único ponto do caminho é exatamente o defeito que esta lista vive registrando.
 *Destino: BETA — toda loja nova passa por esse configurador na implantação; sem conserto, o
 defeito se reproduz cinco vezes nas lojas-piloto.*
 

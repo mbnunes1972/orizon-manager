@@ -1,7 +1,8 @@
 # Lista Imediata — as lacunas que a conferência de 22/09 deixou abertas
 
 > **Camada 4 · TRABALHO EM ANDAMENTO.** Descartável quando fechar. Lista FECHADA: **8 itens**,
-> numerados LI-1 a LI-8. Item novo não entra aqui — vai para a `LISTA_PARALELA.md` com destino.
+> numerados LI-1 a LI-8 — **7 ativos**, porque o LI-2 nasceu cortado (já estava feito, ver a
+> tabela). Item novo não entra aqui — vai para a `LISTA_PARALELA.md` com destino.
 
 **Data:** 22/09/2026. **Alvo:** fechar até 23/09.
 **Origem:** a conferência da `LISTA_PARALELA.md` contra o código (commit `2d72c2e`) e a medição do
@@ -16,7 +17,7 @@ ninguém: o repositório é a memória, a conversa não é.
 | item | o que é | estado | commit |
 |---|---|---|---|
 | LI-1 | ACHADO-20 — guarda no endpoint do contrato + guarda de ciclo | ABERTO | — |
-| LI-2 | LP-33b — validação de servidor no lado da FUNÇÃO | ABERTO | — |
+| LI-2 | LP-33b — validação de servidor no lado da FUNÇÃO | **CORTADO (já estava feito desde 17/09)** | — |
 | LI-3 | LP-35 — inverter o default de `senha_provisoria` (DDL) | ABERTO | — |
 | LI-4 | LP-32 — selo da loja no cabeçalho | ABERTO | — |
 | LI-5 | LP-27 — motivos de retenção servidos pelo backend | ABERTO | — |
@@ -78,19 +79,17 @@ hoje ele só é alcançável por quem chama a rota direto. Isso muda a urgência
 
 ---
 
-## LI-2 · LP-33b — o lado da FUNÇÃO grava faixa de comissão sem validação de servidor
+## LI-2 · CORTADO — a validação do lado da FUNÇÃO já existe desde 17/09
 
-A metade que sobrou do LP-33. O configurador da função já força a última faixa sem teto **na
-tela** (`_rmFaixas`, `static/index.html`), e o motor da loja já tem `mod_provisoes.validar` — mas
-`mod_cadastro` grava `comissao.faixas` conferindo só o tipo dos números, sem exigir a forma
-(última faixa com `venda_ate` nulo). Enquanto for assim, a garantia daquele lado depende da tela,
-e a tela não é garantia.
+**Não fazer nada aqui.** Este item nasceu de um erro meu de conferência, corrigido no mesmo dia, e
+fica registrado porque o erro é instrutivo.
 
-**Conserto:** validação no servidor, espelhando a regra de `mod_provisoes.validar`, no ponto em
-que `mod_cadastro` grava. Os dois modelos continuam separados de propósito (decisão de 17/09) —
-o que se compartilha é a forma da faixa, não o resolvedor.
-**Prova:** teste que tenta gravar faixas com a última fechada e espera recusa.
-**Tamanho:** pequeno.
+A regra está em `mod_provisoes.validar_faixas_comissao` e é chamada pelos dois lados: pelo motor
+da loja (via `validar_config_financeira`) e pelo lado da FUNÇÃO no endpoint `/api/funcoes`
+(`main.py`, logo antes de `apl()`), desde 17/09 — com `tests/test_lp33_faixas_sem_teto.py`
+cobrindo os dois. **Como o erro aconteceu:** olhei `mod_cadastro.funcao_aplicar`, não achei
+validação ali, e concluí ausência. A guarda mora um nível acima, no endpoint que chama `apl()`.
+Ausência não se conclui de um ponto do caminho — se conclui percorrendo o caminho.
 
 ---
 
