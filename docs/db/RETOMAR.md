@@ -27,6 +27,9 @@ inteira sem reler o histórico. **A memória deste projeto é o repositório, n�
   sete contas privilegiadas passaram a exigir troca de senha e `pdm2026` foi desativado.
 - **Redefinição de senha existe** (`scripts/redefinir_senha.py`, e pela tela do gestor).
 - **A Inspirium foi limpa** (`scripts/limpar_loja.py`, 1.688 linhas) e restou um master ativo.
+- **O nome da Gabriela foi corrigido** em 18–19/09: `Usuario.nome` = "Gabriela" (era "Gabriela
+  Adm/Fin"). Ela é a única conta ativa da Inspirium, então esse nome assina toda mensagem que sai
+  para cliente. O alvo certo era mesmo o `Usuario` — ela **não tem `Funcionario` vinculado**.
 - **As lojas-piloto existem:** Salinas (16) e Casa Shopping (17) clonadas, Caraguatatuba (4)
   completada como PDV, Recreio (3) entrou na rede. Cada uma com master e **SAC**.
 
@@ -45,9 +48,6 @@ inteira sem reler o histórico. **A memória deste projeto é o repositório, n�
   Homologação tem lead real desde 18/09 e o backup ainda mora na mesma máquina do banco.
 - **Testar a tarja vermelha de entrega falhada** com um contato de janela fechada. O código está
   no ar desde 18/09 e ninguém viu funcionando.
-- **O nome da Gabriela** (`Usuario.nome` = "Gabriela Adm/Fin") — ela é a única conta ativa da
-  Inspirium, então esse nome assina toda mensagem que sai para cliente. Corrigir no `Usuario`, não
-  no `Funcionario`.
 - **CNPJ e razão social de Salinas e Casa Shopping** — nasceram sem identidade fiscal, de
   propósito. É passo obrigatório antes de 01/11.
 - **Não conectar um segundo número de WhatsApp** até existir roteamento por `phone_number_id`
