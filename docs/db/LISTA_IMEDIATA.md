@@ -7,6 +7,29 @@
 **Origem:** a conferência da `LISTA_PARALELA.md` contra o código (commit `2d72c2e`) e a medição do
 ACHADO-20 pedida pelo Marcelo em 22/09.
 
+## Estado — a única fonte de verdade sobre o que já fechou
+
+**Quem fecha um item edita ESTA tabela no mesmo commit do conserto.** É o que permite qualquer
+sessão nova (ou qualquer terminal que perdeu contexto) pegar a lista de onde parou sem perguntar a
+ninguém: o repositório é a memória, a conversa não é.
+
+| item | o que é | estado | commit |
+|---|---|---|---|
+| LI-1 | ACHADO-20 — guarda no endpoint do contrato + guarda de ciclo | ABERTO | — |
+| LI-2 | LP-33b — validação de servidor no lado da FUNÇÃO | ABERTO | — |
+| LI-3 | LP-35 — inverter o default de `senha_provisoria` (DDL) | ABERTO | — |
+| LI-4 | LP-32 — selo da loja no cabeçalho | ABERTO | — |
+| LI-5 | LP-27 — motivos de retenção servidos pelo backend | ABERTO | — |
+| LI-6 | LP-28 — rótulo "Operacional" → Montagem | ABERTO | — |
+| LI-7 | LP-36 — verificar a tarja em campo (não é código) | ABERTO | — |
+| LI-8 | Lote Causa F — sete achados de higiene contábil | ABERTO | — |
+
+Estados válidos: `ABERTO`, `EM CURSO (<terminal>)`, `FECHADO (<hash>)`, `CORTADO (<motivo>)`.
+Quando os oito saírem de ABERTO, esta lista é apagada e o que sobrar volta para a
+`LISTA_PARALELA.md` com destino.
+
+---
+
 **Por que esta lista existe:** a lista paralela é organizada por *destino* e não por *data* — é
 boa para não crescer sem controle, e ruim para responder "o que eu fecho amanhã". Esta lista tem
 número fixo e um critério de pronto por item. Quando os oito fecharem, ela é apagada.
@@ -178,7 +201,10 @@ LI-3 → LI-8.
 ## Regras deste lote
 
 1. **Não abrir achado novo.** Encontrou defeito? Anota e reporta ao Marcelo — não conserta.
-2. Suíte verde antes de cada commit; um commit por item, com o número do LI na mensagem.
+2. Um commit por item, com o número do LI na mensagem, e a tabela de Estado atualizada no MESMO
+   commit. **Portão por BLOCO, não por item:** a suíte completa leva ~13 min (medido em 22/09),
+   então cada item fecha com os testes ALVO dele verdes, e a suíte completa roda uma vez ao fim de
+   cada bloco de itens. Nada vai para tag sem suíte completa verde.
 3. LI-3 é o único com DDL — migração no mesmo commit do modelo (R1), sem exceção.
 4. Antes da suíte completa, a checagem da regra 2b do `PLANO_SEMANA_1.md` **na redação corrigida
    de 22/09** (olhar `playwright-mcp` pelo PPID, excluindo a própria árvore — não o processo
