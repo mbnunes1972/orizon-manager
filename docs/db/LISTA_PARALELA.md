@@ -336,6 +336,25 @@ desenhado para fazer ("a loja do cliente vence"). Este caso **não é evidência
 roteamento nem de nada relacionado a clone. O que ele mostra é que o DESENHO contraria a regra do
 Marcelo: quem deve vencer é a loja que recebeu, não a loja onde o contato já está cadastrado.
 
+**Segunda evidência de campo (23/09, 15h42) — agora o roteamento por conversa existente, medido.**
+Nova mensagem do mesmo número para o número da loja: `conversa_mensagens` id 113 entrou direto na
+**conversa 31** (a "Lead — Marcelo Buonocore Nunes", loja 15), canal `comercial`, autor NULL;
+`envios_externos` id 33 registra a entrada; e **nenhuma linha nova em `triagem_entradas`** — a
+última continua a id 9, de 00:37, já resolvida. Ou seja: `_rotear_com_candidatos` achou a conversa
+de ontem e `_loja_da_entrada` nem foi consultado. **A triagem não roda mais para esse contato, e
+não voltará a rodar** — o número está preso à loja 15 por ter falado com ela uma vez.
+
+*Consequência prática para quem for testar a triagem:* arquivar ou concluir a conversa **não**
+resolve. `_rotear_com_candidatos` só descarta candidata quando a conversa está amarrada a um
+`projeto_nome` cujo projeto está concluído; conversa de lead sem projeto segue casando sempre. Para
+ver a triagem de novo é preciso **um número que nunca falou com o sistema** — ou o conserto deste
+item.
+
+*Nota menor, da mesma medição:* o webhook promete rastro (`logging.info("webhook whatsapp: …")`,
+`main.py`) e o `journalctl -u orizon-b` não mostrou nenhuma linha, mesmo com a mensagem tendo
+entrado. Ou o rastro não está saindo, ou não está onde se procura — vale conferir antes de
+depender dele num diagnóstico futuro.
+
 ### O tamanho do conserto — medido em 23/09, e é menor do que este item sugeria
 
 O `phone_number_id` **já chega**. O payload da Meta o traz em `entry[].changes[].value.metadata`,
