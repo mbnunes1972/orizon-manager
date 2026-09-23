@@ -367,6 +367,42 @@ Peças, com âncora por nome:
   de ser "trocar o phone id" e passa a exigir credencial por loja, guardada com cifra — não mais
   em variável de ambiente.
 
+  **Estado real da conta Meta, verificado nas telas em 23/09 — e ele abre um caminho curto para
+  outubro.** O portfólio empresarial é o da **Inspirium Móveis Planejados**, e ele está
+  **VERIFICADO** (é a peça que leva dias e já está pronta). Dentro dele existem **seis WABAs** —
+  Dalmobile SJC, Orizon One (duas), OrizonOne, Orizon Soluções e uma de teste —, **todas com
+  "Propriedade de: Inspirium Móveis Planejados"**, inclusive a da Dalmóbile. O app que a
+  integração usa é o `OrizonChat Inspirium` (ID 1036246669392700), do mesmo portfólio, com o
+  usuário de sistema **`orizon-whatsapp`** em acesso total — é dele o `ORIZON_WA_TOKEN` de hoje.
+  **A Orizon não tem portfólio próprio:** os quatro apps da conta pertencem a Inspirium, Dalmobile
+  SJC e Verano Atelier. Ou seja, hoje o fornecedor não existe como entidade na Meta; o software
+  mora dentro do portfólio de um cliente.
+
+  **Dois caminhos, e eles não competem — um é ponte, o outro é destino:**
+
+  - **Ponte (outubro):** manter as WABAs sob o portfólio da Inspirium, que já é verificado, e dar
+    a cada loja-piloto seu número. O teto de números sobe de 2 para 20 com a verificação, que já
+    existe. Um único token de usuário de sistema alcança as WABAs do portfólio **desde que o
+    `orizon-whatsapp` esteja atribuído a cada uma** (aba "Pessoas" de cada WABA — é configuração,
+    não desenvolvimento; confirmar uma a uma). Nesse cenário **o código precisa só do que já foi
+    dimensionado**: `phone_number_id` por loja, degrau 0, filtro de loja no roteamento e número
+    por loja na saída. Zero papelada com a Meta.
+  - **Destino (a decisão do Marcelo):** conta da LOJA. Cada loja com portfólio próprio (CNPJ
+    dela), WABA própria, e a Orizon como Tech Provider — o que exige criar um portfólio da Orizon,
+    um app sob ele, verificação de negócio da Orizon e revisão do app para acesso avançado. É
+    semanas, e o relógio é da Meta, não nosso.
+
+  **Consequência de planejamento:** a ponte não desperdiça trabalho — as quatro peças de código
+  são as MESMAS nos dois cenários; o que muda é só onde a credencial mora (env hoje, por loja
+  cifrada depois). Então o caminho é fazer o código agora pela ponte e abrir a frente de Tech
+  Provider em paralelo, porque ela é gargalo de calendário externo.
+
+  **Dois riscos de governança vistos nas mesmas telas, que não são de código:** a WABA da
+  **Dalmóbile é propriedade do portfólio da Inspirium** — negócios distintos com ativos
+  misturados, exatamente o que a decisão do Marcelo desfaz; e o portfólio tem **um único
+  administrador** (a tela de Central de Segurança avisa). Perder essa conta é perder o WhatsApp
+  de todas as lojas de uma vez.
+
   *A boa notícia, da mesma pesquisa:* no modelo **Tech Provider + Embedded Signup**, o cliente é
   dono dos ativos, a Orizon recebe um **business token por cliente** no onboarding, e **um app só
   com UM endpoint de webhook recebe as mensagens de todos os clientes** — o payload identifica a
