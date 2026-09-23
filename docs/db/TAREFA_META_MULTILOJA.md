@@ -98,6 +98,28 @@ entra na lista de conferência ANTES de qualquer migração — não depois.
 `phone_number_id = 1240173699181323` → hoje servindo a loja 1 (Inspirium) no nosso banco, ainda
 que a WABA se chame Dalmobile SJC. Falta o resto do inventário, que sai clicando.
 
+## Mudança de estado — 23/09, o Marcelo apagou as WABAs "Orizon"
+
+Sobraram **duas** no portfólio da Inspirium: **Dalmobile SJC** (`1351550097174694`, com o número
+vivo) e **Test WhatsApp Business Account** (a sandbox criada pela Meta). As quatro que se chamavam
+"Orizon One"/"OrizonOne"/"Orizon Soluções" foram apagadas.
+
+**Custo real disso, medido contra o que importa:** baixo. O que leva dias e não se recria é a
+**verificação do portfólio**, e ela é do portfólio — continua intacta. WABA nova sob um portfólio
+já verificado se cria em poucos cliques (`Contas do WhatsApp → Adicionar`). E as apagadas teriam
+que ser renomeadas de qualquer jeito, porque nenhuma tinha nome de loja. A perda é de alguns
+cliques, não de calendário.
+
+**A única coisa que precisa de conferência:** se alguma daquelas WABAs tinha número registrado, o
+número foi liberado junto e precisaria ser registrado de novo. O número vivo está na Dalmobile
+SJC, que não foi tocada — mas isso se confirma em cinco segundos consultando o
+`phone_number_id 1240173699181323`, e é o que vale fazer antes de qualquer outro passo.
+
+**Lição de processo, que vale mais que o episódio:** o inventário das seis WABAs nunca foi feito —
+a listagem por API deu 403 e a coleta manual ficou pendente. Apagou-se sem saber o que havia
+dentro. Para os próximos passos desta tarefa, a regra é a mesma que o projeto já aplica em código:
+**medir antes de mexer**, inclusive na conta Meta.
+
 ## A ordem que eu recomendo, e o porquê
 
 **Fase 0 — hoje, risco zero, não depende da Meta:**
