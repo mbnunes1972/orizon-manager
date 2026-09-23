@@ -44,7 +44,11 @@ portfólios de clientes (Inspirium, Dalmobile SJC, Verano Atelier). O caminho, n
 
 1. **Criar o portfólio empresarial da Orizon** (CNPJ da Orizon, não de loja);
 2. **Verificação de negócio da Orizon** — documentos, e o prazo é da Meta. **É o item mais longo
-   e o único que não se acelera de dentro.** Começa hoje ou atrasa tudo;
+   e o único que não se acelera de dentro.** Começa hoje ou atrasa tudo. **Prazo pesquisado em
+   23/09: a verificação clássica (pelo próprio portfólio, na Central de Segurança) leva até
+   14 dias ÚTEIS** — ou seja, perto de três semanas de calendário. A via rápida de parceiro
+   (Partner-led, ~48h) está **suspensa desde 01/09/2026**, então não há atalho. Isso confirma, com
+   número, que as lojas-piloto de outubro têm de entrar pela ponte, não por este caminho;
 3. criar o **app sob o portfólio da Orizon**, adicionar o produto WhatsApp;
 4. no painel do app: **Casos de uso → Personalizar → Onboarding de Tech Provider**, completar as
    etapas (verificação, ícone/política de privacidade/categoria);
