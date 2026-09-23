@@ -4,6 +4,32 @@
 > **Aberta em 23/09/2026**, a pedido do Marcelo. Companheira do **LP-39** (`LISTA_PARALELA.md`),
 > que trata do lado do CÓDIGO. Esta trata do lado da CONTA META — que é onde está o prazo.
 
+## Mapa mental da Meta — as seis camadas, para parar de se perder
+
+A confusão não é sua: a Meta empilha seis coisas que se parecem e usa nomes repetidos em todas.
+Da mais externa para a mais interna:
+
+1. **Sua conta pessoal do Facebook** — é só a chave que abre as portas. Não é empresa, não é ativo.
+2. **Portfólio empresarial** (ex-Business Manager) — o cofre de UMA empresa. **É ele que se
+   verifica**, e é por isso que ele precisa ter a razão social exata. Uma pessoa pode ter vários.
+3. **Ativos dentro do cofre** — Páginas, Instagram, contas de anúncios, **Apps** e **WABAs**.
+   Ativo pertence ao portfólio, não a você.
+4. **WABA** (conta do WhatsApp Business) — uma caixa que guarda números. Não envia nada sozinha.
+   **Não pode mudar de portfólio**, nunca.
+5. **Número** (`phone_number_id`) — o que de fato envia e recebe. Tem nome próprio
+   (`verified_name`), aprovado em separado, e é esse nome que o cliente lê.
+6. **App + usuário de sistema** — o software que fala com a API, e dentro dele a identidade que
+   gera o token. Precisa estar **atribuído** a cada WABA que vai usar.
+
+**As três armadilhas que fazem tudo parecer confuso:**
+
+- **Nome se repete em três camadas.** O portfólio tem um nome, a WABA tem outro, e o número tem um
+  terceiro — e só o terceiro o cliente vê. No nosso caso os três eram diferentes entre si.
+- **A tela mistura pessoa e empresa.** "Editar informações" na lista de Pessoas edita VOCÊ, não a
+  empresa; o nome do portfólio fica em outro lugar (Informações da empresa).
+- **Quase nada se move depois.** WABA não troca de portfólio, verificação não se transfere. Por
+  isso vale gastar cinco minutos conferindo um nome antes, em vez de duas semanas depois.
+
 ## O fato que decide o desenho (pesquisado na documentação da Meta, 23/09)
 
 **Uma WABA NÃO pode mudar de portfólio empresarial.** A documentação é explícita: *"You cannot
