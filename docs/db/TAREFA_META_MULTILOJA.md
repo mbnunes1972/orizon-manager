@@ -125,6 +125,22 @@ a listagem por API deu 403 e a coleta manual ficou pendente. Apagou-se sem saber
 dentro. Para os próximos passos desta tarefa, a regra é a mesma que o projeto já aplica em código:
 **medir antes de mexer**, inclusive na conta Meta.
 
+## Mapa dos portfólios (visto em 23/09)
+
+Existem **quatro** portfólios empresariais na conta do Marcelo, e **nenhum é da Orizon**:
+
+| portfólio | id | observação |
+|---|---|---|
+| **Inspirium Moveis Planejados** | `37632910929655762` | é onde vivem a WABA com o número vivo e o app `OrizonChat Inspirium`; **verificado** |
+| **Dalmobile SJC** | `448387691450653` | vazio |
+| **dalmobilesjc** | — | **duplicata** do anterior, em minúsculas; vazio |
+| Verano Atelier | — | vazio |
+
+Dois pontos que isto acrescenta: (a) a Orizon precisa de portfólio novo, confirmado — não há o que
+reaproveitar; (b) há **duas** entradas de Dalmóbile SJC, mesma doença dos nomes duplicados das
+WABAs. **Não mexer nelas agora** — limpeza de portfólio sem inventário foi exatamente o que gerou
+o susto das WABAs; entra na fila depois que o Tech Provider estiver de pé.
+
 ## Fase 0 — estado final (23/09)
 
 **O inventário está completo**, e por um caminho que não era o planejado: com as remoções, o
