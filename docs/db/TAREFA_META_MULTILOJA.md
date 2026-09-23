@@ -68,7 +68,11 @@ templates zera por 24h. **Cobrança:** antes da migração é da origem, depois 
 Hoje a Orizon **não é** Tech Provider e **não tem portfólio próprio**: os apps pertencem a
 portfólios de clientes (Inspirium, Dalmobile SJC, Verano Atelier). O caminho, na ordem:
 
-1. **Criar o portfólio empresarial do fornecedor.** *Decisão do Marcelo (23/09): a entidade é a
+1. **Criar o portfólio empresarial do fornecedor. FEITO em 23/09:** portfólio
+   **`Jkaercher Consultoria LTDA`**, `business_id` **`2529138684166777`**, com razão social,
+   endereço (São José dos Campos/SP), telefone, CNPJ e site `orizonone.com.br` preenchidos e
+   e-mail `dev@orizonone.com.br`. Status: **Unverified** — verificação a abrir.
+   *(Contexto original abaixo.)* *Decisão do Marcelo (23/09): a entidade é a
    **Jkaercher**, CNPJ existente, que **futuramente será renomeada para "Orizon Soluções"**,
    detentora do OrizonOne.* Consequências práticas, nesta ordem:
    - **o portfólio nasce com o nome que está no Cartão CNPJ HOJE** — "Jkaercher", exato. A
