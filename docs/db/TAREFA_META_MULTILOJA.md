@@ -112,8 +112,9 @@ cliques, não de calendário.
 
 **A única coisa que precisa de conferência:** se alguma daquelas WABAs tinha número registrado, o
 número foi liberado junto e precisaria ser registrado de novo. O número vivo está na Dalmobile
-SJC, que não foi tocada — mas isso se confirma em cinco segundos consultando o
-`phone_number_id 1240173699181323`, e é o que vale fazer antes de qualquer outro passo.
+SJC, que não foi tocada. **CONFERIDO em 23/09, logo depois das remoções:** o
+`phone_number_id 1240173699181323` responde `status: CONNECTED`, `quality_rating: GREEN`,
+`+55 12 99602-1234`. Nada foi perdido.
 
 **Lição de processo, que vale mais que o episódio:** o inventário das seis WABAs nunca foi feito —
 a listagem por API deu 403 e a coleta manual ficou pendente. Apagou-se sem saber o que havia
