@@ -302,12 +302,33 @@ recorre a `_loja_da_entrada` quando nada casou (conversa nova). Consequência: s
 conversou com QUALQUER loja da instalação, a mensagem seguinte cai naquela conversa, mesmo que o
 número que recebeu pertença a outra loja.
 
-**Evidência de campo (22/09, Homologação):** um lead do Marcelo entrou como
+**Evidência de campo (22–23/09, Homologação):** um lead do Marcelo entrou como
 "Lead — Marcelo Buonocore Nunes" na **Loja Teste (15)**, enquanto o único `numero_conectado` da
-instalação é o da **Inspirium (1)**. Os três degraus de `_loja_da_entrada` dariam loja 1 nos três
-casos (não há Cliente casando — o prefixo "Lead —" prova isso; número único → loja do número = 1;
-fallback → primeira loja = 1). Nenhum deles produz 15. O roteamento por conversa existente é o
-único caminho que produz.
+instalação é o da **Inspirium (1)**. `conversas.origem_entrada = 'triagem'` — veio do webhook,
+não do "Adicionar Contato".
+
+**CORREÇÃO (23/09) — um argumento deste item estava errado e fica registrado.** A versão anterior
+dizia que o prefixo "Lead —" provava não haver Cliente casando com o telefone, e portanto que o
+primeiro degrau de `_loja_da_entrada` não tinha sido usado. **É falso.**
+`triagem_materializar` (`chat/triagem.py`) monta o título como `"Lead — %s" % nome` nos DOIS
+ramos — com Cliente encontrado ou sem. O que muda entre eles é a criação de um `Lead`, não o
+título. Então o prefixo não prova nada sobre match de Cliente, e o degrau 1 continua candidato:
+**se existir um Cliente com esse telefone na Loja Teste, `_loja_da_entrada` devolve 15 e todo o
+resto se explica sem precisar do vazamento de roteamento.**
+
+Consulta que decide, e que ainda não foi feita:
+
+```sql
+SELECT id, loja_id, nome, telefone, whatsapp FROM clientes
+ WHERE nome ILIKE '%buonocore%' OR whatsapp ILIKE '%9960%' OR telefone ILIKE '%9960%';
+```
+
+- **Cliente do Marcelo na loja 15** → o degrau 1 explica o caso. O comportamento é o do desenho
+  ATUAL ("a loja do cliente vence"), e o que ele contraria é a regra do Marcelo ("quem recebeu
+  vence"), abaixo. O vazamento de roteamento continua existindo como fato de código, mas **não
+  foi ele que produziu este caso**, e este item não pode usá-lo como evidência.
+- **Nenhum Cliente casando** → aí sim nenhum dos três degraus produz 15, e o roteamento por
+  conversa existente volta a ser o único caminho.
 
 **Falta confirmar (não confirmado ainda):** qual conversa anterior da Loja Teste capturou a
 entrada. É uma consulta, está no fim deste item.
