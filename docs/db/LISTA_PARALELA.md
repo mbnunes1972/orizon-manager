@@ -357,10 +357,23 @@ Peças, com âncora por nome:
 
 **Duas coisas podem fazer isso crescer, e nenhuma é de código:**
 
-- **O token.** Um único `ORIZON_WA_TOKEN` cobre vários números apenas se todos estiverem sob a
-  MESMA conta WhatsApp Business. Isso é fato da conta Meta do Marcelo, não do repositório —
-  precisa ser conferido no Business Manager antes de dimensionar. Se cada loja exigir WABA
-  própria, o item 5 deixa de ser "trocar o phone id" e vira credencial por loja.
+- **O token — PESQUISADO em 23/09 na documentação da Meta, e a resposta é credencial por loja.**
+  Tecnicamente uma WABA única comporta vários números (o teto do portfólio começa em 2 e sobe
+  para 20 com verificação de negócio), então "um token só" seria possível — **mas só se os
+  números fossem todos da Orizon**, porque a WABA e a verificação pertencem ao portfólio de
+  negócio que é dono do número, e a verificação é por portfólio, ou seja, por entidade jurídica.
+  Com lojas de CNPJs diferentes (Inspirium, Dalmóbile) e a decisão do Marcelo de que **a conta
+  Meta é da LOJA, não da Orizon**, cada loja tem portfólio, WABA e token próprios. O item 5 deixa
+  de ser "trocar o phone id" e passa a exigir credencial por loja, guardada com cifra — não mais
+  em variável de ambiente.
+
+  *A boa notícia, da mesma pesquisa:* no modelo **Tech Provider + Embedded Signup**, o cliente é
+  dono dos ativos, a Orizon recebe um **business token por cliente** no onboarding, e **um app só
+  com UM endpoint de webhook recebe as mensagens de todos os clientes** — o payload identifica a
+  origem por `entry[].id` (a WABA) e `value.metadata.phone_number_id` (o número). Ou seja, o
+  degrau 0 continua valendo e não multiplica endpoint; o que multiplica é a credencial guardada.
+  Fontes em `docs/db/LISTA_PARALELA.md` não cabem como link: ver `developers.facebook.com`,
+  seções "Business phone numbers", "Embedded Signup" e "Webhooks".
 - **O override por canal/segmento** que `_env_por_canal` já oferece (`ORIZON_WA_PHONE_ID_SAC` e
   irmãos). Loja e canal passam a disputar quem escolhe o número, e isso é decisão de desenho —
   pequena, mas precisa ser respondida antes de escrever o item 5.
