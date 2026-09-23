@@ -384,8 +384,10 @@ Peças, com âncora por nome:
     a cada loja-piloto seu número. O teto de números sobe de 2 para 20 com a verificação, que já
     existe. Um único token de usuário de sistema alcança as WABAs do portfólio **desde que o
     `orizon-whatsapp` esteja atribuído a cada uma** (aba "Pessoas" de cada WABA — é configuração,
-    não desenvolvimento; confirmar uma a uma). Nesse cenário **o código precisa só do que já foi
-    dimensionado**: `phone_number_id` por loja, degrau 0, filtro de loja no roteamento e número
+    não desenvolvimento; confirmar uma a uma). **CONFIRMADO em 23/09 na WABA `Dalmobile SJC`
+    (ID 1351550097174694): `orizon-whatsapp` está lá com acesso total** — a premissa da ponte se
+    sustenta; falta só repetir a conferência nas demais WABAs que forem receber número de loja.
+    Nesse cenário **o código precisa só do que já foi dimensionado**: `phone_number_id` por loja, degrau 0, filtro de loja no roteamento e número
     por loja na saída. Zero papelada com a Meta.
   - **Destino (a decisão do Marcelo):** conta da LOJA. Cada loja com portfólio próprio (CNPJ
     dela), WABA própria, e a Orizon como Tech Provider — o que exige criar um portfólio da Orizon,
