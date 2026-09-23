@@ -68,7 +68,21 @@ templates zera por 24h. **Cobrança:** antes da migração é da origem, depois 
 Hoje a Orizon **não é** Tech Provider e **não tem portfólio próprio**: os apps pertencem a
 portfólios de clientes (Inspirium, Dalmobile SJC, Verano Atelier). O caminho, na ordem:
 
-1. **Criar o portfólio empresarial da Orizon** (CNPJ da Orizon, não de loja);
+1. **Criar o portfólio empresarial do fornecedor.** *Decisão do Marcelo (23/09): a entidade é a
+   **Jkaercher**, CNPJ existente, que **futuramente será renomeada para "Orizon Soluções"**,
+   detentora do OrizonOne.* Consequências práticas, nesta ordem:
+   - **o portfólio nasce com o nome que está no Cartão CNPJ HOJE** — "Jkaercher", exato. A
+     verificação confere contra o documento de hoje, não contra o nome futuro; usar "Orizon
+     Soluções" antes da alteração societária é recusa garantida e mais 14 dias úteis;
+   - **a renomeação futura não recria nada.** App, status de Tech Provider e tokens pertencem ao
+     PORTFÓLIO, e o portfólio continua o mesmo objeto depois de trocar de nome. Não se perde
+     onboarding nem revisão de app;
+   - **mudança de dados legais tende a disparar nova verificação** — é o comportamento esperado
+     quando razão social muda, mas não confirmei na documentação; conferir quando a alteração
+     societária sair, e não contar com o contrário;
+   - **o cliente final não vê esse nome em momento nenhum.** O que aparece no WhatsApp é o
+     `verified_name` do NÚMERO, que é por loja. Ou seja, o nome do fornecedor ser "Jkaercher" por
+     alguns meses não tem efeito nenhum sobre a marca que o cliente da loja enxerga;
 2. **Verificação de negócio da Orizon** — documentos, e o prazo é da Meta. **É o item mais longo
    e o único que não se acelera de dentro.** Começa hoje ou atrasa tudo. **Prazo pesquisado em
    23/09: a verificação clássica (pelo próprio portfólio, na Central de Segurança) leva até
