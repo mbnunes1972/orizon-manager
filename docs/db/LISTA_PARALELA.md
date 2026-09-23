@@ -320,10 +320,46 @@ itens andam juntos:** enquanto o roteamento não souber por qual número a mensa
 degrau 2 de `_loja_da_entrada` quanto qualquer filtro de loja no roteamento são chute com cara de
 regra.
 
-**Consulta que fecha a medição, em Homologação:**
+**Segunda medição (23/09) — o clone está descartado, e apareceu coisa maior.**
+
+*A hipótese do clone não se sustenta.* `exportar_config_loja`/`aplicar_config_loja`
+(`mod_implantacao_loja.py`) carregam perfis, funções, documentos-modelo, emitente e a config da
+loja. **Não carregam conversa, envio externo, cliente nem `numero_conectado`.** `seed_loja15.py`
+também não cria conversa nenhuma (o único telefone que ele gera é `(12) 91500-50XX`, de cliente
+fictício). A Loja Teste não herdou conversa da Inspirium.
+
+*O caminho que existe no código e produz exatamente o que se viu:*
+`chat/core.py::iniciar_conversa_externa` — o fluxo "Adicionar Contato"/"Iniciar Conversa" da tela
+de Atendimentos — cria uma conversa **"Lead — <nome>" na loja ATIVA** e adiciona o telefone como
+participante externo. Com a sessão na Loja Teste, a conversa nasce na Loja Teste. A resposta que
+o contato manda depois é roteada por telefone, **sem filtro de loja** (o achado do topo deste
+item), e cai nessa conversa. Título, "Janela aberta" e a linha de transferência batem com esse
+caminho. **Decide qual foi:** `conversas.origem_entrada` — `'triagem'` se veio do webhook,
+`'avulsa'` se veio do "Adicionar Contato".
+
+**A descoberta maior, e ela redefine o item:** *não existe "o número da loja" hoje.* O transporte
+real de WhatsApp é `ORIZON_WA_TOKEN` + `ORIZON_WA_PHONE_ID` em **variável de ambiente**, com
+override por **canal/segmento** (`_env_por_canal`) — nunca por loja. A tabela `numero_conectado`
+guarda só o número EXIBÍVEL e o rótulo; ela não roteia nada, nem na entrada nem na saída. Então:
+
+- toda loja da instalação **envia pelo mesmo número**. A Loja Teste falou com o contato usando o
+  número da Inspirium — vazamento na direção de saída, que ninguém tinha medido ainda;
+- as cinco lojas-piloto de outubro sairiam **todas** pelo número da Inspirium;
+- e a entrada não tem como saber qual loja recebeu, porque só existe um número para receber.
+
+**A regra do Marcelo (23/09), que é o desenho-alvo:** *"lead entra por um número de telefone,
+cada loja tem o seu; depois de entrar, a triagem define o canal de atendimento; se já está
+distribuído, a comunicação se desenvolve pelo contato estabelecido."* Traduzido para ordem de
+consulta na entrada: **(1)** qual loja recebeu, pelo `phone_number_id` do payload; **(2)** dentro
+dessa loja, o telefone cadastrado (Cliente/Lead) → o atendimento dele; **(3)** senão, triagem
+daquela loja; **(4)** conversa existente só vale dentro da mesma loja. Os degraus 2 a 4 são
+baratos; **o degrau 1 é pré-requisito de todos os outros e não existe** — e sem ele, "cada loja
+tem o seu número" não é configuração, é desenvolvimento.
+
+**Consultas que fecham a medição, em Homologação:**
 
 ```sql
-SELECT c.id, c.loja_id, c.tipo, c.titulo, c.segmento, c.criado_em
+SELECT c.id, c.loja_id, c.tipo, c.titulo, c.segmento, c.origem_entrada, c.criado_em
   FROM conversas c WHERE c.titulo ILIKE '%Buonocore%' ORDER BY c.id;
 ```
 
