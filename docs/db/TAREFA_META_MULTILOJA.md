@@ -80,6 +80,9 @@ portfólios de clientes (Inspirium, Dalmobile SJC, Verano Atelier). O caminho, n
    - **mudança de dados legais tende a disparar nova verificação** — é o comportamento esperado
      quando razão social muda, mas não confirmei na documentação; conferir quando a alteração
      societária sair, e não contar com o contrário;
+   - **e-mail do portfólio: `dev@orizonone.com.br`** (decisão de 23/09) — do domínio, não Gmail,
+     que é o que a verificação espera. Precisa ser caixa monitorada: é por ali que a Meta avisa
+     recusa, pedido de documento e status;
    - **o cliente final não vê esse nome em momento nenhum.** O que aparece no WhatsApp é o
      `verified_name` do NÚMERO, que é por loja. Ou seja, o nome do fornecedor ser "Jkaercher" por
      alguns meses não tem efeito nenhum sobre a marca que o cliente da loja enxerga;
@@ -228,6 +231,28 @@ Provider, revisão do app.
 **Fase 3 — por loja, conforme entram:** portfólio da loja (CNPJ dela) → verificação → Embedded
 Signup → número. Para loja com número já existente em outra WABA, aí sim a migração de número,
 em janela combinada.
+
+### Tensão a resolver antes de outubro (decisão do Marcelo, 23/09: "os WhatsApp serão de cada loja")
+
+A regra do destino está clara: **o número é da loja, não da Orizon**. Só que a ponte coloca os
+números das pilotos sob o portfólio da **Inspirium** — que é justamente a mistura de ativos entre
+CNPJs que esta tarefa existe para desfazer. As duas saídas, com o custo de cada uma:
+
+- **Ponte agora, migração depois.** A piloto entra em outubro com número sob o portfólio da
+  Inspirium e, quando o Tech Provider estiver de pé, o número migra para o portfólio da loja.
+  Custo: **uma migração por número**, cada uma exigindo 2FA desligada, verificação por SMS/voz na
+  linha, e perda dos templates que não forem de alta qualidade. Nada disso é caro isoladamente; o
+  problema é fazer cinco vezes com loja já operando.
+- **Portfólio próprio da loja desde o dia um.** Zero migração, mas **cada loja precisa da própria
+  verificação de negócio — até 14 dias úteis, por loja**, e isso corre em paralelo ao da Jkaercher.
+  Para as pilotos de outubro, só é viável se começar agora.
+
+**O corte que provavelmente resolve:** piloto que **compartilha o CNPJ da Inspirium** (caso do PDV
+de Caraguatatuba, pelo nome) pode usar a ponte sem mistura nenhuma — é a mesma empresa. Piloto com
+**CNPJ próprio** (Dalmóbile Salinas, Casa Shopping, Recreio, se forem entidades distintas) deveria
+abrir a verificação do portfólio dela **agora**, porque 14 dias úteis a partir de hoje cai no meio
+de outubro. **Falta o Marcelo dizer quais pilotos são CNPJ próprio e quais são filial/PDV da
+Inspirium** — é a informação que decide, e não está em lugar nenhum do repositório.
 
 **E a ponte continua válida:** as lojas-piloto de outubro NÃO precisam esperar nada disso. Com o
 portfólio da Inspirium já verificado e o `orizon-whatsapp` alcançando as WABAs dele, cada piloto
