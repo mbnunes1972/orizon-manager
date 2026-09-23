@@ -25,6 +25,12 @@ ninguém: o repositório é a memória, a conversa não é.
 | LI-7 | LP-36 — verificar a tarja em campo (não é código) | ABERTO | — |
 | LI-8 | Lote Causa F — sete achados de higiene contábil | ABERTO | — |
 
+**Portão do bloco 1 (LI-1, LI-5, LI-6) — PASSOU, 22/09 23h:** suíte completa **2.893 passed,
+3 xfailed, 0 failed em 10m56**. Nenhum vermelho, nem os 3 do `#neg-subtotal` (flake LP-22) — zero
+numa rodada não prova nada, a taxa registrada é de 1/10 a 10/10; é só o que aconteceu desta vez.
+Os 3 `xfailed` são pré-existentes (achados do ACHADO-19 ainda pendentes), não são consequência do
+bloco. Comparação útil: a rodada da manhã deu 2.884 passed em 13m20 com 3 vermelhos.
+
 Estados válidos: `ABERTO`, `EM CURSO (<terminal>)`, `FECHADO`, `CORTADO (<motivo>)`.
 
 **Correção de 22/09 — a coluna não guarda hash, e o motivo é bom.** A regra original mandava
