@@ -232,6 +232,37 @@ Provider, revisão do app.
 Signup → número. Para loja com número já existente em outra WABA, aí sim a migração de número,
 em janela combinada.
 
+### O caminho mais simples que FUNCIONA (pesquisado em 23/09, com a restrição que ele tem)
+
+O Marcelo pediu o mais simples, e a resposta honesta é: existe um caminho mais simples que o
+Embedded Signup, ele satisfaz a regra "o número é da loja", e **não exige verificação por loja**.
+Mas tem dois portões, e nenhum dos dois se pula.
+
+**Como funciona:** a loja cria o portfólio dela, a WABA dela e registra o número dela; depois
+**compartilha a WABA com a Orizon como PARCEIRO** (Meta Business Suite, "Atribuir parceiro", até
+dois parceiros por WABA). A Orizon opera com um app e um usuário de sistema só, atendendo todas as
+lojas. Sem Embedded Signup, sem token por cliente para gerenciar.
+
+**Os dois portões, ambos UMA vez só — não por loja:**
+
+1. **A Jkaercher precisa estar business-verified.** A documentação é explícita: só se compartilha
+   WABA com parceiro verificado. Até 14 dias úteis, e é o que já está começando.
+2. **O app da Orizon precisa de ACESSO AVANÇADO a `whatsapp_business_management`.** A
+   documentação diz, com todas as letras, que sem isso o parceiro toma erro ao operar a WABA
+   compartilhada. E acesso avançado **é revisão de app** — o mesmo passo do onboarding de Tech
+   Provider, com vídeo demonstrando envio de mensagem e criação de template.
+
+**O que isso elimina de verdade:** a verificação de negócio **por loja**. Portfólio novo não
+verificado já registra **até 2 números** (o teto sobe para 20 com verificação), e uma loja precisa
+de um. A loja fica num tier de mensagens menor, o que para uma loja de móveis planejados não
+aperta. Ou seja: **cada loja entra em minutos** — portfólio, WABA, número, compartilhar com a
+Orizon — desde que os dois portões acima já tenham sido vencidos.
+
+**Resposta à pergunta "simples + Meta existe?":** não existe simples de verdade, mas existe
+*simples o suficiente*: **dois portões uma vez, e depois minutos por loja**. O que não existe é
+caminho nenhum que dispense a revisão de app, porque é ela que autoriza a Orizon a operar WABA de
+terceiro.
+
 ### Tensão a resolver antes de outubro (decisão do Marcelo, 23/09: "os WhatsApp serão de cada loja")
 
 A regra do destino está clara: **o número é da loja, não da Orizon**. Só que a ponte coloca os
