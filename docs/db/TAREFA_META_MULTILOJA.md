@@ -96,7 +96,13 @@ portfólios de clientes (Inspirium, Dalmobile SJC, Verano Atelier). O caminho, n
    14 dias ÚTEIS** — ou seja, perto de três semanas de calendário. A via rápida de parceiro
    (Partner-led, ~48h) está **suspensa desde 01/09/2026**, então não há atalho. Isso confirma, com
    número, que as lojas-piloto de outubro têm de entrar pela ponte, não por este caminho;
-3. criar o **app sob o portfólio da Orizon**, adicionar o produto WhatsApp;
+3. criar o **app sob o portfólio da Orizon**, adicionar o produto WhatsApp. **ATENÇÃO — a ordem
+   real é esta, medida em 23/09:** a Central de Segurança do portfólio novo diz *"Your
+   organization does not need to be verified"* e **não oferece botão de iniciar verificação**. A
+   Meta só abre a verificação quando existe motivo para ela. **O gatilho é o app:** criado o app
+   sob o portfólio e adicionado o produto WhatsApp, a verificação aparece como primeira etapa
+   dentro do *Tech Provider onboarding*, com o botão "Start verification". Ou seja: **app antes,
+   verificação depois** — o inverso do que esta tarefa dizia na primeira redação;
 4. no painel do app: **Casos de uso → Personalizar → Onboarding de Tech Provider**, completar as
    etapas (verificação, ícone/política de privacidade/categoria);
 5. **Revisão do app** com vídeo demonstrando envio de mensagem e criação de template, pedindo
