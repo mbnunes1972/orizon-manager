@@ -121,6 +121,35 @@ a listagem por API deu 403 e a coleta manual ficou pendente. Apagou-se sem saber
 dentro. Para os próximos passos desta tarefa, a regra é a mesma que o projeto já aplica em código:
 **medir antes de mexer**, inclusive na conta Meta.
 
+## Fase 0 — estado final (23/09)
+
+**O inventário está completo**, e por um caminho que não era o planejado: com as remoções, o
+portfólio da Inspirium ficou com **duas** WABAs, e não há mais o que inventariar.
+
+| WABA | ID | conteúdo |
+|---|---|---|
+| **Dalmobile SJC** | `1351550097174694` · `account_review_status: APPROVED` | `phone_number_id` **`1240173699181323`** · +55 12 99602-1234 · `status: CONNECTED` · `quality: GREEN` |
+| Test WhatsApp Business Account | (sandbox da Meta) | — |
+
+**Susto de 23/09, medido e descartado:** houve a suspeita de ter apagado a WABA que funcionava. A
+consulta direta devolveu a WABA viva e APROVADA e o número CONNECTED/GREEN. Bate com o
+comportamento documentado: **WABA com número registrado não se apaga** — a própria Meta barra. As
+que saíram eram as vazias.
+
+**Estado do nome de exibição, a pendência que sobra:** `verified_name: "Orizon One"` com
+`name_status: **DECLINED**` — o nome em vigor foi recusado pela Meta e mesmo assim é o que o
+cliente lê no WhatsApp (conferido no celular). Há um `new_name_status: PENDING_REVIEW`, ainda sem
+confirmação de qual nome está na fila. **Consequência além da marca:** um pré-requisito da
+migração de número entre WABAs é nome aprovado e nenhuma troca pendente — então aprovar o nome da
+loja é o que destrava o caminho do "destino" mais adiante.
+
+**Segundo administrador:** convite enviado em 23/09, aguardando aceite. A Fase 0 fecha quando ele
+aparecer como "Acesso total" na lista de Pessoas.
+
+**Mapa para o código (LP-39), primeira linha real:**
+`loja 1 (Inspirium Móveis Planejados / "Dalmóbile SJC")` → WABA `1351550097174694` →
+`phone_number_id 1240173699181323`.
+
 ## A ordem que eu recomendo, e o porquê
 
 **Fase 0 — hoje, risco zero, não depende da Meta:**
