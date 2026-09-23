@@ -53,6 +53,51 @@ portfólios de clientes (Inspirium, Dalmobile SJC, Verano Atelier). O caminho, n
 6. só então o **Embedded Signup** funciona: cada loja entra com o portfólio DELA, mantém a posse
    dos ativos, e a Orizon recebe um **business token por cliente**.
 
+## Inventário da Fase 0 — primeira medição real (23/09)
+
+Feita pelo token do sistema, no servidor de Homologação. Três achados, e o segundo é grave.
+
+**1. O token não enxerga o portfólio, e agora sabemos por quê.** `debug_token` do
+`ORIZON_WA_TOKEN`: é `SYSTEM_USER` do app **OrizonChat Inspirium** (1036246669392700), escopos
+`whatsapp_business_management`, `whatsapp_business_messaging`, `public_profile` — **não tem
+`business_management`**, que é o exigido pela aresta `owned_whatsapp_business_accounts`. Daí o 403.
+Os `granular_scopes` vêm **sem `target_ids`**, ou seja, o token não está limitado a uma WABA
+específica; ele só não pode ENUMERAR o portfólio. Consequência prática: o resto do inventário sai
+clicando (aba "Phone numbers" de cada WABA), ou concedendo `business_management` ao usuário de
+sistema — o que é uma permissão bem mais larga e não vale a pena só para listar.
+
+**2. O número vivo tem TRÊS nomes, e nenhum bate com o outro.** A consulta direta devolveu:
+
+| o quê | valor |
+|---|---|
+| WABA | `1351550097174694` — **"Dalmobile SJC"** |
+| `phone_number_id` | **`1240173699181323`** |
+| número exibível | **+55 12 99602-1234** |
+| **nome que o cliente vê** (`verified_name`) | **"Orizon One"** |
+| qualidade | GREEN |
+| `code_verification_status` | **EXPIRED** |
+| plataforma | CLOUD_API |
+
+Ou seja: o número que o nosso banco atribui à **Inspirium** (`numero_conectado.loja_id = 1`) mora,
+na Meta, dentro da WABA chamada **"Dalmobile SJC"**, e aparece para o cliente final como
+**"Orizon One"**. Três nomes para a mesma coisa, nenhum deles o da loja que atende.
+
+**Por que isso é grave para outubro, e não é cosmético:** `verified_name` é o nome que o cliente
+lê no WhatsApp. Hoje, qualquer cliente de qualquer loja vê "Orizon One" — o nome do fornecedor do
+software, não da loja com quem ele acha que está falando. Com cinco pilotos de duas redes
+diferentes, isso deixa de ser detalhe e vira problema de marca e de confiança. **E o nome de
+exibição é POR NÚMERO e passa por aprovação da Meta** — então cada loja-piloto com número próprio
+precisa do nome dela aprovado, o que é mais um item com relógio da Meta (bem mais curto que a
+verificação de negócio, mas não instantâneo).
+
+**3. `code_verification_status = EXPIRED`.** O número opera normalmente (qualidade GREEN, mensagens
+fluindo), então isso não é incêndio. Mas é um dos pontos que a migração de número checa, e por isso
+entra na lista de conferência ANTES de qualquer migração — não depois.
+
+**O que já dá para o código (LP-39):** o primeiro par real do mapa é
+`phone_number_id = 1240173699181323` → hoje servindo a loja 1 (Inspirium) no nosso banco, ainda
+que a WABA se chame Dalmobile SJC. Falta o resto do inventário, que sai clicando.
+
 ## A ordem que eu recomendo, e o porquê
 
 **Fase 0 — hoje, risco zero, não depende da Meta:**
