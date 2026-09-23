@@ -330,6 +330,41 @@ SELECT id, loja_id, nome, telefone, whatsapp FROM clientes
 - **Nenhum Cliente casando** → aí sim nenhum dos três degraus produz 15, e o roteamento por
   conversa existente volta a ser o único caminho.
 
+**RESPONDIDO em 23/09:** existe `Cliente id=7, loja_id=15, "Marcelo Buonocore Nunes",
+telefone (12) 98115-1998`. **O degrau 1 explica o caso inteiro** — o sistema fez o que foi
+desenhado para fazer ("a loja do cliente vence"). Este caso **não é evidência** do vazamento de
+roteamento nem de nada relacionado a clone. O que ele mostra é que o DESENHO contraria a regra do
+Marcelo: quem deve vencer é a loja que recebeu, não a loja onde o contato já está cadastrado.
+
+### O tamanho do conserto — medido em 23/09, e é menor do que este item sugeria
+
+O `phone_number_id` **já chega**. O payload da Meta o traz em `entry[].changes[].value.metadata`,
+irmão de `contacts[]` e `messages[]`, que `iter_mensagens_whatsapp` (`chat/externo.py`) já lê. Ele
+só não é extraído. Não há nada a negociar com a Meta nem a reconfigurar no webhook.
+
+Peças, com âncora por nome:
+
+1. `iter_mensagens_whatsapp` passa a devolver `phone_number_id` — uma linha;
+2. coluna `phone_number_id` em `numero_conectado` (único) — **DDL, exige migração (R1)**, e é a
+   única peça com esse custo;
+3. `processar_entrada` ganha o degrau 0: a loja é a DONA DO NÚMERO QUE RECEBEU, acima do cliente
+   cadastrado. Os degraus atuais viram fallback de compatibilidade enquanto houver número sem
+   `phone_number_id` mapeado;
+4. `_rotear_com_candidatos` ganha o filtro de loja — que só passa a fazer sentido depois do 3,
+   porque antes dele não se sabe qual loja é;
+5. saída: `_enviar_whatsapp`, `despachar_template` e `despachar_documento` tiram o
+   `ORIZON_WA_PHONE_ID` da loja da conversa em vez do ambiente, com fallback ao env.
+
+**Duas coisas podem fazer isso crescer, e nenhuma é de código:**
+
+- **O token.** Um único `ORIZON_WA_TOKEN` cobre vários números apenas se todos estiverem sob a
+  MESMA conta WhatsApp Business. Isso é fato da conta Meta do Marcelo, não do repositório —
+  precisa ser conferido no Business Manager antes de dimensionar. Se cada loja exigir WABA
+  própria, o item 5 deixa de ser "trocar o phone id" e vira credencial por loja.
+- **O override por canal/segmento** que `_env_por_canal` já oferece (`ORIZON_WA_PHONE_ID_SAC` e
+  irmãos). Loja e canal passam a disputar quem escolhe o número, e isso é decisão de desenho —
+  pequena, mas precisa ser respondida antes de escrever o item 5.
+
 **Falta confirmar (não confirmado ainda):** qual conversa anterior da Loja Teste capturou a
 entrada. É uma consulta, está no fim deste item.
 
