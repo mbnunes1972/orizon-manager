@@ -35,7 +35,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 
 | Destino | Itens | Observação |
 |---|---|---|
-| **BETA** | **2** | Conferido em 22/09 contra o código, não contra o texto desta lista: sobram LP-32 (identificação da loja no cabeçalho — a pílula do topo é de 23/08, ANTERIOR ao achado de 16/09, então segue aberta) e LP-35 (inversão do default, precisa de migração). **LP-31 implementado em 21/09 (`67fb832`), LP-36 em 18/09 (`c070b46`) e LP-33 em 16–17/09** — saem da contagem de aberto e ficam como registro, junto de LP-02 (15/09). |
+| **BETA** | **3** | **LP-39 novo (22/09)** — o roteamento de entrada externa atravessa a fronteira de loja; medido no código, evidência de campo em Homologação. Os outros dois, conferidos em 22/09 contra o código e não contra o texto desta lista: LP-32 (identificação da loja no cabeçalho — a pílula do topo é de 23/08, ANTERIOR ao achado de 16/09, então segue aberta) e LP-35 (inversão do default, precisa de migração). **LP-31 implementado em 21/09 (`67fb832`), LP-36 em 18/09 (`c070b46`) e LP-33 em 16–17/09** — saem da contagem de aberto e ficam como registro, junto de LP-02 (15/09). |
 | **FRONTEIRA** | 10 | Agrupados por fronteira — ver detalhamento abaixo. |
 | ↳ 6.1 (regra única de transição) | 2 | Ainda não construída — Marcelo quer desenhar com calma. |
 | ↳ 6.2 (Tela Única de Provisões) | 3 | **Em construção nesta Semana 2** — `docs/db/TAREFA_TELA_UNICA_PROVISOES.md`. |
@@ -47,7 +47,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | **DECIDIDO — fila da 1.0** | **4** | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. **LP-38 novo (22/09)** — separar assistência durante a montagem (vira Pendência de Montagem) da assistência de pós-venda (garantia ou contratada). |
 | **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **29** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste), LP-35 (17/09, do lote da exposição segura), LP-36 (18/09, janela de 24 h da Meta) e LP-37 (21/09, comentários `main.py:NNNN` desatualizáveis, achado do planejamento de `TAREFA_SPLIT_BACKEND.md`). |
+| **Total aberto** | **30** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste), LP-35 (17/09, do lote da exposição segura), LP-36 (18/09, janela de 24 h da Meta) e LP-37 (21/09, comentários `main.py:NNNN` desatualizáveis, achado do planejamento de `TAREFA_SPLIT_BACKEND.md`). |
 
 ---
 
@@ -287,6 +287,45 @@ rodada — é medição.
 esbarrou primeiro num erro interno ("Sem permissão para postar aqui" — `pode_escrever_conversa`,
 conversa sem participante, resolvido pelo conserto do portão da Triagem). A janela de 24 h é o
 obstáculo **seguinte**, que aparece depois que o interno sai da frente.
+
+**LP-39 · O roteamento de entrada externa atravessa a fronteira de loja — quem decide a loja é
+"onde esse número já falou", não quem é dono do número que recebeu.**
+*Destino: BETA — cinco lojas-piloto entram em outubro, de negócios diferentes (Inspirium e
+Dalmóbile), e a implantação é por clone. Registrado em 22/09, medido no código; a confirmação de
+campo está abaixo.*
+
+**Medido no código (não é hipótese):** `_rotear_com_candidatos` (`chat/externo.py`) procura a
+conversa de uma entrada externa casando telefone/e-mail contra `EnvioExterno` × `ConversaMensagem`
+**de toda a instalação** — o `filter` tem `EnvioExterno.meio == meio` e mais nada. Não existe
+`loja_id` em lugar nenhum dessa função. `processar_entrada` chama esse roteamento PRIMEIRO e só
+recorre a `_loja_da_entrada` quando nada casou (conversa nova). Consequência: se o número já
+conversou com QUALQUER loja da instalação, a mensagem seguinte cai naquela conversa, mesmo que o
+número que recebeu pertença a outra loja.
+
+**Evidência de campo (22/09, Homologação):** um lead do Marcelo entrou como
+"Lead — Marcelo Buonocore Nunes" na **Loja Teste (15)**, enquanto o único `numero_conectado` da
+instalação é o da **Inspirium (1)**. Os três degraus de `_loja_da_entrada` dariam loja 1 nos três
+casos (não há Cliente casando — o prefixo "Lead —" prova isso; número único → loja do número = 1;
+fallback → primeira loja = 1). Nenhum deles produz 15. O roteamento por conversa existente é o
+único caminho que produz.
+
+**Falta confirmar (não confirmado ainda):** qual conversa anterior da Loja Teste capturou a
+entrada. É uma consulta, está no fim deste item.
+
+**O conserto NÃO é só acrescentar `loja_id` ao filtro.** O mesmo contato pode legitimamente
+existir em duas lojas (é o caso do Marcelo hoje), então a pergunta certa é *qual loja RECEBEU a
+mensagem* — e isso só se responde com o `phone_number_id` do payload da Meta, que é exatamente o
+pré-requisito já registrado em `TAREFA_LOJAS_PILOTO.md` para conectar um segundo número. **Os dois
+itens andam juntos:** enquanto o roteamento não souber por qual número a mensagem chegou, tanto o
+degrau 2 de `_loja_da_entrada` quanto qualquer filtro de loja no roteamento são chute com cara de
+regra.
+
+**Consulta que fecha a medição, em Homologação:**
+
+```sql
+SELECT c.id, c.loja_id, c.tipo, c.titulo, c.segmento, c.criado_em
+  FROM conversas c WHERE c.titulo ILIKE '%Buonocore%' ORDER BY c.id;
+```
 
 ---
 
