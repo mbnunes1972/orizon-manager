@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from database import EnvioExterno, Conversa, Funcionario, Lead, TriagemEntrada
 
 from .externo import (_canal_do_thread, _cliente_por_telefone, _cliente_por_email,
-                      registrar_envio)  # noqa: F401  (canal do fio externo)
+                      _lead_existente, registrar_envio)  # noqa: F401  (canal do fio externo)
 
 SEGMENTO_TRIAGEM = "triagem"   # selo próprio (não é um dos 7 de SEGMENTOS) — SAC distribui
 MINUTOS_SWEEP = 2
@@ -129,23 +129,33 @@ def _sac_usuario_id(db, loja_id):
 
 def triagem_materializar(db, entrada, segmento):
     """Resolução ÚNICA e sempre automática: se o telefone/e-mail bate com um Cliente já
-    cadastrado, a conversa segue para ele normalmente. Contato NOVO cria um `Lead` (Captação
-    provisória) — NUNCA mais um `Cliente` direto. + uma conversa de grupo, ancorada nesse Lead
-    (`conv.lead_id`), com o SAC como responsável inicial + o contato como participante externo.
-    `segmento` é o escolhido pelo cliente no menu (já validado em interpretar_resposta_triagem)
-    OU SEGMENTO_TRIAGEM quando ninguém respondeu a tempo. Nome do lead: cadastro > perfil do
-    WhatsApp (Meta) > o próprio remetente, nessa ordem (pedido 2026-08-05). Não commita.
+    cadastrado, a conversa segue para ele normalmente (`conv.cliente_id` gravado — TAREFA-B,
+    B1 item 2: a informação já estava na mão e era descartada). `segmento` é o escolhido pelo
+    cliente no menu (já validado em interpretar_resposta_triagem) OU SEGMENTO_TRIAGEM quando
+    ninguém respondeu a tempo. Nome: cadastro > perfil do WhatsApp (Meta) > o próprio
+    remetente, nessa ordem (pedido 2026-08-05). Título é o NOME puro, sem prefixo — o selo
+    Lead/Cliente/Contato é DERIVADO em `serializar_conversa` (TAREFA-B, B1 item 3), nunca mais
+    escrito aqui. Não commita.
+
+    TAREFA-B (docs/db/TAREFA_LEAD_E_PAINEL_SAC.md, B2, decisão do Marcelo 24/09): Lead deixou
+    de nascer aqui incondicionalmente pra todo contato sem Cliente — **Lead é quem veio de
+    campanha** (`referral` da Meta). Quando há, `processar_entrada` (chat/externo.py) já criou
+    o `Lead` NA ENTRADA (o clique no anúncio já é o evento) — aqui só PROCURA por
+    (telefone, loja) e liga `conv.lead_id`, nunca cria um segundo (dedup: a mesma pessoa pode
+    mandar várias mensagens antes de materializar). Sem `referral` nenhum (nem agora, nem
+    antes) e telefone desconhecido: **nenhum Lead nasce** — a conversa é atendimento comum do
+    SAC, selo "Contato", até alguém promover a Lead manualmente (botão, fora desta tarefa).
 
     REVERSÃO DA "DECISÃO 12" (14/09/2026, PLANO_SEMANA_1.md — reversão deliberada, registrada
     com data e motivo por pedido do Marcelo): a decisão original ("contato vira cadastro") fazia
-    todo contato inbound sem match virar `Cliente` direto, sem estágio de qualificação. Na
-    prática, os leads de Google/Instagram/Facebook chegam por WhatsApp e a triagem os promovia a
-    Cliente antes de qualquer briefing — o motivo de existir do `Lead` (Captação provisória,
-    commit anterior) evaporava se o principal ponto de entrada continuasse criando Cliente direto.
+    todo contato inbound sem match virar `Cliente` direto, sem estágio de qualificação — o
+    motivo de existir do `Lead` (Captação provisória) evaporava se o principal ponto de entrada
+    continuasse criando Cliente direto. Continua valendo: nunca cria `Cliente` aqui.
     Dedup de contato repetido não muda: `_rotear_com_candidatos` (chat/externo.py) já resolve
     mensagens subsequentes do mesmo número/e-mail pela conversa existente (via
-    ConversaParticipanteExterno), independente de ela estar ancorada em Cliente ou em Lead — este
-    caminho só roda na PRIMEIRA mensagem de um contato sem conversa nenhuma."""
+    ConversaParticipanteExterno), independente de ela estar ancorada em Cliente, Lead ou
+    nenhum dos dois — este caminho só roda na PRIMEIRA mensagem de um contato sem conversa
+    nenhuma."""
     if entrada.status != "pendente":
         raise ValueError("Esta entrada já foi resolvida.")
     from . import core as _mc
@@ -155,19 +165,17 @@ def triagem_materializar(db, entrada, segmento):
     sac_uid = _sac_usuario_id(db, entrada.loja_id)
     lead = None
     if cli is None:
-        lead = Lead(nome=nome, loja_id=entrada.loja_id, canal=entrada.meio,
-                   whatsapp=(entrada.remetente if entrada.meio == "whatsapp" else None),
-                   email=(entrada.remetente if entrada.meio == "email" else None),
-                   responsavel_usuario_id=sac_uid)
-        db.add(lead); db.flush()
+        lead = _lead_existente(db, entrada.loja_id, entrada.meio, entrada.remetente)
     if sac_uid:
-        conv = _mc.criar_grupo(db, entrada.loja_id, sac_uid, "Lead — %s" % nome, [sac_uid],
+        conv = _mc.criar_grupo(db, entrada.loja_id, sac_uid, nome, [sac_uid],
                                exige_dois=False)
     else:
-        conv = Conversa(loja_id=entrada.loja_id, tipo="grupo", titulo="Lead — %s" % nome)
+        conv = Conversa(loja_id=entrada.loja_id, tipo="grupo", titulo=nome)
         db.add(conv); db.flush()
     if lead is not None:
         conv.lead_id = lead.id
+    elif cli is not None:
+        conv.cliente_id = cli.id
     _mc.adicionar_externo(db, conv, nome,
                           telefone=(entrada.remetente if entrada.meio == "whatsapp" else None),
                           email=(entrada.remetente if entrada.meio == "email" else None),

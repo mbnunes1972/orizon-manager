@@ -414,6 +414,53 @@ def _cliente_por_email(db, remetente):
     return None
 
 
+def _lead_existente(db, loja_id, meio, remetente):
+    """Lead já existente para este contato NESTA loja (TAREFA_LEAD_E_PAINEL_SAC.md, B2, item 7)
+    — Lead, ao contrário de Cliente, não é global: escopado à loja que recebeu. Mesmo critério
+    de match de `_cliente_por_telefone` (últimos 8 dígitos, tolera DDI/DDD). Chamado tanto na
+    ENTRADA (evita criar um segundo Lead se o mesmo telefone mandar mais de uma mensagem antes
+    de a triagem materializar) quanto na MATERIALIZAÇÃO (liga a conversa ao Lead que já existe,
+    nunca cria um novo ali)."""
+    from database import Lead
+    if meio == "whatsapp":
+        tail = _digitos(remetente)[-8:]
+        if len(tail) != 8:
+            return None
+        for lead in db.query(Lead).filter_by(loja_id=loja_id).all():
+            for campo in (lead.whatsapp, lead.telefone):
+                d = _digitos(campo)
+                if len(d) >= 8 and d[-8:] == tail:
+                    return lead
+        return None
+    alvo = (remetente or "").strip().lower()
+    if not alvo:
+        return None
+    for lead in db.query(Lead).filter_by(loja_id=loja_id).all():
+        if (lead.email or "").strip().lower() == alvo:
+            return lead
+    return None
+
+
+def _criar_lead_referral(db, loja_id, meio, remetente, nome, referral):
+    """Lead de campanha (TAREFA_LEAD_E_PAINEL_SAC.md, B2, item 6, decisão do Marcelo 24/09):
+    Lead é quem veio de campanha — o clique no anúncio (Click-to-WhatsApp da Meta) JÁ É o
+    evento de lead, então nasce na ENTRADA, sem esperar a materialização da triagem. `canal`
+    deriva do próprio bloco `referral` (`source_type`: 'ad'|'post' — a Meta não manda uma
+    string "instagram"/"facebook" pronta aqui; ver aviso do documento sobre Google Ads não
+    mandar `referral` nenhum). O bloco inteiro fica em `dados_json` sem achatar nada — mesmo
+    espírito de `Funcao.beneficios_json`, `template` nomeia a forma pra quem for ler depois.
+    Não commita."""
+    from database import Lead
+    canal = (referral or {}).get("source_type") or "meta_ads"
+    lead = Lead(nome=nome, loja_id=loja_id, canal=canal,
+               whatsapp=(remetente if meio == "whatsapp" else None),
+               email=(remetente if meio == "email" else None),
+               template="whatsapp_referral",
+               dados_json=json.dumps(referral, ensure_ascii=False))
+    db.add(lead); db.flush()
+    return lead
+
+
 def _loja_da_entrada(db, remetente=None, meio="whatsapp"):
     """Loja da entrada externa — QUEM RECEBEU decide (LP-39 passo 1, decisão do Marcelo 22/09,
     docs/db/TAREFA_LP39_ROTEAMENTO.md — reverte a ordem antiga, medida em campo entregando na
@@ -444,7 +491,7 @@ def _loja_da_entrada(db, remetente=None, meio="whatsapp"):
 
 
 def processar_entrada(db, meio, remetente, texto, id_externo_ref=None, id_externo=None,
-                      nome=None):
+                      nome=None, referral=None):
     """Recebe uma resposta EXTERNA já normalizada (o webhook faz o parse específico do provedor)
     e a persiste na conversa certa — ou no BUFFER de triagem (spec 2026-07-31: mensagem nenhuma
     é descartada em silêncio). Idempotente por `id_externo` (a Meta reentrega o mesmo webhook até
@@ -452,7 +499,9 @@ def processar_entrada(db, meio, remetente, texto, id_externo_ref=None, id_extern
     resultado. Retorna {status: 'roteado'|'triagem', conversa_id, [triagem_id]}. Autor NULL =
     veio de fora. `nome` (2026-08-05): perfil do WhatsApp (Meta) — usado só como FALLBACK do
     nome do lead quando o telefone não bate com nenhum Cliente já cadastrado (cadastro vence).
-    NÃO commita (o chamador decide)."""
+    `referral` (TAREFA_LEAD_E_PAINEL_SAC.md, B2): bloco de Click-to-WhatsApp — quando presente
+    e o telefone não bate com Cliente, o `Lead` nasce AQUI (não espera a materialização da
+    triagem), porque o clique já é o evento de lead. NÃO commita (o chamador decide)."""
     from . import core as _mc
     if id_externo:
         ja = (db.query(EnvioExterno)
@@ -495,6 +544,15 @@ def processar_entrada(db, meio, remetente, texto, id_externo_ref=None, id_extern
         cli = (_cliente_por_telefone(db, remetente) if meio == "whatsapp"
                else _cliente_por_email(db, remetente))
         nome_resolvido = (cli.nome if cli else None) or nome
+        # TAREFA-B (docs/db/TAREFA_LEAD_E_PAINEL_SAC.md, B2, item 6): Lead é quem veio de
+        # campanha — o `referral` só chega na PRIMEIRA mensagem (é a que abriu a conversa), e é
+        # exatamente esta, a que cria a TriagemEntrada. Cliente cadastrado nunca vira Lead
+        # (item 48). Procura antes de criar (`_lead_existente`) — evita duplicar se este
+        # telefone já tiver clicado no anúncio e mandado mensagem antes.
+        if cli is None and referral:
+            if _lead_existente(db, loja_id, meio, remetente) is None:
+                _criar_lead_referral(db, loja_id, meio, remetente,
+                                     nome_resolvido or remetente, referral)
         ent = TriagemEntrada(
             loja_id=loja_id, meio=meio,
             remetente=_rem_norm, nome_whatsapp=nome_resolvido,
@@ -523,9 +581,15 @@ def processar_entrada(db, meio, remetente, texto, id_externo_ref=None, id_extern
 
 def iter_mensagens_whatsapp(payload):
     """Extrai as mensagens de um payload de entrada da Meta WhatsApp Cloud API, normalizadas em
-    {from, texto, id, ref, nome}. Tolerante à forma aninhada (entry[].changes[].value.messages[]).
+    {from, texto, id, ref, nome, referral}. Tolerante à forma aninhada
+    (entry[].changes[].value.messages[]).
     `nome` (2026-08-05): perfil do contato que a Meta manda em `value.contacts[]` (wa_id→nome) —
-    fallback de nome do lead automático quando o telefone não bate com nenhum Cliente cadastrado."""
+    fallback de nome do lead automático quando o telefone não bate com nenhum Cliente cadastrado.
+    `referral` (TAREFA_LEAD_E_PAINEL_SAC.md, B2, item 4): o bloco que a Meta manda em
+    `msg.referral` quando a mensagem veio de um clique em anúncio Click-to-WhatsApp (id do
+    anúncio, `source_type`, `source_id`, `headline`, `body`) — `None` quando ausente (mensagem
+    orgânica, ou anúncio do Google, que não manda este bloco). Mesma família do
+    `phone_number_id` do LP-39: o sinal chegava e era jogado fora."""
     for entry in (payload or {}).get("entry", []) or []:
         for change in entry.get("changes", []) or []:
             val = change.get("value", {}) or {}
@@ -536,6 +600,7 @@ def iter_mensagens_whatsapp(payload):
                        "texto": ((msg.get("text") or {}).get("body")
                                  or "(mensagem sem texto)"),
                        "id": msg.get("id"),
+                       "referral": msg.get("referral"),
                        "ref": (msg.get("context") or {}).get("id"),
                        "nome": nomes.get(msg.get("from"))}
 

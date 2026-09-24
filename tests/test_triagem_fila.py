@@ -219,18 +219,20 @@ def test_segmento_reconhecido_materializa_com_sac_responsavel(app_db, seed):
     assert conv.segmento == "comercial"
     assert conv.responsavel_usuario_id == sac.usuario_id
     assert conv.origem_entrada == "triagem"
-    # Reversão da "decisão 12" (14/09/2026, PLANO_SEMANA_1.md): contato sem match vira Lead
-    # (Captação provisória), NUNCA mais Cliente direto — motivo: leads de Google/Instagram/
-    # Facebook chegam por WhatsApp e estavam sendo promovidos a Cliente sem qualificação.
+    # Reversão da "decisão 12" (14/09/2026, PLANO_SEMANA_1.md): contato sem match NUNCA vira
+    # Cliente direto — continua valendo, sem qualificação nenhuma antes do briefing.
     cli = db.query(app_db.Cliente).filter_by(loja_id=seed["loja1_id"]).filter(
         app_db.Cliente.whatsapp.contains("955550001")).first()
     assert cli is None
+    # TAREFA-B (docs/db/TAREFA_LEAD_E_PAINEL_SAC.md, B2, decisão do Marcelo 24/09) SUBSTITUI a
+    # regra acima: **Lead é quem veio de campanha** (`referral` da Meta), não todo contato sem
+    # match. Esta entrada não tem `referral` (mensagem orgânica) → nenhum Lead nasce — a
+    # conversa é atendimento comum do SAC, selo "Contato" (ver
+    # tests/test_tarefa_b_lead_e_painel_sac.py pro caso COM referral).
     lead = db.query(app_db.Lead).filter_by(loja_id=seed["loja1_id"]).filter(
         app_db.Lead.whatsapp.contains("955550001")).first()
-    assert lead is not None
-    assert lead.canal == "whatsapp"
-    assert lead.responsavel_usuario_id == sac.usuario_id
-    assert conv.lead_id == lead.id
+    assert lead is None
+    assert conv.lead_id is None and conv.cliente_id is None
     ext_part = (db.query(app_db.ConversaParticipanteExterno)
                   .filter_by(conversa_id=conv.id).first())
     assert ext_part is not None                        # contato espelha por WhatsApp

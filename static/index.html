@@ -13543,6 +13543,12 @@ function _atdItemHTML(c){
   const seg = c.segmento ? '<span class="'+_ocSegClasse(c.segmento)+'"><span class="dot" style="background:currentColor"></span>'+esc(_ocSegRot(c.segmento))+'</span>' : _atdFallbackTag(c);
   const jan = _atdJanelaBadge(c.janela);
   const concl = c.status==='concluida' ? '<span class="atd-badge" style="border-color:var(--ok);color:var(--ok)">Concluída</span>' : '';
+  // TAREFA-B (docs/db/TAREFA_LEAD_E_PAINEL_SAC.md, B1): selo DERIVADO (serializar_conversa),
+  // não mais escrito no título ("Lead — Nome" rotulava todo contato novo, cliente incluso). Só
+  // aparece pra Lead/Cliente — "Contato" (o default, nem lead nem cadastro) fica mudo de
+  // propósito, é exatamente o excesso de rótulo que este item tira.
+  const contatoTipo = c.contato_tipo==='lead' ? '<span class="atd-badge atd-b-seg">Lead</span>'
+    : c.contato_tipo==='cliente' ? '<span class="atd-badge atd-b-seg">Cliente</span>' : '';
   const nl = (c.nao_lidas||0)>0 ? '<span class="atd-nl">'+(c.nao_lidas>99?'99+':c.nao_lidas)+'</span>' : '';
   const titulo = (c.titulo||'Conversa').replace(/^\s*[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]\s*/u,'');
   const dot = c.urgente ? '<span class="atd-urgent-dot" title="Urgente"></span>' : '';
@@ -13551,7 +13557,7 @@ function _atdItemHTML(c){
     + _ocAvatarHTML(titulo, c.tipo)
     + '<div class="atd-main">'
     + '<div class="atd-top"><span class="atd-nome">'+dot+esc(titulo)+nl+'</span><span class="atd-tempo">'+esc(_atdQuando(c.ultima_em||c.criado_em))+'</span></div>'
-    + '<div class="atd-bottom"><div class="atd-prev">'+esc(c.ultima_previa||'—')+'</div><div class="atd-tags">'+seg+jan+concl+'</div></div></div></div>';
+    + '<div class="atd-bottom"><div class="atd-prev">'+esc(c.ultima_previa||'—')+'</div><div class="atd-tags">'+contatoTipo+seg+jan+concl+'</div></div></div></div>';
 }
 // (atendAbrir é definido no bloco do painel de conversa: alias de ocAbrirConversa — thread na própria página.)
 

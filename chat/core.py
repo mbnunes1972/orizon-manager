@@ -1766,12 +1766,20 @@ def serializar_conversa(db, c, viewer_id, ultima=None, participantes=None, nao_l
     if getattr(c, "responsavel_usuario_id", None):
         ur = db.get(Usuario, c.responsavel_usuario_id)
         resp = {"id": c.responsavel_usuario_id, "nome": (ur.nome if ur else None)}
+    # TAREFA-B (docs/db/TAREFA_LEAD_E_PAINEL_SAC.md, B1 item 3): selo DERIVADO, nunca mais
+    # escrito no título — "Lead — Nome" rotulava TODO contato novo da triagem, cliente
+    # reconhecido incluso. `lead_id` só existe quando o contato veio de campanha (referral,
+    # B2) e sobrevive à conversão; `cliente_id` é o cadastro. Nunca os dois ao mesmo tempo na
+    # criação (lead vira cliente por conversão depois, fora desta tarefa).
+    contato_tipo = "lead" if getattr(c, "lead_id", None) else (
+        "cliente" if getattr(c, "cliente_id", None) else "contato")
     return {
         "id": c.id, "tipo": c.tipo, "titulo": titulo,
         "projeto_nome": c.projeto_nome, "outro_usuario_id": outro_id,
         "assunto": _assunto_do(db, c),
         "nao_lidas": nao_lidas,
         "arquivada": bool(arquivada),
+        "contato_tipo": contato_tipo,
         # Atendimentos UI (spec 2026-08-04): responsável atual (§7.1-A), urgência manual (§6.1),
         # origem p/ tag de fallback Triagem×Avulsa (§5) e status concluída (§8).
         "responsavel": resp,

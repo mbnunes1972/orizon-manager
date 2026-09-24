@@ -7015,7 +7015,8 @@ class Handler(BaseHTTPRequestHandler):
                                                      texto=msg["texto"],
                                                      id_externo_ref=msg.get("ref"),
                                                      id_externo=msg.get("id"),
-                                                     nome=msg.get("nome"))
+                                                     nome=msg.get("nome"),
+                                                     referral=msg.get("referral"))
                         # Rastro do destino (spec triagem 2026-07-31): nem sucesso nem fila
                         # passam mais em silêncio pelo webhook.
                         logging.getLogger(__name__).info(
