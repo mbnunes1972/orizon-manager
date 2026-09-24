@@ -1,8 +1,30 @@
 # Tarefa — LP-39, passo 1: quem recebeu decide a loja
 
-> **Camada 4 · TRABALHO EM ANDAMENTO.** Descartável quando fechar.
-> Aberta em 23/09/2026. Executa a primeira fatia do **LP-39** (`LISTA_PARALELA.md`), que é a
-> única BETA com evidência de campo repetida — três vezes em dois dias.
+> **Camada 4 · FECHADA em 24/09/2026** (`git log --grep="LP-39"`). Aberta em 23/09/2026. Executa
+> a primeira fatia do **LP-39** (`LISTA_PARALELA.md`), que é a única BETA com evidência de campo
+> repetida — três vezes em dois dias. Descartável — o passo 2 (`phone_number_id`, DDL) é tarefa
+> nova, não continuação deste arquivo.
+
+## Estado final
+
+**Portão alvo** (`tests/test_lp39_roteamento_loja.py` + `tests/test_chat_externo.py` +
+`tests/test_triagem_auto.py` + `tests/test_triagem_fila.py` + `tests/test_chat_wa.py`):
+**47 passed, 0 failed.**
+
+**Suíte completa:** **2.894 passed, 3 xfailed, 3 failed em 13m07** — os 3 vermelhos são
+`#neg-subtotal[chromium]`, o flake conhecido da família LP-22 (não é consequência desta tarefa;
+critério de aceite já registrado no bloco 1 do `LISTA_IMEDIATA.md`).
+
+**Quatro testes pré-existentes precisaram de ajuste de fixture** (nenhum é o teste novo da
+tarefa) — todos pelo mesmo motivo: não tinham `NumeroConectado` nenhum, então
+`_loja_da_entrada` caía no fallback "primeira loja por id" — a loja-seed do
+`_seed_loja_padrao()` (sempre criada primeiro pelo `init_db()`), não a loja do fixture `seed` —
+e o filtro novo rejeitava conversas legítimas por "loja errada": `test_sem_sac_configurado_
+materializa_sem_responsavel` (`test_triagem_fila.py`), `test_webhook_configurado_roteia_
+resposta` (`test_chat_externo.py`), as três de `test_chat_ciclo_eventos.py` (fixture de módulo
+nova, `numero_da_loja1`), e `test_nova_entrada_reabre_atendimento_concluido`
+(`test_atendimentos_ui.py`). Fiel à produção (RF-01: todo número WhatsApp conectado pertence a
+uma loja) — mesmo padrão que `test_triagem_fila.py` já usava antes desta tarefa.
 
 ## Por que agora, e não em outubro
 

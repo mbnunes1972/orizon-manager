@@ -489,6 +489,17 @@ SELECT c.id, c.loja_id, c.tipo, c.titulo, c.segmento, c.origem_entrada, c.criado
   FROM conversas c WHERE c.titulo ILIKE '%Buonocore%' ORDER BY c.id;
 ```
 
+**Passo 1 — FECHADO em 24/09 (`git log --grep="LP-39"`), sem DDL.** Detalhe completo em
+`docs/db/TAREFA_LP39_ROTEAMENTO.md`. Inverte a ordem dos degraus 2-4 acima (o degrau 1 —
+`phone_number_id` do payload — segue sem existir; fica pro passo 2, com DDL, fora deste commit):
+`_loja_da_entrada` (`chat/externo.py`) passa a decidir primeiro pelo `NumeroConectado` ÚNICO da
+instalação (hoje é o único jeito de saber "quem recebeu" sem o `phone_number_id`), depois pelo
+cliente cadastrado, depois primeira loja; `_rotear_com_candidatos` ganha filtro de loja
+(`loja_id=None` por padrão, comportamento antigo intacto) que vale também pro ramo da citação
+(`id_externo_ref`); `processar_entrada` resolve a loja ANTES de rotear. As quatro provas da
+tarefa em `tests/test_lp39_roteamento_loja.py`. Suíte completa: 2.894 passed, 3 xfailed, 3 failed
+(os 3 são `#neg-subtotal[chromium]`, flake LP-22 conhecido) em 13m07.
+
 ---
 
 ## FRONTEIRA

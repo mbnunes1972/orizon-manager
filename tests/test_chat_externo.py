@@ -232,10 +232,19 @@ def test_webhook_configurado_roteia_resposta(http_client_factory, seed, app_db, 
     # prepara um envio de saída p/ o número, para a resposta ter onde cair
     import mod_chat_externo as ext, mod_chat
     db = app_db.get_session()
+    # LP-39 passo 1 (docs/db/TAREFA_LP39_ROTEAMENTO.md): o roteamento agora filtra candidatas
+    # (inclusive a citada por id_externo_ref) pela loja de QUEM RECEBEU. Sem NumeroConectado
+    # nenhum aqui, a loja cairia no fallback "primeira loja por id" — que na suíte de teste é a
+    # loja-seed do _seed_loja_padrao (id sempre menor que as do fixture `seed`), não
+    # seed["loja1_id"]; a conversa certa seria rejeitada por "loja errada" e a resposta cairia
+    # na fila. Fiel à produção (RF-01: todo número WhatsApp conectado pertence a uma loja) —
+    # mesmo padrão de tests/test_triagem_fila.py (fixture numero_da_loja1).
+    num1 = app_db.NumeroConectado(loja_id=seed["loja1_id"], numero="+55 12 98888-7777")
+    db.add(num1)
     conv = mod_chat.get_or_create_conversa_projeto(db, seed["loja1_id"], "Proj_L1"); db.flush()
     m = mod_chat.enviar_mensagem(db, conv, None, "pergunta", canal="financeiro", _permitir_externo=True)
     e = ext.registrar_envio(db, m, "whatsapp", "financeiro", "cliente", seed["cliente_l1_id"], "5512988887777")
-    e.id_externo = "wamid.OUT2"; db.commit(); conv_id = conv.id; db.close()
+    e.id_externo = "wamid.OUT2"; db.commit(); conv_id = conv.id; num1_id = num1.id; db.close()
 
     payload = {"entry":[{"changes":[{"value":{"messages":[
         {"from":"5512988887777","id":"wamid.IN2","text":{"body":"resposta via webhook"},
@@ -249,6 +258,7 @@ def test_webhook_configurado_roteia_resposta(http_client_factory, seed, app_db, 
     db = app_db.get_session()
     msgs = mod_chat.listar_mensagens(db, conv_id)
     assert any(x["corpo"] == "resposta via webhook" and x["autor_usuario_id"] is None for x in msgs)
+    db.delete(db.get(app_db.NumeroConectado, num1_id)); db.commit()
     db.close()
 
     # assinatura inválida → 403, nada persistido

@@ -415,9 +415,22 @@ def _cliente_por_email(db, remetente):
 
 
 def _loja_da_entrada(db, remetente=None, meio="whatsapp"):
-    """Loja da entrada externa: (1) o remetente é um Cliente cadastrado → a loja dele (mais
-    específico); (2) NumeroConectado ÚNICO na instalação → a loja do número; (3) primeira loja.
-    Multi-número por loja fica p/ quando o webhook repassar o phone_number_id do payload."""
+    """Loja da entrada externa — QUEM RECEBEU decide (LP-39 passo 1, decisão do Marcelo 22/09,
+    docs/db/TAREFA_LP39_ROTEAMENTO.md — reverte a ordem antiga, medida em campo entregando na
+    loja errada 3 vezes: cliente cadastrado vencia o número que de fato recebeu a mensagem):
+
+    (1) dono do NumeroConectado ÚNICO na instalação — hoje é o único jeito de saber "quem
+        recebeu" sem o phone_number_id do payload da Meta (generaliza para N números no passo 2,
+        fora desta tarefa; a ordem não muda quando isso entrar);
+    (2) sem número conectado nenhum (ou mais de um — ambíguo do mesmo jeito, sem phone_number_id
+        pra desempatar), cliente cadastrado com aquele telefone/e-mail → a loja dele. É o
+        comportamento de ANTES desta tarefa, preservado como fallback explícito — instalação sem
+        NumeroConectado nenhum não muda de comportamento;
+    (3) primeira loja por id."""
+    from database import NumeroConectado
+    nums = db.query(NumeroConectado).all()
+    if len(nums) == 1:
+        return nums[0].loja_id
     if remetente and meio == "whatsapp":
         cli = _cliente_por_telefone(db, remetente)
         if cli is not None:
@@ -426,10 +439,6 @@ def _loja_da_entrada(db, remetente=None, meio="whatsapp"):
         cli = _cliente_por_email(db, remetente)
         if cli is not None:
             return cli.loja_id
-    from database import NumeroConectado
-    nums = db.query(NumeroConectado).all()
-    if len(nums) == 1:
-        return nums[0].loja_id
     l = db.query(Loja).order_by(Loja.id.asc()).first()
     return l.id if l else None
 
@@ -455,8 +464,12 @@ def processar_entrada(db, meio, remetente, texto, id_externo_ref=None, id_extern
         if ent_ja is not None:                    # reentrega de entrada já no BUFFER
             return {"status": ("roteado" if ent_ja.status == "resolvido" else "triagem"),
                     "conversa_id": ent_ja.conversa_id, "triagem_id": ent_ja.id}
+    # LP-39 passo 1 (docs/db/TAREFA_LP39_ROTEAMENTO.md): a loja é resolvida ANTES de rotear —
+    # QUEM RECEBEU decide (é a inversão que dá nome à tarefa) — e repassada ao roteamento, pra
+    # filtrar candidatas de outra loja ANTES de uma conversa antiga vencer por conta própria.
+    loja_id = _loja_da_entrada(db, remetente=remetente, meio=meio)
     conv, candidatos = _rotear_com_candidatos(db, meio, id_externo_ref=id_externo_ref,
-                                              remetente=remetente)
+                                              remetente=remetente, loja_id=loja_id)
     if conv is None:
         from . import triagem as _tri
         _rem_norm = (_digitos(remetente) if meio == "whatsapp"
@@ -483,7 +496,7 @@ def processar_entrada(db, meio, remetente, texto, id_externo_ref=None, id_extern
                else _cliente_por_email(db, remetente))
         nome_resolvido = (cli.nome if cli else None) or nome
         ent = TriagemEntrada(
-            loja_id=_loja_da_entrada(db, remetente=remetente, meio=meio), meio=meio,
+            loja_id=loja_id, meio=meio,
             remetente=_rem_norm, nome_whatsapp=nome_resolvido,
             texto=texto, id_externo=id_externo, id_externo_ref=id_externo_ref,
             candidatos_json=(json.dumps(sorted(candidatos)) if candidatos else None))
@@ -840,19 +853,26 @@ def processar_entrada_usuario(db, remetente, texto):
     return {"status": "roteado", "conversa_id": conv.id, "usuario_id": u.id}
 
 
-def _rotear_com_candidatos(db, meio, id_externo_ref=None, remetente=None):
+def _rotear_com_candidatos(db, meio, id_externo_ref=None, remetente=None, loja_id=None):
     """Roteamento da entrada externa com os CANDIDATOS preservados (spec 2026-07-31): retorna
     (conversa, candidatos). Ordem: (1) reply CITANDO um envio nosso (id_externo) → determinístico
     (vence inclusive projeto concluído); (2) sem citação, número/e-mail com UMA única conversa
     ATIVA → vai direto — conversa de projeto CONCLUÍDO não é reaberta sozinha, vira candidata;
-    (3) várias/nenhuma ativa → (None, candidatos) e a lista NÃO se perde (vai à fila)."""
+    (3) várias/nenhuma ativa → (None, candidatos) e a lista NÃO se perde (vai à fila).
+
+    `loja_id` (LP-39 passo 1, docs/db/TAREFA_LP39_ROTEAMENTO.md): quando informado, FILTRA as
+    candidatas por `Conversa.loja_id` — sem isto a conversa antiga de OUTRA loja vencia antes de
+    qualquer decisão de loja (era como a mensagem 113 chegou na conversa 31 da loja 15 pelo
+    número da loja 1). Vale também pro ramo da citação (`id_externo_ref`): conversa citada de
+    outra loja não serve — cai pro resto do fluxo (remetente), não retorna direto. `None`
+    (padrão) = comportamento de antes, sem filtro nenhum."""
     if id_externo_ref:
         env = (db.query(EnvioExterno)
                  .filter(EnvioExterno.id_externo == id_externo_ref).first())
         if env is not None:
             msg = db.get(ConversaMensagem, env.mensagem_id)
             conv = db.get(Conversa, msg.conversa_id) if msg else None
-            if conv is not None:
+            if conv is not None and (loja_id is None or conv.loja_id == loja_id):
                 return conv, [conv.id]
     if not remetente:
         return None, []
@@ -867,6 +887,11 @@ def _rotear_com_candidatos(db, meio, id_externo_ref=None, remetente=None):
             conv_ids.add(conv_id)
     if not conv_ids:
         return None, []
+    if loja_id is not None:
+        conv_ids = {cid for cid in conv_ids
+                   if getattr(db.get(Conversa, cid), "loja_id", None) == loja_id}
+        if not conv_ids:
+            return None, []
     ativas = []
     for cid in conv_ids:
         c = db.get(Conversa, cid)
@@ -880,11 +905,12 @@ def _rotear_com_candidatos(db, meio, id_externo_ref=None, remetente=None):
     return None, sorted(conv_ids)
 
 
-def rotear_entrada(db, meio, id_externo_ref=None, remetente=None):
+def rotear_entrada(db, meio, id_externo_ref=None, remetente=None, loja_id=None):
     """Conversa-alvo de uma resposta EXTERNA, ou None quando é ambíguo/desconhecido (→ fila de
-    triagem persistida — processar_entrada guarda os candidatos)."""
+    triagem persistida — processar_entrada guarda os candidatos). `loja_id`: ver
+    `_rotear_com_candidatos`."""
     conv, _cand = _rotear_com_candidatos(db, meio, id_externo_ref=id_externo_ref,
-                                         remetente=remetente)
+                                         remetente=remetente, loja_id=loja_id)
     return conv
 
 # Re-export de compatibilidade: a fila de triagem vive em chat/triagem.py (spec de portas).

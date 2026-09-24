@@ -1637,7 +1637,11 @@ def iniciar_conversa_externa(db, loja_id, usuario_id, contato, template_id=None,
     if livre and not _ext.janela_por_telefone(db, loja_id, telefone)["aberta"]:
         raise ValueError("Sem janela de atendimento aberta com este contato — escolha um "
                          "modelo aprovado pela Meta.")
-    conv, _cands = _ext._rotear_com_candidatos(db, "whatsapp", remetente=telefone)
+    # LP-39 passo 1 (docs/db/TAREFA_LP39_ROTEAMENTO.md): filtra pela loja de quem está
+    # iniciando — o `conv.loja_id != loja_id` abaixo já cobria isto criando conversa nova
+    # quando divergia; com o filtro ele vira redundância inofensiva (mantido, não faz mal).
+    conv, _cands = _ext._rotear_com_candidatos(db, "whatsapp", remetente=telefone,
+                                               loja_id=loja_id)
     if conv is None or conv.loja_id != loja_id:
         conv = criar_grupo(db, loja_id, usuario_id, "Lead — %s" % nome, [usuario_id],
                            exige_dois=False)

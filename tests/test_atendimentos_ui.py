@@ -162,6 +162,13 @@ def test_nova_entrada_reabre_atendimento_concluido(app_db, seed, monkeypatch):
     tel = "5512999990101"
     db = app_db.get_session()
     try:
+        # LP-39 passo 1 (docs/db/TAREFA_LP39_ROTEAMENTO.md): o roteamento agora filtra
+        # candidatas (inclusive a citada por id_externo_ref) pela loja de QUEM RECEBEU. Sem
+        # NumeroConectado nenhum aqui, a loja cairia no fallback "primeira loja por id" — a
+        # loja-seed do _seed_loja_padrao, não seed["loja1_id"] — e rejeitaria a conversa certa
+        # por "loja errada". Mesmo padrão de tests/test_triagem_fila.py/test_chat_externo.py.
+        num1 = app_db.NumeroConectado(loja_id=seed["loja1_id"], numero="+55 12 90000-0003")
+        db.add(num1); db.commit()
         crid = _uid(db, app_db, "dir_l1")
         conv = mod_chat.criar_grupo(db, seed["loja1_id"], crid, "G reab", [], exige_dois=False)
         mod_chat.adicionar_externo(db, conv, "Cli R", telefone=tel, meio="whatsapp")
@@ -180,6 +187,7 @@ def test_nova_entrada_reabre_atendimento_concluido(app_db, seed, monkeypatch):
         assert r["status"] == "roteado" and r["conversa_id"] == conv.id
         db.refresh(conv)
         assert conv.status == "aberta"              # §8.5: reabriu sozinho
+        db.delete(db.get(app_db.NumeroConectado, num1.id)); db.commit()
     finally:
         db.close()
 

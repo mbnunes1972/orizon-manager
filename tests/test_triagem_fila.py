@@ -252,23 +252,35 @@ def test_sem_sac_configurado_materializa_sem_responsavel(app_db, seed):
     import mod_chat_externo as ext
     from database import Conversa
     db = app_db.get_session()
-    # âncora a entrada na loja 2 por Cliente já cadastrado (mais específico que o fallback de
-    # NumeroConectado/1ª loja — ver _loja_da_entrada) sem depender de haver só 1 NumeroConectado
+    # LP-39 passo 1 (docs/db/TAREFA_LP39_ROTEAMENTO.md): _loja_da_entrada agora prioriza QUEM
+    # RECEBEU — o fixture do módulo (numero_da_loja1, autouse) garante 1 NumeroConectado só
+    # (loja 1), que sozinho já decidiria a loja sem olhar pro cliente. Pra ancorar de fato na
+    # loja 2 (o que este teste precisa — SAC ausente É da loja 2), soma um segundo
+    # NumeroConectado (loja 2): com 2 números a decisão vira ambígua do mesmo jeito que 0 (sem
+    # phone_number_id pra desempatar, passo 2 — fora desta tarefa), e cai pro degrau seguinte
+    # (cliente cadastrado), que aponta pra loja 2. Removido no fim — não é o cenário padrão do
+    # módulo, os outros testes deste arquivo continuam com 1 número só (loja 1).
+    num2 = app_db.NumeroConectado(loja_id=seed["loja2_id"], numero="+55 31 90000-0002")
+    db.add(num2)
     db.add(app_db.Cliente(nome="Cliente Loja 2 Novo", loja_id=seed["loja2_id"],
                           whatsapp="(31) 95555-0099"))
     db.commit()
-    r1 = ext.processar_entrada(db, "whatsapp", remetente="(31) 95555-0099",
-                               texto="oi", id_externo="wamid.NOSAC1")
-    db.commit()
-    assert db.get(app_db.TriagemEntrada, r1["triagem_id"]).loja_id == seed["loja2_id"]
-    r2 = ext.processar_entrada(db, "whatsapp", remetente="(31) 95555-0099",
-                               texto="1", id_externo="wamid.NOSAC2")
-    db.commit()
-    assert r2["status"] == "roteado"
-    conv = db.get(Conversa, r2["conversa_id"])
-    assert conv.segmento == "comercial"
-    assert conv.responsavel_usuario_id is None and conv.criado_por_id is None
-    db.close()
+    try:
+        r1 = ext.processar_entrada(db, "whatsapp", remetente="(31) 95555-0099",
+                                   texto="oi", id_externo="wamid.NOSAC1")
+        db.commit()
+        assert db.get(app_db.TriagemEntrada, r1["triagem_id"]).loja_id == seed["loja2_id"]
+        r2 = ext.processar_entrada(db, "whatsapp", remetente="(31) 95555-0099",
+                                   texto="1", id_externo="wamid.NOSAC2")
+        db.commit()
+        assert r2["status"] == "roteado"
+        conv = db.get(Conversa, r2["conversa_id"])
+        assert conv.segmento == "comercial"
+        assert conv.responsavel_usuario_id is None and conv.criado_por_id is None
+    finally:
+        db.delete(db.get(app_db.NumeroConectado, num2.id))
+        db.commit()
+        db.close()
 
 
 def test_sweep_materializa_com_segmento_triagem_apos_2min(app_db, seed):

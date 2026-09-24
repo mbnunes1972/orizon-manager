@@ -9,6 +9,17 @@ funcionário)."""
 import pytest
 
 
+@pytest.fixture(scope="module", autouse=True)
+def numero_da_loja1(app_db, seed):
+    """LP-39 passo 1 (docs/db/TAREFA_LP39_ROTEAMENTO.md): o roteamento agora filtra candidatas
+    pela loja de QUEM RECEBEU. Sem isto, `_loja_da_entrada` cairia no fallback "primeira loja
+    por id" (a loja-seed do `_seed_loja_padrao`, não `seed["loja1_id"]`) e rejeitaria as
+    conversas deste arquivo por "loja errada" — mesmo padrão de tests/test_triagem_fila.py."""
+    db = app_db.get_session()
+    db.add(app_db.NumeroConectado(loja_id=seed["loja1_id"], numero="+55 12 90000-0001"))
+    db.commit(); db.close()
+
+
 def _numero_entrada(db, app_db, conv, numero, texto="oi", wamid=None):
     """Entrada externa recente na conversa (abre a janela de 24h)."""
     import mod_chat_externo as ext
