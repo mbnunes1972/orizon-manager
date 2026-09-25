@@ -1917,6 +1917,18 @@ class TriagemEntrada(Base):
     resolvido_por_id = Column(Integer,  ForeignKey("usuarios.id"), nullable=True)
     resolvido_em     = Column(DateTime, nullable=True)
     criado_em        = Column(DateTime, default=datetime.utcnow)
+    # TAREFA-A (docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md): estado do diálogo de
+    # reconhecimento de Cliente cadastrado — RAMIFICA (P1 → P2 ou P3 ou menu de segmentos),
+    # então não dá pra derivar por contagem (mesma limitação que levou ja_reformulou a documentar
+    # a premissa do escritor único). Forma (mesmo espírito de Lead.dados_json — JSON com campo
+    # próprio nomeando a forma, aqui embutido no nome da coluna por ter uma forma só):
+    #   {"estado": "aguardando_reconhecimento"|"aguardando_projeto"|"aguardando_consultor"|
+    #              "aguardando_segmento",
+    #    "projeto": "<nome_safe>",              # preenchido ao sair de P2 (ou direto, 1 projeto)
+    #    "consultor_funcionario_id": <int>}
+    # NULL = entrada anterior a esta tarefa, OU fluxo de número desconhecido — comportamento de
+    # hoje, intacto. Sem backfill de propósito: a ausência já significa a coisa certa.
+    dialogo_json     = Column(Text, nullable=True)
 
 
 class ContraparteFinanceira(Base):
