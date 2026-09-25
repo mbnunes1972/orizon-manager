@@ -11,8 +11,9 @@ telefone desconhecido → `Lead` nasce NA ENTRADA (`processar_entrada`), não na
 `triagem_materializar` passa a PROCURAR Lead existente por (telefone, loja) em vez de criar
 incondicionalmente — sem `referral` nenhum, nenhum Lead nasce (selo "Contato").
 
-As 5 primeiras provas da seção "Prova" do documento (B1+B2); B3/B4 (sinalização/ordenação)
-ficam no arquivo/commit seguinte."""
+As 5 primeiras provas da seção "Prova" do documento (B1+B2) + a metade de BACKEND da prova 6
+(B3, item 9: `pendente` computado certo — a metade de FRONTEND, a marca aparecendo no item,
+está em tests/test_e2e_browser_tarefa_b_ordenacao.py, junto da prova 7 de ordenação)."""
 import mod_chat_externo as ext
 import mod_chat
 from chat import triagem as tri
@@ -234,5 +235,31 @@ def test_serializar_conversa_devolve_selo_derivado(app_db, seed):
         assert d_lead["contato_tipo"] == "lead"
         assert d_cliente["contato_tipo"] == "cliente"
         assert d_contato["contato_tipo"] == "contato"
+    finally:
+        db.close()
+
+
+# ── prova 6 (metade backend): última mensagem externa → pendente verdadeiro ──────────────────
+# A metade de frontend (a marca aparecendo no item) está em
+# tests/test_e2e_browser_tarefa_b_ordenacao.py::test_marca_de_aguardando_resposta_aparece_no_item.
+
+def test_ultima_mensagem_externa_marca_pendente_verdadeiro(app_db, seed):
+    db = app_db.get_session()
+    try:
+        uid = db.query(app_db.Usuario).filter_by(login="dir_l1").first().id
+        conv = mod_chat.criar_grupo(db, seed["loja1_id"], uid, "Aguardando Resposta", [uid],
+                                    exige_dois=False, assunto_tipo="livre")
+        db.commit()
+        mod_chat.enviar_mensagem(db, conv, uid, "oi, tudo bem?", canal="comercial",
+                                 _permitir_externo=True)
+        db.commit()
+        assert mod_chat.serializar_conversa(db, conv, uid)["pendente"] is False, \
+            "última mensagem NOSSA (autor interno) não pode marcar pendente"
+
+        mod_chat.enviar_mensagem(db, conv, None, "quero saber do orçamento", canal="comercial",
+                                 _permitir_externo=True)
+        db.commit()
+        assert mod_chat.serializar_conversa(db, conv, uid)["pendente"] is True, \
+            "última mensagem EXTERNA (autor NULL) tem que marcar pendente verdadeiro"
     finally:
         db.close()

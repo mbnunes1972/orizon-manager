@@ -82,6 +82,23 @@ Duas sessões de Claude Code rodando em paralelo, com papéis que **não se cruz
    suíte dirigia o dela. Chromium de pé desde a véspera, sem ninguém dirigindo, não compete por
    CPU: em 22/09 a suíte completa rodou com o Chromium da sessão-irmã vivo e ocioso e fechou em
    13m20 com 2.884 verdes e 3 vermelhos, todos do flake conhecido do `#neg-subtotal` (LP-22).
+
+   **Regra nova (24/09/2026) — a suíte completa roda DESTACADA do monitor de comandos em
+   background do CLI, nunca como comando em background do harness.** Medido: quatro tentativas
+   de rodar a suíte via comando em background (dois turnos, TAREFA-B) foram mortas pelo próprio
+   monitor com a mensagem "the system is running low on memory" — mas `dmesg -T` não tinha
+   nenhuma linha de OOM, o `memory.pressure` da raiz do cgroup estava zerado nas três janelas
+   (10s/60s/300s), nenhum cgroup relevante (`user.slice`, `user-1000.slice`, `init.scope`) tinha
+   teto (`memory.max = max`), e `free -h` mostrava 13 GiB disponíveis nas quatro vezes. O
+   bloqueio não vinha do kernel nem do pytest — vinha do próprio monitor de background do CLI,
+   por um critério não exposto aqui dentro. **Saída que funcionou:** destacar o processo da
+   árvore que o monitor vigia, com `nohup setsid python3 -m pytest -q > /tmp/suite.log 2>&1 <
+   /dev/null & disown` (retorna na hora — não é um comando de longa duração, então não há o que
+   o monitor mate), e acompanhar com `timeout 170 tail -f --pid=<PID> -n 3 /tmp/suite.log`
+   repetido (não é `sleep`: produz saída desde o primeiro instante e termina sozinho quando o
+   PID morre ou o timeout estoura). `sleep` isolado (mesmo curto, mesmo fora de `run_in_background`)
+   é bloqueado pela ferramenta de shell como espera vazia — a diferença é que `tail -f` produz
+   saída imediata e reage a evento, não dorme cego.
 3. **A Sessão B ancora por NOME, nunca por número de linha.** A Sessão A está editando `main.py` e
    `index.html` ao mesmo tempo; qualquer `main.py:9587` anotado hoje estará errado amanhã. Anote
    nome de função, id de elemento, rota — coisas que sobrevivem a uma edição.

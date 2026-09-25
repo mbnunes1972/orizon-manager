@@ -29,10 +29,15 @@ INDEX_HTML = os.path.join(REPO, "static", "index.html")
 # em 18/09/2026 (+80 linhas: TAREFA_FILA_DE_LEADS Parte 2c — canal "Triagem" + botão
 # "Configurações" colapsado na navegação do Orizon Chat, `_OCHAT_TOP`/`ochatToggleConfig` e o
 # bloco `chatFilaCarregar`/`chatFilaAssumir`, todos ANTES deste trecho; as duas pontas moveram o
-# MESMO delta). Deslocamento medido função por função (âncoras: comentário "Financeiro: seções no
-# SUBMENU da sidebar" no início, `function planoContasCarregar(){` no fim — `grep -n` em HEAD vs.
-# working tree, não estimado de cabeça, mesma disciplina de 14/09).
-FAIXA_INICIO, FAIXA_FIM = 14870, 16915
+# MESMO delta). Reajustado de novo em 24/09/2026 (TAREFA-B, LI-5 e LI-6 da mesma sessão, todos
+# ANTES deste trecho) — desta vez as duas pontas NÃO tinham o mesmo delta (56 vs. 62): a
+# constante já estava desalinhada da âncora ANTES desta sessão começar (medido: HEAD antes deste
+# commit também não batia com os dois `grep -n` abaixo — achado incidental, não consequência da
+# TAREFA-B, registrado aqui em vez de aberto como item novo). Recalibrado direto pelas duas
+# âncoras (comentário "Financeiro: seções no SUBMENU da sidebar" no início, `function
+# planoContasCarregar(){` no fim — `grep -n` no working tree, não estimado de cabeça nem
+# propagado por delta).
+FAIXA_INICIO, FAIXA_FIM = 14926, 16977
 
 
 def _texto_do_modulo():

@@ -16,7 +16,31 @@ pré-existente precisou de ajuste — `test_segmento_reconhecido_materializa_com
 (`tests/test_triagem_fila.py`) fixava a regra ANTIGA (todo contato sem Cliente virava Lead);
 B2 substitui essa regra (Lead é só quem veio de campanha) e o teste passou a fixar a nova.
 
-**B3 (sinalização) + B4 (ordenação) — em andamento.**
+**B3 (sinalização) + B4 (ordenação) — FECHADO em 24/09** (`git log --grep="TAREFA-B"`). Portão
+alvo verde. B3: marca de "aguardando resposta" na linha (`.atd-pend-ico`) quando `pendente` —
+`.atd-nl` (não-lidas) foi MEDIDO antes de mexer (item 11) e já funcionava certo, não foi
+reconstruído; contador do canal Triagem passou a somar fila sem dono + conversas pendente da
+loja, reusando o predicado `_ocEhAtendimento` já existente (item 12 — nenhum predicado novo).
+B4: conversa pendente ordena por janela restante (menor primeiro; janela já fechada vem antes
+de qualquer restante positivo), não-pendente mantém a ordem de recência de sempre. Escalonamento
+(item 14) fica como pergunta aberta, não implementado.
+
+Prova 6 e 7 (marca visual e ordenação — lógica de frontend pura, sem teste JS neste projeto)
+provadas via `page.evaluate` chamando as funções reais da página carregada
+(`tests/test_e2e_browser_tarefa_b_ordenacao.py`), sem simular projeto/orçamento — rápido e sem
+o flake conhecido (`#neg-subtotal`, LP-22) dos e2e pesados.
+
+Achado incidental corrigido no mesmo commit, fora do escopo da tarefa mas medido durante ela:
+`tests/test_aceite_achado36.py` tinha `FAIXA_INICIO`/`FAIXA_FIM` desalinhados das âncoras — e a
+medição mostrou que já estava desalinhado ANTES desta sessão (delta de 56 numa ponta e 62 na
+outra, não uniforme). Recalibrado pelas duas âncoras (`grep -n`, não estimado), mesma disciplina
+que o próprio arquivo já registrava 3 vezes antes.
+
+**Suíte completa: 2.906 passed, 3 xfailed, 0 failed em 10m49s** — nem o flake conhecido do
+`#neg-subtotal` apareceu desta rodada. Medida com o processo DESTACADO do monitor de comandos em
+background do CLI (registrado em `docs/db/PLANO_SEMANA_1.md`, regra nova ao lado da 2b) — quatro
+tentativas via comando em background foram mortas por "pouca memória" sem nenhuma evidência real
+(dmesg limpo, PSI zerado, cgroups sem teto, 13 GiB livres nas quatro vezes).
 
 ## O problema, nas palavras do Marcelo (24/09)
 

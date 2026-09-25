@@ -3016,6 +3016,9 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
     .atd-nl{background:var(--accent);color:var(--btn-primary-text);font-size:10px;font-weight:800;border-radius:9px;padding:1px 6px;min-width:15px;text-align:center;margin-left:6px}
     /* Ponto de urgência (spec §6.1 — 7px antes do nome, nunca no lugar da tag de segmento) */
     .atd-urgent-dot{display:inline-block;width:7px;height:7px;min-width:7px;border-radius:50%;background:var(--err);margin-right:6px}
+    /* TAREFA-B (B3, item 9): "aguardando resposta" — cliente esperando, WhatsApp-like. Cor
+       âmbar (--warn) pra não colidir com o vermelho de urgência, que é decisão manual. */
+    .atd-pend-ico{display:inline-block;color:var(--warn);margin-right:6px;font-size:13px;vertical-align:-2px}
     /* Cabeçalho do chat: Responsável (grupo/projeto) + toggle de Urgência (§6.1/§7.1-A) */
     .oc-header-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
     .oc-resp-line{font-size:11px;color:var(--muted);white-space:nowrap}
@@ -13485,6 +13488,7 @@ function atendRender(){
   if(filtroSeg) itens = itens.filter(c=>c.segmento===filtroSeg);
   if(q) itens = itens.filter(c=>((c.titulo||'')+' '+(c.projeto_nome||'')+' '+(c.ultima_previa||'')
     +(_atdOversight?(' '+(c.participantes||[]).join(' ')):'')).toLowerCase().includes(q));
+  itens = _atdOrdenar(itens);
   _atdVisiveis = itens;
   let html = itens.map(_atdOversight ? _ocTodasItemHTML : _atdItemHTML).join('');
   box.innerHTML = html || '<div style="color:var(--muted);font-size:12px;padding:8px">Nenhum atendimento'+(_atdOversight?'.':' nesta categoria.')+'</div>';
@@ -13514,6 +13518,27 @@ function _atdJanelaBadge(j){
   if(j.estado==='fechando') return '<span class="atd-badge atd-b-warn">Janela fecha em '+_atdHoras(j.restante_seg)+'</span>';
   if(j.estado==='fechada')  return '<span class="atd-badge atd-b-err">Janela fechada</span>';
   return '';
+}
+// TAREFA-B (B4, item 13): quanto falta pra janela fechar, num número que dá pra ORDENAR —
+// janela já FECHADA é o caso mais urgente de todos (o cliente já passou do prazo), por isso
+// vem antes de qualquer `restante_seg` positivo; sem janela (`na`) ou sem o número (não
+// deveria acontecer com `pendente`, mas é defensivo) fica por último, nunca sobe por engano.
+function _atdRestanteOrdenavel(c){
+  const j = c.janela;
+  if(j && j.estado==='fechada') return -Infinity;
+  if(j && j.estado!=='na' && j.restante_seg!=null) return j.restante_seg;
+  return Infinity;
+}
+// Na lista de Atendimentos (não Chat Interno — janela/pendente não existe lá), conversa
+// PENDENTE ordena por janela restante (menor primeiro), não mais por data da última
+// mensagem; não-pendente mantém a ordem de recência que já vem do backend (listar_inbox).
+// Escalonamento (subir ao topo por threshold, mudar de cor, notificar gerência) é decisão do
+// Marcelo ainda em aberto — não implementado aqui (ver "Perguntas abertas" do documento).
+function _atdOrdenar(itens){
+  const pend = itens.filter(c=>c.pendente);
+  const resto = itens.filter(c=>!c.pendente);
+  pend.sort((a,b)=>_atdRestanteOrdenavel(a)-_atdRestanteOrdenavel(b));
+  return pend.concat(resto);
 }
 function _atdQuando(iso){
   if(!iso) return '';
@@ -13550,13 +13575,20 @@ function _atdItemHTML(c){
   const contatoTipo = c.contato_tipo==='lead' ? '<span class="atd-badge atd-b-seg">Lead</span>'
     : c.contato_tipo==='cliente' ? '<span class="atd-badge atd-b-seg">Cliente</span>' : '';
   const nl = (c.nao_lidas||0)>0 ? '<span class="atd-nl">'+(c.nao_lidas>99?'99+':c.nao_lidas)+'</span>' : '';
+  // TAREFA-B (B3, item 9): "aguardando resposta" — `pendente` já existia (serializar_conversa)
+  // e só filtrava ("Pendentes" na barra de chips); agora também marca a LINHA, como pedido
+  // ("quero um contador como funciona no WhatsApp real: conversa sem resposta, o funcionário
+  // vê uma linha no contato"). Mesmo lugar onde já vive `.atd-nl` — não é a mesma coisa: `nl`
+  // é POR VIEWER (some quando EU li); `pendente` é do atendimento (o cliente segue esperando
+  // mesmo que eu já tenha lido).
+  const pend = c.pendente ? '<i class="ti ti-clock atd-pend-ico" title="Aguardando resposta"></i>' : '';
   const titulo = (c.titulo||'Conversa').replace(/^\s*[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]\s*/u,'');
   const dot = c.urgente ? '<span class="atd-urgent-dot" title="Urgente"></span>' : '';
   const sel = c.id===_ocConvAtiva ? ' selected' : '';
   return '<div class="atd-item'+sel+'" onclick="atendAbrir('+c.id+')">'
     + _ocAvatarHTML(titulo, c.tipo)
     + '<div class="atd-main">'
-    + '<div class="atd-top"><span class="atd-nome">'+dot+esc(titulo)+nl+'</span><span class="atd-tempo">'+esc(_atdQuando(c.ultima_em||c.criado_em))+'</span></div>'
+    + '<div class="atd-top"><span class="atd-nome">'+dot+pend+esc(titulo)+nl+'</span><span class="atd-tempo">'+esc(_atdQuando(c.ultima_em||c.criado_em))+'</span></div>'
     + '<div class="atd-bottom"><div class="atd-prev">'+esc(c.ultima_previa||'—')+'</div><div class="atd-tags">'+contatoTipo+seg+jan+concl+'</div></div></div></div>';
 }
 // (atendAbrir é definido no bloco do painel de conversa: alias de ocAbrirConversa — thread na própria página.)
@@ -18718,8 +18750,14 @@ function ocAtualizarBadges(){
   const inbox   = _ocInbox || [];
   const interno = inbox.filter(c=>_ocEhInterno(c) || _ocEhMural(c));
   const atend   = inbox.filter(_ocEhAtendimento);
+  // TAREFA-B (B3, item 10): o contador do canal Triagem soma DOIS números distintos — contato
+  // SEM DONO (a fila de triagem de sempre, `_ocFilaItens`) + conversas PENDENTE (cliente
+  // esperando resposta, já distribuídas) DESTA loja. Um número só na tela; o critério é este
+  // comentário. Reusa `atend` (mesmo predicado `_ocEhAtendimento` das três categorias, sem
+  // filtro novo) — só refina por `pendente`, não parte de um quarto predicado divergente.
+  const triagemTotal = (_ocFilaItens||[]).length + atend.filter(c=>c.pendente).length;
   [['oc-badge-atend', soma(atend)], ['oc-badge-interno', soma(interno)],
-   ['oc-badge-triagem', (_ocFilaItens||[]).length]].forEach(([id,total])=>{
+   ['oc-badge-triagem', triagemTotal]].forEach(([id,total])=>{
     const b = document.getElementById(id);
     if(!b) return;
     if(total > 0){ b.textContent = total > 99 ? '99+' : total; b.style.display = 'inline-block'; }
