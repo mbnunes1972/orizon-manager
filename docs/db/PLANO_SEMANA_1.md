@@ -99,6 +99,15 @@ Duas sessões de Claude Code rodando em paralelo, com papéis que **não se cruz
    PID morre ou o timeout estoura). `sleep` isolado (mesmo curto, mesmo fora de `run_in_background`)
    é bloqueado pela ferramenta de shell como espera vazia — a diferença é que `tail -f` produz
    saída imediata e reage a evento, não dorme cego.
+
+   **Regra nova (25/09/2026) — não apagar `/tmp/suite*.log` antes de o número (passed/failed/
+   xfailed) estar REPORTADO ao Marcelo E REGISTRADO no documento da tarefa em andamento.** Achado
+   real do bloco LI-3/LI-8/LI-4: o log foi limpo (`rm -f`) logo depois do resumo final no chat —
+   o número que chegou ao Marcelo existia só na memória da conversa, não em evidência que ele
+   pudesse conferir depois. "Memória não é evidência neste projeto." A ordem certa é: 1) suíte
+   termina, 2) número lido do próprio log (não repetido de cabeça), 3) número escrito no
+   documento da tarefa (Estado/portão), 4) só then o log pode ser apagado — e mesmo assim, não é
+   obrigatório apagar; o log solto em `/tmp` não é ruído versionado, pode ficar até o próximo boot.
 3. **A Sessão B ancora por NOME, nunca por número de linha.** A Sessão A está editando `main.py` e
    `index.html` ao mesmo tempo; qualquer `main.py:9587` anotado hoje estará errado amanhã. Anote
    nome de função, id de elemento, rota — coisas que sobrevivem a uma edição.
