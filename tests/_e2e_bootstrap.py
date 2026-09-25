@@ -62,8 +62,11 @@ def main(db_url):
     db = database.get_session()
     try:
         loja = db.query(database.Loja).order_by(database.Loja.id).first()
+        # LI-3 (25/09/2026, docs/db/LISTA_IMEDIATA.md): senha_provisoria=0 explícito -- senha
+        # real definida duas linhas abaixo, não onboarding em andamento; sem isto o default novo
+        # (1) aciona _forcarTrocaSenha() no login e bloqueia toda a UI dos testes [chromium].
         u = database.Usuario(nome="E2E Master", login="e2e_master", nivel="master",
-                             loja_id=loja.id, ativo=1)
+                             loja_id=loja.id, ativo=1, senha_provisoria=0)
         u.set_senha("senha123")
         db.add(u)
         cli = database.Cliente(nome="Cliente E2E", cpf="111.444.777-35", loja_id=loja.id,

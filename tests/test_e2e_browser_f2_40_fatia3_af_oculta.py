@@ -94,8 +94,10 @@ def _criar_operador(loja_id, nome_projeto):
     import database
     db = _sessao_teste()
     try:
+        # LI-3 (25/09/2026, docs/db/LISTA_IMEDIATA.md): senha_provisoria=0 explícito -- senão o
+        # default novo (1) aciona _forcarTrocaSenha() e bloqueia a UI no login via browser abaixo.
         u = database.Usuario(nome="E2E Operador", login="e2e_operador_f240", nivel="operador",
-                             loja_id=loja_id, ativo=1)
+                             loja_id=loja_id, ativo=1, senha_provisoria=0)
         u.set_senha("senha123")
         db.add(u); db.flush()
         uid = u.id

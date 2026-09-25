@@ -250,8 +250,13 @@ def seed(app_db):
     db.flush()
 
     def mkuser(nome, login, nivel, loja_id=None, rede_id=None):
+        # LI-3 (25/09/2026, docs/db/LISTA_IMEDIATA.md): `senha_provisoria` default virou 1 —
+        # esses logins de seed já nascem com senha REAL definida duas linhas abaixo (não é
+        # onboarding em andamento), e a tela força `_forcarTrocaSenha()` (bloqueia toda a UI)
+        # quando o flag vem 1 — sem isto, todo teste [chromium] que loga como dir_l1/cons_l1/
+        # super/adm_rede trava na tela de trocar senha antes de chegar em qualquer coisa.
         u = app_db.Usuario(nome=nome, login=login, nivel=nivel,
-                           loja_id=loja_id, rede_id=rede_id, ativo=1)
+                           loja_id=loja_id, rede_id=rede_id, ativo=1, senha_provisoria=0)
         u.set_senha("senha123")
         db.add(u)
 
