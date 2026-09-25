@@ -1542,6 +1542,39 @@ def concluir_atendimento(db, conversa, ator_id, observacao=None):
     return conversa
 
 
+def promover_lead(db, conversa, ator_id):
+    """A5 (docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md, decisão 24/09 — resposta à pergunta
+    aberta da TAREFA-B): botão manual do SAC pra contato de atendimento comum (`contato_tipo`
+    'contato' em `serializar_conversa` — sem `lead_id` nem `cliente_id`) que o atendente decide
+    que É comercial, sem ter vindo de campanha (B2 só cria Lead automático no `referral` da
+    Meta). Cria o `Lead` a partir do `ConversaParticipanteExterno` da própria conversa e liga
+    `conversa.lead_id` — a conversa continua exatamente onde está (nenhuma mensagem se move,
+    nenhum grupo novo). Não commita."""
+    if conversa.tipo in _TIPOS_SEM_ATENDIMENTO:
+        raise ValueError("Mural e fóruns não viram Lead.")
+    if conversa.lead_id:
+        raise ValueError("Esta conversa já é um Lead.")
+    if conversa.cliente_id:
+        raise ValueError("Esta conversa já é de um Cliente cadastrado.")
+    ext = (db.query(ConversaParticipanteExterno)
+             .filter_by(conversa_id=conversa.id, removido=0)
+             .order_by(ConversaParticipanteExterno.id.asc()).first())
+    if ext is None:
+        raise ValueError("Conversa sem contato externo — nada para promover.")
+    from database import Lead
+    lead = Lead(nome=ext.nome, loja_id=conversa.loja_id, canal="manual_sac",
+               whatsapp=(ext.telefone if ext.meio == "whatsapp" else None),
+               email=(ext.email if ext.meio == "email" else None))
+    db.add(lead); db.flush()
+    conversa.lead_id = lead.id
+    ator = db.get(Usuario, ator_id) if ator_id else None
+    enviar_mensagem(db, conversa, ator_id,
+                    "%s promoveu este contato a Lead" % (ator.nome if ator else "—"),
+                    evento="promovido_lead")
+    db.flush()
+    return lead
+
+
 def reabrir_se_concluida(db, conversa):
     """Reabertura AUTOMÁTICA (§8.5): nova mensagem do contato em atendimento concluído volta o
     status para 'aberta' — some o selo, a conversa reaparece em Todas. Os campos concluido_*

@@ -9507,11 +9507,14 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
-        # POST /api/comunicacao/conversas/<id>/{transferir|urgente|concluir} — Atendimentos UI
-        # (spec 2026-08-04): transferir responsável (§7.1-A), urgência manual (§6.1) e conclusão
-        # do atendimento (§8, com notificação interna à gerência pós-commit). Participante da
-        # conversa ou gerência (ver_todas_conversas).
-        m_atd = re.match(r'^/api/comunicacao/conversas/(\d+)/(transferir|urgente|concluir)$', path)
+        # POST /api/comunicacao/conversas/<id>/{transferir|urgente|concluir|promover_lead} —
+        # Atendimentos UI (spec 2026-08-04): transferir responsável (§7.1-A), urgência manual
+        # (§6.1), conclusão do atendimento (§8, com notificação interna à gerência pós-commit) e
+        # promoção manual a Lead (A5, docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md). Participante
+        # da conversa ou gerência (ver_todas_conversas).
+        m_atd = re.match(
+            r'^/api/comunicacao/conversas/(\d+)/(transferir|urgente|concluir|promover_lead)$',
+            path)
         if m_atd:
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -9545,6 +9548,10 @@ class Handler(BaseHTTPRequestHandler):
                                                          bool(dd.get("on", True)))
                         db.commit()
                         self.send_json({"ok": True, "urgente": flag})
+                    elif acao == "promover_lead":
+                        lead = mod_chat.promover_lead(db, conv, usuario["id"])
+                        db.commit()
+                        self.send_json({"ok": True, "lead_id": lead.id})
                     else:   # concluir
                         tpl_id = dd.get("template_id")
                         if tpl_id:

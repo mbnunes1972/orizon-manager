@@ -326,6 +326,34 @@ def test_endpoints_transferir_urgente_concluir(http_client_factory, app_db, seed
     assert outro.post("/api/comunicacao/conversas/%d/urgente" % cid, {"on": True})[0] == 404
 
 
+# TAREFA-A, A5 (docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md): endpoint do botão "promover a
+# Lead" — mesma família de transferir/urgente/concluir, mesmo padrão de checagem de tenancy.
+def test_endpoint_promover_lead(http_client_factory, app_db, seed):
+    db = app_db.get_session()
+    try:
+        crid = _uid(db, app_db, "dir_l1")
+        conv = mod_chat.criar_grupo(db, seed["loja1_id"], crid, "G a5", [], exige_dois=False)
+        mod_chat.adicionar_externo(db, conv, "Contato A5", telefone="5512999994001",
+                                   meio="whatsapp", criado_por_id=crid)
+        db.commit(); cid = conv.id
+    finally:
+        db.close()
+    ger = _login(http_client_factory, "dir_l1")
+    st, b = ger.post("/api/comunicacao/conversas/%d/promover_lead" % cid, {})
+    assert st == 200 and b["ok"] and b["lead_id"]
+    db = app_db.get_session()
+    try:
+        assert db.get(Conversa, cid).lead_id == b["lead_id"]
+    finally:
+        db.close()
+    # promover 2x recusa (já é Lead)
+    st, b = ger.post("/api/comunicacao/conversas/%d/promover_lead" % cid, {})
+    assert st == 400 and not b["ok"]
+    # tenancy: loja 2 não alcança
+    outro = _login(http_client_factory, "dir_l2")
+    assert outro.post("/api/comunicacao/conversas/%d/promover_lead" % cid, {})[0] == 404
+
+
 def test_endpoint_nao_participante_operador_403(http_client_factory, app_db, seed):
     db = app_db.get_session()
     try:

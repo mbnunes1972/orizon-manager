@@ -3358,6 +3358,10 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
                      estilos diferentes). -->
                 <div class="oc-action-bar" id="oc-action-bar" style="display:none">
                   <button class="oc-btn-ok" id="oc-concluir-btn" style="display:none" onclick="ocConcluirAbrir()"><i class="ti ti-circle-check"></i> Concluir atendimento</button>
+                  <!-- A5 (docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md): contato comum (sem
+                       lead_id nem cliente_id) que o SAC decide ser comercial, sem ter vindo de
+                       campanha — promoção manual, a conversa não se move. -->
+                  <button class="btn btn-ghost btn-sm" id="oc-lead-btn" style="display:none" title="Marcar este contato como Lead comercial" onclick="ocPromoverLead()"><i class="ti ti-user-plus"></i> Promover a Lead</button>
                   <button class="btn btn-ghost btn-sm" title="Anexar foto/arquivo" onclick="document.getElementById('oc-file').click()"><i class="ti ti-paperclip"></i> Anexar</button>
                   <div class="oc-am-wrap">
                     <button class="btn btn-ghost btn-sm" onclick="ocAmToggle('oc-transferir-menu')"><i class="ti ti-arrows-right-left"></i> <span id="oc-transferir-label">Transferir atendimento</span></button>
@@ -18866,6 +18870,11 @@ function _ocSetHeaderExtras(c){
   const temAtendimentoReal = !!(c && (c.projeto_nome || c.segmento || (c.janela && c.janela.estado !== 'na')));
   const concluirBtn = document.getElementById('oc-concluir-btn');
   if(concluirBtn) concluirBtn.style.display = (_ocScrAtual==='atend' && ehAtendimento && temAtendimentoReal && status!=='concluida') ? '' : 'none';
+  // A5: só contato comum (nem Lead nem Cliente) vira candidato — quem já é um ou outro não
+  // precisa (Cliente nunca vira Lead, TAREFA-B; Lead já é Lead).
+  const leadBtn = document.getElementById('oc-lead-btn');
+  if(leadBtn) leadBtn.style.display = (_ocScrAtual==='atend' && ehAtendimento
+    && (c && c.contato_tipo) === 'contato') ? '' : 'none';
   const transfLabel = document.getElementById('oc-transferir-label');
   if(transfLabel) transfLabel.textContent = _ocScrAtual==='atend' ? 'Transferir atendimento' : 'Encaminhar conversa';
   // Atalho de transferência ao lado do nome (pedido 2026-08-05) — só em Atendimentos, mesmo
@@ -18979,6 +18988,25 @@ async function ocTransferirPara(uid){
   }
   await _ocInboxAtualizar(); _ocRefrescar();
   await ocCarregarMsgs();   // mostra o evento de transferência na timeline
+}
+
+// A5 (docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md): promoção manual de contato comum a Lead —
+// a conversa não se move, só ganha lead_id (mesmo espírito de ocUrgenciaToggle: 1 POST, atualiza
+// o botão e a inbox).
+async function ocPromoverLead(){
+  if(!_ocConvAtiva) return;
+  if(!confirm('Marcar este contato como Lead comercial?')) return;
+  let d;
+  try{
+    d = await fetch('/api/comunicacao/conversas/'+_ocConvAtiva+'/promover_lead',
+      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({})}).then(r=>r.json());
+  }catch(e){ showToast('Erro de rede.', true); return; }
+  if(!d.ok){ showToast(d.erro||'Falha ao promover a Lead.', true); return; }
+  _ocFlash('✓ Promovido a Lead');
+  const leadBtn = document.getElementById('oc-lead-btn'); if(leadBtn) leadBtn.style.display = 'none';
+  await _ocInboxAtualizar(); _ocRefrescar();
+  await ocCarregarMsgs();   // mostra o evento de promoção na timeline
 }
 
 function ocExportar(formato){

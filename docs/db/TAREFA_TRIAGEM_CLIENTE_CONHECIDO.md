@@ -30,7 +30,26 @@ Nove das dez provas (a 10ª é A5) em `tests/test_tarefa_a_triagem_cliente_conhe
 3 delas ajustadas por usarem `Cliente` real como âncora de loja — passam a receber P1 em vez do
 menu direto, mesmo comportamento novo e correto).
 
-**A5 (botão promover a Lead) — pendente.**
+**A5 (botão promover a Lead) — FECHADO em 25/09** (`git log --grep="TAREFA-A"`). Sem migration
+nova: `Conversa.lead_id`/`Lead` já existiam (PLANO_SEMANA_1.md, 14/09). `chat/core.py`:
+`promover_lead(db, conversa, ator_id)` cria o `Lead` a partir do `ConversaParticipanteExterno` da
+própria conversa (nome/telefone ou email conforme `meio`), liga `conversa.lead_id`, registra o
+evento na timeline — a conversa não se move, nenhuma mensagem muda de lugar. Recusa (`ValueError`)
+quando a conversa já é Lead, já é Cliente, é mural/fórum, ou não tem contato externo nenhum.
+Endpoint `POST /api/comunicacao/conversas/<id>/promover_lead` (mesma família de
+transferir/urgente/concluir — participante da conversa ou gerência). Botão "Promover a Lead" no
+action-bar do Orizon Chat (`static/index.html`, `oc-lead-btn`/`ocPromoverLead`), visível só quando
+`contato_tipo === 'contato'` (nem Lead nem Cliente). Prova 10 em
+`tests/test_tarefa_a5_promover_lead.py` (unidade, incl. as 3 recusas) +
+`tests/test_atendimentos_ui.py::test_endpoint_promover_lead` (endpoint + tenancy). Portão
+`-k "triagem or externo or chat or rotear or lead or atendimento or achado36"`: 186 passed.
+
+`tests/test_aceite_achado36.py` recalibrado (2ª vez nesta tarefa): 3 hunks puros no
+`static/index.html` (botão no cabeçalho, +4; toggle de visibilidade em `_ocSetHeaderExtras`, +5;
+`ocPromoverLead`, +19) — a faixa financeiro (+4, só o 1º hunk é anterior) e a 1ª sub-faixa do
+ciclo (`abrirProjeto`, +4, mesmo motivo) deslocam pouco; as 5 sub-faixas seguintes do ciclo, que
+vêm DEPOIS dos 3 hunks, deslocam +28 (4+5+19). Contagem total de `showToast(..., true)` sobe de
+147 pra 149 (os 2 sites novos de `ocPromoverLead`).
 
 ## O problema
 

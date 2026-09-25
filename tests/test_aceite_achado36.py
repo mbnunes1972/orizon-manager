@@ -36,8 +36,10 @@ INDEX_HTML = os.path.join(REPO, "static", "index.html")
 # TAREFA-B, registrado aqui em vez de aberto como item novo). Recalibrado direto pelas duas
 # âncoras (comentário "Financeiro: seções no SUBMENU da sidebar" no início, `function
 # planoContasCarregar(){` no fim — `grep -n` no working tree, não estimado de cabeça nem
-# propagado por delta).
-FAIXA_INICIO, FAIXA_FIM = 14926, 16977
+# propagado por delta). Reajustado de novo em 25/09/2026 (+4 linhas: TAREFA-A A5 — botão
+# "Promover a Lead" no cabeçalho/action-bar do Orizon Chat, ANTES deste trecho; as duas pontas
+# moveram o mesmo delta, confirmado pelas mesmas duas âncoras).
+FAIXA_INICIO, FAIXA_FIM = 14930, 16981
 
 
 def _texto_do_modulo():
@@ -85,11 +87,15 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 
     +1 novo em TAREFA_REDEFINICAO_DE_SENHA (18/09, Caminho 1): `usrRedefinirSenha` — falha ao
     redefinir a senha pelo gestor ("Não foi possível redefinir a senha."), site NOVO (a ação não
-    existia antes) — total sobe pra 147."""
+    existia antes) — total sobe pra 147.
+
+    +2 novos na TAREFA-A A5 (25/09): `ocPromoverLead` (botão "Promover a Lead" do Orizon Chat) —
+    erro de rede e erro de negócio ao promover o contato, sites NOVOS (a ação não existia antes)
+    — total sobe pra 149."""
     with open(INDEX_HTML, encoding="utf-8") as f:
         conteudo = f.read()
     total = len(re.findall(r"showToast\([^;]*,\s*true\)", conteudo))
-    assert total == 147, "a contagem mudou — reveja o número reportado (%d)" % total
+    assert total == 149, "a contagem mudou — reveja o número reportado (%d)" % total
 
 
 # ── F2-23 (04/09) — faixa do ciclo (Projeto/Transferência de etapa/PE/Medição) ───────────────────
@@ -113,14 +119,19 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 # calculado a partir dos hunks do diff (offset cumulativo por posição), não estimado — cada
 # faixa conferida batendo o conteúdo da linha do meio contra o commit anterior antes de trocar
 # o número.
+# Reajustado de novo em 25/09/2026 (TAREFA-A A5, 3 hunks puros — `git diff -U0`): botão
+# "Promover a Lead" no cabeçalho/action-bar (~linha 3360, ANTES de todas as faixas, +4), toggle
+# de visibilidade em `_ocSetHeaderExtras` (~linha 18868, entre a 1ª faixa e a 2ª, +5) e
+# `ocPromoverLead` (~linha 18983, também entre a 1ª e a 2ª, +19). A 1ª faixa (abrirProjeto,
+# ANTES dos 3 hunks) só pega o primeiro: +4. As 5 seguintes (DEPOIS dos 3): +4+5+19 = +28.
 FAIXAS_CICLO = [
-    (7985, 8033),      # abrirProjeto (+17, sem mudança nesta rodada)
-    (20050, 20096),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
-    (22626, 22698),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
+    (7989, 8037),      # abrirProjeto (+17, sem mudança nesta rodada)
+    (20078, 20124),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
+    (22654, 22726),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
                        # verificarClickSignPEAgora / reenviarConviteClickSignPE (+103)
-    (23147, 23164),    # peConciliacaoReprovar (+103)
-    (23981, 24031),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
-    (24749, 24848),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
+    (23175, 23192),    # peConciliacaoReprovar (+103)
+    (24009, 24059),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
+    (24777, 24876),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
                        # _confirmarEnvioClickSignMedicao / verificarClickSignMedicaoAgora /
                        # reenviarConviteClickSignMedicao (+103)
     # F2-40 (08/09): linhas deslocadas pela Fatia 1/2 (botão "Negociar Complemento" movido +
