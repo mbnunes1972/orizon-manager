@@ -12,6 +12,81 @@ servidor. A partir de 31/08/2026 todo deploy de codigo — inclusive o
 uma tag e usa `git checkout <tag>`, nunca `git pull` de `main`: um so
 procedimento, nao dois. Ver `## Conferir o que esta rodando` no fim.
 
+**Este arquivo cobre DOIS sentidos diferentes de "implantar", e o resto do documento (a partir
+de `## Mapa`) é só o segundo.** A seção logo abaixo é a checklist de **implantar uma LOJA** (uma
+loja nova entrando no ar, com o servidor já de pé) — LI-4b, 25/09/2026. Tudo depois de `## Mapa`
+é **implantar/reconstruir um AMBIENTE** (Integração/Homologação/Produção, schema+servidor). São
+públicos diferentes: quem abre uma loja não precisa ler `systemctl`/Alembic, e quem reconstrói um
+servidor não precisa desta checklist.
+
+---
+
+## Implantação de uma LOJA — checklist mínimo para entrar no ar
+
+Escrito em 25/09/2026 (LI-4b, `docs/db/LISTA_IMEDIATA.md`), depois de os dois últimos itens desta
+lista custarem tempo real numa semana de loja-piloto por não estarem escritos em lugar nenhum.
+Cada item aqui é ou uma tela (Admin → Dados da empresa / Fiscal → Configuração Fiscal / Config →
+Funções) ou uma configuração de sistema — nenhum é código a escrever, é cadastro a preencher.
+
+1. **Nome Fantasia** (`lojas.nome`, Admin → Dados da empresa). Nome de USO — aparece no
+   cabeçalho, nos seletores de loja, nas telas administrativas. Não é a razão social (item 6).
+
+2. **Código** (3 letras, Admin → Dados da empresa). Entra na numeração de contrato
+   (`gerar_num_contrato`) — identifica de qual loja veio cada contrato.
+
+3. **CNPJ** (da loja, Admin → Dados da empresa). Cadastro operacional da loja — distinto do CNPJ
+   fiscal do Emitente (item 6); os dois podem ser o mesmo número, mas vivem em campos diferentes
+   por motivos diferentes.
+
+4. **Endereço completo** (logradouro, número, bairro, cidade, UF, CEP — Admin → Dados da
+   empresa).
+
+5. **Telefone e e-mail** (Admin → Dados da empresa).
+
+6. **Emitente com razão social e dados fiscais completos** (Fiscal → Configuração Fiscal →
+   Identificação fiscal). **Sem ele não sai contrato nem nota fiscal.** Por quê: o contrato
+   imprime `NOME_EMPRESA`/`CNPJ_EMPRESA` a partir do Emitente da loja (`mod_contrato.py`,
+   `_loja_dict_para_contrato` — LI-4b, 25/09) — `validar_loja_para_contrato` recusa gerar
+   contrato sem `razao_social`/`cnpj_fiscal` preenchidos; a NF-e/NFS-e já dependiam do mesmo
+   Emitente antes disso (`fiscal/mapa_fiscal.py`). Uma loja sem Emitente configurado não emite
+   documento nenhum — nem comercial, nem fiscal.
+
+7. **Testemunhas com e-mail** (`testemunha1_email`/`testemunha2_email`, Admin → Dados da
+   empresa). Por quê: a assinatura digital (ClickSign) cadastra cada testemunha como signatária
+   do envelope pelo e-mail — sem e-mail, a testemunha simplesmente não entra no envelope, e o
+   contrato fica sem uma das assinaturas que o processo espera.
+
+8. **% Mercadoria / % Serviço somando 100** (Admin → Dados da empresa). Segmentação de receita
+   Mercadoria×Serviço (Val_Cont divide NF-e produto / NFS-e serviço) — default 65/35, mas
+   precisa ser uma decisão explícita da loja, não um valor esquecido.
+
+9. **Logo** (Admin → Dados da empresa). Aparece no topo de todos os documentos gerados
+   (contrato, proposta, termos).
+
+10. **Número conectado do WhatsApp apontando para ESTA loja** (`NumeroConectado`). **Por quê,
+    com todo o peso que o item merece:** desde o LP-39 (22/09/2026, "quem recebeu decide a
+    loja"), `_loja_da_entrada` resolve a loja de uma mensagem externa pelo `NumeroConectado` que
+    a recebeu — não mais por quem o cliente é ou onde está cadastrado. Apontar o número errado
+    não perde UMA mensagem: manda **toda** a triagem daquela loja para a loja errada, em
+    silêncio, até alguém notar pelo volume estranho numa fila que não é a dela. Custou tempo
+    real esta semana exatamente assim — configuração feita depois do número já estar recebendo
+    tráfego.
+
+11. **Função "SAC" preenchida, com Funcionário vinculado a uma conta de login** (Config →
+    Funções + Cadastro de Funcionário/Usuário). **Por quê:** `chat.triagem.triagem_materializar`
+    resolve o responsável inicial de toda conversa que sai da triagem automática pelo Funcionário
+    da Função "SAC" da loja (`_sac_usuario_id` → `funcionario_por_funcao`) — sem Função SAC, ou
+    com a Função sem ninguém vinculado, ou vinculado a um Funcionário sem conta de Usuário, a
+    conversa nasce **sem responsável**: ninguém vê ela na fila de atendimento normal, só quem
+    tem visão de Oversight (gerência) enxerga. Caso medido em 24/09/2026 (TAREFA-B) — uma loja
+    sem SAC configurado não trava nada, só fica invisível pra quem deveria atender.
+
+**Nenhum destes onze itens precisa de migration ou deploy** — são todos cadastro, pelas telas que
+já existem. O roteiro de RECONSTRUIR o servidor/schema (Alembic, systemctl, backup) começa em
+`## Mapa`, abaixo, e é assunto separado.
+
+---
+
 ## Mapa
     ambiente      host              servico      diretorio             env                     banco
     Integracao    167.88.33.121     orizon-a     /root/orizon-manager  /root/orizon-A.env       orizon_integracao

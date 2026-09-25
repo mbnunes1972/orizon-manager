@@ -6,7 +6,11 @@ import database
 
 def _loja_completa():
     return {
-        "nome": "INSPIRIUM MOVEIS LTDA", "cnpj": "19.152.134/0001-56", "codigo": "INS",
+        # LI-4b (docs/db/LISTA_IMEDIATA.md, 25/09): "nome" é o Nome Fantasia -- diferente de
+        # propósito de razao_social/cnpj_fiscal (Emitente), que agora também são obrigatórios
+        # pra gerar contrato.
+        "nome": "Dalmóbile SJC", "cnpj": "19.152.134/0001-56", "codigo": "INS",
+        "razao_social": "INSPIRIUM MOVEIS LTDA", "cnpj_fiscal": "19.152.134/0001-56",
         "telefone": "(12) 3341-8777", "email": "sac@dalmobilesjc.com.br",
         "cep": "12200-000", "logradouro": "Rua A", "numero": "100",
         "complemento": "", "bairro": "Centro", "cidade": "SJC", "estado": "SP",
@@ -64,6 +68,8 @@ def test_loja_dict_para_contrato_mapeia_campos():
         testemunha2_nome = "Felipe"; testemunha2_cpf = "987.654.321-00"
         testemunha2_email = "felipe@teste.com"
         logo_arquivo = None
+        loja_mae_id = None
+        emitente_id = None   # sem Emitente: razao_social/cnpj_fiscal ficam vazios (LI-4b)
 
     class _FakeDB:
         def get(self, model, pk):
@@ -75,6 +81,42 @@ def test_loja_dict_para_contrato_mapeia_campos():
     assert d["testemunha1_cpf"] == "123.456.789-00"
     assert d["testemunha1_email"] == "jaime@teste.com"
     assert d["cidade"] == "SJC"
+    assert d["razao_social"] == "" and d["cnpj_fiscal"] == ""
+
+
+def test_loja_dict_para_contrato_razao_social_vem_do_emitente():
+    """LI-4b (docs/db/LISTA_IMEDIATA.md, 25/09): razao_social/cnpj_fiscal vêm do Emitente
+    PRÓPRIO da loja (`emitente_id`), não de `loja.nome`/`loja.cnpj` (Nome Fantasia)."""
+    import main
+    from database import Emitente
+
+    class _FakeLoja:
+        id = 1; nome = "Dalmóbile SJC"; cnpj = "48.346.497/0001-20"; codigo = "DSJ"
+        telefone = "(12) 3341-8777"; email = "sac@x.com"; cep = "12200-000"
+        logradouro = "Rua A"; numero = "100"; complemento = ""; bairro = "Centro"
+        cidade = "SJC"; estado = "SP"
+        testemunha1_nome = "Jaime"; testemunha1_cpf = "123.456.789-00"
+        testemunha1_email = "jaime@teste.com"
+        testemunha2_nome = "Felipe"; testemunha2_cpf = "987.654.321-00"
+        testemunha2_email = "felipe@teste.com"
+        logo_arquivo = None
+        loja_mae_id = None
+        emitente_id = 7
+
+    class _FakeEmitente:
+        id = 7; razao_social = "INSPIRIUM MOVEIS PLANEJADOS LTDA"; cnpj = "19.152.134/0001-56"
+
+    class _FakeDB:
+        def get(self, model, pk):
+            if model is Emitente:
+                return _FakeEmitente() if pk == 7 else None
+            return _FakeLoja() if pk == 1 else None
+
+    d = main._loja_dict_para_contrato(_FakeDB(), 1)
+    assert d["nome"] == "Dalmóbile SJC"                              # Nome Fantasia, intocado
+    assert d["razao_social"] == "INSPIRIUM MOVEIS PLANEJADOS LTDA"    # vem do Emitente
+    assert d["cnpj_fiscal"] == "19.152.134/0001-56"                   # vem do Emitente
+    assert d["cnpj"] == "48.346.497/0001-20"                          # CNPJ da loja, intocado
 
 
 def test_loja_dict_para_contrato_sem_loja():

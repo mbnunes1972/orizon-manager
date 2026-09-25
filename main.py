@@ -4366,7 +4366,7 @@ class Handler(BaseHTTPRequestHandler):
                 lojas = [l for l in q.order_by(Loja.nome).all()
                          if mod_tenancy.pode_ver_loja(
                              ator, {"id": l.id, "rede_id": l.rede_id})]
-                self.send_json({"ok": True, "lojas": [_loja_dict(l) for l in lojas]})
+                self.send_json({"ok": True, "lojas": [_loja_dict(db, l) for l in lojas]})
             finally:
                 db.close()
 
@@ -4386,7 +4386,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                 pdvs = (db.query(Loja).filter(Loja.loja_mae_id == mae.id)
                           .order_by(Loja.nome).all())
-                self.send_json({"ok": True, "pdvs": [_loja_dict(l) for l in pdvs]})
+                self.send_json({"ok": True, "pdvs": [_loja_dict(db, l) for l in pdvs]})
             finally:
                 db.close()
 
@@ -14172,7 +14172,7 @@ class Handler(BaseHTTPRequestHandler):
                     _mc.aplicar_gabarito_completo(db, "loja", l.id)
                     db.commit()
                     perfis.recarregar()
-                    self.send_json({"ok": True, "loja": _loja_dict(l)})
+                    self.send_json({"ok": True, "loja": _loja_dict(db, l)})
                 finally:
                     db.close()
                 return
@@ -14246,7 +14246,7 @@ class Handler(BaseHTTPRequestHandler):
                     _mc.aplicar_gabarito_completo(db, "loja", pdv.id)
                     db.commit()
                     perfis.recarregar()
-                    self.send_json({"ok": True, "pdv": _loja_dict(pdv)})
+                    self.send_json({"ok": True, "pdv": _loja_dict(db, pdv)})
                 finally:
                     db.close()
                 return
@@ -18581,7 +18581,7 @@ class Handler(BaseHTTPRequestHandler):
                         if isinstance(req.get("modulos"), list):
                             l.modulos_ativos = json.dumps([str(mo) for mo in req["modulos"]])
                     db.commit()
-                    self.send_json({"ok": True, "loja": _loja_dict(l)})
+                    self.send_json({"ok": True, "loja": _loja_dict(db, l)})
                 finally:
                     db.close()
                 return
@@ -20303,11 +20303,18 @@ def _rede_dict(r) -> dict:
     }
 
 
-def _loja_dict(l) -> dict:
+def _loja_dict(db, l) -> dict:
+    # LI-4b (docs/db/LISTA_IMEDIATA.md): `nome` é o Nome Fantasia (dado de uso, exibido na tela
+    # e no cabeçalho) — a razão social é OUTRO dado, cadastrado em Fiscal → Configuração Fiscal
+    # (Emitente.razao_social, via l.emitente_id). Trazida aqui só para a tela de Dados da Empresa
+    # mostrar em modo leitura (achado do Marcelo: procurou o campo e não achou) — não editável
+    # por aqui, e não confundir com `nome`.
+    emitente = db.get(Emitente, l.emitente_id) if l.emitente_id else None
     return {
         "id":          l.id,
         "rede_id":     l.rede_id,
         "nome":        l.nome,
+        "razao_social": (emitente.razao_social if emitente else "") or "",
         "cnpj":        l.cnpj        or "",
         "codigo":      l.codigo      or "",
         "telefone":    l.telefone    or "",
@@ -20927,7 +20934,16 @@ def _loja_dict_para_contrato(db, loja_id):
     PDV (loja com mãe, spec 2026-07-22): a CONTRATADA é a mãe — nome/CNPJ/endereço/
     contato vêm dela (juridicamente o cliente contrata com a matriz). Ficam do PDV o
     `codigo` (numeração rastreia a origem da venda) e as testemunhas quando o PDV as
-    tem (cadastro próprio; vazias, caem nas da mãe)."""
+    tem (cadastro próprio; vazias, caem nas da mãe).
+
+    LI-4b (docs/db/LISTA_IMEDIATA.md, decisão do Marcelo 25/09): `dona.nome` é o Nome
+    Fantasia — NÃO é mais a identidade jurídica que assina o contrato. `razao_social`/
+    `cnpj_fiscal` vêm do Emitente PRÓPRIO da dona (`dona.emitente_id` — mesma resolução
+    "self", sem a cadeia de override de `fiscal.mod_fiscal.resolver_emitente`, que é por
+    tipo_doc produto/serviço e responde uma pergunta diferente: quem EMITE cada nota, não
+    quem ASSINA o contrato). Loja sem Emitente próprio → campos vazios,
+    `validar_loja_para_contrato` barra a geração (mesma regra de "sem Emitente não sai
+    contrato" do roteiro de implantação)."""
     if not loja_id:
         return {}
     loja = db.get(Loja, loja_id)
@@ -20944,9 +20960,12 @@ def _loja_dict_para_contrato(db, loja_id):
     t2n = loja.testemunha2_nome or dona.testemunha2_nome
     t2c = loja.testemunha2_cpf  or dona.testemunha2_cpf
     t2e = loja.testemunha2_email or dona.testemunha2_email
+    emitente = db.get(Emitente, dona.emitente_id) if dona.emitente_id else None
     return {
         "id": loja.id,
         "nome": dona.nome or "", "cnpj": dona.cnpj or "", "codigo": loja.codigo or "",
+        "razao_social": (emitente.razao_social if emitente else "") or "",
+        "cnpj_fiscal":  (emitente.cnpj         if emitente else "") or "",
         "telefone": dona.telefone or "", "email": dona.email or "",
         "cep": dona.cep or "", "logradouro": dona.logradouro or "",
         "numero": dona.numero or "", "complemento": dona.complemento or "",

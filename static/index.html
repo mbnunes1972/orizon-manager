@@ -17776,15 +17776,30 @@ async function adminLojaCarregarDados(lid){
   if (!lid){ panel.innerHTML = '<em style="color:var(--muted)">Loja não identificada.</em>'; return; }
   const d = await fetch('/api/admin/lojas?'+ '', {credentials:'same-origin'}).then(r=>r.json()).catch(()=>({lojas:[]}));
   const loja = (d.lojas||[]).find(l=>l.id===lid) || {id:lid};
-  const f = (id,label,val)=>`<div><label class="field-label">${label}</label>
-    <input id="${id}" value="${esc(val||'')}" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px"></div>`;
+  const f = (id,label,val,hint)=>`<div><label class="field-label">${label}</label>
+    <input id="${id}" value="${esc(val||'')}" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px">
+    ${hint?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${hint}</div>`:''}</div>`;
+  // LI-4b (docs/db/LISTA_IMEDIATA.md, decisão do Marcelo 25/09): "Nome" virou "Nome Fantasia"
+  // com ajuda explícita — a razão social É OUTRO dado (Emitente, Fiscal → Configuração Fiscal),
+  // não este campo. Exibida abaixo em modo leitura: o Marcelo procurou o campo e não achou —
+  // o dado estar em outro lugar é certo, estar invisível não é.
   panel.innerHTML = `
     <div class="grid2" style="gap:14px;margin-bottom:14px">
-      ${f('loja-nome','Nome',loja.nome)}
+      ${f('loja-nome','Nome Fantasia',loja.nome,'Nome de uso — aparece no cabeçalho e nas telas. A razão social fica em Fiscal → Configuração Fiscal.')}
       ${f('loja-codigo','Código (3 letras)',loja.codigo)}
       ${f('loja-cnpj','CNPJ',loja.cnpj)}
       ${f('loja-tel','Telefone',loja.telefone)}
       ${f('loja-email','E-mail',loja.email)}
+    </div>
+    <div style="margin-bottom:14px">
+      <label class="field-label">Razão social</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input value="${esc(loja.razao_social||'')}" disabled style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 13px;color:var(--text);font-size:12px;opacity:.7">
+        <button class="btn btn-ghost btn-sm" onclick="goPage(11)" style="white-space:nowrap">Editar em Fiscal →</button>
+      </div>
+      <div style="font-size:11px;margin-top:4px;color:${loja.razao_social?'var(--muted)':'var(--warn)'}">${loja.razao_social
+        ? 'Cadastrada em Fiscal → Configuração Fiscal (Emitente). Somente leitura aqui.'
+        : 'Não configurada em Fiscal → Configuração Fiscal — obrigatória para gerar contrato.'}</div>
     </div>
     <div style="font-size:12px;color:var(--muted);margin:2px 0 8px">Endereço</div>
     <div class="grid2" style="gap:14px;margin-bottom:14px">

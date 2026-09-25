@@ -444,8 +444,13 @@ def test_montar_mapping_inclui_tipo():
 
 
 def test_montar_mapping_inclui_empresa_e_cpfs():
+    """LI-4b (docs/db/LISTA_IMEDIATA.md, 25/09): NOME_EMPRESA/CNPJ_EMPRESA vêm de
+    razao_social/cnpj_fiscal (Emitente) -- `nome`/`cnpj` da loja (Nome Fantasia) NÃO alimentam
+    mais esses marcadores. `loja["nome"]` aqui é DIFERENTE do valor esperado de propósito, pra
+    travar que ninguém reverta a leitura sem entender por quê."""
     from mod_contrato import _montar_mapping
-    loja = {"nome": "INSPIRIUM MOVEIS LTDA", "cnpj": "19.152.134/0001-56",
+    loja = {"nome": "Dalmóbile SJC", "cnpj": "48.346.497/0001-20",
+            "razao_social": "INSPIRIUM MOVEIS LTDA", "cnpj_fiscal": "19.152.134/0001-56",
             "testemunha1_nome": "Jaime", "testemunha1_cpf": "123.456.789-00",
             "testemunha2_nome": "Felipe", "testemunha2_cpf": "987.654.321-00"}
     ctx = {"cliente_cpf": "111.222.333-44", "loja": loja}

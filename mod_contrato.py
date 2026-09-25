@@ -560,11 +560,19 @@ def validar_loja_para_contrato(loja: dict) -> list:
 
     Lista vazia → loja completa. O CPF de testemunha sem nenhum dígito
     (placeholder 'xxx.xxx.xxx-xx') conta como faltando. `complemento` é opcional.
-    """
+
+    LI-4b (docs/db/LISTA_IMEDIATA.md, 25/09): `razao_social`/`cnpj_fiscal` (Emitente, via
+    `_loja_dict_para_contrato`) entraram como obrigatórios — são o que o contrato de fato
+    imprime como CONTRATADA agora. `nome`/`cnpj` (Nome Fantasia + CNPJ da loja) continuam
+    obrigatórios por conta própria (identidade operacional da loja), não porque o contrato
+    ainda os leia diretamente. Sem Emitente configurado, o contrato NÃO sai — mesma regra do
+    roteiro de implantação (docs/db/IMPLANTAR.md)."""
     loja = loja or {}
     obrigatorios = [
-        ("nome",             "Nome da empresa"),
+        ("nome",             "Nome Fantasia"),
         ("cnpj",             "CNPJ"),
+        ("razao_social",     "Razão social (Fiscal → Configuração Fiscal)"),
+        ("cnpj_fiscal",      "CNPJ fiscal (Fiscal → Configuração Fiscal)"),
         ("codigo",           "Código da loja"),
         ("telefone",         "Telefone"),
         ("email",            "E-mail"),
@@ -645,8 +653,13 @@ def _montar_mapping(ctx, pag):
         "NOME_TESTEMUNHA_1": t1n,
         "NOME_TESTEMUNHA2":  t2n,
         "NOME_TESTEMUNHA_2": t2n,
-        "NOME_EMPRESA":      loja.get("nome", "") or "",
-        "CNPJ_EMPRESA":      loja.get("cnpj", "") or "",
+        # LI-4b (docs/db/LISTA_IMEDIATA.md, decisão do Marcelo 25/09): a razão social/CNPJ que
+        # assina o contrato vêm do EMITENTE (Fiscal → Configuração Fiscal), não de `loja["nome"]`
+        # — esse campo virou o Nome Fantasia (uso interno/tela), coisa diferente. `loja` aqui é o
+        # dict de _loja_dict_para_contrato (main.py), que já resolve razao_social/cnpj_fiscal
+        # pelo Emitente próprio da dona (self — mesmo "quem assina" do resto desta função).
+        "NOME_EMPRESA":      loja.get("razao_social", "") or "",
+        "CNPJ_EMPRESA":      loja.get("cnpj_fiscal", "") or "",
         "LOJA_LOGRADOURO":   loja.get("logradouro", "") or "",
         "LOJA_NUMERO":       loja.get("numero", "") or "",
         "LOJA_COMPLEMENTO":  loja.get("complemento", "") or "",

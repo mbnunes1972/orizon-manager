@@ -26,7 +26,7 @@ ninguém: o repositório é a memória, a conversa não é.
 | LI-6 | LP-28 — rótulo "Operacional" → Montagem | **FECHADO** | `git log --grep="LI-6"` |
 | LI-7 | LP-36 — verificar a tarja em campo (não é código) | ABERTO | — |
 | LI-8 | Lote Causa F — sete achados de higiene contábil | **FECHADO** | `git log --grep="LI-8"` |
-| LI-4b | LP-32 (extensão) — Nome Fantasia declarado vs. `lojas.nome` | **PARADO — aguardando decisão do Marcelo** | — |
+| LI-4b | LP-32 (extensão) — Nome Fantasia declarado vs. `lojas.nome` | **FECHADO** | `git log --grep="LI-4b"` |
 
 **Portão do bloco 1 (LI-1, LI-5, LI-6) — PASSOU, 22/09 23h:** suíte completa **2.893 passed,
 3 xfailed, 0 failed em 10m56**. Nenhum vermelho, nem os 3 do `#neg-subtotal` (flake LP-22) — zero
@@ -299,6 +299,38 @@ rótulo.
 **PAREI aqui — não abri migração.** Aguardando decisão do Marcelo entre: manter `lojas.nome` como
 está (identidade jurídica, intocada) e criar `lojas.nome_fantasia` (opção b); ou primeiro fazer o
 backfill de `Emitente` por loja e só depois considerar (a); ou uma terceira forma que ele prefira.
+
+### Decisão do Marcelo (25/09) e conserto — FECHADO
+
+**A peça que faltava na medição acima:** a razão social JÁ TEM tela própria — Fiscal →
+Configuração Fiscal → Identificação fiscal (`adminFiscalCarregar`, grava `Emitente.razao_social`)
+— é dali que o contrato e a nota já deveriam ler. `lojas.nome` vira o Nome Fantasia, SEM coluna
+nova; o leitor jurídico (o contrato) passa a ler o Emitente, no mesmo commit.
+
+**Implementado:**
+1. `mod_contrato.py` — `_montar_mapping`: `NOME_EMPRESA`/`CNPJ_EMPRESA` agora leem
+   `razao_social`/`cnpj_fiscal` (não mais `loja["nome"]`/`loja["cnpj"]`). `validar_loja_para_
+   contrato` ganhou os dois como obrigatórios — sem Emitente, o contrato não gera (mesma regra
+   do item 6 do roteiro de implantação, abaixo).
+2. `main.py` — `_loja_dict_para_contrato`: resolve `razao_social`/`cnpj_fiscal` pelo Emitente
+   PRÓPRIO da "dona" (self — mesma pessoa que já resolve nome/cnpj/endereço para PDV; não usei
+   `fiscal.mod_fiscal.resolver_emitente`, que resolve por `tipo_doc` produto/serviço e responde
+   uma pergunta diferente — quem EMITE cada nota, não quem ASSINA o contrato — decisão registrada
+   aqui, não escondida). `_loja_dict` (Admin → Dados da empresa) ganhou `razao_social` só para
+   exibição.
+3. `static/index.html` — rótulo "Nome" → "Nome Fantasia" com ajuda explícita; razão social
+   exibida em modo LEITURA logo abaixo, com link "Editar em Fiscal →" (`goPage(11)`) — o Marcelo
+   procurou o campo e não achou; o dado estar em outro lugar é certo, estar invisível não era.
+4. `docs/db/IMPLANTAR.md` — nova seção "Implantação de uma LOJA", 11 itens, cada um com o
+   porquê — inclui Emitente (item 6), Número conectado do WhatsApp (item 10, LP-39) e Função SAC
+   com login (item 11, TAREFA-B), os dois que custaram tempo por não estarem escritos.
+5. Testes: `tests/test_li4b_nome_fantasia.py` (rótulo/ajuda travados, razão social em leitura
+   travada, `NOME_EMPRESA`/`CNPJ_EMPRESA` vêm do Emitente e NÃO do Nome Fantasia,
+   `validar_loja_para_contrato` exige os dois novos campos, `_loja_dict` expõe razão social com
+   e sem Emitente configurado) + `tests/test_contrato.py`/`tests/test_contrato_loja.py`
+   atualizados para o novo dict (não mais `nome`/`cnpj` alimentando o contrato).
+
+**Portão:** `-k "contrato or marcadores or loja or emitente or fiscal"` — 590 passed, 0 failed.
 
 ---
 

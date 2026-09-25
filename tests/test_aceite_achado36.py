@@ -127,14 +127,19 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 # de visibilidade em `_ocSetHeaderExtras` (~linha 18868, entre a 1ª faixa e a 2ª, +5) e
 # `ocPromoverLead` (~linha 18983, também entre a 1ª e a 2ª, +19). A 1ª faixa (abrirProjeto,
 # ANTES dos 3 hunks) só pega o primeiro: +4. As 5 seguintes (DEPOIS dos 3): +4+5+19 = +28.
+# Reajustado de novo no mesmo dia (LI-4b, docs/db/LISTA_IMEDIATA.md): rótulo "Nome Fantasia" +
+# ajuda + razão social em modo leitura em `adminLojaCarregarDados` (~linha 17779, ENTRE a 1ª
+# faixa e a 2ª — depois de todos os hunks do A5 acima) — +15 linhas puras (`git diff -U0`,
+# medido contra HEAD anterior: 20505→20520, 23132→23147, 23770→23785, 25404→25419, os quatro
+# com o MESMO delta). A 1ª faixa (abrirProjeto, ANTES deste ponto) fica intocada.
 FAIXAS_CICLO = [
     (7994, 8042),      # abrirProjeto (+17, sem mudança nesta rodada)
-    (20083, 20129),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
-    (22659, 22731),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
+    (20098, 20144),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
+    (22674, 22746),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
                        # verificarClickSignPEAgora / reenviarConviteClickSignPE (+103)
-    (23180, 23197),    # peConciliacaoReprovar (+103)
-    (24014, 24064),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
-    (24782, 24881),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
+    (23195, 23212),    # peConciliacaoReprovar (+103)
+    (24029, 24079),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
+    (24797, 24896),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
                        # _confirmarEnvioClickSignMedicao / verificarClickSignMedicaoAgora /
                        # reenviarConviteClickSignMedicao (+103)
     # F2-40 (08/09): linhas deslocadas pela Fatia 1/2 (botão "Negociar Complemento" movido +
