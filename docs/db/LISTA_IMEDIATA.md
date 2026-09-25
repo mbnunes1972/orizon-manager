@@ -18,7 +18,7 @@ ninguém: o repositório é a memória, a conversa não é.
 |---|---|---|---|
 | LI-1 | ACHADO-20 — guarda no endpoint do contrato + guarda de ciclo | **FECHADO** | `git log --grep="LI-1"` |
 | LI-2 | LP-33b — validação de servidor no lado da FUNÇÃO | **CORTADO (já estava feito desde 17/09)** | — |
-| LI-3 | LP-35 — inverter o default de `senha_provisoria` (DDL) | ABERTO | — |
+| LI-3 | LP-35 — inverter o default de `senha_provisoria` (DDL) | **FECHADO** | `git log --grep="LI-3"` |
 | LI-4 | LP-32 — selo da loja no cabeçalho | ABERTO | — |
 | LI-5 | LP-27 — motivos de retenção servidos pelo backend | **FECHADO** | `git log --grep="LI-5"` |
 | LI-6 | LP-28 — rótulo "Operacional" → Montagem | **FECHADO** | `git log --grep="LI-6"` |

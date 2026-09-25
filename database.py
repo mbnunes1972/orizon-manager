@@ -58,11 +58,12 @@ class Usuario(Base):
     cpf           = Column(String(20),  nullable=True)
     whatsapp      = Column(String(20),  nullable=True)
     ativo         = Column(Integer,     default=1)
-    # T-D (27/08/2026, alinhamento de modelos): server_default alinhado ao que
-    # _migrar_colunas_pg já grava no banco (ALTER TABLE ... DEFAULT 0) — precisa existir
-    # de verdade no Postgres pra backfillar linha antiga direto no ADD COLUMN, não só no
-    # INSERT feito pelo ORM (que é tudo que `default=` sozinho garante).
-    senha_provisoria = Column(Integer,  default=0, server_default="0")   # 1 = precisa trocar a senha no 1º login
+    # LI-3 (LP-35, docs/db/LISTA_IMEDIATA.md, migração `c64d026c88e5`): default invertido de 0
+    # para 1 — esquecer o parâmetro na criação de um Usuario passa a produzir conta que força
+    # troca de senha no 1º login, não conta insegura por omissão (já aconteceu uma vez, tela de
+    # Admin). `_migrar_colunas_pg` (linha do ADD COLUMN original, DEFAULT 0) fica congelada por
+    # R1 — histórico de bancos pré-Alembic, nunca reaplica em banco que já tem a coluna.
+    senha_provisoria = Column(Integer,  default=1, server_default="1")   # 1 = precisa trocar a senha no 1º login
     funcionario_id = Column(Integer,    ForeignKey("funcionarios.id"), nullable=True, index=True)  # RH (Cadastro) que esta conta representa
     # Função (cargo) da CONTA quando não há Funcionário vinculado (Perfil-4 rev2 §2): a coluna Função
     # de Usuários da Loja usa Funcionario.funcao_id se houver vínculo, senão este funcao_id.

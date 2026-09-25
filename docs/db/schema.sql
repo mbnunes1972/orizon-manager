@@ -3360,7 +3360,7 @@ CREATE TABLE public.usuarios (
     criado_em timestamp without time zone,
     loja_id integer,
     rede_id integer,
-    senha_provisoria integer DEFAULT 0,
+    senha_provisoria integer DEFAULT 1,
     notificar_whatsapp character varying(16) DEFAULT 'quando_offline'::character varying,
     capacidades_override_json text
 );
