@@ -35,7 +35,7 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 
 | Destino | Itens | Observação |
 |---|---|---|
-| **BETA** | **3** | **LP-39 novo (22/09)** — o roteamento de entrada externa atravessa a fronteira de loja; medido no código, evidência de campo em Homologação. Os outros dois, conferidos em 22/09 contra o código e não contra o texto desta lista: LP-32 (identificação da loja no cabeçalho — a pílula do topo é de 23/08, ANTERIOR ao achado de 16/09, então segue aberta) e LP-35 (inversão do default, precisa de migração). **LP-31 implementado em 21/09 (`67fb832`), LP-36 em 18/09 (`c070b46`) e LP-33 em 16–17/09** — saem da contagem de aberto e ficam como registro, junto de LP-02 (15/09). |
+| **BETA** | **2** | LP-32 (identificação da loja no cabeçalho — segue aberto, precisa do aceite visual do Marcelo; LI-4 em andamento em 25/09) e LP-39 (roteamento de entrada externa atravessa a fronteira de loja — implementado em 24/09, `21af98a`, "quem recebeu decide a loja"; conferir se pode sair da contagem). **LP-35 FECHADO em 25/09 (LI-3, ver abaixo). LP-31 implementado em 21/09 (`67fb832`), LP-36 em 18/09 (`c070b46`) e LP-33 em 16–17/09** — saem da contagem de aberto e ficam como registro, junto de LP-02 (15/09). |
 | **FRONTEIRA** | 10 | Agrupados por fronteira — ver detalhamento abaixo. |
 | ↳ 6.1 (regra única de transição) | 2 | Ainda não construída — Marcelo quer desenhar com calma. |
 | ↳ 6.2 (Tela Única de Provisões) | 3 | **Em construção nesta Semana 2** — `docs/db/TAREFA_TELA_UNICA_PROVISOES.md`. |
@@ -45,9 +45,9 @@ justificativa explícita — para o Marcelo corrigir se discordar.
 | ↳ 6.8 (extração do JS de index.html, nova) | 1 | Ainda não construída — os ratchets de linha/contagem sobre `static/index.html` precisam ser repensados quando a Semana 2 chegar lá. |
 | **HIGIENE** | 5 | LP-34, novo (16/09) — clone copia funções de teste da loja-fonte. LP-37, novo (21/09) — comentários `main.py:NNNN` em 16 arquivos de teste, órfãos em silêncio quando a rota se mover na extração do `TAREFA_SPLIT_BACKEND.md`. LP-11 implementado em 15/09 — sai da contagem, fica como registro. Lote único, quando alguém tiver uma tarde livre. |
 | **DECIDIDO — fila da 1.0** | **4** | Decisão fechada em 15/09; falta só implementar, agendado para depois de 01/10. **LP-38 novo (22/09)** — separar assistência durante a montagem (vira Pendência de Montagem) da assistência de pós-venda (garantia ou contratada). |
-| **PRODUTO** | 0 | Os oito itens que estavam aqui foram todos decididos em 15/09 — ver "Decisões de 15/09" abaixo. |
+| **PRODUTO** | **2** | ACHADO-09 e ACHADO-17, saíram do lote de higiene LI-8 (25/09) — cada um precisa de uma decisão de classificação/produto do Marcelo, não conserto mecânico. |
 | **INFRA** | 8 | Congelados até depois de 01/10/2026. |
-| **Total aberto** | **30** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste), LP-35 (17/09, do lote da exposição segura), LP-36 (18/09, janela de 24 h da Meta) e LP-37 (21/09, comentários `main.py:NNNN` desatualizáveis, achado do planejamento de `TAREFA_SPLIT_BACKEND.md`). |
+| **Total aberto** | **31** | 26 da rodada anterior, menos LP-02 e LP-11 (implementados em 15/09 — saem da contagem de aberto, ficam como registro no lugar), mais LP-31, LP-32, LP-33 e LP-34 (de 16/09 — LP-31 do vazamento de tenancy medido em Homologação; os outros três do Aceite 6 da Loja Teste), LP-36 (18/09, janela de 24 h da Meta), LP-37 (21/09, comentários `main.py:NNNN` desatualizáveis, achado do planejamento de `TAREFA_SPLIT_BACKEND.md`), menos LP-35 (FECHADO em 25/09, LI-3), mais ACHADO-09/ACHADO-17 (25/09, saíram do lote de higiene contábil LI-8 — ver PRODUTO). |
 
 ---
 
@@ -192,9 +192,17 @@ premiação e estatística de cumprimento no futuro. As faixas não precisam ter
 fato de o topo (300.000) ser menor que a meta (500.000) não é, por si, inconsistência.
 
 
-**LP-35 · `senha_provisoria` nasce em 0 por padrão no modelo — esquecer produz conta insegura.**
-*Destino: BETA — o endpoint da tela de Admin já foi consertado em 17/09; o que fica aqui é a
-inversão do default, que é o conserto estrutural e precisa de migração.*
+**LP-35 · `senha_provisoria` nasce em 0 por padrão no modelo — esquecer produz conta insegura.
+FECHADO em 25/09 (LI-3, `docs/db/LISTA_IMEDIATA.md`, migração `c64d026c88e5`).**
+*Destino: BETA — o endpoint da tela de Admin já foi consertado em 17/09; o que ficava aqui era a
+inversão do default, que era o conserto estrutural e precisava de migração.*
+
+**Implementado:** `default`/`server_default` viraram `1` no mesmo commit (R10); migração
+`c64d026c88e5` faz só `ALTER COLUMN ... SET DEFAULT '1'` (schema, R6 — nenhuma linha existente
+muda). Varredura confirmou: nenhum teste dependia do valor 0 implícito (login não bloqueia por
+`senha_provisoria`, só devolve o flag `precisa_trocar_senha`); os dois seeds que queriam 0
+(`scripts/seed_funcionarios_homolog.py`, `scripts/seed_loja15.py`) já passavam o valor explícito,
+intocados. `docs/db/schema.sql` atualizado no mesmo commit (edição cirúrgica).
 
 **Medido em 17/09 (regra dos irmãos — quatro pontos de criação de `Usuario`):**
 
@@ -862,7 +870,36 @@ real; (2) acrescentar "conferir funções da loja-fonte" ao roteiro de implanta�
 
 ## PRODUTO
 
-**Nenhum item aberto.** Os oito itens que estavam aqui (LP-01, 02, 09, 11, 12, 14, 18, 24) foram
+**2 itens abertos**, os dois vindos do lote de higiene contábil LI-8 (25/09/2026,
+`docs/db/LISTA_IMEDIATA.md`) — a regra do próprio lote manda tirar do lote de higiene qualquer
+achado que exija decisão, não decidir dentro dele.
+
+**ACHADO-09 · `5.3.01` compartilhada entre retenção de comissão e comissão de rotina.**
+*Destino: PRODUTO — mistura duas origens (folha de rotina e reconhecimento de retenção
+provisionada) na mesma conta, sem distinção além do campo `origem` do lançamento; decidir se é
+intencional ou se merece conta própria é escolha de classificação contábil, não higiene.*
+`reconhecimento_despesa_retencao_com_vendas` e `folha_variavel` debitam 5.3.01 pelos dois motivos
+diferentes (`mod_contabil.py`). **A decidir:** é intencional que retenção de comissão e comissão de
+venda de rotina compartilhem 5.3.01, ou a supressão da família 5.6 (Sessão 109) deveria ter criado
+uma conta própria para a retenção? Pista: um comentário de 2026-08-08 (`mod_contabil.py`, junto à
+entrada do evento, da refatoração Centro de Custo/Natureza) chama a retenção de "conceitualmente
+uma variação de comissão de vendedor" — sugere fusão deliberada, mas é sobre outra mudança (a
+supressão de 5.3.20), não uma resposta direta a esta pergunta. Detalhe completo: `ACHADO-09` em
+`docs/db/ACHADOS_CONTABEIS.md`.
+
+**ACHADO-17 · `2.1.04.12` promete retenção parcial/liberação/reversão que o código não faz.**
+*Destino: PRODUTO — a funcionalidade de retenção condicional simplesmente não existe; implementar
+como concebida ou renomear a conta pro que ela de fato é são as duas opções, e as duas são decisão
+de produto, não conserto de nome sozinho.*
+O mecanismo atual é provisão simples (nasce na 2ª assinatura, a Folha resolve) — sem retenção
+parcial, condição de liberação por entrega/erro de projeto, nem reversão do resíduo para receita.
+**A decidir:** implementar a retenção como concebida, ou renomear a conta para "Provisão de
+Comissão de Vendas" (o que ela de fato é hoje)? Detalhe completo: `ACHADO-17` em
+`docs/db/ACHADOS_CONTABEIS.md`.
+
+---
+
+**Histórico:** os oito itens que estavam aqui antes (LP-01, 02, 09, 11, 12, 14, 18, 24) foram
 todos decididos pelo Marcelo em 15/09 — ver `docs/db/DECISOES_PENDENTES.md` para o histórico da
 folha de decisão que levou a cada uma. Nenhum voltou pra PRODUTO: LP-02 → BETA; LP-11 → HIGIENE;
 LP-01, LP-12, LP-14 → DECIDIDO/fila da 1.0 (abaixo); LP-18 → FRONTEIRA/6.3; LP-09 e LP-24 → recusa

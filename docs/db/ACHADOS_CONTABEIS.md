@@ -228,7 +228,18 @@ própria.
 
 ---
 
-## ACHADO-04 — 2.1.05 "Financiamento Total Flex a Pagar" nunca é tocada
+## ACHADO-04 — 2.1.05 "Financiamento Total Flex a Pagar" nunca é tocada · RESOLVIDO 2026-08-29, confirmado 25/09/2026 (LI-8)
+
+**Confirmado em 25/09/2026 (LI-8, docs/db/LISTA_IMEDIATA.md):** já estava decidido em 2026-08-29
+(`docs/db/PLANO_AJUSTES.md`) — só este registro não tinha o carimbo. O evento `custo_financeiro`
+(5.5.03×2.1.05) nunca foi confirmado pelo contador nem chamado em produção e foi REMOVIDO de
+`mc.EVENTOS` (`mod_contabil.py`, comentário junto à definição de EVENTOS, linha ~1462). A conta
+**2.1.05 fica no catálogo de propósito** — "volta a fazer sentido se o Parcelamento Loja/Total
+Flex algum dia for fundeado por terceiro" — não é resíduo esquecido, é reserva documentada.
+`tests/test_eventos.py::test_eventos_mortos_removidos_por_decisao` prova a remoção
+(`assert "custo_financeiro" not in mc.EVENTOS`).
+
+**Texto original do achado (histórico):**
 
 **O que acontece:** a conta existe no PLANO_PADRAO com esse nome, mas
 nenhum evento e nenhum site direto de `lancar` credita ou debita ela.
@@ -256,7 +267,18 @@ um caso de financiamento de terceiro real que ainda precisa dela?
 
 ---
 
-## ACHADO-05 — 2.1.04.01 "Provisão de Comissão" e o evento `pagamento_comissao` são mecanismo morto
+## ACHADO-05 — 2.1.04.01 "Provisão de Comissão" e o evento `pagamento_comissao` são mecanismo morto · RESOLVIDO 2026-08-29, confirmado 25/09/2026 (LI-8)
+
+**Confirmado em 25/09/2026 (LI-8, docs/db/LISTA_IMEDIATA.md):** já estava decidido em 2026-08-29
+— o registro só não tinha o carimbo. `pagamento_comissao` foi REMOVIDO de `mc.EVENTOS`
+(`tests/test_eventos.py::test_eventos_mortos_removidos_por_decisao` prova:
+`assert "pagamento_comissao" not in mc.EVENTOS`). A conta **2.1.04.01 fica no catálogo de
+propósito** — o comentário em `_PROV_PAINEL_EXCLUI` (`mod_contabil.py`, ~linha 3082) já diz "segue
+no catálogo mas sem mecanismo algum hoje — não é set-aside de custo", já excluída do painel. Não
+há duplicidade de saldo com 2.1.04.12 (a comissão de venda real usa só essa, via
+`mod_folha.pagar`).
+
+**Texto original do achado (histórico):**
 
 **O que acontece:** `EVENTOS["pagamento_comissao"]` debita 2.1.04.01 e
 credita 1.1.01, mas nenhum caminho de produção chama esse evento — só
@@ -337,7 +359,14 @@ que contornam toda a lógica de negócio das rotas dedicadas?
 
 ---
 
-## ACHADO-08 — Contas do PLANO_PADRAO nunca tocadas por nenhum evento (refinado em 2026-08-29)
+## ACHADO-08 — Contas do PLANO_PADRAO nunca tocadas por nenhum evento (refinado em 2026-08-29) · FECHADO 25/09/2026 (LI-8), sem ação
+
+**Fechado em 25/09/2026 (LI-8, docs/db/LISTA_IMEDIATA.md):** o próprio texto de 2026-08-29 já
+concluía "nenhuma decisão pendente" — o registro só não tinha o carimbo de fechamento. Confirmado
+contra o código atual: nenhuma das contas do grupo "módulo declarado" (1.1.03, 1.1.04,
+1.2.1.01-04, 1.2.2, 2.1.02, 2.2.01, 4.2.02, 4.4.01) ganhou evento desde então — seguem só no
+PLANO_PADRAO, como mapa do que a empresa pretende ser, não sobra de código. Sem ação de código
+nesta rodada; a decisão relevante (construir o módulo) é de roadmap, não de auditoria.
 
 **Origem comum:** todas as contas abaixo nasceram juntas no seed inicial
 (commit `0b86514`, 09/07/2026, "Plano de Contas — modelo Conta + seed
@@ -416,9 +445,22 @@ origem além do campo `origem` do lançamento.
 de venda de rotina compartilhem 5.3.01, ou a supressão da família 5.6
 deveria ter criado uma conta própria para a retenção?
 
+**LI-8 (25/09/2026, docs/db/LISTA_IMEDIATA.md):** é decisão de produto, não higiene — sai do lote,
+vira item PRODUTO em `docs/db/LISTA_PARALELA.md`. **Pista pra quem decidir:** há um comentário de
+2026-08-08 (`mod_contabil.py`, junto à entrada de `reconhecimento_despesa_retencao_com_vendas`,
+refatoração Centro de Custo/Natureza) dizendo que a retenção "é conceitualmente uma variação de
+comissão de vendedor" — sugere que a fusão em 5.3.01 já foi uma escolha deliberada, não descuido;
+mas é um comentário sobre OUTRA mudança (a supressão de 5.3.20), não uma resposta direta a esta
+pergunta — por isso não fecho sozinho, só repasso a pista.
+
 ---
 
-## ACHADO-10 — `_fin_evento_seguro` é código morto
+## ACHADO-10 — `_fin_evento_seguro` é código morto · RESOLVIDO 2026-08-29, confirmado 25/09/2026 (LI-8)
+
+**Confirmado em 25/09/2026 (LI-8, docs/db/LISTA_IMEDIATA.md):** já estava removido — o registro só
+não tinha o carimbo. `grep -rn "_fin_evento_seguro"` no repositório inteiro só acha
+`tests/test_pdv_visao_unificada.py:152`, um comentário histórico ("ACHADO-10... usava
+`main._fin_evento_seguro`, removida"). A função não existe mais em `main.py`.
 
 **O que acontece:** função definida em main.py:667-686 (wrapper fail-soft
 em torno de `registrar_evento`), sem nenhum chamador em todo o main.py.
@@ -435,7 +477,14 @@ nunca foi ligada?
 
 ---
 
-## ACHADO-11 — Docstring de `conciliar_final` desatualizada
+## ACHADO-11 — Docstring de `conciliar_final` desatualizada · RESOLVIDO, confirmado 25/09/2026 (LI-8)
+
+**Confirmado em 25/09/2026 (LI-8, docs/db/LISTA_IMEDIATA.md):** o docstring atual de
+`conciliar_final` (`mod_contabil.py:2782-2796`) já NÃO contém o texto "sobra → 4.4.02, falta →
+5.6.10" que este achado apontava — foi reescrito em algum ponto entre ACHADO-16/ACHADO-26/F2-3
+(a função hoje delega para `resolver_veredito_provisao`, não mais `resolver_saldo_provisao`, e o
+próprio docstring já descreve o mecanismo de veredito nomeado corretamente). Nenhuma edição
+necessária nesta rodada — o "conserto trivial" já tinha acontecido, só faltava o carimbo aqui.
 
 **O que acontece:** o docstring de `conciliar_final` (mod_contabil.py:2143-2153)
 ainda descreve "sobra → 4.4.02, falta → 5.6.10" como o comportamento das 17
@@ -992,7 +1041,12 @@ Custo Financeiro — é de **toda provisão que fecha sem efetivação**.
 
 ---
 
-## ACHADO-17 — `2.1.04.12 "Retenção de Comissão de Vendas"`: o nome descreve o que o código não faz
+## ACHADO-17 — `2.1.04.12 "Retenção de Comissão de Vendas"`: o nome descreve o que o código não faz · MOVIDO PARA LISTA_PARALELA/PRODUTO 25/09/2026 (LI-8)
+
+**Triagem 25/09/2026 (LI-8, docs/db/LISTA_IMEDIATA.md):** confirmado contra o código atual — o
+mecanismo continua provisão simples, sem retenção parcial, condição de liberação nem reversão para
+receita. É decisão de produto, não higiene — sai do lote, vira item PRODUTO em
+`docs/db/LISTA_PARALELA.md`, com a mesma pergunta abaixo.
 
 O conceito pretendido: a comissão **nasce retida**, é liberada quando paga,
 pode ficar retida parcialmente até a entrega ou por erro de projeto do

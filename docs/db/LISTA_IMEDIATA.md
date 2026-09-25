@@ -23,7 +23,7 @@ ninguém: o repositório é a memória, a conversa não é.
 | LI-5 | LP-27 — motivos de retenção servidos pelo backend | **FECHADO** | `git log --grep="LI-5"` |
 | LI-6 | LP-28 — rótulo "Operacional" → Montagem | **FECHADO** | `git log --grep="LI-6"` |
 | LI-7 | LP-36 — verificar a tarja em campo (não é código) | ABERTO | — |
-| LI-8 | Lote Causa F — sete achados de higiene contábil | ABERTO | — |
+| LI-8 | Lote Causa F — sete achados de higiene contábil | **FECHADO** | `git log --grep="LI-8"` |
 
 **Portão do bloco 1 (LI-1, LI-5, LI-6) — PASSOU, 22/09 23h:** suíte completa **2.893 passed,
 3 xfailed, 0 failed em 10m56**. Nenhum vermelho, nem os 3 do `#neg-subtotal` (flake LP-22) — zero
@@ -259,6 +259,40 @@ de um lote de higiene.
 **Prova:** suíte verde + os sete achados marcados no `ACHADOS_CONTABEIS.md` com o commit.
 **Tamanho:** médio pelo volume, baixo por item. **É o segundo candidato a sair do dia**, atrás
 do LI-3.
+
+### FECHADO em 25/09/2026 — cinco já estavam decididos, dois saíram pra PRODUTO
+
+Conferido cada um dos sete contra o CÓDIGO ATUAL (não contra a data em que foi escrito) antes de
+tocar em qualquer coisa. Achado real do próprio lote: **cinco dos sete já estavam resolvidos em
+código desde 2026-08-29 (ou antes) — só o `ACHADOS_CONTABEIS.md` nunca ganhou o carimbo.** Nenhuma
+decisão nova foi tomada por mim em nenhum dos sete — os cinco fechados abaixo reconhecem uma
+decisão que já existe (evento removido, docstring já reescrita); os dois que restam têm pergunta
+de produto genuína, sem resposta no código, e foram embora do lote como a regra manda:
+
+- **ACHADO-04** (2.1.05 nunca tocada) — RESOLVIDO. Evento `custo_financeiro` removido em 29/08;
+  a conta fica no catálogo de propósito (reserva documentada, não resíduo).
+- **ACHADO-05** (2.1.04.01 + `pagamento_comissao`) — RESOLVIDO. Mesmo padrão: evento removido em
+  29/08, conta retida de propósito, já excluída do painel.
+- **ACHADO-08** (contas nunca tocadas do PLANO_PADRAO) — FECHADO sem ação. O próprio texto de
+  29/08 já concluía "nenhuma decisão pendente"; confirmado que nenhuma das contas de "módulo
+  declarado" ganhou evento desde então.
+- **ACHADO-09** (`5.3.01` com dois mecanismos) — **saiu do lote, é PRODUTO.** Ainda usada pelos
+  dois motivos hoje; achei um comentário de 08/08 sugerindo fusão deliberada, mas é sobre outra
+  mudança — não decido por interpretação, fica pro Marcelo. Ver `docs/db/LISTA_PARALELA.md` §
+  PRODUTO.
+- **ACHADO-10** (`_fin_evento_seguro` código morto) — RESOLVIDO. A função já não existe em
+  `main.py`; só sobrou um comentário histórico num teste.
+- **ACHADO-11** (docstring de `conciliar_final`) — RESOLVIDO sem edição. O docstring atual já foi
+  reescrito (delega pra `resolver_veredito_provisao`, não mais a versão que o achado descrevia) —
+  o "conserto trivial" já tinha acontecido.
+- **ACHADO-17** (`2.1.04.12` não faz o que o nome promete) — **saiu do lote, é PRODUTO.**
+  Confirmado que o mecanismo continua provisão simples, sem retenção parcial/liberação/reversão.
+  Implementar como concebido ou renomear a conta é decisão do Marcelo. Ver `LISTA_PARALELA.md` §
+  PRODUTO.
+
+**Nenhuma linha de código de produção mudou** — as cinco fechadas já estavam certas, as duas que
+saíram do lote não se conserta sem decisão. Único arquivo de código tocado por este item: nenhum
+(só `docs/db/ACHADOS_CONTABEIS.md` e `docs/db/LISTA_PARALELA.md`, mais este arquivo).
 
 ---
 
