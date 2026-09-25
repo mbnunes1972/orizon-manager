@@ -2,7 +2,9 @@
 
 > **Camada 4 · TRABALHO EM ANDAMENTO.** Descartável quando fechar. Lista FECHADA: **8 itens**,
 > numerados LI-1 a LI-8 — **7 ativos**, porque o LI-2 nasceu cortado (já estava feito, ver a
-> tabela). Item novo não entra aqui — vai para a `LISTA_PARALELA.md` com destino.
+> tabela). Item novo não entra aqui — vai para a `LISTA_PARALELA.md` com destino. **Exceção
+> aberta pelo Marcelo em 25/09: LI-4b** — mesma origem do LI-4 (LP-32), entra aqui por instrução
+> direta dele, não pela regra padrão acima.
 
 **Data:** 22/09/2026. **Alvo:** fechar até 23/09.
 **Origem:** a conferência da `LISTA_PARALELA.md` contra o código (commit `2d72c2e`) e a medição do
@@ -24,6 +26,7 @@ ninguém: o repositório é a memória, a conversa não é.
 | LI-6 | LP-28 — rótulo "Operacional" → Montagem | **FECHADO** | `git log --grep="LI-6"` |
 | LI-7 | LP-36 — verificar a tarja em campo (não é código) | ABERTO | — |
 | LI-8 | Lote Causa F — sete achados de higiene contábil | **FECHADO** | `git log --grep="LI-8"` |
+| LI-4b | LP-32 (extensão) — Nome Fantasia declarado vs. `lojas.nome` | **PARADO — aguardando decisão do Marcelo** | — |
 
 **Portão do bloco 1 (LI-1, LI-5, LI-6) — PASSOU, 22/09 23h:** suíte completa **2.893 passed,
 3 xfailed, 0 failed em 10m56**. Nenhum vermelho, nem os 3 do `#neg-subtotal` (flake LP-22) — zero
@@ -230,6 +233,72 @@ tela: o nome da loja agora tem peso visível ao lado do wordmark "OrizonOne", se
 (1280/1600, claro/escuro) estão publicadas em https://claude.ai/artifact/Fk9WGMibnk4b5bypW5erKq
 (não vão pro repo — não são artefato de commit); posso gerar de novo a qualquer momento se
 precisar olhar antes de decidir.
+
+---
+
+## LI-4b · LP-32 (extensão) — Nome Fantasia declarado, não `lojas.nome` reinterpretado
+
+**Contexto (Marcelo, 25/09):** a pílula do topo mostra `lojas.nome`, e em campo esse campo está
+preenchido com a RAZÃO SOCIAL — a tela diz "INSPIRIUM MOVEIS PLAN..." onde o operador pensa
+"Dalmóbile SJC". **Decisão:** Nome Fantasia é dado DECLARADO na configuração da empresa, informado
+na criação da loja — não um campo genérico reinterpretado.
+
+### Medição (25/09/2026) — antes de escolher a forma
+
+Varredura de todo leitor de `lojas.nome`/`Loja.nome` no repositório, classificado por o que cada
+um espera:
+
+**Espera NOME JURÍDICO (documento assinado/emitido) — achado real, contradiz o pressuposto do
+contexto:**
+- `mod_contrato.py:648` — `"NOME_EMPRESA": loja.get("nome", "")`, o marcador da CONTRATADA no
+  contrato. Catalogado em `mod_marcadores.py:48` como **`{"rotulo": "Razão social da loja",
+  "escopo": "loja"}`** — o próprio código já rotula isto como razão social, não nome de uso.
+  Consumido por `contrato_template/contrato.md:97` ("**Contratada:** [NOME_EMPRESA]"),
+  `contrato_template/termo_aditivo.md:3,34`, `modelos_documentos_padrao/termo_responsabilidade.md:28`,
+  e qualquer documento customizado que uma loja cadastre com esse marcador (`documento_modelos`,
+  catálogo `mod_marcadores.CATALOGO` — está disponível pra qualquer modelo).
+- `main.py:20923` `_loja_dict_para_contrato` — monta o dict acima a partir de `dona.nome`
+  (`dona` = a própria loja, ou a mãe quando é PDV); docstring da função já chama isso de "quem
+  assina" / "juridicamente o cliente contrata com a matriz".
+- **Nota fiscal (NFe/NFSe) — CONFIRMA o pressuposto do contexto, ao contrário do contrato:**
+  `fiscal/mapa_fiscal.py:54,200` puxa de `Emitente.razao_social`, não de `lojas.nome`. A nota
+  fiscal já está certa; o contrato não.
+
+**Espera NOME DE USO (tela, seletor, cabeçalho, texto de UI) — maioria dos leitores:**
+- `static/index.html` — a pílula do cabeçalho (`.tf-marca-loja`/`#tf-loja-nome`, o próprio motivo
+  do LI-4) e o campo de edição em Admin → Dados da empresa (`f('loja-nome','Nome',loja.nome)`,
+  linha 17783 — rótulo genérico "Nome", sem texto de ajuda hoje).
+- `auth/auth_routes.py:90` — lista de lojas do seletor pós-login (multi-loja).
+- `main.py:2720,4245,4407,18683,20310` — lookups/serializações para telas administrativas
+  (nomes exibidos, não documentos).
+- `mod_simulador_autorizacao.py:33` — lista de lojas no simulador (picker de UI).
+- `chat/core.py:1246` — título/rótulo de conversa.
+- `mod_implantacao_loja.py:258`, `mod_estrategico.py:224` — dashboards internos.
+- `scripts/limpar_loja.py`, `scripts/seed_funcionarios_homolog.py`, `scripts/seed_loja15.py`,
+  `scripts/relatorio_comissao_montagem_ausente.py` — prints de console/CLI.
+
+**Emitente como substituto do contrato — medido, não é viável hoje:** consultado o banco local
+(`select l.id, l.nome, l.emitente_id, e.razao_social from lojas l left join emitente e on
+e.id=l.emitente_id`) — **5 das 6 lojas não têm `emitente_id` preenchido**, incluindo a própria
+"Dalmóbile Recreio" que motivou o achado. Redirecionar `NOME_EMPRESA`/`CNPJ_EMPRESA` do contrato
+para `Emitente` exigiria popular `Emitente` pra toda loja primeiro — rollout de dado numa área
+sensível (identidade jurídica do documento assinado, CLAUDE.md § Contrato/Proposta), não um
+rótulo trocado.
+
+### Conclusão — empurra pra (b), PARADO conforme instruído
+
+O pressuposto "razão social já vive em Emitente.razao_social, de onde contrato e nota fiscal
+puxam" está certo pra nota fiscal e **errado pro contrato**: o contrato usa `lojas.nome` DIRETO
+como razão social, rotulado assim no próprio catálogo de marcadores. Reinterpretar `lojas.nome`
+como Nome Fantasia (opção a) sem mudar mais nada corromperia a cláusula CONTRATADA de todo
+contrato novo, em silêncio — a mesma classe de defeito que motivou várias regras deste projeto.
+Redirecionar o contrato pra `Emitente` primeiro é viável em tese, mas depende de backfill de dado
+que a medição mostra ausente em 5/6 lojas — maior que "sem DDL" e decisão de modelagem, não de
+rótulo.
+
+**PAREI aqui — não abri migração.** Aguardando decisão do Marcelo entre: manter `lojas.nome` como
+está (identidade jurídica, intocada) e criar `lojas.nome_fantasia` (opção b); ou primeiro fazer o
+backfill de `Emitente` por loja e só depois considerar (a); ou uma terceira forma que ele prefira.
 
 ---
 
