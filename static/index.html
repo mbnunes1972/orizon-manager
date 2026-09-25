@@ -116,16 +116,21 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-sans);height:
    MESMA LINHA do glifo/wordmark (decisão de 2026-08-24, não empilha — ver os comentários acima
    sobre `.topframe`). `--sidebar-item-active` é o MESMO tom já usado pro item ativo da sidebar —
    reaproveitado aqui como "isto é o contexto atual", não um token novo. */
-.tf-marca-loja{display:flex;align-items:center;margin-left:6px;padding:6px 14px;border-radius:999px;
-  background:var(--sidebar-item-active);border:1px solid var(--sidebar-border)}
-.tf-loja-nome{font-size:13px;font-weight:600;color:var(--sidebar-text-active);letter-spacing:.2px;
+.tf-marca-loja{display:flex;align-items:center;margin-left:6px;padding:7px 16px;border-radius:999px;
+  background:var(--sidebar-item-active);border:1px solid var(--sidebar-accent)}
+/* LI-4 (22/09→25/09, docs/db/LISTA_IMEDIATA.md): o container ganhou peso próprio em 17/09
+   (fundo+borda, LP-32 original), mas o TEXTO dentro ficou no mesmo 13px de 23/08 — com 5 lojas-
+   piloto simultâneas, quem opera duas unidades precisa ler a loja atual sem esforço antes de
+   aprovar desconto ou assinar contrato. 13→15px, 600→700, borda trocada pra `--sidebar-accent`
+   (mesmo cobre do item ativo, mais contraste que `--sidebar-border` a 6-7% de opacidade). */
+.tf-loja-nome{font-size:15px;font-weight:700;color:var(--sidebar-text-active);letter-spacing:.2px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
 /* Seletor de loja (2+ lojas — `_renderSeletorLoja`): vive dentro do MESMO selo acima, por isso
    sem fundo/borda própria (herdaria do pill) — só tipografia igual à do nome fixo, pra ficar
    coerente com quem vê o nome sem seletor. `color-scheme:dark` no `.topframe` (regra já
    existente) cobre o arrow nativo do <select> e as opções do dropdown nos dois temas. */
 .tf-seletor-loja{background:transparent;border:none;color:var(--sidebar-text-active);
-  font-family:var(--font-sans);font-size:13px;font-weight:600;padding:0;max-width:200px;
+  font-family:var(--font-sans);font-size:15px;font-weight:700;padding:0;max-width:200px;
   text-overflow:ellipsis;cursor:pointer}
 .tf-seletor-loja:focus{outline:none}
 .tf-central{display:flex;align-items:center;gap:10px;flex-shrink:0;justify-content:center}

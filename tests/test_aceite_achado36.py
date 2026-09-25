@@ -38,8 +38,11 @@ INDEX_HTML = os.path.join(REPO, "static", "index.html")
 # planoContasCarregar(){` no fim — `grep -n` no working tree, não estimado de cabeça nem
 # propagado por delta). Reajustado de novo em 25/09/2026 (+4 linhas: TAREFA-A A5 — botão
 # "Promover a Lead" no cabeçalho/action-bar do Orizon Chat, ANTES deste trecho; as duas pontas
-# moveram o mesmo delta, confirmado pelas mesmas duas âncoras).
-FAIXA_INICIO, FAIXA_FIM = 14930, 16981
+# moveram o mesmo delta, confirmado pelas mesmas duas âncoras). Reajustado de novo no mesmo dia
+# (+5 linhas: LI-4, docs/db/LISTA_IMEDIATA.md — `.tf-loja-nome`/`.tf-seletor-loja` ganharam
+# comentário+font-size maiores, ~linha 119, ANTES deste trecho; confirmado pelas mesmas duas
+# âncoras, `git diff -U0` mostra os dois hunks como inserção pura).
+FAIXA_INICIO, FAIXA_FIM = 14935, 16986
 
 
 def _texto_do_modulo():
@@ -125,13 +128,13 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 # `ocPromoverLead` (~linha 18983, também entre a 1ª e a 2ª, +19). A 1ª faixa (abrirProjeto,
 # ANTES dos 3 hunks) só pega o primeiro: +4. As 5 seguintes (DEPOIS dos 3): +4+5+19 = +28.
 FAIXAS_CICLO = [
-    (7989, 8037),      # abrirProjeto (+17, sem mudança nesta rodada)
-    (20078, 20124),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
-    (22654, 22726),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
+    (7994, 8042),      # abrirProjeto (+17, sem mudança nesta rodada)
+    (20083, 20129),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
+    (22659, 22731),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
                        # verificarClickSignPEAgora / reenviarConviteClickSignPE (+103)
-    (23175, 23192),    # peConciliacaoReprovar (+103)
-    (24009, 24059),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
-    (24777, 24876),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
+    (23180, 23197),    # peConciliacaoReprovar (+103)
+    (24014, 24064),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
+    (24782, 24881),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
                        # _confirmarEnvioClickSignMedicao / verificarClickSignMedicaoAgora /
                        # reenviarConviteClickSignMedicao (+103)
     # F2-40 (08/09): linhas deslocadas pela Fatia 1/2 (botão "Negociar Complemento" movido +

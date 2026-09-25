@@ -19,7 +19,7 @@ ninguém: o repositório é a memória, a conversa não é.
 | LI-1 | ACHADO-20 — guarda no endpoint do contrato + guarda de ciclo | **FECHADO** | `git log --grep="LI-1"` |
 | LI-2 | LP-33b — validação de servidor no lado da FUNÇÃO | **CORTADO (já estava feito desde 17/09)** | — |
 | LI-3 | LP-35 — inverter o default de `senha_provisoria` (DDL) | **FECHADO** | `git log --grep="LI-3"` |
-| LI-4 | LP-32 — selo da loja no cabeçalho | ABERTO | — |
+| LI-4 | LP-32 — selo da loja no cabeçalho | **EM CURSO (aguardando aceite do Marcelo)** | `git log --grep="LI-4"` |
 | LI-5 | LP-27 — motivos de retenção servidos pelo backend | **FECHADO** | `git log --grep="LI-5"` |
 | LI-6 | LP-28 — rótulo "Operacional" → Montagem | **FECHADO** | `git log --grep="LI-6"` |
 | LI-7 | LP-36 — verificar a tarja em campo (não é código) | ABERTO | — |
@@ -207,6 +207,28 @@ saber em qual está **antes** de aprovar desconto ou assinar contrato.
 **Prova:** captura em 1280 e em 1600, claro e escuro — e o seu aceite visual, que é o único
 critério que vale aqui.
 **Tamanho:** pequeno. **Dependência:** precisa de você para fechar.
+
+### Feito em 25/09/2026 — aguardando aceite visual
+
+**Achado ao medir de novo:** o CONTAINER do selo (fundo, borda, padding — "peso próprio") já tinha
+sido consertado em 17/09 (`1619a476`, LP-32 original) — só o TEXTO dentro ficou esquecido no mesmo
+13px/600 de 23/08. É por isso que a medição de 22/09 ainda achou "pequena demais": o container
+mudou, a letra não.
+
+**Conserto:** `.tf-loja-nome`/`.tf-seletor-loja` (`static/index.html`) — `font-size` 13→15px,
+`font-weight` 600→700; borda do pill trocada de `--sidebar-border` (6-7% opacidade, quase
+invisível) para `--sidebar-accent` (o mesmo cobre do item ativo da sidebar) para dar mais contraste
+ao selo inteiro, não só à letra.
+
+**Prova:** capturado em 1280 e 1600, tema claro e escuro (o `.topframe` é fixo escuro nos dois
+temas de propósito — "sidebar é escura nos dois temas", token comment — então as 4 capturas
+mostram o MESMO selo; a variação real é só de largura). Login `pdm2026` (master, Loja 1). Visto na
+tela: o nome da loja agora tem peso visível ao lado do wordmark "OrizonOne", sem competir com ele
+(19px/700) nem sumir como legenda.
+
+**Aguardando:** aceite visual do Marcelo — único critério que fecha este item. Screenshots não
+ficaram no repo (não são artefato de commit); posso gerar de novo a qualquer momento se precisar
+olhar antes de decidir.
 
 ---
 
