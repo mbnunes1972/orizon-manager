@@ -338,13 +338,15 @@ loja mantém o próprio, mesmo quando o CNPJ por trás é o mesmo.
    e sem Emitente configurado) + `tests/test_contrato.py`/`tests/test_contrato_loja.py`
    atualizados para o novo dict (não mais `nome`/`cnpj` alimentando o contrato).
 
-**Portão alvo:** `-k "contrato or marcadores or loja or emitente or fiscal or li4b"` — 596 passed,
-0 failed.
+**Portão alvo:** `-k "contrato or marcadores or loja or emitente or fiscal or li4b"` — 597 passed,
+0 failed (depois do ajuste de herança do PDV, commit `66535ca`).
 
-**Suíte completa (fecha o bloco LI-3/LI-8/LI-4/LI-4b, procedimento do PLANO_SEMANA_1.md — nohup
-setsid + timeout tail -f --pid, log lido antes de apagar):** `python3 -m pytest -q` — **2929
-passed, 3 xfailed, 0 failed em 669s (11m09)**. Os 3 `xfailed` são os mesmos pré-existentes de
-sempre (ACHADO-19), não consequência deste bloco.
+**Suíte completa — FECHA A LISTA_IMEDIATA.md INTEIRA (procedimento do PLANO_SEMANA_1.md — nohup
+setsid + timeout tail -f --pid, log lido antes de apagar):** `python3 -m pytest -q` — **2930
+passed, 3 xfailed, 0 failed em 672,59s (11m12)**. Os 3 `xfailed` são os mesmos pré-existentes de
+sempre (ACHADO-19), não consequência deste bloco. Com este número: LI-1 a LI-8, LI-4b — todos
+FECHADOS ou CORTADOS; LI-7 segue ABERTO por depender só do Marcelo (verificação em campo, não é
+código).
 
 ---
 
