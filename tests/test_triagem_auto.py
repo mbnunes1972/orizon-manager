@@ -130,11 +130,12 @@ def test_resposta_nao_reconhecida_reformula_uma_vez_depois_some(app_db, seed, mo
 
 
 def test_ja_reformulou_escritores_fixos():
-    """Fixa a premissa do docstring de `ja_reformulou`: hoje só DUAS funções deste módulo
-    levam a um `EnvioExterno.triagem_id` gravado (as duas chamam `_enviar_texto_triagem`,
-    que é o ÚNICO ponto que constrói `EnvioExterno(triagem_id=...)`). Uma terceira função
-    passando a chamar o escritor, OU um segundo ponto de construção direta, tem que estourar
-    AQUI — vermelho no teste — nunca virar contagem errada em produção."""
+    """Fixa a premissa do docstring de `ja_reformulou`: `EnvioExterno(triagem_id=...)` só se
+    constrói num lugar (`_enviar_texto_triagem`) — o conjunto de funções que CHAMAM esse
+    escritor pode crescer (TAREFA-A somou o diálogo de reconhecimento do Cliente cadastrado:
+    P1/P2/P3 cada uma manda a própria pergunta/reformulação), mas tem que ser um conjunto
+    CONHECIDO — uma função nova chamando o escritor sem entrar aqui é o mesmo risco de sempre
+    (contagem/premissa errada em produção), só que agora por conjunto, não por número fixo."""
     arvore = ast.parse(inspect.getsource(tri))
 
     def chama_o_escritor(no):
@@ -146,7 +147,12 @@ def test_ja_reformulou_escritores_fixos():
     chamadores = {no.name for no in ast.walk(arvore)
                   if isinstance(no, ast.FunctionDef) and no.name != "_enviar_texto_triagem"
                   and chama_o_escritor(no)}
-    assert chamadores == {"enviar_pergunta_triagem", "registrar_resposta_triagem"}
+    assert chamadores == {
+        "enviar_pergunta_triagem", "registrar_resposta_triagem",
+        # TAREFA-A (docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md) — diálogo de reconhecimento:
+        "enviar_reconhecimento_cliente", "_registrar_resposta_dialogo", "_dialogo_falhar",
+        "_dialogo_ir_para_segmento", "_dialogo_enviar_p2", "_dialogo_projeto_definido",
+    }
 
     construtores = [no for no in ast.walk(arvore)
                     if isinstance(no, ast.Call) and isinstance(no.func, ast.Name)

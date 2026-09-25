@@ -12,7 +12,25 @@
 backfill. `tests/test_schema_boot_estavel.py` + `tests/test_schema_fk_integridade.py`: verdes
 (`init_db()` e `alembic upgrade head` continuam produzindo o mesmo schema).
 
-**Fluxo (itens 2-5) e A5 — pendentes.**
+**Fluxo (itens 2-5) — FECHADO em 25/09** (`git log --grep="TAREFA-A"`). `chat/externo.py`:
+`processar_entrada` cria `dialogo_json={"estado": "aguardando_reconhecimento"}` e chama
+`enviar_reconhecimento_cliente` (P1) só quando o telefone bate com `Cliente` DA loja resolvida
+(LP-39); resto (número desconhecido) segue com `dialogo_json=None`, fluxo de hoje intacto.
+`chat/triagem.py`: `registrar_resposta_triagem` passa a checar `dialogo_json` antes do caminho
+antigo — se presente, despacha pro novo `_registrar_resposta_dialogo` (P1→P2/P3→menu, conforme o
+`estado`). `SEGMENTO_PROJETO_DEFINIDO` (sentinela interno) sinaliza pra `triagem_materializar`
+entrar na conversa do PROJETO em vez de abrir grupo novo; "ramo do comercial" (sem consultor, ou
+consultor recusado em P3) materializa normal com segmento `comercial` — sem tocar
+`SegmentoConfig.responsavel_funcionario_id`, como pedido. Sweep de 2min (`varrer_triagem_vencida`)
+já cobria qualquer `dialogo_json` pendente sem mudança — materializa com `SEGMENTO_TRIAGEM`
+igual a antes, em qualquer estado do diálogo.
+
+Nove das dez provas (a 10ª é A5) em `tests/test_tarefa_a_triagem_cliente_conhecido.py`. Portão
+`-k "triagem or externo or chat or rotear or lead"`: 155 passed (146 pré-existentes + 9 novas,
+3 delas ajustadas por usarem `Cliente` real como âncora de loja — passam a receber P1 em vez do
+menu direto, mesmo comportamento novo e correto).
+
+**A5 (botão promover a Lead) — pendente.**
 
 ## O problema
 

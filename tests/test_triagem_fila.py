@@ -272,12 +272,22 @@ def test_sem_sac_configurado_materializa_sem_responsavel(app_db, seed):
                                    texto="oi", id_externo="wamid.NOSAC1")
         db.commit()
         assert db.get(app_db.TriagemEntrada, r1["triagem_id"]).loja_id == seed["loja2_id"]
+        # TAREFA-A (docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md): este contato é um Cliente de
+        # verdade (âncora de loja acima) — recebe P1 (reconhecimento), não o menu direto. "1"
+        # aqui é "projeto" (P1), e o Cliente não tem Projeto nenhum → 0 ativos → cai no ramo 3
+        # ("outro assunto" por definição, item 2 da regra): a entrada ainda NÃO materializa,
+        # ganha o menu de segmentos como SEGUNDA pergunta.
         r2 = ext.processar_entrada(db, "whatsapp", remetente="(31) 95555-0099",
                                    texto="1", id_externo="wamid.NOSAC2")
         db.commit()
-        assert r2["status"] == "roteado"
-        conv = db.get(Conversa, r2["conversa_id"])
+        assert r2["status"] == "triagem" and r2["triagem_id"] == r1["triagem_id"]
+        r3 = ext.processar_entrada(db, "whatsapp", remetente="(31) 95555-0099",
+                                   texto="1", id_externo="wamid.NOSAC3")
+        db.commit()
+        assert r3["status"] == "roteado"
+        conv = db.get(Conversa, r3["conversa_id"])
         assert conv.segmento == "comercial"
+        assert conv.cliente_id is not None       # já é Cliente — TAREFA-B nunca vira Lead
         assert conv.responsavel_usuario_id is None and conv.criado_por_id is None
     finally:
         db.delete(db.get(app_db.NumeroConectado, num2.id))
@@ -337,9 +347,17 @@ def test_nome_do_lead_prioriza_cadastro_sobre_meta(app_db, seed):
     r1 = ext.processar_entrada(db, "whatsapp", remetente="(11) 91111-2222",
                                texto="oi", id_externo="wamid.NOME1", nome="Nome da Meta")
     db.commit()
+    # TAREFA-A (docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md): Cliente cadastrado recebe P1
+    # (reconhecimento), não o menu direto — "1" é "projeto"; sem Projeto nenhum, 0 ativos cai
+    # no ramo 3 (menu de segmentos, item 2 da regra). Precisa de uma segunda resposta real
+    # pra materializar; o nome do título continua vindo do cadastro (o que este teste prova).
     r2 = ext.processar_entrada(db, "whatsapp", remetente="(11) 91111-2222",
                                texto="1", id_externo="wamid.NOME2")
     db.commit()
-    conv = db.get(Conversa, r2["conversa_id"])
+    assert r2["status"] == "triagem"
+    r3 = ext.processar_entrada(db, "whatsapp", remetente="(11) 91111-2222",
+                               texto="1", id_externo="wamid.NOME3")
+    db.commit()
+    conv = db.get(Conversa, r3["conversa_id"])
     assert "Fulano do Cadastro" in (conv.titulo or "")   # cadastro vence o perfil da Meta
     db.close()

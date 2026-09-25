@@ -553,16 +553,28 @@ def processar_entrada(db, meio, remetente, texto, id_externo_ref=None, id_extern
             if _lead_existente(db, loja_id, meio, remetente) is None:
                 _criar_lead_referral(db, loja_id, meio, remetente,
                                      nome_resolvido or remetente, referral)
+        # TAREFA-A (docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md): Cliente cadastrado NESTA loja
+        # (LP-39: quem recebeu decide a loja — cliente de OUTRA loja da rede segue tratado como
+        # desconhecido aqui, mesmo comportamento de hoje) não recebe o menu de segmentos —
+        # recebe reconhecimento (P1). `dialogo_json` nasce preenchido só neste caso; o resto
+        # (número desconhecido) mantém `dialogo_json=None`, comportamento de hoje intacto.
+        cli_da_loja = cli if (cli is not None and cli.loja_id == loja_id) else None
+        dialogo_inicial = (json.dumps({"estado": "aguardando_reconhecimento"})
+                          if cli_da_loja is not None else None)
         ent = TriagemEntrada(
             loja_id=loja_id, meio=meio,
             remetente=_rem_norm, nome_whatsapp=nome_resolvido,
             texto=texto, id_externo=id_externo, id_externo_ref=id_externo_ref,
-            candidatos_json=(json.dumps(sorted(candidatos)) if candidatos else None))
+            candidatos_json=(json.dumps(sorted(candidatos)) if candidatos else None),
+            dialogo_json=dialogo_inicial)
         db.add(ent); db.flush()
         # RF-08 (2026-08-04): pergunta de triagem AUTOMÁTICA de volta ao contato (texto livre
         # — a janela de 24h acabou de abrir). Best-effort: nunca derruba o webhook.
         try:
-            _tri.enviar_pergunta_triagem(db, ent)
+            if cli_da_loja is not None:
+                _tri.enviar_reconhecimento_cliente(db, ent)
+            else:
+                _tri.enviar_pergunta_triagem(db, ent)
         except Exception:
             pass
         return {"status": "triagem", "conversa_id": None, "triagem_id": ent.id}
