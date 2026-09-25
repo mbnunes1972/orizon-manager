@@ -20306,10 +20306,19 @@ def _rede_dict(r) -> dict:
 def _loja_dict(db, l) -> dict:
     # LI-4b (docs/db/LISTA_IMEDIATA.md): `nome` é o Nome Fantasia (dado de uso, exibido na tela
     # e no cabeçalho) — a razão social é OUTRO dado, cadastrado em Fiscal → Configuração Fiscal
-    # (Emitente.razao_social, via l.emitente_id). Trazida aqui só para a tela de Dados da Empresa
-    # mostrar em modo leitura (achado do Marcelo: procurou o campo e não achou) — não editável
-    # por aqui, e não confundir com `nome`.
-    emitente = db.get(Emitente, l.emitente_id) if l.emitente_id else None
+    # (Emitente.razao_social). Trazida aqui só para a tela de Dados da Empresa mostrar em modo
+    # leitura (achado do Marcelo: procurou o campo e não achou) — não editável por aqui, e não
+    # confundir com `nome`. Nome Fantasia é da LOJA (prova de campo do Marcelo: loja 4, PDV
+    # Caraguatatuba, é da Inspirium — mesmo CNPJ/Emitente, nome de uso próprio); a razão social
+    # de um PDV sem Emitente PRÓPRIO herda da mãe (mesma resolução "dona" de
+    # `_loja_dict_para_contrato` — sem isto, a tela do PDV mostraria "não configurada" mesmo
+    # quando o contrato dele já funciona via herança).
+    dona = l
+    if getattr(l, "loja_mae_id", None):
+        mae = db.get(Loja, l.loja_mae_id)
+        if mae is not None:
+            dona = mae
+    emitente = db.get(Emitente, dona.emitente_id) if dona.emitente_id else None
     return {
         "id":          l.id,
         "rede_id":     l.rede_id,

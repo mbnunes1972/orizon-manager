@@ -49,7 +49,8 @@ Funções) ou uma configuração de sistema — nenhum é código a escrever, é
    `_loja_dict_para_contrato` — LI-4b, 25/09) — `validar_loja_para_contrato` recusa gerar
    contrato sem `razao_social`/`cnpj_fiscal` preenchidos; a NF-e/NFS-e já dependiam do mesmo
    Emitente antes disso (`fiscal/mapa_fiscal.py`). Uma loja sem Emitente configurado não emite
-   documento nenhum — nem comercial, nem fiscal.
+   documento nenhum — nem comercial, nem fiscal. Não é hipotético: medido em 25/09/2026, quatro
+   das cinco lojas-piloto estavam sem Emitente configurado.
 
 7. **Testemunhas com e-mail** (`testemunha1_email`/`testemunha2_email`, Admin → Dados da
    empresa). Por quê: a assinatura digital (ClickSign) cadastra cada testemunha como signatária
@@ -79,7 +80,9 @@ Funções) ou uma configuração de sistema — nenhum é código a escrever, é
     com a Função sem ninguém vinculado, ou vinculado a um Funcionário sem conta de Usuário, a
     conversa nasce **sem responsável**: ninguém vê ela na fila de atendimento normal, só quem
     tem visão de Oversight (gerência) enxerga. Caso medido em 24/09/2026 (TAREFA-B) — uma loja
-    sem SAC configurado não trava nada, só fica invisível pra quem deveria atender.
+    sem SAC configurado não trava nada, só fica invisível pra quem deveria atender. Corrigido nas
+    cinco lojas-piloto em 25/09/2026 (`scripts/usuarios_piloto.py`) — usuário chamado "SAC" não
+    basta, precisa ser o Funcionário vinculado à Função "SAC" da loja.
 
 **Nenhum destes onze itens precisa de migration ou deploy** — são todos cadastro, pelas telas que
 já existem. O roteiro de RECONSTRUIR o servidor/schema (Alembic, systemctl, backup) começa em

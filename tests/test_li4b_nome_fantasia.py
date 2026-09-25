@@ -95,3 +95,24 @@ def test_loja_dict_sem_emitente_nao_quebra(app_db, seed):
         db.rollback()
     finally:
         db.close()
+
+
+def test_loja_dict_pdv_sem_emitente_proprio_herda_razao_social_da_mae(app_db, seed):
+    """Prova de campo do Marcelo (25/09): um PDV (loja com mãe) pode não ter `emitente_id`
+    próprio e ainda assim ter razão social de verdade — herdada da mãe, mesma resolução "dona"
+    que `_loja_dict_para_contrato` já usa pro contrato. Sem isto, a tela do PDV mostraria "não
+    configurada" mesmo quando o contrato dele já funciona via herança (caso real: loja 4,
+    PDV Caraguatatuba, é da Inspirium -- mesmo CNPJ/Emitente, nome de uso próprio)."""
+    import main
+    db = app_db.get_session()
+    try:
+        mae = db.get(app_db.Loja, seed["loja1_id"])   # já tem Emitente (seed)
+        pdv = app_db.Loja(nome="PDV Sem Emitente Próprio", rede_id=seed["rede_id"],
+                          loja_mae_id=mae.id, tipo="ponto_venda")
+        db.add(pdv); db.flush()
+        d = main._loja_dict(db, pdv)
+        assert d["nome"] == "PDV Sem Emitente Próprio"       # Nome Fantasia é do PDV, não da mãe
+        assert d["razao_social"] == "EMITENTE LOJA 1 LTDA"   # razão social herdada da mãe
+        db.rollback()
+    finally:
+        db.close()

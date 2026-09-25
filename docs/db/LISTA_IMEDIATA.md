@@ -308,6 +308,13 @@ Configuração Fiscal → Identificação fiscal (`adminFiscalCarregar`, grava `
 — é dali que o contrato e a nota já deveriam ler. `lojas.nome` vira o Nome Fantasia, SEM coluna
 nova; o leitor jurídico (o contrato) passa a ler o Emitente, no mesmo commit.
 
+**A regra, em uma linha (Marcelo, 25/09):** NOME FANTASIA é o nome da loja e é o que aparece na
+pílula do topo; RAZÃO SOCIAL é o nome do CNPJ e é o que vai na NF-e e no contrato. Dois campos,
+dois usos, nada além disso. **Prova de campo que fixa por que o nome de uso é da LOJA, não do
+emitente:** a loja 4 (PDV Caraguatatuba) é da Inspirium — mesmo CNPJ, mesmo Emitente, loja
+diferente. Um Emitente pode ser compartilhado por mais de uma loja; o Nome Fantasia não — cada
+loja mantém o próprio, mesmo quando o CNPJ por trás é o mesmo.
+
 **Implementado:**
 1. `mod_contrato.py` — `_montar_mapping`: `NOME_EMPRESA`/`CNPJ_EMPRESA` agora leem
    `razao_social`/`cnpj_fiscal` (não mais `loja["nome"]`/`loja["cnpj"]`). `validar_loja_para_
