@@ -330,7 +330,13 @@ nova; o leitor jurídico (o contrato) passa a ler o Emitente, no mesmo commit.
    e sem Emitente configurado) + `tests/test_contrato.py`/`tests/test_contrato_loja.py`
    atualizados para o novo dict (não mais `nome`/`cnpj` alimentando o contrato).
 
-**Portão:** `-k "contrato or marcadores or loja or emitente or fiscal"` — 590 passed, 0 failed.
+**Portão alvo:** `-k "contrato or marcadores or loja or emitente or fiscal or li4b"` — 596 passed,
+0 failed.
+
+**Suíte completa (fecha o bloco LI-3/LI-8/LI-4/LI-4b, procedimento do PLANO_SEMANA_1.md — nohup
+setsid + timeout tail -f --pid, log lido antes de apagar):** `python3 -m pytest -q` — **2929
+passed, 3 xfailed, 0 failed em 669s (11m09)**. Os 3 `xfailed` são os mesmos pré-existentes de
+sempre (ACHADO-19), não consequência deste bloco.
 
 ---
 
