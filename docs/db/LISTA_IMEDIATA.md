@@ -226,9 +226,10 @@ mostram o MESMO selo; a variação real é só de largura). Login `pdm2026` (mas
 tela: o nome da loja agora tem peso visível ao lado do wordmark "OrizonOne", sem competir com ele
 (19px/700) nem sumir como legenda.
 
-**Aguardando:** aceite visual do Marcelo — único critério que fecha este item. Screenshots não
-ficaram no repo (não são artefato de commit); posso gerar de novo a qualquer momento se precisar
-olhar antes de decidir.
+**Aguardando:** aceite visual do Marcelo — único critério que fecha este item. As quatro capturas
+(1280/1600, claro/escuro) estão publicadas em https://claude.ai/artifact/Fk9WGMibnk4b5bypW5erKq
+(não vão pro repo — não são artefato de commit); posso gerar de novo a qualquer momento se
+precisar olhar antes de decidir.
 
 ---
 
