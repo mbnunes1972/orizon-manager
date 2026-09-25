@@ -21,7 +21,7 @@ ninguém: o repositório é a memória, a conversa não é.
 | LI-1 | ACHADO-20 — guarda no endpoint do contrato + guarda de ciclo | **FECHADO** | `git log --grep="LI-1"` |
 | LI-2 | LP-33b — validação de servidor no lado da FUNÇÃO | **CORTADO (já estava feito desde 17/09)** | — |
 | LI-3 | LP-35 — inverter o default de `senha_provisoria` (DDL) | **FECHADO** | `git log --grep="LI-3"` |
-| LI-4 | LP-32 — selo da loja no cabeçalho | **EM CURSO (aguardando aceite do Marcelo)** | `git log --grep="LI-4"` |
+| LI-4 | LP-32 — selo da loja no cabeçalho | **FECHADO em 25/09 (aceite visual do Marcelo)** | `git log --grep="LI-4"` |
 | LI-5 | LP-27 — motivos de retenção servidos pelo backend | **FECHADO** | `git log --grep="LI-5"` |
 | LI-6 | LP-28 — rótulo "Operacional" → Montagem | **FECHADO** | `git log --grep="LI-6"` |
 | LI-7 | LP-36 — verificar a tarja em campo (não é código) | ABERTO | — |
@@ -229,10 +229,11 @@ mostram o MESMO selo; a variação real é só de largura). Login `pdm2026` (mas
 tela: o nome da loja agora tem peso visível ao lado do wordmark "OrizonOne", sem competir com ele
 (19px/700) nem sumir como legenda.
 
-**Aguardando:** aceite visual do Marcelo — único critério que fecha este item. As quatro capturas
-(1280/1600, claro/escuro) estão publicadas em https://claude.ai/artifact/Fk9WGMibnk4b5bypW5erKq
-(não vão pro repo — não são artefato de commit); posso gerar de novo a qualquer momento se
-precisar olhar antes de decidir.
+**FECHADO em 25/09/2026 — aceite visual do Marcelo:** "o nome está joia", sobre as quatro
+capturas (1280/1600, claro/escuro) publicadas em
+https://claude.ai/artifact/Fk9WGMibnk4b5bypW5erKq. Único critério que fechava este item, e foi
+dado por inspeção visual direta, não por suíte automatizada — registrado aqui porque é o tipo de
+aceite que não aparece em nenhum "N passed".
 
 ---
 
