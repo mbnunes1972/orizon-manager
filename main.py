@@ -5349,7 +5349,8 @@ class Handler(BaseHTTPRequestHandler):
                         db, loja_id,
                         participante_id=(qs.get("participante", [None])[0] or None),
                         assunto_tipo=(qs.get("assunto_tipo", [None])[0] or None),
-                        assunto_ref=(qs.get("assunto_ref", [None])[0] or None))})
+                        assunto_ref=(qs.get("assunto_ref", [None])[0] or None),
+                        ator_usuario_id=usuario["id"], ator_nivel=usuario.get("nivel"))})
                 finally:
                     db.close()
                 return
@@ -9507,13 +9508,15 @@ class Handler(BaseHTTPRequestHandler):
                 db.close()
             return
 
-        # POST /api/comunicacao/conversas/<id>/{transferir|urgente|concluir|promover_lead} —
+        # POST /api/comunicacao/conversas/<id>/{transferir|urgente|concluir|promover_lead|entrar} —
         # Atendimentos UI (spec 2026-08-04): transferir responsável (§7.1-A), urgência manual
-        # (§6.1), conclusão do atendimento (§8, com notificação interna à gerência pós-commit) e
-        # promoção manual a Lead (A5, docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md). Participante
-        # da conversa ou gerência (ver_todas_conversas).
+        # (§6.1), conclusão do atendimento (§8, com notificação interna à gerência pós-commit),
+        # promoção manual a Lead (A5, docs/db/TAREFA_TRIAGEM_CLIENTE_CONHECIDO.md) e entrar numa
+        # conversa aberta pelo Oversight (OVERSIGHT-ENTRAR, docs/db/TAREFA_OVERSIGHT_ENTRAR.md).
+        # Participante da conversa ou gerência (ver_todas_conversas) — "entrar" tem gate PRÓPRIO,
+        # mais estrito, checado dentro do próprio ramo (ver comentário lá).
         m_atd = re.match(
-            r'^/api/comunicacao/conversas/(\d+)/(transferir|urgente|concluir|promover_lead)$',
+            r'^/api/comunicacao/conversas/(\d+)/(transferir|urgente|concluir|promover_lead|entrar)$',
             path)
         if m_atd:
             usuario = get_usuario_sessao(self)
@@ -9552,6 +9555,21 @@ class Handler(BaseHTTPRequestHandler):
                         lead = mod_chat.promover_lead(db, conv, usuario["id"])
                         db.commit()
                         self.send_json({"ok": True, "lead_id": lead.id})
+                    elif acao == "entrar":
+                        # OVERSIGHT-ENTRAR: gate PRÓPRIO, mais estrito que o "participante ou
+                        # ver_todas_conversas" de cima — nível bruto master/gerencial OU Função
+                        # SAC, nunca a capacidade configurável (mesmo gate de pode_trabalhar_
+                        # fila, ADR-029). Quem tem ver_todas_conversas mas não é master/
+                        # gerencial/SAC passa no gate de cima (é assim que chega no Oversight)
+                        # e é barrado aqui.
+                        if not mod_chat.pode_trabalhar_fila(db, loja_id, usuario["id"],
+                                                            usuario.get("nivel")):
+                            self.send_json({"ok": False, "erro": "Sem permissão para entrar "
+                                            "nesta conversa."}, code=403); return
+                        u_entrou = mod_chat.entrar_na_conversa(db, conv, usuario["id"])
+                        db.commit()
+                        self.send_json({"ok": True, "usuario":
+                                        {"id": u_entrou.id, "nome": u_entrou.nome}})
                     else:   # concluir
                         tpl_id = dd.get("template_id")
                         if tpl_id:

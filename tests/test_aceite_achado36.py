@@ -41,8 +41,11 @@ INDEX_HTML = os.path.join(REPO, "static", "index.html")
 # moveram o mesmo delta, confirmado pelas mesmas duas âncoras). Reajustado de novo no mesmo dia
 # (+5 linhas: LI-4, docs/db/LISTA_IMEDIATA.md — `.tf-loja-nome`/`.tf-seletor-loja` ganharam
 # comentário+font-size maiores, ~linha 119, ANTES deste trecho; confirmado pelas mesmas duas
-# âncoras, `git diff -U0` mostra os dois hunks como inserção pura).
-FAIXA_INICIO, FAIXA_FIM = 14935, 16986
+# âncoras, `git diff -U0` mostra os dois hunks como inserção pura). Reajustado de novo em
+# 26/09/2026 (+5 linhas: OVERSIGHT-ENTRAR, docs/db/TAREFA_OVERSIGHT_ENTRAR.md — botão "Entrar
+# na conversa" no cabeçalho, ~linha 3311, ANTES deste trecho; confirmado pelas mesmas duas
+# âncoras).
+FAIXA_INICIO, FAIXA_FIM = 14940, 16991
 
 
 def _texto_do_modulo():
@@ -94,11 +97,15 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 
     +2 novos na TAREFA-A A5 (25/09): `ocPromoverLead` (botão "Promover a Lead" do Orizon Chat) —
     erro de rede e erro de negócio ao promover o contato, sites NOVOS (a ação não existia antes)
-    — total sobe pra 149."""
+    — total sobe pra 149.
+
+    +2 novos no OVERSIGHT-ENTRAR (26/09): `ocEntrarNaConversa` (botão "Entrar na conversa" do
+    Oversight) — erro de rede e erro de negócio ao entrar, sites NOVOS (a ação não existia
+    antes) — total sobe pra 151."""
     with open(INDEX_HTML, encoding="utf-8") as f:
         conteudo = f.read()
     total = len(re.findall(r"showToast\([^;]*,\s*true\)", conteudo))
-    assert total == 149, "a contagem mudou — reveja o número reportado (%d)" % total
+    assert total == 151, "a contagem mudou — reveja o número reportado (%d)" % total
 
 
 # ── F2-23 (04/09) — faixa do ciclo (Projeto/Transferência de etapa/PE/Medição) ───────────────────
@@ -132,14 +139,20 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 # faixa e a 2ª — depois de todos os hunks do A5 acima) — +15 linhas puras (`git diff -U0`,
 # medido contra HEAD anterior: 20505→20520, 23132→23147, 23770→23785, 25404→25419, os quatro
 # com o MESMO delta). A 1ª faixa (abrirProjeto, ANTES deste ponto) fica intocada.
+# Reajustado de novo em 26/09/2026 (OVERSIGHT-ENTRAR): 3 hunks puros (`git diff -U0`) — botão
+# "Entrar na conversa" no cabeçalho (~linha 3311, ANTES de tudo, +5), toggle de visibilidade em
+# `_ocSetHeaderExtras` (~linha 18873, entre a 1ª faixa e a 2ª, +6) e `ocEntrarNaConversa`
+# (~linha 19031, também entre a 1ª e a 2ª, +24). A 1ª faixa só pega o primeiro: +5. As 5
+# seguintes: +5+6+24 = +35. Medido contra HEAD anterior: 8161→8166 (+5),
+# 20520→20555/23147→23182/23785→23820/25419→25454 (+35, as quatro com o mesmo delta).
 FAIXAS_CICLO = [
-    (7994, 8042),      # abrirProjeto (+17, sem mudança nesta rodada)
-    (20098, 20144),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
-    (22674, 22746),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
+    (7999, 8047),      # abrirProjeto (+17, sem mudança nesta rodada)
+    (20133, 20179),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
+    (22709, 22781),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
                        # verificarClickSignPEAgora / reenviarConviteClickSignPE (+103)
-    (23195, 23212),    # peConciliacaoReprovar (+103)
-    (24029, 24079),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
-    (24797, 24896),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
+    (23230, 23247),    # peConciliacaoReprovar (+103)
+    (24064, 24114),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
+    (24832, 24931),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
                        # _confirmarEnvioClickSignMedicao / verificarClickSignMedicaoAgora /
                        # reenviarConviteClickSignMedicao (+103)
     # F2-40 (08/09): linhas deslocadas pela Fatia 1/2 (botão "Negociar Complemento" movido +

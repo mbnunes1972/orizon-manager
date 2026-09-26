@@ -3309,6 +3309,11 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
                       </div>
                       <!-- canto superior direito (spec §6.1): só Urgência/Arquivar/Membros agora -->
                       <div class="oc-header-right">
+                        <!-- OVERSIGHT-ENTRAR (docs/db/TAREFA_OVERSIGHT_ENTRAR.md, 26/09): só
+                             quando o backend manda pode_entrar=true (Oversight + gate de
+                             pode_trabalhar_fila + ainda não é participante) — o Oversight
+                             continua abrindo em leitura, este botão é a única porta. -->
+                        <button class="btn btn-primary btn-sm" id="oc-entrar-btn" style="display:none;white-space:nowrap" onclick="ocEntrarNaConversa()"><i class="ti ti-door-enter"></i> Entrar na conversa</button>
                         <button class="oc-urg-btn" id="oc-urg-btn" onclick="ocUrgenciaToggle()">○ Marcar urgente</button>
                         <div style="display:flex;gap:8px">
                           <button class="btn btn-ghost btn-sm" id="oc-arq-btn" style="display:none;white-space:nowrap" onclick="ocArquivarToggle()" title="Arquivar/retirar da fila pessoal (reversível)"><i class="ti ti-archive"></i> <span id="oc-arq-rot">Arquivar</span></button>
@@ -18871,6 +18876,12 @@ function _ocSetHeaderExtras(c){
       document.getElementById('oc-resp-nome').textContent = (c && c.responsavel && c.responsavel.nome) || 'SAC';
     } else respWrap.style.display = 'none';
   }
+  // OVERSIGHT-ENTRAR: pode_entrar só vem preenchido no item de listar_todas_conversas (o
+  // caminho de Oversight) — o serializer normal (inbox pessoal) nunca manda esse campo, então
+  // este botão nunca aparece fora do Oversight, sem precisar de um estado "abriu por oversight"
+  // à parte.
+  const entrarBtn = document.getElementById('oc-entrar-btn');
+  if(entrarBtn) entrarBtn.style.display = (c && c.pode_entrar) ? '' : 'none';
   const urgente = !!(c && c.urgente);
   const urgBtn = document.getElementById('oc-urg-btn');
   if(urgBtn){
@@ -19027,6 +19038,30 @@ async function ocPromoverLead(){
   const leadBtn = document.getElementById('oc-lead-btn'); if(leadBtn) leadBtn.style.display = 'none';
   await _ocInboxAtualizar(); _ocRefrescar();
   await ocCarregarMsgs();   // mostra o evento de promoção na timeline
+}
+
+// OVERSIGHT-ENTRAR (docs/db/TAREFA_OVERSIGHT_ENTRAR.md, decisão do Marcelo 26/09): o Oversight
+// continua abrindo em leitura — este é o ÚNICO botão que vira participante, sem trocar
+// responsável (isso é o Transferir). Libera o compositor sem recarregar a tela.
+async function ocEntrarNaConversa(){
+  if(!_ocConvAtiva) return;
+  let d;
+  try{
+    d = await fetch('/api/comunicacao/conversas/'+_ocConvAtiva+'/entrar',
+      {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({})}).then(r=>r.json());
+  }catch(e){ showToast('Erro de rede.', true); return; }
+  if(!d.ok){ showToast(d.erro||'Falha ao entrar na conversa.', true); return; }
+  const entrarBtn = document.getElementById('oc-entrar-btn'); if(entrarBtn) entrarBtn.style.display = 'none';
+  document.getElementById('oc-compositor').style.display = 'block';
+  const tit = document.getElementById('oc-thread-titulo');
+  if(tit) tit.textContent = tit.textContent.replace(/\s*\(somente leitura\)\s*$/, '');
+  ocAtualizarBotaoEnviar();
+  setTimeout(()=>{ const t=document.getElementById('oc-texto'); if(t) t.focus(); }, 60);
+  _ocFlash('✓ Você entrou na conversa');
+  await ocCarregarMsgs();          // mostra "Fulano entrou na conversa" na linha do tempo
+  await _ocTodasCarregar(true);    // refaz pode_entrar/participante desta conversa na aba Todas
+  await _ocInboxAtualizar(); _ocRefrescar();
 }
 
 function ocExportar(formato){

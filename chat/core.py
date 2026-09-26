@@ -1101,14 +1101,23 @@ def _nomes_participantes(db, conversa_id):
 
 
 def listar_todas_conversas(db, loja_id, participante_id=None,
-                           assunto_tipo=None, assunto_ref=None):
+                           assunto_tipo=None, assunto_ref=None,
+                           ator_usuario_id=None, ator_nivel=None):
     """OVERSIGHT (ver_todas_conversas — aba "Todas" da gerência, r5): TODAS as conversas
     direct/grupo/PROJETO da loja — a comunicação entre os funcionários E os atendimentos —
     com filtro opcional por participante e por assunto. Leitura; postar segue as regras
     normais (DM alheia é somente leitura). `assunto_ref` = projeto_nome ou id (custom).
     `urgente`/`status`/`pendente` (achado 2026-08-05): mesmos campos do serializer da inbox
     pessoal, pra Oversight poder combinar com os MESMOS chips de categoria no frontend em vez
-    de substituí-los — `pendente` já é independente de viewer, então vale igual aqui."""
+    de substituí-los — `pendente` já é independente de viewer, então vale igual aqui.
+
+    `pode_entrar` (OVERSIGHT-ENTRAR, docs/db/TAREFA_OVERSIGHT_ENTRAR.md, 26/09): só computado
+    quando `ator_usuario_id`/`ator_nivel` são passados (o único chamador de hoje sempre passa —
+    parâmetros opcionais só pra não quebrar quem chamar sem ator no futuro). Gate É
+    `pode_trabalhar_fila` (nível bruto master/gerencial OU Função SAC — NUNCA capacidade
+    configurável, ADR-029) **e** o ator ainda não ser participante desta conversa específica —
+    a parte do nível é a mesma pra toda a lista, computada uma vez; a de participante varia por
+    item."""
     q = (db.query(Conversa)
            .filter(Conversa.loja_id == loja_id,
                    Conversa.tipo.in_(("direct", "grupo", "projeto"))))
@@ -1123,6 +1132,8 @@ def listar_todas_conversas(db, loja_id, participante_id=None,
                .filter_by(usuario_id=int(participante_id)).all()}
         q = q.filter(Conversa.id.in_(ids or {-1}))
     convs = q.all()
+    pode_gate = (bool(ator_usuario_id) and
+                pode_trabalhar_fila(db, loja_id, int(ator_usuario_id), ator_nivel))
     itens = []
     for c in convs:
         nomes = _nomes_participantes(db, c.id)
@@ -1138,6 +1149,7 @@ def listar_todas_conversas(db, loja_id, participante_id=None,
             "urgente": bool(getattr(c, "urgente", 0)),
             "status": (getattr(c, "status", None) or "aberta"),
             "pendente": bool(ultima is not None and ultima.autor_usuario_id is None),
+            "pode_entrar": bool(pode_gate and not eh_participante(db, c.id, ator_usuario_id)),
             "participantes": nomes, "assunto": _assunto_do(db, c),
             "ultima_previa": (("" if ultima is None else
                                (MASCARA_PRIVADA if ultima.privada else (ultima.corpo or "")))[:120]),
@@ -1466,6 +1478,25 @@ def arquivar_conversa(db, conversa, usuario_id, arquivar=True):
 _TIPOS_SEM_ATENDIMENTO = ("mural", "publico", "forum_loja", "forum_orizon")
 
 
+def _participar(db, conversa, usuario_id, origem="auto"):
+    """Adiciona `usuario_id` como participante da conversa se ainda não for, ou reativa se tinha
+    sido removido — carteira aditiva, nunca remove ninguém. Não commita.
+
+    OVERSIGHT-ENTRAR (docs/db/TAREFA_OVERSIGHT_ENTRAR.md): extraído de `transferir_responsavel`
+    pra virar a ÚNICA escrita de `ConversaParticipante` por este caminho — `entrar_na_conversa`
+    reusa a mesma função em vez de abrir um terceiro lugar (a lição das cópias do predicado de
+    partição: `gerir_participante`/`sincronizar_participantes_projeto` já são dois outros lugares
+    que fazem algo parecido, achado conhecido, fora do escopo desta tarefa — não adicionar um
+    quarto)."""
+    p = (db.query(ConversaParticipante)
+           .filter_by(conversa_id=conversa.id, usuario_id=usuario_id).first())
+    if p is None:
+        db.add(ConversaParticipante(conversa_id=conversa.id, usuario_id=usuario_id,
+                                    papel="membro", origem=origem, removido=0))
+    elif p.removido:
+        p.removido = 0
+
+
 def transferir_responsavel(db, conversa, ator_id, usuario_destino_id):
     """Transferência MANUAL do responsável atual (§7.1-A): seta o campo, ADICIONA o destino como
     participante (carteira aditiva — nunca remove ninguém; sem participação ele nem conseguiria
@@ -1483,19 +1514,36 @@ def transferir_responsavel(db, conversa, ator_id, usuario_destino_id):
     u = db.get(Usuario, uid)
     if u is None or not u.ativo or (u.loja_id and u.loja_id != conversa.loja_id):
         raise ValueError("Usuário de destino inválido nesta loja.")
-    p = (db.query(ConversaParticipante)
-           .filter_by(conversa_id=conversa.id, usuario_id=uid).first())
-    if p is None:
-        db.add(ConversaParticipante(conversa_id=conversa.id, usuario_id=uid,
-                                    papel="membro", origem="auto", removido=0))
-    elif p.removido:
-        p.removido = 0
+    _participar(db, conversa, uid)
     conversa.responsavel_usuario_id = uid
     ator = db.get(Usuario, ator_id) if ator_id else None
     enviar_mensagem(db, conversa, ator_id,
                     "Atendimento transferido para %s por %s"
                     % (u.nome, (ator.nome if ator else "—")),
                     evento="responsavel_transf")
+    db.flush()
+    return u
+
+
+def entrar_na_conversa(db, conversa, usuario_id):
+    """OVERSIGHT-ENTRAR (docs/db/TAREFA_OVERSIGHT_ENTRAR.md, decisão do Marcelo 26/09): quem
+    abriu a conversa pelo Oversight (leitura, sem participar) vira participante por ATO
+    EXPLÍCITO — reusa `_participar` (mesma escrita de `transferir_responsavel`), com `origem=
+    "manual"` (é a pessoa entrando por conta própria, não um sistema atribuindo). NÃO troca
+    `responsavel_usuario_id` — quem já era responsável continua sendo; trocar é o Transferir,
+    trilha própria. Registra evento na timeline, mesmo padrão de `responsavel_transf`. Recusa
+    (`ValueError`) se já é participante — o botão nem deveria aparecer nesse caso (visibilidade é
+    responsabilidade do chamador/tela), mas a função não confia nisso sozinha. Não commita."""
+    if conversa.tipo in _TIPOS_SEM_ATENDIMENTO:
+        raise ValueError("Mural e fóruns não recebem participante por aqui.")
+    if eh_participante(db, conversa.id, usuario_id):
+        raise ValueError("Você já participa desta conversa.")
+    u = db.get(Usuario, usuario_id)
+    if u is None:
+        raise ValueError("Usuário inválido.")
+    _participar(db, conversa, usuario_id, origem="manual")
+    enviar_mensagem(db, conversa, usuario_id, "%s entrou na conversa" % u.nome,
+                    evento="entrou_conversa")
     db.flush()
     return u
 
