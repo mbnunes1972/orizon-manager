@@ -147,7 +147,12 @@ vê / mural fica de fora) + gate por Função SAC + recusa de reentrada + regres
 `transferir_responsavel` + endpoint com tenancy e gate próprio.
 
 **Portão:** `-k "chat or oversight or atendimento or transferir or participante or li4b or
-contrato"` — 337 passed, 0 failed. Suíte completa: ver commit.
+contrato"` — 337 passed, 0 failed.
+
+**Suíte completa (procedimento do PLANO_SEMANA_1.md — nohup setsid + timeout tail -f --pid, log
+lido antes de apagar):** `python3 -m pytest -q` — **2941 passed, 3 xfailed, 0 failed em 671,49s
+(11m11)**. Os 3 `xfailed` são os mesmos pré-existentes de sempre (ACHADO-19), não consequência
+desta tarefa.
 
 ## Regras deste lote
 
