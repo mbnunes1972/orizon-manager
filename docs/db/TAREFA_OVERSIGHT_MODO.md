@@ -61,6 +61,38 @@ não introduz o problema do "sem teto", que já existia. **Não decidi sozinho c
 desta tarefa; fica registrado como achado conhecido, não corrigido, se o volume real em campo
 mostrar que precisa.
 
+### Teto do Oversight — medição pedida em 28/09 (pendência 2, ainda NÃO implementada)
+
+**Volume real medido (28/09/2026), população exata que `listar_todas_conversas` itera
+(`loja_id=X AND tipo IN ('direct','grupo','projeto')`, sem outro filtro):**
+
+| ambiente | loja 1 | direct | grupo | projeto | total |
+|---|---|---|---|---|---|
+| Homologação (`orizon_homologacao`, VPS `167.88.33.121`) | Dalmóbile SJC | 3 | 3 | 0 | **6** |
+| Produção (`orizon_producao`, VPS `179.197.77.9`) | Inspirium | 0 | 0 | 0 | **0** |
+
+Produção está em **zero** porque o módulo de Chat/Oversight ainda não teve uso real lá — não serve
+de teto ancorado em pico observado, ao contrário do que `LIMITE_FILA=300` pôde fazer em 18/09
+(`chat/triagem.py:28-31`, calibrado sobre a Inspirium real tendo 7-8 órfãs naquele momento, ~40x
+de folga). Hoje o único sinal real que existe é Homologação: **6**.
+
+**Por que não dá pra copiar o número 300 da fila sem ajustar:** `listar_fila`/`listar_conversas_
+sem_dono` montam cada item a partir de colunas já carregadas na MESMA query — custo extra por item
+é **zero**. `listar_todas_conversas` (esta tarefa) faz de **2 a 5 queries por item** (participantes
++ última mensagem, sempre; `janela_da_conversa`, sempre, desde esta tarefa; `responsavel` e o
+fallback de segmento, condicionais). Um teto de 300 aqui autorizaria até **1.500 queries por poll
+de 45s, por gerente, por loja** — quase 3 ordens de magnitude acima do pior caso da fila com o
+mesmo N. O número certo pra Oversight não é "o mesmo N da fila", é um N que mantenha o ORÇAMENTO de
+queries por poll numa faixa parecida.
+
+**Proposta (número, não implementação):** teto de **100** conversas por chamada de
+`listar_todas_conversas`. Justificativa: (a) ~17x de folga sobre o único pico real observado hoje
+(6, Homologação) — mesma ordem de grandeza de folga que a fila usou sobre o pico dela; (b) pior
+caso de custo em 100×5 = 500 queries/poll, mesma ordem de grandeza do pior caso já tolerado hoje
+pela fila (300 itens × ~1-2 queries de apoio); (c) mesma filosofia da fila — trunca, não recusa;
+estourar 100 é sintoma de uso real que ninguém está processando, não motivo pra a tela não abrir.
+**Não é número fechado** — é o cálculo que ancora a decisão; Marcelo decide o valor final.
+
 ## Queixa 2 — o botão do Oversight parece um filtro, e não é
 
 > "O botão do oversight não está claro pra mim como funciona exatamente. (...) Se é assim, o
@@ -160,6 +192,17 @@ portão alvo desta tarefa (`-k "chat or oversight or inbox or atendimento or jan
 aceite_achado36"`, rodado isolado) deu **175 passed, 0 failed** antes deste run cheio. Registrado
 como achado de infraestrutura (contenção de recursos), não reaberto como bug de código — não é
 desta tarefa investigar timeout de suíte sob concorrência de sessões.
+
+**Prova, não explicação (28/09/2026):** os mesmos 5 testes rodados ISOLADOS, host confirmado
+quieto antes (`pgrep pytest` vazio, nenhum Chromium de teste de pé) —
+
+| execução | resultado | tempo |
+|---|---|---|
+| suíte cheia (com 2 sessões Claude Code concorrentes) | 5 failed, 2948 passed, 3 xfailed | 1162,57s |
+| os mesmos 5, isolados, host quieto | **5 passed** | 51,41s |
+
+Confirma contenção, não defeito — os dois números lado a lado, como pedido. Se tivesse falhado
+isolado, a instrução era parar e reportar como defeito; não foi o caso.
 
 ## Regras deste lote
 1. Sem DDL.
