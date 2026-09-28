@@ -44,10 +44,14 @@ INDEX_HTML = os.path.join(REPO, "static", "index.html")
 # âncoras, `git diff -U0` mostra os dois hunks como inserção pura). Reajustado de novo em
 # 26/09/2026 (+5 linhas: OVERSIGHT-ENTRAR, docs/db/TAREFA_OVERSIGHT_ENTRAR.md — botão "Entrar
 # na conversa" no cabeçalho, ~linha 3311, ANTES deste trecho; confirmado pelas mesmas duas
-# âncoras). Reajustado de novo em 28/09/2026 (+5 linhas: OVERSIGHT-MODO, docs/db/
+# âncoras). Reajustado de novo em 28/09/2026 (+5 linhas: OVERSIGHT-MODO Queixa 1, docs/db/
 # TAREFA_OVERSIGHT_MODO.md — tarja de janela em `_ocTodasItemHTML` via `_atdJanelaBadge`,
-# ~linha 13348, ANTES deste trecho; confirmado pelas mesmas duas âncoras).
-FAIXA_INICIO, FAIXA_FIM = 14945, 16996
+# ~linha 13348, ANTES deste trecho; confirmado pelas mesmas duas âncoras). Reajustado de novo no
+# mesmo dia (Queixa 2, forma do switch/aviso): +46 linhas (CSS do `.oc-modo-wrap`/`.oc-modo-
+# aviso` ~linha 2959, HTML do switch+aviso nos dois topbars ~3163/3176/3436/3445, e a função
+# `_ocModoSetar` ~13284 — todos ANTES deste trecho; `atendRender`/`intRender` só trocaram
+# conteúdo de uma linha, sem alterar contagem).
+FAIXA_INICIO, FAIXA_FIM = 14991, 17042
 
 
 def _texto_do_modulo():
@@ -152,15 +156,18 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 # ponto) fica intocada; as 5 seguintes (DEPOIS): +5. Medido: 8166→8166 (sem mudança),
 # 20560/23187/23825/25459 (+5, as quatro com o mesmo delta).
 FAIXAS_CICLO = [
-    (7999, 8047),      # abrirProjeto (+17, sem mudança nesta rodada)
-    (20138, 20184),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
-    (22714, 22786),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
-                       # verificarClickSignPEAgora / reenviarConviteClickSignPE (+103)
-    (23235, 23252),    # peConciliacaoReprovar (+103)
-    (24069, 24119),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
-    (24837, 24936),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
+    (8031, 8079),      # abrirProjeto (+32: OVERSIGHT-MODO Queixa 2, hunks ANTES desta âncora --
+                       # CSS .oc-modo-wrap/.oc-modo-aviso e HTML do switch+aviso nos dois topbars;
+                       # _ocModoSetar e os trechos de atendRender/intRender ficam DEPOIS, não contam)
+    (20184, 20230),    # _cicloTransferResponder / _cicloTransferConfirmar (+46: Queixa 2 inteira,
+                       # todos os hunks ficam antes desta âncora)
+    (22760, 22832),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
+                       # verificarClickSignPEAgora / reenviarConviteClickSignPE (+46)
+    (23281, 23298),    # peConciliacaoReprovar (+46)
+    (24115, 24165),    # toggleSalvarEtapa / reabrirEtapaCascata (+46)
+    (24883, 24982),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
                        # _confirmarEnvioClickSignMedicao / verificarClickSignMedicaoAgora /
-                       # reenviarConviteClickSignMedicao (+103)
+                       # reenviarConviteClickSignMedicao (+46)
     # F2-40 (08/09): linhas deslocadas pela Fatia 1/2 (botão "Negociar Complemento" movido +
     # modal reescrito, ~150 linhas novas entre a 11c e a 11e) — mesmas 4 funções de antes,
     # conteúdo intocado, só a numeração absoluta mudou (medido função por função, não chutado).

@@ -116,8 +116,33 @@ Prova central: `tests/test_oversight_modo.py::test_oversight_e_inbox_concordam_n
 impede o terceiro sintoma da mesma causa. Portão: `-k "chat or oversight or inbox or atendimento
 or janela"` — 163 passed, 0 failed.
 
-**Queixa 2 (forma) — pendente.** Aguardando aceite visual do Marcelo (item 7 do conserto) antes
-de marcar FECHADA — comportamento inalterado, só forma.
+**Queixa 2 (forma) — implementada em 28/09/2026, aguardando aceite visual do Marcelo.**
+O Oversight deixou de ser `.oc-chip` (a regra CSS e a classe no HTML foram removidas) e virou um
+switch: reusa `.sw`/`.sw-slider`, o MESMO componente de Fiscal → Configuração Fiscal ("Discrimina
+impostos") — nenhum CSS de switch novo. Fica separado dos chips por `margin-left:auto` + uma
+divisória (`#atd-modo-divisor` / `#int-modo-divisor`), com o rótulo "Ver toda a loja" em vez de
+"Oversight". Quando ligado, aparece um aviso discreto acima da lista ("Todas as conversas da
+loja", `#atd-modo-aviso` / `#int-modo-aviso`). Um único `_ocModoSetar(prefixo, ligado,
+podeOversight)` decide a aparência do switch/aviso nos dois canais — `atendRender()` e
+`intRender()` chamam a MESMA função, não duas cópias.
+
+Comportamento não tocado (item 6 do conserto): o toggle continua trocando só a FONTE
+(`_atdOversight ? _ocTodasDoCanal('atd') : _atdInbox`) e o filtro por chip continua agindo por
+cima (`base.filter(c=>_ocDaChip(c,_atdChip))`) — linhas intactas, confirmado por teste. O botão
+"Entrar na conversa" (OVERSIGHT-ENTRAR) não foi mexido.
+
+Verificado num navegador real (Playwright, servidor local, `pdm2026`/master,
+`ver_todas_conversas=true`) em 1280 e 1600px, claro e escuro: em 1600px o switch fica
+nitidamente separado dos chips; em 1280px a topbar rola horizontalmente para alcançar o switch —
+comportamento de overflow já existente na topbar (não é regressão desta tarefa). Capturas
+publicadas: ver link na resposta desta tarefa.
+
+Prova: `tests/test_oversight_modo_forma.py` (7 testes, trava estrutura/texto — sem teste JS no
+projeto). Portão: `tests/test_aceite_achado36.py` + `test_oversight_modo_forma.py` verdes (12
+passed); faixas de linha de `test_aceite_achado36.py` recalibradas (+46 na maioria, +32 na
+faixa de `abrirProjeto`, que fica antes de parte dos hunks desta queixa).
+
+**Não marcar FECHADA** — item 7 do conserto exige aceite visual explícito do Marcelo.
 
 ## Regras deste lote
 1. Sem DDL.

@@ -2953,10 +2953,27 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
        --ok já é exatamente essa semântica) em vez do primário neutro genérico do app. */
     .oc-btn-ok{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--chat-green);background:var(--chat-green-soft);border:1px solid var(--chat-green);border-radius:8px;padding:7px 12px;cursor:pointer;font-family:inherit}
     .oc-btn-ok:hover{opacity:.85}
-    /* Chips + toggle de oversight: agora vivem na topbar de largura total (não mais espremidos
-       na coluna da lista) — cabem numa linha só com sobra, oversight sempre por último. */
+    /* Chips vivem na topbar de largura total (não mais espremidos na coluna da lista) — cabem
+       numa linha só com sobra. */
     .atd-tabs{display:flex;gap:6px;align-items:center;flex-wrap:nowrap;flex-shrink:0}
-    .oc-chip-oversight{padding:3px 9px}
+    /* OVERSIGHT-MODO (docs/db/TAREFA_OVERSIGHT_MODO.md, 28/09, achado do Marcelo: "o botão de
+       oversight não está claro pra mim como funciona... deve ser diferente e talvez
+       posicionado em outro lugar para não confundir"). Antes era `.oc-chip.oc-chip-oversight`
+       — mesma pílula/mesmo destaque `.active` dos filtros de escolha única (Todas/Grupos/
+       Projetos/...), então parecia a sétima opção de uma escolha única, quando é um
+       INTERRUPTOR ortogonal (troca a FONTE da lista, empilha por cima do filtro escolhido).
+       Virou switch de verdade (`.sw`/`.sw-slider`, o MESMO componente já usado em Fiscal →
+       Configuração Fiscal "Discrimina impostos" — não um estilo novo), empurrado pro fim da
+       topbar (`margin-left:auto`) e separado por uma divisória própria — layout diferente,
+       não só cor, pra não ler como chip nem por engano.*/
+    .oc-modo-wrap{display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:auto;cursor:pointer}
+    .oc-modo-wrap .oc-modo-label{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap}
+    /* Cabeçalho discreto da lista quando o modo está ligado (item 5 do conserto) — não é chip,
+       não é filtro: é a lista dizendo "você está vendo outra coisa agora", sem depender só do
+       switch aceso lá em cima (achado do Marcelo: o botão sozinho não bastava). */
+    .oc-modo-aviso{display:none;align-items:center;gap:6px;padding:7px 16px;font-size:11px;
+      font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:var(--accent);
+      background:var(--accent-tint);border-bottom:1px solid var(--border)}
     .atd-filtro{display:flex;gap:6px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;flex-shrink:0}
     /* Linhas da lista (mockup .conv-row): SEM card/borda própria — linha reta com borda inferior
        só, igual ao mockup; “selecionada” ganha friso à esquerda + fundo, não uma cor nova. */
@@ -3143,12 +3160,20 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
               <button class="oc-pill oc-pill-amber" onclick="ocNovaAbrir()"><i class="ti ti-users-plus"></i> Criar Grupo</button>
               <div class="oc-topbar-divider"></div>
               <div class="atd-tabs" id="atd-tabs"></div>
+              <!-- OVERSIGHT-MODO: switch, não chip — empurrado pro fim da topbar (margin-left:
+                   auto), com divisória própria, pra não ler como a 7ª opção dos filtros acima. -->
+              <div class="oc-topbar-divider" id="atd-modo-divisor" style="display:none"></div>
+              <label class="oc-modo-wrap" id="atd-modo-wrap" style="display:none" title="Troca a fonte da lista para TODAS as conversas da loja, inclusive as que você não participa — continua respeitando o filtro escolhido acima">
+                <span class="sw"><input type="checkbox" id="atd-modo-check" onchange="atendOversightToggle()"><span class="sw-slider"></span></span>
+                <span class="oc-modo-label">Ver toda a loja</span>
+              </label>
             </div>
             <div class="atd-filtro">
               <select id="atd-seg-filtro" onchange="atendRender()" title="Segmento" style="padding:5px 8px;font-family:inherit;font-size:12px"><option value="">Todos</option></select>
             </div>
             <div class="oc-middle">
               <div class="oc-list-col">
+                <div class="oc-modo-aviso" id="atd-modo-aviso"><i class="ti ti-eye"></i> Todas as conversas da loja</div>
                 <div class="oc-lista-scroll" id="atd-lista"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
               </div>
               <div class="oc-pane-col" id="oc-slot-atend">
@@ -3408,9 +3433,16 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
               <button class="btn btn-ghost btn-sm" id="int-forum-orizon" style="display:none" onclick="ocForumAbrir('orizon')"><i class="ti ti-world"></i> Fórum Orizon</button>
               <div class="oc-topbar-divider"></div>
               <div class="atd-tabs" id="int-tabs"></div>
+              <!-- OVERSIGHT-MODO (docs/db/TAREFA_OVERSIGHT_MODO.md): mesmo switch de Atendimentos. -->
+              <div class="oc-topbar-divider" id="int-modo-divisor" style="display:none"></div>
+              <label class="oc-modo-wrap" id="int-modo-wrap" style="display:none" title="Troca a fonte da lista para TODAS as conversas da loja, inclusive as que você não participa — continua respeitando o filtro escolhido acima">
+                <span class="sw"><input type="checkbox" id="int-modo-check" onchange="intOversightToggle()"><span class="sw-slider"></span></span>
+                <span class="oc-modo-label">Ver toda a loja</span>
+              </label>
             </div>
             <div class="oc-middle">
               <div class="oc-list-col">
+                <div class="oc-modo-aviso" id="int-modo-aviso"><i class="ti ti-eye"></i> Todas as conversas da loja</div>
                 <div class="oc-lista-scroll" id="int-lista"><em style="color:var(--muted);font-size:12px">Carregando…</em></div>
               </div>
               <div class="oc-pane-col" id="oc-slot-interno"></div>
@@ -13249,6 +13281,20 @@ const _INT_CHIPS = [
 ];
 let _atdChip = 'all', _intChip = 'all';
 let _atdOversight = false, _intOversight = false;
+// OVERSIGHT-MODO (docs/db/TAREFA_OVERSIGHT_MODO.md, 28/09): 1 função só decide como o
+// switch/divisória/aviso aparecem — reusada por atendRender() e intRender(), não duas cópias
+// do mesmo toggle. `ligado` = _atdOversight/_intOversight; `podeOversight` = mesmo gate de
+// sempre (pode_ver_todas_conversas).
+function _ocModoSetar(prefixo, ligado, podeOversight){
+  const wrap = document.getElementById(prefixo+'-modo-wrap');
+  const div = document.getElementById(prefixo+'-modo-divisor');
+  const check = document.getElementById(prefixo+'-modo-check');
+  const aviso = document.getElementById(prefixo+'-modo-aviso');
+  if(wrap) wrap.style.display = podeOversight ? '' : 'none';
+  if(div) div.style.display = podeOversight ? '' : 'none';
+  if(check) check.checked = !!ligado;
+  if(aviso) aviso.style.display = ligado ? 'flex' : 'none';
+}
 const _INT_TIPOROT = {direct:'Pessoal', grupo:'Grupo', mural:'Mural', publico:'Mural'};
 const _INT_TIPOS = ['direct','grupo'];   // equipe; Mural via botão; projeto vai em Atendimentos
 // ── Partição do painel de Comunicação — FONTE ÚNICA (TAREFA_TRIAGEM_E_CONTADOR.md Item 2,
@@ -13407,8 +13453,8 @@ function intRender(){
   const tabsEl = document.getElementById('int-tabs');
   const q = ((document.getElementById('int-busca')||{}).value||'').trim().toLowerCase();
   const podeOversight = !!(_usuarioAtual && _usuarioAtual.pode_ver_todas_conversas);
-  tabsEl.innerHTML = _ocChipsRow(_INT_CHIPS, _intChip, 'intChip') + _ocPendChip('int')
-    + (podeOversight ? '<span class="oc-chip oc-chip-oversight'+(_intOversight?' active':'')+'" title="Ver todas as conversas da loja, inclusive as que você não participa" onclick="intOversightToggle()"><i class="ti ti-eye"></i> Oversight</span>' : '');
+  tabsEl.innerHTML = _ocChipsRow(_INT_CHIPS, _intChip, 'intChip') + _ocPendChip('int');
+  _ocModoSetar('int', _intOversight, podeOversight);
   const box = document.getElementById('int-lista');
   // Oversight (r5) troca a FONTE (minhas conversas → todas da loja) mas segue os MESMOS
   // chip/Pendentes/busca (achado 2026-08-05: antes ele IGNORAVA os outros filtros por
@@ -13496,8 +13542,8 @@ function atendRender(){
   const filtroSeg = document.getElementById('atd-seg-filtro').value;
   const q = ((document.getElementById('atd-busca')||{}).value||'').trim().toLowerCase();
   const podeOversight = !!(_usuarioAtual && _usuarioAtual.pode_ver_todas_conversas);
-  tabsEl.innerHTML = _ocChipsRow(_ATD_CHIPS, _atdChip, 'atendChip') + _ocPendChip('atd')
-    + (podeOversight ? '<span class="oc-chip oc-chip-oversight'+(_atdOversight?' active':'')+'" title="Ver todas as conversas da loja, inclusive as que você não participa" onclick="atendOversightToggle()"><i class="ti ti-eye"></i> Oversight</span>' : '');
+  tabsEl.innerHTML = _ocChipsRow(_ATD_CHIPS, _atdChip, 'atendChip') + _ocPendChip('atd');
+  _ocModoSetar('atd', _atdOversight, podeOversight);
   const box = document.getElementById('atd-lista');
   // Oversight (r5) troca a FONTE (meus atendimentos → todos da loja) mas segue os MESMOS
   // chip/segmento/Pendentes/busca (achado 2026-08-05: antes ignorava tudo isso e sempre
