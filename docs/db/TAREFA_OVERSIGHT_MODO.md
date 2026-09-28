@@ -144,6 +144,23 @@ faixa de `abrirProjeto`, que fica antes de parte dos hunks desta queixa).
 
 **Não marcar FECHADA** — item 7 do conserto exige aceite visual explícito do Marcelo.
 
+**Suíte completa (28/09/2026, após o commit da Queixa 2):** `5 failed, 2948 passed, 3 xfailed,
+187303 warnings in 1162.57s (0:19:22)`. As 5 falhas são timeout, não assert de lógica, e em
+domínio nenhum tocado por esta tarefa:
+- `test_aceite_achado12.py::test_projeto_com_aditivo_termina_com_2106_zerado` — `urllib` `timeout=5`
+  estourou esperando resposta HTTP (contábil/aditivo, não mexido aqui);
+- `test_e2e_browser_f2_37_linha_item_especial.py`, `test_e2e_browser_f2_40_fatia3_af_oculta.py`,
+  `test_e2e_browser_f2_41_apoio_dev.py`, `test_e2e_browser_remover_ciclo.py` (todos `[chromium]`) —
+  `Page.wait_for_selector` estourou 10000ms esperando elemento de orçamento/ciclo aparecer; nenhum
+  toca `atd-`/`int-`/Oversight/chat.
+
+Suíte levou 19m22s, muito acima do ~2m45 de referência (CLAUDE.md) — duas outras sessões do Claude
+Code concorrentes no mesmo host (confirmado via `ps aux`) explicam a lentidão e os timeouts; o
+portão alvo desta tarefa (`-k "chat or oversight or inbox or atendimento or janela or
+aceite_achado36"`, rodado isolado) deu **175 passed, 0 failed** antes deste run cheio. Registrado
+como achado de infraestrutura (contenção de recursos), não reaberto como bug de código — não é
+desta tarefa investigar timeout de suíte sob concorrência de sessões.
+
 ## Regras deste lote
 1. Sem DDL.
 2. Não abrir achado novo — anotar e reportar.
