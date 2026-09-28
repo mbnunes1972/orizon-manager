@@ -1111,6 +1111,14 @@ def listar_todas_conversas(db, loja_id, participante_id=None,
     pessoal, pra Oversight poder combinar com os MESMOS chips de categoria no frontend em vez
     de substituí-los — `pendente` já é independente de viewer, então vale igual aqui.
 
+    `segmento`/`janela`/`responsavel` (OVERSIGHT-MODO, docs/db/TAREFA_OVERSIGHT_MODO.md, 28/09):
+    mesma origem (`_atendimento_meta`/`_resolver_responsavel`) e mesmo formato do serializer da
+    inbox — antes esta função montava o item à mão e não devolvia `janela`/`responsavel` nenhuma,
+    e o `segmento` era a coluna crua (sem o fallback derivado do tráfego que `_atendimento_meta`
+    já fazia pra inbox). Custo medido e registrado no documento antes de fechar: `janela_da_
+    conversa` é uma query NOVA por item (sempre roda), sem teto — mesma ausência de teto que já
+    valia pra `ultima`/`_nomes_participantes` antes desta tarefa.
+
     `pode_entrar` (OVERSIGHT-ENTRAR, docs/db/TAREFA_OVERSIGHT_ENTRAR.md, 26/09): só computado
     quando `ator_usuario_id`/`ator_nivel` são passados (o único chamador de hoje sempre passa —
     parâmetros opcionais só pra não quebrar quem chamar sem ator no futuro). Gate É
@@ -1142,10 +1150,19 @@ def listar_todas_conversas(db, loja_id, participante_id=None,
         titulo = c.titulo or (" ↔ ".join(nomes) if c.tipo == "direct" else "Conversa")
         if c.tipo == "projeto":
             titulo = "📁 " + ((c.projeto_nome or "Projeto").replace("_", " "))
+        # OVERSIGHT-MODO (docs/db/TAREFA_OVERSIGHT_MODO.md, 28/09): `segmento`/`janela` vêm de
+        # `_atendimento_meta`, a MESMA função que `listar_inbox` já chama — antes esta função
+        # devolvia `c.segmento` cru (sem o fallback derivado do tráfego) e não devolvia `janela`
+        # nenhuma; `responsavel` vem de `_resolver_responsavel`, extraída de dentro de
+        # `serializar_conversa` pelo mesmo motivo. Nenhuma quinta cópia de cálculo — reuso direto
+        # das duas funções que a inbox pessoal já usa.
+        segmento, janela = _atendimento_meta(db, c)
         itens.append({
             "id": c.id, "tipo": c.tipo, "titulo": titulo,
             "projeto_nome": c.projeto_nome,
-            "segmento": c.segmento,               # r5: separa atendimentos × internas na aba Todas
+            "segmento": segmento,                 # r5: separa atendimentos × internas na aba Todas
+            "janela": janela,
+            "responsavel": _resolver_responsavel(db, c),
             "urgente": bool(getattr(c, "urgente", 0)),
             "status": (getattr(c, "status", None) or "aberta"),
             "pendente": bool(ultima is not None and ultima.autor_usuario_id is None),
@@ -1809,6 +1826,19 @@ def _conta_nao_lidas(db, conversa_id, usuario_id, lido_ate):
               .count())
 
 
+def _resolver_responsavel(db, c):
+    """Responsável atual da conversa, `{"id", "nome"}` ou `None` — MESMO formato nos dois
+    serializers (inbox pessoal e Oversight). Extraído de dentro de `serializar_conversa`
+    (OVERSIGHT-MODO, docs/db/TAREFA_OVERSIGHT_MODO.md, 28/09) pra `listar_todas_conversas`
+    reusar em vez de duplicar — antes o Oversight não devolvia este campo, o frontend caía no
+    fallback "sem responsável → SAC" mesmo quando havia um responsável de verdade."""
+    rid = getattr(c, "responsavel_usuario_id", None)
+    if not rid:
+        return None
+    ur = db.get(Usuario, rid)
+    return {"id": rid, "nome": (ur.nome if ur else None)}
+
+
 def serializar_conversa(db, c, viewer_id, ultima=None, participantes=None, nao_lidas=0,
                         arquivada=False):
     """Item da inbox: id/tipo/título de exibição + prévia da última mensagem. Para direct, o
@@ -1843,10 +1873,7 @@ def serializar_conversa(db, c, viewer_id, ultima=None, participantes=None, nao_l
     previa = ""
     if ultima is not None:
         previa = MASCARA_PRIVADA if ultima.privada else (ultima.corpo or "")
-    resp = None
-    if getattr(c, "responsavel_usuario_id", None):
-        ur = db.get(Usuario, c.responsavel_usuario_id)
-        resp = {"id": c.responsavel_usuario_id, "nome": (ur.nome if ur else None)}
+    resp = _resolver_responsavel(db, c)
     # TAREFA-B (docs/db/TAREFA_LEAD_E_PAINEL_SAC.md, B1 item 3): selo DERIVADO, nunca mais
     # escrito no título — "Lead — Nome" rotulava TODO contato novo da triagem, cliente
     # reconhecido incluso. `lead_id` só existe quando o contato veio de campanha (referral,

@@ -44,8 +44,10 @@ INDEX_HTML = os.path.join(REPO, "static", "index.html")
 # âncoras, `git diff -U0` mostra os dois hunks como inserção pura). Reajustado de novo em
 # 26/09/2026 (+5 linhas: OVERSIGHT-ENTRAR, docs/db/TAREFA_OVERSIGHT_ENTRAR.md — botão "Entrar
 # na conversa" no cabeçalho, ~linha 3311, ANTES deste trecho; confirmado pelas mesmas duas
-# âncoras).
-FAIXA_INICIO, FAIXA_FIM = 14940, 16991
+# âncoras). Reajustado de novo em 28/09/2026 (+5 linhas: OVERSIGHT-MODO, docs/db/
+# TAREFA_OVERSIGHT_MODO.md — tarja de janela em `_ocTodasItemHTML` via `_atdJanelaBadge`,
+# ~linha 13348, ANTES deste trecho; confirmado pelas mesmas duas âncoras).
+FAIXA_INICIO, FAIXA_FIM = 14945, 16996
 
 
 def _texto_do_modulo():
@@ -145,14 +147,18 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 # (~linha 19031, também entre a 1ª e a 2ª, +24). A 1ª faixa só pega o primeiro: +5. As 5
 # seguintes: +5+6+24 = +35. Medido contra HEAD anterior: 8161→8166 (+5),
 # 20520→20555/23147→23182/23785→23820/25419→25454 (+35, as quatro com o mesmo delta).
+# Reajustado de novo em 28/09/2026 (OVERSIGHT-MODO): 1 hunk puro (`_atdJanelaBadge` em
+# `_ocTodasItemHTML`, ~linha 13348, ANTES de tudo, +5) — a 1ª faixa (abrirProjeto, ANTES deste
+# ponto) fica intocada; as 5 seguintes (DEPOIS): +5. Medido: 8166→8166 (sem mudança),
+# 20560/23187/23825/25459 (+5, as quatro com o mesmo delta).
 FAIXAS_CICLO = [
     (7999, 8047),      # abrirProjeto (+17, sem mudança nesta rodada)
-    (20133, 20179),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
-    (22709, 22781),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
+    (20138, 20184),    # _cicloTransferResponder / _cicloTransferConfirmar (+103)
+    (22714, 22786),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
                        # verificarClickSignPEAgora / reenviarConviteClickSignPE (+103)
-    (23230, 23247),    # peConciliacaoReprovar (+103)
-    (24064, 24114),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
-    (24832, 24931),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
+    (23235, 23252),    # peConciliacaoReprovar (+103)
+    (24069, 24119),    # toggleSalvarEtapa / reabrirEtapaCascata (+103)
+    (24837, 24936),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
                        # _confirmarEnvioClickSignMedicao / verificarClickSignMedicaoAgora /
                        # reenviarConviteClickSignMedicao (+103)
     # F2-40 (08/09): linhas deslocadas pela Fatia 1/2 (botão "Negociar Complemento" movido +

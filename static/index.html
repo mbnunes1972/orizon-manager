@@ -13346,13 +13346,18 @@ function _ocTodasItemHTML(c){
   const titulo = (c.titulo||'Conversa').replace(/^\s*[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]\s*/u,'');
   const badge = '<span class="atd-badge atd-b-seg"><span class="dot" style="background:var(--accent)"></span>'+esc(tipoRot)+'</span>'
     + (c.segmento ? ' <span class="'+_ocSegClasse(c.segmento)+'">'+esc(_ocSegRot(c.segmento))+'</span>' : '');
+  // OVERSIGHT-MODO (docs/db/TAREFA_OVERSIGHT_MODO.md, 28/09): `_atdJanelaBadge` é a MESMA
+  // função que a lista normal já usa (`_atdItemHTML`) -- reusa, não duplica o texto/cor da
+  // tarja. Só existe algo pra mostrar agora porque `listar_todas_conversas` passou a devolver
+  // `c.janela` (antes vinha undefined, a tarja nunca aparecia aqui).
+  const jan = _atdJanelaBadge(c.janela);
   return '<div class="atd-item" onclick="ocAbrirTodas('+c.id+')">'
     + _ocAvatarHTML(titulo, c.tipo)
     + '<div class="atd-main">'
     + '<div class="atd-top"><span class="atd-nome">'+esc(titulo)+'</span><span class="atd-tempo">'+esc(_atdQuando(c.ultima_em||c.criado_em))+'</span></div>'
     + '<div class="atd-prev">'+esc(c.ultima_previa||'—')+'</div>'
     + '<div style="font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc((c.participantes||[]).join(', '))+'</div>'
-    + '<div class="atd-tags">'+badge+'</div></div></div>';
+    + '<div class="atd-tags">'+badge+jan+'</div></div></div>';
 }
 async function ocAbrirTodas(id){
   if((_ocInbox||[]).some(x=>x.id===id)){ await ocAbrirConversa(id); return; }   // participo → normal
