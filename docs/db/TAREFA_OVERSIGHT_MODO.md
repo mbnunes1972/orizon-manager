@@ -135,7 +135,7 @@ Verificado num navegador real (Playwright, servidor local, `pdm2026`/master,
 `ver_todas_conversas=true`) em 1280 e 1600px, claro e escuro: em 1600px o switch fica
 nitidamente separado dos chips; em 1280px a topbar rola horizontalmente para alcançar o switch —
 comportamento de overflow já existente na topbar (não é regressão desta tarefa). Capturas
-publicadas: ver link na resposta desta tarefa.
+publicadas em https://claude.ai/artifact/VDnqrVxnEsQikjatkoEoo6 (mesmo critério do LI-4).
 
 Prova: `tests/test_oversight_modo_forma.py` (7 testes, trava estrutura/texto — sem teste JS no
 projeto). Portão: `tests/test_aceite_achado36.py` + `test_oversight_modo_forma.py` verdes (12
