@@ -25,7 +25,9 @@ PERFIS = {
     "gerencial": {"rotulo": "Gerente", "desconto_max": 20.0,   # rótulo padronizado 2026-07-22 (slug não muda)
         "acesso_operacional": True, "acesso_financeiro": True, "acesso_fiscal": True,
         "acesso_admin": False, "acesso_config": False,
-        "ver_parametros": True, "autorizar": True, "aprovar_financeiro": True,
+        # FIN-001 (15/10/2026, decisão da Juliana): Gerente acessa o Financeiro mas NÃO aprova —
+        # aprovação financeira é só do Master. Loja que quiser dar ao Gerente liga em Admin › Perfis.
+        "ver_parametros": True, "autorizar": True, "aprovar_financeiro": False,
         "aprovar_medicao_reprovada": True, "gerir_usuarios": False, "gerir_perfis": False,
         "editar_dados_loja": False, "gerir_documentos": False,
         "executar_pe": True, "revisar_pe": True, "registrar_medicao": True,

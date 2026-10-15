@@ -25,13 +25,12 @@ def test_gerente_adm_fin_libera(http_client_factory, seed, app_db):
     assert st == 200 and body["ok"]
 
 
-def test_gerencial_libera(http_client_factory, seed, app_db):
-    # Novo modelo (truth table Perfil-4): Gerencial ganhou acesso_financeiro/aprovar_financeiro
-    # (diferente do antigo "gerente de vendas", que era barrado aqui). Comportamento mudou de
-    # propósito — Gerencial agora libera impostos como Master.
+def test_gerencial_nao_libera(http_client_factory, seed, app_db):
+    # FIN-001 (15/10/2026): aprovar_financeiro voltou a ser só do Master — liberar a exibição dos
+    # impostos é dessa capacidade (docs/USUARIOS.md), então o Gerente é barrado aqui de novo.
     _mk(app_db, "gv", "gerencial")
     st, body = _post(http_client_factory, "gv", "senha123")
-    assert st == 200 and body["ok"] is True
+    assert st == 403 and body["ok"] is False
 
 
 def test_senha_errada_401(http_client_factory, seed):

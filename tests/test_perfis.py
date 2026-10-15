@@ -42,7 +42,7 @@ def test_capacidades_preservadas():
     assert perfis.pode("gerencial", "autorizar") is True
     assert perfis.pode("operador", "autorizar") is False
     assert perfis.pode("master", "aprovar_financeiro") is True
-    assert perfis.pode("gerencial", "aprovar_financeiro") is True    # Gerencial GANHOU Financeiro (novo modelo)
+    assert perfis.pode("gerencial", "aprovar_financeiro") is False   # FIN-001 (15/10/2026): só Master aprova
     assert perfis.pode("master", "gerir_usuarios") is True
     assert perfis.pode("gerencial", "gerir_usuarios") is False       # Gerencial NÃO gerencia usuários (novo modelo)
     assert perfis.pode("operador", "gerir_usuarios") is False

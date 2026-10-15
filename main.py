@@ -13088,13 +13088,15 @@ class Handler(BaseHTTPRequestHandler):
                 # contrato é IRREVERSÍVEL — sempre pede senha, sem atalho e sem janela, de propósito.
                 # `handler=None` EXPLÍCITO (obrigatório desde a verificação de 11/09 — Ponta 2 de
                 # TAREFA_ACHADO68_VERIFICACAO.md): é o que mantém este ponto FORA do mecanismo de
-                # janela (nunca abre uma, nunca consulta uma) mesmo reusando `_aprovador_financeiro`
-                # só pra validar a credencial. Uma janela aberta por OUTRA aprovação financeira não
-                # pode virar permissão de passagem pra isto — não "conserte" isto trocando pro
-                # `handler=self` que os outros 14 pontos têm.
-                aprovador = _aprovador_financeiro(db, req.get("login"), req.get("senha"),
-                                                  sessao=usuario, handler=None)
-                if not aprovador or not perfis.pode(aprovador.nivel, "autorizar"):
+                # janela (nunca abre uma, nunca consulta uma). Uma janela aberta por OUTRA aprovação
+                # financeira não pode virar permissão de passagem pra isto.
+                # FIN-001 (15/10/2026): valida por `autorizar` (Gerente ou superior — decisão de
+                # 12/08), não mais via `_aprovador_financeiro`: desde que `aprovar_financeiro` ficou
+                # só do Master, passar por lá barrava o Gerente. `sessao=None` de propósito: sem
+                # sessão-primeiro, a senha é SEMPRE exigida.
+                aprovador = _usuario_com_capacidade(db, req.get("login"), req.get("senha"),
+                                                    "autorizar", sessao=None)
+                if not aprovador:
                     self.send_json({"ok": False, "erro": "Cancelamento de contrato exige senha de Gerente ou superior"}, code=403); return
                 ator = _ator_dict(db, usuario)
                 loja_id, _err = mod_tenancy.escopo_operacional(ator)
