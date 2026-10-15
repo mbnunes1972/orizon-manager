@@ -9,8 +9,9 @@ def test_bases_existem_com_caps_finas():
     assert perfis.pode("master", "gerir_perfis") is True
     assert perfis.pode("master", "aprovar_financeiro") is True
     assert perfis.desconto_max("master") == 50.0
-    # Gerencial: financeiro sim, mas sem painel admin → sem gerir_usuarios/perfis
-    assert perfis.pode("gerencial", "aprovar_financeiro") is True
+    # Gerencial: acessa o módulo financeiro, mas NÃO aprova (FIN-001, 15/10/2026: aprovação
+    # financeira é só do Master); sem painel admin → sem gerir_usuarios/perfis
+    assert perfis.pode("gerencial", "aprovar_financeiro") is False
     assert perfis.pode("gerencial", "gerir_usuarios") is False
     assert perfis.pode("gerencial", "gerir_perfis") is False
     assert perfis.desconto_max("gerencial") == 20.0

@@ -104,9 +104,10 @@ REMUNERACAO = {
 }
 
 # ── As 10 pessoas ─────────────────────────────────────────────────────────────
-# nivel: master | gerencial | operador (auth/perfis.py). `gerencial` tem aprovar_financeiro=True;
-# `operador`, não — os dois gerentes servem de conta "com permissão" no percurso, o resto de
-# conta "sem permissão" (itens 6.1 e 8.3.1 do PERCURSO_HOMOLOGACAO.md).
+# nivel: master | gerencial | operador (auth/perfis.py). Desde FIN-001 (15/10/2026) só `master` tem
+# aprovar_financeiro — `gerencial` e `operador`, não. Nos itens 6.1 e 8.3.1 do
+# PERCURSO_HOMOLOGACAO.md a conta "com permissão" passa a ser um Master da loja; os gerentes daqui
+# viram conta "sem permissão" junto com o resto.
 PESSOAS = [
     # (nome,                    função,                              login,      nivel)
     ("Ricardo Salgado Vieira",  "Gerente de Vendas",                 "rvieira",  "gerencial"),
