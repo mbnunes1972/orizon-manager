@@ -9084,7 +9084,7 @@ class Handler(BaseHTTPRequestHandler):
                                                           sessao=usuario)
                     if not autorizador:
                         self.send_json({"ok": False, "erro": "Credenciais inválidas ou perfil "
-                                        "sem permissão (Gerente/Diretor)."}, code=403); return
+                                        "sem permissão (Gerente/Master)."}, code=403); return
                     db.add(LogAcaoGerencial(
                         solicitante_id=usuario["id"],
                         autorizador_id=autorizador.id,
@@ -13244,7 +13244,7 @@ class Handler(BaseHTTPRequestHandler):
                     if quer_override:   # sessão-primeiro; credenciais de terceiro seguem valendo
                         autorizador = _usuario_com_capacidade(db, login, senha, "autorizar", sessao=usuario)
                         if not autorizador:
-                            self.send_json({"ok": False, "erro": "Credenciais inválidas ou perfil sem permissão (Gerente/Diretor)"}, code=403); return
+                            self.send_json({"ok": False, "erro": "Credenciais inválidas ou perfil sem permissão (Gerente/Master)"}, code=403); return
                         override_ok = True
                         db.add(LogAcaoGerencial(
                             solicitante_id=usuario["id"], autorizador_id=autorizador.id,
@@ -14393,7 +14393,7 @@ class Handler(BaseHTTPRequestHandler):
                     # Sessão-primeiro (2026-07-24): logado com 'autorizar' não redigita senha.
                     autorizador = _usuario_com_capacidade(db, login, senha, "autorizar", sessao=usuario)
                     if not autorizador:
-                        self.send_json({"ok": False, "erro": "Credenciais inválidas ou perfil sem permissão (Gerente/Diretor)"})
+                        self.send_json({"ok": False, "erro": "Credenciais inválidas ou perfil sem permissão (Gerente/Master)"})
                         return
                     # Verifica se contrato está assinado — nesse caso não pode voltar
                     contrato = db.query(Contrato).filter_by(projeto_nome=nome_safe)\
@@ -14443,7 +14443,7 @@ class Handler(BaseHTTPRequestHandler):
                     # Sessão-primeiro (2026-07-24): logado com 'autorizar' não redigita senha.
                     autorizador = _usuario_com_capacidade(db, login, senha, "autorizar", sessao=solicitante)
                     if not autorizador:
-                        self.send_json({"ok": False, "erro": "Credenciais inválidas ou perfil sem permissão (Gerente/Diretor)"}, code=403)
+                        self.send_json({"ok": False, "erro": "Credenciais inválidas ou perfil sem permissão (Gerente/Master)"}, code=403)
                         return
                     todas    = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe).all()
                     codigos  = [e.etapa_codigo for e in todas]
@@ -14521,7 +14521,7 @@ class Handler(BaseHTTPRequestHandler):
                     # Sessão-primeiro (2026-07-24): logado com 'autorizar' não redigita senha.
                     autorizador = _usuario_com_capacidade(db, login, senha, "autorizar", sessao=solicitante)
                     if not autorizador:
-                        self.send_json({"ok": False, "erro": "Credenciais inválidas ou perfil sem permissão (Gerente/Diretor)"}, code=403)
+                        self.send_json({"ok": False, "erro": "Credenciais inválidas ou perfil sem permissão (Gerente/Master)"}, code=403)
                         return
                     try:
                         nova_dt = datetime.strptime(nova_str, "%Y-%m-%d") if nova_str else None
@@ -16091,7 +16091,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Só aplicável a uma medição com parecer Reprovado."}); return
                     u = _usuario_com_capacidade(db, campos.get("login",""), campos.get("senha",""), "aprovar_medicao_reprovada", sessao=solicitante)
                     if not u:
-                        self.send_json({"ok": False, "erro": "Liberação exige login+senha de Gerente de Vendas, Gerente Adm/Financeiro ou Diretor."}, code=403); return
+                        self.send_json({"ok": False, "erro": "Liberação exige login+senha do Gerente ou do Master."}, code=403); return
                     if "doc_cliente" not in arquivos:
                         self.send_json({"ok": False, "erro": "Anexe o documento de aprovação do cliente."}); return
                     fname, data = arquivos["doc_cliente"]
@@ -16264,8 +16264,7 @@ class Handler(BaseHTTPRequestHandler):
                         u = _usuario_com_capacidade(db, req.get("login", ""), req.get("senha", ""),
                                                     "revisar_pe", sessao=usuario)
                         if not u:
-                            self.send_json({"ok": False, "erro": "Ação exige login+senha de Gerente "
-                                            "de Vendas, Gerente Adm/Financeiro ou Diretor."}, code=403); return
+                            self.send_json({"ok": False, "erro": "Ação exige login+senha do Gerente ou do Master."}, code=403); return
                         quem = u.id
                     else:
                         u = _usuario_com_capacidade(db, req.get("login", ""), req.get("senha", ""),
@@ -16409,7 +16408,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Esta subfase não permite revisão."}, code=400); return
                     u = _usuario_com_capacidade(db, campos.get("login", ""), campos.get("senha", ""), "revisar_pe", sessao=solicitante)
                     if not u:
-                        self.send_json({"ok": False, "erro": "Revisão exige login+senha de Gerente de Vendas, Gerente Adm/Financeiro ou Diretor."}, code=403); return
+                        self.send_json({"ok": False, "erro": "Revisão exige login+senha do Gerente ou do Master."}, code=403); return
                     if "arquivo" not in arquivos:
                         self.send_json({"ok": False, "erro": "Anexe o relatório complementar (obrigatório)."}, code=400); return
                     fname, data = arquivos["arquivo"]
@@ -18084,7 +18083,7 @@ class Handler(BaseHTTPRequestHandler):
                         if not aprovador:
                             self.send_json({
                                 "ok": False,
-                                "erro": "Apenas Gerente Administrativo/Financeiro ou Diretor podem "
+                                "erro": "Apenas o Master pode "
                                         "aprovar a etapa financeira (login/senha inválidos ou sem permissão).",
                             }, code=403)
                             return
