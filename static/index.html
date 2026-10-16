@@ -4200,7 +4200,7 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
 <div id="modal-liberar-impostos" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:9600;align-items:center;justify-content:center">
   <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;width:100%;max-width:380px">
     <div style="font-family:var(--font-sans);font-weight:700;font-size:15px;margin-bottom:8px">Liberar impostos</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">Senha de Diretor ou Gerente Administrativo-Financeiro.</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">Senha do Master.</div>
     <input id="li-login" placeholder="Usuário" autocomplete="off" style="width:100%;margin-bottom:8px;padding:9px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);box-sizing:border-box">
     <input id="li-senha" type="password" placeholder="Senha" autocomplete="off" onkeydown="if(event.key==='Enter')confirmarLiberarImpostos()" style="width:100%;margin-bottom:8px;padding:9px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);box-sizing:border-box">
     <div id="li-erro" style="font-size:11px;color:var(--err);min-height:14px;margin-bottom:10px"></div>
@@ -15436,7 +15436,7 @@ async function reconRecebConfirmar(id, btn){
   try{
     const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_financeiro',
       titulo: 'Confirmar recebimento',
-      mensagem: 'Baixa Contas a Receber no razão. Login e senha do Gerente Adm/Financeiro ou Diretor.'});
+      mensagem: 'Baixa Contas a Receber no razão. Login e senha do Master.'});
     if(!cred){ if(btn) btn.disabled = false; return; }
     const d = await fetch('/api/recebiveis/'+id+'/confirmar',
       {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
@@ -15453,7 +15453,7 @@ async function reconRecebReprogramar(id, btn){
     if(!novaData){ avisoPopup('Escolha a nova data prevista.', {titulo:'Financeiro'}); if(btn) btn.disabled = false; return; }
     const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_financeiro',
       titulo: 'Reprogramar recebível',
-      mensagem: 'Não-recebimento: só muda a data prevista, sem lançamento. Login e senha do Gerente Adm/Financeiro ou Diretor.'});
+      mensagem: 'Não-recebimento: só muda a data prevista, sem lançamento. Login e senha do Master.'});
     if(!cred){ if(btn) btn.disabled = false; return; }
     const d = await fetch('/api/recebiveis/'+id+'/reprogramar',
       {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
@@ -15470,7 +15470,7 @@ async function reconRecebDuvidoso(id, btn){
     }
     const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_financeiro',
       titulo: 'Marcar como duvidoso',
-      mensagem: 'Reclassifica no razão (Contas a Receber → Recebíveis Duvidosos). Login e senha do Gerente Adm/Financeiro ou Diretor.'});
+      mensagem: 'Reclassifica no razão (Contas a Receber → Recebíveis Duvidosos). Login e senha do Master.'});
     if(!cred){ if(btn) btn.disabled = false; return; }
     const d = await fetch('/api/recebiveis/'+id+'/duvidoso',
       {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
@@ -15913,7 +15913,7 @@ function _fluxoPrevistosHtml(d){
 async function fluxoRecebivelConfirmar(id){
   const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_financeiro',
     titulo: 'Confirmar recebimento',
-    mensagem: 'Baixa Contas a Receber no razão. Login e senha do Gerente Adm/Financeiro ou Diretor.'});
+    mensagem: 'Baixa Contas a Receber no razão. Login e senha do Master.'});
   if(!cred) return;
   try {
     const j = await fetch('/api/recebiveis/'+id+'/confirmar',
@@ -17328,7 +17328,7 @@ async function pcEditarConta(conta, tituloOverride){
       + '<label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Natureza</label>'
       + '<select id="_pce-nat" style="'+inputStyle+'"><option value="">— selecione —</option>'+natOpts+'</select>'
       + '<div style="font-size:10px;color:var(--muted);margin:-4px 0 12px">Centro de Custo e Natureza são obrigatórios '
-      + 'para contas de Despesas/Custos e exigem perfil Gerente Adm/Financeiro ou Diretor. A mudança afeta os '
+      + 'para contas de Despesas/Custos e exigem o perfil Master. A mudança afeta os '
       + 'relatórios de Natureza/Centro de Custo de qualquer período ainda aberto (períodos fechados com um '
       + 'intervalo definido ficam congelados, ver Reconciliação).</div>'
       + '<div style="display:flex;gap:8px;justify-content:flex-end">'
@@ -21947,7 +21947,7 @@ function _renderCardAprovacaoFinanceira(codigo, dados, bloqueada) {
   }
   return `
     <p style="color:var(--muted);font-size:.85rem;margin:0 0 14px">
-      Abra as Provisões para revisar as rubricas e <strong>aprovar</strong> a etapa (o botão Aprovar fica dentro do painel). Exige Gerente Administrativo/Financeiro ou Diretor.
+      Abra as Provisões para revisar as rubricas e <strong>aprovar</strong> a etapa (o botão Aprovar fica dentro do painel). Exige o perfil Master.
     </p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       ${_btnProvisoes}
@@ -21958,7 +21958,7 @@ async function concluirAprovacaoFinanceira(codigo) {
   if (!projetoAtivo) return;
   const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_financeiro', 
     titulo: 'Aprovação Financeira',
-    mensagem: 'Login e senha do Gerente Administrativo/Financeiro ou Diretor.' });
+    mensagem: 'Login e senha do Master.' });
   if (!cred) return;
   try {
     const r = await fetch(
@@ -22249,7 +22249,7 @@ async function _provAprovar(oid, rev) {
   }
   const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_financeiro',
     titulo: 'Aprovar Aprovação Financeira',
-    mensagem: 'Salva a revisão e aprova a etapa. Login e senha do Gerente Adm/Financeiro ou Diretor.' });
+    mensagem: 'Salva a revisão e aprova a etapa. Login e senha do Master.' });
   if (!cred) return;
   const erroEl = document.getElementById('_prov-erro');
   if (erroEl) erroEl.textContent = '';
@@ -23855,7 +23855,7 @@ async function peConciliacaoAprovar(){
     return;
   }
   const cred = await pedirCredenciaisGerente({capacidade:'aprovar_financeiro', titulo:'Aprovar AF2',
-    mensagem:'Login e senha do Gerente Administrativo/Financeiro ou Diretor.'});
+    mensagem:'Login e senha do Master.'});
   if(!cred) return;
   try {
     const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/11d/aprovar`,
@@ -23874,7 +23874,7 @@ async function peConciliacaoReprovar(){
     {titulo:'Reprovar AF2', placeholder:'Ex.: revisar o valor do ambiente X'});
   if(!motivo) return;
   const cred = await pedirCredenciaisGerente({capacidade:'aprovar_financeiro', titulo:'Reprovar AF2',
-    mensagem:'Login e senha do Gerente Administrativo/Financeiro ou Diretor.'});
+    mensagem:'Login e senha do Master.'});
   if(!cred) return;
   try {
     const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/ciclo/11d/reprovar`,
@@ -24083,7 +24083,7 @@ async function ramoJurosLojaRegistrar(){
   if(!(valor > 0)){ await avisoPopup('Informe o valor de juros recebido (> 0).', {titulo:'Receita financeira'}); return; }
   const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_financeiro', 
     titulo: 'Apropriar receita financeira',
-    mensagem: 'Realiza a receita de juros no razão. Login e senha do Gerente Adm/Financeiro ou Diretor.' });
+    mensagem: 'Realiza a receita de juros no razão. Login e senha do Master.' });
   if(!cred) return;
   try {
     const j = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/receita-financeira',
@@ -24103,7 +24103,7 @@ async function devolucaoRegistrar(){
   if(!(pct > 0 && pct <= 100)){ await avisoPopup('Informe o % devolvido (0–100).', {titulo:'Devolução'}); return; }
   const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_financeiro', 
     titulo: 'Registrar devolução',
-    mensagem: 'Estorna a venda no razão (receita/impostos/provisões diferidas, na proporção). Login e senha do Gerente Adm/Financeiro ou Diretor.' });
+    mensagem: 'Estorna a venda no razão (receita/impostos/provisões diferidas, na proporção). Login e senha do Master.' });
   if(!cred) return;
   try {
     const j = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/devolucao',
@@ -24183,7 +24183,7 @@ async function ramoAntecipacaoRegistrar(){
   if(!(valor > 0)){ await avisoPopup('Informe o custo real (> 0).', {titulo:'Antecipação'}); return; }
   const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_financeiro', 
     titulo: 'Reconhecer custo de antecipação',
-    mensagem: 'Lança a despesa no razão. Login e senha do Gerente Adm/Financeiro ou Diretor.' });
+    mensagem: 'Lança a despesa no razão. Login e senha do Master.' });
   if(!cred) return;
   try {
     const j = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/antecipacao',
@@ -24203,7 +24203,7 @@ async function ramoFinanceiroTrocar(ramo){
   const cred = await pedirCredenciaisGerente({
     capacidade: 'aprovar_financeiro',
     titulo: 'Financiamento do custo financeiro',
-    mensagem: 'A troca lança/reverte no razão. Login e senha do Gerente Adm/Financeiro ou Diretor.' });
+    mensagem: 'A troca lança/reverte no razão. Login e senha do Master.' });
   if(!cred){ ramoFinanceiroRender(); return; }   // cancelou → re-renderiza (desfaz o radio)
   try {
     const j = await fetch('/api/orcamentos/'+_orcamentoAtivoId+'/ramo-financeiro',
@@ -24345,7 +24345,7 @@ async function conferenciaRegistrar(){
   const cred = await pedirCredenciaisGerente({
     capacidade: 'aprovar_financeiro',
     titulo: 'Conferência e Implantação do Pedido',
-    mensagem: 'Lança o ajuste no razão. Login e senha do Gerente Adm/Financeiro ou Diretor.' });
+    mensagem: 'Lança o ajuste no razão. Login e senha do Master.' });
   if(!cred) return;
   try {
     const j = await fetch(`/api/projetos/${encodeURIComponent(projetoAtivo.nome_safe)}/conferencia`,
@@ -25413,7 +25413,7 @@ async function _concluirContratoFinanceiro() {
   if (!projetoAtivo) return;
   const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_financeiro',
     titulo: 'Concluir Contrato',
-    mensagem: 'Fecha a fase financeira do contrato. Login e senha do Gerente Adm/Financeiro ou Diretor.'});
+    mensagem: 'Fecha a fase financeira do contrato. Login e senha do Master.'});
   if (!cred) return;
   const erroEl = document.getElementById('ct-concluir-erro');
   if (erroEl) erroEl.textContent = '';

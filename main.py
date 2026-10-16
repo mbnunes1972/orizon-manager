@@ -18084,7 +18084,7 @@ class Handler(BaseHTTPRequestHandler):
                         if not aprovador:
                             self.send_json({
                                 "ok": False,
-                                "erro": "Apenas Gerente Administrativo/Financeiro ou Diretor podem "
+                                "erro": "Apenas o Master pode "
                                         "aprovar a etapa financeira (login/senha inválidos ou sem permissão).",
                             }, code=403)
                             return

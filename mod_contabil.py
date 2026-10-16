@@ -694,7 +694,7 @@ def criar_conta(db, owner_tipo, owner_id, pai_id, nome, centro_custo_id=None, na
     cc_id, nat = None, None
     if pai.grupo == 5:
         if not reclassificar_autorizado:
-            raise PermissionError("Criar conta em Despesas/Custos exige Gerente Adm/Financeiro ou Diretor.")
+            raise PermissionError("Criar conta em Despesas/Custos exige o perfil Master.")
         if not centro_custo_id:
             raise ValueError("Centro de Custo é obrigatório para contas do grupo 5.")
         if not natureza_custo:
@@ -732,7 +732,7 @@ def editar_conta(db, owner_tipo, owner_id, conta_id, nome=None, ordem=None,
         c.ordem = int(ordem)
     if centro_custo_id is not _NAO_INFORMADO or natureza_custo is not _NAO_INFORMADO:
         if not reclassificar_autorizado:
-            raise PermissionError("Reclassificar Centro de Custo/Natureza exige Gerente Adm/Financeiro ou Diretor.")
+            raise PermissionError("Reclassificar Centro de Custo/Natureza exige o perfil Master.")
         if c.grupo == 5:
             if not centro_custo_id:
                 raise ValueError("Centro de Custo é obrigatório para contas do grupo 5.")
