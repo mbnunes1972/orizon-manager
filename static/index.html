@@ -4224,7 +4224,7 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
   <div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:28px;width:100%;max-width:380px">
     <div style="font-family:var(--font-sans);font-weight:700;font-size:15px;margin-bottom:8px">Autorização Necessária</div>
     <div id="auth-modal-msg" style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6"></div>
-    <div style="font-size:11px;color:var(--text);margin-bottom:14px">Informe as credenciais de um Gerente ou Diretor:</div>
+    <div style="font-size:11px;color:var(--text);margin-bottom:14px">Informe as credenciais de um Gerente ou Master:</div>
     <div style="display:grid;gap:12px;margin-bottom:16px">
       <div>
         <label style="font-size:var(--fs-sm);color:var(--muted);letter-spacing:.8px;text-transform:uppercase;display:block;margin-bottom:5px">Usuário autorizador</label>
@@ -20060,7 +20060,7 @@ async function convDestravar(mid){
   const motivo = ((await promptPopup('Motivo do destravamento de emergência (obrigatório):', {titulo:'Destravar (emergência)'})) || '').trim();
   if(!motivo) return;
   const cred = await pedirCredenciaisGerente({titulo:'Destravar bloqueador (emergência)',
-    mensagem:'Login e senha de Gerente/Diretor. O destravamento fica registrado na auditoria.'});
+    mensagem:'Login e senha de Gerente/Master. O destravamento fica registrado na auditoria.'});
   if(!cred) return;
   try{
     const d = await fetch(`/api/projetos/${encodeURIComponent(proj)}/conversa/mensagens/${mid}/destravar-emergencia`,
@@ -22555,7 +22555,7 @@ async function enviarParecerMedicao() {
 async function enviarDecisaoReprovado() {
   const f = document.getElementById('med-doc-file')?.files[0];
   if (!f) { await avisoPopup('Anexe o documento de aprovação do cliente.', {titulo:'Medição'}); return; }
-  const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_medicao_reprovada', titulo:'Decisão Comercial', mensagem:'Login e senha de Gerente de Vendas, Adm/Financeiro ou Diretor.'});
+  const cred = await pedirCredenciaisGerente({capacidade: 'aprovar_medicao_reprovada', titulo:'Decisão Comercial', mensagem:'Login e senha do Gerente ou do Master.'});
   if (!cred) return;
   const fd = new FormData();
   fd.append('doc_cliente', f);
@@ -24686,7 +24686,7 @@ async function peRevisao(codigo, inputRelatorio) {
   const cred = await pedirCredenciaisGerente({
     capacidade: 'revisar_pe',
     titulo: 'Revisão PE',
-    mensagem: 'Login e senha de quem pode revisar o PE (Gerente de Vendas, Adm/Financeiro ou Diretor).'
+    mensagem: 'Login e senha de quem pode revisar o PE (Gerente ou Master).'
   });
   if (!cred) return;
   const fd = new FormData();
@@ -25220,7 +25220,7 @@ async function salvarDataEntrega(){
       if(_podeAutorizarFront && _podeAutorizarFront()){
         msg += '<button class="btn-ciclo" style="font-size:var(--fs-xs);border-color:var(--cancel);color:var(--cancel)" onclick="abrirModalAutorizaEntrega()">Registrar com autorização</button>';
       } else {
-        msg += 'Requer autorização de Gerente/Diretor.';
+        msg += 'Requer autorização de Gerente/Master.';
       }
       setRes(msg, 'var(--err)');
       return;
@@ -25946,10 +25946,10 @@ async function abrirModalReverOrcamento() {
     <div style="background:var(--card);border:1px solid var(--warn);border-radius:8px;padding:24px;min-width:340px;max-width:440px">
       <h4 style="margin:0 0 6px;color:var(--warn)">&#x270E; Rever Or&ccedil;amento</h4>
       <p style="color:var(--muted);font-size:.85rem;margin:0 0 16px">
-        Esta a&ccedil;&atilde;o requer autoriza&ccedil;&atilde;o de um Gerente ou Diretor.<br>
+        Esta a&ccedil;&atilde;o requer autoriza&ccedil;&atilde;o de um Gerente ou Master.<br>
         O contrato atual ser&aacute; marcado como rascunho e o or&ccedil;amento poder&aacute; ser editado novamente.
       </p>
-      <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Login do Gerente/Diretor</label>
+      <label style="font-size:var(--fs-sm);color:var(--muted);display:block;margin-bottom:3px">Login do Gerente/Master</label>
       <input id="vt-login" type="text" autocomplete="off"
         style="width:100%;box-sizing:border-box;background:var(--input);border:1px solid var(--border);
         color:var(--fg);padding:7px;border-radius:4px;font-size:.9rem;margin-bottom:10px">
