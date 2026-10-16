@@ -376,8 +376,11 @@ def _parse_multipart_arquivos(body, ct):
     return arquivos, campos
 
 
-_STEPUP_GRANTS = {}   # {(token, recurso): expira_em_epoch}
-_STEPUP_TTL = 30 * 60
+# Step-up: o estado mora em auth/stepup.py (16/10/2026) — `python3 main.py` roda este arquivo
+# como __main__, e o `import main` de auth/ criava uma 2ª cópia com outro dict (cadeado não liberava).
+from auth import stepup as _stepup
+_STEPUP_GRANTS = _stepup.GRANTS   # {(token, recurso): expira_em_epoch} — MESMO objeto do auth
+_STEPUP_TTL = _stepup.TTL
 
 # Hierarquia dos 3 perfis DE LOJA (Redefinição de senha, Caminho 1 — TAREFA_REDEFINICAO_DE_SENHA,
 # 18/09): quem redefine não pode redefinir alguém do próprio nível ou acima — senão um gerencial
@@ -393,39 +396,10 @@ _NIVEL_RANK_LOJA = {"operador": 1, "gerencial": 2, "master": 3}
 _APROVAR_FINANCEIRO_JANELA_SEGUNDOS = 15 * 60
 
 
-def _stepup_purgar_expirados():
-    """`_STEPUP_GRANTS` é um dict de PROCESSO — sem isto, só cresce: `_stepup_valido` limpa a
-    própria chave quando ALGUÉM a consulta depois de expirada, mas uma janela que ninguém nunca
-    mais consulta (ex.: a pessoa fechou a aba sem outra ação financeira) fica pra sempre. Chamado
-    a cada `_stepup_conceder` — concessões são raras (uma por aprovação financeira/step-up de
-    módulo), então a varredura sai barata e o dict nunca acumula mais que o necessário."""
-    agora = time.time()
-    for chave, exp in list(_STEPUP_GRANTS.items()):
-        if exp <= agora:
-            _STEPUP_GRANTS.pop(chave, None)
-
-
-def _stepup_conceder(token, recurso, ttl=None):
-    _stepup_purgar_expirados()
-    _STEPUP_GRANTS[(token, recurso)] = time.time() + (ttl if ttl is not None else _STEPUP_TTL)
-
-
-def _stepup_valido(token, recurso):
-    exp = _STEPUP_GRANTS.get((token, recurso))
-    if exp and exp > time.time():
-        return True
-    if exp:
-        _STEPUP_GRANTS.pop((token, recurso), None)
-    return False
-
-
-def _stepup_revogar_todos(token):
-    """ACHADO-68: chamado no logout — nenhuma janela de step-up (nenhum recurso, não só
-    aprovar_financeiro) sobrevive à sessão que a abriu."""
-    if not token:
-        return
-    for chave in [k for k in _STEPUP_GRANTS if k[0] == token]:
-        _STEPUP_GRANTS.pop(chave, None)
+_stepup_purgar_expirados = _stepup.purgar_expirados
+_stepup_conceder = _stepup.conceder
+_stepup_valido = _stepup.valido
+_stepup_revogar_todos = _stepup.revogar_todos
 
 
 def _usuario_com_capacidade(db, login, senha, capacidade, sessao=None):

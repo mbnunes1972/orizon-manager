@@ -30,6 +30,7 @@ from .auth import (
 )
 from database import get_session, Usuario, Loja, Rede, membership_loja_ids, lojas_acessiveis_ids, LogAcessoDelegado
 from . import perfis
+from . import stepup   # janelas de step-up (estado único; ver auth/stepup.py)
 
 # ── Caminho do login.html ─────────────────────────────────────────────────────
 # DOIS dirname: este arquivo vive em auth/, e o static/ está na RAIZ do projeto.
@@ -63,8 +64,7 @@ def handle_auth_get(handler, path: str) -> bool:
         if token:
             fazer_logout(token)
             # ACHADO-68: nenhuma janela de step-up (módulo OU aprovar_financeiro) sobrevive ao logout.
-            import main as _main
-            _main._stepup_revogar_todos(token)
+            stepup.revogar_todos(token)
         handler.send_response(302)
         handler.send_header("Location", "/login")
         handler.send_header("Set-Cookie", f"{COOKIE_NAME}=; Max-Age=0; Path=/; HttpOnly")
@@ -171,8 +171,7 @@ def handle_auth_post(handler, path: str, body: bytes) -> bool:
         if token:
             fazer_logout(token)
             # ACHADO-68: nenhuma janela de step-up (módulo OU aprovar_financeiro) sobrevive ao logout.
-            import main as _main
-            _main._stepup_revogar_todos(token)
+            stepup.revogar_todos(token)
         _send_json(handler, {"ok": True})
         return True
 
@@ -288,8 +287,7 @@ def handle_auth_post(handler, path: str, body: bytes) -> bool:
                 _send_json(handler, {"ok": False, "erro": f"{u.nome} não tem acesso a este recurso."}, 403); return True
             db.add(LogAcessoDelegado(solicitante_id=solicitante["id"], autorizador_id=u.id, recurso=recurso))
             db.commit()
-            import main as _main
-            _main._stepup_conceder(token, recurso)
+            stepup.conceder(token, recurso)
             _send_json(handler, {"ok": True, "autorizador": {"nome": u.nome}})
         finally:
             db.close()
