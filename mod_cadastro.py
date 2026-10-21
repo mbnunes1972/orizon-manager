@@ -167,7 +167,13 @@ def func_sync_acesso(db, f, req):
     if not tem:
         if f.usuario_id:
             u = db.get(Usuario, f.usuario_id)
-            if u:
+            if u and (u.funcionario_id != f.id or _outros_vinculos(db, f, u.id)):
+                # FIN-002: conta LIGADA (ou com Funcionário em outra loja) — solta só este
+                # vínculo; desativar derrubaria o login nas outras lojas da pessoa.
+                if u.funcionario_id == f.id:
+                    u.funcionario_id = None
+                f.usuario_id = None
+            elif u:
                 u.ativo = 0                      # desativa (nunca apaga — preserva histórico/sessões)
         return True, None
     email = _s(ac.get("email")) or _s(f.email)
@@ -178,11 +184,23 @@ def func_sync_acesso(db, f, req):
         return False, "Informe o e-mail de acesso do funcionário."
     if perfil not in perfis.slugs_loja():
         return False, "Perfil de acesso inválido."
-    # e-mail (login) não pode colidir com outro usuário
+    if f.usuario_id:
+        u = db.get(Usuario, f.usuario_id)
+        if u and u.funcionario_id != f.id:
+            # conta LIGADA (FIN-002): é gerida em Admin › Usuários — o Funcionário não mexe nela.
+            # E-mail trocado = ligar a outra conta (ou criar), então solta este vínculo e segue.
+            if u.login == email:
+                return True, None
+            f.usuario_id = None
+    # e-mail (login) de outra conta: liga em vez de recusar (FIN-002), quando permitido
     conflito = (db.query(Usuario)
                 .filter(Usuario.login == email, Usuario.id != (f.usuario_id or -1)).first())
     if conflito is not None:
-        return False, "Já existe uma conta com este e-mail."
+        erro = _erro_ligar_conta(db, f, conflito)
+        if erro:
+            return False, erro
+        f.usuario_id = conflito.id            # só deste lado: Usuario.funcionario_id = conta que NASCEU
+        return True, None
     if f.usuario_id:
         u = db.get(Usuario, f.usuario_id)
         if u:
@@ -201,6 +219,31 @@ def func_sync_acesso(db, f, req):
     db.add(u); db.flush()
     f.usuario_id = u.id
     return True, None
+
+
+def _outros_vinculos(db, f, usuario_id):
+    """Funcionários ATIVOS de outras lojas ligados à mesma conta (FIN-002)."""
+    return (db.query(Funcionario)
+            .filter(Funcionario.usuario_id == usuario_id, Funcionario.id != f.id,
+                    Funcionario.status == "ativo").count() > 0)
+
+
+def _erro_ligar_conta(db, f, u):
+    """FIN-002: None se o Funcionário `f` pode ligar-se à conta existente `u`; senão a mensagem.
+    Pode quando a conta é de loja, tem acesso à loja do Funcionário e ainda não tem outro
+    Funcionário nesta loja (uma pessoa = um Funcionário por loja)."""
+    from database import lojas_acessiveis_ids
+    if u.nivel in ("super_admin", "admin_rede"):
+        return "Já existe uma conta administrativa com este e-mail."
+    if f.loja_id not in lojas_acessiveis_ids(db, u.id, u.nivel, u.loja_id):
+        return ("Já existe uma conta com este e-mail, mas ela não tem acesso a esta loja. "
+                "Dê acesso em Admin › Usuários antes.")
+    outro = (db.query(Funcionario)
+             .filter(Funcionario.usuario_id == u.id, Funcionario.loja_id == f.loja_id,
+                     Funcionario.id != f.id).first())
+    if outro is not None:
+        return "Esta conta já está ligada ao funcionário %s nesta loja." % outro.nome
+    return None
 
 
 # ── Fornecedor ───────────────────────────────────────────────────────────────

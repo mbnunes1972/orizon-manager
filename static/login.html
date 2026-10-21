@@ -485,7 +485,8 @@
           credentials: 'same-origin', body: JSON.stringify({login, senha})
         });
         const d = await r.json().catch(() => ({}));
-        if(d.ok){ window.location.href = '/'; return; }
+        // 19/10: quem acessa 2+ lojas escolhe a loja logo depois de entrar (index.html lê e apaga)
+        if(d.ok){ try{ sessionStorage.setItem('escolher_loja', '1'); }catch(e){} window.location.href = '/'; return; }
         mostrarErro(d.erro || 'Usuário ou senha inválidos.');
       }catch(e){ mostrarErro('Falha de conexão. Tente novamente.'); }
       btn.disabled = false; btn.textContent = txt;

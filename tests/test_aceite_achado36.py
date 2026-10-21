@@ -51,7 +51,9 @@ INDEX_HTML = os.path.join(REPO, "static", "index.html")
 # aviso` ~linha 2959, HTML do switch+aviso nos dois topbars ~3163/3176/3436/3445, e a função
 # `_ocModoSetar` ~13284 — todos ANTES deste trecho; `atendRender`/`intRender` só trocaram
 # conteúdo de uma linha, sem alterar contagem).
-FAIXA_INICIO, FAIXA_FIM = 14991, 17042
+# Reajustado em 20/10/2026 (+36: FIN-002 — modal `#modal-escolher-loja` e `_perguntarLojaAoEntrar`,
+# ANTES deste trecho; confirmado pelas mesmas duas âncoras).
+FAIXA_INICIO, FAIXA_FIM = 15027, 17078
 
 
 def _texto_do_modulo():
@@ -155,17 +157,19 @@ def test_contagem_total_de_showtoast_de_erro_no_sistema():
 # `_ocTodasItemHTML`, ~linha 13348, ANTES de tudo, +5) — a 1ª faixa (abrirProjeto, ANTES deste
 # ponto) fica intocada; as 5 seguintes (DEPOIS): +5. Medido: 8166→8166 (sem mudança),
 # 20560/23187/23825/25459 (+5, as quatro com o mesmo delta).
+# FIN-002 (20/10/2026): +36 antes da 1ª faixa, +41 antes das demais (+5 em `_carregarLojasModalUsuario`
+# e `salvarModalUsuario`) — cada ponta conferida linha a linha contra o `main`.
 FAIXAS_CICLO = [
-    (8031, 8079),      # abrirProjeto (+32: OVERSIGHT-MODO Queixa 2, hunks ANTES desta âncora --
+    (8067, 8115),      # abrirProjeto (+32: OVERSIGHT-MODO Queixa 2, hunks ANTES desta âncora --
                        # CSS .oc-modo-wrap/.oc-modo-aviso e HTML do switch+aviso nos dois topbars;
                        # _ocModoSetar e os trechos de atendRender/intRender ficam DEPOIS, não contam)
-    (20184, 20230),    # _cicloTransferResponder / _cicloTransferConfirmar (+46: Queixa 2 inteira,
+    (20225, 20271),    # _cicloTransferResponder / _cicloTransferConfirmar (+46: Queixa 2 inteira,
                        # todos os hunks ficam antes desta âncora)
-    (22760, 22832),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
+    (22801, 22873),    # PE: enviarAprovacaoPEParaClickSign / _confirmarEnvioClickSignPE /
                        # verificarClickSignPEAgora / reenviarConviteClickSignPE (+46)
-    (23281, 23298),    # peConciliacaoReprovar (+46)
-    (24115, 24165),    # toggleSalvarEtapa / reabrirEtapaCascata (+46)
-    (24883, 24982),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
+    (23322, 23339),    # peConciliacaoReprovar (+46)
+    (24156, 24206),    # toggleSalvarEtapa / reabrirEtapaCascata (+46)
+    (24924, 25023),    # Medição: gerarSolicitacaoMedicao / enviarSolicitacaoMedicaoParaClickSign /
                        # _confirmarEnvioClickSignMedicao / verificarClickSignMedicaoAgora /
                        # reenviarConviteClickSignMedicao (+46)
     # F2-40 (08/09): linhas deslocadas pela Fatia 1/2 (botão "Negociar Complemento" movido +

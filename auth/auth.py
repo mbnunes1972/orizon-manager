@@ -234,19 +234,24 @@ def autorizar_desconto(token_solicitante: str, login_autorizador: str,
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
-def _funcao_do_usuario(u):
+def _funcao_do_usuario(u, loja_id=None):
     """(funcao_nome, papeis) da Função do Funcionário vinculado a esta conta, ou (None, None).
     Alimenta mod_escopo.escopo_por_atribuicao/visao_do_papel — re-chave da visão operacional
-    (2026-08-03): o discriminador é a FUNÇÃO, não o nivel (aposentado no Perfil-4)."""
+    (2026-08-03): o discriminador é a FUNÇÃO, não o nivel (aposentado no Perfil-4).
+    FIN-002 (19/10): com `loja_id`, prefere a do Funcionário DAQUELA loja (uma pessoa pode ter um
+    Funcionário em cada loja que acessa, cada um com sua Função); sem Funcionário lá, a de sempre."""
     import json as _json
     from sqlalchemy.orm import object_session
     from database import Funcao, Funcionario
     db = object_session(u)
     if db is None or not getattr(u, "id", None):
         return None, None
-    f = (db.query(Funcao.nome, Funcao.atribuicoes_json)
+    q = (db.query(Funcao.nome, Funcao.atribuicoes_json)
            .join(Funcionario, Funcionario.funcao_id == Funcao.id)
-           .filter(Funcionario.usuario_id == u.id).first())
+           .filter(Funcionario.usuario_id == u.id))
+    f = q.filter(Funcionario.loja_id == loja_id).first() if loja_id is not None else None
+    if f is None:
+        f = q.first()
     if not f:
         return None, None
     papeis = None
