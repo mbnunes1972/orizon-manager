@@ -3926,6 +3926,14 @@ body:not([data-apoio="on"]) .apoio-dev { display: none !important; }
 </div>
 
 <!-- Modal: tipo do novo gestor (Painel Orizon › Gestores) -->
+<div id="modal-escolher-loja" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-title">Em qual loja você vai trabalhar?</div>
+    <div style="font-size:12px;color:var(--muted);margin:6px 0 14px">Você pode trocar depois pelo seletor abaixo do logo.</div>
+    <div id="mel-lista" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
 <div id="modal-tipo-gestor" class="modal-overlay" style="display:none">
   <div class="modal-box" style="max-width:360px">
     <div class="modal-title">Novo gestor</div>
@@ -4587,6 +4595,7 @@ async function carregarUsuarioAutenticado(){
     const _idsValidos = _lojas.map(l => l.id);
     _lojaAtiva = (_salva && _idsValidos.indexOf(_salva) !== -1)
       ? _salva : (_usuarioAtual.loja_ativa_id || null);
+    _lojaAtiva = await _perguntarLojaAoEntrar(_lojas, _lojaAtiva);
     // Perfil-4 (rev2 §2): navegação Admin/Config pela matriz de acesso do perfil (acessa_admin/config).
     // Esconde só quando o backend diz explicitamente NÃO (=== false); flag ausente (backend antigo/
     // pré-restart) NÃO esconde — evita "sumir os painéis" numa janela de deploy.
@@ -4808,6 +4817,33 @@ async function _tfCarregarResponsabilidades(){
 
 // Fechar ao clicar fora: reaproveita o listener global já existente (fecha qualquer
 // .proj-status-dd.open, ver mais abaixo no arquivo) — os triggers acima cortam a propagação.
+
+// 19/10 (pedido da Juliana): quem acessa 2+ lojas ESCOLHE a loja logo depois do login — antes
+// entrava calado na última usada e podia lançar no financeiro da loja errada. Só no login
+// (login.html marca `escolher_loja` no sessionStorage): recarregar ou abrir outra aba não pergunta.
+// super_admin / Gestor de Rede ficam de fora (não operam loja; entram por "Administrar").
+function _perguntarLojaAoEntrar(lojas, atual){
+  let marcado = false;
+  try { marcado = sessionStorage.getItem('escolher_loja') === '1'; sessionStorage.removeItem('escolher_loja'); } catch(e){}
+  const u = _usuarioAtual || {};
+  if (!marcado || lojas.length < 2 || u.nivel === 'super_admin' || u.nivel === 'admin_rede')
+    return Promise.resolve(atual);
+  return new Promise(resolve => {
+    const box = document.getElementById('modal-escolher-loja');
+    const lista = document.getElementById('mel-lista');
+    if (!box || !lista) { resolve(atual); return; }
+    lista.innerHTML = lojas.map(l =>
+      `<button class="btn ${l.id === atual ? 'btn-primary' : 'btn-ghost'} btn-sm" data-loja="${l.id}"
+         style="justify-content:flex-start">${esc(l.nome)}${l.id === atual ? ' <span style="opacity:.7">(última usada)</span>' : ''}</button>`).join('');
+    lista.querySelectorAll('button[data-loja]').forEach(b => b.onclick = () => {
+      const id = parseInt(b.getAttribute('data-loja'), 10);
+      try { localStorage.setItem('loja_ativa', String(id)); } catch(e){}
+      box.style.display = 'none';
+      resolve(id);
+    });
+    box.style.display = 'flex';
+  });
+}
 
 function _renderSeletorLoja(){
   const lojas = (_usuarioAtual && _usuarioAtual.lojas) || [];
@@ -18063,9 +18099,12 @@ async function _carregarLojasModalUsuario(ctx){
   } else if (ctx.loja_id) {
     // Contexto FECHADO de loja/PDV (2026-07-24): o usuário nasce DESTA loja — não pergunta.
     box.style.display = '';
+    const _outras = (ctx.modo === 'editar') ? (ctx.loja_ids || []).filter(id => id !== ctx.loja_id).length : 0;
     document.getElementById('musr-lojas').innerHTML =
       '<div style="font-size:12px;color:var(--muted)">Loja: <strong style="color:var(--text)">'
-      + esc(ctx.loja_nome || '(loja do contexto atual)') + '</strong></div>';
+      + esc(ctx.loja_nome || '(loja do contexto atual)') + '</strong>'
+      + (_outras ? ' — e mais ' + _outras + ' loja(s); a edição aqui não altera as lojas.' : '')
+      + '</div>';
     _modalUserCtx.loja_fixa = ctx.loja_id;
     return;
   } else if (_usuarioAtual && (_usuarioAtual.nivel === 'super_admin' || _usuarioAtual.nivel === 'admin_rede')) {
@@ -18140,7 +18179,9 @@ async function salvarModalUsuario(){
   const lojaIds = ctx.loja_fixa
     ? [ctx.loja_fixa]                                 // contexto fechado: loja já definida
     : Array.from(document.querySelectorAll('.musr-loja-cb:checked')).map(cb => parseInt(cb.value, 10));
-  if (lojaIds.length) payload.loja_ids = lojaIds;
+  // FIN-002 (19/10): EDITAR em contexto fechado não reescreve as lojas — mandava só a loja
+  // principal e o servidor (super_admin/admin_rede) apagava as outras (Jaime perdia a VQ-M5).
+  if (lojaIds.length && !(ctx.modo === 'editar' && ctx.loja_fixa)) payload.loja_ids = lojaIds;
   let url, method;
   if (ctx.modo === 'editar'){
     url = '/api/admin/usuarios/' + ctx.id; method = 'PATCH';

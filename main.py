@@ -4111,6 +4111,14 @@ class Handler(BaseHTTPRequestHandler):
                 loja_ids = {u.loja_id for u in us if u.loja_id is not None}
                 rede_de_loja = {l.id: l.rede_id for l in
                                 db.query(Loja).filter(Loja.id.in_(loja_ids)).all()} if loja_ids else {}
+                # FIN-002 (19/10): acesso a uma loja = principal OU vínculo em usuario_lojas — a
+                # lista da loja mostrava só quem a tinha como PRINCIPAL (Jaime, principal INS,
+                # sumia da VQ-M5 que ele também acessa).
+                lojas_de = {}
+                for _uid, _lid in db.query(UsuarioLoja.usuario_id, UsuarioLoja.loja_id).all():
+                    lojas_de.setdefault(_uid, set()).add(_lid)
+                def _acessa(u, lid):
+                    return lid is not None and (u.loja_id == lid or lid in lojas_de.get(u.id, ()))
                 visiveis = []
                 for u in us:
                     if mod_tenancy._eh_super_admin(ator):
@@ -4120,16 +4128,17 @@ class Handler(BaseHTTPRequestHandler):
                             u.loja_id is not None and mod_tenancy.pode_ver_loja(
                                 ator, {"id": u.loja_id, "rede_id": rede_de_loja.get(u.loja_id)}))
                     else:
-                        ok = (u.loja_id is not None and u.loja_id == ator.get("loja_id"))
+                        ok = _acessa(u, ator.get("loja_id"))
                     if ok:
                         visiveis.append(u)
                 from urllib.parse import parse_qs
                 qs = parse_qs(urlparse(self.path).query)
                 escopo = (qs.get("escopo") or [""])[0].strip()
+                loja_lista = None
                 if escopo == "loja":
                     fl = (qs.get("loja_id") or [""])[0]
-                    visiveis = [u for u in visiveis
-                                if u.loja_id is not None and str(u.loja_id) == fl]
+                    loja_lista = int(fl) if fl.isdigit() else None
+                    visiveis = [u for u in visiveis if _acessa(u, loja_lista)]
                 elif escopo == "rede":
                     fr = (qs.get("rede_id") or [""])[0]
                     visiveis = [u for u in visiveis
@@ -4163,8 +4172,25 @@ class Handler(BaseHTTPRequestHandler):
                     | {u.funcao_id for u in visiveis if u.funcao_id}
                 funcoes_map = {fn.id: fn.nome for fn in db.query(Funcao).filter(Funcao.id.in_(funcao_ids)).all()} \
                     if funcao_ids else {}
+                # lista de UMA loja: a Função é a do Funcionário DAQUELA loja (FIN-002 — uma conta
+                # pode ter um Funcionário por loja); fora disso, a ponte de sempre.
+                func_da_loja = {}
+                if loja_lista is not None and vis_ids:
+                    for _f in db.query(Funcionario).filter(Funcionario.usuario_id.in_(vis_ids),
+                                                           Funcionario.loja_id == loja_lista).all():
+                        func_da_loja[_f.usuario_id] = _f
+                    _fx = {f.funcao_id for f in func_da_loja.values() if f.funcao_id} - set(funcao_ids)
+                    if _fx:
+                        funcoes_map.update({fn.id: fn.nome for fn in
+                                            db.query(Funcao).filter(Funcao.id.in_(_fx)).all()})
                 def _funcao_nome(u):
+                    if loja_lista is not None:
+                        fl_ = func_da_loja.get(u.id)
+                        if fl_ is not None:
+                            return funcoes_map.get(fl_.funcao_id, "") if fl_.funcao_id else ""
                     f = funcs.get(u.funcionario_id) if u.funcionario_id else None
+                    if f is not None and loja_lista is not None and f.loja_id != loja_lista:
+                        f = None   # Funcionário de OUTRA loja: não é o cargo desta
                     if f and f.funcao_id:
                         return funcoes_map.get(f.funcao_id, "")
                     return funcoes_map.get(u.funcao_id, "") if u.funcao_id else ""
@@ -5660,7 +5686,7 @@ class Handler(BaseHTTPRequestHandler):
                     # Revisão 2026-07-25 (decisão 16): CRIADOR do projeto é o dono-base — resolve
                     # o "não atribuído". Usuário → Funcionário pela ponte; None se não vinculado.
                     _proj_meta = db.query(Projeto).filter_by(nome_safe=nome_safe).first()
-                    _criador_fid = (_funcionario_do_usuario(db, _proj_meta.criado_por_id)
+                    _criador_fid = (_funcionario_do_usuario(db, _proj_meta.criado_por_id, loja_id)
                                     if _proj_meta and _proj_meta.criado_por_id else None)
                     _criador_nome = ""
                     if _proj_meta and _proj_meta.criado_por_id:
@@ -5693,7 +5719,7 @@ class Handler(BaseHTTPRequestHandler):
                         if _tdf_ids else {}
                     _tdt_map = {t.id: t.nome for t in db.query(Terceiro).filter(Terceiro.id.in_(_tdt_ids)).all()} \
                         if _tdt_ids else {}
-                    _meu_fid = _funcionario_do_usuario(db, usuario["id"])
+                    _meu_fid = _funcionario_do_usuario(db, usuario["id"], loja_id)
                     _meu_terc = db.query(Terceiro).filter_by(usuario_id=usuario["id"]).first()
                     _meu_tid = _meu_terc.id if _meu_terc else None
                     def _transf_campos(e):
@@ -5767,17 +5793,17 @@ class Handler(BaseHTTPRequestHandler):
                 db = get_session()
                 try:
                     ator = _ator_dict(db, usuario)
-                    meu_fid = _funcionario_do_usuario(db, usuario["id"])
+                    meus_fids = _funcionarios_do_usuario(db, usuario["id"])   # 1 por loja (FIN-002)
                     meu_terc = db.query(Terceiro).filter_by(usuario_id=usuario["id"]).first()
                     meu_tid = meu_terc.id if meu_terc else None
                     itens = []
-                    if meu_fid or meu_tid:
+                    if meus_fids or meu_tid:
                         q = db.query(CicloEtapa).filter(CicloEtapa.transferencia_status == "pendente")
-                        if meu_fid and meu_tid:
-                            q = q.filter((CicloEtapa.transferencia_destino_funcionario_id == meu_fid)
+                        if meus_fids and meu_tid:
+                            q = q.filter((CicloEtapa.transferencia_destino_funcionario_id.in_(meus_fids))
                                         | (CicloEtapa.transferencia_destino_terceiro_id == meu_tid))
-                        elif meu_fid:
-                            q = q.filter(CicloEtapa.transferencia_destino_funcionario_id == meu_fid)
+                        elif meus_fids:
+                            q = q.filter(CicloEtapa.transferencia_destino_funcionario_id.in_(meus_fids))
                         else:
                             q = q.filter(CicloEtapa.transferencia_destino_terceiro_id == meu_tid)
                         pendentes = q.all()
@@ -5822,18 +5848,18 @@ class Handler(BaseHTTPRequestHandler):
                 db = get_session()
                 try:
                     ator = _ator_dict(db, usuario)
-                    meu_fid = _funcionario_do_usuario(db, usuario["id"])
+                    meus_fids = _funcionarios_do_usuario(db, usuario["id"])   # 1 por loja (FIN-002)
                     meu_terc = db.query(Terceiro).filter_by(usuario_id=usuario["id"]).first()
                     meu_tid = meu_terc.id if meu_terc else None
                     itens = []
-                    if meu_fid or meu_tid:
+                    if meus_fids or meu_tid:
                         q = db.query(CicloEtapa).filter(
                             ~CicloEtapa.status.in_(mod_ciclo.STATUS_CONCLUSIVOS))
-                        if meu_fid and meu_tid:
-                            q = q.filter((CicloEtapa.responsavel_funcionario_id == meu_fid)
+                        if meus_fids and meu_tid:
+                            q = q.filter((CicloEtapa.responsavel_funcionario_id.in_(meus_fids))
                                         | (CicloEtapa.responsavel_terceiro_id == meu_tid))
-                        elif meu_fid:
-                            q = q.filter(CicloEtapa.responsavel_funcionario_id == meu_fid)
+                        elif meus_fids:
+                            q = q.filter(CicloEtapa.responsavel_funcionario_id.in_(meus_fids))
                         else:
                             q = q.filter(CicloEtapa.responsavel_terceiro_id == meu_tid)
                         minhas = q.all()
@@ -9042,7 +9068,7 @@ class Handler(BaseHTTPRequestHandler):
                                    code=400); return
                 req = json.loads(body or b'{}')
                 if acao_res == "resolver":
-                    fid = _funcionario_do_usuario(db, usuario.get("id"))
+                    fid = _funcionario_do_usuario(db, usuario.get("id"), loja_id)
                     if not fid or fid != msg.transferido_para_funcionario_id:
                         self.send_json({"ok": False, "erro": "Só quem recebeu a transferência "
                                         "pode resolvê-la (use a válvula de emergência da "
@@ -14763,7 +14789,7 @@ class Handler(BaseHTTPRequestHandler):
                     if etapa is None or etapa.transferencia_status != "pendente":
                         self.send_json({"ok": False,
                             "erro": "Não há transferência pendente para esta etapa."}, code=400); return
-                    meu_fid = _funcionario_do_usuario(db, usuario["id"])
+                    meu_fid = _funcionario_do_usuario(db, usuario["id"], loja_id)
                     meu_tid = db.query(Terceiro).filter_by(usuario_id=usuario["id"]).first()
                     meu_tid = meu_tid.id if meu_tid else None
                     eh_destino = ((etapa.transferencia_destino_funcionario_id
@@ -20365,7 +20391,7 @@ def _ator_dict(db, usuario_sessao, header_loja_id=None):
     # mod_escopo.escopo_por_atribuicao/visao_do_papel. `id` incluído junto (predicados de
     # posse/atribuição usam ator.get("id")).
     from auth.auth import _funcao_do_usuario as _fdu
-    _funcao_nome, _funcao_papeis = _fdu(u)
+    _funcao_nome, _funcao_papeis = _fdu(u, active)
     return {"id": u.id, "nivel": u.nivel, "loja_id": u.loja_id, "rede_id": u.rede_id,
             "active_loja_id": active, "lojas_ids": membership,
             "funcao_nome": _funcao_nome, "funcao_papeis": _funcao_papeis}
@@ -20502,26 +20528,49 @@ _FUNCAO_FINANCEIRO = "Gerente Administrativo/Financeiro"
 _FUNCAO_LOGISTICA  = "Assistente Logístico"
 
 
-def _funcionario_do_usuario(db, usuario_id):
+def _funcionario_do_usuario(db, usuario_id, loja_id=None):
     """Ponte Usuário↔Funcionário (uma só, usada pelo default de Vendas e pelo resolver do
-    bloqueador): Usuario.funcionario_id; fallback: o reverso Funcionario.usuario_id."""
+    bloqueador): Usuario.funcionario_id; fallback: o reverso Funcionario.usuario_id.
+    FIN-002 (19/10): uma conta pode ter um Funcionário em CADA loja que acessa — com `loja_id`,
+    prefere o Funcionário DAQUELA loja. Sem nenhum lá (ex.: Diretor da mãe operando o PDV, acesso
+    derivado), cai no comportamento de sempre."""
     if not usuario_id:
         return None
     u = db.get(Usuario, usuario_id)
+    if loja_id is not None:
+        if u is not None and u.funcionario_id:
+            fu = db.get(Funcionario, u.funcionario_id)
+            if fu is not None and fu.loja_id == loja_id:
+                return fu.id
+        f = db.query(Funcionario).filter_by(usuario_id=usuario_id, loja_id=loja_id).first()
+        if f is not None:
+            return f.id
     if u is not None and u.funcionario_id:
         return u.funcionario_id
     f = db.query(Funcionario).filter_by(usuario_id=usuario_id).first()
     return f.id if f else None
 
 
-def _consultor_funcionario_id(db, nome_safe):
+def _funcionarios_do_usuario(db, usuario_id):
+    """TODOS os Funcionários da conta (um por loja — FIN-002), para as listas que cruzam as
+    lojas acessíveis (Pendências/Responsabilidades). Lista vazia se nenhum."""
+    if not usuario_id:
+        return []
+    ids = {r[0] for r in db.query(Funcionario.id).filter_by(usuario_id=usuario_id).all()}
+    u = db.get(Usuario, usuario_id)
+    if u is not None and u.funcionario_id:
+        ids.add(u.funcionario_id)
+    return sorted(ids)
+
+
+def _consultor_funcionario_id(db, nome_safe, loja_id=None):
     """Default de VENDAS: Briefing.consultor_id (Usuario) → Funcionario pela ponte única.
     Consultor sem Funcionário vinculado → None (etapa fica sem default; não é erro)."""
     b = (db.query(Briefing).filter_by(projeto_nome=nome_safe)
            .order_by(Briefing.id.desc()).first())
     if b is None or not b.consultor_id:
         return None
-    return _funcionario_do_usuario(db, b.consultor_id)
+    return _funcionario_do_usuario(db, b.consultor_id, loja_id)
 
 
 def _responsavel_funcionario_etapa(db, nome_safe, loja_id, etapa_codigo):
@@ -20541,7 +20590,7 @@ def _responsavel_funcionario_etapa(db, nome_safe, loja_id, etapa_codigo):
     if fid:
         return fid
     pm = db.query(Projeto).filter_by(nome_safe=nome_safe).first()
-    return _funcionario_do_usuario(db, pm.criado_por_id) if pm and pm.criado_por_id else None
+    return _funcionario_do_usuario(db, pm.criado_por_id, loja_id) if pm and pm.criado_por_id else None
 
 
 def _default_responsavel_faixa(db, nome_safe, loja_id, etapa_codigo, cache):
@@ -20558,7 +20607,7 @@ def _default_responsavel_faixa(db, nome_safe, loja_id, etapa_codigo, cache):
         return None
     if faixa not in cache:
         if faixa == "vendas":
-            cache[faixa] = _consultor_funcionario_id(db, nome_safe)
+            cache[faixa] = _consultor_funcionario_id(db, nome_safe, loja_id)
         elif faixa == "financeiro":
             cache[faixa] = _mchat.funcionario_por_funcao(db, loja_id, _FUNCAO_FINANCEIRO)
         else:
