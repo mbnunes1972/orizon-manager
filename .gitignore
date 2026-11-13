@@ -1,8 +1,6 @@
-﻿__pycache__/
+__pycache__/
 *.pyc
 *.pyo
-omie_config.json
-omie_grupos_cache.json
 /PROJETOS/
 /CONTRATOS/
 /ASSISTENCIAS_AVULSAS/
@@ -86,12 +84,15 @@ COMUNICACAO/
 # --- higiene 27/08/2026 ---
 /*.png
 docs/db/backup/
-*.dump
 dia0_resultado.txt
-__pycache__/
-*.pyc
 
 .playwright-mcp/
 
 docs/db/config_*.sql
 Claude outputs/
+
+.venv/
+
+# perfil "ativo" da tela (legado) — o app GRAVA este arquivo em POST /perfis e
+# /perfis/ativo; funciona sem ele (cai em "consultor"). Estado local, não código.
+perfis_config.json
