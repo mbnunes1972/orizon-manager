@@ -80,6 +80,7 @@ Como se desenvolve, testa e implanta. Mudou o procedimento, muda o documento no 
 | O procedimento de deploy, passo a passo | `db/IMPLANTAR.md` |
 | Regras de desenvolvimento | `../DEV_RULES.md` |
 | Rotas e banco (precisam de revisão — ver Camada 2) | `arquitetura/ROTAS.md`, `arquitetura/BANCO_DE_DADOS.md`, `arquitetura/STACK.md` |
+| Perfis de usuário e capacidades (precisa de revisão — `[VALIDAR]`) | `USUARIOS.md` |
 
 ---
 
@@ -119,6 +120,9 @@ camada** — ele está certo sobre o que se sabia naquele dia. Só cresce.
 | Desenhos de funcionalidade de jun–ago/2026 (~100 arquivos) | `superpowers/specs/` |
 | A auditoria de julho/2026 | `audit/` |
 | Especificações de módulo anteriores ao Módulos v12 | `modulos/*/SPEC.md` |
+| Mapa lógico de módulos de jul/2026 (hoje: `modulos.py` e `db/MAPA_MODULOS.md` — `[VALIDAR]`) | `ARQUITETURA-MODULOS.md` |
+| Design: tokens de jul/2026 (superados por `design-system/`) e auditoria da migração v4 | `design-tokens.md`, `auditoria_design_v4.md` |
+| Roteiro do smoke de NF-e em homologação (07/07/2026) | `RUNBOOK-smoke-nfe.md` |
 
 > **`ACHADOS_CONTABEIS.md` é histórico, não fila.** Foi essa confusão — ser as duas coisas ao
 > mesmo tempo — que fez a lista de achados parecer infinita. A fila vive na Camada 4.

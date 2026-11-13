@@ -1,5 +1,8 @@
 # Auditoria de migração de design — Padrão Orizon v4
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-10 — não mantido. Ver
+> `docs/README.md`.
+
 Estado de cada rota/tela quanto à migração para `Padrao_Design_Orizon_v4` (tokens `var(--…)`,
 depth via `--shadow`, accent teal `--accent`, sem verde-terminal/dourado fixo, theme-aware claro/escuro).
 Data: 2026-07-10 · substitui a descoberta tela-a-tela por captura.

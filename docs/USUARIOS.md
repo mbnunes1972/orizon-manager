@@ -1,5 +1,8 @@
 # Perfis de Usuário — Orizon Manager
 
+> **Camada 3 · COMO SE TRABALHA.** Tem que ser verdade hoje. `[VALIDAR]` — precisa de revisão: ainda
+> cita `perfis.py` na raiz (hoje `auth/perfis.py`). Ver `docs/README.md`.
+
 > Fonte da verdade do código: `perfis.py` (fonte **única** desde a frente "Separar Função de
 > Perfil"). Ao adicionar/alterar um perfil, atualize `perfis.py` **e** este documento. Usuários são
 > criados no Painel Admin (Diretor ou Gerente Administrativo/Financeiro) ou via `seed.py`.

@@ -1,5 +1,8 @@
 # Design Tokens — Orizon Manager | Dalmóbile
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-12 — não mantido. Ver
+> `docs/README.md`.
+
 > ⛔ **SUPERADO (2026-07-12).** A fonte única da paleta agora é **`design-system/orizon-tokens.css`
 > (v1.5)** — identidade **cobre** unificada nos dois temas (accent cobre), com **areia** no claro e
 > **carvão quente** no escuro; sem mais divergência entre temas. A marca vive em

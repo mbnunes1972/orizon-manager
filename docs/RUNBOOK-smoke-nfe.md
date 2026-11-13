@@ -1,5 +1,8 @@
 # Runbook — Smoke da NF-e (homologação) · etapa 15
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-07 — não mantido. Ver
+> `docs/README.md`.
+
 > Preparado em 2026-07-06 para rodar em **2026-07-07**, após o certificado A1 entrar na Focus.
 > Objetivo: emitir uma NF-e **real em homologação** da loja INSPIRIUM, ponta a ponta, pelo painel da etapa 15.
 

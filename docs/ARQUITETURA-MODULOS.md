@@ -1,5 +1,9 @@
 # Arquitetura de Módulos — Orizon Manager | Dalmóbile
 
+> **Camada 5 · O QUE JÁ ACONTECEU.** Nunca se corrige — congelado em 2026-07-08 — não mantido. Ver
+> `docs/README.md`. `[VALIDAR]` — o papel deste mapa hoje
+> é do `modulos.py` (manifesto executável) e do `docs/db/MAPA_MODULOS.md`.
+
 > **Documento vivo · 2026-07-06.** Mapa lógico dos módulos do sistema — a taxonomia de "onde mora cada
 > coisa" e "onde mora código novo". Nomeia fronteiras sobre o código que já existe (monolito `main.py` +
 > `database.py` de schema único + `~20 mod_*.py`) e guia o que vem. Atualize-o ao criar/mover um módulo.

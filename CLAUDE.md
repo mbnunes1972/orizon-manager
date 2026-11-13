@@ -1,8 +1,11 @@
 # CLAUDE.md — Orizon Manager | Dalmóbile
 
-Instruções carregadas automaticamente pelo Claude Code. Regras completas de processo estão em
-`DEV_RULES.md`; **estado atual e histórico** em `DEV_LOG.md` (comece pela seção `## ⏸️ ESTADO ATUAL`,
-no fim); requisitos em `REQUIREMENTS.md`; specs de design em `docs/superpowers/specs/`.
+Instruções carregadas automaticamente pelo Claude Code. Para só **rodar o projeto**, ver `README.md`.
+Regras completas de processo estão em `DEV_RULES.md`; mapa da documentação (5 camadas) em
+`docs/README.md`; **trabalho em andamento** na Camada 4 (`docs/db/LISTA_PARALELA.md`,
+`docs/db/RETOMAR.md`); **histórico** em `DEV_LOG.md` — parado desde 27/08/2026 (Sessão 232), o
+"RESUMO ATUAL" do topo dele é de 11/07 `[VALIDAR: retomar ou encerrar o DEV_LOG]`; requisitos em
+`REQUIREMENTS.md`; specs de design em `docs/superpowers/specs/`.
 
 ## O que é
 Sistema de vendas de móveis planejados (loja Dalmóbile). **Backend** Python puro com `http.server`
@@ -11,10 +14,11 @@ Sistema de vendas de móveis planejados (loja Dalmóbile). **Backend** Python pu
 
 ## Layout do código (reorganização 2026-07-15, EM ANDAMENTO)
 A maioria dos módulos ainda é `.py` na **raiz**, classificados por domínio em `modulos.py` (um teste,
-`test_arquitetura_modulos`, garante que nenhum fique órfão e que o ratchet de dependência valha). Três
-domínios já viraram **pacote**: `fiscal/`, `integracoes/`, `auth/` (+ o `mod_fin/` antigo). Import de
+`test_arquitetura_modulos`, garante que nenhum fique órfão e que o ratchet de dependência valha). Quatro
+domínios já viraram **pacote**: `fiscal/`, `integracoes/`, `auth/`, `chat/` (desde 31/07, com os shims
+`mod_chat.py`/`mod_chat_externo.py` na raiz) (+ o `mod_fin/` antigo). Import de
 fora: `from fiscal import mod_nfe`; entre irmãos, relativo: `from . import mapa_fiscal`. Falta empacotar
-o `comercial` (15 arquivos) — os 4 módulos da importação de contrato (`mod_contrato`,
+o `comercial` (17 arquivos, ver `modulos.py`) — os 4 módulos da importação de contrato (`mod_contrato`,
 `mod_documentos`, `mod_documentos_import`, `mod_marcadores`) seguem na raiz.
 **ARMADILHA ao empacotar:** caminho relativo a `__file__` dentro de pacote aponta pra pasta do pacote,
 não a raiz — suba um nível (`dirname(dirname(__file__))`). Um `__file__` errado devolve 404/`""` em
@@ -27,7 +31,9 @@ estabilizar em produção; até lá, frente paralela **só de documentação/inv
 Spec: `docs/superpowers/specs/_geral/2026-07-16-motor-5-reestruturacao-app-design.md`.
 
 ## Ambiente e execução
-- Use **`python3`** (nunca `python`). WSL/Ubuntu.
+- Use **`python3`** (nunca `python`). WSL/Ubuntu ou Linux nativo, com o `.venv` ativado
+  (`source .venv/bin/activate`; sem ele o `run.sh` cai no Python do sistema e falha com
+  `No module named 'sqlalchemy'`).
 - Servidor local: **`./run.sh`** → `http://localhost:8765` (lê `DATABASE_URL` do `.env`, sobe no
   **PostgreSQL**). O **SQLite foi REMOVIDO por inteiro** (faxina 2026-07-23, Sessão 113 — o
   aposentar da S85 e o escape `ORIZON_ALLOW_SQLITE` deixaram de existir): sem `DATABASE_URL`
@@ -49,29 +55,41 @@ Spec: `docs/superpowers/specs/_geral/2026-07-16-motor-5-reestruturacao-app-desig
   A suíte roda **SEMPRE em Postgres** (faxina 2026-07-23): o conftest deriva o banco de teste
   `orizon_test` do `DATABASE_URL` do `.env` (override: `TEST_DATABASE_URL`). NUNCA aponte pro
   banco de dev/produção — o setup dá `DROP SCHEMA CASCADE` por módulo. Postgres local precisa
-  estar de pé (~2m45 a suíte inteira).
+  estar de pé (~11 a 16 min a suíte inteira, ~2.960 testes — medido em 11–12/11/2026).
+- Rode com **`BROWSER=true python3 -m pytest -q`**: ~36 arquivos de teste sobem o `main.py`, que abre o navegador
+  em bind local — em Linux com área de trabalho, cada um abriria uma janela (no WSL não acontece).
+- Bancos extras: `orizon_baseline_teste` (testes de migração do Alembic) e `orizon_e2e` (E2E de
+  navegador, que exigem Playwright + Chromium e usam a senha fixa `senha_local_qualquer` no usuário
+  `orizon`). Dois E2E são instáveis conhecidos (`docs/db/TAREFA_FLAKES_E2E.md`); um deles
+  (`test_e2e_browser_f2_40_fatia2_modal_complemento.py::test_modal_complemento_desc_pct_totais_e_travamento_por_pagamento`)
+  pode travar e o timeout encerra a rodada inteira — use `--deselect` nele.
 - Frontend: **não há teste JS** → verificação manual no navegador. Para sintaxe, extrair o
   `<script>` e rodar `node --check`.
 
 ## Git — o que commitar
-- Branch `main`. Commits descritivos (pt-BR): `feat(...)`, `fix(...)`, `docs: ...`.
-- **NÃO commitar ruído local**: `XML/…`, `.claude/…`, `~$*.docx`, `*.tmp`, `*.bak*` e artefatos
-  de dado (`orizon.db` legado, `perfis_config.json`) — o `.gitignore` já cobre tudo isso
-  (verificado 2026-07-23: `orizon.db` NÃO é mais tracked; a nota antiga de "working tree sempre
-  sujo" ficou obsoleta). **Sempre `git add` só os arquivos da mudança** (nunca `git add .`).
+- Fluxo **branch + Pull Request** desde 2026-08-13 (`DEV_RULES.md`, seção Git): nada vai direto
+  na `main`. Commits descritivos (pt-BR): `feat(...)`, `fix(...)`, `docs: ...`.
+- **NÃO commitar ruído local**: `.claude/…`, `.venv/`, `~$*.docx`, `*.tmp`, `*.bak*`, `XML/**/*_PE.xml`
+  e artefatos de dado (`orizon.db` legado, `perfis_config.json`) — o `.gitignore` cobre tudo isso
+  (`perfis_config.json` passou a ser ignorado em 10/11/2026). Os XML **sem** `_PE` em `XML/` são
+  versionados **de propósito** (material de referência — ver o comentário no `.gitignore`).
+  **Sempre `git add` só os arquivos da mudança** (nunca `git add .`).
 - Push: as credenciais do GitHub estão no Git Credential Manager (do usuário) — o push funciona; se
-  falhar por credencial, peça ao usuário rodar `!git push origin main`.
+  falhar por credencial, peça ao usuário rodar `!git push` da branch.
 
 ## Fechar uma frente (padrão do projeto)
 1. Suíte verde. 2. Atualizar **DEV_LOG** (nova `## Sessão N`) e o spec em `docs/superpowers/specs/`.
-3. `git add <arquivos> && git commit`. 4. Merge na `main` (ou já está, se commitou direto). 5. `git
-push origin main` (atualiza o "servidor web" = GitHub). 6. **Re-ingerir o grafo MCP** (`ingerir`
-com `fonte: "all"`, ou `POST http://localhost:8767/ingest/all`) para o grafo refletir o código novo.
-Deploy no VPS: runbook em `DEV_RULES.md`.
+3. `git add <arquivos> && git commit` na branch da frente. 4. `git push` da branch e Pull Request,
+revisado antes do merge (`DEV_RULES.md`). 5. Depois do merge, **re-ingerir o grafo MCP** (`ingerir`
+com `fonte: "all"`, ou `POST http://localhost:8767/ingest/all`), onde ele estiver configurado.
+Deploy: **só por tag** desde 2026-08-31 (`git checkout <tag>` + `alembic upgrade head` +
+`docs/db/confirmar.sh`) — esteira em `docs/db/ESTEIRA.md`, procedimento em `docs/db/IMPLANTAR.md`.
+O `scripts/deploy_ab.sh` antigo não roda o Alembic e não é mais o caminho.
 
 ## MCP `orizon` (grafo Neo4j) — camada de consulta, NÃO substitui o DEV_LOG
-Grafo Neo4j que ingere código + requisitos + banco + decisões (projeto `../mcp-orizon`; container
-docker-compose já de pé, config em `.mcp.json`). Responde consultas estruturais: `cobertura`
+Grafo Neo4j que ingere código + requisitos + banco + decisões (projeto `../mcp-orizon`, container
+docker-compose, config em `.mcp.json`). **Depende da máquina:** só funciona onde o `../mcp-orizon`
+estiver instalado e de pé; nas outras, o MCP `orizon` simplesmente não conecta. Responde consultas estruturais: `cobertura`
 (requisitos/etapas sem uso), `rastrear_requisito`, `impacto_de`, `decisoes_de`, `buscar`,
 `entidades_do_arquivo`. **É derivado do código e local (fora do git)** → fica obsoleto se não
 re-ingerir, e some com `docker compose down -v`. Por isso o **DEV_LOG continua sendo a fonte
@@ -82,7 +100,8 @@ implementação.
 
 ## Áreas sensíveis (contexto que evita retrabalho)
 - **Contrato/Proposta:** HTML (capa) + Markdown (cláusulas) → **PDF via WeasyPrint** (assets em
-  `contrato_template/`). `weasyprint` 69 no user-site do `python3.14`. O `.docx`/LibreOffice foi
+  `contrato_template/`). `weasyprint` fixado em `>=69,<70` no `requirements.txt` (o 70 remove
+  `weasyprint.urls.default_url_fetcher`, usado pelo `mod_contrato`). O `.docx`/LibreOffice foi
   **aposentado nos DOIS**: a proposta usa `mod_contrato.gerar_pdf_proposta` (capa + corpo do modelo da
   loja) desde a migração da capa. `mod_proposta.py`/`modelo_proposta.docx` são **código morto** — nada em
   produção os lê; não use de referência. O **LibreOffice segue indispensável** para IMPORTAR modelo
@@ -129,9 +148,10 @@ implementação.
   produção (**`www.orizonone.com.br`**, VPS `179.197.77.9` — domínio trocado 2026-07-23, o antigo
   `orizonsolution.com.br` vira redirect) **e o dev/pré-homolog `167.88.33.121`** (Postgres 16, dbs
   `orizon`/`orizon_homolog`, envs `/root/orizon-A.env`+`/root/orizon-B.env`). Migração de schema =
-  `_migrar_colunas_pg` (ADD/DROP COLUMN idempotentes) + `_seed_loja_padrao`. A suíte roda SEMPRE
+  **Alembic**, com baseline desde 2026-08-27 (`migrations/versions/`); o `_migrar_colunas_pg` está
+  congelado (R1, abaixo). Banco novo: `alembic upgrade head` **antes** do primeiro boot. A suíte roda SEMPRE
   contra Postgres (`orizon_test`, derivado do `.env`; override `TEST_DATABASE_URL`) — FK
-  enforcement real pega id fabricado. **Alembic ainda não tem baseline** (Etapa 2, pendente).
+  enforcement real pega id fabricado.
   Plano/rationale: `docs/superpowers/specs/_geral/2026-07-15-migracao-postgresql.md`.
 - **Segmentação Mercadoria/Serviço + distribuidora Orizon Soluções (decisão 2026-07-16, não implementada):**
   motor fiscal já segrega Val_Cont em mercadoria/serviço (`mod_orcamento_params.SEGMENTACAO_DEFAULT`
