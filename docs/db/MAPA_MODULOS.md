@@ -54,7 +54,7 @@ nenhuma). **100% lacuna**, exatamente como `ARQUITETURA-MODULOS.md` já registra
 ### Comercial — o módulo mais rico, e onde "Projetos" (papel) foi parar
 - **Backend:** `mod_orcamento_params.py`, `mod_margens.py`, `mod_negociacao.py`,
   `mod_contrato.py`, `mod_marcadores.py`, `mod_documentos.py`/`mod_documentos_import.py`,
-  `mod_arvore.py`, `_ler_aymore.py`, pacote `mod_fin`, `mod_pe_comparacao.py`,
+  `mod_arvore.py`, pacote `mod_fin`, `mod_pe_comparacao.py`,
   `mod_parcelas.py`, `mod_retido.py`, `mod_medicao.py`, `mod_qualidade_xml.py`,
   `mod_comercial_dash.py`, `mod_equipe.py`, `mod_clicksign.py`, `mod_assinatura.py`.
 - **Tabelas:** `projetos_meta`, `briefings`, `pool_ambientes`, `orcamentos`,

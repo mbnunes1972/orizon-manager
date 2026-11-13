@@ -2,7 +2,7 @@
 
 ## Demanda
 Substituir o corpo-esqueleto atual do `termo_aditivo` (3 linhas, ver `CONTRATOS/aditivo_2.pdf`)
-pelo modelo jurídico do advogado (`mod_aditivo.doc`, raiz do repo), no MESMO formato do Modelo de
+pelo modelo jurídico do advogado (`mod_aditivo.doc`, hoje em `docs/especificacoes/`), no MESMO formato do Modelo de
 Contrato (`contrato_template/contrato.md`): Markdown com `[MARCADORES]`, cláusulas `#`, bloco de
 assinaturas idêntico. As partes que **dependem do caso concreto** — considerandos, lista integral
 de itens, inclusões, exclusões, valores/pagamento — são preenchidas por **modais sequenciais com

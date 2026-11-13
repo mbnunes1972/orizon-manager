@@ -99,7 +99,7 @@ def corpo_modelo_aditivo_padrao() -> str:
         return ""
 
 
-# Os CONSIDERANDOS são o texto LITERAL do advogado (mod_aditivo.doc, 2022) — não
+# Os CONSIDERANDOS são o texto LITERAL do advogado (docs/especificacoes/mod_aditivo.doc, 2022) — não
 # reescrever; um por parágrafo para o operador apagar os que não se aplicam. Os demais
 # textos são a redação da spec. A adaptação ao caso "sem inclusões/exclusões/alteração
 # de valor" é pelo VALOR do marcador (frase negativa própria), não por condicional no

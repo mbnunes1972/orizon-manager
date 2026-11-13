@@ -11,7 +11,7 @@ POR QUE LIBREOFFICE E NÃO python-docx: o .docx do contrato usa numeração
 AUTOMÁTICA do Word (numId/ilvl). Os números ("1.1", "2.3", "a)") NÃO estão no
 texto do parágrafo, e python-docx não os devolve — as cláusulas sairiam sem
 número. O export em texto do LibreOffice achata a numeração em literal.
-Ver scripts/extrair_clausulas_docx.py (o protótipo que originou este módulo).
+Ver scripts/_historico/extrair_clausulas_docx.py (o protótipo que originou este módulo).
 
 Sem banco. Sem estado.
 """
