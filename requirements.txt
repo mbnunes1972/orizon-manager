@@ -5,8 +5,11 @@
 python-docx
 openpyxl
 requests
-SQLAlchemy
-weasyprint
+# Faixas fixadas em 10/11/2026: um `pip install` limpo pegava versões novas que quebram o app.
+# SQLAlchemy 2.1: URL "postgresql://" sem driver passa a exigir o pacote psycopg (v3).
+SQLAlchemy>=2.0,<2.1
+# WeasyPrint 70: some weasyprint.urls.default_url_fetcher, usado por mod_contrato (todo PDF quebra).
+weasyprint>=69,<70
 markdown
 
 # PostgreSQL (migração 2026-07-15, ver docs/superpowers/specs/2026-07-15-migracao-postgresql.md)
