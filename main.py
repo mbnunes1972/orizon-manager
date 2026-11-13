@@ -31,6 +31,11 @@ import mod_expedicao
 import mod_assistencias
 import mod_cadastro
 import mod_folha
+# mod_expedicao/mod_assistencias/mod_folha/mod_comissao/mod_adiantamento são shims (pacotes
+# expedicao/, assistencias/, folha/ desde 2026-11-13). mod_comissao e mod_adiantamento entram aqui
+# só para o boot resolver o sys.modules antes do servidor subir — mesma corrida descrita no
+# comentário dos shims do chat, logo abaixo. Trava: test_shims_sao_importados_no_topo_do_main.
+import mod_comissao, mod_adiantamento
 import mod_escopo
 # mod_chat/mod_chat_externo são shims de compatibilidade (empacotamento 2026-07-31) que
 # substituem sys.modules[__name__] pelo módulo real de chat/ durante a própria execução —

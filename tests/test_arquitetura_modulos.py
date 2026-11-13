@@ -67,15 +67,22 @@ def test_todo_arquivo_do_manifesto_existe():
 
 
 def test_nucleo_nao_importa_dominio():
-    """Regra de dependência: Núcleo NÃO pode importar módulo de domínio."""
+    """Regra de dependência: Núcleo NÃO pode importar módulo de domínio.
+
+    Reconhece o domínio pelo nome do arquivo da raiz (`import mod_folha`) E pelo nome do pacote
+    (`from folha import mod_folha`). Sem a segunda parte, a trava só funcionava enquanto existissem
+    shims na raiz — e deixaria de funcionar quando eles fossem aposentados (Fase 6 do plano de
+    organização, 13/11/2026)."""
     arqs_dominio = {a for d in m.DOMINIOS for a in _arquivos_do_modulo(d)}
+    pacotes_dominio = {pathlib.Path(a).name for d in m.DOMINIOS for a in m.MODULOS[d]["arquivos"]
+                       if (RAIZ / a).is_dir()}
     violacoes = []
     for nome in m.NUCLEO:
         for arquivo in _arquivos_do_modulo(nome):
             if not arquivo.endswith(".py"):
                 continue
             for imp in _imports_locais(arquivo):
-                if (imp + ".py") in arqs_dominio:
+                if (imp + ".py") in arqs_dominio or imp in pacotes_dominio:
                     violacoes.append(f"{arquivo} (núcleo/{nome}) importa {imp} (domínio)")
     assert not violacoes, "Núcleo importando domínio:\n" + "\n".join(violacoes)
 
@@ -136,3 +143,70 @@ def test_chat_pacote_nao_importa_host():
             if imp not in PERMITIDOS:
                 violacoes.append(f"{rel} importa {imp} — use uma porta (chat/ports.py)")
     assert not violacoes, "chat/ acoplado ao host:\n" + "\n".join(violacoes)
+
+
+# --- Shims de compatibilidade (empacotamento) -------------------------------------------------
+# Um shim é um .py da raiz que entrega o módulo real de um pacote no lugar dele, via
+# `sys.modules[__name__] = <módulo real>` (padrão do mod_chat.py, 31/07/2026). Os dois testes
+# abaixo são as travas do plano de organização (Fase 5, 13/11/2026).
+
+def _shims_da_raiz():
+    """{nome do shim: nome completo do módulo real}, lidos do código de cada shim."""
+    shims = {}
+    for p in sorted(RAIZ.glob("*.py")):
+        tree = ast.parse(p.read_text(encoding="utf-8"))
+        # Shim = atribuição de TOPO `<x>.modules[__name__] = <nome>` (lida pela estrutura, não
+        # pelo texto: o main.py cita "sys.modules[__name__]" num comentário e não é shim).
+        alvo = None
+        for node in tree.body:
+            if not (isinstance(node, ast.Assign) and isinstance(node.value, ast.Name)):
+                continue
+            t = node.targets[0]
+            if (isinstance(t, ast.Subscript) and isinstance(t.value, ast.Attribute)
+                    and t.value.attr == "modules" and isinstance(t.slice, ast.Name)
+                    and t.slice.id == "__name__"):
+                alvo = node.value.id
+        if alvo is None:
+            continue
+        # … e de onde ele veio (ex.: `from folha import mod_folha as _real` → folha.mod_folha)
+        real = None
+        for node in tree.body:
+            if isinstance(node, ast.ImportFrom) and node.module:
+                for a in node.names:
+                    if (a.asname or a.name) == alvo:
+                        real = f"{node.module}.{a.name}"
+        assert real, f"{p.name}: shim sem `from <pacote> import <módulo> as <nome>` reconhecível"
+        shims[p.stem] = real
+    return shims
+
+
+def test_shims_sao_importados_no_topo_do_main():
+    """Todo shim tem que ser importado no NÍVEL DE MÓDULO do main.py (no boot, thread única).
+
+    Por quê (main.py, comentário dos shims do chat): se a PRIMEIRA importação de um shim acontece
+    dentro de um handler, duas requisições simultâneas podem disputar o lock de import e uma delas
+    pega o shim vazio, antes da troca no sys.modules. Aconteceu em produção:
+    `AttributeError: module 'mod_chat_externo' has no attribute 'varrer_triagem_vencida'`."""
+    tree = ast.parse((RAIZ / "main.py").read_text(encoding="utf-8"))
+    no_topo = set()
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            no_topo |= {a.name.split(".")[0] for a in node.names}
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            no_topo.add(node.module.split(".")[0])
+    faltando = sorted(set(_shims_da_raiz()) - no_topo)
+    assert not faltando, ("shim(s) sem import no topo do main.py (risco de corrida de import entre "
+                          "threads): " + ", ".join(faltando))
+
+
+def test_shim_e_o_mesmo_objeto_do_modulo_real():
+    """`import mod_X` e `from <pacote> import mod_X` têm que devolver o MESMO objeto de módulo.
+
+    Um shim escrito como `from pacote.mod_X import *` cria uma CÓPIA: o monkeypatch dos testes
+    passa a valer na cópia, o código real não é afetado, e o teste fica verde testando nada."""
+    import importlib
+    diferentes = []
+    for shim, real in _shims_da_raiz().items():
+        if importlib.import_module(shim) is not importlib.import_module(real):
+            diferentes.append(f"{shim} → {real}")
+    assert not diferentes, "shim e módulo real são objetos diferentes: " + ", ".join(diferentes)
