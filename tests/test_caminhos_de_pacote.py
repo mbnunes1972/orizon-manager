@@ -48,10 +48,13 @@ def test_nenhum_pacote_usa_um_dirname_so_para_alcancar_a_raiz():
     correto — falso positivo que teria bloqueado código bom.)"""
     import re
     suspeitos = []
-    for pkg in ("auth", "fiscal", "integracoes", "mod_fin"):
+    # Pacotes descobertos, não listados à mão: a lista fixa ("auth", "fiscal", "integracoes",
+    # "mod_fin") deixava de fora todo pacote novo — expedicao/assistencias/folha/cadastro/ciclo
+    # (13/11/2026) e, principalmente, o comercial/, onde moram os 2 __file__ de dado de cliente.
+    pacotes = sorted(d.name for d in RAIZ.iterdir()
+                     if d.is_dir() and (d / "__init__.py").exists() and d.name != "tests")
+    for pkg in pacotes:
         d = RAIZ / pkg
-        if not d.is_dir():
-            continue
         for f in d.rglob("*.py"):
             for i, ln in enumerate(f.read_text(encoding="utf-8").split("\n"), 1):
                 if "__file__" not in ln or ln.strip().startswith("#"):
@@ -67,3 +70,31 @@ def test_nenhum_pacote_usa_um_dirname_so_para_alcancar_a_raiz():
         "dentro de pacote, um dirname() só chega na pasta do pacote — não na raiz.\n"
         "Suba um nível (dirname(dirname(__file__)) ou join(dirname(__file__), '..', X)):\n  "
         + "\n  ".join(suspeitos))
+
+
+def test_caminhos_do_comercial_apontam_para_a_raiz():
+    """Trava da Fase 4 do plano de organização (empacotar o comercial), armada ANTES de mover.
+
+    Estas 5 pastas são DADO DE CLIENTE ou template, calculadas a partir de `__file__` em
+    mod_contrato.py e mod_documentos.py. Um dirname a menos depois do empacotamento e: o contrato
+    sai sem cláusulas, contratos assinados e logos dão 404, e uploads novos vão para comercial/…
+    — tudo em silêncio, com o resto da suíte verde (ROTEIRO_EMPACOTAR_COMERCIAL.md, seção 2)."""
+    import mod_contrato, mod_documentos
+    for rotulo, caminho, esperado in [
+        ("CONTRATOS_DIR",         mod_contrato.CONTRATOS_DIR,         RAIZ / "CONTRATOS"),
+        ("CONTRATO_TEMPLATE_DIR", mod_contrato.CONTRATO_TEMPLATE_DIR, RAIZ / "contrato_template"),
+        ("LOGOS_LOJA_DIR",        mod_contrato.LOGOS_LOJA_DIR,        RAIZ / "logos_loja"),
+        ("DOCS_LOJA_DIR",         mod_documentos.DOCS_LOJA_DIR,       RAIZ / "documentos_loja"),
+        ("MODELOS_PADRAO_DIR",    mod_documentos.MODELOS_PADRAO_DIR,  RAIZ / "modelos_documentos_padrao"),
+    ]:
+        assert pathlib.Path(caminho).resolve() == esperado.resolve(), \
+            "%s aponta para %s, esperado %s" % (rotulo, caminho, esperado)
+
+
+def test_template_de_contrato_tem_clausulas():
+    """O sintoma real do bug de caminho: _carregar_md engole arquivo ausente como "" e o contrato
+    sai sem nenhuma cláusula. Confere que o contrato.md é achado onde o código procura."""
+    import mod_contrato
+    md = os.path.join(mod_contrato.CONTRATO_TEMPLATE_DIR, "contrato.md")
+    assert os.path.isfile(md), "contrato.md não encontrado em %s" % md
+    assert os.path.getsize(md) > 1000, "contrato.md suspeito de vazio/truncado (%d bytes)" % os.path.getsize(md)
