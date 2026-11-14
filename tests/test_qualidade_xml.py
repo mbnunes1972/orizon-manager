@@ -1,7 +1,7 @@
 # tests/test_qualidade_xml.py
 import os
 import pytest
-import mod_qualidade_xml as q
+from comercial import mod_qualidade_xml as q
 
 _LELEU_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "PROJETOS", "LELEU", "xmls")
 _skip_leleu = pytest.mark.skipif(not os.path.isdir(_LELEU_DIR), reason="XMLs LELEU nao versionados (PROJETOS/ no .gitignore)")

@@ -125,7 +125,7 @@ def test_fluxo_completo_balanco_fecha_e_dre(app_db):
 
 def test_soma_receitas_igual_val_cont_via_orquestrador(app_db):
     """Σ(4.1.01 + 4.2.01) == Val_Cont exato, com segmentação que gera dízima."""
-    from mod_orcamento_params import segmentar
+    from comercial.mod_orcamento_params import segmentar
     db = app_db.get_session(); ot, oid = "loja", 307; mc.seed_plano(db, ot, oid)
     val_cont = 100000.01
     merc, serv = segmentar(val_cont, 65.0)
@@ -246,7 +246,7 @@ def test_constituir_todas_provisoes_fechamento(app_db):
 
 def test_impostos_efetivacao_segmentada(app_db):
     """B2.6: provisão de impostos reservada no contrato; efetivada proporcional Merc/Serv na emissão."""
-    from mod_orcamento_params import segmentar
+    from comercial.mod_orcamento_params import segmentar
     db = app_db.get_session(); ot, oid = "loja", 404; mc.seed_plano(db, ot, oid)
     s = lambda cod: mc.saldo_conta(db, ot, oid, db.query(mc.Conta).filter_by(owner_tipo=ot, owner_id=oid, codigo=cod).first().id)
     imp_total = 15540.63

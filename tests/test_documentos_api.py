@@ -211,7 +211,8 @@ def test_importar_md_valido_devolve_corpo_e_nao_cria_versao(app_db, seed, http_c
 
 def test_importar_falha_de_conversao_remove_o_staging(seed, http_client_factory, monkeypatch, tmp_path):
     """normalizar() falhando (não FormatoNaoSuportado) tem que limpar o staging."""
-    import mod_documentos, mod_documentos_import
+    from comercial import mod_documentos_import
+    import mod_documentos
     docs_dir = str(tmp_path / "docs_falha")
     monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", docs_dir)
     monkeypatch.setattr(mod_documentos_import, "normalizar",

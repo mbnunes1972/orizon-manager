@@ -9,7 +9,7 @@ from datetime import date
 from database import (CicloLogistico, ConciliacaoPeFase, OrcamentoAmbiente, ParcelaAmbiente,
                        ParcelaProjeto, PoolAmbiente)
 
-import mod_parcelas
+from comercial import mod_parcelas
 
 
 # ── unidade: mod_parcelas.desmembrar_fase ────────────────────────────────────────

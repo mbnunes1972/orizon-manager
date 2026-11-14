@@ -5,7 +5,7 @@ Spec: docs/superpowers/specs/ciclo/2026-07-27-desmembramento-operacional-desde-m
 Medidor SINALIZA ambientes retidos (por ambiente); gerência CONFIRMA → parcela PRONTA × RETIDA
 (reusa mod_parcelas). NÃO toca no razão. `particionar_por_selecao` exige ≥1 pronto (não dá pra
 desmembrar com tudo retido)."""
-import mod_retido
+from comercial import mod_retido
 
 
 def _proj_amb(app_db, seed, nome, n):

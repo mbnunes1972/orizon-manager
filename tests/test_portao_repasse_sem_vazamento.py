@@ -21,7 +21,7 @@ volta `cust_esp × d_orc`.
 Todos os números abaixo são derivados à mão (aritmética no comentário), não copiados do motor."""
 import json
 
-import mod_negociacao as mn
+from comercial import mod_negociacao as mn
 
 
 def _ap(a, b, tol=0.02):

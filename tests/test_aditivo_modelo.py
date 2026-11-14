@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import mod_contrato
-import mod_marcadores
+from comercial import mod_marcadores
 
 
 # ── ordinal ──────────────────────────────────────────────────────────────────

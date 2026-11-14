@@ -1,5 +1,5 @@
 """FASE B1 — Segmentação na Loja (default 65/35) e o resolver a partir do objeto Loja."""
-import mod_orcamento_params as mp
+from comercial import mod_orcamento_params as mp
 from database import Loja
 
 

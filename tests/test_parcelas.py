@@ -6,7 +6,7 @@ com a última parcela (maior ordem) absorvendo o resto do arredondamento.
 """
 import pytest
 
-from mod_parcelas import (
+from comercial.mod_parcelas import (
     congelar_parcelas,
     exige_aprovacao_diretor,
     validar_particao_parcelas,

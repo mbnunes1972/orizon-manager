@@ -173,7 +173,7 @@ def test_parcelas_serve_o_mesmo_catalogo_que_o_post_valida(app_db, seed, http_cl
     POST .../retencoes que valida, e este GET .../parcelas que a tela lê pra montar o <select>
     do modal (era espelho hardcoded em static/index.html antes deste item). Muda a lista no
     backend e confere que o payload reflete — não um snapshot copiado à mão aqui."""
-    import mod_retido
+    from comercial import mod_retido
     nome = seed["projeto_l1"]
     _setup_pool(app_db, seed)
     c = http_client_factory(); c.login("dir_l1", "senha123")

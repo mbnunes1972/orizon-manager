@@ -10,7 +10,7 @@ nome. Estes testes foram renomeados internamente (não o conceito).
 Todos os números abaixo são derivados À MÃO (álgebra, não execução copiada) a partir da MESMA
 fórmula que `mod_negociacao.calcular_orcamento` implementa — ver comentário de cada teste.
 """
-import mod_negociacao
+from comercial import mod_negociacao
 import mod_provisoes
 
 

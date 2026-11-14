@@ -11,7 +11,7 @@ A parcela retida nasce `status='retido'`; ao liberar (Fatia 3) volta a `'aguarda
 import json
 from datetime import datetime
 
-import mod_parcelas
+from . import mod_parcelas
 from database import (CicloLogistico, ParcelaAmbiente, ParcelaProjeto, PoolAmbiente,
                       RetencaoObra, SinalRetido)
 

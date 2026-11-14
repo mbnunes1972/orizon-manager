@@ -1,7 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import pytest
-import mod_documentos_import as imp
+from comercial import mod_documentos_import as imp
 
 # Export de texto do LibreOffice: capa antes, numeração já achatada em literal.
 TXT_EXEMPLO = """MODELO DE CONTRATO

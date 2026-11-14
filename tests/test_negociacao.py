@@ -1,5 +1,5 @@
 # tests/test_negociacao.py
-import mod_negociacao as mn
+from comercial import mod_negociacao as mn
 
 # LELEU oç1 — params do projeto, todos os toggles ON (spec §9)
 PARAMS = {"incluir_custos": True, "comissao_arq_pct": 10.0, "comissao_arq_ativa": True,
@@ -101,7 +101,7 @@ def test_retorna_cust_via_e_bri():
     amb = [{"VBVA": 10000, "CFA": 4000, "desc_amb_pct": 0}]
     p = {"incluir_custos": True, "fora_da_sede": True, "custo_viagem": 300,
          "brinde_ativo": True, "brinde": 200}
-    d = __import__("mod_negociacao").calcular_orcamento(amb, p, 0)
+    d = mn.calcular_orcamento(amb, p, 0)
     assert d["Cust_Via"] == 300.0
     assert d["Bri"] == 200.0
     # cadeia fecha: VAVO − Com_Arq − Pro_Fid − Cust_Via − Bri == Val_Liq
@@ -111,7 +111,7 @@ def test_cust_via_bri_zerados_quando_toggle_off():
     amb = [{"VBVA": 10000, "CFA": 4000, "desc_amb_pct": 0}]
     p = {"incluir_custos": True, "fora_da_sede": False, "custo_viagem": 300,
          "brinde_ativo": False, "brinde": 200}
-    d = __import__("mod_negociacao").calcular_orcamento(amb, p, 0)
+    d = mn.calcular_orcamento(amb, p, 0)
     assert d["Cust_Via"] == 0.0 and d["Bri"] == 0.0
 
 

@@ -8,7 +8,7 @@ Medição original: `comissao_arq_pct`/`fidelidade_pct` não tinham limite (ao c
 `desconto_pct`). Uma comissão de 150% já derrubava `Val_Liq` abaixo de zero, e com CFO > 0 o
 markup virava negativo — com o portão (DECIDIDO 02/09), isso passa a exigir autorização (ou é
 recusado de vez, se a margem for negativa)."""
-import mod_negociacao as mn
+from comercial import mod_negociacao as mn
 
 
 def test_comissao_sem_limite_derruba_markup_abaixo_de_zero():

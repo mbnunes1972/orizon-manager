@@ -1,7 +1,7 @@
 """mod_comercial_dash — métricas do painel Comercial (view derivada da fonte única: projetos_meta,
 orcamentos, contratos, ciclo_etapas). Escopo por loja. Funil de conversão + carteira por status +
 volume contratado/ticket médio."""
-import mod_comercial_dash as cd
+from comercial import mod_comercial_dash as cd
 from database import Projeto, Orcamento, Contrato, CicloEtapa, Loja
 
 

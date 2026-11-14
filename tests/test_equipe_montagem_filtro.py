@@ -5,7 +5,7 @@ A "Equipe de Montagem" deve ofertar só funcionários MONTADOR ou AJUDANTE DE MO
 Supervisor já é papel próprio); antes listava TODOS os funcionários da loja. Terceiros
 (mão de obra terceirizada) seguem candidatos. A função "Ajudante de Montagem" passa a existir
 no catálogo padrão e é semeada em todas as lojas por backfill idempotente."""
-import mod_equipe
+from comercial import mod_equipe
 
 
 def _mk_func(db, app_db, loja_id, pessoa, funcao_nome):

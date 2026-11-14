@@ -6,7 +6,7 @@ Bloqueador INVERTIDO por LACUNA (função com >1 candidato e ninguém escolhido)
   estiver em lacuna.
 - Montagem/Assistência (17/18): responsável por AMBIENTE no Mapa — `montagem_lacunas` trava só
   quando há >1 candidato de montagem e algum ambiente sem responsável (0/1 candidato não trava)."""
-import mod_equipe
+from comercial import mod_equipe
 
 
 def _funcao(app_db, loja_id, nome):

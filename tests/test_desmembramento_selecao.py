@@ -2,7 +2,7 @@
 sofrem a ação da fase; os RESTANTES desmembram para uma nova fase. `particionar_por_selecao` valida e
 separa (2 grupos, ordem do pool preservada). O congelamento (congelar_parcelas) e o gate de prazo
 (mod_cronograma.prazo_excede_limite) já existem e são orquestrados pelo endpoint (B.2)."""
-import mod_parcelas as mp
+from comercial import mod_parcelas as mp
 
 
 def test_particionar_separa_selecionados_e_restantes():

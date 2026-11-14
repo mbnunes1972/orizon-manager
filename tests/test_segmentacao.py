@@ -4,7 +4,7 @@ Val_Cont divide-se em Mercadoria (NF-e produto, 4.1.01) + Serviço (NFS-e, 4.2.0
 configurável (default 65/35). É a base da receita segmentada (sem duplicar) e a chave da futura
 distribuidora. Funções puras (sem I/O)."""
 import pytest
-import mod_orcamento_params as mp
+from comercial import mod_orcamento_params as mp
 
 
 def test_default_65_35():

@@ -40,7 +40,8 @@ def _breakdown_projeto(db, projeto_nome):
     """(breakdown do orçamento vencedor via mod_negociacao, [pool_ambiente_id por índice]).
     Espelha main._negociacao_breakdown (lê só os insumos salvos) para obter o VAVA POR AMBIENTE,
     VAVO e Val_Liq — respeitando o toggle 'incluir_custos'. (None, []) se não há orçamento."""
-    import mod_negociacao, mod_provisoes, mod_orcamento_params
+    from comercial import mod_negociacao, mod_orcamento_params
+    import mod_provisoes
     from database import Loja, Projeto, OrcamentoAmbiente
     orcs = db.query(Orcamento).filter_by(projeto_id=projeto_nome).all()
     if not orcs:

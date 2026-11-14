@@ -2197,7 +2197,7 @@ def reconhecer_provisoes_segmento(db, owner_tipo, owner_id, projeto_id, segmento
 
     Idempotente por ref (um ref por rubrica por documento fiscal — `ref_base + ':' + provisao_cod`).
     Retorna {provisao_cod: lançamento} só das rubricas que de fato reconheceram algo."""
-    from mod_orcamento_params import segmentar as _segmentar
+    from comercial.mod_orcamento_params import segmentar as _segmentar
     out = {}
     for ativo_cod in _PROV_DESPESA_POR_ATIVO:
         provisao_cod = "2.1.04." + ativo_cod.rsplit(".", 1)[-1]

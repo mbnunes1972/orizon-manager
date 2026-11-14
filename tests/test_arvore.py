@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime
 
-import mod_arvore
+from comercial import mod_arvore
 
 
 @pytest.fixture

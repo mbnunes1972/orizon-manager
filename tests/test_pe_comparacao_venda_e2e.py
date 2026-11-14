@@ -107,7 +107,7 @@ def test_conclusao_11c_ignora_ambiente_fora_do_orcamento(http_client_factory, se
 # entre as duas features. Mesmo princípio do teste acima (ambiente fora do orçamento): retido não
 # entra no universo, não trava a conclusão.
 def test_conclusao_11c_ignora_ambiente_retido(http_client_factory, seed, app_db):
-    import mod_retido
+    from comercial import mod_retido
     oid = seed["orcamento_l1_id"]
     nome, pid = _seed_amb(app_db, oid, budget=80000.0)
     _seed_11ab_concluidas(app_db, nome)

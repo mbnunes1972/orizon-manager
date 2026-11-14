@@ -4,7 +4,7 @@
 A origem dos integrantes é a FUNÇÃO responsável de cada etapa (CicloEtapa.funcao_responsavel_id).
 O funcionário é derivado: 1 candidato → auto; >1 → lacuna; 0 → sem responsável. O criador sempre
 entra. `responsavel_funcionario_id` já definido é respeitado."""
-import mod_equipe
+from comercial import mod_equipe
 
 
 def _proj(app_db, seed, nome, criador_login=None):

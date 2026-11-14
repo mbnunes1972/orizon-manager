@@ -1,6 +1,6 @@
 import pytest, sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from mod_orcamento_params import MARGENS_DEFAULT, merge_margens, sanear_descontos
+from comercial.mod_orcamento_params import MARGENS_DEFAULT, merge_margens, sanear_descontos
 
 
 def test_merge_usa_defaults_quando_vazio():
@@ -58,7 +58,7 @@ def test_sanear_descontos_rejeita_nan():
 
 
 def test_parametros_default_tem_12_chaves_estruturais():
-    from mod_orcamento_params import PARAMETROS_DEFAULT
+    from comercial.mod_orcamento_params import PARAMETROS_DEFAULT
     assert set(PARAMETROS_DEFAULT) == {
         "incluir_custos", "comissao_arq_pct", "comissao_arq_ativa",
         "fidelidade_pct", "fidelidade_ativa", "fora_da_sede", "custo_viagem",
@@ -69,13 +69,13 @@ def test_parametros_default_tem_12_chaves_estruturais():
 
 def test_parametros_default_loja_inclui_custos_por_padrao():
     # Padrão inicial de um projeto novo: o toggle "incluir custos adicionais" nasce ON.
-    from mod_orcamento_params import parametros_default_loja
+    from comercial.mod_orcamento_params import parametros_default_loja
     out = parametros_default_loja({})
     assert out["incluir_custos"] is True
 
 
 def test_parametros_default_loja_herda_pcts_e_mantem_incluir_custos():
-    from mod_orcamento_params import parametros_default_loja
+    from comercial.mod_orcamento_params import parametros_default_loja
     out = parametros_default_loja(
         {"defaults_negociacao": {"comissao_arq_pct": 6, "fidelidade_pct": 2, "carga_trib_pct": 9}})
     assert out["comissao_arq_pct"] == 6.0
@@ -85,7 +85,7 @@ def test_parametros_default_loja_herda_pcts_e_mantem_incluir_custos():
 
 
 def test_merge_parametros_coage_e_preserva():
-    from mod_orcamento_params import merge_parametros, PARAMETROS_DEFAULT
+    from comercial.mod_orcamento_params import merge_parametros, PARAMETROS_DEFAULT
     atual = dict(PARAMETROS_DEFAULT, comissao_arq_pct=10.0)
     out = merge_parametros(atual, {"brinde": "300", "fora_da_sede": "true"})
     assert out["brinde"] == 300.0
@@ -95,7 +95,7 @@ def test_merge_parametros_coage_e_preserva():
 
 
 def test_merge_custo_especial_coage_tipos():
-    from mod_orcamento_params import merge_parametros, merge_margens, PARAMETROS_DEFAULT
+    from comercial.mod_orcamento_params import merge_parametros, merge_margens, PARAMETROS_DEFAULT
     out = merge_parametros(dict(PARAMETROS_DEFAULT), {"custo_especial": "1000", "custo_especial_ativo": "true"})
     assert out["custo_especial"] == 1000.0 and out["custo_especial_ativo"] is True
     out2 = merge_margens({}, {"custo_especial": 250, "custo_especial_ativo": 1})

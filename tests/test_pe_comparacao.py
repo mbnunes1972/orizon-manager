@@ -2,7 +2,7 @@
 Função pura, sem contabilidade nem ciclo.
 Spec: docs/superpowers/specs/2026-07-13-desmembramento-pe-parcial-design.md §4(#4,#9), §6."""
 import os
-from mod_pe_comparacao import (montar_comparacao_pe, saldo_margem_estimado, extrair_cfo_pe,
+from comercial.mod_pe_comparacao import (montar_comparacao_pe, saldo_margem_estimado, extrair_cfo_pe,
                                reconciliacao_estimada)
 
 
@@ -97,14 +97,14 @@ def test_extrai_venda_pe_do_total():
     if not os.path.exists(caminho):
         import pytest; pytest.skip("XML de exemplo ausente")
     conteudo = open(caminho, "rb").read()
-    from mod_pe_comparacao import extrair_venda_pe
+    from comercial.mod_pe_comparacao import extrair_venda_pe
     amb = ler_xml_str("Cozinha.xml", conteudo)
     assert extrair_venda_pe("Cozinha.xml", conteudo) == round(float(amb.get("total", 0.0)), 2)
     assert extrair_venda_pe("Cozinha.xml", conteudo) > 0
 
 
 def test_montar_comparacao_venda():
-    from mod_pe_comparacao import montar_comparacao_venda
+    from comercial.mod_pe_comparacao import montar_comparacao_venda
     itens = [("Cozinha", 80000.0), ("Sala", 50000.0)]
     vava_pe = {"Cozinha": 84000.0}
     linhas = montar_comparacao_venda(itens, vava_pe, {"Cozinha": True})

@@ -1,5 +1,5 @@
 import mod_provisoes
-import mod_orcamento_params
+from comercial import mod_orcamento_params
 
 
 def test_default_tem_estrutura_completa():

@@ -62,28 +62,27 @@ from integracoes.projetos_store import (
     _projeto_path, carregar_xmls,
     bloquear_projeto, verificar_integridade_xmls
 )
-from mod_margens import _normalizar_faixas
+from comercial.mod_margens import _normalizar_faixas
 from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada, calcular_total_flex
 from mod_contrato import (calcular_hash_assinatura,
                           gerar_pdf_contrato,
                           construir_contexto, _formatar_valor)
-# Os mod_*.py do comercial na raiz são shims (pacote comercial/ desde 2026-11-14). Os dez abaixo só
-# eram importados dentro de handlers; entram aqui — DEPOIS do mod_contrato, que o mod_marcadores
-# importa no topo — para o boot resolver o sys.modules antes do servidor subir (mesma corrida
-# descrita no comentário dos shims do chat). Saem junto com os shims (aposentadoria da Fase 4).
-import mod_orcamento_params, mod_negociacao, mod_marcadores, mod_documentos_import, mod_documentos
-import mod_parcelas, mod_retido, mod_comercial_dash, mod_equipe, mod_clicksign
+# mod_documentos e mod_clicksign ainda são shims (pacote comercial/ desde 2026-11-14) e só eram
+# importados dentro de handlers; entram aqui para o boot resolver o sys.modules antes do servidor
+# subir (mesma corrida descrita no comentário dos shims do chat). Saem com a 2ª parte da
+# aposentadoria da Fase 4 (mod_contrato, mod_documentos, mod_clicksign).
+import mod_documentos, mod_clicksign
 from ciclo import mod_ciclo
-import mod_medicao
+from comercial import mod_medicao
 from auth import perfis
 from auth import mod_usuarios
 import mod_tenancy
-import mod_arvore
+from comercial import mod_arvore
 import mod_provisoes
-import mod_pe_comparacao
+from comercial import mod_pe_comparacao
 import mod_ajustes_fabrica
 import mod_indicadores
-from mod_qualidade_xml import avaliar_qualidade_xml
+from comercial.mod_qualidade_xml import avaliar_qualidade_xml
 
 def _enriquecer_projetos_com_status(projetos):
     """Adiciona status, ultimo_orcamento_valor e o consultor (criador) a cada projeto da lista."""
@@ -661,7 +660,7 @@ def _bloqueio_execucao_etapa(db, nome_safe, loja_id, codigo):
     já-definido passam; etapas por ambiente (montagem/assistência) ficam de fora deste gate."""
     if str(codigo) in _ETAPAS_POR_AMBIENTE:
         return None
-    import mod_equipe
+    from comercial import mod_equipe
     et = db.query(CicloEtapa).filter_by(projeto_nome=nome_safe, etapa_codigo=str(codigo)).first()
     if et is None or not et.funcao_responsavel_id:
         return None
@@ -1357,7 +1356,8 @@ def _registrar_assinatura_contrato(db, contrato, parte, nome, cpf, ip_origem, lo
         # responsáveis automáticos, apura as lacunas e posta o resumo na conversa
         # do projeto (gerência vê por oversight). Best-effort — nunca quebra a assinatura.
         try:
-            import mod_equipe as _meq, mod_chat as _mchat_f
+            from comercial import mod_equipe as _meq
+            import mod_chat as _mchat_f
             _res = _meq.montar_equipe_no_fechamento(db, nome_safe, loja_id)
             _pm = db.query(Projeto).filter_by(nome_safe=nome_safe).first()
             _conv = _mchat_f.get_or_create_conversa_projeto(
@@ -1661,7 +1661,7 @@ def _notificar_signatarios_clicksign_cancelamento_aditivo(db, aditivo, loja_id, 
 # QUANDO cada um dispara (Contrato: /cancelamento; Aprovação do PE: /ciclo/11d/reprovar e
 # /aprovacao-pe/gerar; Solicitação de medição: /medicao/solicitacao/gerar; Termo Aditivo:
 # regeração, mesma razão dos outros dois — ver a função acima).
-import mod_assinatura
+from comercial import mod_assinatura
 mod_assinatura.registrar("contrato", Contrato,
                           _enviar_contrato_para_clicksign, _reconciliar_contrato_clicksign,
                           cancelar=_notificar_signatarios_clicksign_cancelamento)
@@ -1686,7 +1686,7 @@ def _congelar_segmentacao_no_projeto(db, loja_id, projeto_nome):
     existem como override editável ANTES da assinatura), que a AF1 confere (`_segmentacao_
     congelada`). Retorna o par congelado ou None (loja/projeto ausente). NÃO commita (o chamador
     decide) e preserva os demais parâmetros."""
-    from mod_orcamento_params import (parametros_default_loja, resolver_segmentacao,
+    from comercial.mod_orcamento_params import (parametros_default_loja, resolver_segmentacao,
                                       segmentacao_efetiva)
     lj = db.get(Loja, loja_id) if loja_id else None
     pj = _projeto_da_loja(db, projeto_nome, loja_id)
@@ -1734,7 +1734,7 @@ def _valores_segmentados_do_projeto(db, loja_id, projeto_nome):
     retorno — nenhum dos três consumidores o lia (o custo de fábrica do aditivo já é constituído
     por `_fin_provisoes_venda_seguro` na assinatura, achado do passo 6); mantê-lo seria a mesma
     promessa sem consumidor que o ACHADO-22 descreve."""
-    from mod_orcamento_params import resolver_segmentacao, segmentacao_efetiva, segmentar
+    from comercial.mod_orcamento_params import resolver_segmentacao, segmentacao_efetiva, segmentar
     if not loja_id:
         return None
     loja = db.get(Loja, loja_id)
@@ -1841,7 +1841,7 @@ def _fin_faturamento_segmentado_seguro(loja_id, projeto_nome, segmento, ref_doc)
             pct_merc = vals["seg"]["pct_mercadoria"]
             imp_total = mod_contabil.total_lancado(db, ot, oid, "2.1.04.13", "credito", projeto_nome)
             if imp_total > 0:
-                from mod_orcamento_params import segmentar as _segmentar
+                from comercial.mod_orcamento_params import segmentar as _segmentar
                 imp_merc, imp_serv = _segmentar(imp_total, pct_merc)
                 imp_seg = imp_merc if segmento == "mercadoria" else imp_serv
                 mod_contabil.efetivar_impostos_segmento(db, ot, oid, projeto_nome, imp_seg, ref_base="imp:" + ref_doc)
@@ -2228,7 +2228,8 @@ class Handler(BaseHTTPRequestHandler):
             # Equipe do Projeto: roster papel→responsáveis (automáticos derivados + seletores) +
             # candidatos (funcionários/terceiros da loja) para os seletores.
             from urllib.parse import unquote as _unq
-            import mod_equipe as _meq, mod_tenancy as _mten
+            from comercial import mod_equipe as _meq
+            import mod_tenancy as _mten
             nome_safe = _unq(m_eq.group(1))
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -2738,7 +2739,7 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-            import mod_comercial_dash
+            from comercial import mod_comercial_dash
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -3142,7 +3143,7 @@ class Handler(BaseHTTPRequestHandler):
                                                      if p.entrega_prevista else None),
                                 "ambientes": [{"id": a.pool_ambiente_id,
                                                "nome": pa_nome.get(a.pool_ambiente_id, "")} for a in ambs]})
-                import mod_retido as _mret
+                from comercial import mod_retido as _mret
                 sinais = [{"pool_ambiente_id": s["pool_ambiente_id"], "motivo": s["motivo"],
                            "nome": pa_nome.get(s["pool_ambiente_id"], "")}
                           for s in _mret.listar_sinais(db, nome)]
@@ -3373,7 +3374,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             db = get_session()
             try:
-                import mod_equipe as _meq
+                from comercial import mod_equipe as _meq
                 ator = _ator_dict(db, usuario)
                 loja_id, _err = mod_tenancy.escopo_operacional(ator)
                 if _err:
@@ -3411,7 +3412,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": _err}, code=403); return
                 if _projeto_da_loja(db, nome, loja_id) is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
-                import mod_retido as _mret
+                from comercial import mod_retido as _mret
                 pa_nome = {pa.id: (pa.nome_exibicao or pa.nome)
                            for pa in db.query(PoolAmbiente).filter_by(projeto_id=nome).all()}
                 regs = _mret.listar_retencoes(db, nome)
@@ -5167,7 +5168,8 @@ class Handler(BaseHTTPRequestHandler):
                     if _projeto_visivel_da_loja(db, nome_safe, loja_id, usuario) is None:
                         self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                         return
-                    import mod_chat, mod_equipe
+                    from comercial import mod_equipe
+                    import mod_chat
                     p_meta = db.query(Projeto).filter_by(nome_safe=nome_safe).first()
                     conv = mod_chat.get_or_create_conversa_projeto(
                         db, loja_id, nome_safe,
@@ -6926,7 +6928,7 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                import mod_marcadores as _mmarc
+                from comercial import mod_marcadores as _mmarc
                 self.send_json({"ok": True, "catalogo": _mmarc.CATALOGO})
                 return
 
@@ -7307,7 +7309,7 @@ class Handler(BaseHTTPRequestHandler):
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
             import mod_documentos as _mdoc
-            import mod_marcadores as _mmarc
+            from comercial import mod_marcadores as _mmarc
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -7337,8 +7339,8 @@ class Handler(BaseHTTPRequestHandler):
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
             import mod_documentos as _mdoc
-            import mod_documentos_import as _mdocimp
-            import mod_marcadores as _mmarc
+            from comercial import mod_documentos_import as _mdocimp
+            from comercial import mod_marcadores as _mmarc
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -7506,7 +7508,7 @@ class Handler(BaseHTTPRequestHandler):
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
             import mod_documentos as _mdoc
-            import mod_marcadores as _mmarc
+            from comercial import mod_marcadores as _mmarc
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -7579,7 +7581,7 @@ class Handler(BaseHTTPRequestHandler):
             # entre a Solicitação de Medição e a Montagem. Body: {ambientes: [ids], motivo,
             # liberacao_prevista: 'AAAA-MM-DD', etapa_codigo}. Cria/derrama fases (split se
             # preciso) e registra o evento em RetencaoObra.
-            import mod_retido as _mret
+            from comercial import mod_retido as _mret
             nome = unquote(m_rnew.group(1))
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -7645,7 +7647,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": _err}, code=403); return
                 if _projeto_da_loja(db, nome, loja_id) is None:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
-                import mod_retido as _mret
+                from comercial import mod_retido as _mret
                 req = json.loads(body) if body else {}
                 if acao in ("sinalizar", "limpar"):
                     if not perfis.pode(usuario.get("nivel"), "registrar_medicao"):
@@ -7696,7 +7698,7 @@ class Handler(BaseHTTPRequestHandler):
             # Fatia 2 (desmembramento): desmembra o projeto em parcelas (grupos de ambientes). Valida a
             # partição (#1), congela a fração do Val_Cont (#5) e grava parcela_projeto + parcela_ambiente.
             # Operacional (não lança contábil) — o efeito no ciclo/contábil vem nas etapas seguintes.
-            import mod_parcelas as _mpar
+            from comercial import mod_parcelas as _mpar
             nome = unquote(m_pcreate.group(1))
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -7766,7 +7768,7 @@ class Handler(BaseHTTPRequestHandler):
             # depois, ex. no PE). Preserva exatamente o congelado da mãe (mod_parcelas.desmembrar_fase);
             # a mãe é removida e as fases são renumeradas 1..N. Bloqueado se a fase já está em
             # expedição (CicloLogistico) ou liquidada.
-            import mod_parcelas as _mpar
+            from comercial import mod_parcelas as _mpar
             nome = unquote(m_psub.group(1)); pid = int(m_psub.group(2))
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -8365,7 +8367,7 @@ class Handler(BaseHTTPRequestHandler):
                 pa = db.get(PoolAmbiente, pool_ambiente_id)
                 if pa is None or pa.projeto_id != nome:
                     self.send_json({"ok": False, "erro": "Ambiente não pertence ao projeto"}, code=400); return
-                import mod_retido as _mret   # gate operacional: parcela retida não avança (Fatia 2)
+                from comercial import mod_retido as _mret   # gate operacional: parcela retida não avança (Fatia 2)
                 _ok, _err = _mret.gate_operacao_ambiente(db, nome, pool_ambiente_id)
                 if not _ok:
                     self.send_json({"ok": False, "erro": _err}, code=409); return
@@ -9196,7 +9198,7 @@ class Handler(BaseHTTPRequestHandler):
                     _pn = dd.get("projeto_nome")
                     if not _pn or _projeto_da_loja(db, _pn, loja_id) is None:
                         self.send_json({"ok": False, "erro": "Projeto inválido nesta loja."}, code=400); return
-                    import mod_equipe
+                    from comercial import mod_equipe
                     _pm = db.query(Projeto).filter_by(nome_safe=_pn).first()
                     conv = mod_chat.get_or_create_conversa_projeto(
                         db, loja_id, _pn, cliente_id=(_pm.cliente_id if _pm else None))
@@ -11312,7 +11314,7 @@ class Handler(BaseHTTPRequestHandler):
                 # efetivado. Fechar aqui reconheceria a provisão retida como sobra (receita 4.4.02) antes
                 # da execução, e deixaria o ativo diferido 1.1.06 órfão. Bloqueia até liberar (mesma
                 # regra do gate de execução por parcela).
-                import mod_retido
+                from comercial import mod_retido
                 retidos = mod_retido.ambientes_retidos(db, nome_safe)
                 if retidos:
                     self.send_json({"ok": False, "erro": "Há ambientes retidos pela obra (%d): libere-os "
@@ -12367,7 +12369,7 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
-                from mod_orcamento_params import merge_parametros
+                from comercial.mod_orcamento_params import merge_parametros
                 req = json.loads(body.decode("utf-8", "replace")) if body else {}
                 p = _projeto_da_loja(db, nome_safe, loja_id)
                 if p is None:
@@ -12389,7 +12391,7 @@ class Handler(BaseHTTPRequestHandler):
                                         "erro": "Apenas o Diretor pode alterar a segmentação Mercadoria × Serviço."},
                                        code=403)
                         return
-                    from mod_orcamento_params import validar_segmentacao
+                    from comercial.mod_orcamento_params import validar_segmentacao
                     pm = req.get("pct_mercadoria", atual.get("pct_mercadoria"))
                     ps = req.get("pct_servico", atual.get("pct_servico"))
                     try:
@@ -12676,7 +12678,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False,
                         "erro": "Contrato já concluído financeiramente — reabrir a revisão exige Diretor."}, code=403); return
                 # Fatia C (#10): aumento de custo acima do limite (config) exige step-up do Diretor
-                import mod_parcelas as _mpar
+                from comercial import mod_parcelas as _mpar
                 _loja = db.get(Loja, loja_id) if loja_id else None
                 _cfg = {}
                 if _loja and _loja.config_financeira_json:
@@ -13190,7 +13192,8 @@ class Handler(BaseHTTPRequestHandler):
             # ── POST /api/projetos/<nome>/equipe — grava a seleção de um papel SELETOR da Equipe
             # (medidor/finalizador/montagem). Body: {papel, selecao}. Automáticos não são graváveis. ──
             from urllib.parse import unquote as _unq
-            import mod_equipe as _meq, mod_tenancy as _mten
+            from comercial import mod_equipe as _meq
+            import mod_tenancy as _mten
             m_eqp = re.match(r"^/api/projetos/([^/]+)/equipe$", path)
             nome_safe = _unq(m_eqp.group(1))
             usuario = get_usuario_sessao(self)
@@ -16523,7 +16526,7 @@ class Handler(BaseHTTPRequestHandler):
                         # retenção, mesmo a retenção existindo pra deixar a obra seguir com uma
                         # parte parada). Mesmo princípio já usado pra ambiente fora do
                         # orçamento: não entra no universo, não trava a conclusão.
-                        import mod_retido as _mret
+                        from comercial import mod_retido as _mret
                         ids_orc -= _mret.ambientes_retidos(db, nome_safe)
                         if ids_orc:
                             com_pe = (db.query(ArquivoPE.pool_ambiente_id)
@@ -17654,7 +17657,7 @@ class Handler(BaseHTTPRequestHandler):
                 if _err:
                     self.send_json({"ok": False, "erro": _err}, code=403)
                     return
-                from mod_orcamento_params import sanear_descontos
+                from comercial.mod_orcamento_params import sanear_descontos
                 req = json.loads(body.decode("utf-8", "replace")) if body else {}
                 pares = req.get("descontos", req)   # aceita {"descontos":{...}} ou {...}
                 orc = _obj_da_loja(db, Orcamento, oid, loja_id)
@@ -18065,7 +18068,7 @@ class Handler(BaseHTTPRequestHandler):
                     # dois (desmembramento operacional, achado da Vera — concluir com ambiente
                     # RETIDO registraria "montado" algo que fisicamente não pôde ser montado).
                     if novo_status in mod_ciclo.STATUS_CONCLUSIVOS and etapa_cod in ("17", "18"):
-                        import mod_retido as _mret
+                        from comercial import mod_retido as _mret
                         if _mret.ambientes_retidos(db, nome_safe):
                             self.send_json({"ok": False, "erro": "Há ambientes retidos pela obra: "
                                 "libere-os (Retenção por Obra) antes de concluir a montagem/assistência."},
@@ -18075,7 +18078,7 @@ class Handler(BaseHTTPRequestHandler):
                     # pós Montagem) saiu do Mapa (2026-08-06, papel 'assistencia' aposentado, ver
                     # mod_escopo.PAPEIS); ela não trava mais por essa via.
                     if novo_status in mod_ciclo.STATUS_CONCLUSIVOS and etapa_cod == "17":
-                        import mod_equipe as _meq
+                        from comercial import mod_equipe as _meq
                         faltam = _meq.montagem_lacunas(
                             db, loja_id, _ETAPA_PAPEL.get(etapa_cod),
                             _atribuicoes_dicts(db, nome_safe),
@@ -18211,7 +18214,7 @@ class Handler(BaseHTTPRequestHandler):
                             # Grupo de acompanhamento EVOLUTIVO (spec 2026-07-31, decisão 1):
                             # a transição re-deriva equipe∪gerência e cada entrada/saída vira
                             # evento inline na timeline da conversa do projeto.
-                            import mod_equipe as _meq_f
+                            from comercial import mod_equipe as _meq_f
                             _eqf = _meq_f.equipe_do_projeto(db, nome_safe, loja_id)
                             _mchat.sincronizar_grupo_da_fase(
                                 db, conv, _eqf["membros_usuarios"],
@@ -18586,7 +18589,7 @@ class Handler(BaseHTTPRequestHandler):
                             setattr(l, campo, val)
                     # Segmentação de receita Mercadoria × Serviço (default da loja; valida soma=100).
                     if "pct_mercadoria" in req or "pct_servico" in req:
-                        from mod_orcamento_params import validar_segmentacao
+                        from comercial.mod_orcamento_params import validar_segmentacao
                         pm = req.get("pct_mercadoria", l.pct_mercadoria)
                         ps = req.get("pct_servico", l.pct_servico)
                         try:
@@ -19665,7 +19668,7 @@ def _params_iniciais_projeto(db, projeto_nome, loja_id):
     sempre que houver parceiro. São apenas os valores INICIAIS: uma vez salvos em
     parametros_json, passam a ser respeitados como estão (as edições persistem)."""
     from integracoes import projetos_store
-    from mod_orcamento_params import parametros_default_loja
+    from comercial.mod_orcamento_params import parametros_default_loja
     par = parametros_default_loja(_cfg_financeira_loja(db, loja_id))
     proj_json = projetos_store._carregar_projeto(projeto_nome) or {}
     parceiro_id = proj_json.get("parceiro_id")
@@ -19691,7 +19694,8 @@ def _negociacao_breakdown(orc, db, vbva_override=None, params_override=None,
     02/09): pré-visualizam o efeito de uma alavanca PROPOSTA (ainda não persistida) — comissão de
     arquiteto, fidelidade, desconto global, desconto por ambiente — sem gravar nada. Usados só por
     `_maior_composto_com_parametros_pct`, pra checar o efeito composto ANTES de salvar."""
-    import mod_negociacao, mod_provisoes, mod_orcamento_params
+    from comercial import mod_negociacao, mod_orcamento_params
+    import mod_provisoes
     proj = db.query(Projeto).filter_by(nome_safe=orc.projeto_id).first()
     # Carrega cfg da loja uma única vez — usado para defaults de params E para provisões
     _loja = db.get(Loja, orc.loja_id) if getattr(orc, "loja_id", None) else None
@@ -20136,7 +20140,7 @@ def _reparar_parametros_segmentados(db):
     ANTES do fix ficaram com parametros_json contendo SÓ a segmentação (os defaults vivos
     foram descartados no congelamento). Restaura os defaults da loja POR BAIXO das chaves
     existentes (a segmentação congelada prevalece). Retorna nº de projetos reparados."""
-    from mod_orcamento_params import parametros_default_loja
+    from comercial.mod_orcamento_params import parametros_default_loja
     n = 0
     for pj in db.query(Projeto).filter(Projeto.parametros_json.isnot(None)).all():
         try:

@@ -8,7 +8,7 @@ só (1−d) dos custos fixos — é aceita e previsível.
 
 Todos os números abaixo são DERIVADOS À MÃO da fórmula (ver comentário de cada bloco), não
 copiados de uma execução do motor — a aritmética está no comentário, verificável sem rodar nada."""
-import mod_negociacao as mn
+from comercial import mod_negociacao as mn
 
 
 def _ap(a, b, tol=0.02):

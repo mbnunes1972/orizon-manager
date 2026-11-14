@@ -1,4 +1,4 @@
-import mod_medicao as mm
+from comercial import mod_medicao as mm
 
 
 def test_pareceres():

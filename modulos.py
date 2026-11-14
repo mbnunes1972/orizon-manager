@@ -69,23 +69,18 @@ MODULOS = {
                     "rotas": ["/api/clientes", "/api/parceiros", "/api/funcionarios",
                               "/api/fornecedores", "/api/terceiros", "/api/funcoes"]},
     "comercial":   {"camada": "dominio", "depende_de": ["cadastro"], "rotulo": "Comercial", "faixa": "vendas",
-                    # PACOTE desde 2026-11-14: o código vive em comercial/; os mod_*.py da raiz
-                    # abaixo são SHIMS (sys.modules), até a aposentadoria da Fase 4. O mod_fin/
-                    # segue como pacote próprio na raiz (fora deste movimento).
-                    "arquivos": ["comercial",
-                                 "mod_orcamento_params.py", "mod_margens.py", "mod_negociacao.py",
-                                 "mod_contrato.py", "mod_marcadores.py",
-                                 "mod_documentos_import.py", "mod_documentos.py", "mod_arvore.py",
-                                 "mod_fin",
-                                 "mod_pe_comparacao.py", "mod_parcelas.py", "mod_retido.py",
-                                 # Medição (etapas 9/10 do ciclo): o antigo módulo 'producao' (rótulo UI
-                                 # "Projetos") foi retirado da navegação por ser tela-vazia e duplicar o
-                                 # nome; seu código é dono aqui, pois Medição pertence ao ciclo comercial.
-                                 "mod_medicao.py", "mod_qualidade_xml.py",
-                                 "mod_comercial_dash.py",   # dashboard Comercial (view derivada)
-                                 "mod_equipe.py",            # Equipe do Projeto (roster papel→responsável)
-                                 "mod_clicksign.py",
-                                 "mod_assinatura.py"],       # Registro unificado ClickSign (ACHADO-69, 2026-09-13)
+                    # PACOTE desde 2026-11-14: o código vive em comercial/ (17 módulos). Na raiz
+                    # restam 3 SHIMS (sys.modules) até a 2ª parte da aposentadoria da Fase 4:
+                    # mod_contrato, mod_documentos, mod_clicksign. O mod_fin/ segue como pacote
+                    # próprio na raiz (fora deste movimento).
+                    # Notas dos módulos que moram em comercial/: mod_medicao (etapas 9/10 do ciclo:
+                    # o antigo módulo 'producao', rótulo UI "Projetos", foi retirado da navegação por
+                    # ser tela-vazia e duplicar o nome; Medição pertence ao ciclo comercial);
+                    # mod_comercial_dash (dashboard Comercial, view derivada); mod_equipe (Equipe do
+                    # Projeto, roster papel→responsável); mod_assinatura (registro unificado
+                    # ClickSign, ACHADO-69, 2026-09-13).
+                    "arquivos": ["comercial", "mod_fin",
+                                 "mod_contrato.py", "mod_documentos.py", "mod_clicksign.py"],
                     "tabelas": ["projetos_meta", "briefings", "pool_ambientes", "orcamentos",
                                 "orcamento_ambientes", "contratos", "contratos_assinaturas",
                                 "aditivos", "aditivos_assinaturas",   # Termo Aditivo (Fatia 3 PE)

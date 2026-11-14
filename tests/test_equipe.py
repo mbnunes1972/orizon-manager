@@ -1,7 +1,7 @@
 """mod_equipe — Equipe do Projeto (roster papel → responsáveis). Automáticos DERIVAM da fonte
 (Consultor = criado_por; Gerente Comercial/SAC/Supervisor = funcionário da loja com a função);
 seletores (medidor/finalizador/montagem[N]) são escolhidos e guardados em projetos_meta.equipe_json."""
-import mod_equipe as eq
+from comercial import mod_equipe as eq
 from database import Projeto, Funcionario, Terceiro, Funcao, Usuario, Loja, CicloEtapa
 
 
