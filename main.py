@@ -67,6 +67,12 @@ from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada,
 from mod_contrato import (calcular_hash_assinatura,
                           gerar_pdf_contrato,
                           construir_contexto, _formatar_valor)
+# Os mod_*.py do comercial na raiz são shims (pacote comercial/ desde 2026-11-14). Os dez abaixo só
+# eram importados dentro de handlers; entram aqui — DEPOIS do mod_contrato, que o mod_marcadores
+# importa no topo — para o boot resolver o sys.modules antes do servidor subir (mesma corrida
+# descrita no comentário dos shims do chat). Saem junto com os shims (aposentadoria da Fase 4).
+import mod_orcamento_params, mod_negociacao, mod_marcadores, mod_documentos_import, mod_documentos
+import mod_parcelas, mod_retido, mod_comercial_dash, mod_equipe, mod_clicksign
 from ciclo import mod_ciclo
 import mod_medicao
 from auth import perfis

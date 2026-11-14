@@ -69,7 +69,11 @@ MODULOS = {
                     "rotas": ["/api/clientes", "/api/parceiros", "/api/funcionarios",
                               "/api/fornecedores", "/api/terceiros", "/api/funcoes"]},
     "comercial":   {"camada": "dominio", "depende_de": ["cadastro"], "rotulo": "Comercial", "faixa": "vendas",
-                    "arquivos": ["mod_orcamento_params.py", "mod_margens.py", "mod_negociacao.py",
+                    # PACOTE desde 2026-11-14: o código vive em comercial/; os mod_*.py da raiz
+                    # abaixo são SHIMS (sys.modules), até a aposentadoria da Fase 4. O mod_fin/
+                    # segue como pacote próprio na raiz (fora deste movimento).
+                    "arquivos": ["comercial",
+                                 "mod_orcamento_params.py", "mod_margens.py", "mod_negociacao.py",
                                  "mod_contrato.py", "mod_marcadores.py",
                                  "mod_documentos_import.py", "mod_documentos.py", "mod_arvore.py",
                                  "mod_fin",

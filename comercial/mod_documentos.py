@@ -96,7 +96,9 @@ def criar_tipo(db, loja_id, nome, etapa_ciclo, usuario_id):
     db.flush()
     return t
 
-_THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+# Raiz do repositório: este arquivo vive em comercial/ desde 2026-11-14 — sobe UM nível
+# (trava: tests/test_caminhos_de_pacote.py).
+_THIS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS_LOJA_DIR = os.path.join(_THIS_DIR, "documentos_loja")
 MODELOS_PADRAO_DIR = os.path.join(_THIS_DIR, "modelos_documentos_padrao")
 

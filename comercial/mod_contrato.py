@@ -22,7 +22,9 @@ import hashlib
 import threading
 from datetime import datetime
 
-_THIS_DIR            = os.path.dirname(os.path.abspath(__file__))
+# Raiz do repositório: este arquivo vive em comercial/ desde 2026-11-14 — sobe UM nível. As pastas
+# abaixo são dado de cliente/template; trava: tests/test_caminhos_de_pacote.py.
+_THIS_DIR            = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTRATOS_DIR        = os.path.join(_THIS_DIR, "CONTRATOS")
 CONTRATO_TEMPLATE_DIR = os.path.join(_THIS_DIR, "contrato_template")
 LOGOS_LOJA_DIR        = os.path.join(_THIS_DIR, "logos_loja")
