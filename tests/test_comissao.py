@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-import mod_comissao
+from folha import mod_comissao
 
 
 # ── Task 1: modelo ───────────────────────────────────────────────────────────
@@ -216,7 +216,8 @@ def test_patch_generico_conclui_etapa_17_e_dispara_comissao(http_client_factory,
 
 
 def test_gerar_folha_soma_itens_de_comissao(seed, app_db):
-    import mod_folha, mod_provisoes
+    from folha import mod_folha
+    import mod_provisoes
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
     fn = app_db.Funcao(loja_id=loja, nome="Montador", salario_fixo=1000.0, usa_comissao_vendas=0, status="ativo")
@@ -244,7 +245,8 @@ def test_gerar_folha_soma_itens_de_comissao(seed, app_db):
 def test_gerar_folha_consultor_vira_item_venda(seed, app_db):
     """2026-08-12 (fonte única): o item de venda não recalcula % — busca o saldo da Provisão de
     Comissão de Vendas (2.1.04.12) JÁ constituída no contrato daquele projeto especificamente."""
-    import mod_folha, mod_provisoes, mod_contabil
+    from folha import mod_folha
+    import mod_provisoes, mod_contabil
     from datetime import datetime
     db = app_db.get_session()
     u = db.query(app_db.Usuario).filter_by(login="cons_l1").first()
@@ -274,7 +276,8 @@ def test_gerar_folha_consultor_vira_item_venda(seed, app_db):
 def test_pagar_folha_efetiva_provisao_de_venda_sem_duplicar(seed, app_db):
     """2026-08-12 (achado do usuário): pagar a folha não posta mais um lançamento próprio pra
     comissão de venda — EFETIVA a provisão do contrato (fecha o saldo em aberto, único lançamento)."""
-    import mod_folha, mod_provisoes, mod_contabil
+    from folha import mod_folha
+    import mod_provisoes, mod_contabil
     from datetime import datetime
     db = app_db.get_session()
     u = db.query(app_db.Usuario).filter_by(login="cons_l1").first()
@@ -337,7 +340,8 @@ def _cria_venda_com_provisao(db, app_db, nome_projeto, saldo_provisao, valor_liq
 
 
 def test_pagar_sem_ajuste_nao_gera_lancamento_de_resolucao(seed, app_db):
-    import mod_folha, mod_provisoes, mod_contabil
+    from folha import mod_folha
+    import mod_provisoes, mod_contabil
     db = app_db.get_session()
     loja, f, ot, oid = _cria_venda_com_provisao(db, app_db, "PPagExato", 300.0, valor_liquido=10000.0,
                                                 nome_funcao="Consultor Exato")
@@ -365,7 +369,8 @@ def test_pagar_ajuste_pra_cima_manda_o_excedente_pra_conciliacao(seed, app_db):
     5.3.01 fica em 0; o excedente pago sobre o provisionado (500 pago − 300 provisionado = 200)
     vira FALTA na provisão e `resolver_por_ato_nomeado` reverte pra Despesa de Conciliação
     (5.7.01, 'absorver'), nunca mais pra 5.3.01."""
-    import mod_folha, mod_provisoes, mod_contabil, mod_comissao
+    from folha import mod_folha, mod_comissao
+    import mod_provisoes, mod_contabil
     db = app_db.get_session()
     loja, f, ot, oid = _cria_venda_com_provisao(db, app_db, "PPagCima", 300.0, valor_liquido=10000.0,
                                                 nome_funcao="Consultor Cima")
@@ -389,7 +394,8 @@ def test_pagar_ajuste_pra_cima_manda_o_excedente_pra_conciliacao(seed, app_db):
 
 
 def test_pagar_ajuste_pra_baixo_ate_zero_cancela_sem_dre(seed, app_db):
-    import mod_folha, mod_provisoes, mod_contabil, mod_comissao
+    from folha import mod_folha, mod_comissao
+    import mod_provisoes, mod_contabil
     db = app_db.get_session()
     loja, f, ot, oid = _cria_venda_com_provisao(db, app_db, "PPagZero", 300.0, valor_liquido=10000.0,
                                                 login="cons_l1", nome_funcao="Consultor Zero")
@@ -417,7 +423,8 @@ def test_pagar_ajustado_idempotente(seed, app_db):
     """F2-27: idempotência agora observada em 5.7.01 (Despesa de Conciliação, onde o excedente
     pago vai parar — ver test_pagar_ajuste_pra_cima_manda_o_excedente_pra_conciliacao), não mais
     em 5.3.01 (que `mod_folha.pagar` não toca mais)."""
-    import mod_folha, mod_provisoes, mod_contabil, mod_comissao
+    from folha import mod_folha, mod_comissao
+    import mod_provisoes, mod_contabil
     db = app_db.get_session()
     loja, f, ot, oid = _cria_venda_com_provisao(db, app_db, "PPagIdemp", 300.0, valor_liquido=10000.0,
                                                 login="cons_l1", nome_funcao="Consultor Idemp")
@@ -481,7 +488,8 @@ def test_editar_item_limpar_override_volta_ao_sistema(seed, app_db):
 
 
 def test_editar_item_venda_usa_saldo_provisao_como_sistema(seed, app_db):
-    import mod_provisoes, mod_contabil, mod_folha
+    from folha import mod_folha
+    import mod_provisoes, mod_contabil
     from datetime import datetime
     db = app_db.get_session()
     u = db.query(app_db.Usuario).filter_by(login="cons_l1").first()
@@ -566,7 +574,8 @@ def test_comissao_patch_endpoint_limpa_override_com_null_explicito(http_client_f
 
 
 def test_folha_comissoes_base_endpoint_expoe_venda_com_pct(http_client_factory, seed, app_db):
-    import mod_folha, mod_provisoes, mod_contabil
+    from folha import mod_folha
+    import mod_provisoes, mod_contabil
     db = app_db.get_session()
     u = db.query(app_db.Usuario).filter_by(login="cons_l1").first()
     loja = u.loja_id
@@ -602,7 +611,7 @@ def test_folha_comissoes_base_endpoint_expoe_venda_com_pct(http_client_factory, 
 
 
 def test_serialize_folha_inclui_comissoes(seed, app_db):
-    import mod_folha
+    from folha import mod_folha
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
     f = app_db.Funcionario(loja_id=loja, nome="Q", status="ativo"); db.add(f); db.flush()

@@ -1,4 +1,4 @@
-import mod_adiantamento
+from folha import mod_adiantamento
 
 
 # ── Task 1: modelo ───────────────────────────────────────────────────────────
@@ -59,7 +59,8 @@ def test_upsert_oficial_ignora_terceirizado(seed, app_db):
 
 
 def test_gerar_folha_cria_oficial_e_liquido(seed, app_db):
-    import mod_folha, mod_provisoes
+    from folha import mod_folha
+    import mod_provisoes
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
     fn = app_db.Funcao(loja_id=loja, nome="Reg", salario_fixo=2000.0,
@@ -79,7 +80,7 @@ def test_gerar_folha_cria_oficial_e_liquido(seed, app_db):
 
 
 def test_pagar_quita_adiantamentos_da_competencia(seed, app_db):
-    import mod_folha
+    from folha import mod_folha
     db = app_db.get_session()
     loja = db.query(app_db.Usuario).filter_by(login="dir_l2").first().loja_id
     f = app_db.Funcionario(loja_id=loja, nome="P", status="ativo", pix="p@x"); db.add(f); db.flush()

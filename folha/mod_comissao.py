@@ -3,7 +3,7 @@ comissão do executor na folha do mês de conclusão. Base = Σ order_total dos 
 Mapa (projeto inteiro se atribuição = NULL) × % da Função. Itens em comissao_folha, somados na Folha."""
 import json
 
-import mod_folha
+from . import mod_folha
 from database import (ComissaoFolha, Funcao, Funcionario, PoolAmbiente, AtribuicaoAmbiente, Orcamento)
 
 # Etapa operacional → papel do Mapa (só estas geram comissão de papel). A etapa 18 (Assistência

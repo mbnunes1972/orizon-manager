@@ -1,4 +1,4 @@
-import mod_assistencias as ma
+from assistencias import mod_assistencias as ma
 import mod_contabil as mc
 
 

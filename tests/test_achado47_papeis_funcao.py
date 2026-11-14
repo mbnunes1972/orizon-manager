@@ -74,7 +74,7 @@ def test_backfill_papeis_funcoes_padrao_preenche_so_as_correspondentes(app_db, s
 
 
 def test_mod_assistencias_reaproveita_papel_montagem_do_mod_escopo():
-    import mod_assistencias
+    from assistencias import mod_assistencias
     assert mod_assistencias.FUNCOES_ELEGIVEIS == mod_escopo.PAPEL_FUNCOES["montagem"]
     assert mod_assistencias.funcao_elegivel_assistencia("Projetista", ["montagem"]) is True
     assert mod_assistencias.funcao_elegivel_assistencia("Montador", None) is True

@@ -16,7 +16,7 @@ import json
 
 import mod_contabil
 import mod_provisoes
-import mod_adiantamento
+from . import mod_adiantamento
 # mod_cadastro (domínio "cadastro") é dependência declarada de "folha" em modulos.py — a guarda
 # `funcao_e_comissionada` mora lá (opera só em dados de Funcao/cadastro); reexportada aqui pra não
 # quebrar quem já chama mod_folha.funcao_e_comissionada.

@@ -1,5 +1,5 @@
 import mod_cadastro
-import mod_folha
+from folha import mod_folha
 import mod_provisoes
 
 

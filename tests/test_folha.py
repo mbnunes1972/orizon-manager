@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-import mod_folha
+from folha import mod_folha
 import mod_contabil as mc
 import mod_provisoes
 

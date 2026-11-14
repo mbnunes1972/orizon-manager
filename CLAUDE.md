@@ -17,9 +17,12 @@ A maioria dos módulos ainda é `.py` na **raiz**, classificados por domínio em
 `test_arquitetura_modulos`, garante que nenhum fique órfão e que o ratchet de dependência valha). Sete
 domínios já viraram **pacote**: `fiscal/`, `integracoes/`, `auth/`, `chat/` (desde 31/07, com os shims
 `mod_chat.py`/`mod_chat_externo.py` na raiz) e `expedicao/`, `assistencias/`, `folha/` (desde 13/11,
-com shims `mod_*.py` de mesmo nome na raiz) (+ o `mod_fin/` antigo). **Todo shim novo é importado no
-topo do `main.py`** (corrida de import entre threads — `test_shims_sao_importados_no_topo_do_main`)
-e tem que devolver o mesmo objeto do módulo real (`test_shim_e_o_mesmo_objeto_do_modulo_real`). Import de
+já sem shim: importe `from folha import mod_folha`) (+ o `mod_fin/` antigo). Ao empacotar, o padrão é
+**mover deixando shim na raiz e, logo depois, aposentar o shim** trocando os imports pelo pacote.
+Enquanto existir, **todo shim é importado no topo do `main.py`** (corrida de import entre threads —
+`test_shims_sao_importados_no_topo_do_main`), devolve o mesmo objeto do módulo real
+(`test_shim_e_o_mesmo_objeto_do_modulo_real`) e tem teto de usos que só pode baixar
+(`test_shims_so_diminuem` — **nunca** escreva import novo pelo nome do shim). Import de
 fora: `from fiscal import mod_nfe`; entre irmãos, relativo: `from . import mapa_fiscal`. Falta empacotar
 o `comercial` (17 arquivos, ver `modulos.py`) — os 4 módulos da importação de contrato (`mod_contrato`,
 `mod_documentos`, `mod_documentos_import`, `mod_marcadores`) seguem na raiz.

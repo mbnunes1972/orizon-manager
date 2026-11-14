@@ -210,3 +210,45 @@ def test_shim_e_o_mesmo_objeto_do_modulo_real():
         if importlib.import_module(shim) is not importlib.import_module(real):
             diferentes.append(f"{shim} → {real}")
     assert not diferentes, "shim e módulo real são objetos diferentes: " + ", ".join(diferentes)
+
+
+# Teto de imports PELO NOME DO SHIM, por shim. Só pode BAIXAR: import novo pelo nome antigo
+# reprova; quem aposenta usos baixa o número no mesmo commit; shim que chega a zero é apagado e
+# sai daqui. Medido em 13/11/2026, depois de aposentar os shims da Onda A (expedicao, assistencias,
+# folha). Plano de organização, Fase 6 (feita aos pedaços, junto de cada onda).
+TETO_IMPORTS_POR_SHIM = {"mod_chat": 103, "mod_chat_externo": 69}
+
+
+def _usos_pelo_nome_do_shim(shims):
+    """Quantas vezes cada nome de shim aparece num import absoluto, em todo o repositório."""
+    cont = {s: 0 for s in shims}
+    for f in RAIZ.rglob("*.py"):
+        rel = f.relative_to(RAIZ)
+        if rel.parts[0] in (".venv", "venv", "node_modules") or rel.parts[0].startswith("wt-"):
+            continue
+        if len(rel.parts) == 1 and f.stem in cont:
+            continue  # o próprio shim
+        for node in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                for a in node.names:
+                    if a.name in cont:
+                        cont[a.name] += 1
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module in cont:
+                cont[node.module] += 1
+    return cont
+
+
+def test_shims_so_diminuem():
+    """Catraca: o número de imports pelo nome de cada shim só pode cair, até o shim ser apagado."""
+    shims = set(_shims_da_raiz())
+    assert shims == set(TETO_IMPORTS_POR_SHIM), (
+        "TETO_IMPORTS_POR_SHIM desatualizado — shim sem teto: %s; teto sem shim (apague a entrada): %s"
+        % (sorted(shims - set(TETO_IMPORTS_POR_SHIM)), sorted(set(TETO_IMPORTS_POR_SHIM) - shims)))
+    problemas = []
+    for shim, n in sorted(_usos_pelo_nome_do_shim(shims).items()):
+        teto = TETO_IMPORTS_POR_SHIM[shim]
+        if n > teto:
+            problemas.append(f"{shim}: {n} imports > teto {teto} — importe pelo pacote, não pelo shim")
+        elif n < teto:
+            problemas.append(f"{shim}: {n} imports < teto {teto} — baixe o teto para {n} neste commit")
+    assert not problemas, "\n".join(problemas)

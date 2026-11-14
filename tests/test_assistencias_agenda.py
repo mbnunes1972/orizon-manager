@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 import pytest
 
-import mod_assistencias as ma
+from assistencias import mod_assistencias as ma
 from database import (AssistenciaCaso, AssistenciaExecutor, AssistenciaAnexo, CicloEtapa,
                       Contrato, Funcao, Funcionario, Orcamento, OrcamentoAmbiente, PoolAmbiente,
                       Projeto, Usuario)

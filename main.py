@@ -27,15 +27,10 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        AcordoFabrica, AjusteFabrica, AjusteFabricaAplicacao, AcordoMovimento,
                        ContraparteFinanceira, Recebivel, ProvisaoDataPrevista, LogAutorizacao,
                        IntegracaoClickSign, ConciliacaoPeFase, Lead)
-import mod_expedicao
-import mod_assistencias
+from expedicao import mod_expedicao
+from assistencias import mod_assistencias
 import mod_cadastro
-import mod_folha
-# mod_expedicao/mod_assistencias/mod_folha/mod_comissao/mod_adiantamento são shims (pacotes
-# expedicao/, assistencias/, folha/ desde 2026-11-13). mod_comissao e mod_adiantamento entram aqui
-# só para o boot resolver o sys.modules antes do servidor subir — mesma corrida descrita no
-# comentário dos shims do chat, logo abaixo. Trava: test_shims_sao_importados_no_topo_do_main.
-import mod_comissao, mod_adiantamento
+from folha import mod_folha
 import mod_escopo
 # mod_chat/mod_chat_externo são shims de compatibilidade (empacotamento 2026-07-31) que
 # substituem sys.modules[__name__] pelo módulo real de chat/ durante a própria execução —
@@ -632,7 +627,7 @@ def _set_etapa_status(db, nome_safe, codigo, status, responsavel_id):
         etapa.concluido_em = _agora_etapa
         etapa.responsavel_id = responsavel_id
         try:                       # Fase 4: comissão do papel na conclusão da etapa (nunca bloqueia)
-            import mod_comissao
+            from folha import mod_comissao
             db.flush()             # concluido_em disponível
             mod_comissao.preparar_comissao_etapa(db, _loja_id_etapa, etapa)
         except Exception as _e:
@@ -3459,7 +3454,7 @@ class Handler(BaseHTTPRequestHandler):
                 # COM projeto respeitam a MESMA visibilidade da agenda (consultor só vê os seus);
                 # avulsos (sem projeto) entram sempre — ninguém tem "posse" deles.
                 if not setor or setor == "assistencia":
-                    import mod_assistencias as _mass
+                    from assistencias import mod_assistencias as _mass
                     visiveis = {d["nome_safe"] for d in dados}
                     q_casos = db.query(AssistenciaCaso).filter_by(loja_id=loja_id)
                     if proj_filtro:
@@ -3668,7 +3663,7 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-            import mod_comissao
+            from folha import mod_comissao
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -3691,7 +3686,8 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-            import mod_comissao, mod_contabil
+            from folha import mod_comissao
+            import mod_contabil
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -14472,7 +14468,7 @@ class Handler(BaseHTTPRequestHandler):
                             e.concluido_em   = None
                             e.responsavel_id = None
                             try:               # Fase 4: cancela comissão do papel reaberto (se não paga)
-                                import mod_comissao
+                                from folha import mod_comissao
                                 if e.responsavel_funcionario_id:
                                     mod_comissao.cancelar_comissao_etapa(db, e.projeto_nome, e.etapa_codigo,
                                                                          e.responsavel_funcionario_id)
@@ -17822,7 +17818,8 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                import mod_comissao, mod_contabil
+                from folha import mod_comissao
+                import mod_contabil
                 db = get_session()
                 try:
                     ator = _ator_dict(db, usuario)

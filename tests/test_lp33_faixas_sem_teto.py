@@ -16,7 +16,7 @@ Decisão do Marcelo (16/09):
 
 Tarefa 3d, o trio pedido, para os dois lados."""
 import mod_provisoes
-import mod_folha
+from folha import mod_folha
 
 
 def _cfg_com_faixas(*faixas):

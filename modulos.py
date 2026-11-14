@@ -130,23 +130,20 @@ MODULOS = {
     "estoque":     {"camada": "dominio", "depende_de": ["cadastro", "comercial"], "rotulo": "Estoque", "faixa": "expedicao",
                     "arquivos": [], "tabelas": [], "rotas": []},
     "expedicao":   {"camada": "dominio", "depende_de": ["comercial", "estoque", "fiscal"], "rotulo": "Expedição", "faixa": "expedicao",
-                    # PACOTE desde 2026-11-13: o código vive em expedicao/; o mod_expedicao.py
-                    # da raiz é SHIM (sys.modules) — ver test_shim_e_o_mesmo_objeto_do_modulo_real.
-                    "arquivos": ["expedicao", "mod_expedicao.py"],
+                    # PACOTE desde 2026-11-13 (shim da raiz aposentado no mesmo dia).
+                    "arquivos": ["expedicao"],
                     "tabelas": ["ciclo_logistico", "ciclo_logistico_transicao"],
                     "rotas": ["/api/expedicao"]},
     "montagem":    {"camada": "dominio", "depende_de": ["comercial"], "rotulo": "Montagem", "faixa": "montagem",
                     "arquivos": [], "tabelas": [], "rotas": []},
     "folha":       {"camada": "dominio", "depende_de": ["cadastro", "comercial", "financeiro"], "rotulo": "Folha de Pagamento", "faixa": "financeiro",
-                    # PACOTE desde 2026-11-13: o código vive em folha/; os mod_*.py da raiz
-                    # abaixo são SHIMS (sys.modules).
-                    "arquivos": ["folha", "mod_folha.py", "mod_comissao.py", "mod_adiantamento.py"],
+                    # PACOTE desde 2026-11-13 (shims da raiz aposentados no mesmo dia).
+                    "arquivos": ["folha"],
                     "tabelas": ["folha_pagamento", "comissao_folha", "adiantamento_funcionario"],
                     "rotas": ["/api/folha", "/api/comissao", "/api/adiantamentos"]},
     "assistencias":{"camada": "dominio", "depende_de": ["comercial", "montagem", "financeiro"], "rotulo": "Assistências", "faixa": "montagem",
-                    # PACOTE desde 2026-11-13: o código vive em assistencias/; o
-                    # mod_assistencias.py da raiz é SHIM (sys.modules).
-                    "arquivos": ["assistencias", "mod_assistencias.py"],
+                    # PACOTE desde 2026-11-13 (shim da raiz aposentado no mesmo dia).
+                    "arquivos": ["assistencias"],
                     "tabelas": ["assistencia_caso", "assistencia_executores", "assistencia_anexos"],
                     "rotas": ["/api/assistencias"]},
 }

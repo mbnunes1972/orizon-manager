@@ -93,7 +93,7 @@ nenhuma). **100% lacuna**, exatamente como `ARQUITETURA-MODULOS.md` já registra
 dois itens abertos (LP-15/ACHADO-31 parcial, e parte do LP-18) são sintoma direto dessa ausência.
 
 ### Expedição — módulo fino conforme o desenho, mas com uma violação concreta da própria regra
-- **Backend:** `mod_expedicao.py` (pacote `expedicao/` desde 13/11/2026; shim na raiz). Tabelas: `ciclo_logistico`, `ciclo_logistico_transicao`.
+- **Backend:** `mod_expedicao.py` (pacote `expedicao/` desde 13/11/2026). Tabelas: `ciclo_logistico`, `ciclo_logistico_transicao`.
   Rota: `/api/expedicao`.
 - **Frontend:** `page-13`, Kanban.
 - `ARQUITETURA-MODULOS.md` já escreve a regra para este módulo, em letras grandes: "**NÃO PODE**
@@ -114,7 +114,7 @@ dois itens abertos (LP-15/ACHADO-31 parcial, e parte do LP-18) são sintoma dire
   Plano de Contas, Lançamentos, Fluxo de Caixa, DRE, Balanço, Margem/Projeto, Reconciliação,
   Reconc. Provisões, Fila de Provisões, Contas a Pagar, **Folha de Pagamento**.
 - **Desvio papel↔código:** Folha de Pagamento é, no manifesto (`modulos.py`), um **módulo
-  próprio** (`"folha"`, com `mod_folha.py`/`mod_comissao.py`/`mod_adiantamento.py` (pacote `folha/` desde 13/11/2026; shim na raiz), tabelas e
+  próprio** (`"folha"`, com `mod_folha.py`/`mod_comissao.py`/`mod_adiantamento.py` (pacote `folha/` desde 13/11/2026), tabelas e
   rotas dedicadas), não uma sub-parte de Financeiro — mas na sidebar ele é explicitamente
   filtrado da lista de módulos (`m.id !== 'folha'`) e vive só como aba dentro de `page-12`. O
   próprio código comenta o motivo: "Folha = seção do Financeiro". É decisão de apresentação, não
@@ -136,7 +136,7 @@ emprestado do Ciclo e da Comercial/Folha. A Seção 5 mostra o achado que nasce 
 (LP-23).
 
 ### Assistências — código próprio, mas fundido com Montagem na tela
-- **Backend:** `mod_assistencias.py` (pacote `assistencias/` desde 13/11/2026; shim na raiz). Tabelas: `assistencia_caso`, `assistencia_executores`,
+- **Backend:** `mod_assistencias.py` (pacote `assistencias/` desde 13/11/2026). Tabelas: `assistencia_caso`, `assistencia_executores`,
   `assistencia_anexos`. Rota: `/api/assistencias`.
 - **Frontend:** também filtrado da sidebar (`m.id !== 'assistencias'`) e vive como aba dentro de
   `page-18`, junto com Montagem — o próprio código chama isso de "Assistências = ABA do
@@ -179,13 +179,13 @@ módulo".
 | Comercial | 18 arquivos | ~20 tabelas | 5 prefixos declarados (subespecificado) | 3 páginas | o mais rico; absorve "Projetos" |
 | Fiscal | pacote `fiscal/` | 3 tabelas | 3 prefixos (largos demais) | `page-11` | isolado, mas mal delimitado |
 | Estoque | nenhum | nenhuma | nenhuma | não (stub genérico) | só papel, já é dependência de outros |
-| Expedição | `mod_expedicao.py` (pacote `expedicao/` desde 13/11/2026; shim na raiz) | 2 tabelas | 1 prefixo | `page-13` | fino, mas com violação ativa (`_expPoll`) |
+| Expedição | `mod_expedicao.py` (pacote `expedicao/` desde 13/11/2026) | 2 tabelas | 1 prefixo | `page-13` | fino, mas com violação ativa (`_expPoll`) |
 | Financeiro | 9 arquivos | ~14 tabelas | >20 prefixos | `page-12` (12 abas) | o mais rico depois de Comercial |
 | Montagem | nenhum | nenhuma | nenhuma | `page-18` (compartilhada) | tela sem dados próprios |
-| Assistências | `mod_assistencias.py` (pacote `assistencias/` desde 13/11/2026; shim na raiz) | 3 tabelas | 1 prefixo | `page-18` (compartilhada) | dados próprios, tela fundida |
+| Assistências | `mod_assistencias.py` (pacote `assistencias/` desde 13/11/2026) | 3 tabelas | 1 prefixo | `page-18` (compartilhada) | dados próprios, tela fundida |
 | Admin | nenhum (disperso em `main.py`) | usa auth/tenancy | ~15 prefixos soltos | `page-07` (100% JS) | núcleo sem manifesto |
 | Config | nenhum (agrega 5 módulos) | nenhuma própria | usa rotas de outros módulos | `page-09` (7 abas) | câmara de compensação |
-| *(Folha, fora da lista v12 original)* | `mod_folha.py`, `mod_comissao.py`, `mod_adiantamento.py` (pacote `folha/` desde 13/11/2026; shim na raiz) | 3 tabelas | 3 prefixos | aba dentro de `page-12` | módulo real, sem tela própria |
+| *(Folha, fora da lista v12 original)* | `mod_folha.py`, `mod_comissao.py`, `mod_adiantamento.py` (pacote `folha/` desde 13/11/2026) | 3 tabelas | 3 prefixos | aba dentro de `page-12` | módulo real, sem tela própria |
 
 ---
 

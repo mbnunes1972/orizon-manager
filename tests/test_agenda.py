@@ -352,7 +352,7 @@ def test_endpoint_agenda(app_db, seed, http_client_factory):
 def test_endpoint_agenda_inclui_assistencia(app_db, seed, http_client_factory):
     """2026-08-07: caso de Assistência (com projeto e avulso) aparece no /api/agenda, setor
     'assistencia'; filtro server-side por setor funciona; avulso (sem projeto) também entra."""
-    import mod_assistencias as ma
+    from assistencias import mod_assistencias as ma
     nome = seed["projeto_l1"]
     _setup_projeto(app_db, seed)
     db = app_db.get_session()

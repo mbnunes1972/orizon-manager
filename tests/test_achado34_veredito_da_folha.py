@@ -11,10 +11,10 @@ A propriedade central destes aceites: **o livro não muda**. A porta nova
 chegava sozinho; o que entra é a decisão escrita. Por isso os aceites 3 e 4 conferem conta a conta
 contra os mesmos números que `tests/test_comissao.py` já travava antes desta mudança.
 """
-import mod_folha
+from folha import mod_folha
 import mod_provisoes
 import mod_contabil
-import mod_comissao
+from folha import mod_comissao
 from tests.test_comissao import _cria_venda_com_provisao
 
 _PROV = "2.1.04.12"

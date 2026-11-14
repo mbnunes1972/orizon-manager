@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import get_session, CicloEtapa, ComissaoFolha, Funcionario, Projeto, Loja
-import mod_comissao
+from folha import mod_comissao
 
 
 def _executores_da_etapa(db, etapa):

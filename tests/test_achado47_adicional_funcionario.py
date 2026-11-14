@@ -14,8 +14,8 @@ import json
 from datetime import datetime
 
 import mod_cadastro
-import mod_comissao
-import mod_folha
+from folha import mod_comissao
+from folha import mod_folha
 
 
 def test_funcao_e_comissionada_pure():

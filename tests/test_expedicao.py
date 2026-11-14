@@ -1,5 +1,5 @@
 from datetime import date
-import mod_expedicao
+from expedicao import mod_expedicao
 
 
 # ── Lógica pura (mod_expedicao) ──────────────────────────────────────────────
