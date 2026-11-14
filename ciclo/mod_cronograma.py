@@ -95,7 +95,7 @@ def reancorar_pos_entrega(db, projeto_nome, cfg, nova_entrega):
     data e continua acumulando as durações a partir dela mesma, e não da nova entrega, pra manter a
     cadeia coerente com o que já aconteceu de fato. Idempotente. Retorna as CicloEtapa afetadas
     (lista vazia se nada precisou mudar)."""
-    import mod_ciclo
+    from . import mod_ciclo
     durs = {e["codigo"]: e["prazo_dias"] for e in cronograma_padrao(cfg)}
     afetadas = []
     ancora = nova_entrega
@@ -137,7 +137,7 @@ def reordenar_cadeia(db, projeto_nome, cfg):
     a etapa é deixada como está, evita "inventar" uma data sem base. Só cobre etapas PRINCIPAIS
     (`mod_ciclo.ETAPA_NOME`); não mexe em subfases (11a-11e, 17a). Idempotente. Retorna as
     CicloEtapa corrigidas (lista vazia se a cadeia já estava coerente)."""
-    import mod_ciclo
+    from . import mod_ciclo
     durs = {e["codigo"]: e["prazo_dias"] for e in cronograma_padrao(cfg)}
     codigos = mod_ciclo.ordenar_codigos(mod_ciclo.ETAPA_NOME.keys())
     regs = {e.etapa_codigo: e for e in

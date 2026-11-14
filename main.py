@@ -29,13 +29,8 @@ from database import (init_db, get_session, Cliente, Parceiro, Orcamento,
                        IntegracaoClickSign, ConciliacaoPeFase, Lead)
 from expedicao import mod_expedicao
 from assistencias import mod_assistencias
-import mod_cadastro
+from cadastro import mod_cadastro
 from folha import mod_folha
-# mod_cadastro/validacao_doc e mod_ciclo/mod_cronograma/mod_agenda/mod_calendario são shims (pacotes
-# cadastro/ e ciclo/ desde 2026-11-13). Os quatro abaixo só eram importados dentro de handlers;
-# entram aqui para o boot resolver o sys.modules antes do servidor subir — mesma corrida descrita
-# no comentário dos shims do chat, logo abaixo. Sai junto com os shims (aposentadoria da Onda B).
-import validacao_doc, mod_cronograma, mod_agenda, mod_calendario
 import mod_escopo
 # mod_chat/mod_chat_externo são shims de compatibilidade (empacotamento 2026-07-31) que
 # substituem sys.modules[__name__] pelo módulo real de chat/ durante a própria execução —
@@ -72,7 +67,7 @@ from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada,
 from mod_contrato import (calcular_hash_assinatura,
                           gerar_pdf_contrato,
                           construir_contexto, _formatar_valor)
-import mod_ciclo
+from ciclo import mod_ciclo
 import mod_medicao
 from auth import perfis
 from auth import mod_usuarios
@@ -139,7 +134,7 @@ def _enriquecer_projetos_com_fase_ciclo(projetos):
     lista de projetos — fase crítica pedida pelo usuário pra revisão dedicada."""
     if not projetos:
         return
-    import mod_ciclo
+    from ciclo import mod_ciclo
     nomes = [p['nome_safe'] for p in projetos if p.get('nome_safe')]
     if not nomes:
         return
@@ -199,7 +194,7 @@ def _enriquecer_projetos_com_atraso(projetos):
     (mod_cronograma.projeto_em_atraso). Status terminal (perdido/concluido/cancelado) nunca acende;
     "fechado" NÃO é terminal — é o estado de EXECUÇÃO (2ª assinatura → etapa 21), a população-alvo
     do sinal. Chamar DEPOIS de _enriquecer_projetos_com_status (reusa o p['status'] já anotado)."""
-    import mod_cronograma as _mcr
+    from ciclo import mod_cronograma as _mcr
     nomes = [p['nome_safe'] for p in projetos if p.get('nome_safe')]
     if not nomes:
         return
@@ -437,7 +432,7 @@ def _cpf_diverge_do_cadastro(db, projeto_nome, parte, cpf_digitado, usuario_id):
     Usado só no caminho INTERNO (sessão viva, "tela" que pode perguntar) — o gatilho ClickSign
     (usuario_id=None, assinatura já aconteceu fora, na plataforma deles) não tem onde perguntar
     nada; ClickSign tem seu próprio mecanismo de verificação de identidade."""
-    import validacao_doc
+    from cadastro import validacao_doc
     digitado = validacao_doc._digitos(cpf_digitado)
     if not digitado or usuario_id is None:
         return False
@@ -1247,7 +1242,7 @@ def _registrar_assinatura_contrato(db, contrato, parte, nome, cpf, ip_origem, lo
     fora, na plataforma deles)."""
     if any(a.parte == parte for a in contrato.assinaturas):
         return contrato.status
-    import validacao_doc
+    from cadastro import validacao_doc
     _erro_cpf = validacao_doc.erro_doc(cpf, "CPF de %s" % parte, "cpf")
     if _erro_cpf:
         raise ValueError(_erro_cpf)
@@ -1295,7 +1290,7 @@ def _registrar_assinatura_contrato(db, contrato, parte, nome, cpf, ip_origem, lo
         # partir do Cronograma de Projeto Padrão (Config). Fail-soft: não bloqueia a
         # assinatura se algo falhar.
         try:
-            import mod_cronograma
+            from ciclo import mod_cronograma
             _cfg_crono = _cfg_financeira_loja(db, loja_id)
             _d0 = mod_contabil.agora_no_fuso(db, "loja", loja_id)   # ACHADO-48
             mod_cronograma.gerar_cronograma_projeto(db, nome_safe, _cfg_crono, _d0)
@@ -1436,7 +1431,7 @@ def _registrar_assinatura_aprovacao_pe(db, aprov, parte, nome, cpf, ip_origem, u
     razão de _registrar_assinatura_contrato (acima) — precisa de sessão viva pra perguntar."""
     if any(a.parte == parte for a in aprov.assinaturas):
         return aprov.status
-    import validacao_doc
+    from cadastro import validacao_doc
     _erro_cpf = validacao_doc.erro_doc(cpf, "CPF de %s" % parte, "cpf")
     if _erro_cpf:
         raise ValueError(_erro_cpf)
@@ -1498,7 +1493,7 @@ def _registrar_assinatura_solicitacao_medicao(db, sol, parte, nome, cpf, ip_orig
     razão de _registrar_assinatura_contrato (acima) — precisa de sessão viva pra perguntar."""
     if any(a.parte == parte for a in sol.assinaturas):
         return sol.status
-    import validacao_doc
+    from cadastro import validacao_doc
     _erro_cpf = validacao_doc.erro_doc(cpf, "CPF de %s" % parte, "cpf")
     if _erro_cpf:
         raise ValueError(_erro_cpf)
@@ -1570,7 +1565,7 @@ def _registrar_assinatura_aditivo(db, aditivo, parte, nome, cpf, ip_origem, loja
     remota). Se faltar na hora de completar, `ValueError` — mesmo contrato dos irmãos."""
     if any(a.parte == parte for a in aditivo.assinaturas):
         return aditivo.status
-    import validacao_doc
+    from cadastro import validacao_doc
     _erro_cpf = validacao_doc.erro_doc(cpf, "CPF de %s" % parte, "cpf")
     if _erro_cpf:
         raise ValueError(_erro_cpf)
@@ -2203,7 +2198,8 @@ class Handler(BaseHTTPRequestHandler):
             # Cronograma do projeto — por etapa: Prazo Limite (regressivo) / Planejado (progressivo) /
             # Executado. View derivada do Cronograma Padrão + âncoras do projeto (read-only, operacional).
             from urllib.parse import unquote as _unq
-            import mod_cronograma as _mcr, mod_tenancy as _mten
+            from ciclo import mod_cronograma as _mcr
+            import mod_tenancy as _mten
             nome_safe = _unq(m_crono.group(1))
             usuario = get_usuario_sessao(self)
             if not usuario:
@@ -3205,7 +3201,7 @@ class Handler(BaseHTTPRequestHandler):
                              for c in db.query(CicloLogistico)
                                         .filter(CicloLogistico.projeto_nome == nome,
                                                 CicloLogistico.parcela_id != None).all()}  # noqa: E711
-                    import mod_agenda as _mag_er
+                    from ciclo import mod_agenda as _mag_er
                     for p in parcs:
                         ambs = db.query(ParcelaAmbiente).filter_by(parcela_id=p.id).all()
                         card = cards.get(p.id)
@@ -3268,7 +3264,7 @@ class Handler(BaseHTTPRequestHandler):
                                code=400); return
             db = get_session()
             try:
-                import mod_agenda as _mag
+                from ciclo import mod_agenda as _mag
                 ator = _ator_dict(db, usuario)
                 loja_id, _err = mod_tenancy.escopo_operacional(ator)
                 if _err:
@@ -3322,7 +3318,7 @@ class Handler(BaseHTTPRequestHandler):
             proj_filtro = unquote(_q("projeto") or "") or None
             db = get_session()
             try:
-                import mod_agenda as _mag
+                from ciclo import mod_agenda as _mag
                 ator = _ator_dict(db, usuario)
                 loja_id, _err = mod_tenancy.escopo_operacional(ator)
                 if _err:
@@ -3441,7 +3437,7 @@ class Handler(BaseHTTPRequestHandler):
             meus = (_q("meus") or "") in ("1", "true")   # botão "Minha Agenda" (2026-08-24)
             db = get_session()
             try:
-                import mod_agenda as _mag
+                from ciclo import mod_agenda as _mag
                 ator = _ator_dict(db, usuario)
                 loja_id, _err = mod_tenancy.escopo_operacional(ator)
                 if _err:
@@ -4498,7 +4494,7 @@ class Handler(BaseHTTPRequestHandler):
                 _stored = mod_provisoes.normalizar_cronograma_formato(
                     json.loads(loja.config_financeira_json) if loja.config_financeira_json else {})
                 cfg = {**mod_provisoes.config_financeira_default(), **_stored}
-                import mod_cronograma as _mcr_cfg
+                from ciclo import mod_cronograma as _mcr_cfg
                 from datetime import datetime as _dt_cfg
                 _cabe = _mcr_cfg.padrao_cabe_no_prazo_contratual(cfg, _dt_cfg(2026, 1, 5))  # 2026-01-05 = segunda
                 self.send_json({"ok": True, "config": cfg, "padrao_cabe_prazo": _cabe})
@@ -11049,7 +11045,7 @@ class Handler(BaseHTTPRequestHandler):
                 _campo_doc = {"funcionarios": ("cpf", "cpf"), "terceiros": ("cpf", "cpf"),
                              "fornecedores": ("cnpj_cpf", None)}.get(ent)
                 if _campo_doc and _campo_doc[0] in req:
-                    import validacao_doc
+                    from cadastro import validacao_doc
                     _e = validacao_doc.erro_doc(req.get(_campo_doc[0]), "CPF/CNPJ", _campo_doc[1])
                     if _e:
                         self.send_json({"ok": False, "erro": _e}, code=400); return
@@ -11058,7 +11054,7 @@ class Handler(BaseHTTPRequestHandler):
                 # vier preenchido (nem todo Terceiro é MEI). Sem checagem de duplicidade (mesma
                 # assimetria já existente pro Cliente.cnpj, que também não é unique-checado).
                 if ent == "terceiros" and (req.get("cnpj") or "").strip():
-                    import validacao_doc
+                    from cadastro import validacao_doc
                     _e = validacao_doc.erro_doc(req.get("cnpj"), "CNPJ", "cnpj")
                     if _e:
                         self.send_json({"ok": False, "erro": _e}, code=400); return
@@ -11836,7 +11832,7 @@ class Handler(BaseHTTPRequestHandler):
                                 "erro": "Campos obrigatórios faltando: " + ", ".join(faltando)})
                 return
             nome = (req.get("nome") or "").strip()
-            import validacao_doc
+            from cadastro import validacao_doc
             from sqlalchemy.exc import IntegrityError
             for _val, _rot, _tipo in ((req.get("cpf"), "CPF", "cpf"),
                                       (req.get("cnpj"), "CNPJ", "cnpj")):
@@ -12014,7 +12010,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404); return
                 if lead.situacao == "convertido":
                     self.send_json({"ok": False, "erro": "Este lead já foi convertido."}, code=400); return
-                import validacao_doc
+                from cadastro import validacao_doc
                 cpf = (req.get("cpf") or "").strip() or None
                 _e = validacao_doc.erro_doc(cpf, "CPF", "cpf")
                 if _e:
@@ -12217,7 +12213,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not c:
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
-                import validacao_doc
+                from cadastro import validacao_doc
                 for _val, _rot, _tipo in ((req.get("cpf"), "CPF", "cpf"),
                                           (req.get("cnpj"), "CNPJ", "cnpj")):
                     _e = validacao_doc.erro_doc(_val, _rot, _tipo)
@@ -12266,7 +12262,7 @@ class Handler(BaseHTTPRequestHandler):
             if not nome:
                 self.send_json({"ok": False, "erro": "Nome é obrigatório"})
                 return
-            import validacao_doc
+            from cadastro import validacao_doc
             _e = validacao_doc.erro_doc(req.get("cpf_cnpj"), "CPF/CNPJ")
             if _e:
                 self.send_json({"ok": False, "erro": _e}, code=400)
@@ -12323,7 +12319,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não encontrado"}, code=404)
                     return
                 if "cpf_cnpj" in req:
-                    import validacao_doc
+                    from cadastro import validacao_doc
                     _e = validacao_doc.erro_doc(req.get("cpf_cnpj"), "CPF/CNPJ")
                     if _e:
                         self.send_json({"ok": False, "erro": _e}, code=400)
@@ -13081,7 +13077,7 @@ class Handler(BaseHTTPRequestHandler):
             #  - 2 assinaturas: provisão já existia → estorna de fato e trava o projeto PRA SEMPRE
             #    (cancelado_definitivo) — revender = novo projeto, esta negociação morreu.
             import mod_contabil as _mc
-            import mod_ciclo as _mcic
+            from ciclo import mod_ciclo as _mcic
             m_cc = re.match(r"^/api/orcamentos/(\d+)/cancelamento$", path)
             oid = int(m_cc.group(1))
             usuario = get_usuario_sessao(self)
@@ -13218,7 +13214,8 @@ class Handler(BaseHTTPRequestHandler):
             # medição + venda programada e valida a FOLGA do trecho medição→entrega. folga<0 só grava com
             # reautenticação Gerente+ (auditada). Base do monitoramento e do gate da assinatura. ──
             from urllib.parse import unquote as _unq
-            import mod_cronograma as _mcr, mod_tenancy as _mten
+            from ciclo import mod_cronograma as _mcr
+            import mod_tenancy as _mten
             m_de = re.match(r"^/api/projetos/([^/]+)/data-entrega$", path)
             nome_safe = _unq(m_de.group(1))
             usuario = get_usuario_sessao(self)
@@ -14038,7 +14035,7 @@ class Handler(BaseHTTPRequestHandler):
                     if erros:
                         self.send_json({"ok": False, "erro": " ".join(erros)})
                         return
-                    import validacao_doc
+                    from cadastro import validacao_doc
                     _e = validacao_doc.erro_doc(req.get("cpf"), "CPF", "cpf")
                     if _e:
                         self.send_json({"ok": False, "erro": _e}, code=400)
@@ -14107,7 +14104,7 @@ class Handler(BaseHTTPRequestHandler):
                 if erros:
                     self.send_json({"ok": False, "erro": " ".join(erros)})
                     return
-                import validacao_doc
+                from cadastro import validacao_doc
                 _e = validacao_doc.erro_doc(req.get("cnpj"), "CNPJ", "cnpj")
                 if _e:
                     self.send_json({"ok": False, "erro": _e}, code=400)
@@ -14139,7 +14136,7 @@ class Handler(BaseHTTPRequestHandler):
                     if erros:
                         self.send_json({"ok": False, "erro": " ".join(erros)})
                         return
-                    import validacao_doc
+                    from cadastro import validacao_doc
                     _e = validacao_doc.erro_doc(req.get("cnpj"), "CNPJ", "cnpj")
                     if _e:
                         self.send_json({"ok": False, "erro": _e}, code=400)
@@ -15219,7 +15216,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False,
                             "erro": "Defina a data de entrega esperada E a previsão de medição antes de assinar."}, code=400)
                         return
-                    import mod_cronograma as _mcr_sig
+                    from ciclo import mod_cronograma as _mcr_sig
                     _folga_sig = _mcr_sig.folga_medicao_entrega(
                         _cfg_financeira_loja(db, loja_id), _pm.previsao_medicao, _pm.data_entrega)
                     if _folga_sig < 0 and not _pm.folga_autorizada:
@@ -15260,7 +15257,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401)
                     return
                 import mod_contabil as _mc
-                import mod_ciclo as _mcic
+                from ciclo import mod_ciclo as _mcic
                 req = json.loads(body) if body else {}
                 db = get_session()
                 aprovador = None
@@ -18402,7 +18399,7 @@ class Handler(BaseHTTPRequestHandler):
                             "erro": "Sem permissão para atribuir esse perfil."}, code=403)
                         return
                     if "cpf" in req:
-                        import validacao_doc
+                        from cadastro import validacao_doc
                         _e = validacao_doc.erro_doc(req.get("cpf"), "CPF", "cpf")
                         if _e:
                             self.send_json({"ok": False, "erro": _e}, code=400)
@@ -18473,7 +18470,7 @@ class Handler(BaseHTTPRequestHandler):
                             "erro": "Você não pode redefinir a senha de alguém do seu nível "
                                     "ou acima."}, code=403)
                         return
-                    import validacao_doc
+                    from cadastro import validacao_doc
                     # mesmo gerador de mod_cadastro.func_sync_acesso (regra dos irmãos): dígitos
                     # do documento da própria conta, ou token aleatório quando não há.
                     nova = validacao_doc._digitos(alvo.cpf) or secrets.token_urlsafe(16)
@@ -18518,7 +18515,7 @@ class Handler(BaseHTTPRequestHandler):
                             return
                         r.nome = nome
                     if "cnpj" in req:
-                        import validacao_doc
+                        from cadastro import validacao_doc
                         _e = validacao_doc.erro_doc(req.get("cnpj"), "CNPJ", "cnpj")
                         if _e:
                             self.send_json({"ok": False, "erro": _e}, code=400)
@@ -18566,7 +18563,7 @@ class Handler(BaseHTTPRequestHandler):
                             return
                         l.codigo = req["codigo"].strip().upper()
                     if "cnpj" in req:
-                        import validacao_doc
+                        from cadastro import validacao_doc
                         _e = validacao_doc.erro_doc(req.get("cnpj"), "CNPJ", "cnpj")
                         if _e:
                             self.send_json({"ok": False, "erro": _e}, code=400)
@@ -19987,7 +19984,7 @@ def _montagem_itens_enriquecidos(db, ator, loja_id, cfg_agenda, proj_filtro=None
     ambientes da fase com Val_Liq por ambiente (referência da comissão) e o RESPONSÁVEL do
     papel no Mapa (específico do ambiente prevalece sobre projeto-inteiro). Base do GET
     /api/agenda/montagem (com ?papel=) e do aviso de conflito no POST de atribuição."""
-    import mod_agenda as _mag
+    from ciclo import mod_agenda as _mag
     dados = _agenda_dados_projetos(db, ator, loja_id, proj_filtro)
     itens = (_mag.itens_pe(dados, cfg_agenda) if papel == "projeto_executivo"
              else _mag.itens_montagem(dados, cfg_agenda))
@@ -21131,7 +21128,7 @@ def main():
             if _nliq:
                 print(f"[AGENDA] backfill val_liq_congelado: {_nliq} fase(s) preenchida(s)")
             # Agenda pós-Vera (🟡3): cronogramas legados ganham as datas das subfases do PE.
-            import mod_cronograma as _mcr_bf
+            from ciclo import mod_cronograma as _mcr_bf
             _nsf = _mcr_bf.backfill_subfases_pe(_dbp)
             _dbp.commit()
             if _nsf:

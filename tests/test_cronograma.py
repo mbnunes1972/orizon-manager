@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-import mod_cronograma
+from ciclo import mod_cronograma
 import mod_provisoes
 
 

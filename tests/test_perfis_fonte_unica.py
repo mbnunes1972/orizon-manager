@@ -1,6 +1,6 @@
 import json
 from auth import perfis
-import mod_cadastro
+from cadastro import mod_cadastro
 import storage
 
 

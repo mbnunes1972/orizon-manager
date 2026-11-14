@@ -1,4 +1,4 @@
-import mod_cadastro
+from cadastro import mod_cadastro
 
 
 class _F:  # stub simples com os atributos usados

@@ -19,7 +19,7 @@ Saída (marco): {"data": date, "setor", "etapa", "titulo", "projeto", "cliente",
 """
 from datetime import date, datetime
 
-import mod_ciclo
+from . import mod_ciclo
 
 # Setor (Agenda, spec §3) — refinamento DE EXIBIÇÃO de mod_ciclo.FAIXA_POR_ETAPA.
 # 2026-08-07 (pedido do usuário): Financeiro SAIU daqui — a agenda financeira corre separada,
@@ -122,14 +122,14 @@ ITENS_VALOR = [("pe", "Projeto Executivo"),
 
 
 def _dia_seguinte_util(d, cfg):
-    import mod_calendario
+    from . import mod_calendario
     from datetime import timedelta
     return mod_calendario.proximo_dia_util(d + timedelta(days=1), cfg)
 
 
 def _janela_espalhada(valor, inicio, fim, cfg):
     """Espalha `valor` nos dias úteis de [inicio, fim] (fim < inicio → tudo no inicio)."""
-    import mod_calendario
+    from . import mod_calendario
     inicio = mod_calendario.proximo_dia_util(inicio, cfg)
     n = mod_calendario.dias_uteis_entre(inicio, fim, cfg) if fim and fim >= inicio else 1
     return mod_calendario.espalhar(valor, inicio, max(1, n), cfg)
@@ -211,7 +211,7 @@ def cargas(projetos, cfg_agenda=None, de=None, ate=None):
 def itens_montagem(projetos, cfg_agenda=None):
     """[{projeto, cliente, fase, fase_id, inicio, fim, val_liq, realizado, retida}] por fase
     com janela de montagem calculável (sem entrega prevista → fora). Ordenado por início."""
-    import mod_calendario
+    from . import mod_calendario
     cfg = cfg_agenda or {}
     out = []
     for p in (projetos or []):
@@ -246,7 +246,7 @@ def itens_pe(projetos, cfg_agenda=None):
     """Janelas de PROJETO EXECUTIVO por projeto/fase (módulo Operacional, rev 2026-08-03):
     dia útil seguinte ao fim da 10 (Medição) → prevista/realizada da 11. Mesmo formato de
     itens_montagem — alimenta o Gantt/espelho do PE (papel projeto_executivo)."""
-    import mod_calendario
+    from . import mod_calendario
     from datetime import timedelta
     cfg = cfg_agenda or {}
     out = []

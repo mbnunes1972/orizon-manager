@@ -3,7 +3,7 @@
 - Regressivo (limite): ancora na ENTREGA (etapa do cliente) → o Prazo LIMITE de cada etapa.
 - Folga = Regressivo − Progressivo (negativa = não cabe → cronograma próprio + senha)."""
 from datetime import datetime
-import mod_cronograma as mcr
+from ciclo import mod_cronograma as mcr
 
 
 def test_cronogramas_progressivo_regressivo_folga():

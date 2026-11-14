@@ -37,7 +37,7 @@ a captação de lead (os dois hits são "captação de empréstimo", um evento f
 nenhuma). **100% lacuna**, exatamente como `ARQUITETURA-MODULOS.md` já registra.
 
 ### Cadastro — código rico, uma lacuna central
-- **Backend:** `mod_cadastro.py` + `validacao_doc.py` (pacote `cadastro/` desde 13/11/2026; shims na raiz). Tabelas: `clientes`, `parceiros`,
+- **Backend:** `mod_cadastro.py` + `validacao_doc.py` (pacote `cadastro/` desde 13/11/2026). Tabelas: `clientes`, `parceiros`,
   `funcionarios`, `fornecedores`, `terceiros`, `funcoes`. Rotas: `/api/clientes`,
   `/api/parceiros`, `/api/funcionarios`, `/api/fornecedores`, `/api/terceiros`, `/api/funcoes`.
 - **Frontend:** container `id="page-10"`, com abas roteadas por `cadTab()`/`cadIr()` — Clientes,
@@ -175,7 +175,7 @@ módulo".
 | Módulo (papel v12) | Backend (arquivos) | Tabelas próprias | Rota(s) | Tela própria | Situação |
 |---|---|---|---|---|---|
 | Captação | nenhum | nenhuma | nenhuma | não (stub genérico) | só papel |
-| Cadastro | `mod_cadastro.py`, `validacao_doc.py` (pacote `cadastro/` desde 13/11/2026; shims na raiz) | 6 tabelas | 6 prefixos | `page-10` | rico, 1 lacuna (catálogo) |
+| Cadastro | `mod_cadastro.py`, `validacao_doc.py` (pacote `cadastro/` desde 13/11/2026) | 6 tabelas | 6 prefixos | `page-10` | rico, 1 lacuna (catálogo) |
 | Comercial | 18 arquivos | ~20 tabelas | 5 prefixos declarados (subespecificado) | 3 páginas | o mais rico; absorve "Projetos" |
 | Fiscal | pacote `fiscal/` | 3 tabelas | 3 prefixos (largos demais) | `page-11` | isolado, mas mal delimitado |
 | Estoque | nenhum | nenhuma | nenhuma | não (stub genérico) | só papel, já é dependência de outros |

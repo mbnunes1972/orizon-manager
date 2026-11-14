@@ -393,7 +393,8 @@ def test_11d_reprovar_marca_status_e_notifica(http_client_factory, seed, app_db)
     db = app_db.get_session()
     et = db.query(app_db.CicloEtapa).filter_by(projeto_nome=nome, etapa_codigo="11d").first()
     assert et is not None and et.status == "reprovado"
-    assert et.status not in __import__("mod_ciclo").STATUS_CONCLUSIVOS   # não satisfaz gate nenhum
+    from ciclo import mod_ciclo
+    assert et.status not in mod_ciclo.STATUS_CONCLUSIVOS   # não satisfaz gate nenhum
     log = db.query(app_db.LogAcaoGerencial).filter_by(
         projeto_nome=nome, acao="pe_11d_reprovar").first()
     assert log is not None and "Valor do Complemento" in log.contexto

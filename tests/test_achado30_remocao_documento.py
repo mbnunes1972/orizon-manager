@@ -56,7 +56,8 @@ def test_aceite2_documento_removido_nao_satisfaz_o_portao_da_etapa_12(seed, app_
     etapas operacionais (`guarda_conclusao_operacional`). Prova em duas metades, de propósito:
     a consulta CRUA continua enxergando o documento removido — é assim que o defeito voltaria —
     e a porta única (`_docs_vivos`), que é quem o portão usa, não enxerga."""
-    import main, mod_ciclo
+    from ciclo import mod_ciclo
+    import main
     proj = seed["projeto_l2"]
     tipo12 = mod_ciclo.tipo_doc_operacional("12")
     db = app_db.get_session()

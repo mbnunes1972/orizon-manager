@@ -20,7 +20,7 @@ from . import mod_adiantamento
 # mod_cadastro (domínio "cadastro") é dependência declarada de "folha" em modulos.py — a guarda
 # `funcao_e_comissionada` mora lá (opera só em dados de Funcao/cadastro); reexportada aqui pra não
 # quebrar quem já chama mod_folha.funcao_e_comissionada.
-from mod_cadastro import funcao_e_comissionada
+from cadastro.mod_cadastro import funcao_e_comissionada
 from database import (Funcionario, Funcao, Projeto, Orcamento, FolhaPagamento, ComissaoFolha,
                       AdiantamentoFuncionario)
 

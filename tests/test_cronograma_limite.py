@@ -2,7 +2,7 @@
 etapa) + `prazo_excede_limite` (base do step-up quando o desmembramento excede o limite) +
 `garantir_cronograma` (todo projeto deve ter cronograma — cria do padrão se faltar)."""
 from datetime import datetime
-import mod_cronograma as mcr
+from ciclo import mod_cronograma as mcr
 
 
 def test_prazo_excede_limite():

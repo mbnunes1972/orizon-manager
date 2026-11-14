@@ -253,7 +253,7 @@ def test_fluxo_terminal_conciliacao_final_pela_fila(page, servidor_e2e):
     # "ambas as partes confirmaram", sem passar por um "loja confirmada" intermediário.
     page.wait_for_selector("text=Contrato assinado", timeout=10000)
 
-    import mod_ciclo
+    from ciclo import mod_ciclo
     import database
 
     # ── 7. Medição (puro "marcar feito", nunca objeto de achado): atalho direto no banco —

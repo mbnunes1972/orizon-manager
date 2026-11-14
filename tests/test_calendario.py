@@ -6,7 +6,7 @@ Default: seg–sex úteis, sem feriados. `espalhar` reparte um valor em N dias �
 fatia absorvendo o resíduo (Σ exata ao centavo — padrão da casa)."""
 from datetime import date
 
-import mod_calendario as cal
+from ciclo import mod_calendario as cal
 
 # 2026-08-03 = segunda; 2026-08-08 = sábado; 2026-08-09 = domingo
 SEG, TER, SEX = date(2026, 8, 3), date(2026, 8, 4), date(2026, 8, 7)

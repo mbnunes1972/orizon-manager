@@ -13,7 +13,7 @@ Executivo E Medição) se paga por Adicional, não por uma 2ª função.
 import json
 from datetime import datetime
 
-import mod_cadastro
+from cadastro import mod_cadastro
 from folha import mod_comissao
 from folha import mod_folha
 

@@ -9,7 +9,7 @@ recebeu a transferência (ponte Usuário↔Funcionário); (6) válvula de emerg�
 'autorizar' (master/gerencial) + motivo obrigatório + LogAcaoGerencial."""
 import json
 
-import mod_ciclo
+from ciclo import mod_ciclo
 
 
 def _login(f, who):

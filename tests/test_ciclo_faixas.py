@@ -1,6 +1,6 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-import mod_ciclo as mc
+from ciclo import mod_ciclo as mc
 
 
 def test_faixa_por_etapa_cobre_principais():

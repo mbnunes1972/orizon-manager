@@ -5,7 +5,7 @@ demanda pelo endpoint. Três blocos:
   - **carteira** por status (projetos em aberto: quente/morno/frio);
   - **volume** contratado (contratos assinados × valor do orçamento contratado) + ticket médio.
 """
-import mod_ciclo
+from ciclo import mod_ciclo
 from database import Projeto, Orcamento, Contrato, CicloEtapa
 
 _ETAPA_ORCAMENTO = "4"   # Orçamento aprovado (marco do funil)

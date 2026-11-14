@@ -1,4 +1,4 @@
-import mod_cadastro
+from cadastro import mod_cadastro
 
 
 def test_func_sync_acesso_herda_funcao_e_senha_provisoria(app_db):

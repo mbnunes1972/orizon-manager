@@ -9,7 +9,7 @@ atribuicoes_json vazio — nunca sobrescreve o que o cadastro já editou."""
 import json
 
 import database
-import mod_cadastro
+from cadastro import mod_cadastro
 import mod_escopo
 
 

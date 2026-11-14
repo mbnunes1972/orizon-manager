@@ -6,7 +6,7 @@
 - POST /atribuicoes: LOTE (pool_ambiente_ids), notificação via Orizon Chat e aviso de conflito."""
 from datetime import date, datetime
 
-import mod_agenda
+from ciclo import mod_agenda
 from database import (AtribuicaoAmbiente, CicloEtapa, Contrato, ConversaMensagem, Funcao,
                       Funcionario, Orcamento, OrcamentoAmbiente, PoolAmbiente, Projeto, Usuario)
 

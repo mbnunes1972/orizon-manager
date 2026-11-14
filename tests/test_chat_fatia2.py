@@ -47,7 +47,8 @@ def _mk_etapa(db, app_db, nome, codigo, status="pendente"):
 def test_bloqueador_grava_flag_e_nao_trava_pode_avancar(app_db, seed):
     """Continua chamando mod_chat.enviar_mensagem direto (a função em si não mudou) — só não
     passa mais pelo endpoint HTTP do Chat, que foi removido."""
-    import mod_chat, mod_ciclo
+    from ciclo import mod_ciclo
+    import mod_chat
     db = app_db.get_session()
     _mk_etapa(db, app_db, "Proj_L1", "2", status="concluido")
     _mk_etapa(db, app_db, "Proj_L1", "3", status="pendente")

@@ -1,5 +1,5 @@
 import seed as seed_mod
-import mod_cadastro
+from cadastro import mod_cadastro
 
 
 def test_criar_funcoes_seed_idempotente_por_loja(app_db, seed):

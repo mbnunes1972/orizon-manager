@@ -1,6 +1,6 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-import validacao_doc as vd
+from cadastro import validacao_doc as vd
 
 
 def test_cpf_valido():

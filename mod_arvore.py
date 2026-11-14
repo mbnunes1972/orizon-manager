@@ -7,7 +7,7 @@ mod_tenancy.pode_ver_loja. Erros viram exceções que a rota traduz em HTTP:
   PermissionError -> 403   |   LookupError -> 404
 """
 
-import mod_ciclo
+from ciclo import mod_ciclo
 import mod_tenancy
 from database import Loja, Projeto, CicloEtapa
 

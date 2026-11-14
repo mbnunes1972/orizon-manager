@@ -27,7 +27,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import get_session, Usuario   # noqa: E402
 from auth.auth import trocar_senha          # noqa: E402
-import validacao_doc                        # noqa: E402
+from cadastro import validacao_doc                        # noqa: E402
 
 
 def main():

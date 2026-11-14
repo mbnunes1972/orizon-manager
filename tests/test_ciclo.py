@@ -1,4 +1,4 @@
-import mod_ciclo as mc
+from ciclo import mod_ciclo as mc
 
 
 def test_etapa_anterior():

@@ -303,7 +303,7 @@ def test_termo_aditivo_11e_oferece_as_duas_opcoes_de_canal(page, servidor_e2e, c
     assinatura.get_by_role("button", name="Confirmar", exact=True).click()
     page.wait_for_selector("text=Contrato assinado", timeout=10000)
 
-    import mod_ciclo
+    from ciclo import mod_ciclo
     import database
 
     def _marcar_concluido(cod):

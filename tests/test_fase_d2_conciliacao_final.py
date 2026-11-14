@@ -10,7 +10,7 @@ veredito — ACHADO-01). Idempotente por ref."""
 import pytest
 
 import mod_contabil as mc
-import mod_ciclo
+from ciclo import mod_ciclo
 
 
 def _s(db, ot, oid, cod):

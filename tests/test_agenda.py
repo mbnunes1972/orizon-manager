@@ -4,7 +4,7 @@ do PE no cronograma e o endpoint agregador GET /api/agenda.
 Spec: docs/superpowers/specs/agenda/2026-08-03-agenda-da-loja-design.md §3/§9/§10."""
 from datetime import date, datetime
 
-import mod_agenda
+from ciclo import mod_agenda
 from database import CicloEtapa, Contrato, OrcamentoAmbiente, ParcelaAmbiente, ParcelaProjeto, \
     PoolAmbiente, Projeto
 
@@ -225,7 +225,8 @@ def test_capacidade_vazia_sem_cargas():
 # ── offsets default das subfases do PE no cronograma ─────────────────────────────
 
 def test_cronograma_data_subfases_do_pe(app_db, seed):
-    import mod_cronograma, mod_provisoes
+    from ciclo import mod_cronograma
+    import mod_provisoes
     nome = seed["projeto_l1"]
     cfg = mod_provisoes.config_financeira_default()   # etapa 11: prazo 10 dias
     db = app_db.get_session()
@@ -259,7 +260,7 @@ def test_cronograma_data_subfases_do_pe(app_db, seed):
 
 
 def test_backfill_subfases_pe_em_cronograma_legado(app_db, seed):
-    import mod_cronograma
+    from ciclo import mod_cronograma
     nome = seed["projeto_l2"]          # projeto sem interferência dos outros testes
     db = app_db.get_session()
     try:
