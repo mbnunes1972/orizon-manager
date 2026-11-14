@@ -31,6 +31,11 @@ from expedicao import mod_expedicao
 from assistencias import mod_assistencias
 import mod_cadastro
 from folha import mod_folha
+# mod_cadastro/validacao_doc e mod_ciclo/mod_cronograma/mod_agenda/mod_calendario são shims (pacotes
+# cadastro/ e ciclo/ desde 2026-11-13). Os quatro abaixo só eram importados dentro de handlers;
+# entram aqui para o boot resolver o sys.modules antes do servidor subir — mesma corrida descrita
+# no comentário dos shims do chat, logo abaixo. Sai junto com os shims (aposentadoria da Onda B).
+import validacao_doc, mod_cronograma, mod_agenda, mod_calendario
 import mod_escopo
 # mod_chat/mod_chat_externo são shims de compatibilidade (empacotamento 2026-07-31) que
 # substituem sys.modules[__name__] pelo módulo real de chat/ durante a própria execução —

@@ -14,10 +14,12 @@ Sistema de vendas de móveis planejados (loja Dalmóbile). **Backend** Python pu
 
 ## Layout do código (reorganização 2026-07-15, EM ANDAMENTO)
 A maioria dos módulos ainda é `.py` na **raiz**, classificados por domínio em `modulos.py` (um teste,
-`test_arquitetura_modulos`, garante que nenhum fique órfão e que o ratchet de dependência valha). Sete
-domínios já viraram **pacote**: `fiscal/`, `integracoes/`, `auth/`, `chat/` (desde 31/07, com os shims
-`mod_chat.py`/`mod_chat_externo.py` na raiz) e `expedicao/`, `assistencias/`, `folha/` (desde 13/11,
-já sem shim: importe `from folha import mod_folha`) (+ o `mod_fin/` antigo). Ao empacotar, o padrão é
+`test_arquitetura_modulos`, garante que nenhum fique órfão e que o ratchet de dependência valha). Nove
+módulos já viraram **pacote**: `fiscal/`, `integracoes/`, `auth/`, `chat/` (desde 31/07, com os shims
+`mod_chat.py`/`mod_chat_externo.py` na raiz), `expedicao/`, `assistencias/`, `folha/` (desde 13/11,
+já sem shim: importe `from folha import mod_folha`) e `cadastro/`, `ciclo/` (desde 13/11, **ainda com
+shims** `mod_cadastro`/`validacao_doc`/`mod_ciclo`/`mod_cronograma`/`mod_agenda`/`mod_calendario` na
+raiz — em código novo, importe já pelo pacote) (+ o `mod_fin/` antigo). Ao empacotar, o padrão é
 **mover deixando shim na raiz e, logo depois, aposentar o shim** trocando os imports pelo pacote.
 Enquanto existir, **todo shim é importado no topo do `main.py`** (corrida de import entre threads —
 `test_shims_sao_importados_no_topo_do_main`), devolve o mesmo objeto do módulo real

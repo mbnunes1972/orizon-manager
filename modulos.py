@@ -21,7 +21,9 @@ MODULOS = {
                     "arquivos": [],
                     "tabelas": ["log_autorizacoes", "log_acoes_gerenciais", "log_acesso_delegado"], "rotas": []},
     "ciclo":       {"camada": "nucleo", "depende_de": [],
-                    "arquivos": ["mod_ciclo.py", "mod_cronograma.py", "mod_calendario.py",
+                    # PACOTE desde 2026-11-13: o código vive em ciclo/; os mod_*.py da raiz
+                    # abaixo são SHIMS (sys.modules), até a aposentadoria da Onda B.
+                    "arquivos": ["ciclo", "mod_ciclo.py", "mod_cronograma.py", "mod_calendario.py",
                                  "mod_agenda.py"],
                     "tabelas": ["ciclo_etapas", "ciclo_documentos", "ciclo_revisoes"], "rotas": []},
     "integracoes": {"camada": "nucleo", "depende_de": [],
@@ -63,7 +65,9 @@ MODULOS = {
                     # (ver LISTA_PARALELA.md § FRONTEIRA / 6.7) — por isso `arquivos` segue vazio.
                     "arquivos": [], "tabelas": ["leads"], "rotas": ["/api/leads"]},
     "cadastro":    {"camada": "dominio", "depende_de": [], "rotulo": "Cadastro", "faixa": "vendas",
-                    "arquivos": ["validacao_doc.py", "mod_cadastro.py"],
+                    # PACOTE desde 2026-11-13: o código vive em cadastro/; os .py da raiz abaixo
+                    # são SHIMS (sys.modules), até a aposentadoria da Onda B.
+                    "arquivos": ["cadastro", "validacao_doc.py", "mod_cadastro.py"],
                     "tabelas": ["clientes", "parceiros", "funcionarios", "fornecedores", "terceiros", "funcoes"],
                     "rotas": ["/api/clientes", "/api/parceiros", "/api/funcionarios",
                               "/api/fornecedores", "/api/terceiros", "/api/funcoes"]},
