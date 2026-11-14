@@ -97,7 +97,7 @@ def normalizar(path: str) -> str:
     if ext not in EXTENSOES_OFFICE:
         raise FormatoNaoSuportado(f"Formato não suportado: {ext or '(sem extensão)'}")
 
-    from mod_contrato import _libreoffice_cmd, LibreOfficeIndisponivel
+    from .mod_contrato import _libreoffice_cmd, LibreOfficeIndisponivel
     outdir = tempfile.mkdtemp(prefix="orizon_import_")
     try:
         try:

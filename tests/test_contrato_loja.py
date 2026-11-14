@@ -20,18 +20,18 @@ def _loja_completa():
 
 
 def test_validar_loja_completa():
-    from mod_contrato import validar_loja_para_contrato
+    from comercial.mod_contrato import validar_loja_para_contrato
     assert validar_loja_para_contrato(_loja_completa()) == []
 
 
 def test_validar_loja_complemento_opcional():
-    from mod_contrato import validar_loja_para_contrato
+    from comercial.mod_contrato import validar_loja_para_contrato
     loja = _loja_completa(); loja["complemento"] = ""
     assert validar_loja_para_contrato(loja) == []
 
 
 def test_validar_loja_cpf_placeholder_conta_como_faltando():
-    from mod_contrato import validar_loja_para_contrato
+    from comercial.mod_contrato import validar_loja_para_contrato
     loja = _loja_completa()
     loja["testemunha1_cpf"] = "xxx.xxx.xxx-xx"
     loja["testemunha2_cpf"] = "yyy.yyy.yyy-yy"
@@ -41,7 +41,7 @@ def test_validar_loja_cpf_placeholder_conta_como_faltando():
 
 
 def test_validar_loja_telefone_email_endereco_obrigatorios():
-    from mod_contrato import validar_loja_para_contrato
+    from comercial.mod_contrato import validar_loja_para_contrato
     loja = _loja_completa()
     for c in ("telefone", "email", "cep", "logradouro", "numero", "bairro", "cidade", "estado"):
         loja[c] = ""
@@ -51,7 +51,7 @@ def test_validar_loja_telefone_email_endereco_obrigatorios():
 
 
 def test_validar_loja_vazia_acusa_tudo():
-    from mod_contrato import validar_loja_para_contrato
+    from comercial.mod_contrato import validar_loja_para_contrato
     assert len(validar_loja_para_contrato({})) >= 13
 
 

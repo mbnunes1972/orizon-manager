@@ -64,14 +64,9 @@ from integracoes.projetos_store import (
 )
 from comercial.mod_margens import _normalizar_faixas
 from mod_fin import calcular_aymore, calcular_cartao, calcular_venda_programada, calcular_total_flex
-from mod_contrato import (calcular_hash_assinatura,
+from comercial.mod_contrato import (calcular_hash_assinatura,
                           gerar_pdf_contrato,
                           construir_contexto, _formatar_valor)
-# mod_documentos e mod_clicksign ainda são shims (pacote comercial/ desde 2026-11-14) e só eram
-# importados dentro de handlers; entram aqui para o boot resolver o sys.modules antes do servidor
-# subir (mesma corrida descrita no comentário dos shims do chat). Saem com a 2ª parte da
-# aposentadoria da Fase 4 (mod_contrato, mod_documentos, mod_clicksign).
-import mod_documentos, mod_clicksign
 from ciclo import mod_ciclo
 from comercial import mod_medicao
 from auth import perfis
@@ -1441,7 +1436,7 @@ def _registrar_assinatura_aprovacao_pe(db, aprov, parte, nome, cpf, ip_origem, u
     _erro_cpf = validacao_doc.erro_doc(cpf, "CPF de %s" % parte, "cpf")
     if _erro_cpf:
         raise ValueError(_erro_cpf)
-    from mod_contrato import calcular_hash_assinatura as _cha2
+    from comercial.mod_contrato import calcular_hash_assinatura as _cha2
     ts = datetime.utcnow().isoformat()
     aprov.assinaturas.append(AprovacaoPEAssinatura(
         parte=parte, nome=nome, cpf=cpf, ip_origem=ip_origem,
@@ -1503,7 +1498,7 @@ def _registrar_assinatura_solicitacao_medicao(db, sol, parte, nome, cpf, ip_orig
     _erro_cpf = validacao_doc.erro_doc(cpf, "CPF de %s" % parte, "cpf")
     if _erro_cpf:
         raise ValueError(_erro_cpf)
-    from mod_contrato import calcular_hash_assinatura as _cha3
+    from comercial.mod_contrato import calcular_hash_assinatura as _cha3
     ts = datetime.utcnow().isoformat()
     sol.assinaturas.append(SolicitacaoMedicaoAssinatura(
         parte=parte, nome=nome, cpf=cpf, ip_origem=ip_origem,
@@ -1593,7 +1588,7 @@ def _registrar_assinatura_aditivo(db, aditivo, parte, nome, cpf, ip_origem, loja
                                       mod_contabil.hoje_no_fuso(db, "loja", loja_id), "check"):
                 raise ValueError("O plano de pagamento do aditivo não gera nenhum recebível — "
                                  "informe entrada e/ou parcelas antes de concluir a assinatura.")
-    from mod_contrato import calcular_hash_assinatura as _cha4
+    from comercial.mod_contrato import calcular_hash_assinatura as _cha4
     ts = datetime.utcnow().isoformat()
     aditivo.assinaturas.append(AditivoAssinatura(
         parte=parte, nome=nome, cpf=cpf, ip_origem=ip_origem,
@@ -4883,7 +4878,7 @@ class Handler(BaseHTTPRequestHandler):
                                    "telefone": _get_usuario_telefone(usuario["id"], db),
                                    "email": usuario.get("email", "") or ""}
                     # Proposta = PRIMEIRA PÁGINA do contrato (capa) via WeasyPrint, numerada com 'PV...'.
-                    from mod_contrato import (construir_contexto as _cc,
+                    from comercial.mod_contrato import (construir_contexto as _cc,
                                               gerar_num_proposta as _gnp, gerar_pdf_proposta as _gpp)
                     ctx = _cc(cliente_dict, usuario_ctx, orc.forma_pagamento or "", loja_dict)
                     ctx["_ambientes"] = _ambientes_valor_para_contrato(oid, db)
@@ -5289,7 +5284,7 @@ class Handler(BaseHTTPRequestHandler):
                     formato = (_pq_exp(urlparse(self.path).query).get('formato') or ['txt'])[0]
                     if formato == "pdf":
                         from weasyprint import HTML as _WeasyHTML
-                        from mod_contrato import PDF_LOCK as _PDF_LOCK
+                        from comercial.mod_contrato import PDF_LOCK as _PDF_LOCK
                         with _PDF_LOCK:
                             data = _WeasyHTML(string=mod_chat.exportar_conversa_html(db, conv)).write_pdf()
                         self.send_response(200)
@@ -6276,7 +6271,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False, "erro": "Negocie o complemento antes de gerar "
                                         "o termo aditivo (11e → Negociar Complemento)."},
                                        code=400); return
-                    import mod_contrato as _mc
+                    from comercial import mod_contrato as _mc
                     try:
                         defaults, calc = _aditivo_defaults_blocos(db, nome_safe, contrato, orc_aj)
                     except ContratoComplementoAutoReferente as e:
@@ -6483,7 +6478,7 @@ class Handler(BaseHTTPRequestHandler):
                     arquivo_tipo = ""
                     if tem_arquivo:
                         arquivo_tipo = "pdf" if _pdf_ok.endswith(".pdf") else "docx"
-                    import mod_contrato as _mod_contrato
+                    from comercial import mod_contrato as _mod_contrato
                     _orc_src = db.get(Orcamento, contrato.orcamento_id)
                     _desatualizado = _mod_contrato.contrato_desatualizado(
                         contrato.pagamento_json,
@@ -6881,7 +6876,7 @@ class Handler(BaseHTTPRequestHandler):
                     ator = _ator_dict(db, usuario)
                     if not mod_tenancy.pode_ver_loja(ator, {"id": loja.id, "rede_id": loja.rede_id}):
                         self.send_response(404); self.end_headers(); return
-                    import mod_contrato as _mc
+                    from comercial import mod_contrato as _mc
                     caminho = os.path.join(_mc.LOGOS_LOJA_DIR, str(loja.id), loja.logo_arquivo)
                     alvo = os.path.realpath(caminho)
                     base = os.path.realpath(os.path.join(_mc.LOGOS_LOJA_DIR, str(loja.id)))
@@ -6938,7 +6933,7 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                import mod_documentos as _mdoc
+                from comercial import mod_documentos as _mdoc
                 db = get_session()
                 try:
                     ator = _ator_dict(db, usuario)
@@ -6959,7 +6954,7 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                import mod_documentos as _mdoc
+                from comercial import mod_documentos as _mdoc
                 db = get_session()
                 try:
                     ator = _ator_dict(db, usuario)
@@ -6982,7 +6977,7 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                import mod_documentos as _mdoc
+                from comercial import mod_documentos as _mdoc
                 self.send_json({"ok": True, "tipos": _mdoc.tipos_com_padrao()})
                 return
 
@@ -7068,7 +7063,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": True}, code=200); return
                 reconciliar = reg.reconciliar
                 loja_obj = db.get(Loja, doc.loja_id) if doc.loja_id else None
-                import mod_clicksign
+                from comercial import mod_clicksign
                 cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
                 if cfg is None or not cfg.webhook_secret_enc:
                     self.send_json({"ok": True}, code=200); return
@@ -7107,7 +7102,7 @@ class Handler(BaseHTTPRequestHandler):
             recebido = self.headers.get("X-Internal-Job-Token", "")
             if recebido != job_token:
                 self.send_json({"ok": False, "erro": "Token inválido"}, code=403); return
-            import mod_clicksign
+            from comercial import mod_clicksign
             carencia_min = 10
             limite = datetime.utcnow() - timedelta(minutes=carencia_min)
             contratos_verificados = 0
@@ -7269,7 +7264,7 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-            import mod_documentos as _mdoc
+            from comercial import mod_documentos as _mdoc
             db = get_session()
             try:
                 ator = _ator_dict(db, usuario)
@@ -7308,7 +7303,7 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-            import mod_documentos as _mdoc
+            from comercial import mod_documentos as _mdoc
             from comercial import mod_marcadores as _mmarc
             db = get_session()
             try:
@@ -7338,7 +7333,7 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-            import mod_documentos as _mdoc
+            from comercial import mod_documentos as _mdoc
             from comercial import mod_documentos_import as _mdocimp
             from comercial import mod_marcadores as _mmarc
             db = get_session()
@@ -7398,8 +7393,8 @@ class Handler(BaseHTTPRequestHandler):
                 req = json.loads(body) if body else {}
                 corpo_md = req.get("corpo_md") or ""
                 tipo_prev = (req.get("tipo") or "contrato").strip()
-                import mod_documentos as _mdoc
-                import mod_contrato as _mc
+                from comercial import mod_documentos as _mdoc
+                from comercial import mod_contrato as _mc
                 if not _mdoc.tipo_existe(db, loja_id, tipo_prev):
                     self.send_json({"ok": False, "erro": "tipo inválido: %r" % (tipo_prev,)},
                                    code=400); return
@@ -7434,7 +7429,7 @@ class Handler(BaseHTTPRequestHandler):
                 # o que — pela regra de escopo do Python — torna o nome LOCAL a do_POST inteiro
                 # e quebra a referência ao global aqui em cima com UnboundLocalError. Confirmado
                 # por execução (pytest), não por leitura.
-                from mod_contrato import construir_contexto
+                from comercial.mod_contrato import construir_contexto
                 ctx = construir_contexto(cliente_exemplo, usuario_ctx, "", loja_dict)
                 ctx["num_contrato"] = "EXEMPLO"
                 ctx["_ambientes"] = [("Ambiente de exemplo", 15000.0)]
@@ -7507,7 +7502,7 @@ class Handler(BaseHTTPRequestHandler):
             usuario = get_usuario_sessao(self)
             if not usuario:
                 self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-            import mod_documentos as _mdoc
+            from comercial import mod_documentos as _mdoc
             from comercial import mod_marcadores as _mmarc
             db = get_session()
             try:
@@ -10022,8 +10017,8 @@ class Handler(BaseHTTPRequestHandler):
                     aditivo.clicksign_envelope_id = None
                     aditivo.clicksign_signatarios_json = None
                     aditivo.clicksign_enviado_em = None
-                import mod_documentos as _mdoc
-                import mod_contrato as _mc
+                from comercial import mod_documentos as _mdoc
+                from comercial import mod_contrato as _mc
                 # corpo do modelo: versão CONGELADA do aditivo aberto; senão o ativo da loja;
                 # sem ativo, SEED do modelo jurídico padrão (contrato_template/termo_aditivo.md)
                 mv_ativa = None
@@ -10053,7 +10048,7 @@ class Handler(BaseHTTPRequestHandler):
                     db.add(aditivo); db.flush()
                 if not preview and aditivo.modelo_versao_id is None:   # congela na 1ª geração
                     aditivo.modelo_versao_id = mv_ativa.id
-                from mod_contrato import _formatar_valor as _fv
+                from comercial.mod_contrato import _formatar_valor as _fv
                 calc = _aditivo_dados_calculo(db, nome, contrato, orc_aj)
                 linhas_amb = calc["linhas_amb"]
                 tot_orig, tot_novo, dif = (calc["tot_orig_marc"], calc["tot_novo_marc"],
@@ -10083,7 +10078,7 @@ class Handler(BaseHTTPRequestHandler):
                          "ordinal": n_ord, "blocos": blocos,
                          "forma_pagamento_snapshot": _fp_snapshot}
                 if not preview and not aditivo.num_aditivo:
-                    from mod_contrato import gerar_num_contrato as _gnc
+                    from comercial.mod_contrato import gerar_num_contrato as _gnc
                     _existing = [x.num_aditivo for x in db.query(Aditivo)
                                  .filter(Aditivo.num_aditivo.isnot(None)).all()]
                     aditivo.num_aditivo = _gnc(_existing, "", prefixo="TA")
@@ -10093,8 +10088,8 @@ class Handler(BaseHTTPRequestHandler):
                 usuario_ctx = {"nome": usuario.get("nome", ""),
                                "telefone": _get_usuario_telefone(usuario["id"], db),
                                "email": usuario.get("email", "") or ""}
-                from mod_contrato import construir_contexto as _cc, gerar_pdf_aditivo as _gpa
-                from mod_contrato import CONTRATOS_DIR as _CDIR
+                from comercial.mod_contrato import construir_contexto as _cc, gerar_pdf_aditivo as _gpa
+                from comercial.mod_contrato import CONTRATOS_DIR as _CDIR
                 # data em que o CONTRATO foi firmado = 1ª assinatura; fallback: geração
                 _ass1 = (db.query(ContratoAssinatura).filter_by(contrato_id=contrato.id)
                            .order_by(ContratoAssinatura.assinado_em.asc()).first())
@@ -10276,7 +10271,7 @@ class Handler(BaseHTTPRequestHandler):
                     _recalcular_orcamento(orc_aj, db)
                 except Exception as _e:
                     print("[ADITIVO-CLICKSIGN-ENVIAR] recálculo com forma_pagamento falhou:", _e)
-                import mod_clicksign
+                from comercial import mod_clicksign
                 from integracoes.clicksign_client import ClickSignError
                 loja_obj = db.get(Loja, loja_id)
                 cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
@@ -10332,7 +10327,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not aditivo or (aditivo.assinatura_canal or "interno") != "clicksign":
                     self.send_json({"ok": False,
                         "erro": "Este termo aditivo não está no canal ClickSign."}, code=400); return
-                import mod_clicksign
+                from comercial import mod_clicksign
                 loja_obj = db.get(Loja, loja_id)
                 cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
                 if cfg is None:
@@ -10369,7 +10364,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not aditivo or (aditivo.assinatura_canal or "interno") != "clicksign":
                     self.send_json({"ok": False,
                         "erro": "Este termo aditivo não está no canal ClickSign."}, code=400); return
-                import mod_clicksign
+                from comercial import mod_clicksign
                 from integracoes.clicksign_client import ClickSignError
                 loja_obj = db.get(Loja, loja_id)
                 cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
@@ -10414,7 +10409,7 @@ class Handler(BaseHTTPRequestHandler):
                 if aprov is not None and aprov.status == "assinado":
                     self.send_json({"ok": False, "erro": "Aprovação do PE já assinada — não pode "
                                     "ser regerada."}, code=403); return
-                import mod_documentos as _mdoc
+                from comercial import mod_documentos as _mdoc
                 if aprov is None:
                     aprov = AprovacaoPE(projeto_nome=nome, contrato_id=contrato.id, loja_id=loja_id)
                     db.add(aprov); db.flush()
@@ -10454,7 +10449,7 @@ class Handler(BaseHTTPRequestHandler):
                               for oa in db.query(OrcamentoAmbiente)
                               .filter_by(orcamento_id=contrato.orcamento_id).all()]
                 if not aprov.num_aprovacao:
-                    from mod_contrato import gerar_num_contrato as _gnc2
+                    from comercial.mod_contrato import gerar_num_contrato as _gnc2
                     _existing = [x.num_aprovacao for x in db.query(AprovacaoPE)
                                  .filter(AprovacaoPE.num_aprovacao.isnot(None)).all()]
                     aprov.num_aprovacao = _gnc2(_existing, "", prefixo="AP")
@@ -10464,8 +10459,8 @@ class Handler(BaseHTTPRequestHandler):
                 usuario_ctx = {"nome": usuario.get("nome", ""),
                                "telefone": _get_usuario_telefone(usuario["id"], db),
                                "email": usuario.get("email", "") or ""}
-                from mod_contrato import construir_contexto as _cc2, gerar_pdf_aprovacao_pe as _gpap
-                from mod_contrato import CONTRATOS_DIR as _CDIR2
+                from comercial.mod_contrato import construir_contexto as _cc2, gerar_pdf_aprovacao_pe as _gpap
+                from comercial.mod_contrato import CONTRATOS_DIR as _CDIR2
                 ctx = _cc2(cliente_dict, usuario_ctx, "", loja_dict)
                 ctx["num_contrato"] = aprov.num_aprovacao
                 ctx["_corpo_md_aprovacao"] = corpo_md
@@ -10577,7 +10572,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"ok": False,
                         "erro": "Esta Aprovação do PE já tem assinatura interna registrada — não "
                                 "é possível mudar de canal."}, code=400); return
-                import mod_clicksign
+                from comercial import mod_clicksign
                 from integracoes.clicksign_client import ClickSignError
                 loja_obj = db.get(Loja, loja_id)
                 cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
@@ -10634,7 +10629,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not aprov or (aprov.assinatura_canal or "interno") != "clicksign":
                     self.send_json({"ok": False,
                         "erro": "Esta Aprovação do PE não está no canal ClickSign."}, code=400); return
-                import mod_clicksign
+                from comercial import mod_clicksign
                 loja_obj = db.get(Loja, loja_id)
                 cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
                 if cfg is None:
@@ -10671,7 +10666,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not aprov or (aprov.assinatura_canal or "interno") != "clicksign":
                     self.send_json({"ok": False,
                         "erro": "Esta Aprovação do PE não está no canal ClickSign."}, code=400); return
-                import mod_clicksign
+                from comercial import mod_clicksign
                 from integracoes.clicksign_client import ClickSignError
                 loja_obj = db.get(Loja, loja_id)
                 cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
@@ -15358,7 +15353,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False,
                             "erro": "Este contrato já tem assinatura interna registrada — não é "
                                     "possível mudar de canal."}, code=400); return
-                    import mod_clicksign
+                    from comercial import mod_clicksign
                     from integracoes.clicksign_client import ClickSignError
                     loja_obj = db.get(Loja, loja_id)
                     cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
@@ -15435,7 +15430,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not contrato or (contrato.assinatura_canal or "interno") != "clicksign":
                         self.send_json({"ok": False,
                             "erro": "Este contrato não está no canal ClickSign."}, code=400); return
-                    import mod_clicksign
+                    from comercial import mod_clicksign
                     loja_obj = db.get(Loja, loja_id)
                     cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
                     if cfg is None:
@@ -15474,7 +15469,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not contrato or (contrato.assinatura_canal or "interno") != "clicksign":
                         self.send_json({"ok": False,
                             "erro": "Este contrato não está no canal ClickSign."}, code=400); return
-                    import mod_clicksign
+                    from comercial import mod_clicksign
                     from integracoes.clicksign_client import ClickSignError
                     loja_obj = db.get(Loja, loja_id)
                     cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
@@ -15602,9 +15597,9 @@ class Handler(BaseHTTPRequestHandler):
                     _override = req.get("signatario_override")
                     if isinstance(_override, dict) and _override.get("nome"):
                         cliente_dict = {**cliente_dict, **{k: v for k, v in _override.items() if v not in (None, "")}}
-                    from mod_contrato import construir_contexto
-                    from mod_contrato import _formatar_valor
-                    from mod_contrato import validar_cliente_para_contrato
+                    from comercial.mod_contrato import construir_contexto
+                    from comercial.mod_contrato import _formatar_valor
+                    from comercial.mod_contrato import validar_cliente_para_contrato
                     # Valida os dados que serão de fato renderizados no documento.
                     # Impede gerar contrato com endereço/contato em branco.
                     faltando = validar_cliente_para_contrato(cliente_dict)
@@ -15616,7 +15611,7 @@ class Handler(BaseHTTPRequestHandler):
                             "campos_faltando": faltando,
                         }, code=400)
                         return
-                    from mod_contrato import validar_loja_para_contrato
+                    from comercial.mod_contrato import validar_loja_para_contrato
                     loja_dict = _loja_dict_para_contrato(db, loja_id)
                     faltando_loja = validar_loja_para_contrato(loja_dict)
                     if faltando_loja and not req.get("confirmar_loja_incompleta"):
@@ -15684,7 +15679,7 @@ class Handler(BaseHTTPRequestHandler):
                         cliente_dict.get("cpf") or cliente_dict.get("cnpj") or "")
                     # Número do contrato (gerado uma vez; mantido em regerações).
                     if not contrato.num_contrato:
-                        from mod_contrato import gerar_num_contrato
+                        from comercial.mod_contrato import gerar_num_contrato
                         _existing = [c.num_contrato for c in db.query(Contrato)
                                      .filter(Contrato.num_contrato.isnot(None)).all()]
                         contrato.num_contrato = gerar_num_contrato(_existing, loja_dict.get("codigo", ""))
@@ -15698,7 +15693,7 @@ class Handler(BaseHTTPRequestHandler):
                     # aqui p/ contrato novo; já preenchido de uma geração
                     # anterior p/ regeração) para distinguir "nunca gerado"
                     # (adota e fixa o modelo ativo) de "legado" (fica no global).
-                    import mod_documentos as _mdoc
+                    from comercial import mod_documentos as _mdoc
                     variaveis["_db"] = db
                     variaveis["_modelo_versao_id"] = _mdoc.versao_para_contrato(
                         db, contrato, contrato.loja_id or loja_id)
@@ -15774,7 +15769,7 @@ class Handler(BaseHTTPRequestHandler):
                     if sol is not None and sol.status == "assinado":
                         self.send_json({"ok": False, "erro": "Solicitação de medição já "
                                         "assinada — não pode ser regerada."}, code=403); return
-                    import mod_documentos as _mdocm
+                    from comercial import mod_documentos as _mdocm
                     if sol is None:
                         sol = SolicitacaoMedicao(projeto_nome=nome_safe, loja_id=loja_id)
                         db.add(sol); db.flush()
@@ -15813,7 +15808,7 @@ class Handler(BaseHTTPRequestHandler):
                     usuario_ctx = {"nome": usuario.get("nome", ""),
                                    "telefone": _get_usuario_telefone(usuario["id"], db),
                                    "email": usuario.get("email", "") or ""}
-                    from mod_contrato import construir_contexto as _cc3, \
+                    from comercial.mod_contrato import construir_contexto as _cc3, \
                         gerar_pdf_solicitacao_medicao as _gpsm, CONTRATOS_DIR as _CDIR3
                     ctx = _cc3(cliente_dict, usuario_ctx, "", loja_dict)
                     ctx["_corpo_md_solicitacao_medicao"] = corpo_md
@@ -15918,7 +15913,7 @@ class Handler(BaseHTTPRequestHandler):
                         self.send_json({"ok": False,
                             "erro": "Esta solicitação já tem assinatura interna registrada — não "
                                     "é possível mudar de canal."}, code=400); return
-                    import mod_clicksign
+                    from comercial import mod_clicksign
                     from integracoes.clicksign_client import ClickSignError
                     loja_obj = db.get(Loja, loja_id)
                     cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
@@ -15976,7 +15971,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not sol or (sol.assinatura_canal or "interno") != "clicksign":
                         self.send_json({"ok": False,
                             "erro": "Esta solicitação de medição não está no canal ClickSign."}, code=400); return
-                    import mod_clicksign
+                    from comercial import mod_clicksign
                     loja_obj = db.get(Loja, loja_id)
                     cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
                     if cfg is None:
@@ -16013,7 +16008,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not sol or (sol.assinatura_canal or "interno") != "clicksign":
                         self.send_json({"ok": False,
                             "erro": "Esta solicitação de medição não está no canal ClickSign."}, code=400); return
-                    import mod_clicksign
+                    from comercial import mod_clicksign
                     from integracoes.clicksign_client import ClickSignError
                     loja_obj = db.get(Loja, loja_id)
                     cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
@@ -16689,7 +16684,7 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                import mod_contrato as _mc
+                from comercial import mod_contrato as _mc
                 db = get_session()
                 try:
                     loja = db.get(Loja, int(m.group(1)))
@@ -16732,7 +16727,7 @@ class Handler(BaseHTTPRequestHandler):
                 usuario = get_usuario_sessao(self)
                 if not usuario:
                     self.send_json({"ok": False, "erro": "Não autenticado"}, code=401); return
-                import mod_contrato as _mc
+                from comercial import mod_contrato as _mc
                 db = get_session()
                 try:
                     loja = db.get(Loja, int(m.group(1)))
@@ -17496,7 +17491,7 @@ class Handler(BaseHTTPRequestHandler):
                 req = json.loads(body) if body else {}
             except Exception:
                 self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
-            import mod_clicksign
+            from comercial import mod_clicksign
             amb = req.get("ambiente")
             if amb not in mod_clicksign.AMBIENTES:
                 self.send_json({"ok": False, "erro": "ambiente inválido"}, code=400); return
@@ -17526,7 +17521,7 @@ class Handler(BaseHTTPRequestHandler):
                 req = json.loads(body) if body else {}
             except Exception:
                 self.send_json({"ok": False, "erro": "JSON inválido"}, code=400); return
-            import mod_clicksign
+            from comercial import mod_clicksign
             amb = req.get("ambiente")
             if amb not in mod_clicksign.AMBIENTES:
                 self.send_json({"ok": False, "erro": "ambiente inválido"}, code=400); return
@@ -18273,9 +18268,9 @@ class Handler(BaseHTTPRequestHandler):
                     db.commit()
                     projeto_dict, cliente_dict, orcamento_dict = \
                         _montar_dados_projeto_para_contrato(nome_safe, contrato.orcamento_id, db)
-                    from mod_contrato import construir_contexto
-                    from mod_contrato import _formatar_valor
-                    from mod_contrato import validar_loja_para_contrato
+                    from comercial.mod_contrato import construir_contexto
+                    from comercial.mod_contrato import _formatar_valor
+                    from comercial.mod_contrato import validar_loja_para_contrato
                     loja_dict = _loja_dict_para_contrato(db, contrato.loja_id or loja_id)
                     faltando_loja = validar_loja_para_contrato(loja_dict)
                     if faltando_loja and not req.get("confirmar_loja_incompleta"):
@@ -18315,7 +18310,7 @@ class Handler(BaseHTTPRequestHandler):
                     # depois reproduz estas cláusulas mesmo que a loja troque o
                     # modelo. Contrato legado (já gerado, sem versão) fica no
                     # template global. (spec D6)
-                    import mod_documentos as _mdoc
+                    from comercial import mod_documentos as _mdoc
                     variaveis["_db"] = db
                     variaveis["_modelo_versao_id"] = _mdoc.versao_para_contrato(
                         db, contrato, contrato.loja_id or loja_id)
@@ -19351,7 +19346,7 @@ def _aditivo_condicoes_default(orc_aj):
 
 def _aditivo_defaults_blocos(db, nome, contrato, orc_aj):
     """(defaults_dict, calc) — os 5 textos-padrão do wizard + os números que os geraram."""
-    import mod_contrato as _mc
+    from comercial import mod_contrato as _mc
     calc = _aditivo_dados_calculo(db, nome, contrato, orc_aj)
     defaults = _mc.montar_defaults_aditivo(
         lista_integral=calc["lista_integral"], inclusoes=calc["inclusoes"],
@@ -19836,7 +19831,7 @@ def _get_usuario_telefone(usuario_id: int, db) -> str:
 def _ambientes_valor_para_contrato(orcamento_id, db):
     """Lista [(nome_exibicao, valor_com_financeiro), ...] para a seção de ambientes
     do contrato. Reusa o breakdown do motor e o rateio de mod_contrato."""
-    from mod_contrato import ambientes_valor_contrato
+    from comercial.mod_contrato import ambientes_valor_contrato
     orc = db.get(Orcamento, orcamento_id)
     if not orc:
         return []
@@ -19875,7 +19870,7 @@ def _previsoes_fases(req, n):
 def _valores_contrato_por_ambiente(orcamento_id, db):
     """({pool_ambiente_id: valor_de_contrato}, Val_Cont) — rateio do Val_Cont por ambiente (base da
     fração #5 das parcelas do desmembramento). Reusa o breakdown + mod_contrato.ambientes_valor_contrato."""
-    from mod_contrato import ambientes_valor_contrato
+    from comercial.mod_contrato import ambientes_valor_contrato
     orc = db.get(Orcamento, orcamento_id)
     if not orc:
         return {}, 0.0
@@ -20119,7 +20114,7 @@ def _liquidos_contrato_por_ambiente(orcamento_id, db):
     das comissões e da Agenda) por ambiente, proporcional ao VAVA, com o resíduo no último
     (Σ exata). Gêmeo de _valores_contrato_por_ambiente; mesma lógica de
     mod_comissao._liquidos_por_ambiente, mas com soma exata p/ congelamento (Agenda Fatia 1)."""
-    from mod_contrato import ambientes_valor_contrato
+    from comercial.mod_contrato import ambientes_valor_contrato
     orc = db.get(Orcamento, orcamento_id)
     if not orc:
         return {}, 0.0
@@ -20420,7 +20415,7 @@ def _resolver_pdf_contrato(pdf_path):
         return None
     if os.path.exists(pdf_path):
         return pdf_path
-    from mod_contrato import CONTRATOS_DIR
+    from comercial.mod_contrato import CONTRATOS_DIR
     base = os.path.basename(str(pdf_path).replace('\\', '/'))
     alt = os.path.join(CONTRATOS_DIR, base)
     return alt if os.path.exists(alt) else None
@@ -21066,7 +21061,7 @@ def _remover_staging_seguro(caminho):
     guardar_staging — gerado pelo servidor —, mas uma função com "seguro" no nome que
     não confina mente para o próximo chamador, e apagar é irreversível.
     """
-    import mod_documentos as _mdoc
+    from comercial import mod_documentos as _mdoc
     if not caminho:
         return
     try:

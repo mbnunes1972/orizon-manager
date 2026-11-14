@@ -142,7 +142,7 @@ def test_assinatura_completa_via_clicksign_constitui_as_mesmas_provisoes_do_cana
     assert aditivo_2 != aditivo_1
 
     _instalar_config_clicksign(app_db, seed["loja1_id"])
-    import mod_clicksign
+    from comercial import mod_clicksign
     fake = _FakeClickSignClient()
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
 
@@ -174,7 +174,7 @@ def test_enviar_exige_forma_pagamento(http_client_factory, seed, app_db, monkeyp
     c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
     _gerar_aditivo(c, nome)
     _instalar_config_clicksign(app_db, seed["loja1_id"])
-    import mod_clicksign
+    from comercial import mod_clicksign
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: _FakeClickSignClient())
 
     st, body = c.post(f"/api/projetos/{nome}/aditivo/clicksign/enviar", {})
@@ -191,7 +191,7 @@ def test_enviar_recusa_plano_sem_recebivel_nenhum(http_client_factory, seed, app
     c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
     _gerar_aditivo(c, nome)
     _instalar_config_clicksign(app_db, seed["loja1_id"])
-    import mod_clicksign
+    from comercial import mod_clicksign
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: _FakeClickSignClient())
 
     st, body = c.post(f"/api/projetos/{nome}/aditivo/clicksign/enviar",
@@ -221,7 +221,7 @@ def test_cpf_invalido_do_cliente_nao_completa_a_assinatura_via_clicksign(
 
     try:
         _instalar_config_clicksign(app_db, seed["loja1_id"])
-        import mod_clicksign
+        from comercial import mod_clicksign
         fake = _FakeClickSignClient()
         monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
 
@@ -257,7 +257,7 @@ def test_reenviar_convite_clicksign(http_client_factory, seed, app_db, monkeypat
     c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
     _gerar_aditivo(c, nome)
     _instalar_config_clicksign(app_db, seed["loja1_id"])
-    import mod_clicksign
+    from comercial import mod_clicksign
     fake = _FakeClickSignClient()
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     st, body = c.post(f"/api/projetos/{nome}/aditivo/clicksign/enviar",
@@ -280,7 +280,7 @@ def test_webhook_reconcilia_aditivo_como_quarto_documento(
     aditivo_id = _gerar_aditivo(c, nome)
     webhook_secret = "whs-aditivo"
     _instalar_config_clicksign(app_db, seed["loja1_id"], webhook_secret=webhook_secret)
-    import mod_clicksign
+    from comercial import mod_clicksign
     fake = _FakeClickSignClient()
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     st, body = c.post(f"/api/projetos/{nome}/aditivo/clicksign/enviar",
@@ -323,7 +323,7 @@ def test_regeracao_do_aditivo_cancela_envelope_pendente(
     _gerar_aditivo(c, nome)
 
     _instalar_config_clicksign_cancel(app_db, seed["loja1_id"])
-    import mod_clicksign
+    from comercial import mod_clicksign
     fake = _FakeCancelClient()
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     espiao = _EmailEspiao()
@@ -381,7 +381,7 @@ def test_regeracao_do_aditivo_acontece_mesmo_com_clicksign_fora_do_ar(
     _gerar_aditivo(c, nome)
 
     _instalar_config_clicksign_cancel(app_db, seed["loja1_id"])
-    import mod_clicksign
+    from comercial import mod_clicksign
     fake = _FakeCancelClient()
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     st, body = c.post(f"/api/projetos/{nome}/aditivo/clicksign/enviar",
@@ -417,7 +417,7 @@ def test_job_reconciliar_alcanca_o_aditivo_como_quarto_documento(
     aditivo_id = _gerar_aditivo(c, nome)
 
     _instalar_config_clicksign(app_db, seed["loja1_id"])
-    import mod_clicksign
+    from comercial import mod_clicksign
     fake = _FakeClickSignClient()
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     st, body = c.post(f"/api/projetos/{nome}/aditivo/clicksign/enviar",

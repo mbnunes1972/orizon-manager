@@ -1,7 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import pytest
-import mod_documentos
+from comercial import mod_documentos
 
 
 @pytest.fixture
@@ -62,7 +62,7 @@ def test_resolver_modelo_devolve_a_versao_ativa(db):
 
 def test_resolver_modelo_cai_no_global_quando_a_loja_nao_tem(db):
     """Loja sem modelo próprio continua igual a hoje — migração zero."""
-    import mod_contrato
+    from comercial import mod_contrato
     assert mod_documentos.resolver_modelo(db, 99, "contrato") == mod_contrato._carregar_md()
 
 
@@ -73,7 +73,7 @@ def test_resolver_modelo_de_proposta_sem_modelo_e_vazio(db):
 
 def test_resolver_modelo_ignora_versao_inativa(db):
     mod_documentos.criar_versao(db, 1, "contrato", "RASCUNHO", "c.docx", 1)
-    import mod_contrato
+    from comercial import mod_contrato
     assert mod_documentos.resolver_modelo(db, 1, "contrato") == mod_contrato._carregar_md()
 
 

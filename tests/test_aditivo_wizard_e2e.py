@@ -125,7 +125,7 @@ def test_aditivo_wizard_ponta_a_ponta(http_client_factory, seed, app_db):
     assert blocos["considerandos"] == editado                     # editado persistido
     assert "Adega: R$ 10.000,00" in blocos["inclusoes"]           # demais = default
     assert abs(a["dados"]["diferenca"] - 14444.44) < 0.05
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv_seed = mod_documentos.ativo_de(db, seed["loja1_id"], "termo_aditivo")
     assert mv_seed is not None                                    # seed aconteceu

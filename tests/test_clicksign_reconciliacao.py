@@ -98,7 +98,7 @@ def _post_job(client, path):
 
 
 def _enviar(app_db, seed, fake, monkeypatch, tmp_path):
-    import mod_clicksign
+    from comercial import mod_clicksign
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     db = app_db.get_session()
     try:

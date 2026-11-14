@@ -75,7 +75,7 @@ def test_aditivo_com_plano_vazio_e_recusado(app_db, seed, http_client_factory):
     st, body = c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
     assert st == 200 and body["ok"], body
 
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"
@@ -128,7 +128,7 @@ def test_aditivo_com_plano_real_materializa_recebivel_e_passa(app_db, seed, http
     assert st == 200 and body["ok"], body
     aj_id = body["orcamento"]["id"]
 
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"

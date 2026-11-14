@@ -52,7 +52,7 @@ nenhuma). **100% lacuna**, exatamente como `ARQUITETURA-MODULOS.md` já registra
   mantido só por dependência de outra função.
 
 ### Comercial — o módulo mais rico, e onde "Projetos" (papel) foi parar
-- **Backend** (pacote `comercial/` desde 14/11/2026; shims na raiz)**:** `mod_orcamento_params.py`, `mod_margens.py`, `mod_negociacao.py`,
+- **Backend** (pacote `comercial/` desde 14/11/2026)**:** `mod_orcamento_params.py`, `mod_margens.py`, `mod_negociacao.py`,
   `mod_contrato.py`, `mod_marcadores.py`, `mod_documentos.py`/`mod_documentos_import.py`,
   `mod_arvore.py`, pacote `mod_fin`, `mod_pe_comparacao.py`,
   `mod_parcelas.py`, `mod_retido.py`, `mod_medicao.py`, `mod_qualidade_xml.py`,

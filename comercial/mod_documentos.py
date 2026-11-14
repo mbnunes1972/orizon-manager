@@ -368,7 +368,7 @@ def resolver_modelo(db, loja_id, tipo):
         # mod_documentos (para resolver o corpo do contrato pela versão), fechando
         # mod_contrato → mod_documentos → mod_contrato. No topo isso quebra o import;
         # aqui dentro, não. Não promova para o topo do arquivo.
-        import mod_contrato
+        from . import mod_contrato
         return mod_contrato._carregar_md()
     return ""
 

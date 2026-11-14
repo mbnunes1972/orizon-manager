@@ -138,7 +138,8 @@ def _enviar_via_fake(app_db, seed, fake, monkeypatch, tmp_path,
                      email_loja="loja@teste.com", nome_loja="Loja 1",
                      email_cliente="cliente@teste.com", nome_cliente="Cliente L1",
                      cpf_cliente="11144477735", testemunhas=None):
-    import mod_clicksign, main
+    from comercial import mod_clicksign
+    import main
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     db = app_db.get_session()
     try:
@@ -434,7 +435,7 @@ def test_enviar_via_endpoint_erro_da_clicksign_vira_400_nao_500(
     _instalar_config_clicksign(app_db, lid)
     _limpar_contrato_anterior(app_db, seed["projeto_l1"])
     _garantir_email_do_consultor(app_db, "dir_l1")
-    import mod_clicksign
+    from comercial import mod_clicksign
     fake = _FakeClickSignClientRejeitaNome()
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     db = app_db.get_session()
@@ -465,7 +466,7 @@ def test_enviar_via_endpoint_aceita_emails_editados_no_body(
     _instalar_config_clicksign(app_db, lid)
     _limpar_contrato_anterior(app_db, seed["projeto_l1"])
     _garantir_email_do_consultor(app_db, "dir_l1")
-    import mod_clicksign
+    from comercial import mod_clicksign
     fake = _FakeClickSignClient()
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     db = app_db.get_session()
@@ -532,7 +533,8 @@ def test_cancelamento_leve_revisao_libera_canal_clicksign_e_notifica(
     escolheu "retornar para orçamento" — tentar assinar de novo ficava bloqueado com "já enviado
     pra assinatura eletrônica" (o canal ficava preso em 'clicksign' pra sempre). Também precisa
     notificar por e-mail quem já tinha recebido o convite, e tentar cancelar o envelope."""
-    import main, mod_clicksign
+    from comercial import mod_clicksign
+    import main
     lid = seed["loja1_id"]
     _instalar_config_clicksign(app_db, lid)
     _limpar_contrato_anterior(app_db, seed["projeto_l1"])
@@ -575,7 +577,8 @@ def test_cancelamento_leve_cancelar_notifica_mas_nao_libera_canal(
         app_db, seed, monkeypatch, http_client_factory, tmp_path):
     """Desfecho "cancelar" (projeto travado pra sempre): também notifica quem recebeu o convite,
     mas não precisa liberar o canal — não haverá nova tentativa de assinar."""
-    import main, mod_clicksign
+    from comercial import mod_clicksign
+    import main
     lid = seed["loja1_id"]
     _instalar_config_clicksign(app_db, lid)
     _limpar_contrato_anterior(app_db, seed["projeto_l1"])

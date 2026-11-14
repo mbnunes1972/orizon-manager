@@ -8,7 +8,7 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import pytest
-import mod_contrato
+from comercial import mod_contrato
 
 
 # ── Testes puros da função helper ─────────────────────────────────────────────

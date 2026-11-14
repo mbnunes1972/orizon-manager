@@ -132,7 +132,7 @@ def test_complemento_por_diferenca_ponta_a_ponta(http_client_factory, seed, app_
     db.close()
 
     # 5) aditivo documenta a diferença NEGOCIADA
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"
@@ -194,7 +194,7 @@ def test_aditivo_assinado_constitui_provisao_contabil(http_client_factory, seed,
     aj_id = body["orcamento"]["id"]
     assert body["orcamento"]["valor_total"] > 0
 
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"
@@ -342,7 +342,7 @@ def test_resync_ambiente_marcado_depois_da_criacao_entra_na_negociacao_e_no_adit
     db.close()
 
     # ...e no Termo Aditivo (mesma fonte: vínculos, via _negociacao_breakdown)
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"
@@ -440,7 +440,7 @@ def test_reset_pos_aditivo_assinado_cria_orcamento_novo_com_pagamento_zerado(
         {"tipo": "avista", "total_cliente": 4444.44, "entrada_valor": 1.0})
     db.commit(); db.close()
 
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"

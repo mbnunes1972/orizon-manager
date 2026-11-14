@@ -75,7 +75,7 @@ def test_put_ambiente_invalido_rejeita(http_client_factory, seed, app_db):
 
 
 def test_resolver_config_cai_pra_rede_sem_config_propria(app_db, seed):
-    import mod_clicksign
+    from comercial import mod_clicksign
     db = app_db.get_session()
     try:
         rede_id = seed["rede_id"]
@@ -102,7 +102,7 @@ def test_resolver_config_cai_pra_rede_sem_config_propria(app_db, seed):
 
 
 def test_client_de_levanta_sem_token(app_db):
-    import mod_clicksign
+    from comercial import mod_clicksign
     db = app_db.get_session()
     try:
         cfg = app_db.IntegracaoClickSign(ambiente_ativo="sandbox")

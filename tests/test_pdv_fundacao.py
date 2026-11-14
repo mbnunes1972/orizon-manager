@@ -186,7 +186,7 @@ def test_override_proprio_do_pdv_vence_a_mae(app_db, pdv):
 # ── Desvio 2 — Documentos: modelos e dados da mãe, código do PDV ─────────────
 
 def test_modelo_de_documento_vem_da_mae(app_db, pdv, seed):
-    import mod_documentos as mdoc
+    from comercial import mod_documentos as mdoc
     db = app_db.get_session()
     try:
         m = app_db.DocumentoModelo(loja_id=seed["loja1_id"], tipo="contrato",
@@ -212,7 +212,7 @@ def test_dados_do_contrato_sao_da_mae_com_codigo_do_pdv(app_db, pdv, seed):
     assert d["cidade"] == "Sao Jose dos Campos"
     assert d["codigo"] == "PRA"                        # numeração rastreia o PDV
     assert d["testemunha1_nome"] == "Testemunha PDV"   # testemunha própria do PDV vence
-    from mod_contrato import gerar_num_contrato
+    from comercial.mod_contrato import gerar_num_contrato
     assert gerar_num_contrato([], d["codigo"]).startswith("PRA")
 
 

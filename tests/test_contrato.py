@@ -2,14 +2,14 @@ import sys, os, json
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import pytest
-from mod_contrato import calcular_hash_assinatura
+from comercial.mod_contrato import calcular_hash_assinatura
 
 
 @pytest.fixture(autouse=True)
 def _isola_contratos_dir(tmp_path):
     """Isola CONTRATOS_DIR num diretório temporário para que a geração de contratos nos testes
     não escreva na pasta CONTRATOS do repositório (era a origem dos contrato_99/8888/9999.docx)."""
-    import mod_contrato
+    from comercial import mod_contrato
     orig = mod_contrato.CONTRATOS_DIR
     mod_contrato.CONTRATOS_DIR = str(tmp_path / "contratos")
     os.makedirs(mod_contrato.CONTRATOS_DIR, exist_ok=True)
@@ -36,7 +36,7 @@ def test_hash_assinatura_formato_sha256():
 
 
 def test_construir_contexto_aymore():
-    from mod_contrato import construir_contexto
+    from comercial.mod_contrato import construir_contexto
     cliente = {
         "nome": "João Silva", "cpf": "123.456.789-00",
         "email": "joao@test.com", "telefone": "12999990000",
@@ -80,7 +80,7 @@ def test_construir_contexto_aymore():
 
 
 def test_construir_contexto_cartao():
-    from mod_contrato import construir_contexto
+    from comercial.mod_contrato import construir_contexto
     cliente = {
         "nome": "Ana", "cpf": "", "email": "", "telefone": "",
         "logradouro": "", "numero": "", "complemento": "", "bairro": "",
@@ -107,7 +107,7 @@ def test_construir_contexto_cartao():
 
 
 def test_construir_contexto_total_flex():
-    from mod_contrato import construir_contexto
+    from comercial.mod_contrato import construir_contexto
     cliente = {
         "nome": "Carlos", "cpf": "", "email": "", "telefone": "",
         "logradouro": "Av B", "numero": "5", "complemento": "", "bairro": "Vila",
@@ -152,12 +152,12 @@ def _cliente_completo():
 
 
 def test_validar_cliente_completo_sem_faltas():
-    from mod_contrato import validar_cliente_para_contrato
+    from comercial.mod_contrato import validar_cliente_para_contrato
     assert validar_cliente_para_contrato(_cliente_completo()) == []
 
 
 def test_validar_cliente_sem_endereco_residencial():
-    from mod_contrato import validar_cliente_para_contrato
+    from comercial.mod_contrato import validar_cliente_para_contrato
     c = _cliente_completo()
     for campo in ("logradouro", "numero", "bairro", "cidade", "cep", "estado"):
         c[campo] = ""
@@ -170,7 +170,7 @@ def test_validar_cliente_sem_endereco_residencial():
 
 
 def test_validar_cliente_sem_contato():
-    from mod_contrato import validar_cliente_para_contrato
+    from comercial.mod_contrato import validar_cliente_para_contrato
     c = _cliente_completo()
     c["email"] = ""
     c["telefone"] = None
@@ -181,7 +181,7 @@ def test_validar_cliente_sem_contato():
 
 
 def test_validar_inst_diferente_exige_endereco_instalacao():
-    from mod_contrato import validar_cliente_para_contrato
+    from comercial.mod_contrato import validar_cliente_para_contrato
     c = _cliente_completo()
     c["inst_mesmo_residencial"] = False
     # inst_* vazios → devem ser cobrados
@@ -195,14 +195,14 @@ def test_validar_inst_diferente_exige_endereco_instalacao():
 
 
 def test_validar_inst_mesma_nao_exige_inst_fields():
-    from mod_contrato import validar_cliente_para_contrato
+    from comercial.mod_contrato import validar_cliente_para_contrato
     c = _cliente_completo()  # inst_mesmo_residencial=True, inst_* vazios
     assert validar_cliente_para_contrato(c) == []
 
 
 def test_validar_contribuinte_sem_cnpj_barra():
     """Cliente contribuinte precisa de CNPJ (CPF não substitui)."""
-    from mod_contrato import validar_cliente_para_contrato
+    from comercial.mod_contrato import validar_cliente_para_contrato
     c = _cliente_completo()
     c["tipo_dest"] = "contribuinte"
     c["cnpj"] = ""            # sem CNPJ → deve barrar
@@ -216,7 +216,7 @@ def test_validar_contribuinte_sem_cnpj_barra():
 
 def test_validar_isento_sem_cnpj_barra():
     """Cliente isento (indicador IE 2) também exige CNPJ."""
-    from mod_contrato import validar_cliente_para_contrato
+    from comercial.mod_contrato import validar_cliente_para_contrato
     c = _cliente_completo()
     c["tipo_dest"] = "isento"
     c["cnpj"] = ""
@@ -226,7 +226,7 @@ def test_validar_isento_sem_cnpj_barra():
 
 def test_validar_nao_contribuinte_sem_cpf_barra():
     """Não-contribuinte sem CPF barra (comportamento atual, mantido)."""
-    from mod_contrato import validar_cliente_para_contrato
+    from comercial.mod_contrato import validar_cliente_para_contrato
     c = _cliente_completo()
     c["tipo_dest"] = "nao_contribuinte"
     c["cpf"] = ""
@@ -236,7 +236,7 @@ def test_validar_nao_contribuinte_sem_cpf_barra():
 
 def test_validar_contribuinte_com_cnpj_sem_ie_nao_barra():
     """IE não bloqueia o contrato: contribuinte com CNPJ e sem IE passa."""
-    from mod_contrato import validar_cliente_para_contrato
+    from comercial.mod_contrato import validar_cliente_para_contrato
     c = _cliente_completo()
     c["tipo_dest"] = "contribuinte"
     c["cnpj"] = "19.152.134/0001-56"
@@ -245,7 +245,7 @@ def test_validar_contribuinte_com_cnpj_sem_ie_nao_barra():
 
 
 def test_email_fallback_consultor():
-    from mod_contrato import construir_contexto
+    from comercial.mod_contrato import construir_contexto
     cliente = {"nome": "X", "cpf": "", "email": "", "telefone": "",
                "logradouro": "", "numero": "", "complemento": "", "bairro": "",
                "cidade": "", "cep": "", "estado": "",
@@ -262,7 +262,7 @@ def test_email_fallback_consultor():
 
 def test_gerar_num_contrato_formato():
     from datetime import datetime
-    from mod_contrato import gerar_num_contrato
+    from comercial.mod_contrato import gerar_num_contrato
     # sigla (3 letras) + AAAAMMDD + 5 dígitos sequenciais
     n = gerar_num_contrato([], "INS", data=datetime(2026, 6, 17))
     assert n == "INS2026061700001"
@@ -270,7 +270,7 @@ def test_gerar_num_contrato_formato():
 
 def test_gerar_num_contrato_sequencia_continua():
     from datetime import datetime
-    from mod_contrato import gerar_num_contrato
+    from comercial.mod_contrato import gerar_num_contrato
     existentes = ["INS2026061500001", "INS2026061600002", "ORZ2026061600009"]
     n = gerar_num_contrato(existentes, "INS", data=datetime(2026, 6, 17))
     assert n == "INS2026061700003"   # contínuo por prefixo INS (ignora ORZ)
@@ -278,14 +278,14 @@ def test_gerar_num_contrato_sequencia_continua():
 
 def test_gerar_num_contrato_loja_customizada():
     from datetime import datetime
-    from mod_contrato import gerar_num_contrato
+    from comercial.mod_contrato import gerar_num_contrato
     n = gerar_num_contrato([], "ORZ", data=datetime(2026, 1, 5))
     assert n == "ORZ2026010500001"
 
 
 def test_gerar_num_contrato_ignora_formato_antigo():
     from datetime import datetime
-    from mod_contrato import gerar_num_contrato
+    from comercial.mod_contrato import gerar_num_contrato
     # números no formato antigo (com traços) não contaminam o novo sequencial
     n = gerar_num_contrato(["INS-2026-06-15-050"], "INS", data=datetime(2026, 6, 17))
     assert n == "INS2026061700001"
@@ -293,14 +293,14 @@ def test_gerar_num_contrato_ignora_formato_antigo():
 
 def test_gerar_num_proposta_prefixo_pv():
     from datetime import datetime
-    from mod_contrato import gerar_num_proposta
+    from comercial.mod_contrato import gerar_num_proposta
     assert gerar_num_proposta([], data=datetime(2026, 6, 17)) == "PV2026061700001"
     # a data é sempre a da emissão; só o SEQ continua (contínuo por 'PV')
     assert gerar_num_proposta(["PV2026061500007"], data=datetime(2026, 6, 17)) == "PV2026061700008"
 
 
 def test_proposta_html_e_capa_do_contrato_com_pv():
-    from mod_contrato import construir_contexto, montar_html_proposta
+    from comercial.mod_contrato import construir_contexto, montar_html_proposta
     cliente = {"nome": "Fulano", "cpf": "111.111.111-11", "logradouro": "Rua X",
                "numero": "10", "cidade": "São Paulo", "estado": "SP"}
     ctx = construir_contexto(cliente, {"nome": "Consultor"}, "", {"nome": "Loja", "codigo": "INS"})
@@ -317,7 +317,7 @@ def test_proposta_html_e_capa_do_contrato_com_pv():
 # ── Valores das parcelas ───────────────────────────────────────────────────────
 
 def test_parse_pagamento_valores_alinhados():
-    from mod_contrato import _parse_pagamento
+    from comercial.mod_contrato import _parse_pagamento
     pag = json.dumps({
         "tipo": "aymore", "nome_forma": "Aymoré",
         "parcelas": [
@@ -334,7 +334,7 @@ def test_parse_pagamento_valores_alinhados():
 
 
 def test_parse_pagamento_cartao_sem_valores():
-    from mod_contrato import _parse_pagamento
+    from comercial.mod_contrato import _parse_pagamento
     d = _parse_pagamento(json.dumps({"tipo": "cartao", "nome_forma": "Cartão"}))
     assert d["valores"] == [""] * 24
     assert d["num_parcelas_int"] == 0
@@ -342,7 +342,7 @@ def test_parse_pagamento_cartao_sem_valores():
 
 def test_parse_pagamento_estrutura_real():
     import json
-    from mod_contrato import _parse_pagamento
+    from comercial.mod_contrato import _parse_pagamento
     pag = json.dumps({
         "tipo": "aymore", "nome_forma": "Financiamento Aymoré",
         "entrada_valor": 20000, "entrada_data": "2026-06-18", "entrada_forma": "pix",
@@ -365,7 +365,7 @@ def test_parse_pagamento_estrutura_real():
 
 def test_parse_pagamento_cartao_texto():
     import json
-    from mod_contrato import _parse_pagamento
+    from comercial.mod_contrato import _parse_pagamento
     d = _parse_pagamento(json.dumps({
         "tipo": "cartao", "nome_forma": "Cartão de Crédito",
         "texto_cartao": "12x R$ 10.000,00", "total_cliente": 120000, "parcelas": []}))
@@ -377,7 +377,7 @@ def test_parse_pagamento_cartao_texto():
 
 def test_parse_pagamento_cartao_avista_num_parcelas():
     import json
-    from mod_contrato import _parse_pagamento
+    from comercial.mod_contrato import _parse_pagamento
     d = _parse_pagamento(json.dumps({"tipo": "cartao", "nome_forma": "Cartão de Crédito",
         "total_cliente": 5000, "parcelas": [{"num": 1, "valor": 5000, "data": ""}]}))
     assert d["num_parcelas"] == "à vista"
@@ -386,7 +386,7 @@ def test_parse_pagamento_cartao_avista_num_parcelas():
 
 def test_parse_pagamento_cartao_parcelado_num_parcelas_e_datas_vazias():
     import json
-    from mod_contrato import _parse_pagamento
+    from comercial.mod_contrato import _parse_pagamento
     d = _parse_pagamento(json.dumps({"tipo": "cartao", "nome_forma": "Cartão de Crédito",
         "total_cliente": 12000, "parcelas": [{"num": i+1, "valor": 1000, "data": ""} for i in range(12)]}))
     assert d["num_parcelas"] == "12"
@@ -397,7 +397,7 @@ def test_parse_pagamento_cartao_parcelado_num_parcelas_e_datas_vazias():
 # ── Forma de pagamento: rótulos pt-BR + forma_parcela + marcador TIPO ──────────
 
 def test_forma_label_mapeia_codigos():
-    from mod_contrato import _forma_label
+    from comercial.mod_contrato import _forma_label
     assert _forma_label("pix") == "Pix"
     assert _forma_label("ted") == "TED"
     assert _forma_label("transferencia") == "TED"
@@ -411,7 +411,7 @@ def test_forma_label_mapeia_codigos():
 
 def test_parse_pagamento_forma_parcela_de_parcelas():
     import json
-    from mod_contrato import _parse_pagamento
+    from comercial.mod_contrato import _parse_pagamento
     pag = json.dumps({
         "tipo": "venda_programada", "nome_forma": "Venda Programada",
         "entrada_valor": 1000, "entrada_forma": "pix", "total_cliente": 5000,
@@ -427,7 +427,7 @@ def test_parse_pagamento_forma_parcela_de_parcelas():
 
 def test_parse_pagamento_forma_parcela_cartao():
     import json
-    from mod_contrato import _parse_pagamento
+    from comercial.mod_contrato import _parse_pagamento
     d = _parse_pagamento(json.dumps({
         "tipo": "cartao", "nome_forma": "Cartão de Crédito",
         "texto_cartao": "12x R$ 10.000,00", "total_cliente": 120000, "parcelas": []}))
@@ -435,7 +435,7 @@ def test_parse_pagamento_forma_parcela_cartao():
 
 
 def test_montar_mapping_inclui_tipo():
-    from mod_contrato import _montar_mapping
+    from comercial.mod_contrato import _montar_mapping
     ctx = {}
     pag = {"forma_parcela": "Boleto", "entrada_tipo": "Pix", "num_parcelas": "3"}
     m = _montar_mapping(ctx, pag)
@@ -448,7 +448,7 @@ def test_montar_mapping_inclui_empresa_e_cpfs():
     razao_social/cnpj_fiscal (Emitente) -- `nome`/`cnpj` da loja (Nome Fantasia) NÃO alimentam
     mais esses marcadores. `loja["nome"]` aqui é DIFERENTE do valor esperado de propósito, pra
     travar que ninguém reverta a leitura sem entender por quê."""
-    from mod_contrato import _montar_mapping
+    from comercial.mod_contrato import _montar_mapping
     loja = {"nome": "Dalmóbile SJC", "cnpj": "48.346.497/0001-20",
             "razao_social": "INSPIRIUM MOVEIS LTDA", "cnpj_fiscal": "19.152.134/0001-56",
             "testemunha1_nome": "Jaime", "testemunha1_cpf": "123.456.789-00",
@@ -467,7 +467,7 @@ def test_montar_mapping_inclui_empresa_e_cpfs():
 # ── Valor por ambiente no contrato (rateio do financeiro) ──────────────────────
 
 def test_ambientes_valor_proporcional_ao_vava():
-    from mod_contrato import ambientes_valor_contrato
+    from comercial.mod_contrato import ambientes_valor_contrato
     out = ambientes_valor_contrato([("Cozinha", 100.0), ("Sala", 300.0)],
                                    vavo=400.0, val_cont=440.0)
     assert out == [("Cozinha", 110.0), ("Sala", 330.0)]
@@ -475,7 +475,7 @@ def test_ambientes_valor_proporcional_ao_vava():
 
 
 def test_ambientes_reconciliacao_residuo_no_ultimo():
-    from mod_contrato import ambientes_valor_contrato
+    from comercial.mod_contrato import ambientes_valor_contrato
     out = ambientes_valor_contrato(
         [("A", 33.33), ("B", 33.33), ("C", 33.34)], vavo=100.0, val_cont=100.01)
     assert round(sum(v for _, v in out), 2) == 100.01
@@ -485,18 +485,18 @@ def test_ambientes_reconciliacao_residuo_no_ultimo():
 
 
 def test_ambientes_sem_financeiro_valor_igual_vava():
-    from mod_contrato import ambientes_valor_contrato
+    from comercial.mod_contrato import ambientes_valor_contrato
     out = ambientes_valor_contrato([("A", 100.0), ("B", 300.0)],
                                    vavo=400.0, val_cont=400.0)
     assert out == [("A", 100.0), ("B", 300.0)]
 
 
 def test_ambientes_vavo_zero_nao_divide():
-    from mod_contrato import ambientes_valor_contrato
+    from comercial.mod_contrato import ambientes_valor_contrato
     out = ambientes_valor_contrato([("A", 0.0), ("B", 0.0)], vavo=0.0, val_cont=0.0)
     assert out == [("A", 0.0), ("B", 0.0)]
 
 
 def test_ambientes_lista_vazia():
-    from mod_contrato import ambientes_valor_contrato
+    from comercial.mod_contrato import ambientes_valor_contrato
     assert ambientes_valor_contrato([], vavo=0.0, val_cont=0.0) == []

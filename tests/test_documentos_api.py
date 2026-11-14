@@ -122,7 +122,7 @@ def test_modelos_get_escopado_e_pode_gerir_reflete_perfil(http_client_factory):
 
 
 def test_tenancy_loja_a_nao_ve_modelo_da_loja_b(app_db, seed, http_client_factory):
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     try:
         v = mod_documentos.criar_versao(
@@ -155,7 +155,7 @@ def test_importar_sem_capacidade_403(app_db, seed, http_client_factory, monkeypa
     asserções nada trava isso — bastaria alguém mover o guardar_staging para cima do gate
     para um operador sem permissão passar a escrever no disco da loja, e o teste seguiria verde.
     """
-    import mod_documentos
+    from comercial import mod_documentos
     docs_dir = str(tmp_path / "docs_403")
     monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", docs_dir)
     db = app_db.get_session()
@@ -212,7 +212,7 @@ def test_importar_md_valido_devolve_corpo_e_nao_cria_versao(app_db, seed, http_c
 def test_importar_falha_de_conversao_remove_o_staging(seed, http_client_factory, monkeypatch, tmp_path):
     """normalizar() falhando (não FormatoNaoSuportado) tem que limpar o staging."""
     from comercial import mod_documentos_import
-    import mod_documentos
+    from comercial import mod_documentos
     docs_dir = str(tmp_path / "docs_falha")
     monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", docs_dir)
     monkeypatch.setattr(mod_documentos_import, "normalizar",
@@ -231,7 +231,7 @@ def test_importar_falha_de_conversao_remove_o_staging(seed, http_client_factory,
 
 
 def test_importar_corpo_vazio_remove_o_staging(seed, http_client_factory, monkeypatch, tmp_path):
-    import mod_documentos
+    from comercial import mod_documentos
     docs_dir = str(tmp_path / "docs_vazio")
     monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", docs_dir)
 
@@ -404,7 +404,7 @@ def test_staging_vetor_hostil_nao_promove_nada(app_db, seed, http_client_factory
     O contrato é: não resolveu -> segue SEM trilha de origem (origem_path None), 200.
     A versão vale sem o original; o que não pode é tocar arquivo de fora.
     """
-    import mod_documentos
+    from comercial import mod_documentos
     docs_dir = str(tmp_path / ("docs_" + str(abs(hash(vetor)))))
     monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", docs_dir)
 
@@ -447,7 +447,7 @@ def test_staging_legitimo_continua_sendo_promovido(app_db, seed, http_client_fac
     O nome que o importar devolve TEM que continuar promovendo o original para v<N>/ —
     senão a trilha de auditoria (origem_path/origem_sha256) morreria em silêncio.
     """
-    import mod_documentos
+    from comercial import mod_documentos
     monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", str(tmp_path / "docs_feliz"))
 
     c = _login(http_client_factory, "dir_l1")
@@ -484,7 +484,7 @@ def test_falha_de_io_ao_promover_nao_derruba_conexao_nem_duplica_versao(
     criaria uma DUPLICADA — a armadilha que o próprio criar_versao documenta. O certo é
     recuperar a linha, ativar e avisar.
     """
-    import mod_documentos
+    from comercial import mod_documentos
     monkeypatch.setattr(mod_documentos, "DOCS_LOJA_DIR", str(tmp_path / "docs_io"))
 
     # app_db/seed são module-scoped: as versões acumulam entre os testes deste arquivo.
@@ -609,7 +609,7 @@ def test_usar_padrao_seguido_de_ativar_cria_versao_sem_origem(app_db, seed, http
 def test_modelos_padrao_arquivos_tem_forma_de_tipo_valida():
     """Todo .md em modelos_documentos_padrao/ (exceto README) precisa nomear um tipo que
     o backend reconheça — senão o arquivo existe mas nunca aparece em nenhuma tela."""
-    import mod_documentos
+    from comercial import mod_documentos
     for nome in os.listdir(mod_documentos.MODELOS_PADRAO_DIR):
         if not nome.endswith(".md") or nome == "README.md":
             continue

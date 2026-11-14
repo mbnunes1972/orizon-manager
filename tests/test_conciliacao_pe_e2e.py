@@ -547,7 +547,7 @@ def test_aditivo_por_parcela_nao_pega_o_complemento_errado(http_client_factory, 
     orc_fase_id = body_fase["orcamento"]["id"]
     assert orc_fase_id != orc_legado_id
 
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"
@@ -581,7 +581,7 @@ def test_aditivo_da_fase_assinatura_completa_constitui_provisao(http_client_fact
     st, body = c.post(f"/api/projetos/{nome}/pe/complemento/fase/{parcela_id}", {})
     assert st == 200 and body["ok"], body
 
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"

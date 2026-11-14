@@ -140,7 +140,8 @@ def _enviar_via_fake(app_db, aprov_id, fake, monkeypatch,
                      email_loja="loja@teste.com", nome_loja="Loja 1",
                      email_cliente="cliente@teste.com", nome_cliente="Cliente L1",
                      cpf_cliente="11144477735"):
-    import mod_clicksign, main
+    from comercial import mod_clicksign
+    import main
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     db = app_db.get_session()
     try:
@@ -300,7 +301,7 @@ def test_enviar_via_endpoint_explicito(app_db, seed, monkeypatch, http_client_fa
     _limpar_aprovacao_anterior(app_db, seed["projeto_l1"])
     _criar_aprovacao(app_db, seed, tmp_path)
     fake = _FakeClickSignClient()
-    import mod_clicksign
+    from comercial import mod_clicksign
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     c = _login(http_client_factory, "dir_l1")
     st, b = c.post(f"/api/projetos/{seed['projeto_l1']}/aprovacao-pe/clicksign/enviar",

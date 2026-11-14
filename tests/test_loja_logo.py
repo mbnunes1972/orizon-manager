@@ -21,7 +21,7 @@ PNG_FAKE = b"\x89PNG\r\n\x1a\nconteudo fake de teste, nao precisa ser um PNG rea
 
 @pytest.fixture
 def logos_dir(monkeypatch, tmp_path):
-    import mod_contrato
+    from comercial import mod_contrato
     d = str(tmp_path / "logos_loja")
     monkeypatch.setattr(mod_contrato, "LOGOS_LOJA_DIR", d)
     return d
@@ -106,7 +106,7 @@ def test_remover_logo_volta_para_padrao(app_db, seed, http_client_factory, logos
 
 
 def test_gerar_pdf_contrato_usa_logo_da_loja_quando_definido(app_db, seed, http_client_factory, logos_dir):
-    import mod_contrato
+    from comercial import mod_contrato
     import tempfile
 
     c = _login(http_client_factory, "dir_l1")
@@ -133,7 +133,7 @@ def test_gerar_pdf_contrato_usa_logo_da_loja_quando_definido(app_db, seed, http_
 
 
 def test_gerar_pdf_sem_logo_cai_no_padrao(logos_dir):
-    import mod_contrato
+    from comercial import mod_contrato
     html = mod_contrato._html_capa(
         {"loja": {"id": 1}, "_ambientes": [], "_pag": {}, "num_contrato": "X", "data_contrato": "1"})
     assert 'src="logo_dalmobile.png"' in html

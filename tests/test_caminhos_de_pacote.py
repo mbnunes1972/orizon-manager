@@ -79,7 +79,7 @@ def test_caminhos_do_comercial_apontam_para_a_raiz():
     mod_contrato.py e mod_documentos.py. Um dirname a menos depois do empacotamento e: o contrato
     sai sem cláusulas, contratos assinados e logos dão 404, e uploads novos vão para comercial/…
     — tudo em silêncio, com o resto da suíte verde (ROTEIRO_EMPACOTAR_COMERCIAL.md, seção 2)."""
-    import mod_contrato, mod_documentos
+    from comercial import mod_contrato, mod_documentos
     for rotulo, caminho, esperado in [
         ("CONTRATOS_DIR",         mod_contrato.CONTRATOS_DIR,         RAIZ / "CONTRATOS"),
         ("CONTRATO_TEMPLATE_DIR", mod_contrato.CONTRATO_TEMPLATE_DIR, RAIZ / "contrato_template"),
@@ -94,7 +94,7 @@ def test_caminhos_do_comercial_apontam_para_a_raiz():
 def test_template_de_contrato_tem_clausulas():
     """O sintoma real do bug de caminho: _carregar_md engole arquivo ausente como "" e o contrato
     sai sem nenhuma cláusula. Confere que o contrato.md é achado onde o código procura."""
-    import mod_contrato
+    from comercial import mod_contrato
     md = os.path.join(mod_contrato.CONTRATO_TEMPLATE_DIR, "contrato.md")
     assert os.path.isfile(md), "contrato.md não encontrado em %s" % md
     assert os.path.getsize(md) > 1000, "contrato.md suspeito de vazio/truncado (%d bytes)" % os.path.getsize(md)

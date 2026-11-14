@@ -34,7 +34,7 @@ def test_assinatura_sem_forma_pagamento_recusa_com_mensagem_clara(app_db, seed, 
     st, body = c.post(f"/api/projetos/{nome}/pe/complemento/orcamento", {})
     assert st == 200 and body["ok"], body
 
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"
@@ -97,7 +97,7 @@ def test_recebivel_do_aditivo_existe_e_nao_mexe_nos_do_contrato(app_db, seed, ht
     assert st == 200 and body["ok"], body
     aj_id = body["orcamento"]["id"]
 
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"
@@ -149,7 +149,7 @@ def test_custo_financeiro_do_aditivo_antes_e_depois_da_forma_de_pagamento(app_db
     antes_cust_fin = db.get(app_db.Orcamento, aj_id).cust_fin or 0.0
     db.close()
 
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"

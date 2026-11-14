@@ -1,7 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from comercial import mod_marcadores
-import mod_contrato
+from comercial import mod_contrato
 
 
 def _mapping_real():

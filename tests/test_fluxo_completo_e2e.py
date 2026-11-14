@@ -22,7 +22,7 @@ import pytest
 def contratos_dir(tmp_path):
     """Redireciona CONTRATOS_DIR para um temp (hermético) — a geração real escreve o .pdf ali,
     sem poluir a pasta CONTRATOS do repo. Restaura no teardown."""
-    import mod_contrato
+    from comercial import mod_contrato
     orig = mod_contrato.CONTRATOS_DIR
     mod_contrato.CONTRATOS_DIR = str(tmp_path / "contratos")
     os.makedirs(mod_contrato.CONTRATOS_DIR, exist_ok=True)
@@ -230,7 +230,7 @@ def test_contrato_real_geracao_e_assinatura(app_db, seed, projetos_dir, contrato
     with open(_pdf, "rb") as _f:
         assert _f.read(5) == b"%PDF-"
     assert len(_ctxs) == 1
-    from mod_contrato import _montar_html_contrato
+    from comercial.mod_contrato import _montar_html_contrato
     _html = _montar_html_contrato(_ctxs[0])
     assert "4. Ambientes do Projeto" in _html
     assert "5. Forma de Pagamento" in _html

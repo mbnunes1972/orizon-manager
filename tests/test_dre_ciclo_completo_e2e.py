@@ -200,7 +200,7 @@ def _gravar_relatorio(retratos, path):
 
 @pytest.fixture
 def contratos_dir(tmp_path):
-    import mod_contrato
+    from comercial import mod_contrato
     orig = mod_contrato.CONTRATOS_DIR
     mod_contrato.CONTRATOS_DIR = str(tmp_path / "contratos")
     os.makedirs(mod_contrato.CONTRATOS_DIR, exist_ok=True)
@@ -297,7 +297,7 @@ def test_ciclo_completo_tres_visoes_dre(app_db, seed, projetos_dir, contratos_di
     aditivo_valor = b["orcamento"]["valor_total"]
     assert aditivo_valor > 0, "cenário precisa de diferença > 0 no complemento pra exercitar o aditivo"
 
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     try:
         mv = mod_documentos.criar_versao(db, loja_id, "termo_aditivo",

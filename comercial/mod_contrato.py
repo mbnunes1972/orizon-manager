@@ -857,7 +857,7 @@ def _resolver_corpo_contrato(ctx):
     db = ctx.get("_db")
     if db is None:
         return _carregar_md()
-    import mod_documentos
+    from . import mod_documentos
     if "_modelo_versao_id" in ctx:
         versao_id = ctx["_modelo_versao_id"]
         if versao_id:
@@ -1029,7 +1029,7 @@ def _resolver_corpo_proposta(ctx):
     loja_id = (ctx.get("loja") or {}).get("id")
     if db is None or not loja_id:
         return ""
-    import mod_documentos    # local: mod_documentos importa mod_contrato (ciclo)
+    from . import mod_documentos    # local: mod_documentos importa mod_contrato (ciclo)
     return mod_documentos.resolver_modelo(db, loja_id, "proposta")
 
 

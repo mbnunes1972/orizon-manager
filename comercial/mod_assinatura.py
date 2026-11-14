@@ -114,7 +114,7 @@ def enviar_para_clicksign(doc, cfg, *, titulo, nome_arquivo, pdf_path, erro_pdf_
         raise ValueError("E-mail da loja e do cliente são obrigatórios para assinatura eletrônica (ClickSign).")
     if not pdf_path or not os.path.exists(pdf_path):
         raise ValueError(erro_pdf_ausente)
-    import mod_clicksign
+    from . import mod_clicksign
     cli = mod_clicksign.client_de(cfg)
     with open(pdf_path, "rb") as f:
         pdf_bytes = f.read()
@@ -155,7 +155,7 @@ def reconciliar_clicksign(db, doc, cfg, *, nome_doc, registrar_assinatura):
     parte, nome, cpf, ip_origem) — quem chama já fecha os parâmetros extras que só o próprio
     documento sabe (ex.: `loja_id` do Contrato) antes de passar pra cá. CPF inválido vindo de
     fora não trava a reconciliação dos outros signatários — só loga (ACHADO-28)."""
-    import mod_clicksign
+    from . import mod_clicksign
     cli = mod_clicksign.client_de(cfg)
     dados = cli.consultar_envelope(doc.clicksign_envelope_id)
     envelope_fechado = (dados.get("data") or {}).get("attributes", {}).get("status") == "closed"
@@ -222,7 +222,7 @@ def cancelar_e_notificar_clicksign(db, doc, loja_id, status_final, *,
                     status_final, parte, email, doc.id, _e)
     if doc.clicksign_envelope_id:
         try:
-            import mod_clicksign
+            from . import mod_clicksign
             loja_obj = db.get(Loja, loja_id)
             cfg = mod_clicksign.resolver_config(db, loja_obj) if loja_obj else None
             if cfg is not None:

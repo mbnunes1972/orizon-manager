@@ -81,7 +81,7 @@ def _upsert_compl(app_db, nome, pid, venda, cfo=30000.0):
 
 
 def _criar_modelo_aditivo(app_db, seed, loja_id=None):
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     mv = mod_documentos.criar_versao(db, loja_id or seed["loja1_id"], "termo_aditivo",
                                      "# TERMO ADITIVO [NUM_ADITIVO]\n1. [AMBIENTES_COMPLEMENTO]\n"

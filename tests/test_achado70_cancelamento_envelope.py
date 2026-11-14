@@ -117,7 +117,8 @@ def _instalar_modelo_aprovacao_pe(app_db, loja_id):
 
 def _criar_aprovacao_enviada(app_db, seed, monkeypatch, tmp_path):
     """AprovacaoPE já no canal ClickSign — devolve (aprov_id, fake, envelope_id)."""
-    import mod_clicksign, main
+    from comercial import mod_clicksign
+    import main
     db = app_db.get_session()
     try:
         pdf = tmp_path / "aprovacao_pe.pdf"
@@ -189,7 +190,8 @@ def test_cancelar_chamado_duas_vezes_nao_explode(app_db, seed, monkeypatch, tmp_
     """Propriedade 2 (metade 'já cancelado'): chamar a função de cancelamento duas vezes seguidas
     sobre o MESMO objeto (envelope já cancelado da primeira vez) não pode levantar nada — direto
     na função, sem depender de o call site já resetar o canal antes da 2ª chamada."""
-    import mod_clicksign, main
+    from comercial import mod_clicksign
+    import main
     lid = seed["loja1_id"]
     _instalar_config_clicksign(app_db, lid)
     _limpar_aprovacao_anterior(app_db, seed["projeto_l1"])
@@ -206,7 +208,7 @@ def test_cancelar_chamado_duas_vezes_nao_explode(app_db, seed, monkeypatch, tmp_
 
 def test_reprovacao_acontece_mesmo_com_clicksign_fora_do_ar(app_db, seed, monkeypatch, http_client_factory, tmp_path):
     """Propriedade 3: ClickSign indisponível não pode impedir a reprovação em si."""
-    import mod_clicksign
+    from comercial import mod_clicksign
     lid = seed["loja1_id"]
     _instalar_config_clicksign(app_db, lid)
     _limpar_aprovacao_anterior(app_db, seed["projeto_l1"])
@@ -284,7 +286,8 @@ def _preparar_contrato_assinado(app_db, seed):
 
 
 def _criar_solicitacao_enviada(app_db, seed, monkeypatch, tmp_path):
-    import mod_clicksign, main
+    from comercial import mod_clicksign
+    import main
     db = app_db.get_session()
     try:
         pdf = tmp_path / "solicitacao_medicao.pdf"
@@ -348,7 +351,7 @@ def test_regeracao_da_solicitacao_acontece_mesmo_com_clicksign_fora_do_ar(
         app_db, seed, monkeypatch, http_client_factory, tmp_path):
     """Propriedade 3 pra Solicitação de Medição: ClickSign fora do ar não pode impedir a
     regeração do documento."""
-    import mod_clicksign
+    from comercial import mod_clicksign
     lid = seed["loja1_id"]
     _instalar_config_clicksign(app_db, lid)
     _limpar_solicitacao_anterior(app_db, seed["projeto_l1"])

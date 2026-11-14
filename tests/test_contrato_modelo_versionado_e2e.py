@@ -60,7 +60,7 @@ def captura_html(monkeypatch):
     """Intercepta mod_contrato._montar_html_contrato: deixa a lógica real rodar (é
     exatamente o que resolve qual corpo usar) e só grava o HTML produzido, evitando
     ter que dar parse em PDF para verificar qual cláusula foi renderizada."""
-    import mod_contrato
+    from comercial import mod_contrato
     capturas = []
     original = mod_contrato._montar_html_contrato
 
@@ -81,7 +81,7 @@ def test_post_contrato_novo_fixa_o_modelo_ativo_da_loja(
     faria contrato.gerado_em não ser mais None no momento em que versao_para_contrato
     olhasse — e o contrato NUNCA adotaria o modelo. Provar que modelo_versao_id fica
     fixado depois de um POST real é a prova de que a reordenação funcionou."""
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     try:
         v1 = mod_documentos.criar_versao(
@@ -145,7 +145,7 @@ def test_patch_contrato_regenera_e_reproduz_a_versao_fixada(
     anterior já ter fixado modelo_versao_id=v1 no contrato (mesmo módulo, fixtures
     compartilhadas). A loja troca de modelo (v2 ativo) e o PATCH tem que continuar
     reproduzindo v1 — a garantia jurídica da frente, agora provada no call site 2."""
-    import mod_documentos
+    from comercial import mod_documentos
     db = app_db.get_session()
     try:
         v2 = mod_documentos.criar_versao(
@@ -198,8 +198,8 @@ def test_patch_contrato_legado_regenera_no_template_global(
     através do call site 2 real, com dados verdadeiros da Loja 2."""
     import json as _json
     from datetime import datetime
-    import mod_documentos
-    import mod_contrato
+    from comercial import mod_documentos
+    from comercial import mod_contrato
 
     db = app_db.get_session()
     try:

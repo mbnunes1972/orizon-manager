@@ -10,7 +10,7 @@ import mod_contabil as mc
 @pytest.fixture
 def contratos_dir(tmp_path):
     """Redireciona CONTRATOS_DIR para um temp (hermético) — igual test_fluxo_completo_e2e.py."""
-    import mod_contrato
+    from comercial import mod_contrato
     orig = mod_contrato.CONTRATOS_DIR
     mod_contrato.CONTRATOS_DIR = str(tmp_path / "contratos")
     os.makedirs(mod_contrato.CONTRATOS_DIR, exist_ok=True)

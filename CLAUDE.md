@@ -18,9 +18,8 @@ A maioria dos módulos ainda é `.py` na **raiz**, classificados por domínio em
 módulos já viraram **pacote**: `fiscal/`, `integracoes/`, `auth/`, `chat/` (desde 31/07, com os shims
 `mod_chat.py`/`mod_chat_externo.py` na raiz), `expedicao/`, `assistencias/`, `folha/`, `cadastro/` e
 `ciclo/` (desde 13/11, já sem shim: importe `from folha import mod_folha`,
-`from cadastro import validacao_doc`, `from ciclo import mod_ciclo`) e `comercial/` (desde 14/11;
-**ainda com 3 shims** na raiz — `mod_contrato`, `mod_documentos`, `mod_clicksign`; em código novo,
-importe já `from comercial import mod_contrato`) (+ o `mod_fin/` antigo, que segue na raiz). Ao empacotar, o padrão é
+`from cadastro import validacao_doc`, `from ciclo import mod_ciclo`) e `comercial/` (desde 14/11,
+já sem shim: `from comercial import mod_contrato`) (+ o `mod_fin/` antigo, que segue na raiz). Ao empacotar, o padrão é
 **mover deixando shim na raiz e, logo depois, aposentar o shim** trocando os imports pelo pacote.
 Enquanto existir, **todo shim é importado no topo do `main.py`** (corrida de import entre threads —
 `test_shims_sao_importados_no_topo_do_main`), devolve o mesmo objeto do módulo real

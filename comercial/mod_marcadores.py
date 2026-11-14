@@ -119,7 +119,7 @@ import re as _re
 
 # Reusa o regex do motor de substituição — se divergirem, a análise validaria
 # um marcador que o renderizador não reconhece (ou o contrário).
-from mod_contrato import _MARK_RE
+from .mod_contrato import _MARK_RE
 
 # Sem estes, o documento sai quebrado: cliente sem nome, contrato sem data,
 # fecho sem testemunha. O wizard avisa; não bloqueia (pode ser um modelo parcial).

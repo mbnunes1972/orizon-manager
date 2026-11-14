@@ -216,9 +216,7 @@ def test_shim_e_o_mesmo_objeto_do_modulo_real():
 # reprova; quem aposenta usos baixa o número no mesmo commit; shim que chega a zero é apagado e
 # sai daqui. Medido em 13/11/2026, depois de aposentar os shims da Onda A (expedicao, assistencias,
 # folha). Plano de organização, Fase 6 (feita aos pedaços, junto de cada onda).
-TETO_IMPORTS_POR_SHIM = {"mod_chat": 103, "mod_chat_externo": 69,
-                         # Fase 4 — comercial: restam os 3 maiores (2ª parte da aposentadoria).
-                         "mod_clicksign": 45, "mod_contrato": 119, "mod_documentos": 48}
+TETO_IMPORTS_POR_SHIM = {"mod_chat": 103, "mod_chat_externo": 69}
 # Ponto cego desta contagem: `__import__("mod_x")` / `importlib.import_module("mod_x")` com o nome
 # como TEXTO não é import para o ast. Ao aposentar um shim, procure também por isso (foi o caso de
 # `__import__("mod_ciclo")` em tests/test_conciliacao_pe_e2e.py, na Onda B).

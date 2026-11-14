@@ -24,7 +24,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 
 import pytest
 
-import mod_contrato
+from comercial import mod_contrato
 
 
 # ── Servidor de prova: registra qualquer requisição que o renderizador emitir ───

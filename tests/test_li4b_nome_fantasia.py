@@ -42,7 +42,7 @@ def test_razao_social_exibida_em_modo_leitura_com_link_para_fiscal():
 # ── backend: contrato lê do Emitente, não mais de lojas.nome/cnpj ─────────────────────────────
 
 def test_montar_mapping_nome_empresa_vem_de_razao_social():
-    from mod_contrato import _montar_mapping
+    from comercial.mod_contrato import _montar_mapping
     loja = {"nome": "Nome Fantasia Qualquer", "cnpj": "00.000.000/0001-00",
            "razao_social": "RAZAO SOCIAL DE VERDADE LTDA", "cnpj_fiscal": "11.111.111/0001-11"}
     m = _montar_mapping({"loja": loja}, {})
@@ -54,7 +54,7 @@ def test_montar_mapping_nome_empresa_vem_de_razao_social():
 
 
 def test_validar_loja_para_contrato_exige_razao_social_e_cnpj_fiscal():
-    from mod_contrato import validar_loja_para_contrato
+    from comercial.mod_contrato import validar_loja_para_contrato
     loja = {"nome": "Fantasia", "cnpj": "00.000.000/0001-00", "codigo": "ABC",
            "telefone": "x", "email": "x", "cep": "x", "logradouro": "x", "numero": "x",
            "bairro": "x", "cidade": "x", "estado": "x",

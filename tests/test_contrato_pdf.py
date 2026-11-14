@@ -10,7 +10,7 @@ def test_markdown_disponivel():
 
 
 def test_subst_marcadores_html_substitui_e_mantem_desconhecido():
-    from mod_contrato import _substituir_marcadores_html
+    from comercial.mod_contrato import _substituir_marcadores_html
     html = "<p>Nome: [NOME_CLIENTE] — Falta: [NAO_EXISTE]</p>"
     out = _substituir_marcadores_html(html, {"NOME_CLIENTE": "Ana Paula"})
     assert "Ana Paula" in out
@@ -19,14 +19,14 @@ def test_subst_marcadores_html_substitui_e_mantem_desconhecido():
 
 
 def test_subst_marcadores_html_case_e_duplo_colchete():
-    from mod_contrato import _substituir_marcadores_html
+    from comercial.mod_contrato import _substituir_marcadores_html
     out = _substituir_marcadores_html("N:[Num_Contrato] D:[[Data_Contrato]",
                                       {"NUM_CONTRATO": "INS-1", "DATA_CONTRATO": "02/07/2026"})
     assert "INS-1" in out and "02/07/2026" in out and "[" not in out
 
 
 def test_html_ambientes_linhas_par_e_impar():
-    from mod_contrato import _html_ambientes_linhas, _TRACO
+    from comercial.mod_contrato import _html_ambientes_linhas, _TRACO
     html = _html_ambientes_linhas([("Cozinha", 20000.0), ("Sala", 12000.0), ("Closet", 6000.0)])
     assert html.count("<tr") == 2                      # ceil(3/2)=2 linhas
     assert "Cozinha" in html and "R$ 20.000,00" in html
@@ -36,13 +36,13 @@ def test_html_ambientes_linhas_par_e_impar():
 
 
 def test_html_ambientes_linhas_vazio():
-    from mod_contrato import _html_ambientes_linhas, _TRACO
+    from comercial.mod_contrato import _html_ambientes_linhas, _TRACO
     html = _html_ambientes_linhas([])
     assert html.count("<tr") == 1 and html.count(_TRACO) == 4
 
 
 def test_html_parcelas_linhas_elimina_vazias_e_tracos():
-    from mod_contrato import _html_parcelas_linhas, _TRACO
+    from comercial.mod_contrato import _html_parcelas_linhas, _TRACO
     pag = {"tipo": "aymore", "num_parcelas_int": 4,
            "valores": ["R$ 4.000,00"] * 4 + [""] * 20,
            "datas": ["10/08/2026", "10/09/2026", "10/10/2026", "10/11/2026"] + [""] * 20}
@@ -53,7 +53,7 @@ def test_html_parcelas_linhas_elimina_vazias_e_tracos():
 
 
 def test_html_parcelas_linhas_cartao_sem_data():
-    from mod_contrato import _html_parcelas_linhas
+    from comercial.mod_contrato import _html_parcelas_linhas
     pag = {"tipo": "cartao", "num_parcelas_int": 3,
            "valores": ["R$ 100,00"] * 3 + [""] * 21, "datas": [""] * 24}
     html = _html_parcelas_linhas(pag)
@@ -61,7 +61,7 @@ def test_html_parcelas_linhas_cartao_sem_data():
 
 
 def test_nivel_clausula():
-    from mod_contrato import _nivel_clausula
+    from comercial.mod_contrato import _nivel_clausula
     assert _nivel_clausula("2. Após a assinatura...") == 1
     assert _nivel_clausula("2.3. A execução...") == 2
     assert _nivel_clausula("2.3.1. O Termo...") == 3
@@ -70,7 +70,7 @@ def test_nivel_clausula():
 
 
 def test_html_corpo_aplica_classe_por_nivel():
-    from mod_contrato import _html_corpo
+    from comercial.mod_contrato import _html_corpo
     md = "# CLÁUSULA PRIMEIRA\n\n1. Item um.\n\n1.1. Sub item.\n\na) alinea.\n"
     html = _html_corpo(md)
     assert "<h1" in html
@@ -82,7 +82,7 @@ def test_html_corpo_aplica_classe_por_nivel():
 
 def test_assets_template_existem():
     import os
-    from mod_contrato import CONTRATO_TEMPLATE_DIR
+    from comercial.mod_contrato import CONTRATO_TEMPLATE_DIR
     for f in ("contrato.css", "contrato.html", "logo_dalmobile.png"):
         assert os.path.exists(os.path.join(CONTRATO_TEMPLATE_DIR, f)), f
     shell = open(os.path.join(CONTRATO_TEMPLATE_DIR, "contrato.html"), encoding="utf-8").read()
@@ -91,7 +91,7 @@ def test_assets_template_existem():
 
 def test_montar_html_contrato_substitui_e_inclui_secoes():
     import json
-    from mod_contrato import construir_contexto, _montar_html_contrato
+    from comercial.mod_contrato import construir_contexto, _montar_html_contrato
     loja = {"nome": "L", "cnpj": "1", "codigo": "INS",
             "testemunha1_nome": "J", "testemunha1_cpf": "1",
             "testemunha2_nome": "F", "testemunha2_cpf": "2"}
@@ -118,7 +118,7 @@ def test_montar_html_contrato_substitui_e_inclui_secoes():
 @skip_sem_weasy
 def test_gerar_pdf_contrato_gera_pdf(tmp_path):
     import json, os
-    from mod_contrato import gerar_pdf_contrato, construir_contexto
+    from comercial.mod_contrato import gerar_pdf_contrato, construir_contexto
     loja = {"nome": "L", "cnpj": "1", "codigo": "INS",
             "testemunha1_nome": "J", "testemunha1_cpf": "1",
             "testemunha2_nome": "F", "testemunha2_cpf": "2"}
@@ -140,13 +140,13 @@ def test_gerar_pdf_contrato_gera_pdf(tmp_path):
 # ── Refinamentos de capa/corpo (Task 8) ──────────────────────────────────────
 
 def test_html_corpo_linha_assinatura_ganha_classe():
-    from mod_contrato import _html_corpo
+    from comercial.mod_contrato import _html_corpo
     h = _html_corpo("________________________\n[NOME_EMPRESA]\n")
     assert 'class="assinatura"' in h
 
 
 def test_mapping_rede_identificador_fallback_cidade():
-    from mod_contrato import _montar_mapping
+    from comercial.mod_contrato import _montar_mapping
     m = _montar_mapping({"loja": {"cidade": "São José dos Campos"}}, {})
     assert m["REDE_IDENTIFICADOR"] == "São José dos Campos"
     m2 = _montar_mapping({"loja": {"cidade": "X"}, "rede_identificador": "Rede Y"}, {})
@@ -154,7 +154,7 @@ def test_mapping_rede_identificador_fallback_cidade():
 
 
 def test_html_capa_inclui_consultor_e_rede_e_num_dir():
-    from mod_contrato import _html_capa
+    from comercial.mod_contrato import _html_capa
     h = _html_capa({"_ambientes": [], "_pag": {}})
     assert "Consultor:" in h and "[CONSULTOR_NOME]" in h
     assert "cab-rede" in h and "[REDE_IDENTIFICADOR]" in h
@@ -164,14 +164,14 @@ def test_html_capa_inclui_consultor_e_rede_e_num_dir():
 # ── Fixes da revisão final (escape, underscores, nível) ──────────────────────
 
 def test_inline_md_preserva_underscores():
-    from mod_contrato import _inline_md
+    from comercial.mod_contrato import _inline_md
     out = _inline_md("(nome do representante) __________, CPF nº __________.")
     assert "__________" in out
     assert "<em>" not in out and "<strong>" not in out
 
 
 def test_montar_html_escapa_valores_e_adendo_multilinha():
-    from mod_contrato import _montar_html_contrato
+    from comercial.mod_contrato import _montar_html_contrato
     ctx = {"_pag": {}, "_ambientes": [], "loja": {"cidade": "X"},
            "cliente_nome": "A & B <script>", "adendo": "Linha 1 < & >\nLinha 2"}
     html = _montar_html_contrato(ctx)
@@ -182,7 +182,7 @@ def test_montar_html_escapa_valores_e_adendo_multilinha():
 
 
 def test_html_corpo_clausula_4niveis_nao_vira_alinea():
-    from mod_contrato import _html_corpo
+    from comercial.mod_contrato import _html_corpo
     h = _html_corpo("2.3.4.1. Texto de subcláusula.\na) alinea de verdade.\n")
     assert 'class="cl-3"' in h                         # 4º nível numérico usa cl-3
     assert 'class="cl-alinea"' in h                    # a) continua alínea

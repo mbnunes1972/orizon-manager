@@ -151,7 +151,8 @@ def _enviar_via_fake(app_db, sol_id, fake, monkeypatch,
                      email_loja="loja@teste.com", nome_loja="Loja 1",
                      email_cliente="cliente@teste.com", nome_cliente="Cliente L1",
                      cpf_cliente="11144477735"):
-    import mod_clicksign, main
+    from comercial import mod_clicksign
+    import main
     monkeypatch.setattr(mod_clicksign, "client_de", lambda cfg: fake)
     db = app_db.get_session()
     try:
